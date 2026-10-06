@@ -544,7 +544,7 @@ def check_windows_lifecycle() -> None:
     uninstall = read("installer/uninstall.ps1")
     for required_text in [
         "payload manifest.json",
-        "Get-FileHash",
+        "function Get-Sha256File",
         "secrets_config.py",
         "credentials",
         "logs",
@@ -596,8 +596,12 @@ def check_windows_lifecycle() -> None:
         "NexoFlow-Setup.log",
         "Stop-InstalledNexoFlowProcesses",
         "taskkill.exe",
-        "function Remove-InstallDirectory",
-        "$attempt -le 12",
+        "function Remove-DirectoryWithRetry",
+        "function Stage-ExistingInstall",
+        "function Restore-PreviousInstall",
+        "$attempt -le $Attempts",
+        "Ensure-Administrator",
+        "-Verb RunAs",
     ]:
         if required_text not in install:
             fail(f"Setup 1.0 não contém a proteção/diagnóstico obrigatório: {required_text}")
@@ -611,7 +615,7 @@ def check_windows_lifecycle() -> None:
         "function Ensure-InstalledPayloadFile",
         "Write-Step 'Validando componentes instalados'",
         "Restaurando a partir do payload validado",
-        "Get-FileHash -LiteralPath $target -Algorithm SHA256",
+        "Get-Sha256File -Path $target",
         "installer\\uninstall.ps1",
         "desinstalar_nexoflow.cmd",
         "Verifique antivírus/EDR e tente novamente",
@@ -623,7 +627,8 @@ def check_windows_lifecycle() -> None:
     for required_text in [
         "function Install-OptionalUninstaller",
         "NexoFlow Uninstall.exe",
-        "A instalação continuará normalmente",
+        "OptionalUninstallerValidated",
+        "Como ele e opcional, o Setup continuara normalmente",
         "Where-Object { $_.Name -notin @('payload manifest.json','NexoFlow Uninstall.exe') }",
     ]:
         if required_text not in install:

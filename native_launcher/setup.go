@@ -17,12 +17,19 @@ func main() {
     if !requireFile(script) { os.Exit(2) }
 
     // Necessário enquanto o script PowerShell puder estar sem Authenticode.
-    rc = runChild(powershellPath(), "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script)
+    args := []string{"-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script}
+    nonInteractive := os.Getenv("NEXOFLOW_SETUP_NONINTERACTIVE") == "1"
+    if nonInteractive {
+        args = append(args, "-NonInteractive")
+    }
+    rc = runChild(powershellPath(), args...)
     if rc != 0 {
         fmt.Printf("\n[ERRO] O NexoFlow Setup foi encerrado com o codigo %d.\n", rc)
-        fmt.Println("A janela permanecera aberta para que a causa possa ser lida.")
         fmt.Println("Consulte tambem o log: %TEMP%\\NexoFlow-Setup.log")
-        waitEnter()
+        if !nonInteractive {
+            fmt.Println("A janela permanecera aberta para que a causa possa ser lida.")
+            waitEnter()
+        }
     }
     os.Exit(rc)
 }

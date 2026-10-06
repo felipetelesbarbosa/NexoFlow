@@ -2,6 +2,18 @@
 
 ## 1.0 — Release consolidada
 
+### Estabilidade do Setup
+
+- Setup validado em Windows com primeira instalação e atualização real;
+- atualização com rollback automático para a instalação anterior em caso de falha;
+- elevação UAC automática quando necessária;
+- modo não interativo para smoke tests e automação;
+- `NexoFlow Uninstall.exe` realmente opcional inclusive na validação de integridade do payload;
+- cenário de antivírus/EDR removendo o Uninstall opcional coberto por smoke test;
+- preservação de `secrets_config.py`, `credentials` e `logs` verificada em atualização;
+- publicação da Release v1.0 bloqueada se testes, auditoria, build ou smoke test falharem.
+
+
 ### Pedidos e status na Weni
 
 - `ultimo_pedido` é a fonte prioritária para ID, data, produtos, quantidades e valores;

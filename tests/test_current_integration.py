@@ -545,8 +545,12 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn("NexoFlow-Setup.log", install)
         self.assertIn("Stop-InstalledNexoFlowProcesses", install)
         self.assertIn("taskkill.exe", install)
-        self.assertIn("function Remove-InstallDirectory", install)
-        self.assertIn("$attempt -le 12", install)
+        self.assertIn("function Remove-DirectoryWithRetry", install)
+        self.assertIn("function Stage-ExistingInstall", install)
+        self.assertIn("function Restore-PreviousInstall", install)
+        self.assertIn("$attempt -le $Attempts", install)
+        self.assertIn("Ensure-Administrator", install)
+        self.assertIn("-Verb RunAs", install)
 
     def test_windows_uninstaller_is_script_based_and_self_elevates(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -572,7 +576,7 @@ class CurrentIntegrationTests(unittest.TestCase):
         install = (root / "installer" / "install.ps1").read_text(encoding="utf-8-sig")
         self.assertIn("function Ensure-InstalledPayloadFile", install)
         self.assertIn("Write-Step 'Validando componentes instalados'", install)
-        self.assertIn("Get-FileHash -LiteralPath $target -Algorithm SHA256", install)
+        self.assertIn("Get-Sha256File -Path $target", install)
         self.assertIn("Restaurando a partir do payload validado", install)
         for name in (
             "NexoFlow Analytics.exe",
@@ -598,7 +602,7 @@ class CurrentIntegrationTests(unittest.TestCase):
             self.assertIn(value, install)
             self.assertIn(value, uninstall)
         self.assertIn("payload manifest.json", install)
-        self.assertIn("Get-FileHash", install)
+        self.assertIn("function Get-Sha256File", install)
         self.assertIn("CurrentVersion\\Uninstall\\NexoFlow", install)
         self.assertIn("NexoFlow Analytics.lnk", install)
         # O fluxo atual aceita Python 3.11+ e inclui o instalador 3.14.8 como
