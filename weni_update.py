@@ -696,7 +696,8 @@ def _apply_purchase_candidate(
     reason = "pedido resolvido e validado; somente cancelados ficam fora da compra"
 
     status_label = farmalider_order_status_name(order.get("farmalider_status_pedido"))
-    if not status_label and is_order_cancelled(order):
+    if is_order_cancelled(order):
+        # Cancelamento explícito sempre prevalece sobre qualquer código operacional.
         status_label = "Cancelado"
 
     order_fields_to_write: dict[str, Any] = {
