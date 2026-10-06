@@ -637,7 +637,7 @@ class WeniUpdateTests(unittest.TestCase):
                     applied_contact, farm, captured_at="2026-10-03T13:01:00Z",
                 )
                 self.assertTrue(second.order_validated)
-                self.assertEqual(second.purchase_confirmed, status == 2)
+                self.assertEqual(second.purchase_confirmed, active)
                 self.assertEqual(second.fields, {})
                 self.assertEqual(second.evidence, {})
 
