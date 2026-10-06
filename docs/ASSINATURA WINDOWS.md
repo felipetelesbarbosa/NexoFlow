@@ -8,7 +8,7 @@ Não é recomendado desativar SmartScreen, UAC ou outras proteções para contor
 
 ## Forma recomendada
 
-Assine a release NexoFlow 1.0 com um certificado de assinatura de código:
+Assine os executáveis do NexoFlow 1.0 com um certificado de assinatura de código:
 
 - certificado OV/EV de uma autoridade certificadora confiável; ou
 - certificado corporativo cuja cadeia seja distribuída como confiável nas máquinas da organização por TI/GPO/Intune.
@@ -28,7 +28,7 @@ Os executáveis e scripts PowerShell podem receber assinatura Authenticode. Use 
 
 ## Script preparado
 
-A pasta de release contém `Assinar Release.ps1`. O script:
+O pacote do NexoFlow 1.0 contém `Assinar Release.ps1`. O script:
 
 1. localiza o certificado pelo thumbprint;
 2. assina os executáveis do payload;
@@ -39,7 +39,7 @@ A pasta de release contém `Assinar Release.ps1`. O script:
 
 Nenhuma chave privada ou certificado é incluído no projeto.
 
-## Estado da release NexoFlow 1.0
+## Estado do NexoFlow 1.0
 
 - executáveis PE32+ x64 nativos;
 - VERSIONINFO configurado como 1.0.0.0, representação de quatro componentes usada pelo Windows;
@@ -47,7 +47,7 @@ Nenhuma chave privada ou certificado é incluído no projeto.
 - sem tokens ou senhas embutidos;
 - launchers sem `system()`;
 - integridade SHA-256 do payload do instalador;
-- hashes SHA-256 externos publicados junto à release;
+- hashes SHA-256 externos publicados junto ao NexoFlow 1.0;
 - `ExecutionPolicy Bypass` restrito ao entrypoint local do Setup quando o script ainda não estiver assinado.
 
 Essas medidas melhoram transparência e integridade, mas não substituem uma assinatura Authenticode confiável para reputação do Windows.

@@ -125,7 +125,7 @@ Copy-Item -LiteralPath (Join-Path $RepoRoot "prerequisites\python-3.14.8-amd64.e
 $readme = @"
 NexoFlow $Version - SETUP
 
-Este pacote mantem a versao publica NexoFlow $Version.
+Este pacote corresponde ao NexoFlow $Version.
 
 Extraia TODO o ZIP antes de executar.
 Depois execute: NexoFlow Setup.exe
@@ -197,38 +197,28 @@ $shaLines = @(
 $releaseNotes = @"
 # NexoFlow $Version
 
-## Setup 1.0 - ESTAVEL
+Distribuicao oficial do **NexoFlow 1.0**.
 
-A versao do produto continua NexoFlow 1.0. Nao houve alteracao para 1.1.
+O arquivo `NexoFlow-Setup-$Version.zip` contem o instalador do NexoFlow 1.0 e foi validado automaticamente em Windows para primeira instalacao e atualizacao de uma instalacao existente.
 
-O arquivo NexoFlow-Setup-$Version.zip contem o Setup atual e foi submetido a
-validacao automatizada em Windows, incluindo primeira instalacao, atualizacao
-sobre uma instalacao existente, preservacao de dados privados, execucao do
-check-up instalado e simulacao de antivirus/EDR removendo o launcher opcional
-NexoFlow Uninstall.exe.
-
-Estabilidade do Setup:
+Principais garantias do Setup:
 - elevacao UAC automatica quando necessaria;
-- atualizacao com rollback automatico para a instalacao anterior se a nova falhar;
-- NexoFlow Uninstall.exe realmente opcional inclusive na validacao do manifesto;
-- modo nao interativo para validacao automatizada;
+- rollback automatico se uma atualizacao falhar;
+- NexoFlow Uninstall.exe opcional;
 - integridade SHA-256 dos componentes obrigatorios;
 - preservacao de secrets_config.py, credentials e logs em atualizacoes.
 
 Downloads:
-- NexoFlow-Setup-$Version.zip - instalador validado;
-- NexoFlow-$Version.zip - projeto completo correspondente ao mesmo codigo;
+- NexoFlow-Setup-$Version.zip - instalador do NexoFlow 1.0;
+- NexoFlow-$Version.zip - projeto completo do NexoFlow 1.0;
 - SHA256SUMS-$Version.txt - hashes SHA-256.
 
-Regras atuais de pedidos:
-- ultimo_pedido e a fonte prioritaria de ID, data, produtos, quantidades e valores;
-- no Caminho 1 a API consulta somente o mesmo pedido_id para confirmar o status;
-- pedido_status recebe Em processamento, Em transito, Concluido, Cancelado ou Pronto para rota;
-- pedidos 0, 1, 2 e 4 contam como pedido feito;
-- somente Cancelado fica fora;
-- pedidos abertos sao rechecados ate Concluido ou Cancelado.
-
-A versao publica, CLI, documentacao e metadados do produto permanecem 1.0.
+Recursos incluidos:
+- NexoFlow Analytics;
+- NexoFlow Weni;
+- NexoFlow Terminal;
+- integracao Weni, FarmaLider, Google Sheets e Looker Studio;
+- tratamento de pedidos, status, LGPD, canais e atribuicao de anuncios.
 "@
 [IO.File]::WriteAllText((Join-Path $DistDir "release-notes.md"), $releaseNotes, (New-Object Text.UTF8Encoding($false)))
 

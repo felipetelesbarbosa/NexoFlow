@@ -16,7 +16,7 @@ O NexoFlow é executado em Windows x64 e utiliza **Python 3.11 ou superior, 64 b
 
 ### Camada BI / Looker Studio
 
-Após instalar por cima da versão anterior, execute `check-up.bat`, `testar_conexoes.bat` e uma vez `executar_carga_completa.bat`. A carga completa cria/preenche `BI_Resumo_Diario`, `BI_Canais`, `BI_Conversao`, `BI_Vendas`, `BI_Ads` e `BI_Status`, além de completar `Base_Contatos` com todos os contatos Weni. Depois disso, volte ao fluxo incremental normal.
+Após instalar sobre uma instalação existente, execute `check-up.bat`, `testar_conexoes.bat` e uma vez `executar_carga_completa.bat`. A carga completa cria/preenche `BI_Resumo_Diario`, `BI_Canais`, `BI_Conversao`, `BI_Vendas`, `BI_Ads` e `BI_Status`, além de completar `Base_Contatos` com todos os contatos Weni. Depois disso, volte ao fluxo incremental normal.
 
 ### Otimizações de desempenho
 
@@ -158,7 +158,7 @@ Feche janelas de terminal, Explorador de Arquivos ou editores que estejam aberto
 
 Os executáveis não contêm credenciais. No NexoFlow 1.0, os launchers deixaram de usar `system()`, receberam informações formais de versão no PE e os scripts reduziram uso desnecessário de shell/processos genéricos. O desinstalador não encerra terminais `cmd.exe`/PowerShell genéricos e não executa Stage2 oculto.
 
-Essas medidas reduzem padrões comuns de falso positivo, mas um binário novo e sem reputação ainda pode ser alertado ou colocado em quarentena. Não desative SmartScreen, UAC ou antivírus para contornar isso. A medida mais importante para distribuição corporativa é assinar a release com Authenticode usando o certificado real da empresa.
+Essas medidas reduzem padrões comuns de falso positivo, mas um binário novo e sem reputação ainda pode ser alertado ou colocado em quarentena. Não desative SmartScreen, UAC ou antivírus para contornar isso. A medida mais importante para distribuição corporativa é assinar os executáveis com Authenticode usando o certificado real da empresa.
 
 ## Revisão humana da carga completa
 Na primeira carga/backfill, execute `atualizar_weni_carga_completa.bat`. Antes do apply, o NexoFlow gera e abre `logs\weni_update_review_full.txt`. Revise especialmente LGPD, idade/maioridade, entradas/saídas dos grupos Opt-In LGPD e Opt-Out LGPD e campos de pedido.
@@ -168,4 +168,4 @@ A confirmação exigida é `CARGA COMPLETA REVISADA`. No NexoFlow 1.0, depois de
 
 ## Ícone do NexoFlow Weni
 
-No NexoFlow 1.0, a atualização força o Windows Explorer a invalidar/recarregar o cache de ícones após instalar `NexoFlow Weni.exe`. O executável usa internamente `assets\NexoFlow_Weni.ico`, e o instalador também atualiza o timestamp do arquivo para impedir reaproveitamento visual da versão anterior.
+No NexoFlow 1.0, a atualização força o Windows Explorer a invalidar/recarregar o cache de ícones após instalar `NexoFlow Weni.exe`. O executável usa internamente `assets\NexoFlow_Weni.ico`, e o instalador também atualiza o timestamp do arquivo para impedir reaproveitamento visual de um ícone antigo.

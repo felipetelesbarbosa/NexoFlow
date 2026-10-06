@@ -10,7 +10,7 @@ O NexoFlow 1.0 foi empacotado para reduzir padrões que costumam gerar falsos po
 - processos filhos iniciados por `CreateProcessW`/`os/exec`, sem `system()`;
 - scripts e fontes incluídos no projeto completo para auditoria;
 - payload do Setup validado por SHA-256 antes da instalação;
-- suporte a assinatura Authenticode da release quando houver certificado adequado.
+- suporte a assinatura Authenticode dos executáveis quando houver certificado adequado.
 
 ## Componentes
 
@@ -26,6 +26,6 @@ O NexoFlow não tenta desativar ou contornar antivírus/EDR. Caso uma política 
 
 O Update Weni mantém revisão humana na carga completa, snapshot congelado, controle de concorrência por contato, checkpoint seguro e logs de auditoria. O Analytics mantém timeout/retry controlado para serviços externos e não amplia permissões de API além das credenciais configuradas pelo operador.
 
-## Release atual
+## NexoFlow 1.0
 
 Toda a distribuição deve ser identificada como **NexoFlow 1.0**. Os executáveis Windows usam `1.0.0.0` somente no recurso VERSIONINFO, formato de quatro componentes do Windows.

@@ -160,7 +160,7 @@ O mutex `Local\NexoFlowOperationLock` impede Analytics, NexoFlow Weni, instalaç
 
 A rotina de write-back fica separada da sincronização analítica. `contact_enrichment.py` extrai apenas evidências conservadoras; `weni_update.py` monta e audita planos; `weni_client.py` concentra os endpoints. Nenhum novo campo pode ser escrito sem entrar em `ALLOWED_WRITE_FIELDS` e nos testes de auditoria.
 
-Antes de release, valide especialmente que `audit_plans(plans)` aparece antes de `update_contact_fields`, que o checkpoint vem depois das escritas e que o dry-run não executa POST.
+Antes de publicar o NexoFlow 1.0, valide especialmente que `audit_plans(plans)` aparece antes de `update_contact_fields`, que o checkpoint vem depois das escritas e que o dry-run não executa POST.
 
 ## Assinatura
 
