@@ -797,7 +797,7 @@ class WeniUpdateTests(unittest.TestCase):
                     self.assertEqual(farm.get_cliente_by_cpf.call_count, 2)
                     self.assertEqual(farm.get_pedido.call_count, 2)
 
-    def test_populated_raw_preserves_confirmed_same_order_snapshot_without_api(self) -> None:
+    def test_populated_raw_rechecks_same_order_status_without_cpf_lookup(self) -> None:
         contact = self._purchase_contact(include_raw=False)
         farm = self._purchase_api()
         first = self._purchase_plan(contact, farm)
@@ -811,7 +811,7 @@ class WeniUpdateTests(unittest.TestCase):
         self.assertEqual(second.fields, {})
         self.assertEqual(second.evidence, {})
         farm.get_cliente_by_cpf.assert_not_called()
-        farm.get_pedido.assert_not_called()
+        farm.get_pedido.assert_called_once_with("123")
         audit_plans([second], opt_out_group_available=True)
 
     def test_api_freight_preserves_original_weni_difference_on_idempotent_rerun(self) -> None:
