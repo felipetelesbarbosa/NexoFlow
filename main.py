@@ -1,0 +1,1017 @@
+from __future__ import annotations
+
+import logging
+import os
+import sys
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from typing import Any
+
+import secrets_config as secrets
+from analytics import (
+    build_bi_ads_rows,
+    build_bi_channel_records,
+    build_bi_conversion_records,
+    build_bi_sales_rows,
+    build_bi_summary_record,
+    build_daily_metrics,
+    build_sales_metrics,
+    is_relevant_contact,
+    is_valid_cpf,
+    normalize_contact,
+    normalize_cpf,
+    parse_ultimo_pedido,
+)
+from config import (
+    FARMALIDER_BATCH_ERROR_ABORT_MIN_ERRORS,
+    FARMALIDER_BATCH_ERROR_ABORT_RATE,
+    FARMALIDER_BATCH_SIZE,
+    FARMALIDER_CACHE_CONFIRMED_HOURS,
+    FARMALIDER_CACHE_NOT_FOUND_HOURS,
+    FARMALIDER_MAX_WORKERS,
+    FARMALIDER_PARALLEL_MIN_CPFS,
+    FARMALIDER_REQUEST_DELAY_SECONDS,
+    SYNC_OVERLAP_MINUTES,
+)
+from farmalider_client import (
+    FarmaliderAuthError,
+    FarmaliderClient,
+    FarmaliderError,
+)
+from farmalider_integration import (
+    apply_pedido_api_confirmation,
+    cliente_link_status,
+)
+from google_sheets import GoogleSheetsStore
+from logging_config import configure_logging
+from weni_client import WeniClient
+
+Contact = dict[str, Any]
+Row = dict[str, str]
+ClienteResult = tuple[str, str, str]
+
+TOKEN_PLACEHOLDER = "COLE_SEU_TOKEN_WENI_AQUI"
+FARMALIDER_TOKEN_PLACEHOLDER = "COLE_SEU_TOKEN_FARMALIDER_AQUI"
+SHEET_PLACEHOLDER = "COLE_O_ID_DA_PLANILHA_GOOGLE_AQUI"
+APP_VERSION = "1.0"
+
+
+@dataclass(frozen=True)
+class FarmaliderSettings:
+    enabled: bool
+    token: str
+    use_hml: bool
+
+
+@dataclass
+class ClienteValidationStats:
+    unique_queries: int = 0
+    cache_reused: int = 0
+    confirmed: int = 0
+    not_found: int = 0
+    invalid: int = 0
+    api_errors: int = 0
+    http_requests: int = 0
+    retries: int = 0
+    rate_limits: int = 0
+    server_errors: int = 0
+    network_errors: int = 0
+    slow_requests: int = 0
+    average_response_ms: float = 0.0
+    p95_response_ms: float = 0.0
+    max_response_ms: float = 0.0
+    effective_delay_ms: float = 0.0
+    elapsed_seconds: float = 0.0
+
+
+@dataclass
+class OrderStats:
+    parse_errors: int = 0
+    confirmed_api: int = 0
+    api_errors: int = 0
+
+
+def validate_configuration() -> None:
+    weni_token = str(getattr(secrets, "WENI_API_TOKEN", "")).strip()
+    spreadsheet_id = str(
+        getattr(secrets, "GOOGLE_SPREADSHEET_ID", "")
+    ).strip()
+
+    if not weni_token or weni_token == TOKEN_PLACEHOLDER:
+        raise RuntimeError(
+            "Cole o token da Weni em secrets_config.py antes de executar."
+        )
+    if not spreadsheet_id or spreadsheet_id == SHEET_PLACEHOLDER:
+        raise RuntimeError(
+            "Cole o ID da planilha Google em secrets_config.py antes de executar."
+        )
+
+
+def load_farmalider_settings() -> FarmaliderSettings:
+    token = str(getattr(secrets, "FARMALIDER_API_TOKEN", "")).strip()
+    if token == FARMALIDER_TOKEN_PLACEHOLDER:
+        token = ""
+
+    return FarmaliderSettings(
+        enabled=bool(getattr(secrets, "FARMALIDER_API_ENABLED", True)),
+        token=token,
+        use_hml=bool(getattr(secrets, "FARMALIDER_USE_HML", False)),
+    )
+
+
+def parse_control_datetime(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def utc_iso(dt: datetime) -> str:
+    return dt.astimezone(timezone.utc).isoformat(timespec="seconds")
+
+
+def contact_has_cpf(contact: Contact) -> bool:
+    fields = contact.get("fields")
+    if not isinstance(fields, dict):
+        return False
+    return bool(normalize_cpf(fields.get("cpf")))
+
+
+def split_contacts(
+    contacts: list[Contact],
+) -> tuple[list[Contact], list[Contact], list[Contact]]:
+    """Separa contatos relevantes/com CPF e mantém toda a base para o Analytics/BI."""
+    relevant: list[Contact] = []
+    with_cpf: list[Contact] = []
+
+    for contact in contacts:
+        if is_relevant_contact(contact):
+            relevant.append(contact)
+        if contact_has_cpf(contact):
+            with_cpf.append(contact)
+
+    # Desde o NexoFlow 1.0 o Analytics preserva todos os contatos retornados pela Weni.
+    # A validação FarmaLíder continua consultando somente CPFs válidos e pedidos
+    # continuam sendo processados apenas para contatos relevantes.
+    return relevant, with_cpf, list(contacts)
+
+
+def _format_duration(seconds: float) -> str:
+    seconds = max(0, int(round(seconds)))
+    minutes, sec = divmod(seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+
+    if hours:
+        return f"{hours}h{minutes:02d}m"
+    if minutes:
+        return f"{minutes}m{sec:02d}s"
+    return f"{sec}s"
+
+
+def _format_ms_as_seconds(milliseconds: float) -> str:
+    """Formata latência interna em ms para exibição legível em segundos."""
+    return f"{max(0.0, milliseconds) / 1000:.2f}s"
+
+
+def _query_cliente(
+    cpf: str,
+    farm_client: FarmaliderClient,
+) -> ClienteResult:
+    try:
+        api_cliente = farm_client.get_cliente_by_cpf(cpf)
+        return cliente_link_status(cpf, api_cliente)
+    except FarmaliderAuthError:
+        raise
+    except FarmaliderError:
+        # O erro individual vira status. Se a taxa de falha do lote subir
+        # demais, validate_contacts interrompe a carga antes de gravar.
+        return "ERRO_API", "", ""
+
+
+def _apply_cliente_result(
+    row: Row,
+    result: ClienteResult,
+) -> None:
+    status, cliente_id, cliente_nome = result
+    row["farmalider_cliente_status"] = status
+    row["farmalider_cliente_id"] = cliente_id
+    row["farmalider_cliente_nome"] = cliente_nome
+
+
+def _parse_iso_datetime(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    except ValueError:
+        return None
+
+
+def _reusable_farmalider_result(
+    row: Row,
+    existing: Row | None,
+    *,
+    now: datetime,
+) -> ClienteResult | None:
+    if not existing:
+        return None
+    cpf = normalize_cpf(row.get("cpf", ""))
+    existing_cpf = normalize_cpf(existing.get("cpf_normalizado") or existing.get("cpf", ""))
+    if not cpf or cpf != existing_cpf:
+        return None
+
+    status = str(existing.get("farmalider_cliente_status") or "").strip()
+    if status not in {"CPF_CONFIRMADO", "CPF_DIVERGENTE_API", "CPF_NAO_ENCONTRADO"}:
+        return None
+    consulted = _parse_iso_datetime(
+        str(existing.get("farmalider_cliente_consultado_em") or "")
+    )
+    if consulted is None:
+        return None
+    max_hours = (
+        FARMALIDER_CACHE_NOT_FOUND_HOURS
+        if status == "CPF_NAO_ENCONTRADO"
+        else FARMALIDER_CACHE_CONFIRMED_HOURS
+    )
+    if (now - consulted).total_seconds() > max(0, float(max_hours)) * 3600:
+        return None
+    return (
+        status,
+        str(existing.get("farmalider_cliente_id") or ""),
+        str(existing.get("farmalider_cliente_nome") or ""),
+    )
+
+
+def validate_contacts(
+    rows: list[Row],
+    *,
+    farm_client: FarmaliderClient | None,
+    farm_settings: FarmaliderSettings,
+    sync_time: str,
+    existing_by_uuid: dict[str, Row] | None = None,
+    reuse_existing: bool = False,
+) -> ClienteValidationStats:
+    """
+    Valida CPFs com concorrência controlada e cache por CPF único.
+
+    A API recebe um CPF por requisição. O projeto agrupa até
+    FARMALIDER_BATCH_SIZE CPFs por lote e executa no máximo
+    FARMALIDER_MAX_WORKERS chamadas simultâneas. O FarmaliderClient ainda
+    aplica um limitador GLOBAL entre inícios de requisição e cooldown de 429.
+    """
+    stats = ClienteValidationStats()
+    started = time.monotonic()
+    rows_by_cpf: dict[str, list[Row]] = {}
+
+    for row in rows:
+        cpf = normalize_cpf(row.get("cpf", ""))
+        row["cpf_normalizado"] = cpf
+        row["farmalider_cliente_consultado_em"] = ""
+        row["farmalider_cliente_id"] = ""
+        row["farmalider_cliente_nome"] = ""
+
+        if not cpf:
+            row["farmalider_cliente_status"] = "CPF_NAO_INFORMADO"
+            continue
+
+        if not is_valid_cpf(cpf):
+            row["farmalider_cliente_status"] = "CPF_INVALIDO"
+            continue
+
+        if farm_client is None:
+            row["farmalider_cliente_status"] = (
+                "TOKEN_NAO_CONFIGURADO"
+                if farm_settings.enabled and not farm_settings.token
+                else "API_DESABILITADA"
+            )
+            continue
+
+        if reuse_existing and existing_by_uuid is not None:
+            existing = existing_by_uuid.get(str(row.get("contact_uuid") or "").strip())
+            reused = _reusable_farmalider_result(
+                row,
+                existing,
+                now=datetime.now(timezone.utc),
+            )
+            if reused is not None:
+                _apply_cliente_result(row, reused)
+                row["farmalider_cliente_consultado_em"] = str(
+                    (existing or {}).get("farmalider_cliente_consultado_em") or ""
+                )
+                stats.cache_reused += 1
+                continue
+
+        row["farmalider_cliente_consultado_em"] = sync_time
+        rows_by_cpf.setdefault(cpf, []).append(row)
+
+    unique_cpfs = list(rows_by_cpf)
+    cache: dict[str, ClienteResult] = {}
+
+    if unique_cpfs and farm_client is not None:
+        parallel_min = max(1, int(FARMALIDER_PARALLEL_MIN_CPFS))
+        worker_count = (
+            1
+            if len(unique_cpfs) < parallel_min
+            else min(
+                max(1, int(FARMALIDER_MAX_WORKERS)),
+                len(unique_cpfs),
+            )
+        )
+        batch_size = max(1, int(FARMALIDER_BATCH_SIZE))
+        delay_ms = int(round(FARMALIDER_REQUEST_DELAY_SECONDS * 1000))
+        rate_cap = (
+            1 / FARMALIDER_REQUEST_DELAY_SECONDS
+            if FARMALIDER_REQUEST_DELAY_SECONDS > 0
+            else 0
+        )
+        total_batches = (len(unique_cpfs) + batch_size - 1) // batch_size
+
+        logging.info(
+            "FarmaLíder: %s CPFs únicos válidos. "
+            "Concorrência controlada com %s workers, lotes de até %s CPFs, "
+            "paralelismo a partir de %s CPFs, intervalo global mínimo de %s ms%s.",
+            len(unique_cpfs),
+            worker_count,
+            batch_size,
+            parallel_min,
+            delay_ms,
+            (
+                f" (~{rate_cap:.0f} inícios/s no máximo)"
+                if rate_cap > 0
+                else ""
+            ),
+        )
+
+        executor = ThreadPoolExecutor(
+            max_workers=worker_count,
+            thread_name_prefix="farmalider",
+        )
+        completed = 0
+
+        try:
+            for batch_number, start in enumerate(
+                range(0, len(unique_cpfs), batch_size),
+                start=1,
+            ):
+                batch = unique_cpfs[start:start + batch_size]
+                futures = {
+                    executor.submit(_query_cliente, cpf, farm_client): cpf
+                    for cpf in batch
+                }
+                batch_errors = 0
+
+                for future in as_completed(futures):
+                    cpf = futures[future]
+                    try:
+                        result = future.result()
+                    except FarmaliderAuthError:
+                        for pending in futures:
+                            pending.cancel()
+                        raise
+
+                    cache[cpf] = result
+                    completed += 1
+                    if result[0] == "ERRO_API":
+                        batch_errors += 1
+
+                error_rate = batch_errors / len(batch) if batch else 0.0
+                if (
+                    batch_errors >= FARMALIDER_BATCH_ERROR_ABORT_MIN_ERRORS
+                    and error_rate >= FARMALIDER_BATCH_ERROR_ABORT_RATE
+                ):
+                    raise FarmaliderError(
+                        "FarmaLíder apresentou taxa elevada de erros no lote "
+                        f"{batch_number}/{total_batches}: "
+                        f"{batch_errors}/{len(batch)} "
+                        f"({error_rate:.1%}). Carga interrompida antes da "
+                        "gravação no Google Sheets."
+                    )
+
+                elapsed = max(time.monotonic() - started, 0.001)
+                rate = completed / elapsed
+                remaining = len(unique_cpfs) - completed
+                eta = remaining / rate if rate > 0 else 0.0
+                metrics = farm_client.metrics_snapshot()
+
+                logging.info(
+                    "FarmaLíder: %s/%s CPFs concluídos | lote %s/%s | "
+                    "%.1f CPF/s | ETA %s | HTTP=%s retries=%s 429=%s 5xx=%s "
+                    "lentas=%s p95=%s max=%s delay=%.0fms.",
+                    completed,
+                    len(unique_cpfs),
+                    batch_number,
+                    total_batches,
+                    rate,
+                    _format_duration(eta),
+                    metrics["total_requests"],
+                    metrics["retries"],
+                    metrics["rate_limits"],
+                    metrics["server_errors"],
+                    metrics.get("slow_requests", 0),
+                    _format_ms_as_seconds(
+                        metrics.get("p95_response_ms", 0.0)
+                    ),
+                    _format_ms_as_seconds(metrics["max_response_ms"]),
+                    metrics["effective_delay_ms"],
+                )
+        finally:
+            executor.shutdown(wait=True, cancel_futures=True)
+
+        for cpf, cpf_rows in rows_by_cpf.items():
+            result = cache.get(cpf, ("ERRO_API", "", ""))
+            for row in cpf_rows:
+                _apply_cliente_result(row, result)
+
+        metrics = farm_client.metrics_snapshot()
+        stats.unique_queries = len(cache)
+        stats.http_requests = int(metrics["total_requests"])
+        stats.retries = int(metrics["retries"])
+        stats.rate_limits = int(metrics["rate_limits"])
+        stats.server_errors = int(metrics["server_errors"])
+        stats.network_errors = int(metrics["network_errors"])
+        stats.slow_requests = int(metrics.get("slow_requests", 0))
+        stats.average_response_ms = float(metrics["average_response_ms"])
+        stats.p95_response_ms = float(metrics.get("p95_response_ms", 0.0))
+        stats.max_response_ms = float(metrics["max_response_ms"])
+        stats.effective_delay_ms = float(metrics["effective_delay_ms"])
+
+    for row in rows:
+        status = row.get("farmalider_cliente_status", "")
+        if status == "CPF_CONFIRMADO":
+            stats.confirmed += 1
+        elif status == "CPF_NAO_ENCONTRADO":
+            stats.not_found += 1
+        elif status == "CPF_INVALIDO":
+            stats.invalid += 1
+        elif status == "ERRO_API":
+            stats.api_errors += 1
+
+    stats.elapsed_seconds = time.monotonic() - started
+    return stats
+
+def build_orders(
+    relevant_contacts: list[Contact],
+    *,
+    rows_by_uuid: dict[str, Row],
+    farm_client: FarmaliderClient | None,
+    sync_time: str,
+) -> tuple[list[Row], list[Row], OrderStats]:
+    order_rows: list[Row] = []
+    item_rows: list[Row] = []
+    stats = OrderStats()
+
+    for contact in relevant_contacts:
+        order, items = parse_ultimo_pedido(contact, captured_at=sync_time)
+        if order is None:
+            continue
+
+        contact_uuid = order.get("contact_uuid", "")
+        contact_row = rows_by_uuid.get(contact_uuid, {})
+
+        order["cpf_normalizado"] = contact_row.get(
+            "cpf_normalizado",
+            order.get("cpf_normalizado", ""),
+        )
+        order["farmalider_cliente_id"] = contact_row.get(
+            "farmalider_cliente_id",
+            "",
+        )
+
+        for key in (
+            "primeiro_anuncio_origem",
+            "primeiro_anuncio_id",
+            "primeiro_anuncio_titulo",
+            "primeiro_anuncio_data",
+            "primeiro_anuncio_tipo_campanha",
+            "primeiro_anuncio_canal_destino",
+            "ultimo_anuncio_origem",
+            "ultimo_anuncio_id",
+            "ultimo_anuncio_titulo",
+            "ultimo_anuncio_data",
+            "ultimo_anuncio_tipo_campanha",
+            "ultimo_anuncio_canal_destino",
+        ):
+            order[key] = contact_row.get(key, "")
+
+        pedido_id = order.get("pedido_id", "").strip()
+        if (
+            pedido_id
+            and order.get("status_validacao") != "ERRO"
+            and farm_client is not None
+        ):
+            try:
+                pedido_api = farm_client.get_pedido(pedido_id)
+                order, items = apply_pedido_api_confirmation(
+                    order,
+                    items,
+                    pedido_api,
+                    linked_cliente_id=order.get("farmalider_cliente_id", ""),
+                    confirmed_at=sync_time,
+                )
+            except FarmaliderAuthError:
+                raise
+            except FarmaliderError as exc:
+                order["status_confirmacao"] = "ERRO_API"
+                order["farmalider_erro"] = exc.__class__.__name__
+                stats.api_errors += 1
+
+        if order.get("status_confirmacao", "").startswith("CONFIRMADO_API"):
+            stats.confirmed_api += 1
+
+        for item in items:
+            item["pedido_id"] = pedido_id
+
+        order_rows.append(order)
+        item_rows.extend(items)
+
+        if order.get("status_validacao") == "ERRO":
+            stats.parse_errors += 1
+
+    return order_rows, item_rows, stats
+
+
+def open_farmalider_client(
+    settings: FarmaliderSettings,
+) -> FarmaliderClient | None:
+    if settings.enabled and settings.token:
+        client = FarmaliderClient(settings.token, use_hml=settings.use_hml)
+        logging.info(
+            "Integração FarmaLíder habilitada (%s).",
+            "HML" if settings.use_hml else "produção",
+        )
+        return client
+
+    if settings.enabled:
+        logging.warning(
+            "Integração FarmaLíder habilitada, mas token não configurado. "
+            "A sincronização continuará sem validação FarmaLíder."
+        )
+    else:
+        logging.info("Integração FarmaLíder desabilitada.")
+    return None
+
+
+def main() -> int:
+    configure_logging()
+    farm_client: FarmaliderClient | None = None
+    sheets: GoogleSheetsStore | None = None
+
+    try:
+        validate_configuration()
+        total_started_monotonic = time.monotonic()
+        sync_started = datetime.now(timezone.utc)
+        sync_time = utc_iso(sync_started)
+        # FarmaLíder/Grupo Líder opera em Belém (UTC-3, sem horário de verão).
+        bi_snapshot_date = (sync_started - timedelta(hours=3)).date().isoformat()
+        logging.info("Iniciando sincronização Weni → FarmaLíder → Google Sheets.")
+
+        spreadsheet_id = str(
+            getattr(secrets, "GOOGLE_SPREADSHEET_ID", "")
+        ).strip()
+        weni_token = str(getattr(secrets, "WENI_API_TOKEN", "")).strip()
+        farm_settings = load_farmalider_settings()
+        farm_client = open_farmalider_client(farm_settings)
+        sheets_started = time.monotonic()
+        sheets = GoogleSheetsStore(spreadsheet_id)
+        logging.info(
+            "Google Sheets inicializado em %.2fs.",
+            time.monotonic() - sheets_started,
+        )
+
+        force_full = os.getenv("FORCE_FULL_SYNC", "").strip() == "1"
+        last_success = None
+        if not force_full:
+            last_success = parse_control_datetime(
+                sheets.get_control("ultima_sincronizacao_sucesso_utc")
+            )
+
+        if force_full:
+            after = None
+            logging.info("Carga completa forçada.")
+        elif last_success is not None:
+            after = last_success - timedelta(minutes=SYNC_OVERLAP_MINUTES)
+            logging.info(
+                "Sincronização incremental desde %s UTC | horário local=%s "
+                "(%s min de sobreposição).",
+                utc_iso(after),
+                after.astimezone().isoformat(timespec="seconds"),
+                SYNC_OVERLAP_MINUTES,
+            )
+        else:
+            after = None
+            logging.info("Primeira execução: carga completa de contatos.")
+
+        # A Base_Contatos é pré-carregada enquanto a Weni pagina contatos.
+        # São APIs independentes, então a latência de uma fica escondida pela outra.
+        with ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix="sheets-preload",
+        ) as preload_executor:
+            preload_base = force_full or after is None
+            base_snapshot_future = (
+                preload_executor.submit(sheets.load_base_snapshot)
+                if preload_base
+                else None
+            )
+
+            weni_started = time.monotonic()
+            weni_client = WeniClient(weni_token)
+            try:
+                contacts = weni_client.list_contacts(after=after)
+            finally:
+                weni_client.close()
+            logging.info(
+                "Weni concluída em %.2fs.",
+                time.monotonic() - weni_started,
+            )
+
+            relevant_contacts, cpf_contacts, contacts_to_process = split_contacts(
+                contacts
+            )
+            normalized = [
+                normalize_contact(contact, sync_time)
+                for contact in contacts_to_process
+            ]
+            valid_unique_cpfs = {
+                normalize_cpf(row.get("cpf", ""))
+                for row in normalized
+                if is_valid_cpf(normalize_cpf(row.get("cpf", "")))
+            }
+
+            logging.info(
+                "Weni: recebidos=%s | relevantes=%s | com CPF=%s | processados=%s.",
+                len(contacts),
+                len(relevant_contacts),
+                len(cpf_contacts),
+                len(contacts_to_process),
+            )
+            logging.info(
+                "FarmaLíder: CPFs válidos únicos para consulta=%s.",
+                len(valid_unique_cpfs),
+            )
+
+            if not force_full and after is not None and not contacts_to_process:
+                sheets.set_controls(
+                    {
+                        "ultima_sincronizacao_sucesso_utc": utc_iso(sync_started),
+                        "ultima_execucao_status": "sucesso",
+                        "ultima_execucao_contatos_api": str(len(contacts)),
+                        "ultima_execucao_contatos_processados": "0",
+                        "ultima_execucao_contatos_inseridos": "0",
+                        "ultima_execucao_contatos_atualizados": "0",
+                    }
+                )
+                request_stats = sheets.request_stats()
+                logging.info(
+                    "Incremental sem contatos processáveis: carga encerrada sem ler Base_Contatos, "
+                    "consultar FarmaLíder ou recalcular métricas."
+                )
+                logging.info(
+                    "Google Sheets: requisições HTTP da execução: leituras=%s | escritas=%s | total=%s.",
+                    request_stats["reads"],
+                    request_stats["writes"],
+                    request_stats["total"],
+                )
+                return 0
+
+            # Uma única leitura integral alimenta cache FarmaLíder incremental,
+            # detecção de mudanças, histórico e métricas. Em carga completa/primeira
+            # execução ela já ocorre em paralelo à paginação da Weni.
+            if base_snapshot_future is not None:
+                base_values, base_records_before, existing_uuids = (
+                    base_snapshot_future.result()
+                )
+            else:
+                base_values, base_records_before, existing_uuids = (
+                    sheets.load_base_snapshot()
+                )
+        existing_by_uuid = {
+            row.get("contact_uuid", ""): row
+            for row in base_records_before
+            if row.get("contact_uuid")
+        }
+        cliente_stats = validate_contacts(
+            normalized,
+            farm_client=farm_client,
+            farm_settings=farm_settings,
+            sync_time=sync_time,
+            existing_by_uuid=existing_by_uuid,
+            reuse_existing=not force_full,
+        )
+        if cliente_stats.cache_reused:
+            logging.info(
+                "FarmaLíder: %s validação(ões) reutilizada(s) do cache da Base_Contatos; "
+                "consultas HTTP desnecessárias foram evitadas.",
+                cliente_stats.cache_reused,
+            )
+
+        contacts_sheets_started = time.monotonic()
+        logging.info(
+            "Google Sheets: etapa 1/4 - Base_Contatos + Historico_Alteracoes (%s contatos).",
+            len(normalized),
+        )
+        contact_result = sheets.upsert_contacts_detailed(
+            normalized,
+            existing_values=base_values,
+        )
+        inserted, updated = contact_result.inserted, contact_result.updated
+        logging.info(
+            "Google Sheets: etapa 1/4 - Base_Contatos finalizada; histórico receberá somente %s contato(s) com mudança real.",
+            len(contact_result.changed_records),
+        )
+        sheets.append_history(contact_result.changed_records, existing_uuids)
+        logging.info(
+            "Google Sheets: contatos + histórico em %.2fs.",
+            time.monotonic() - contacts_sheets_started,
+        )
+
+        rows_by_uuid = {
+            row["contact_uuid"]: row
+            for row in normalized
+            if row.get("contact_uuid")
+        }
+        order_rows, item_rows, order_stats = build_orders(
+            relevant_contacts,
+            rows_by_uuid=rows_by_uuid,
+            farm_client=farm_client,
+            sync_time=sync_time,
+        )
+
+        postprocess_started = time.monotonic()
+        logging.info(
+            "Google Sheets: etapa 2/4 - Pedidos e itens."
+        )
+        order_result = (
+            sheets.upsert_orders_detailed(order_rows) if order_rows else None
+        )
+        item_result = (
+            sheets.upsert_order_items_detailed(item_rows) if item_rows else None
+        )
+        orders_inserted = order_result.inserted if order_result else 0
+        orders_updated = order_result.updated if order_result else 0
+        items_inserted = item_result.inserted if item_result else 0
+        items_updated = item_result.updated if item_result else 0
+
+        logging.info(
+            "Google Sheets: etapa 3/4 - Métricas de contatos e anúncios."
+        )
+        ad_metrics = build_daily_metrics(contact_result.final_records)
+        sheets.replace_metrics(ad_metrics)
+
+        logging.info(
+            "Google Sheets: etapa 4/4 - Métricas de vendas e fechamento."
+        )
+        all_order_records = (
+            order_result.final_records if order_result else sheets.load_order_records()
+        )
+        all_item_records = (
+            item_result.final_records if item_result else sheets.load_order_item_records()
+        )
+        sales_metrics = build_sales_metrics(all_order_records, all_item_records)
+        sheets.replace_sales_metrics(sales_metrics)
+        sales_metrics_count = len(sales_metrics)
+        logging.info(
+            "Google Sheets: pedidos + métricas em %.2fs.",
+            time.monotonic() - postprocess_started,
+        )
+
+        # Camada BI pronta para o Looker Studio. As abas são mantidas pelo próprio
+        # Analytics para que o relatório não precise recalcular regras de negócio.
+        bi_started = time.monotonic()
+        logging.info("Google Sheets: camada BI/Looker Studio - iniciando 6 tabelas.")
+        bi_summary = build_bi_summary_record(
+            contact_result.final_records,
+            all_order_records,
+            all_item_records,
+            snapshot_date=bi_snapshot_date,
+            updated_at=sync_time,
+        )
+        sheets.upsert_bi_summary(bi_summary)
+        logging.info("Google Sheets: BI 1/6 - BI_Resumo_Diario atualizado.")
+
+        bi_channels = build_bi_channel_records(
+            contact_result.final_records,
+            snapshot_date=bi_snapshot_date,
+            updated_at=sync_time,
+        )
+        sheets.upsert_bi_channels(bi_channels)
+        logging.info("Google Sheets: BI 2/6 - BI_Canais atualizado.")
+
+        bi_conversion = build_bi_conversion_records(
+            contact_result.final_records,
+            all_order_records,
+            snapshot_date=bi_snapshot_date,
+            updated_at=sync_time,
+        )
+        sheets.upsert_bi_conversion(bi_conversion)
+        logging.info("Google Sheets: BI 3/6 - BI_Conversao atualizado.")
+
+        bi_sales = build_bi_sales_rows(
+            all_order_records,
+            all_item_records,
+            snapshot_date=bi_snapshot_date,
+            updated_at=sync_time,
+        )
+        sheets.replace_bi_sales(bi_sales)
+        logging.info("Google Sheets: BI 4/6 - BI_Vendas atualizado.")
+
+        bi_ads = build_bi_ads_rows(
+            contact_result.final_records,
+            all_order_records,
+            snapshot_date=bi_snapshot_date,
+            updated_at=sync_time,
+        )
+        sheets.replace_bi_ads(bi_ads)
+        logging.info("Google Sheets: BI 5/6 - BI_Ads atualizado.")
+
+        # O status é gravado por último para refletir a própria execução do BI.
+        status_stats = sheets.request_stats()
+        status_elapsed = time.monotonic() - total_started_monotonic
+        sheets.replace_bi_status([
+            sync_time,
+            APP_VERSION,
+            "sucesso",
+            "carga_completa" if force_full or after is None else "incremental",
+            round(status_elapsed, 2),
+            len(contacts),
+            len(contacts_to_process),
+            cliente_stats.unique_queries,
+            cliente_stats.http_requests,
+            cliente_stats.retries,
+            cliente_stats.rate_limits,
+            cliente_stats.server_errors,
+            status_stats["reads"],
+            status_stats["writes"],
+            inserted,
+            updated,
+            contact_result.unchanged,
+            order_stats.confirmed_api,
+        ])
+        logging.info(
+            "Google Sheets: BI 6/6 - BI_Status atualizado; camada BI concluída em %.2fs.",
+            time.monotonic() - bi_started,
+        )
+
+        sheets.set_controls(
+            {
+                "ultima_sincronizacao_sucesso_utc": utc_iso(sync_started),
+                "ultima_execucao_status": "sucesso",
+                "ultima_execucao_contatos_api": str(len(contacts)),
+                "ultima_execucao_contatos_relevantes": str(
+                    len(relevant_contacts)
+                ),
+                "ultima_execucao_contatos_com_cpf": str(len(cpf_contacts)),
+                "ultima_execucao_contatos_processados": str(
+                    len(contacts_to_process)
+                ),
+                "ultima_execucao_cpfs_unicos_consultados": str(
+                    cliente_stats.unique_queries
+                ),
+                "ultima_execucao_contatos_inseridos": str(inserted),
+                "ultima_execucao_contatos_atualizados": str(updated),
+                "ultima_execucao_contatos_sem_mudanca": str(contact_result.unchanged),
+                "ultima_execucao_farmalider_cache_reutilizado": str(
+                    cliente_stats.cache_reused
+                ),
+                "ultima_execucao_cpfs_confirmados_farmalider": str(
+                    cliente_stats.confirmed
+                ),
+                "ultima_execucao_cpfs_nao_encontrados": str(
+                    cliente_stats.not_found
+                ),
+                "ultima_execucao_cpfs_invalidos": str(cliente_stats.invalid),
+                "ultima_execucao_erros_cliente_farmalider": str(
+                    cliente_stats.api_errors
+                ),
+                "ultima_execucao_farmalider_http_requests": str(
+                    cliente_stats.http_requests
+                ),
+                "ultima_execucao_farmalider_retries": str(
+                    cliente_stats.retries
+                ),
+                "ultima_execucao_farmalider_429": str(
+                    cliente_stats.rate_limits
+                ),
+                "ultima_execucao_farmalider_5xx": str(
+                    cliente_stats.server_errors
+                ),
+                "ultima_execucao_farmalider_erros_rede": str(
+                    cliente_stats.network_errors
+                ),
+                "ultima_execucao_farmalider_tempo_segundos": (
+                    f"{cliente_stats.elapsed_seconds:.2f}"
+                ),
+                "ultima_execucao_farmalider_requisicoes_lentas": str(
+                    cliente_stats.slow_requests
+                ),
+                "ultima_execucao_farmalider_latencia_media_ms": (
+                    f"{cliente_stats.average_response_ms:.2f}"
+                ),
+                "ultima_execucao_farmalider_latencia_p95_ms": (
+                    f"{cliente_stats.p95_response_ms:.2f}"
+                ),
+                "ultima_execucao_farmalider_latencia_max_ms": (
+                    f"{cliente_stats.max_response_ms:.2f}"
+                ),
+                "ultima_execucao_farmalider_delay_final_ms": (
+                    f"{cliente_stats.effective_delay_ms:.2f}"
+                ),
+                "ultima_execucao_pedidos_lidos": str(len(order_rows)),
+                "ultima_execucao_pedidos_confirmados_api": str(
+                    order_stats.confirmed_api
+                ),
+                "ultima_execucao_pedidos_inseridos": str(orders_inserted),
+                "ultima_execucao_pedidos_atualizados": str(orders_updated),
+                "ultima_execucao_itens_inseridos": str(items_inserted),
+                "ultima_execucao_itens_atualizados": str(items_updated),
+                "ultima_execucao_erros_ultimo_pedido": str(
+                    order_stats.parse_errors
+                ),
+                "ultima_execucao_erros_pedido_farmalider": str(
+                    order_stats.api_errors
+                ),
+                "ultima_execucao_metricas_ads": str(len(ad_metrics)),
+                "ultima_execucao_metricas_vendas": str(sales_metrics_count),
+            }
+        )
+
+        total_elapsed = time.monotonic() - total_started_monotonic
+        logging.info("Resumo da execução:")
+        logging.info(
+            "  Weni | recebidos=%s | processados=%s | com CPF=%s.",
+            len(contacts),
+            len(contacts_to_process),
+            len(cpf_contacts),
+        )
+        logging.info(
+            "  FarmaLíder | CPFs válidos=%s | consultas=%s | cache=%s | confirmados=%s | "
+            "HTTP=%s | retries=%s | 429=%s | 5xx=%s | lentas=%s | "
+            "latência média/p95/máx=%s/%s/%s | tempo=%.2fs.",
+            len(valid_unique_cpfs),
+            cliente_stats.unique_queries,
+            cliente_stats.cache_reused,
+            cliente_stats.confirmed,
+            cliente_stats.http_requests,
+            cliente_stats.retries,
+            cliente_stats.rate_limits,
+            cliente_stats.server_errors,
+            cliente_stats.slow_requests,
+            _format_ms_as_seconds(cliente_stats.average_response_ms),
+            _format_ms_as_seconds(cliente_stats.p95_response_ms),
+            _format_ms_as_seconds(cliente_stats.max_response_ms),
+            cliente_stats.elapsed_seconds,
+        )
+        request_stats = sheets.request_stats()
+        logging.info(
+            "  Google Sheets | contatos inseridos=%s | atualizados=%s | sem mudança=%s | "
+            "pedidos inseridos=%s | pedidos atualizados=%s | HTTP leituras/escritas=%s/%s.",
+            inserted,
+            updated,
+            contact_result.unchanged,
+            orders_inserted,
+            orders_updated,
+            request_stats["reads"],
+            request_stats["writes"],
+        )
+        logging.info(
+            "  Pedidos | confirmados pela API=%s | erros ultimo_pedido=%s.",
+            order_stats.confirmed_api,
+            order_stats.parse_errors,
+        )
+        logging.info("Sincronização concluída com sucesso em %.2fs.", total_elapsed)
+        return 0
+
+    except Exception as exc:
+        logging.exception("Falha na sincronização: %s", exc)
+
+        if sheets is not None:
+            try:
+                sheets.set_controls(
+                    {
+                        "ultima_execucao_status": "erro",
+                        "ultima_execucao_erro_tipo": exc.__class__.__name__,
+                        "ultima_execucao_erro_em_utc": utc_iso(
+                            datetime.now(timezone.utc)
+                        ),
+                    }
+                )
+            except Exception:
+                logging.warning(
+                    "Não foi possível registrar o status de erro na aba Controle.",
+                    exc_info=True,
+                )
+        return 1
+    finally:
+        if farm_client is not None:
+            farm_client.close()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

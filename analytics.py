@@ -1,0 +1,1191 @@
+from __future__ import annotations
+
+import hashlib
+import json
+from collections import defaultdict
+from datetime import datetime
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from typing import Any
+
+from config import TIPO_PRIMEIRO_ANUNCIO, TIPO_ULTIMO_ANUNCIO
+from urn_utils import resolve_contact_urns
+
+
+AD_FIELDS = [
+    "primeiro_anuncio_origem",
+    "primeiro_anuncio_id",
+    "primeiro_anuncio_titulo",
+    "primeiro_anuncio_url",
+    "primeiro_anuncio_clique_id",
+    "primeiro_anuncio_data",
+    "ultimo_anuncio_origem",
+    "ultimo_anuncio_id",
+    "ultimo_anuncio_titulo",
+    "ultimo_anuncio_url",
+    "ultimo_anuncio_clique_id",
+    "ultimo_anuncio_data",
+    "primeiro_anuncio_tipo_campanha",
+    "primeiro_anuncio_canal_destino",
+    "ultimo_anuncio_tipo_campanha",
+    "ultimo_anuncio_canal_destino",
+]
+
+# Alias mantido para compatibilidade com integrações antigas do projeto.
+META_FIELDS = AD_FIELDS
+
+BASE_COLUMNS = [
+    "contact_uuid",
+    "telefone",
+    "weni_name",
+    "nome",
+    "cpf",
+    "cpf_normalizado",
+    "email",
+    "idade",
+    "maior_de_18_anos",
+    "opt_in_lgpd",
+    "contact_urn",
+    "contact_urn_whatsapp",
+    "contact_urn_instagram",
+    "contact_urn_facebook",
+    "contact_canal_principal",
+    "farmalider_cliente_id",
+    "farmalider_cliente_nome",
+    "farmalider_cliente_status",
+    "farmalider_cliente_consultado_em",
+    *AD_FIELDS,
+    "ultimo_pedido",
+    "voltou_por_outro_anuncio",
+    "weni_created_on",
+    "weni_modified_on",
+    "sincronizado_em",
+]
+
+HISTORY_COLUMNS = ["acao", "sincronizado_em", *BASE_COLUMNS[:-1]]
+
+METRIC_COLUMNS = [
+    "data",
+    "tipo_atribuicao",
+    "anuncio_id",
+    "anuncio_titulo",
+    "contatos",
+]
+
+EVENT_COLUMNS = [
+    "event_id",
+    "recebido_em",
+    "contact_uuid",
+    "contact_urn",
+    "source_type",
+    "anuncio_id",
+    "anuncio_titulo",
+    "anuncio_url",
+    "clique_id",
+]
+
+META_CAMPAIGN_COLUMNS = [
+    "anuncio_id",
+    "anuncio_nome",
+    "conjunto_id",
+    "conjunto_nome",
+    "campanha_id",
+    "campanha_nome",
+    "investimento",
+    "impressoes",
+    "cliques",
+    "atualizado_em",
+]
+
+CONTROL_COLUMNS = ["chave", "valor", "atualizado_em"]
+
+ORDER_COLUMNS = [
+    "pedido_chave",
+    "pedido_id",
+    "origem_pedido",
+    "status_confirmacao",
+    "data_hora",
+    "data",
+    "hora",
+    "contact_uuid",
+    "telefone",
+    "cliente",
+    "cpf",
+    "cpf_normalizado",
+    "farmalider_cliente_id",
+    "primeiro_anuncio_origem",
+    "primeiro_anuncio_id",
+    "primeiro_anuncio_titulo",
+    "primeiro_anuncio_data",
+    "primeiro_anuncio_tipo_campanha",
+    "primeiro_anuncio_canal_destino",
+    "ultimo_anuncio_origem",
+    "ultimo_anuncio_id",
+    "ultimo_anuncio_titulo",
+    "ultimo_anuncio_data",
+    "ultimo_anuncio_tipo_campanha",
+    "ultimo_anuncio_canal_destino",
+    "valor_total_compra",
+    "valor_total_itens",
+    "diferenca_total",
+    "quantidade_produtos",
+    "quantidade_itens",
+    "status_validacao",
+    "erro_parse",
+    "farmalider_public_id",
+    "farmalider_emissao",
+    "farmalider_status_pedido",
+    "farmalider_cod_filial",
+    "farmalider_cod_cliente",
+    "farmalider_forma_pagamento",
+    "farmalider_cupom",
+    "farmalider_frete",
+    "farmalider_pedido_web",
+    "farmalider_cancelamento",
+    "farmalider_entrega",
+    "valor_total_api_itens",
+    "quantidade_itens_api",
+    "farmalider_confirmado_em",
+    "farmalider_erro",
+    "ultimo_pedido_raw",
+    "weni_modified_on",
+    "capturado_em",
+]
+
+ORDER_ITEM_COLUMNS = [
+    "item_chave",
+    "pedido_chave",
+    "pedido_id",
+    "data_hora",
+    "data",
+    "hora",
+    "contact_uuid",
+    "telefone",
+    "cliente",
+    "produto_ordem",
+    "produto_nome",
+    "quantidade",
+    "valor_unitario",
+    "valor_total",
+    "capturado_em",
+]
+
+SALES_METRIC_COLUMNS = [
+    "data",
+    "pedidos",
+    "pedidos_confirmados_api",
+    "clientes_compradores",
+    "unidades_vendidas",
+    "faturamento",
+    "faturamento_confirmado_api",
+]
+
+
+BI_SUMMARY_COLUMNS = [
+    "data",
+    "atualizado_em",
+    "contatos_total",
+    "novos_contatos",
+    "contatos_com_cpf",
+    "cpfs_validos",
+    "contatos_sem_cpf",
+    "clientes_farmalider",
+    "clientes_nao_encontrados",
+    "whatsapp",
+    "instagram",
+    "facebook",
+    "outro",
+    "opt_in_lgpd",
+    "opt_out_lgpd",
+    "lgpd_nao_informado",
+    "maiores_18",
+    "menores_18",
+    "maioridade_nao_informada",
+    "contatos_ads",
+    "clientes_compradores_total",
+    "pedidos_total",
+    "faturamento_total",
+    "pedidos_dia",
+    "pedidos_confirmados_api_dia",
+    "clientes_compradores_dia",
+    "unidades_vendidas_dia",
+    "faturamento_dia",
+    "faturamento_confirmado_api_dia",
+    "ticket_medio_dia",
+]
+
+BI_CHANNEL_COLUMNS = [
+    "chave",
+    "data",
+    "canal",
+    "contatos",
+    "contatos_com_cpf",
+    "clientes_farmalider",
+    "contatos_ads",
+    "opt_in_lgpd",
+    "atualizado_em",
+]
+
+BI_CONVERSION_COLUMNS = [
+    "chave",
+    "data",
+    "etapa_ordem",
+    "etapa",
+    "quantidade",
+    "taxa_base_pct",
+    "taxa_etapa_anterior_pct",
+    "atualizado_em",
+]
+
+BI_SALES_COLUMNS = [
+    "data",
+    "pedidos",
+    "pedidos_confirmados_api",
+    "clientes_compradores",
+    "unidades_vendidas",
+    "faturamento",
+    "faturamento_confirmado_api",
+    "ticket_medio",
+    "taxa_confirmacao_pct",
+    "atualizado_em",
+]
+
+BI_ADS_COLUMNS = [
+    "data_snapshot",
+    "tipo_atribuicao",
+    "origem",
+    "tipo_campanha",
+    "canal_destino",
+    "anuncio_id",
+    "anuncio_titulo",
+    "contatos",
+    "clientes_farmalider",
+    "compradores",
+    "pedidos",
+    "faturamento",
+    "atualizado_em",
+]
+
+BI_STATUS_COLUMNS = [
+    "atualizado_em",
+    "versao",
+    "status",
+    "modo_execucao",
+    "duracao_segundos",
+    "weni_recebidos",
+    "contatos_processados",
+    "cpfs_unicos_consultados",
+    "farmalider_http_requests",
+    "farmalider_retries",
+    "farmalider_429",
+    "farmalider_5xx",
+    "google_leituras",
+    "google_escritas",
+    "contatos_inseridos",
+    "contatos_atualizados",
+    "contatos_sem_mudanca",
+    "pedidos_confirmados_api",
+]
+
+
+def normalize_cpf(value: Any, pad_to_11: bool = False) -> str:
+    digits = "".join(ch for ch in normalize_value(value) if ch.isdigit())
+    if pad_to_11 and digits and len(digits) < 11:
+        digits = digits.zfill(11)
+    return digits
+
+
+def is_valid_cpf(value: Any) -> bool:
+    cpf = normalize_cpf(value)
+    if len(cpf) != 11 or cpf == cpf[0] * 11:
+        return False
+
+    def digit(base: str, factor: int) -> str:
+        total = sum(
+            int(n) * weight
+            for n, weight in zip(base, range(factor, 1, -1))
+        )
+        result = (total * 10) % 11
+        return "0" if result == 10 else str(result)
+
+    return cpf[9] == digit(cpf[:9], 10) and cpf[10] == digit(cpf[:10], 11)
+
+
+def normalize_value(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, dict):
+        if "value" in value:
+            return normalize_value(value["value"])
+        return json.dumps(value, ensure_ascii=False, sort_keys=True)
+    if isinstance(value, list):
+        return "; ".join(normalize_value(v) for v in value)
+    return str(value)
+
+
+def get_fields(contact: dict[str, Any]) -> dict[str, Any]:
+    fields = contact.get("fields")
+    return fields if isinstance(fields, dict) else {}
+
+
+def get_phone_and_urn(
+    contact: dict[str, Any],
+    fields: dict[str, Any],
+) -> tuple[str, str]:
+    urns = contact.get("urns") or []
+    if not isinstance(urns, list):
+        urns = []
+
+    resolved = resolve_contact_urns(contact, fields)
+    tel_urn = next(
+        (u for u in urns if isinstance(u, str) and u.startswith("tel:")),
+        "",
+    )
+    whatsapp_urn = resolved.channel_urns.get("whatsapp", "")
+    if tel_urn:
+        phone = tel_urn[4:]
+    elif whatsapp_urn.startswith("whatsapp:"):
+        phone = whatsapp_urn.split(":", 1)[1]
+    else:
+        phone = ""
+    return phone, resolved.principal_urn
+
+
+def is_ads_contact(contact: dict[str, Any]) -> bool:
+    fields = get_fields(contact)
+    keys = (
+        "primeiro_anuncio_origem",
+        "primeiro_anuncio_id",
+        "primeiro_anuncio_clique_id",
+        "ultimo_anuncio_origem",
+        "ultimo_anuncio_id",
+        "ultimo_anuncio_clique_id",
+    )
+    return any(normalize_value(fields.get(key)).strip() for key in keys)
+
+
+def is_meta_ads_contact(contact: dict[str, Any]) -> bool:
+    """Alias legado: a detecção agora é genérica para Meta Ads e Google Ads."""
+    return is_ads_contact(contact)
+
+
+def has_ultimo_pedido(contact: dict[str, Any]) -> bool:
+    fields = get_fields(contact)
+    return bool(normalize_value(fields.get("ultimo_pedido")).strip())
+
+
+def is_relevant_contact(contact: dict[str, Any]) -> bool:
+    return is_ads_contact(contact) or has_ultimo_pedido(contact)
+
+
+def normalize_contact(
+    contact: dict[str, Any],
+    sync_time: str,
+) -> dict[str, str]:
+    fields = get_fields(contact)
+    phone, urn = get_phone_and_urn(contact, fields)
+    resolved_urns = resolve_contact_urns(contact, fields)
+
+    first_id = normalize_value(fields.get("primeiro_anuncio_id")).strip()
+    last_id = normalize_value(fields.get("ultimo_anuncio_id")).strip()
+
+    if first_id and last_id and first_id != last_id:
+        returned_other_ad = "Sim"
+    elif first_id and last_id:
+        returned_other_ad = "Não"
+    else:
+        returned_other_ad = "Não informado"
+
+    row = {
+        "contact_uuid": normalize_value(contact.get("uuid")),
+        "telefone": phone,
+        "weni_name": normalize_value(contact.get("name")),
+        "nome": normalize_value(fields.get("nome")),
+        "cpf": normalize_value(fields.get("cpf")),
+        "cpf_normalizado": normalize_cpf(fields.get("cpf")),
+        "email": normalize_value(fields.get("email")),
+        "idade": normalize_value(fields.get("idade")),
+        "maior_de_18_anos": normalize_value(fields.get("maior_de_18_anos")),
+        "opt_in_lgpd": normalize_value(fields.get("opt_in_lgpd")),
+        "contact_urn": urn,
+        "contact_urn_whatsapp": normalize_value(fields.get("contact_urn_whatsapp")) or resolved_urns.channel_urns.get("whatsapp", ""),
+        "contact_urn_instagram": normalize_value(fields.get("contact_urn_instagram")) or resolved_urns.channel_urns.get("instagram", ""),
+        "contact_urn_facebook": normalize_value(fields.get("contact_urn_facebook")) or resolved_urns.channel_urns.get("facebook", ""),
+        "contact_canal_principal": normalize_value(fields.get("contact_canal_principal")) or resolved_urns.principal_channel,
+        "farmalider_cliente_id": "",
+        "farmalider_cliente_nome": "",
+        "farmalider_cliente_status": "",
+        "farmalider_cliente_consultado_em": "",
+        "ultimo_pedido": normalize_value(fields.get("ultimo_pedido")),
+        "voltou_por_outro_anuncio": returned_other_ad,
+        "weni_created_on": normalize_value(contact.get("created_on")),
+        "weni_modified_on": normalize_value(contact.get("modified_on")),
+        "sincronizado_em": sync_time,
+    }
+
+    for key in AD_FIELDS:
+        row[key] = normalize_value(fields.get(key))
+
+    return row
+
+
+def parse_date(value: str) -> str:
+    if not value:
+        return ""
+    raw = value.strip()
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        return dt.date().isoformat()
+    except ValueError:
+        if len(raw) >= 10 and raw[4:5] == "-" and raw[7:8] == "-":
+            return raw[:10]
+        return ""
+
+
+def parse_time(value: str) -> str:
+    if not value:
+        return ""
+    raw = value.strip()
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        return dt.time().replace(tzinfo=None).isoformat(timespec="seconds")
+    except ValueError:
+        return ""
+
+
+def build_daily_metrics(
+    base_records: list[dict[str, str]],
+) -> list[list[Any]]:
+    counts: dict[tuple[str, str, str, str], int] = defaultdict(int)
+
+    definitions = [
+        (
+            TIPO_PRIMEIRO_ANUNCIO,
+            "primeiro_anuncio_data",
+            "primeiro_anuncio_id",
+            "primeiro_anuncio_titulo",
+        ),
+        (
+            TIPO_ULTIMO_ANUNCIO,
+            "ultimo_anuncio_data",
+            "ultimo_anuncio_id",
+            "ultimo_anuncio_titulo",
+        ),
+    ]
+
+    for record in base_records:
+        for label, date_key, id_key, title_key in definitions:
+            date = parse_date(record.get(date_key, ""))
+            ad_id = record.get(id_key, "").strip()
+            title = record.get(title_key, "").strip()
+
+            if not date or not (ad_id or title):
+                continue
+
+            counts[(date, label, ad_id, title)] += 1
+
+    return [
+        [date, label, ad_id, title, count]
+        for (date, label, ad_id, title), count in sorted(counts.items())
+    ]
+
+
+def _to_decimal(value: Any, field_name: str) -> Decimal:
+    if value is None or value == "":
+        raise ValueError(f"{field_name} está vazio.")
+
+    if isinstance(value, Decimal):
+        return value
+
+    if isinstance(value, (int, float)):
+        return Decimal(str(value))
+
+    raw = str(value).strip().replace("R$", "").replace(" ", "")
+
+    if "," in raw and "." in raw:
+        if raw.rfind(",") > raw.rfind("."):
+            raw = raw.replace(".", "").replace(",", ".")
+        else:
+            raw = raw.replace(",", "")
+    elif "," in raw:
+        raw = raw.replace(",", ".")
+
+    try:
+        return Decimal(raw)
+    except InvalidOperation as exc:
+        raise ValueError(
+            f"{field_name} possui valor numérico inválido: {value!r}"
+        ) from exc
+
+
+def _money(value: Decimal) -> str:
+    return str(value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+def _quantity(value: Any) -> Decimal:
+    qty = _to_decimal(value, "quantidade")
+    if qty < 0:
+        raise ValueError("quantidade não pode ser negativa.")
+    return qty
+
+
+def _quantity_text(value: Decimal) -> str:
+    if value == value.to_integral_value():
+        return str(int(value))
+    return format(value.normalize(), "f")
+
+
+def _canonical_order_key(
+    contact_uuid: str,
+    data_hora: str,
+    raw: str,
+    pedido_id: str = "",
+) -> str:
+    if pedido_id:
+        return f"FARMALIDER:{pedido_id}"
+
+    basis = (
+        f"{contact_uuid}|{data_hora}"
+        if data_hora
+        else f"{contact_uuid}|{raw}"
+    )
+    return hashlib.sha256(basis.encode("utf-8")).hexdigest()[:32]
+
+
+def _item_key(pedido_chave: str, position: int) -> str:
+    basis = f"{pedido_chave}|{position}"
+    return hashlib.sha256(basis.encode("utf-8")).hexdigest()[:32]
+
+
+def parse_ultimo_pedido_raw(
+    raw: str,
+    *,
+    contact_uuid: str,
+    phone: str = "",
+    client_name: str = "",
+    cpf: str = "",
+    modified_on: str = "",
+    captured_at: str,
+) -> tuple[dict[str, str] | None, list[dict[str, str]]]:
+    """
+    Parser reutilizável do JSON armazenado em `ultimo_pedido`.
+
+    Hoje ele é usado pela sincronização periódica.
+    No futuro, o webhook poderá chamar esta mesma função, garantindo
+    que sincronização e webhook produzam exatamente a mesma estrutura.
+    """
+    raw = (raw or "").strip()
+    if not raw:
+        return None, []
+
+    fallback_key = _canonical_order_key(contact_uuid, "", raw)
+
+    try:
+        payload = json.loads(raw)
+        if not isinstance(payload, dict):
+            raise ValueError("ultimo_pedido deve conter um objeto JSON.")
+
+        pedido_id = normalize_value(
+            payload.get("pedido_id")
+            or payload.get("pedidoId")
+            or payload.get("codigo")
+            or payload.get("codPedido")
+        ).strip()
+
+        data_hora = normalize_value(payload.get("data_hora")).strip()
+        if not data_hora:
+            raise ValueError("data_hora não informado.")
+
+        data = parse_date(data_hora)
+        hora = parse_time(data_hora)
+        if not data:
+            raise ValueError(
+                f"data_hora inválido ou fora do padrão ISO/Weni: {data_hora!r}"
+            )
+
+        total_compra = _to_decimal(
+            payload.get("valor_total_compra"),
+            "valor_total_compra",
+        )
+
+        produtos = payload.get("produtos")
+        if not isinstance(produtos, list):
+            raise ValueError("produtos precisa ser uma lista.")
+
+        pedido_chave = _canonical_order_key(
+            contact_uuid, data_hora, raw, pedido_id
+        )
+
+        item_rows: list[dict[str, str]] = []
+        total_itens = Decimal("0")
+        total_unidades = Decimal("0")
+
+        for position, product in enumerate(produtos, start=1):
+            if not isinstance(product, dict):
+                raise ValueError(
+                    f"produto na posição {position} não é um objeto."
+                )
+
+            nome = normalize_value(product.get("nome")).strip()
+            if not nome:
+                raise ValueError(
+                    f"produto na posição {position} sem nome."
+                )
+
+            quantidade = _quantity(product.get("quantidade"))
+            valor_unitario = _to_decimal(
+                product.get("valor_unitario"),
+                f"produto {position}.valor_unitario",
+            )
+            valor_total = _to_decimal(
+                product.get("valor_total"),
+                f"produto {position}.valor_total",
+            )
+
+            total_itens += valor_total
+            total_unidades += quantidade
+
+            item_rows.append(
+                {
+                    "item_chave": _item_key(pedido_chave, position),
+                    "pedido_chave": pedido_chave,
+                    "pedido_id": pedido_id,
+                    "data_hora": data_hora,
+                    "data": data,
+                    "hora": hora,
+                    "contact_uuid": contact_uuid,
+                    "telefone": phone,
+                    "cliente": client_name,
+                    "produto_ordem": str(position),
+                    "produto_nome": nome,
+                    "quantidade": _quantity_text(quantidade),
+                    "valor_unitario": _money(valor_unitario),
+                    "valor_total": _money(valor_total),
+                    "capturado_em": captured_at,
+                }
+            )
+
+        difference = total_compra - total_itens
+        status = (
+            "OK"
+            if abs(difference) <= Decimal("0.01")
+            else "ATENÇÃO_TOTAL_DIVERGENTE"
+        )
+
+        order_row = {
+            "pedido_chave": pedido_chave,
+            "pedido_id": pedido_id,
+            "origem_pedido": "WENI_ULTIMO_PEDIDO",
+            "status_confirmacao": (
+                "AGUARDANDO_API" if pedido_id else "NAO_CONFIRMADO_SEM_PEDIDO_ID"
+            ),
+            "data_hora": data_hora,
+            "data": data,
+            "hora": hora,
+            "contact_uuid": contact_uuid,
+            "telefone": phone,
+            "cliente": client_name,
+            "cpf": cpf,
+            "cpf_normalizado": normalize_cpf(cpf),
+            "farmalider_cliente_id": "",
+            "primeiro_anuncio_origem": "",
+            "primeiro_anuncio_id": "",
+            "primeiro_anuncio_titulo": "",
+            "primeiro_anuncio_data": "",
+            "primeiro_anuncio_tipo_campanha": "",
+            "primeiro_anuncio_canal_destino": "",
+            "ultimo_anuncio_origem": "",
+            "ultimo_anuncio_id": "",
+            "ultimo_anuncio_titulo": "",
+            "ultimo_anuncio_data": "",
+            "ultimo_anuncio_tipo_campanha": "",
+            "ultimo_anuncio_canal_destino": "",
+            "valor_total_compra": _money(total_compra),
+            "valor_total_itens": _money(total_itens),
+            "diferenca_total": _money(difference),
+            "quantidade_produtos": str(len(produtos)),
+            "quantidade_itens": _quantity_text(total_unidades),
+            "status_validacao": status,
+            "erro_parse": "",
+            "farmalider_public_id": "",
+            "farmalider_emissao": "",
+            "farmalider_status_pedido": "",
+            "farmalider_cod_filial": "",
+            "farmalider_cod_cliente": "",
+            "farmalider_forma_pagamento": "",
+            "farmalider_cupom": "",
+            "farmalider_frete": "",
+            "farmalider_pedido_web": "",
+            "farmalider_cancelamento": "",
+            "farmalider_entrega": "",
+            "valor_total_api_itens": "",
+            "quantidade_itens_api": "",
+            "farmalider_confirmado_em": "",
+            "farmalider_erro": "",
+            "ultimo_pedido_raw": raw,
+            "weni_modified_on": modified_on,
+            "capturado_em": captured_at,
+        }
+        return order_row, item_rows
+
+    except (json.JSONDecodeError, ValueError, TypeError) as exc:
+        error_row = {
+            "pedido_chave": fallback_key,
+            "pedido_id": "",
+            "origem_pedido": "WENI_ULTIMO_PEDIDO",
+            "status_confirmacao": "ERRO_DADOS_WENI",
+            "data_hora": "",
+            "data": "",
+            "hora": "",
+            "contact_uuid": contact_uuid,
+            "telefone": phone,
+            "cliente": client_name,
+            "cpf": cpf,
+            "cpf_normalizado": normalize_cpf(cpf),
+            "farmalider_cliente_id": "",
+            "primeiro_anuncio_origem": "",
+            "primeiro_anuncio_id": "",
+            "primeiro_anuncio_titulo": "",
+            "primeiro_anuncio_data": "",
+            "primeiro_anuncio_tipo_campanha": "",
+            "primeiro_anuncio_canal_destino": "",
+            "ultimo_anuncio_origem": "",
+            "ultimo_anuncio_id": "",
+            "ultimo_anuncio_titulo": "",
+            "ultimo_anuncio_data": "",
+            "ultimo_anuncio_tipo_campanha": "",
+            "ultimo_anuncio_canal_destino": "",
+            "valor_total_compra": "",
+            "valor_total_itens": "",
+            "diferenca_total": "",
+            "quantidade_produtos": "",
+            "quantidade_itens": "",
+            "status_validacao": "ERRO",
+            "erro_parse": str(exc),
+            "farmalider_public_id": "",
+            "farmalider_emissao": "",
+            "farmalider_status_pedido": "",
+            "farmalider_cod_filial": "",
+            "farmalider_cod_cliente": "",
+            "farmalider_forma_pagamento": "",
+            "farmalider_cupom": "",
+            "farmalider_frete": "",
+            "farmalider_pedido_web": "",
+            "farmalider_cancelamento": "",
+            "farmalider_entrega": "",
+            "valor_total_api_itens": "",
+            "quantidade_itens_api": "",
+            "farmalider_confirmado_em": "",
+            "farmalider_erro": "",
+            "ultimo_pedido_raw": raw,
+            "weni_modified_on": modified_on,
+            "capturado_em": captured_at,
+        }
+        return error_row, []
+
+
+def parse_ultimo_pedido(
+    contact: dict[str, Any],
+    captured_at: str,
+) -> tuple[dict[str, str] | None, list[dict[str, str]]]:
+    """
+    Lê `ultimo_pedido` de um contato da Weni e delega ao parser comum.
+    """
+    fields = get_fields(contact)
+    raw = normalize_value(fields.get("ultimo_pedido")).strip()
+
+    if not raw:
+        return None, []
+
+    contact_uuid = normalize_value(contact.get("uuid")).strip()
+    phone, _ = get_phone_and_urn(contact, fields)
+    client_name = (
+        normalize_value(fields.get("nome")).strip()
+        or normalize_value(contact.get("name")).strip()
+    )
+    cpf = normalize_value(fields.get("cpf")).strip()
+    modified_on = normalize_value(contact.get("modified_on")).strip()
+
+    return parse_ultimo_pedido_raw(
+        raw,
+        contact_uuid=contact_uuid,
+        phone=phone,
+        client_name=client_name,
+        cpf=cpf,
+        modified_on=modified_on,
+        captured_at=captured_at,
+    )
+
+
+def build_sales_metrics(
+    order_records: list[dict[str, str]],
+    item_records: list[dict[str, str]],
+) -> list[list[Any]]:
+    orders_by_date: dict[str, set[str]] = defaultdict(set)
+    confirmed_by_date: dict[str, set[str]] = defaultdict(set)
+    clients_by_date: dict[str, set[str]] = defaultdict(set)
+    revenue_by_date: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
+    confirmed_revenue_by_date: dict[str, Decimal] = defaultdict(
+        lambda: Decimal("0")
+    )
+    units_by_date: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
+
+    for record in order_records:
+        if record.get("status_validacao") not in (
+            "OK",
+            "ATENÇÃO_TOTAL_DIVERGENTE",
+        ):
+            continue
+
+        # Pedido explicitamente cancelado na FarmaLíder não entra em vendas.
+        if record.get("farmalider_cancelamento", "").strip():
+            continue
+
+        date = record.get("data", "").strip()
+        order_key = record.get("pedido_chave", "").strip()
+        contact_uuid = record.get("contact_uuid", "").strip()
+        if not date or not order_key:
+            continue
+
+        orders_by_date[date].add(order_key)
+        if contact_uuid:
+            clients_by_date[date].add(contact_uuid)
+
+        try:
+            value = _to_decimal(
+                record.get("valor_total_compra"),
+                "valor_total_compra",
+            )
+            revenue_by_date[date] += value
+        except ValueError:
+            value = Decimal("0")
+
+        confirmation = record.get("status_confirmacao", "")
+        if confirmation.startswith("CONFIRMADO_API"):
+            confirmed_by_date[date].add(order_key)
+            confirmed_revenue_by_date[date] += value
+
+    valid_order_keys = {
+        record.get("pedido_chave", "").strip()
+        for record in order_records
+        if record.get("status_validacao") in ("OK", "ATENÇÃO_TOTAL_DIVERGENTE")
+        and not record.get("farmalider_cancelamento", "").strip()
+    }
+
+    for record in item_records:
+        if record.get("pedido_chave", "").strip() not in valid_order_keys:
+            continue
+        date = record.get("data", "").strip()
+        if not date:
+            continue
+        try:
+            units_by_date[date] += _quantity(
+                record.get("quantidade", "0")
+            )
+        except ValueError:
+            pass
+
+    dates = sorted(
+        set(orders_by_date)
+        | set(confirmed_by_date)
+        | set(clients_by_date)
+        | set(revenue_by_date)
+        | set(units_by_date)
+    )
+
+    return [
+        [
+            date,
+            len(orders_by_date[date]),
+            len(confirmed_by_date[date]),
+            len(clients_by_date[date]),
+            _quantity_text(units_by_date[date]),
+            _money(revenue_by_date[date]),
+            _money(confirmed_revenue_by_date[date]),
+        ]
+        for date in dates
+    ]
+
+
+
+def _bi_decimal(value: Any) -> Decimal:
+    try:
+        return _to_decimal(value, "bi")
+    except ValueError:
+        return Decimal("0")
+
+
+def _bi_float(value: Decimal) -> float:
+    return float(value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+def _bi_valid_orders(order_records: list[dict[str, str]]) -> list[dict[str, str]]:
+    return [
+        record
+        for record in order_records
+        if record.get("status_validacao") in ("OK", "ATENÇÃO_TOTAL_DIVERGENTE")
+        and not record.get("farmalider_cancelamento", "").strip()
+        and record.get("pedido_chave", "").strip()
+    ]
+
+
+def build_bi_sales_rows(
+    order_records: list[dict[str, str]],
+    item_records: list[dict[str, str]],
+    *,
+    snapshot_date: str,
+    updated_at: str,
+) -> list[list[Any]]:
+    base = build_sales_metrics(order_records, item_records)
+    rows: list[list[Any]] = []
+    dates_seen: set[str] = set()
+    for row in base:
+        date, pedidos, confirmados, compradores, unidades, faturamento, fat_confirmado = row
+        pedidos_i = int(pedidos or 0)
+        confirmados_i = int(confirmados or 0)
+        faturamento_d = _bi_decimal(faturamento)
+        ticket = (faturamento_d / pedidos_i) if pedidos_i else Decimal("0")
+        taxa = (Decimal(confirmados_i) * 100 / pedidos_i) if pedidos_i else Decimal("0")
+        rows.append([
+            date,
+            pedidos_i,
+            confirmados_i,
+            int(compradores or 0),
+            float(_bi_decimal(unidades)),
+            _bi_float(faturamento_d),
+            _bi_float(_bi_decimal(fat_confirmado)),
+            _bi_float(ticket),
+            _bi_float(taxa),
+            updated_at,
+        ])
+        dates_seen.add(str(date))
+
+    if snapshot_date not in dates_seen:
+        rows.append([snapshot_date, 0, 0, 0, 0, 0.0, 0.0, 0.0, 0.0, updated_at])
+    rows.sort(key=lambda row: str(row[0]))
+    return rows
+
+
+def _bi_channel(record: dict[str, str]) -> str:
+    value = (record.get("contact_canal_principal") or "").strip().casefold()
+    if value in {"whatsapp", "instagram", "facebook"}:
+        return value
+    return "outro"
+
+
+def _bi_is_ad_contact(record: dict[str, str]) -> bool:
+    return any(
+        (record.get(key) or "").strip()
+        for key in (
+            "primeiro_anuncio_id",
+            "primeiro_anuncio_clique_id",
+            "primeiro_anuncio_origem",
+            "ultimo_anuncio_id",
+            "ultimo_anuncio_clique_id",
+            "ultimo_anuncio_origem",
+        )
+    )
+
+
+def build_bi_summary_record(
+    base_records: list[dict[str, str]],
+    order_records: list[dict[str, str]],
+    item_records: list[dict[str, str]],
+    *,
+    snapshot_date: str,
+    updated_at: str,
+) -> dict[str, Any]:
+    valid_orders = _bi_valid_orders(order_records)
+    all_buyers = {r.get("contact_uuid", "").strip() for r in valid_orders if r.get("contact_uuid", "").strip()}
+    all_order_keys = {r.get("pedido_chave", "").strip() for r in valid_orders}
+    all_revenue = sum((_bi_decimal(r.get("valor_total_compra")) for r in valid_orders), Decimal("0"))
+
+    sales_rows = build_bi_sales_rows(
+        order_records, item_records, snapshot_date=snapshot_date, updated_at=updated_at
+    )
+    today = next(row for row in sales_rows if str(row[0]) == snapshot_date)
+
+    counts = {"whatsapp": 0, "instagram": 0, "facebook": 0, "outro": 0}
+    novos = com_cpf = cpfs_validos = clientes = nao_encontrados = 0
+    opt_in = opt_out = maiores = menores = ads = 0
+    for record in base_records:
+        counts[_bi_channel(record)] += 1
+        cpf = normalize_cpf(record.get("cpf_normalizado") or record.get("cpf"))
+        if cpf:
+            com_cpf += 1
+        if is_valid_cpf(cpf):
+            cpfs_validos += 1
+        status = (record.get("farmalider_cliente_status") or "").strip()
+        if status == "CPF_CONFIRMADO":
+            clientes += 1
+        elif status == "CPF_NAO_ENCONTRADO":
+            nao_encontrados += 1
+        if parse_date(record.get("weni_created_on", "")) == snapshot_date:
+            novos += 1
+        lgpd = (record.get("opt_in_lgpd") or "").strip().casefold()
+        if lgpd == "ativo":
+            opt_in += 1
+        elif lgpd == "recusado":
+            opt_out += 1
+        majority = (record.get("maior_de_18_anos") or "").strip().casefold()
+        if majority in {"sim", "yes", "true", "1"}:
+            maiores += 1
+        elif majority in {"não", "nao", "no", "false", "0"}:
+            menores += 1
+        if _bi_is_ad_contact(record):
+            ads += 1
+
+    total = len(base_records)
+    return {
+        "data": snapshot_date,
+        "atualizado_em": updated_at,
+        "contatos_total": total,
+        "novos_contatos": novos,
+        "contatos_com_cpf": com_cpf,
+        "cpfs_validos": cpfs_validos,
+        "contatos_sem_cpf": max(0, total - com_cpf),
+        "clientes_farmalider": clientes,
+        "clientes_nao_encontrados": nao_encontrados,
+        "whatsapp": counts["whatsapp"],
+        "instagram": counts["instagram"],
+        "facebook": counts["facebook"],
+        "outro": counts["outro"],
+        "opt_in_lgpd": opt_in,
+        "opt_out_lgpd": opt_out,
+        "lgpd_nao_informado": max(0, total - opt_in - opt_out),
+        "maiores_18": maiores,
+        "menores_18": menores,
+        "maioridade_nao_informada": max(0, total - maiores - menores),
+        "contatos_ads": ads,
+        "clientes_compradores_total": len(all_buyers),
+        "pedidos_total": len(all_order_keys),
+        "faturamento_total": _bi_float(all_revenue),
+        "pedidos_dia": int(today[1]),
+        "pedidos_confirmados_api_dia": int(today[2]),
+        "clientes_compradores_dia": int(today[3]),
+        "unidades_vendidas_dia": float(today[4]),
+        "faturamento_dia": float(today[5]),
+        "faturamento_confirmado_api_dia": float(today[6]),
+        "ticket_medio_dia": float(today[7]),
+    }
+
+
+def build_bi_channel_records(
+    base_records: list[dict[str, str]],
+    *,
+    snapshot_date: str,
+    updated_at: str,
+) -> list[dict[str, Any]]:
+    channels = ["whatsapp", "instagram", "facebook", "outro"]
+    result: list[dict[str, Any]] = []
+    for channel in channels:
+        rows = [r for r in base_records if _bi_channel(r) == channel]
+        result.append({
+            "chave": f"{snapshot_date}|{channel}",
+            "data": snapshot_date,
+            "canal": channel,
+            "contatos": len(rows),
+            "contatos_com_cpf": sum(1 for r in rows if normalize_cpf(r.get("cpf_normalizado") or r.get("cpf"))),
+            "clientes_farmalider": sum(1 for r in rows if (r.get("farmalider_cliente_status") or "").strip() == "CPF_CONFIRMADO"),
+            "contatos_ads": sum(1 for r in rows if _bi_is_ad_contact(r)),
+            "opt_in_lgpd": sum(1 for r in rows if (r.get("opt_in_lgpd") or "").strip().casefold() == "ativo"),
+            "atualizado_em": updated_at,
+        })
+    return result
+
+
+def build_bi_conversion_records(
+    base_records: list[dict[str, str]],
+    order_records: list[dict[str, str]],
+    *,
+    snapshot_date: str,
+    updated_at: str,
+) -> list[dict[str, Any]]:
+    valid_orders = _bi_valid_orders(order_records)
+    buyers = {r.get("contact_uuid", "").strip() for r in valid_orders if r.get("contact_uuid", "").strip()}
+    stages = [
+        (1, "Contatos", len(base_records)),
+        (2, "CPF válido", sum(1 for r in base_records if is_valid_cpf(normalize_cpf(r.get("cpf_normalizado") or r.get("cpf"))))),
+        (3, "Cliente FarmaLíder", sum(1 for r in base_records if (r.get("farmalider_cliente_status") or "").strip() == "CPF_CONFIRMADO")),
+        (4, "Cliente comprador", len(buyers)),
+    ]
+    base = stages[0][2] or 0
+    previous = 0
+    result: list[dict[str, Any]] = []
+    for order, label, qty in stages:
+        base_rate = (qty * 100 / base) if base else 0.0
+        prev_rate = 100.0 if order == 1 else ((qty * 100 / previous) if previous else 0.0)
+        result.append({
+            "chave": f"{snapshot_date}|{order}",
+            "data": snapshot_date,
+            "etapa_ordem": order,
+            "etapa": label,
+            "quantidade": qty,
+            "taxa_base_pct": round(base_rate, 2),
+            "taxa_etapa_anterior_pct": round(prev_rate, 2),
+            "atualizado_em": updated_at,
+        })
+        previous = qty
+    return result
+
+
+def build_bi_ads_rows(
+    base_records: list[dict[str, str]],
+    order_records: list[dict[str, str]],
+    *,
+    snapshot_date: str,
+    updated_at: str,
+) -> list[list[Any]]:
+    dimensions = [
+        ("Primeiro anúncio", "primeiro_anuncio_"),
+        ("Último anúncio", "ultimo_anuncio_"),
+    ]
+    contact_groups: dict[tuple[str, ...], dict[str, Any]] = {}
+
+    for label, prefix in dimensions:
+        for record in base_records:
+            ad_id = (record.get(prefix + "id") or "").strip()
+            title = (record.get(prefix + "titulo") or "").strip()
+            origin = (record.get(prefix + "origem") or "").strip()
+            campaign = (record.get(prefix + "tipo_campanha") or "").strip()
+            destination = (record.get(prefix + "canal_destino") or "").strip()
+            if not any((ad_id, title, origin)):
+                continue
+            key = (label, origin, campaign, destination, ad_id, title)
+            bucket = contact_groups.setdefault(key, {"contatos": 0, "clientes": 0, "buyers": set(), "orders": set(), "revenue": Decimal("0")})
+            bucket["contatos"] += 1
+            if (record.get("farmalider_cliente_status") or "").strip() == "CPF_CONFIRMADO":
+                bucket["clientes"] += 1
+
+    for label, prefix in dimensions:
+        for record in _bi_valid_orders(order_records):
+            ad_id = (record.get(prefix + "id") or "").strip()
+            title = (record.get(prefix + "titulo") or "").strip()
+            origin = (record.get(prefix + "origem") or "").strip()
+            campaign = (record.get(prefix + "tipo_campanha") or "").strip()
+            destination = (record.get(prefix + "canal_destino") or "").strip()
+            if not any((ad_id, title, origin)):
+                continue
+            key = (label, origin, campaign, destination, ad_id, title)
+            bucket = contact_groups.setdefault(key, {"contatos": 0, "clientes": 0, "buyers": set(), "orders": set(), "revenue": Decimal("0")})
+            uuid = (record.get("contact_uuid") or "").strip()
+            order_key = (record.get("pedido_chave") or "").strip()
+            if uuid:
+                bucket["buyers"].add(uuid)
+            if order_key:
+                bucket["orders"].add(order_key)
+            bucket["revenue"] += _bi_decimal(record.get("valor_total_compra"))
+
+    rows: list[list[Any]] = []
+    for key in sorted(contact_groups):
+        label, origin, campaign, destination, ad_id, title = key
+        bucket = contact_groups[key]
+        rows.append([
+            snapshot_date, label, origin, campaign, destination, ad_id, title,
+            int(bucket["contatos"]), int(bucket["clientes"]),
+            len(bucket["buyers"]), len(bucket["orders"]),
+            _bi_float(bucket["revenue"]), updated_at,
+        ])
+
+    if not rows:
+        rows.append([snapshot_date, "Sem dados", "", "", "", "", "Sem conversas atribuídas a anúncios", 0, 0, 0, 0, 0.0, updated_at])
+    return rows

@@ -1,0 +1,14 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+extend-exclude = [
+  ".venv",
+  "webhook_eventos.py",
+  "webhook_pedidos.py",
+  "run_webhook.py",
+  "run_webhook_pedidos.py",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]

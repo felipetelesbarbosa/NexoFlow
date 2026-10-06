@@ -1,0 +1,297 @@
+# NexoFlow Weni
+
+## Objetivo
+
+A rotina **NexoFlow Weni** elimina o processo manual de exportar mensagens/contatos da Weni, tratar planilhas e importar uma nova planilha. Ela consulta a API da Weni, monta um plano de alterações, audita obrigatoriamente esse plano e só então permite gravar os campos.
+
+## Execução recomendada
+
+### Uso diário
+
+Abra o atalho:
+
+```text
+NexoFlow Weni
+```
+
+O executável chama `atualizar_weni.bat` e executa:
+
+```text
+1. check-up.bat
+2. testar_update_weni.bat
+3. dry-run incremental
+4. auditoria obrigatória do plano
+5. confirmação manual: ATUALIZAR
+6. apply incremental
+```
+
+O apply faz uma nova leitura e uma nova auditoria antes de qualquer POST.
+
+### Primeira carga / reprocessamento integral
+
+Use:
+
+```text
+atualizar_weni_carga_completa.bat
+```
+
+A rotina faz dry-run completo, gera um relatório detalhado para revisão humana e exige a confirmação literal `CARGA COMPLETA REVISADA` antes do apply. Use para primeira implantação, backfill ou revalidação integral.
+
+Arquivos gerados:
+
+```text
+logs\weni_update_review_full.txt   relatório legível para o operador
+logs\weni_update_review_full.json  snapshot verificável do plano revisado
+```
+
+O TXT é aberto automaticamente no Bloco de Notas. Ele mostra, por contato, valores anteriores e propostos, evidência técnica, ações de grupo e confirmação FarmaLíder. No NexoFlow 1.0, o plano revisado fica **congelado**. Depois da confirmação, o NexoFlow não recalcula mensagens nem inclui novos contatos no mesmo apply. Em vez disso, relê cada contato imediatamente antes de gravá-lo. Se os campos/URNs/fontes relevantes daquele contato mudaram, somente aquele contato é marcado como conflito e ignorado. Os demais continuam normalmente. O checkpoint usa o corte temporal do dry-run, permitindo que mensagens, contatos e conflitos posteriores sejam reprocessados na próxima incremental.
+
+### Somente simulação
+
+Use:
+
+```text
+atualizar_weni_dry_run.bat
+```
+
+Nenhuma alteração é gravada e o checkpoint não é avançado.
+
+### Teste de acesso
+
+Use:
+
+```text
+testar_update_weni.bat
+```
+
+O teste é somente leitura e valida acesso a contatos, mensagens, grupos Opt-In LGPD e Opt-Out LGPD e disponibilidade da FarmaLíder para confirmação de pedidos.
+
+## Campos que a rotina pode escrever
+
+A lista é fechada e auditada:
+
+```text
+contact_urn
+contact_urn_whatsapp
+contact_urn_instagram
+contact_urn_facebook
+contact_canal_principal
+cpf
+idade
+maior_de_18_anos
+opt_in_lgpd
+pedido_id
+pedido_data
+pedido_produtos
+pedido_quantidade_itens
+pedido_valor
+ultima_compra
+primeiro_anuncio_origem
+primeiro_anuncio_id
+primeiro_anuncio_titulo
+primeiro_anuncio_url
+primeiro_anuncio_clique_id
+primeiro_anuncio_data
+primeiro_anuncio_tipo_campanha
+primeiro_anuncio_canal_destino
+ultimo_anuncio_origem
+ultimo_anuncio_id
+ultimo_anuncio_titulo
+ultimo_anuncio_url
+ultimo_anuncio_clique_id
+ultimo_anuncio_data
+ultimo_anuncio_tipo_campanha
+ultimo_anuncio_canal_destino
+```
+
+Qualquer tentativa de escrever outro campo bloqueia a execução antes do primeiro POST.
+
+## Regras de URN e canais
+
+A Weni continua sendo a fonte de verdade das URNs. O NexoFlow apenas classifica as identidades que a API realmente retorna, sem fabricar endereço de canal.
+
+Prioridade da URN principal quando existem vários canais:
+
+```text
+WhatsApp > Instagram > Facebook/Messenger > outra URN nativa
+```
+
+Campos mantidos pela rotina:
+
+```text
+contact_urn            URN principal
+contact_urn_whatsapp   URN oficial de WhatsApp
+contact_urn_instagram  URN oficial de Instagram
+contact_urn_facebook   URN oficial de Facebook/Messenger
+contact_canal_principal  whatsapp | instagram | facebook | outro
+```
+
+Antes do dry-run ou apply, o NexoFlow consulta a API de campos da Weni e exige que os quatro campos multicanal específicos existam. Eles devem ser criados como **Texto** na Weni. Se algum estiver ausente, a execução é interrompida antes de qualquer escrita em contatos.
+
+Regras:
+
+- a URN é preservada exatamente como recebida da Weni;
+- `messenger:` e variantes reconhecidas de Facebook são classificadas como `facebook`, mas o valor original da URN não é reescrito;
+- se o contato tiver WhatsApp e Instagram, `contact_urn` usa WhatsApp e os dois canais permanecem registrados nos campos específicos;
+- se houver apenas Instagram, o Instagram vira a URN principal;
+- se houver apenas Facebook/Messenger, esse canal vira o principal;
+- sem URN nativa reconhecida, o NexoFlow pode manter a `contact_urn` já existente ou usar outra URN nativa como `outro`;
+- um campo específico não é apagado por ausência temporária da URN numa resposta da API;
+- clique/anúncio não é URN. `primeiro_anuncio_*` e `ultimo_anuncio_*` continuam registrando atribuição de mídia separadamente.
+
+A revisão humana mostra a URN e o canal principal, contabiliza alterações de identificação de canal e também informa quantos contatos receberam atribuição Google Ads. O snapshot de revisão do NexoFlow 1.0 usa schema 5, inclui guardas de concorrência e o corte temporal do dry-run. Snapshots de versões anteriores são rejeitados para evitar apply com semântica antiga.
+
+
+
+## Atendimento 24h e concorrência
+A carga completa foi adaptada para ambientes em que a Weni continua recebendo mensagens e contatos durante toda a revisão. O dry-run fixa um corte temporal (`captured_at_utc`) e gera o snapshot schema 5. O apply usa os planos armazenados nesse JSON, valida seu SHA-256 e não volta a montar o plano a partir do histórico.
+
+Antes de cada contato ser gravado, o NexoFlow consulta novamente aquele contato na Weni. Para cada campo planejado, o valor atual precisa continuar igual ao valor anterior revisado ou já ter chegado ao próprio valor proposto. Também são protegidas as URNs nativas, `opt_in_lgpd` quando governa grupos e `ultimo_pedido` quando sustenta dados de compra. Se houver divergência, o contato recebe status de auditoria `conflict_skipped` e a carga continua para os demais. Se outra automação já aplicou exatamente o mesmo resultado, o status é `already_satisfied` e não há regravação.
+
+Ao final, o checkpoint avança para o **corte do dry-run**, não para o horário final da aplicação. Assim, tudo que chegou ou mudou depois do snapshot é elegível para a próxima execução incremental, inclusive os contatos que foram isolados por conflito. Uma falha real de POST continua interrompendo a execução e impede o avanço do checkpoint.
+
+## Google Ads e canal de destino
+
+O NexoFlow 1.0 pode reconhecer um contato como vindo de **Google Ads** quando a evidência do clique chega à Weni em campos/metadados estruturados. São aceitos marcadores explícitos como `gclid`, `gbraid`, `wbraid`, `utm_source=google` com meio pago ou metadados equivalentes de Google Ads. Um URL comum do Google é ignorado. Para evitar falso positivo, um link com `gclid` simplesmente colado pelo cliente no texto livre da conversa também não é usado como prova de origem.
+
+O anúncio e o canal continuam separados. Exemplos:
+
+```text
+Google Ads Performance Max -> WhatsApp
+  primeiro_anuncio_origem = Google Ads
+  primeiro_anuncio_tipo_campanha = Performance Max
+  primeiro_anuncio_canal_destino = whatsapp
+  contact_urn = whatsapp:...
+
+Google Ads Search -> Instagram Direct
+  ultimo_anuncio_origem = Google Ads
+  ultimo_anuncio_tipo_campanha = Search
+  ultimo_anuncio_canal_destino = instagram
+  contact_urn_instagram = <URN oficial da Weni>
+
+Google Ads YouTube -> Messenger
+  ultimo_anuncio_origem = Google Ads
+  ultimo_anuncio_tipo_campanha = YouTube
+  ultimo_anuncio_canal_destino = facebook
+  contact_urn_facebook = <URN Facebook/Messenger da Weni>
+```
+
+Tipos reconhecidos quando a evidência é explícita: **Performance Max**, **Search**, **Display/Banner**, **YouTube**, **Demand Gen** e **Shopping**. `utm_medium=cpc` sozinho não distingue Search de Performance Max, por isso o NexoFlow não adivinha o tipo nesse caso.
+
+O primeiro anúncio válido é preservado. O último anúncio só é substituído por uma evidência realmente mais recente. Os campos `primeiro_anuncio_tipo_campanha`, `primeiro_anuncio_canal_destino`, `ultimo_anuncio_tipo_campanha` e `ultimo_anuncio_canal_destino` são opcionais: se não existirem na Weni, a rotina avisa e continua com os campos genéricos de anúncio disponíveis.
+
+**Limitação importante:** se o Google Ads abrir diretamente WhatsApp, Instagram ou Messenger e nenhum `gclid`/`gbraid`/`wbraid`/UTM/metadado chegar à Weni, o NexoFlow não consegue provar a origem e não marca o contato como Google Ads. Para atribuição garantida nesses casos é necessário preservar a informação do clique em um redirecionador/landing de rastreamento ou integração equivalente.
+
+## Regras de CPF
+
+- o campo autorizado é `cpf` (`@fields.cpf` na Weni);
+- o NexoFlow aceita CPF com ou sem pontuação, mas grava sempre 11 dígitos sem pontuação;
+- o documento precisa passar pela validação oficial dos dois dígitos verificadores;
+- em uma mensagem comum, o número só é considerado CPF quando o próprio texto o identifica como CPF, por exemplo `Meu CPF é 529.982.247-25`;
+- um CPF isolado, por exemplo `52998224725`, só é aceito quando existe uma solicitação contextual anterior de CPF;
+- se uma mesma mensagem contiver mais de um CPF válido, ela é tratada como ambígua e não altera o cadastro;
+- se o campo `cpf` estiver vazio, o CPF válido mais recente encontrado pode preenchê-lo;
+- se o cliente informar depois um CPF válido diferente do que está salvo, o CPF mais recente substitui o anterior;
+- o mesmo CPF em outra formatação não é regravado;
+- nenhuma mensagem sem CPF válido limpa ou substitui um valor já existente.
+
+## Regras de idade e maioridade
+
+- idade explícita, como `Tenho 27 anos`, pode preencher `idade = 27` e `maior_de_18_anos = sim`;
+- idade abaixo de 18 gera `maior_de_18_anos = não`;
+- declaração explícita de maioridade pode atualizar apenas `maior_de_18_anos`;
+- respostas curtas como `27`, `Sim` e `Não` só são aceitas quando existe uma pergunta contextual clara imediatamente anterior;
+- mensagens ambíguas são ignoradas.
+
+## Regras de LGPD
+
+- aceite inequívoco em contexto explícito de LGPD/consentimento pode definir `opt_in_lgpd = ativo`;
+- recusa inequívoca pode definir `opt_in_lgpd = recusado`;
+- `Sim`/`Não` sem contexto de LGPD nunca altera consentimento;
+- `opt_in_lgpd_status` não é escrito pelo NexoFlow;
+- `ativo` -> garantir associação ao grupo **Opt-In LGPD** e remover do **Opt-Out LGPD**, caso esteja nele;
+- `recusado` -> garantir associação ao grupo **Opt-Out LGPD** e remover do **Opt-In LGPD**, caso esteja nele;
+- o valor de `opt_in_lgpd` é a fonte de verdade: a rotina também corrige contatos já existentes com grupos incompatíveis;
+- quando precisar trocar de grupo, o NexoFlow tenta primeiro adicionar o grupo correto e depois remover o incompatível.
+
+## Regras de pedido e última compra
+
+`ultimo_pedido` é a fonte estruturada em JSON. A rotina não o reescreve. Se houver `pedido_id`, o NexoFlow consulta a API FarmaLíder e só atualiza os campos de compra quando a confirmação oficial for válida e o pedido não estiver cancelado.
+
+Campos derivados:
+
+```text
+pedido_id                Texto
+pedido_data              YYYY-MM-DD HH:mm:ss
+pedido_valor             Número
+pedido_quantidade_itens  Soma das quantidades
+pedido_produtos          Nome xQtd | Nome xQtd
+ultima_compra            YYYY-MM-DD HH:mm:ss
+```
+
+Uma compra mais antiga nunca substitui uma `ultima_compra` mais recente.
+
+## Incremental e checkpoint
+
+O estado fica em:
+
+```text
+logs\weni_update_state.json
+```
+
+A rotina usa uma sobreposição de segurança no período consultado e é idempotente: valores idênticos não são regravados. O checkpoint só avança depois que todas as gravações terminam sem erro.
+
+## Auditoria e logs
+
+Log operacional:
+
+```text
+logs\nexoflow_update_weni.log
+```
+
+Trilha de auditoria estruturada:
+
+```text
+logs\weni_update_audit.jsonl
+```
+
+A auditoria registra contato, campos anteriores/novos, evidência técnica, ações de grupo e confirmação de pedido. O corpo completo das mensagens do cliente não é salvo nessa trilha.
+
+## Princípios de segurança
+
+- nunca inventar dados;
+- nunca gravar vazio sobre um valor válido;
+- preferir API/flow oficial a interpretação de conversa;
+- pedido só atualiza campos de compra com confirmação FarmaLíder;
+- nenhuma escrita acontece antes de `audit_plans`;
+- carga completa aplica exatamente o snapshot congelado revisado pelo operador, sem recalcular todo o histórico;
+- falha de escrita bloqueia o checkpoint;
+- nenhuma credencial é incorporada ao executável.
+
+
+## Atalho
+
+O executável/atalho **NexoFlow Weni** usa o ícone exclusivo `assets\NexoFlow_Weni.ico`.
+
+## Uso pelo NexoFlow Terminal
+
+No NexoFlow 1.0, as rotinas desta documentação também podem ser chamadas por comandos amigáveis:
+
+```text
+nexo weni testar
+nexo weni dry-run
+nexo weni atualizar
+nexo weni carga-completa
+```
+
+Para investigar um contato sem alterar a Weni:
+
+```text
+nexo api weni contato --uuid <UUID>
+nexo api weni mensagens --uuid <UUID> --limite 10
+nexo api weni grupos
+nexo api weni campos
+```
+
+As consultas `nexo api` são somente leitura. Consulte `README TERMINAL.md` para a referência completa.
+

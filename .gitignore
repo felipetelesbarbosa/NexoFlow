@@ -1,0 +1,21 @@
+.venv/
+__pycache__/
+*.pyc
+
+# Segredos e credenciais locais
+secrets_config.py
+.env
+.env.*
+credentials/google_credentials.json
+credentials/*.json
+
+# Logs
+logs/*.log
+logs/*.log.*
+
+# VS Code
+.vscode/
+
+# Sistema operacional
+Thumbs.db
+.DS_Store

@@ -1,0 +1,19 @@
+{
+  "include": [
+    "*.py",
+    "*.pyi"
+  ],
+  "exclude": [
+    ".venv",
+    "__pycache__",
+    "webhook_eventos.py",
+    "webhook_pedidos.py",
+    "run_webhook.py",
+    "run_webhook_pedidos.py",
+    "tests"
+  ],
+  "venvPath": ".",
+  "venv": ".venv",
+  "typeCheckingMode": "basic",
+  "reportMissingTypeStubs": "none"
+}

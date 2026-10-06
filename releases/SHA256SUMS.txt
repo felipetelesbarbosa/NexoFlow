@@ -1,0 +1,2 @@
+e02b6a9804cf1cca7e78ee8bfc598145a53a2284fffaa6ec57cd5dd892a11213  NexoFlow-Setup-1.0.zip
+ac8e4f65bc64272c8eef38b71359539d850a605737bbb87dc100eb3b2e5ae899  NexoFlow-1.0.zip
