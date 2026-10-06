@@ -122,7 +122,8 @@ Regras importantes:
 - `Sim`, `Não` ou uma idade isolada só são usados quando existe contexto explícito na conversa;
 - `opt_in_lgpd_status` permanece controlado pelos flows/agentes da Weni;
 - `ultimo_pedido` pode ser fornecido como JSON estruturado; a rotina NexoFlow Weni não reescreve esse campo. O Analytics também aceita os campos separados `pedido_*` e deriva o JSON quando necessário;
-- se os campos do contato não fornecerem um pedido utilizável com identificador oficial, a rotina pode consultar o CPF confirmado, obter `ultimoPedido` na resposta da API e validar esse pedido pela FarmaLíder;
+- quando `ultimo_pedido` está preenchido e possui ID válido, seus dados têm prioridade; a API consulta somente esse mesmo pedido por ID para confirmar o status, sem buscar outro pedido pelo CPF;
+- somente quando `ultimo_pedido` está ausente, vazio ou `null`, a rotina pode consultar o CPF confirmado, obter `ultimoPedido` na resposta da API e validar esse pedido pela FarmaLíder;
 - pedidos são validados pelo identificador e pelo vínculo com o titular. Cancelamentos são preservados no registro, mas não confirmam uma compra nem atualizam `ultima_compra`;
 - `opt_in_lgpd = ativo` garante o contato no grupo **Opt-In LGPD** e remove **Opt-Out LGPD**, se necessário;
 - `opt_in_lgpd = recusado` garante o contato no grupo **Opt-Out LGPD** e remove **Opt-In LGPD**, se necessário;
@@ -179,9 +180,9 @@ Na operação rotineira, execute o NexoFlow Weni antes do Analytics.
 
 O NexoFlow 1.0 aceita `ultimo_pedido` e os campos `pedido_id`, `pedido_data`, `pedido_produtos`, `pedido_quantidade_itens` e `pedido_valor`. Esses campos também são preservados na `Base_Contatos`. Quando necessário, o Analytics deriva um JSON estruturado a partir deles e mantém as tabelas de pedidos e itens.
 
-Se não houver um pedido utilizável com identificador oficial, o fluxo `CPF → ultimoPedido → pedido` consulta e valida o último pedido disponível na FarmaLíder. Produtos permanecem em JSON, com os códigos reais e sem inventar nomes ausentes. Valores, frete, origem do total e cancelamento são mantidos para interpretação correta das métricas.
+Quando `ultimo_pedido` estiver preenchido, seus dados são usados como Caminho 1 e o NexoFlow consulta somente o mesmo `pedido_id` para confirmar o status atual. O fluxo `CPF → ultimoPedido → pedido` é Caminho 2 e só é usado quando `ultimo_pedido` estiver ausente, vazio ou `null`. Produtos permanecem em JSON e os cinco campos de pedido são mantidos em qualquer estado válido.
 
-Datas de pedidos usam **America/Belem (UTC−3 / GMT−3)**. Os indicadores de vendas incluem somente pedidos identificados pelo NexoFlow em **Concluído (status 2)**, válidos e não cancelados. Pedidos em processamento e cancelamentos permanecem registrados; `ultima_compra` exige também confirmação pela API. Concluído descreve o estado operacional e não comprova pagamento. A leitura do último pedido não recupera automaticamente todo o histórico comercial.
+Datas de pedidos usam **America/Belem (UTC−3 / GMT−3)**. Os indicadores de vendas incluem somente pedidos em **Concluído (status 2)**, confirmados pela API, válidos e não cancelados. Pedidos nos estados 0, 1, 3 e 4 continuam registrados nos cinco campos; `ultima_compra` só avança para status 2 confirmado pela API. Concluído descreve o estado operacional e não comprova pagamento. A leitura do último pedido não recupera automaticamente todo o histórico comercial.
 
 Consulte [Pedidos no NexoFlow 1.0](docs/PEDIDOS.md) para o contrato e as regras de validação.
 
