@@ -18,7 +18,7 @@ O Analytics mantém esses campos na `Base_Contatos` e pode derivar `ultimo_pedid
 
 O campo `ultimo_pedido` preenchido é a fonte prioritária. Os campos separados não podem substituí-lo por outro pedido nem ocultar conteúdo inválido. Um snapshot previamente confirmado ou cancelado pela API pode ser preservado, incluindo valores, itens e estado, somente quando pertence ao mesmo ID oficial positivo, passa pelas validações do snapshot e tem data igual ou mais recente. O JSON original continua preservado em `Pedidos_FarmaLider.ultimo_pedido_raw`; isso evita que um JSON antigo apague um cancelamento já registrado do mesmo pedido.
 
-O JSON produzido para `pedido_produtos` é um envelope com a lista `produtos`, identificação e data do pedido, valores, quantidades, origem, estados de validação/confirmação, `farmalider_frete`, `farmalider_status_pedido` e `farmalider_cancelamento`. Ele não é uma descrição de produtos em texto livre. Os códigos recebidos são preservados; um nome ausente permanece ausente. O código do produto não deve ser apresentado como se fosse seu nome.
+O JSON de `ultimo_pedido` é a fonte primária do Caminho 1 e pode fornecer diretamente `pedido_id`, data/hora, nomes dos produtos, quantidades, valores unitários e valor total. O NexoFlow usa esse conteúdo para derivar e preencher `pedido_id`, `pedido_data`, `pedido_produtos`, `pedido_quantidade_itens` e `pedido_valor`. O JSON produzido para `pedido_produtos` preserva a lista de produtos e os metadados de auditoria, incluindo status e cancelamento quando confirmados.
 
 ## Resolução e confirmação
 
@@ -83,20 +83,19 @@ De-para da documentação fornecida pelo usuário, **Integração API Líder.pdf
 
 ### Critério dos indicadores de vendas
 
-Faturamento, pedidos, unidades vendidas e compradores incluem somente pedidos identificados pelo NexoFlow em **Concluído (código 2)**, **confirmados pela consulta da API**, não cancelados e com os demais critérios de validação satisfeitos. Estados 0, 1 e 4 continuam registrados nos cinco campos de pedido, mas não entram em vendas enquanto não chegarem ao estado 2. A regra se aplica também às métricas usadas em Resumo, Conversão e Ads.
+Faturamento, pedidos, unidades vendidas e compradores consideram como **pedido feito** todos os estados operacionais conhecidos e não cancelados: **0 — Em processamento, 1 — Em trânsito, 2 — Concluído e 4 — Pronto para rota**, desde que o status tenha sido confirmado pela API e os demais dados sejam válidos. Somente **3 — Cancelado** fica fora. A mesma regra se aplica às métricas usadas em Resumo, Conversão e Ads.
 
 | Estado do pedido | Captura e auditoria | Indicadores de vendas |
 |---|---|---|
-| 0, 1 ou 4 | Preservados; podem atualizar os cinco campos `pedido_*` quando os dados são válidos. | Fora dos indicadores enquanto não concluídos. |
-| 2 | Preservado. | Elegível quando validado e não cancelado. |
+| 0, 1, 2 ou 4 | Preservados e alimentam os cinco campos `pedido_*` quando os dados são válidos. | Entram como pedido feito quando o status é confirmado pela API e não há cancelamento explícito. |
 | 3 | Cancelamento preservado. | Fora dos indicadores. |
-| Ausente ou desconhecido | Informação disponível preservada, sem inferir conclusão. | Fora dos indicadores. |
+| Ausente ou desconhecido | Informação disponível preservada, sem inferir estado. | Fora dos indicadores. |
 
 **Concluído é um estado operacional/logístico:** por si só, não comprova pagamento ou liquidação financeira. Os indicadores cobrem os pedidos identificados pelo NexoFlow; não representam automaticamente todas as vendas da FarmaLíder nem comprovam uma venda originada por um anúncio.
 
 - Pedidos cancelados não compõem faturamento, unidades vendidas, compradores ou métricas de pedidos válidos.
-- `ultima_compra` somente avança para um pedido concluído, não cancelado e confirmado pela API FarmaLíder.
-- Um cancelamento explícito mantém o pedido fora das métricas mesmo que outro campo indique código 2.
+- `ultima_compra` avança para o pedido não cancelado mais recente com status conhecido 0, 1, 2 ou 4 confirmado pela API FarmaLíder.
+- Um cancelamento explícito mantém o pedido fora das métricas mesmo que outro campo indique um estado não cancelado.
 - Dados válidos não são apagados apenas porque uma fonte deixou de informar um campo.
 - Divergências de identificador ou titular são registradas para diagnóstico e não devem alimentar indicadores como pedidos confirmados.
 
