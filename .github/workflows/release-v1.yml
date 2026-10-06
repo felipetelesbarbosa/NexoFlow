@@ -23,25 +23,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Limpar branches antigas do NexoFlow
-        if: github.event_name == 'push'
-        shell: pwsh
-        run: |
-          $branches = @(
-            "codex/validacao-pedidos-dois-caminhos",
-            "fix/setup-estavel-1.0",
-            "hotfix/nexoflow-1.0-release",
-            "release/nexoflow-1.0-final"
-          )
-          foreach ($branch in $branches) {
-            git ls-remote --exit-code --heads origin "refs/heads/$branch" *> $null
-            if ($LASTEXITCODE -eq 0) {
-              Write-Host "Removendo branch: $branch"
-              git push origin --delete $branch
-              if ($LASTEXITCODE -ne 0) { throw "Falha ao remover branch $branch" }
-            }
-          }
-
       - name: Python para testes
         uses: actions/setup-python@v5
         with:
