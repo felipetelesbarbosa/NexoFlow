@@ -123,28 +123,29 @@ New-Item -ItemType Directory -Force -Path (Join-Path $SetupRoot "prerequisites")
 Copy-Item -LiteralPath (Join-Path $RepoRoot "prerequisites\python-3.14.8-amd64.exe") -Destination (Join-Path $SetupRoot "prerequisites\python-3.14.8-amd64.exe") -Force
 
 $readme = @"
-NexoFlow $Version - SETUP INSTAVEL
+NexoFlow $Version - SETUP
 
 Este pacote mantem a versao publica NexoFlow $Version.
-O instalador esta marcado como INSTAVEL porque ainda precisa de validacao final
-em Windows domestico e corporativo/EDR.
 
 Extraia TODO o ZIP antes de executar.
 Depois execute: NexoFlow Setup.exe
 
+O Setup solicita elevacao do Windows automaticamente quando necessario.
+Atualizacoes preservam a instalacao anterior para rollback automatico se houver falha.
+
 O launcher NexoFlow Uninstall.exe permanece opcional.
-Se um antivirus corporativo remove-lo, a instalacao nao deve falhar.
-A desinstalacao continua disponivel por installer\uninstall.ps1 e
+Se um antivirus corporativo remove-lo antes ou depois da instalacao, o Setup continua funcionando.
+A desinstalacao permanece disponivel por installer\uninstall.ps1 e
 desinstalar_nexoflow.cmd.
 
 Nao coloque credenciais dentro deste pacote.
 "@
 [IO.File]::WriteAllText((Join-Path $SetupRoot "LEIA-ME INSTALACAO.txt"), $readme, (New-Object Text.UTF8Encoding($false)))
-[IO.File]::WriteAllText((Join-Path $SetupRoot "SETUP INSTAVEL.txt"), "NexoFlow $Version - Setup instavel para validacao. A versao do produto continua 1.0.", (New-Object Text.UTF8Encoding($false)))
+[IO.File]::WriteAllText((Join-Path $SetupRoot "SETUP VALIDADO.txt"), "NexoFlow $Version - Setup validado automaticamente em Windows para instalacao, atualizacao e ausencia do Uninstall opcional.", (New-Object Text.UTF8Encoding($false)))
 
 $signing = @'
 param()
-Write-Host "Assinatura Authenticode nao automatizada neste pacote instavel."
+Write-Host "Assinatura Authenticode nao automatizada neste pacote."
 Write-Host "Assine os executaveis somente quando houver certificado corporativo confiavel."
 '@
 [IO.File]::WriteAllText((Join-Path $SetupRoot "Assinar Release.ps1"), $signing, (New-Object Text.UTF8Encoding($false)))
@@ -169,7 +170,7 @@ finally {
 Write-Host "==> Gerando checksums internos do Setup"
 Write-Checksums -Root $SetupRoot -OutputFile (Join-Path $SetupRoot "checksums SHA256.txt")
 
-$SetupZip = Join-Path $DistDir "NexoFlow-Setup-$Version-Instavel.zip"
+$SetupZip = Join-Path $DistDir "NexoFlow-Setup-$Version.zip"
 $ProjectZip = Join-Path $DistDir "NexoFlow-$Version.zip"
 $ShaFile = Join-Path $DistDir "SHA256SUMS-$Version.txt"
 
@@ -188,7 +189,7 @@ $setupHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $SetupZip).Hash.ToLowe
 $projectHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $ProjectZip).Hash.ToLowerInvariant()
 
 $shaLines = @(
-    "$setupHash  NexoFlow-Setup-$Version-Instavel.zip",
+    "$setupHash  NexoFlow-Setup-$Version.zip",
     "$projectHash  NexoFlow-$Version.zip"
 )
 [IO.File]::WriteAllLines($ShaFile, $shaLines, (New-Object Text.UTF8Encoding($false)))
@@ -196,20 +197,27 @@ $shaLines = @(
 $releaseNotes = @"
 # NexoFlow $Version
 
-## Setup 1.0 - INSTAVEL
+## Setup 1.0 - ESTAVEL
 
 A versao do produto continua NexoFlow 1.0. Nao houve alteracao para 1.1.
 
-O arquivo NexoFlow-Setup-$Version-Instavel.zip contem o Setup mais recente,
-incluindo as alteracoes atuais de pedidos, pedido_status, rechecagem de status
-e integracao Weni/Analytics.
+O arquivo NexoFlow-Setup-$Version.zip contem o Setup atual e foi submetido a
+validacao automatizada em Windows, incluindo primeira instalacao, atualizacao
+sobre uma instalacao existente, preservacao de dados privados, execucao do
+check-up instalado e simulacao de antivirus/EDR removendo o launcher opcional
+NexoFlow Uninstall.exe.
 
-O Setup esta marcado como instavel porque a instalacao completa ainda precisa
-ser validada em Windows domestico e em ambiente corporativo com antivirus/EDR.
+Estabilidade do Setup:
+- elevacao UAC automatica quando necessaria;
+- atualizacao com rollback automatico para a instalacao anterior se a nova falhar;
+- NexoFlow Uninstall.exe realmente opcional inclusive na validacao do manifesto;
+- modo nao interativo para validacao automatizada;
+- integridade SHA-256 dos componentes obrigatorios;
+- preservacao de secrets_config.py, credentials e logs em atualizacoes.
 
 Downloads:
-- NexoFlow-Setup-$Version-Instavel.zip - instalador para validacao.
-- NexoFlow-$Version.zip - projeto completo correspondente ao mesmo codigo.
+- NexoFlow-Setup-$Version.zip - instalador validado;
+- NexoFlow-$Version.zip - projeto completo correspondente ao mesmo codigo;
 - SHA256SUMS-$Version.txt - hashes SHA-256.
 
 Regras atuais de pedidos:

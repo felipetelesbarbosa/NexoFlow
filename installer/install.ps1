@@ -1,5 +1,7 @@
 ﻿[CmdletBinding()]
-param()
+param(
+    [switch]$NonInteractive
+)
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
@@ -16,6 +18,8 @@ $BundledPythonInstaller = Join-Path $PackageRoot 'prerequisites\python-3.14.8-am
 $BundledPythonSha256 = '759be887b96e736a3ca886daf8d575f18fcae1a09efab6902f42d59e8999f8ef'
 $UninstallKey = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\NexoFlow'
 $AppKey = 'HKLM:\Software\Grupo Lider\NexoFlow'
+$script:OptionalUninstallerValidated = $true
+$script:RollbackInstallDir = $null
 
 # Caminhos da instalação anterior, usados somente para migração para a marca NexoFlow.
 $LegacyInstallDir = 'C:\Weni\WeniWhatsAppAnalytics'
@@ -36,11 +40,51 @@ function Test-Admin {
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
+function Ensure-Administrator {
+    if (Test-Admin) { return }
+
+    if ($NonInteractive) {
+        throw 'O modo nao interativo precisa ser executado com privilegios de administrador.'
+    }
+
+    $powershellExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    if (-not (Test-Path -LiteralPath $powershellExe -PathType Leaf)) {
+        $powershellExe = 'powershell.exe'
+    }
+
+    $argumentLine = '-NoLogo -NoProfile -ExecutionPolicy Bypass -File "{0}"' -f $PSCommandPath
+    try {
+        $process = Start-Process -FilePath $powershellExe -ArgumentList $argumentLine -Verb RunAs -Wait -PassThru -ErrorAction Stop
+        exit $process.ExitCode
+    } catch {
+        throw "A instalacao precisa de permissao de administrador. Operacao cancelada ou negada pelo Windows. $($_.Exception.Message)"
+    }
+}
+
 function Show-Info([string]$Text, [string]$Title = $AppName) {
+    if ($NonInteractive) {
+        Write-Host "[$Title] $Text"
+        return
+    }
+
     try {
         Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
         [System.Windows.Forms.MessageBox]::Show($Text, $Title, 'OK', 'Information') | Out-Null
     } catch { Write-Host $Text }
+}
+
+function Get-Sha256File([string]$Path) {
+    $stream = $null
+    $sha = $null
+    try {
+        $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+        $sha = [Security.Cryptography.SHA256]::Create()
+        $bytes = $sha.ComputeHash($stream)
+        return ([BitConverter]::ToString($bytes)).Replace('-', '').ToLowerInvariant()
+    } finally {
+        if ($sha) { $sha.Dispose() }
+        if ($stream) { $stream.Dispose() }
+    }
 }
 
 
@@ -434,6 +478,8 @@ function Get-CompatiblePython {
 }
 
 function Confirm-PythonInstall {
+    if ($NonInteractive) { return $false }
+
     $message = @"
 Nenhuma instalação compatível do Python foi localizada pelo NexoFlow.
 
@@ -481,7 +527,7 @@ function Install-PythonIfNeeded {
         throw "O instalador incluído do Python 3.14.8 não foi encontrado em: $BundledPythonInstaller"
     }
 
-    $actualHash = (Get-FileHash -LiteralPath $BundledPythonInstaller -Algorithm SHA256).Hash.ToLowerInvariant()
+    $actualHash = Get-Sha256File -Path $BundledPythonInstaller
     if ($actualHash -ne $BundledPythonSha256) {
         throw 'Falha de integridade no instalador incluído do Python 3.14.8.'
     }
@@ -572,6 +618,8 @@ Abra o atalho "Python 3.14.8" uma vez para confirmar que o interpretador inicia 
 }
 
 function Confirm-Update {
+    if ($NonInteractive) { return $true }
+
     try {
         Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
         $result = [System.Windows.Forms.MessageBox]::Show(
@@ -587,18 +635,50 @@ function Confirm-Update {
 function Validate-Payload {
     if (-not (Test-Path -LiteralPath $PayloadDir -PathType Container)) { throw "Pasta payload nao encontrada em: $PayloadDir" }
     if (-not (Test-Path -LiteralPath $ManifestPath -PathType Leaf)) { throw "Manifesto de integridade nao encontrado: $ManifestPath" }
+
+    $script:OptionalUninstallerValidated = $true
+    $optionalRelative = 'NexoFlow Uninstall.exe'
     $manifest = Get-Content -LiteralPath $ManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
     $count = 0
+
     foreach ($entry in $manifest.files) {
         $relative = [string]$entry.path
         if ($relative -eq 'payload manifest.json') { continue }
+
         $file = Join-Path $PayloadDir $relative
-        if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Arquivo ausente no pacote: $relative" }
-        $hash = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
-        if ($hash -ne ([string]$entry.sha256).ToLowerInvariant()) { throw "Falha de integridade no arquivo: $relative" }
+        if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
+            if ($relative -eq $optionalRelative) {
+                $script:OptionalUninstallerValidated = $false
+                Write-Warning "$optionalRelative foi removido ou bloqueado antes da instalacao. Como ele e opcional, o Setup continuara normalmente."
+                continue
+            }
+            throw "Arquivo ausente no pacote: $relative"
+        }
+
+        try {
+            $hash = Get-Sha256File -Path $file
+        } catch {
+            if ($relative -eq $optionalRelative) {
+                $script:OptionalUninstallerValidated = $false
+                Write-Warning "Nao foi possivel validar $optionalRelative. O componente sera ignorado e o Setup continuara."
+                continue
+            }
+            throw
+        }
+
+        if ($hash -ne ([string]$entry.sha256).ToLowerInvariant()) {
+            if ($relative -eq $optionalRelative) {
+                $script:OptionalUninstallerValidated = $false
+                Write-Warning "$optionalRelative divergiu do manifesto. Por seguranca ele nao sera instalado, mas o Setup continuara."
+                continue
+            }
+            throw "Falha de integridade no arquivo: $relative"
+        }
+
         $count++
     }
-    Write-Host "[OK] Integridade do pacote validada ($count arquivos)." -ForegroundColor Green
+
+    Write-Host "[OK] Integridade dos componentes obrigatorios validada ($count arquivos)." -ForegroundColor Green
 }
 
 function Ensure-InstalledPayloadFile([string]$RelativePath) {
@@ -612,8 +692,8 @@ function Ensure-InstalledPayloadFile([string]$RelativePath) {
     $needsRestore = -not (Test-Path -LiteralPath $target -PathType Leaf)
     if (-not $needsRestore) {
         try {
-            $sourceHash = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash
-            $targetHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
+            $sourceHash = Get-Sha256File -Path $source
+            $targetHash = Get-Sha256File -Path $target
             $needsRestore = ($sourceHash -ne $targetHash)
         } catch {
             $needsRestore = $true
@@ -632,8 +712,8 @@ function Ensure-InstalledPayloadFile([string]$RelativePath) {
         throw "$RelativePath não permaneceu em $InstallDir após a instalação. Verifique antivírus/EDR e tente novamente."
     }
 
-    $sourceHash = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash
-    $targetHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
+    $sourceHash = Get-Sha256File -Path $source
+    $targetHash = Get-Sha256File -Path $target
     if ($sourceHash -ne $targetHash) {
         throw "Falha de integridade no arquivo instalado: $RelativePath"
     }
@@ -643,6 +723,11 @@ function Ensure-InstalledPayloadFile([string]$RelativePath) {
 
 function Install-OptionalUninstaller {
     $relative = 'NexoFlow Uninstall.exe'
+
+    if (-not $script:OptionalUninstallerValidated) {
+        Write-Warning "$relative nao sera instalado porque nao passou pela validacao opcional do pacote. A desinstalacao por script permanece funcional."
+        return
+    }
     $source = Join-Path $PayloadDir $relative
     $target = Join-Path $InstallDir $relative
 
@@ -665,8 +750,8 @@ function Install-OptionalUninstaller {
     }
 
     try {
-        $sourceHash = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash
-        $targetHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
+        $sourceHash = Get-Sha256File -Path $source
+        $targetHash = Get-Sha256File -Path $target
         if ($sourceHash -ne $targetHash) {
             Write-Warning "$relative está presente, mas diverge do pacote. Ele será tratado como indisponível; a instalação continuará normalmente."
             return
@@ -735,20 +820,72 @@ function Stop-InstalledNexoFlowProcesses {
     Start-Sleep -Milliseconds 700
 }
 
-function Remove-InstallDirectory {
-    if (-not (Test-Path -LiteralPath $InstallDir)) { return }
+function Remove-DirectoryWithRetry {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [int]$Attempts = 20
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) { return $true }
 
     $lastError = $null
-    for ($attempt = 1; $attempt -le 12; $attempt++) {
+    for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
         try {
-            Remove-Item -LiteralPath $InstallDir -Recurse -Force -ErrorAction Stop
-            return
+            Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
+            return $true
         } catch {
             $lastError = $_.Exception.Message
             Start-Sleep -Milliseconds 500
         }
     }
-    throw "Nao foi possivel substituir a instalacao anterior em $InstallDir. Feche janelas do NexoFlow Terminal e tente novamente. Detalhe: $lastError"
+
+    Write-Warning "Nao foi possivel remover completamente: $Path. Detalhe: $lastError"
+    return $false
+}
+
+function Stage-ExistingInstall {
+    if (-not (Test-Path -LiteralPath $InstallDir -PathType Container)) { return $null }
+
+    $rollback = "$InstallDir.__rollback__.$([guid]::NewGuid().ToString('N'))"
+    $lastError = $null
+
+    for ($attempt = 1; $attempt -le 20; $attempt++) {
+        try {
+            Move-Item -LiteralPath $InstallDir -Destination $rollback -Force -ErrorAction Stop
+            Write-Host "[OK] Instalacao anterior preservada para rollback seguro." -ForegroundColor Green
+            return $rollback
+        } catch {
+            $lastError = $_.Exception.Message
+            Start-Sleep -Milliseconds 500
+        }
+    }
+
+    throw "Nao foi possivel preparar a atualizacao segura de $InstallDir. A instalacao anterior foi mantida intacta. Feche terminais/Explorer nessa pasta e tente novamente. Detalhe: $lastError"
+}
+
+function Restore-PreviousInstall {
+    param([string]$RollbackPath)
+
+    if (-not $RollbackPath -or -not (Test-Path -LiteralPath $RollbackPath -PathType Container)) {
+        return $false
+    }
+
+    Stop-InstalledNexoFlowProcesses
+
+    if (Test-Path -LiteralPath $InstallDir) {
+        if (-not (Remove-DirectoryWithRetry -Path $InstallDir -Attempts 20)) {
+            return $false
+        }
+    }
+
+    try {
+        Move-Item -LiteralPath $RollbackPath -Destination $InstallDir -Force -ErrorAction Stop
+        Write-Host "[OK] Instalacao anterior restaurada automaticamente." -ForegroundColor Green
+        return $true
+    } catch {
+        Write-Warning "Falha ao restaurar automaticamente a instalacao anterior: $($_.Exception.Message)"
+        return $false
+    }
 }
 
 function Refresh-NexoFlowIconCache([string[]]$Executables) {
@@ -844,7 +981,7 @@ try {
     Write-Host '==========================================================' -ForegroundColor DarkCyan
     Write-Host ' NexoFlow - Instalador' -ForegroundColor Cyan
     Write-Host '==========================================================' -ForegroundColor DarkCyan
-    if (-not (Test-Admin)) { throw 'O instalador precisa ser executado como administrador.' }
+    Ensure-Administrator
 
     Write-Step 'Validando integridade do pacote'
     Validate-Payload
@@ -870,7 +1007,7 @@ try {
     Backup-PrivateData -Source $InstallDir -Backup (Join-Path $backupDir 'installed')
 
     Write-Step "Instalando arquivos em $InstallDir"
-    Remove-InstallDirectory
+    $script:RollbackInstallDir = Stage-ExistingInstall
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
     # O launcher NexoFlow Uninstall.exe é opcional e pode ser bloqueado por EDR/antivírus.
     # Ele é copiado separadamente em modo tolerante para nunca reprovar o Setup.
@@ -959,6 +1096,15 @@ try {
     Write-Step 'Registrando NexoFlow no Windows'
     Register-Uninstaller
     Remove-LegacyBrand
+
+    if ($script:RollbackInstallDir -and (Test-Path -LiteralPath $script:RollbackInstallDir -PathType Container)) {
+        if (-not (Remove-DirectoryWithRetry -Path $script:RollbackInstallDir -Attempts 20)) {
+            Write-Warning "A atualizacao foi concluida, mas a copia de rollback antiga permaneceu em: $script:RollbackInstallDir"
+        } else {
+            $script:RollbackInstallDir = $null
+        }
+    }
+
     if (Test-Path -LiteralPath $DataDir) { Remove-Item -LiteralPath $DataDir -Recurse -Force }
     Remove-Item -LiteralPath $backupDir -Recurse -Force -ErrorAction SilentlyContinue
 
@@ -975,15 +1121,37 @@ try {
 }
 catch {
     $errorMessage = $_.Exception.Message
-    if ($backupDir -and (Test-Path -LiteralPath $backupDir -PathType Container)) {
+    $rollbackRestored = $false
+
+    if ($script:RollbackInstallDir) {
+        Write-Host "`n[INFO] A instalacao falhou. Tentando restaurar automaticamente a versao anterior..." -ForegroundColor DarkYellow
+        $rollbackRestored = Restore-PreviousInstall -RollbackPath $script:RollbackInstallDir
+        if ($rollbackRestored) {
+            $script:RollbackInstallDir = $null
+        }
+    }
+
+    if (-not $rollbackRestored -and $backupDir -and (Test-Path -LiteralPath $backupDir -PathType Container)) {
         try {
             New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
-            foreach ($name in @('legacy preserved','legacy installed','preserved','installed')) { Restore-PrivateData -Backup (Join-Path $backupDir $name) -Target $DataDir }
+            foreach ($name in @('legacy preserved','legacy installed','preserved','installed')) {
+                Restore-PrivateData -Backup (Join-Path $backupDir $name) -Target $DataDir
+            }
         } catch { }
     }
+
     Write-Host "`n[ERRO] $errorMessage" -ForegroundColor Red
+    if ($rollbackRestored) {
+        Write-Host "[OK] A instalacao anterior foi restaurada; o NexoFlow nao ficou parcialmente atualizado." -ForegroundColor Green
+    }
     Write-Host "[INFO] Log do Setup: $SetupLogPath" -ForegroundColor DarkYellow
-    Show-Info "A instalacao nao foi concluida.`n`n$errorMessage`n`nLog: $SetupLogPath`n`nDados privados existentes foram preservados sempre que possivel." "$AppName - Erro"
+
+    $rollbackMessage = if ($rollbackRestored) {
+        "`n`nA instalacao anterior foi restaurada automaticamente."
+    } else {
+        "`n`nDados privados existentes foram preservados sempre que possivel."
+    }
+    Show-Info "A instalacao nao foi concluida.`n`n$errorMessage`n`nLog: $SetupLogPath$rollbackMessage" "$AppName - Erro"
     try { Stop-Transcript | Out-Null } catch { }
     exit 1
 }

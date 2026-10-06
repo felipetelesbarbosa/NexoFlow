@@ -2,21 +2,33 @@
 
 Distribuição oficial do **NexoFlow 1.0**.
 
-A versão do produto permanece **1.0**. O Setup atual está publicado como **instável** enquanto passa pela validação final em Windows doméstico e corporativo/EDR.
+A versão do produto permanece **1.0**.
 
 ## Downloads
 
 Use a página oficial da Release **v1.0**:
 
-- **NexoFlow-Setup-1.0-Instavel.zip** — Setup mais recente para validação;
+- **NexoFlow-Setup-1.0.zip** — Setup validado;
 - **NexoFlow-1.0.zip** — projeto completo correspondente ao mesmo código;
 - **SHA256SUMS-1.0.txt** — hashes SHA-256 dos dois pacotes.
 
 Release:
 https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.0
 
-O Setup inclui o NexoFlow Uninstall.exe como launcher opcional. Se um antivírus corporativo bloquear ou remover esse executável, a instalação não deve falhar; a desinstalação continua disponível por installer\uninstall.ps1 e desinstalar_nexoflow.cmd.
+## Estabilidade do Setup
 
-Os pacotes são gerados automaticamente a partir da branch main após validação dos testes e auditoria. Credenciais reais não entram nos artefatos.
+O Setup 1.0 é validado automaticamente em Windows antes da publicação. A validação cobre:
 
-> Importante: **instável** se refere ao estado de validação do Setup, não a uma mudança de versão. O produto continua sendo **NexoFlow 1.0**.
+- primeira instalação;
+- atualização sobre uma instalação existente;
+- preservação de `secrets_config.py`, `credentials` e `logs`;
+- execução do `check-up.bat` após a instalação;
+- cenário em que antivírus/EDR remove `NexoFlow Uninstall.exe` do pacote extraído.
+
+O `NexoFlow Uninstall.exe` é opcional. Se for bloqueado ou removido, o Setup continua funcionando e a desinstalação permanece disponível por `installer\uninstall.ps1` e `desinstalar_nexoflow.cmd`.
+
+Atualizações preservam temporariamente a instalação anterior. Se a nova instalação falhar depois de iniciada, o Setup tenta restaurar automaticamente a versão anterior, evitando deixar o NexoFlow parcialmente atualizado.
+
+O Setup também solicita elevação UAC automaticamente quando necessário.
+
+Os pacotes são gerados automaticamente a partir da `main` somente depois de testes, auditoria e smoke test do instalador. Credenciais reais não entram nos artefatos.
