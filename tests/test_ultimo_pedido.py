@@ -2,6 +2,8 @@ import json
 import unittest
 
 from analytics import (
+    BASE_COLUMNS,
+    ORDER_ITEM_COLUMNS,
     build_sales_metrics,
     normalize_contact,
     parse_ultimo_pedido,
@@ -64,7 +66,7 @@ class UltimoPedidoTests(unittest.TestCase):
         self.assertIsNotNone(order)
         self.assertEqual(order["data_hora"], "2026-09-30T16:07:00Z")
         self.assertEqual(order["data"], "2026-09-30")
-        self.assertEqual(order["hora"], "16:07:00")
+        self.assertEqual(order["hora"], "13:07:00")
         self.assertEqual(order["valor_total_compra"], "110.80")
         self.assertEqual(order["valor_total_itens"], "110.80")
         self.assertEqual(order["quantidade_produtos"], "3")
@@ -119,6 +121,122 @@ class UltimoPedidoTests(unittest.TestCase):
             metrics,
             [["2026-09-30", 1, 0, 1, "4", "110.80", "0.00"]],
         )
+
+    def derived_contact(self, *, raw="", date="2026-10-03T01:00:00Z", metadata=None):
+        envelope = {
+            "pedido_id": "321",
+            "produtos": [{"codigo": "9001", "nome": "", "quantidade": 2,
+                          "valor_unitario": "10.00", "valor_total": "19.00"}],
+            **(metadata or {}),
+        }
+        contact = sample_contact(raw)
+        contact["fields"].update({
+            "pedido_id": {"value": "321"},
+            "pedido_data": {"value": date},
+            "pedido_produtos": {"value": json.dumps(envelope)},
+            "pedido_quantidade_itens": {"value": "2"},
+            "pedido_valor": {"value": "19.00"},
+        })
+        return contact
+
+    def test_derived_order_with_product_code_reaches_sales_without_raw(self):
+        contact = self.derived_contact()
+        order, items = parse_ultimo_pedido(contact, "2026-10-03T04:00:00Z")
+        self.assertEqual(order["pedido_chave"], "FARMALIDER:321")
+        self.assertEqual(order["data"], "2026-10-02")
+        self.assertEqual(order["hora"], "22:00:00")
+        self.assertEqual(order["ultimo_pedido_raw"], "")
+        self.assertEqual(order["status_confirmacao"], "NAO_CONFIRMADO_API")
+        self.assertEqual(items[0]["produto_nome"], "")
+        self.assertEqual(items[0]["produto_codigo"], "9001")
+        self.assertEqual(items[0]["valor_total"], "19.00")
+        self.assertEqual(build_sales_metrics([order], items),
+                         [["2026-10-02", 1, 0, 1, "2", "19.00", "0.00"]])
+
+    def test_derived_order_recovers_invalid_raw_preserving_original(self):
+        contact = self.derived_contact(raw="{invalid original}")
+        order, items = parse_ultimo_pedido(contact, "2026-10-03T04:00:00Z")
+        self.assertEqual(order["status_validacao"], "OK")
+        self.assertEqual(order["ultimo_pedido_raw"], "{invalid original}")
+        self.assertEqual(len(items), 1)
+
+    def test_only_verified_newer_derived_order_replaces_valid_raw(self):
+        contact = self.derived_contact(raw=EXAMPLE_JSON)
+        order, _ = parse_ultimo_pedido(contact, "2026-10-03T04:00:00Z")
+        self.assertEqual(order["data_hora"], EXAMPLE_PAYLOAD["data_hora"])
+        contact["fields"]["pedido_produtos"]["value"] = json.dumps({
+            **json.loads(contact["fields"]["pedido_produtos"]["value"]),
+            "status_confirmacao": "CONFIRMADO_API", "origem_pedido": "FARMALIDER_API",
+        })
+        order, _ = parse_ultimo_pedido(contact, "2026-10-03T04:00:00Z")
+        self.assertEqual(order["pedido_id"], "321")
+        self.assertEqual(order["ultimo_pedido_raw"], EXAMPLE_JSON)
+        contact["fields"]["pedido_data"]["value"] = "2026-09-29T13:00:00-03:00"
+        older, _ = parse_ultimo_pedido(contact, "2026-10-03T04:00:00Z")
+        self.assertEqual(older["data_hora"], EXAMPLE_PAYLOAD["data_hora"])
+
+    def test_derived_id_must_match_product_envelope(self):
+        contact = self.derived_contact(metadata={"pedido_id": "other"})
+        order, items = parse_ultimo_pedido(contact, "2026-10-03T04:00:00Z")
+        self.assertEqual(order["status_validacao"], "ERRO")
+        self.assertEqual(items, [])
+
+    def test_legacy_product_summary_and_missing_prices_are_not_invented(self):
+        contact = self.derived_contact()
+        for products in ("Produto x2", [{"nome": "Produto", "quantidade": 2}]):
+            with self.subTest(products=products):
+                contact["fields"]["pedido_produtos"] = products
+                order, items = parse_ultimo_pedido(contact, "2026-10-03T04:00:00Z")
+                self.assertEqual(order["status_validacao"], "ERRO")
+                self.assertEqual(items, [])
+
+    def test_nonfinite_values_and_quantity_mismatch_are_errors(self):
+        for value in ("NaN", "Infinity", "-Infinity", True):
+            with self.subTest(value=value):
+                payload = {**EXAMPLE_PAYLOAD, "valor_total_compra": value}
+                order, items = parse_ultimo_pedido(sample_contact(json.dumps(payload)), "2026-10-03T04:00:00Z")
+                self.assertEqual(order["status_validacao"], "ERRO")
+                self.assertEqual(items, [])
+        contact = self.derived_contact()
+        contact["fields"]["pedido_quantidade_itens"] = "1"
+        order, items = parse_ultimo_pedido(contact, "2026-10-03T04:00:00Z")
+        self.assertEqual(order["status_validacao"], "ERRO")
+        self.assertEqual(items, [])
+
+    def test_derived_snapshot_normalization_and_keys_are_stable(self):
+        contact = self.derived_contact()
+        row = normalize_contact(contact, "2026-10-03T04:00:00Z")
+        for key in ("pedido_id", "pedido_data", "pedido_produtos", "pedido_quantidade_itens", "pedido_valor"):
+            self.assertIn(key, BASE_COLUMNS)
+            self.assertTrue(row[key])
+        self.assertIn("produto_codigo", ORDER_ITEM_COLUMNS)
+        first, items1 = parse_ultimo_pedido(contact, "2026-10-03T04:00:00Z")
+        second, items2 = parse_ultimo_pedido(contact, "2026-10-04T04:00:00Z")
+        self.assertEqual(first["pedido_chave"], second["pedido_chave"])
+        self.assertEqual(items1[0]["item_chave"], items2[0]["item_chave"])
+
+    def test_canonical_freight_total_round_trips_without_false_divergence(self):
+        contact = self.derived_contact(metadata={
+            "status_confirmacao": "CONFIRMADO_API", "status_validacao": "OK",
+            "farmalider_frete": "9.99", "valor_total_compra": "28.99",
+            "valor_origem": "SOMA_ITENS_MAIS_FRETE_API",
+        })
+        contact["fields"]["pedido_valor"] = "28.99"
+        order, items = parse_ultimo_pedido(contact, "2026-10-03T04:00:00Z")
+        self.assertEqual(order["status_validacao"], "OK")
+        self.assertEqual(order["valor_total_itens"], "19.00")
+        self.assertEqual(order["valor_total_compra"], "28.99")
+        self.assertEqual(order["diferenca_total"], "0.00")
+        self.assertEqual(items[0]["valor_total"], "19.00")
+
+    def test_partial_api_total_does_not_become_complete_after_round_trip(self):
+        contact = self.derived_contact(metadata={
+            "status_confirmacao": "CONFIRMADO_API", "status_validacao": "ATENCAO_TOTAL_PARCIAL",
+            "valor_origem": "SOMA_ITENS_API",
+        })
+        order, items = parse_ultimo_pedido(contact, "2026-10-03T04:00:00Z")
+        self.assertEqual(order["status_validacao"], "ATENCAO_TOTAL_PARCIAL")
+        self.assertEqual(build_sales_metrics([order], items), [])
 
 
 if __name__ == "__main__":

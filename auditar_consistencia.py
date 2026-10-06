@@ -851,7 +851,7 @@ def check_weni_update_safety() -> None:
         '"contact_urn_facebook"',
         '"contact_canal_principal"',
         '_sync_contact_channel_fields',
-        'REVIEW_SCHEMA_VERSION = 5',
+        'REVIEW_SCHEMA_VERSION = 6',
     ]:
         if required not in update_text:
             fail(f"Update Weni não contém a identificação multicanal obrigatória: {required}")
@@ -993,7 +993,7 @@ def check_weni_update_safety() -> None:
         "load_review_snapshot",
         "_prepare_frozen_plan_for_apply",
         "_plan_digest",
-        "REVIEW_SCHEMA_VERSION = 5",
+        "REVIEW_SCHEMA_VERSION = 6",
         "frozen_full_apply",
         "conflict_skipped",
         "pending_conflict_uuids",

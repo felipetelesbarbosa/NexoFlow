@@ -1,5 +1,9 @@
+import json
 import tempfile
 import unittest
+from copy import deepcopy
+from dataclasses import replace
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -32,6 +36,73 @@ class WeniUpdateTests(unittest.TestCase):
         )
         self._load_state_patcher.start()
         self.addCleanup(self._load_state_patcher.stop)
+
+    def _purchase_contact(self, *, include_raw: bool = True) -> dict:
+        fields = {"cpf": "52998224725"}
+        if include_raw:
+            fields["ultimo_pedido"] = json.dumps({
+                "pedido_id": "123",
+                "data_hora": "2026-10-03T12:00:00Z",
+                "valor_total_compra": 25.5,
+                "produtos": [
+                    {"nome": "Produto A", "quantidade": 2,
+                     "valor_unitario": 10.0, "valor_total": 20.0},
+                    {"nome": "Produto B", "quantidade": 1,
+                     "valor_unitario": 5.5, "valor_total": 5.5},
+                ],
+            })
+        else:
+            fields["pedido_id"] = "123"
+        return {"uuid": "u-pedido", "fields": fields}
+
+    def _purchase_api(self) -> Mock:
+        farm = Mock()
+        farm.get_cliente_by_cpf.return_value = {
+            "id": "99", "cpf": "52998224725", "nome": "Cliente Teste",
+            "ultimoPedido": {"id": "123", "codCliente": "99"},
+        }
+        farm.get_pedido.return_value = {
+            "capa": {
+                "id": "123", "codCliente": "99",
+                "emissao": "2026-10-03T12:00:00Z",
+                "status": "CONFIRMADO", "cancelamento": "", "frete": 0,
+            },
+            "itens": [
+                {"codPedido": "123", "codProduto": "A1", "nome": "Produto A",
+                 "quantidade": 2, "valor": 10.0, "total": 20.0},
+                {"codPedido": "123", "codProduto": "B1", "nome": "Produto B",
+                 "quantidade": 1, "valor": 5.5, "total": 5.5},
+            ],
+        }
+        return farm
+
+    def _purchase_plan(self, contact: dict, farm: Mock | None = None,
+                       *, captured_at: str = "2026-10-03T12:01:00Z") -> ContactUpdatePlan:
+        return _build_contact_plan(
+            contact,
+            context_messages=[],
+            candidate_message_ids=set(),
+            farm_client=farm,
+            opt_out_group_name="Opt-Out LGPD",
+            opt_out_group_uuid="g-out",
+            captured_at=captured_at,
+        )
+
+    def _incremental_purchase_client(self, contact: dict) -> Mock:
+        client = Mock()
+        client.list_fields.return_value = [
+            {"key": "contact_urn_whatsapp"},
+            {"key": "contact_urn_instagram"},
+            {"key": "contact_urn_facebook"},
+            {"key": "contact_canal_principal"},
+        ]
+        client.list_groups.return_value = [
+            {"uuid": "g-in", "name": "Opt-In LGPD"},
+            {"uuid": "g-out", "name": "Opt-Out LGPD"},
+        ]
+        client.list_contacts.return_value = [contact]
+        client.list_messages.return_value = []
+        return client
 
     def test_required_groups_are_resolved_with_one_api_listing(self) -> None:
         client = Mock()
@@ -70,6 +141,25 @@ class WeniUpdateTests(unittest.TestCase):
         )
         with self.assertRaises(PlanAuditError):
             audit_plans([plan], opt_out_group_available=True)
+
+    def test_audit_rejects_malformed_fields_even_for_a_validated_order(self) -> None:
+        malformed_fields = (
+            {"pedido_data": "data inválida"},
+            {"pedido_valor": -1},
+            {"pedido_valor": float("nan")},
+            {"pedido_valor": float("inf")},
+            {"pedido_quantidade_itens": 0},
+            {"pedido_quantidade_itens": -1},
+            {"pedido_produtos": "Produto A x2"},
+            {"pedido_produtos": json.dumps({"produtos": []})},
+        )
+        for fields in malformed_fields:
+            with self.subTest(fields=fields):
+                plan = ContactUpdatePlan(
+                    contact_uuid="u-pedido", fields=fields, order_validated=True,
+                )
+                with self.assertRaises(PlanAuditError):
+                    audit_plans([plan], opt_out_group_available=True)
 
     def test_audit_requires_optout_group_when_group_action_exists(self) -> None:
         plan = ContactUpdatePlan(
@@ -399,51 +489,253 @@ class WeniUpdateTests(unittest.TestCase):
             self.assertEqual(_load_state(path), payload)
 
     def test_confirmed_purchase_populates_expected_fields(self) -> None:
-        contact = {
-            "uuid": "u1",
-            "fields": {
-                "ultimo_pedido": (
-                    '{"data_hora":"2026-10-03T12:00:00Z",'
-                    '"pedido_id":"123",'
-                    '"valor_total_compra":25.5,'
-                    '"produtos":[{"nome":"Produto A","quantidade":2,'
-                    '"valor_unitario":10.0,"valor_total":20.0},'
-                    '{"nome":"Produto B","quantidade":1,'
-                    '"valor_unitario":5.5,"valor_total":5.5}]}'
-                ),
-                "id_do_cliente": 99,
-            },
-        }
-        farm = Mock()
-        farm.get_pedido.return_value = {
-            "capa": {
-                "id": "123",
-                "codCliente": "99",
-                "emissao": "2026-10-03T12:00:00Z",
-                "status": "CONFIRMADO",
-                "cancelamento": "",
-            },
-            "itens": [
-                {"quantidade": 2, "total": 20.0},
-                {"quantidade": 1, "total": 5.5},
-            ],
-        }
-        plan = _build_contact_plan(
-            contact,
-            context_messages=[],
-            candidate_message_ids=set(),
-            farm_client=farm,
-            opt_out_group_name="Opt-Out LGPD",
-            opt_out_group_uuid="g1",
-            captured_at="2026-10-03T12:01:00Z",
-        )
+        contact = self._purchase_contact()
+        farm = self._purchase_api()
+        plan = self._purchase_plan(contact, farm)
+        self.assertTrue(plan.order_validated)
         self.assertTrue(plan.purchase_confirmed)
         self.assertEqual(plan.fields["pedido_id"], "123")
         self.assertEqual(plan.fields["pedido_valor"], 25.5)
         self.assertEqual(plan.fields["pedido_quantidade_itens"], 3)
-        self.assertEqual(plan.fields["ultima_compra"], "2026-10-03 12:00:00")
-        self.assertIn("Produto A x2", plan.fields["pedido_produtos"])
+        self.assertEqual(plan.fields["pedido_data"], "2026-10-03T09:00:00-03:00")
+        self.assertEqual(plan.fields["ultima_compra"], "2026-10-03T09:00:00-03:00")
+        products = json.loads(plan.fields["pedido_produtos"])
+        self.assertIsInstance(products, dict)
+        self.assertEqual(products["pedido_id"], "123")
+        self.assertEqual(products["status_confirmacao"], "CONFIRMADO_API")
+        self.assertEqual(float(products["valor_total_compra"]), 25.5)
+        self.assertEqual(float(products["quantidade_itens"]), 3)
+        self.assertEqual(len(products["produtos"]), 2)
+        self.assertEqual(products["produtos"][0]["nome"], "Produto A")
+        farm.get_cliente_by_cpf.assert_called_once_with("52998224725")
+        farm.get_pedido.assert_called_once_with("123")
         audit_plans([plan], opt_out_group_available=True)
+
+    def test_api_resolves_structured_order_without_raw_payload(self) -> None:
+        contact = self._purchase_contact(include_raw=False)
+        contact["fields"].pop("pedido_id")
+        farm = self._purchase_api()
+        plan = self._purchase_plan(contact, farm)
+        final_fields = {**contact["fields"], **plan.fields}
+        self.assertTrue(plan.order_validated)
+        self.assertTrue(plan.purchase_confirmed)
+        self.assertEqual(final_fields["pedido_id"], "123")
+        self.assertEqual(final_fields["pedido_data"], "2026-10-03T09:00:00-03:00")
+        self.assertEqual(final_fields["pedido_valor"], 25.5)
+        self.assertEqual(final_fields["pedido_quantidade_itens"], 3)
+        self.assertEqual(len(json.loads(final_fields["pedido_produtos"])["produtos"]), 2)
+        self.assertEqual(final_fields["ultima_compra"], final_fields["pedido_data"])
+        audit_plans([plan], opt_out_group_available=True)
+
+    def test_cancelled_order_updates_five_fields_without_latest_purchase(self) -> None:
+        contact = self._purchase_contact()
+        contact["fields"]["ultima_compra"] = "2026-10-01T10:00:00-03:00"
+        farm = self._purchase_api()
+        farm.get_pedido.return_value["capa"]["cancelamento"] = "2026-10-03T13:00:00Z"
+        plan = self._purchase_plan(contact, farm)
+        self.assertTrue(plan.order_validated)
+        self.assertFalse(plan.purchase_confirmed)
+        self.assertEqual(set(plan.fields), {
+            "pedido_id", "pedido_data", "pedido_produtos",
+            "pedido_quantidade_itens", "pedido_valor",
+        })
+        self.assertNotIn("ultima_compra", plan.fields)
+        self.assertEqual(contact["fields"]["ultima_compra"], "2026-10-01T10:00:00-03:00")
+        products = json.loads(plan.fields["pedido_produtos"])
+        self.assertEqual(products["status_confirmacao"], "CANCELADO_API")
+        self.assertEqual(products["farmalider_cancelamento"], "2026-10-03T13:00:00Z")
+        audit_plans([plan], opt_out_group_available=True)
+
+    def test_complete_weni_order_without_api_remains_unconfirmed(self) -> None:
+        contact = self._purchase_contact()
+        plan = self._purchase_plan(contact)
+        self.assertTrue(plan.order_validated)
+        self.assertFalse(plan.purchase_confirmed)
+        self.assertEqual(set(plan.fields), {
+            "pedido_id", "pedido_data", "pedido_produtos",
+            "pedido_quantidade_itens", "pedido_valor",
+        })
+        self.assertEqual(plan.fields["pedido_valor"], 25.5)
+        self.assertEqual(plan.fields["pedido_quantidade_itens"], 3)
+        self.assertNotIn("ultima_compra", plan.fields)
+        products = json.loads(plan.fields["pedido_produtos"])
+        self.assertEqual(products["status_confirmacao"], "NAO_CONFIRMADO_API")
+        self.assertEqual(products["origem_pedido"], "WENI_ULTIMO_PEDIDO")
+        audit_plans([plan], opt_out_group_available=True)
+
+    def test_purchase_dates_use_belem_day_at_utc_midnight_boundary(self) -> None:
+        contact = self._purchase_contact(include_raw=False)
+        farm = self._purchase_api()
+        farm.get_pedido.return_value["capa"]["emissao"] = "2026-10-04T01:30:00Z"
+        plan = self._purchase_plan(contact, farm)
+        self.assertEqual(plan.fields["pedido_data"], "2026-10-03T22:30:00-03:00")
+        self.assertEqual(plan.fields["ultima_compra"], "2026-10-03T22:30:00-03:00")
+
+    def test_api_identity_mismatches_do_not_produce_order_writes(self) -> None:
+        for mismatch in ("cpf", "cliente", "codPedido"):
+            with self.subTest(mismatch=mismatch):
+                contact = self._purchase_contact(include_raw=False)
+                farm = self._purchase_api()
+                if mismatch == "cpf":
+                    farm.get_cliente_by_cpf.return_value["cpf"] = "11144477735"
+                elif mismatch == "cliente":
+                    farm.get_pedido.return_value["capa"]["codCliente"] = "100"
+                else:
+                    farm.get_pedido.return_value["itens"][0]["codPedido"] = "999"
+                plan = self._purchase_plan(contact, farm)
+                self.assertFalse(plan.order_validated)
+                self.assertFalse(plan.purchase_confirmed)
+                self.assertFalse(set(plan.fields) & {
+                    "pedido_id", "pedido_data", "pedido_produtos",
+                    "pedido_quantidade_itens", "pedido_valor", "ultima_compra",
+                })
+
+    def test_purchase_plan_is_idempotent_after_applying_structured_fields(self) -> None:
+        for api_available in (False, True):
+            with self.subTest(api_available=api_available):
+                contact = self._purchase_contact()
+                farm = self._purchase_api() if api_available else None
+                first = self._purchase_plan(contact, farm)
+                applied_contact = deepcopy(contact)
+                applied_contact["fields"].update(first.fields)
+                second = self._purchase_plan(
+                    applied_contact, farm, captured_at="2026-10-03T13:01:00Z",
+                )
+                self.assertTrue(second.order_validated)
+                self.assertEqual(second.fields, {})
+
+    def test_api_freight_preserves_original_weni_difference_on_idempotent_rerun(self) -> None:
+        contact = self._purchase_contact()
+        farm = self._purchase_api()
+        farm.get_pedido.return_value["capa"]["frete"] = 5
+        first = self._purchase_plan(contact, farm)
+        self.assertTrue(first.order_validated)
+        self.assertTrue(first.purchase_confirmed)
+        self.assertEqual(first.fields["pedido_valor"], 30.5)
+        self.assertEqual(first.fields["ultima_compra"], "2026-10-03T09:00:00-03:00")
+        products = json.loads(first.fields["pedido_produtos"])
+        self.assertEqual(products["status_validacao"], "ATENÇÃO_TOTAL_DIVERGENTE")
+        self.assertEqual(products["status_confirmacao"], "CONFIRMADO_API")
+        self.assertEqual(products["valor_total_compra"], "30.50")
+        self.assertEqual(products["valor_total_api_itens"], "25.50")
+        self.assertEqual(products["farmalider_frete"], "5.00")
+        self.assertEqual(products["valor_total_weni"], "25.50")
+        self.assertEqual(products["diferenca_total_weni_api"], "-5.00")
+        audit_plans([first], opt_out_group_available=True)
+
+        applied_contact = deepcopy(contact)
+        applied_contact["fields"].update(first.fields)
+        second = self._purchase_plan(
+            applied_contact, farm, captured_at="2026-10-03T13:01:00Z",
+        )
+        self.assertTrue(second.order_validated)
+        self.assertTrue(second.purchase_confirmed)
+        self.assertEqual(second.fields, {})
+        self.assertEqual(second.evidence, {})
+        self.assertEqual(json.loads(applied_contact["fields"]["pedido_produtos"]), products)
+
+    def test_divergent_weni_total_without_api_does_not_validate_order(self) -> None:
+        contact = self._purchase_contact()
+        raw = json.loads(contact["fields"]["ultimo_pedido"])
+        raw["valor_total_compra"] = 30.5
+        contact["fields"]["ultimo_pedido"] = json.dumps(raw)
+        plan = self._purchase_plan(contact)
+        self.assertFalse(plan.order_validated)
+        self.assertFalse(plan.purchase_confirmed)
+        self.assertFalse(plan.has_changes)
+        self.assertEqual(plan.fields, {})
+        self.assertEqual(plan.evidence, {})
+
+    def test_validated_unconfirmed_order_survives_frozen_review_roundtrip(self) -> None:
+        plan = self._purchase_plan(self._purchase_contact())
+        stats = UpdateStats(
+            contacts_considered=1, plans_with_changes=1, field_changes=len(plan.fields),
+        )
+        self.assertTrue(plan.order_validated)
+        self.assertFalse(plan.purchase_confirmed)
+        with tempfile.TemporaryDirectory() as tmp:
+            review = Path(tmp) / "review.json"
+            _, _, digest = write_review_snapshot(
+                [plan], stats, full=True, json_path=review,
+                captured_at_utc="2026-10-03T12:01:00Z",
+            )
+            loaded, payload, loaded_digest = load_review_snapshot(full=True, json_path=review)
+            self.assertTrue(payload["plans"][0]["order_validated"])
+            self.assertTrue(loaded[0].order_validated)
+            self.assertFalse(loaded[0].purchase_confirmed)
+            self.assertEqual(loaded[0].fields, plan.fields)
+            self.assertEqual(loaded[0].guards, plan.guards)
+            self.assertEqual(loaded_digest, digest)
+            audit_plans(loaded, opt_out_group_available=True)
+            self.assertEqual(verify_review_snapshot(loaded, full=True, json_path=review), digest)
+            with self.assertRaisesRegex(PlanAuditError, "plano mudou"):
+                verify_review_snapshot(
+                    [replace(plan, order_validated=False)], full=True, json_path=review,
+                )
+        audit_plans([plan], opt_out_group_available=True)
+
+    def test_incremental_order_apply_rechecks_identity_and_queues_conflicts(self) -> None:
+        started = datetime(2026, 10, 3, 12, 1, tzinfo=timezone.utc)
+        for changed_source in ("cpf", "ultimo_pedido"):
+            with self.subTest(changed_source=changed_source):
+                contact = self._purchase_contact()
+                client = self._incremental_purchase_client(contact)
+                current = deepcopy(contact)
+                if changed_source == "cpf":
+                    current["fields"]["cpf"] = "11144477735"
+                else:
+                    changed_order = json.loads(current["fields"]["ultimo_pedido"])
+                    changed_order["pedido_id"] = "999"
+                    current["fields"]["ultimo_pedido"] = json.dumps(changed_order)
+                client.get_contact.return_value = current
+                with (
+                    patch("weni_update.WeniClient", return_value=client),
+                    patch("weni_update._open_farmalider", return_value=self._purchase_api()),
+                    patch("weni_update.resolve_window", return_value=UpdateWindow(
+                        started_at=started, after=started, full=False,
+                    )),
+                    patch("weni_update._append_audit") as audit_mock,
+                    patch("weni_update._save_state") as save_mock,
+                ):
+                    result = run_update(apply=True, full=False)
+                self.assertEqual(result.contacts_conflicted, 1)
+                self.assertEqual(result.contacts_updated, 0)
+                self.assertEqual(result.contacts_failed, 0)
+                client.get_contact.assert_called_once_with(uuid="u-pedido")
+                client.update_contact_fields.assert_not_called()
+                client.contact_group_action.assert_not_called()
+                save_mock.assert_called_once()
+                self.assertEqual(save_mock.call_args.args[0]["pending_conflict_uuids"], ["u-pedido"])
+                self.assertEqual(audit_mock.call_args.args[0]["status"], "conflict_skipped")
+                self.assertIn(changed_source, audit_mock.call_args.args[0]["error"])
+
+    def test_incremental_order_apply_skips_fields_already_written_concurrently(self) -> None:
+        started = datetime(2026, 10, 3, 12, 1, tzinfo=timezone.utc)
+        contact = self._purchase_contact()
+        farm = self._purchase_api()
+        planned = self._purchase_plan(contact, farm)
+        current = deepcopy(contact)
+        current["fields"].update(planned.fields)
+        client = self._incremental_purchase_client(contact)
+        client.get_contact.return_value = current
+        with (
+            patch("weni_update.WeniClient", return_value=client),
+            patch("weni_update._open_farmalider", return_value=farm),
+            patch("weni_update.resolve_window", return_value=UpdateWindow(
+                started_at=started, after=started, full=False,
+            )),
+            patch("weni_update._append_audit") as audit_mock,
+            patch("weni_update._save_state") as save_mock,
+        ):
+            result = run_update(apply=True, full=False)
+        self.assertEqual(result.contacts_already_satisfied, 1)
+        self.assertEqual(result.contacts_conflicted, 0)
+        self.assertEqual(result.contacts_updated, 0)
+        client.get_contact.assert_called_once_with(uuid="u-pedido")
+        client.update_contact_fields.assert_not_called()
+        client.contact_group_action.assert_not_called()
+        self.assertEqual(save_mock.call_args.args[0]["pending_conflict_uuids"], [])
+        self.assertEqual(audit_mock.call_args.args[0]["status"], "already_satisfied")
 
 
 

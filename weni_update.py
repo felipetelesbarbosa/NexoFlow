@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import secrets_config as secrets
-from analytics import get_fields, is_valid_cpf, normalize_cpf, normalize_value, parse_ultimo_pedido
+from analytics import get_fields, is_valid_cpf, normalize_cpf, normalize_value
 from ad_attribution import (
     GOOGLE_ADS_ORIGIN,
     GOOGLE_ADS_WRITE_FIELDS,
@@ -34,7 +34,8 @@ from contact_enrichment import (
     message_id,
 )
 from farmalider_client import FarmaliderAuthError, FarmaliderClient, FarmaliderError
-from farmalider_integration import apply_pedido_api_confirmation
+from farmalider_integration import resolve_contact_order
+from pedido_utils import business_order_datetime, is_order_cancelled, serialize_pedido_products
 from weni_client import WeniClient
 from urn_utils import (
     CHANNEL_FIELD_MAP,
@@ -100,6 +101,7 @@ class ContactUpdatePlan:
     guards: dict[str, Any] = field(default_factory=dict)
     evidence: dict[str, dict[str, str]] = field(default_factory=dict)
     group_actions: list[GroupAction] = field(default_factory=list)
+    order_validated: bool = False
     purchase_confirmed: bool = False
     purchase_confirmation: str = ""
 
@@ -184,12 +186,14 @@ def _weni_datetime(value: Any) -> str:
 
 
 def _safe_number(value: Any) -> int | float | None:
-    text = str(value or "").strip().replace(",", ".")
+    text = str(value if value is not None else "").strip().replace(",", ".")
     if not text:
         return None
     try:
         number = Decimal(text)
     except (InvalidOperation, ValueError):
+        return None
+    if not number.is_finite():
         return None
     if number == number.to_integral_value():
         return int(number)
@@ -212,10 +216,15 @@ def _same_value(field_name: str, current: Any, proposed: Any) -> bool:
         if current_num is not None and proposed_num is not None:
             return Decimal(str(current_num)) == Decimal(str(proposed_num))
     if field_name in {"pedido_data", "ultima_compra"}:
-        current_dt = _parse_datetime(current)
-        proposed_dt = _parse_datetime(proposed)
+        current_dt = business_order_datetime(normalize_value(current))
+        proposed_dt = business_order_datetime(normalize_value(proposed))
         if current_dt is not None and proposed_dt is not None:
             return current_dt == proposed_dt
+    if field_name == "pedido_produtos":
+        try:
+            return json.loads(normalize_value(current)) == json.loads(normalize_value(proposed))
+        except (ValueError, TypeError):
+            pass
     return _semantic_text(current).casefold() == _semantic_text(proposed).casefold()
 
 
@@ -614,22 +623,7 @@ def _set_field_if_changed(
 
 
 def _purchase_is_cancelled(order: dict[str, str]) -> bool:
-    cancellation = str(order.get("farmalider_cancelamento") or "").strip().casefold()
-    if cancellation and cancellation not in {"0", "false", "none", "null", "nao", "não"}:
-        return True
-    status = str(order.get("farmalider_status_pedido") or "").strip().casefold()
-    return "cancel" in status
-
-
-def _product_summary(items: list[dict[str, str]]) -> str:
-    parts: list[str] = []
-    for item in items:
-        name = str(item.get("produto_nome") or "").strip()
-        qty = str(item.get("quantidade") or "").strip()
-        if not name:
-            continue
-        parts.append(f"{name} x{qty or '1'}")
-    return " | ".join(parts)
+    return is_order_cancelled(order)
 
 
 def _apply_purchase_candidate(
@@ -639,120 +633,77 @@ def _apply_purchase_candidate(
     farm_client: FarmaliderClient | None,
     captured_at: str,
 ) -> bool:
+    """Resolve o pedido; registrar um cancelamento não confirma uma compra."""
     current_fields = get_fields(contact)
-    raw = str(current_fields.get("ultimo_pedido") or "").strip()
-    if not raw:
-        return False
-
-    order, items = parse_ultimo_pedido(contact, captured_at=captured_at)
-    if order is None or order.get("status_validacao") == "ERRO":
-        return False
-
-    if not order.get("pedido_id", "").strip():
-        existing_order_id = str(current_fields.get("pedido_id") or "").strip()
-        if existing_order_id:
-            order["pedido_id"] = existing_order_id
-            for item in items:
-                item["pedido_id"] = existing_order_id
-
-    pedido_id = order.get("pedido_id", "").strip()
-    if not pedido_id or farm_client is None:
-        return False
+    candidate = dict(contact)
+    candidate["fields"] = dict(current_fields)
+    if "cpf" in plan.fields:
+        candidate["fields"]["cpf"] = plan.fields["cpf"]
 
     try:
-        pedido_api = farm_client.get_pedido(pedido_id)
-        order, items = apply_pedido_api_confirmation(
-            order,
-            items,
-            pedido_api,
-            linked_cliente_id=str(current_fields.get("id_do_cliente") or "").strip(),
-            confirmed_at=captured_at,
+        order, items = resolve_contact_order(
+            candidate,
+            farm_client=farm_client,
+            captured_at=captured_at,
         )
     except FarmaliderAuthError:
         raise
     except FarmaliderError:
-        logging.exception("Falha ao confirmar pedido na FarmaLíder API.")
+        logging.warning("Falha ao consultar ou confirmar pedido na FarmaLíder API.")
         return False
 
+    if order is None or not items:
+        return False
     confirmation = order.get("status_confirmacao", "")
-    if not confirmation.startswith("CONFIRMADO_API") or _purchase_is_cancelled(order):
+    if confirmation not in {"CONFIRMADO_API", "CANCELADO_API", "NAO_CONFIRMADO_API"}:
         return False
-
-    proposed_date = _weni_datetime(order.get("data_hora"))
-    if not proposed_date:
-        return False
-
-    current_last_purchase = _parse_datetime(current_fields.get("ultima_compra"))
-    proposed_dt = _parse_datetime(proposed_date)
-    if (
-        current_last_purchase is not None
-        and proposed_dt is not None
-        and current_last_purchase > proposed_dt
+    validation = order.get("status_validacao")
+    if validation != "OK" and not (
+        validation == "ATENÇÃO_TOTAL_DIVERGENTE"
+        and confirmation in {"CONFIRMADO_API", "CANCELADO_API"}
     ):
-        logging.info(
-            "Pedido %s confirmado, mas ultima_compra atual é mais recente; ignorando snapshot antigo.",
-            pedido_id,
-        )
         return False
 
-    current_order_date = _parse_datetime(current_fields.get("pedido_data"))
-    if current_order_date is not None and proposed_dt is not None and current_order_date > proposed_dt:
-        return False
-
+    pedido_id = str(order.get("pedido_id") or "").strip()
+    proposed_dt = business_order_datetime(order.get("data_hora"))
     order_value = _safe_number(order.get("valor_total_compra"))
-    quantity = _safe_number(
-        order.get("quantidade_itens_api") or order.get("quantidade_itens")
-    )
-    summary = _product_summary(items)
+    quantity = _safe_number(order.get("quantidade_itens"))
+    if not pedido_id or proposed_dt is None or order_value is None or quantity is None:
+        return False
+    if order_value < 0 or quantity <= 0:
+        return False
 
-    _set_field_if_changed(
-        plan,
-        current_fields,
-        "pedido_id",
-        pedido_id,
-        reason="pedido confirmado pela API FarmaLíder",
-    )
-    _set_field_if_changed(
-        plan,
-        current_fields,
-        "pedido_data",
-        proposed_date,
-        reason="data oficial do pedido confirmado pela API FarmaLíder",
-    )
-    if order_value is not None:
-        _set_field_if_changed(
-            plan,
-            current_fields,
-            "pedido_valor",
-            order_value,
-            reason="valor do ultimo_pedido confirmado pela API FarmaLíder",
-        )
-    if quantity is not None:
-        _set_field_if_changed(
-            plan,
-            current_fields,
-            "pedido_quantidade_itens",
-            quantity,
-            reason="quantidade do pedido confirmado pela API FarmaLíder",
-        )
-    if summary:
-        _set_field_if_changed(
-            plan,
-            current_fields,
-            "pedido_produtos",
-            summary,
-            reason="resumo dos produtos do pedido confirmado",
-        )
-    _set_field_if_changed(
-        plan,
-        current_fields,
-        "ultima_compra",
-        proposed_date,
-        reason="compra confirmada pela API FarmaLíder",
-    )
+    current_order_date = business_order_datetime(normalize_value(current_fields.get("pedido_data")))
+    if current_order_date is not None and current_order_date > proposed_dt:
+        return False
+    proposed_date = proposed_dt.isoformat()
+    products = serialize_pedido_products(order, items)
+    if not products:
+        return False
 
-    plan.purchase_confirmed = True
+    plan.order_validated = True
     plan.purchase_confirmation = confirmation
+    plan.purchase_confirmed = confirmation == "CONFIRMADO_API" and not is_order_cancelled(order)
+    reason = "pedido resolvido e validado; cancelamentos preservados sem confirmar venda"
+    for field_name, value in {
+        "pedido_id": pedido_id,
+        "pedido_data": proposed_date,
+        "pedido_valor": order_value,
+        "pedido_quantidade_itens": quantity,
+        "pedido_produtos": products,
+    }.items():
+        _set_field_if_changed(plan, current_fields, field_name, value, reason=reason)
+
+    if plan.purchase_confirmed:
+        current_last_purchase = business_order_datetime(normalize_value(current_fields.get("ultima_compra")))
+        if current_last_purchase is None or current_last_purchase <= proposed_dt:
+            _set_field_if_changed(
+                plan,
+                current_fields,
+                "ultima_compra",
+                proposed_date,
+                reason="compra não cancelada confirmada pela API FarmaLíder",
+            )
     return True
 
 
@@ -873,10 +824,10 @@ def _build_contact_plan(
         farm_client=farm_client,
         captured_at=captured_at,
     )
-    if plan.purchase_confirmed:
-        # ultimo_pedido é a origem estruturada da confirmação. Se ele mudar
-        # durante a revisão, o plano antigo é ignorado somente para o contato.
-        plan.guards["ultimo_pedido"] = fields.get("ultimo_pedido")
+    if plan.order_validated:
+        # A revisão depende da identidade e das duas possíveis fontes.
+        for key in ("cpf", "ultimo_pedido", "pedido_id", "pedido_data", "pedido_produtos", "pedido_quantidade_itens", "pedido_valor"):
+            plan.guards[key] = fields.get(key)
     return plan
 
 def audit_plans(
@@ -961,10 +912,35 @@ def audit_plans(
             if field_name in plan.fields and str(plan.fields[field_name]).strip() != GOOGLE_ADS_ORIGIN:
                 errors.append(f"{plan.contact_uuid}: origem de anúncio não autorizada pelo detector Google Ads")
 
-        if set(plan.fields) & PURCHASE_FIELDS and not plan.purchase_confirmed:
-            errors.append(
-                f"{plan.contact_uuid}: campos de pedido sem confirmação FarmaLíder"
-            )
+        if set(plan.fields) & (PURCHASE_FIELDS - {"ultima_compra"}) and not (plan.order_validated or plan.purchase_confirmed):
+            errors.append(f"{plan.contact_uuid}: campos de pedido sem validação")
+        if "ultima_compra" in plan.fields and not plan.purchase_confirmed:
+            errors.append(f"{plan.contact_uuid}: ultima_compra sem compra não cancelada confirmada")
+        for date_field in ("pedido_data", "ultima_compra"):
+            if date_field in plan.fields and business_order_datetime(plan.fields[date_field]) is None:
+                errors.append(f"{plan.contact_uuid}: data inválida em {date_field}")
+        for numeric_field in ("pedido_valor", "pedido_quantidade_itens"):
+            if numeric_field not in plan.fields:
+                continue
+            number = _safe_number(plan.fields[numeric_field])
+            if number is None or number < 0 or (numeric_field == "pedido_quantidade_itens" and number == 0):
+                errors.append(f"{plan.contact_uuid}: número inválido em {numeric_field}")
+        if "pedido_produtos" in plan.fields:
+            try:
+                products = json.loads(str(plan.fields["pedido_produtos"]))
+                if not isinstance(products, dict) or not isinstance(products.get("produtos"), list) or not products["produtos"]:
+                    raise ValueError("envelope de produtos vazio ou inválido")
+                if products.get("status_validacao") != "OK" and not (
+                    products.get("status_validacao") == "ATENÇÃO_TOTAL_DIVERGENTE"
+                    and products.get("status_confirmacao") in {"CONFIRMADO_API", "CANCELADO_API"}
+                ):
+                    raise ValueError("pedido sem validação válida")
+                if products.get("status_confirmacao") not in {"CONFIRMADO_API", "CANCELADO_API", "NAO_CONFIRMADO_API"}:
+                    raise ValueError("confirmação inválida")
+                if plan.purchase_confirmed and is_order_cancelled(products):
+                    raise ValueError("pedido cancelado não confirma compra")
+            except (ValueError, TypeError):
+                errors.append(f"{plan.contact_uuid}: estrutura inválida em pedido_produtos")
 
         for action in plan.group_actions:
             if action.action not in {"add", "remove"}:
@@ -1016,13 +992,14 @@ def _audit_plan_event(
         "changes": plan.fields,
         "evidence": plan.evidence,
         "group_actions": [asdict(item) for item in plan.group_actions],
+        "order_validated": plan.order_validated,
         "purchase_confirmed": plan.purchase_confirmed,
         "purchase_confirmation": plan.purchase_confirmation,
         "error": error,
     }
 
 
-REVIEW_SCHEMA_VERSION = 5
+REVIEW_SCHEMA_VERSION = 6
 
 
 def _canonical_plan(plan: ContactUpdatePlan) -> dict[str, Any]:
@@ -1034,6 +1011,7 @@ def _canonical_plan(plan: ContactUpdatePlan) -> dict[str, Any]:
         "changes": plan.fields,
         "evidence": plan.evidence,
         "group_actions": [asdict(item) for item in plan.group_actions],
+        "order_validated": plan.order_validated,
         "purchase_confirmed": plan.purchase_confirmed,
         "purchase_confirmation": plan.purchase_confirmation,
     }
@@ -1356,6 +1334,7 @@ def load_review_snapshot(
             guards=dict(raw.get("guards") or {}),
             evidence=dict(raw.get("evidence") or {}),
             group_actions=actions,
+            order_validated=bool(raw.get("order_validated")),
             purchase_confirmed=bool(raw.get("purchase_confirmed")),
             purchase_confirmation=str(raw.get("purchase_confirmation") or ""),
         )
@@ -1481,6 +1460,7 @@ def _prepare_frozen_plan_for_apply(
         guards=plan.guards,
         evidence=plan.evidence,
         group_actions=pending_actions,
+        order_validated=plan.order_validated,
         purchase_confirmed=plan.purchase_confirmed,
         purchase_confirmation=plan.purchase_confirmation,
     )
@@ -1586,12 +1566,12 @@ def _open_farmalider() -> FarmaliderClient | None:
     placeholder = "COLE_SEU_TOKEN_FARMALIDER_AQUI"
     if not enabled:
         logging.warning(
-            "FarmaLíder API desabilitada: campos de compra não serão atualizados."
+            "FarmaLíder API desabilitada: somente pedidos completos da Weni podem ser derivados; compra não recebe confirmação oficial."
         )
         return None
     if not token or token == placeholder:
         logging.warning(
-            "Token FarmaLíder ausente: campos de compra não serão atualizados."
+            "Token FarmaLíder ausente: fallback por CPF e confirmação oficial indisponíveis; pedidos completos da Weni podem ser derivados."
         )
         return None
     use_hml = bool(getattr(secrets, "FARMALIDER_USE_HML", False))
@@ -1993,8 +1973,33 @@ def run_update(
             logging.info("DRY-RUN concluído. Nenhum contato foi alterado na Weni.")
             return stats
 
+        conflicted_uuids: list[str] = []
         for plan in plans:
             try:
+                if plan.order_validated:
+                    current_contact = weni.get_contact(uuid=plan.contact_uuid)
+                    prepared = None
+                    conflict = "contato não localizado no momento do apply"
+                    if current_contact is not None:
+                        prepared, conflict = _prepare_frozen_plan_for_apply(
+                            plan,
+                            current_contact,
+                            opt_in_group_name=WENI_UPDATE_OPT_IN_GROUP,
+                            opt_in_group_uuid=opt_in_uuid,
+                            opt_out_group_name=WENI_UPDATE_OPT_OUT_GROUP,
+                            opt_out_group_uuid=opt_out_uuid,
+                        )
+                    if prepared is None:
+                        stats.contacts_conflicted += 1
+                        conflicted_uuids.append(plan.contact_uuid)
+                        _append_audit(_audit_plan_event(plan, mode=mode, status="conflict_skipped", error=conflict))
+                        continue
+                    if not prepared.has_changes:
+                        stats.contacts_already_satisfied += 1
+                        _append_audit(_audit_plan_event(plan, mode=mode, status="already_satisfied"))
+                        continue
+                    audit_plans([prepared], opt_out_group_available=opt_out_available, opt_in_group_available=opt_in_available)
+                    plan = prepared
                 if plan.fields:
                     weni.update_contact_fields(plan.contact_uuid, plan.fields)
                 for action in plan.group_actions:
@@ -2026,6 +2031,8 @@ def run_update(
                 "last_success_utc": captured_at,
                 "last_mode": "full" if full else "incremental",
                 "contacts_updated": stats.contacts_updated,
+                "contacts_conflicted": stats.contacts_conflicted,
+                "pending_conflict_uuids": conflicted_uuids,
                 "field_changes": stats.field_changes,
                 "group_actions": stats.group_actions,
             }

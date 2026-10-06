@@ -1,51 +1,9 @@
-# Pedidos da Weni - formato atual
+# Pedidos da Weni — NexoFlow 1.0
 
-A operação atual usa o campo `ultimo_pedido` do contato Weni.
+Os dados podem vir do JSON `ultimo_pedido` ou de `pedido_id`, `pedido_data`, `pedido_produtos`, `pedido_quantidade_itens` e `pedido_valor`. A rotina Weni mantém os campos autorizados, e o Analytics preserva os campos separados na `Base_Contatos` e deriva o JSON quando necessário.
 
-## Exemplo
+O contrato completo, incluindo confirmação pela FarmaLíder, produtos e cancelamentos, está em [Pedidos no NexoFlow 1.0](PEDIDOS.md).
 
-```json
-{
-  "data_hora": "2026-09-30T16:07:00Z",
-  "valor_total_compra": 110.80,
-  "produtos": [
-    {
-      "nome": "Dipirona Gotas 20ml",
-      "quantidade": 2,
-      "valor_unitario": 8.50,
-      "valor_total": 17.00
-    }
-  ]
-}
-```
+O campo `ultimo_pedido` pode chegar como objeto, texto JSON ou wrapper da Weni. O parser reconhece os identificadores `pedido_id`, `pedidoId`, `codigo` e `codPedido` quando disponíveis. Com identificador oficial, a chave do pedido é `FARMALIDER:<pedido_id>`; sem ele, a rotina mantém uma chave sintética estável para o registro recebido.
 
-O campo pode chegar como objeto ou como texto JSON dentro da estrutura retornada
-pela Weni.
-
-## Identificador oficial
-
-Se disponível, o parser reconhece:
-
-- `pedido_id`
-- `pedidoId`
-- `codigo`
-- `codPedido`
-
-Com identificador, o sincronizador consulta a FarmaLíder para confirmar e
-enriquecer o pedido.
-
-Sem identificador, o pedido continua podendo ser persistido com os dados da
-Weni, mas não recebe confirmação oficial da API FarmaLíder.
-
-## Validação
-
-O projeto não deve inventar informação ausente. Erros de parse ficam registrados
-para diagnóstico e não devem ser silenciosamente corrigidos com suposições.
-
-## Abas
-
-- `Pedidos_FarmaLider`
-- `Itens_Pedidos_FarmaLider`
-- `Metricas_Vendas`
-
-Leia `README PEDIDOS.md` para a visão completa.
+Produtos devem continuar estruturados em JSON, preservando códigos, quantidades e valores. Erros de parse são registrados, e informação ausente não é completada por suposição.

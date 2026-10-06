@@ -9,6 +9,7 @@ from typing import Any
 
 from config import TIPO_PRIMEIRO_ANUNCIO, TIPO_ULTIMO_ANUNCIO
 from urn_utils import resolve_contact_urns
+from pedido_utils import business_order_datetime, is_order_cancelled
 
 
 AD_FIELDS = [
@@ -55,6 +56,11 @@ BASE_COLUMNS = [
     "farmalider_cliente_consultado_em",
     *AD_FIELDS,
     "ultimo_pedido",
+    "pedido_id",
+    "pedido_data",
+    "pedido_produtos",
+    "pedido_quantidade_itens",
+    "pedido_valor",
     "voltou_por_outro_anuncio",
     "weni_created_on",
     "weni_modified_on",
@@ -146,6 +152,10 @@ ORDER_COLUMNS = [
     "quantidade_itens_api",
     "farmalider_confirmado_em",
     "farmalider_erro",
+    "valor_origem",
+    "total_api",
+    "valor_total_weni",
+    "diferenca_total_weni_api",
     "ultimo_pedido_raw",
     "weni_modified_on",
     "capturado_em",
@@ -163,6 +173,7 @@ ORDER_ITEM_COLUMNS = [
     "cliente",
     "produto_ordem",
     "produto_nome",
+    "produto_codigo",
     "quantidade",
     "valor_unitario",
     "valor_total",
@@ -370,7 +381,9 @@ def is_meta_ads_contact(contact: dict[str, Any]) -> bool:
 
 def has_ultimo_pedido(contact: dict[str, Any]) -> bool:
     fields = get_fields(contact)
-    return bool(normalize_value(fields.get("ultimo_pedido")).strip())
+    return any(normalize_value(fields.get(key)).strip() for key in (
+        "ultimo_pedido", "pedido_id", "pedido_produtos",
+    ))
 
 
 def is_relevant_contact(contact: dict[str, Any]) -> bool:
@@ -424,6 +437,16 @@ def normalize_contact(
 
     for key in AD_FIELDS:
         row[key] = normalize_value(fields.get(key))
+
+    for key in ("pedido_id", "pedido_data", "pedido_quantidade_itens", "pedido_valor"):
+        row[key] = normalize_value(fields.get(key))
+    products = fields.get("pedido_produtos")
+    if isinstance(products, dict) and "value" in products:
+        products = products["value"]
+    row["pedido_produtos"] = (
+        json.dumps(products, ensure_ascii=False, sort_keys=True)
+        if isinstance(products, (list, dict)) else normalize_value(products)
+    )
 
     return row
 
@@ -493,12 +516,8 @@ def _to_decimal(value: Any, field_name: str) -> Decimal:
     if value is None or value == "":
         raise ValueError(f"{field_name} está vazio.")
 
-    if isinstance(value, Decimal):
-        return value
-
-    if isinstance(value, (int, float)):
-        return Decimal(str(value))
-
+    if isinstance(value, bool):
+        raise ValueError(f"{field_name} deve ser numérico, não booleano.")
     raw = str(value).strip().replace("R$", "").replace(" ", "")
 
     if "," in raw and "." in raw:
@@ -510,7 +529,10 @@ def _to_decimal(value: Any, field_name: str) -> Decimal:
         raw = raw.replace(",", ".")
 
     try:
-        return Decimal(raw)
+        number = Decimal(raw)
+        if not number.is_finite():
+            raise ValueError(f"{field_name} deve ser finito.")
+        return number
     except InvalidOperation as exc:
         raise ValueError(
             f"{field_name} possui valor numérico inválido: {value!r}"
@@ -595,17 +617,20 @@ def parse_ultimo_pedido_raw(
         if not data_hora:
             raise ValueError("data_hora não informado.")
 
-        data = parse_date(data_hora)
-        hora = parse_time(data_hora)
-        if not data:
+        order_dt = business_order_datetime(data_hora)
+        if order_dt is None:
             raise ValueError(
                 f"data_hora inválido ou fora do padrão ISO/Weni: {data_hora!r}"
             )
+        data = order_dt.date().isoformat()
+        hora = order_dt.time().replace(tzinfo=None).isoformat(timespec="seconds")
 
         total_compra = _to_decimal(
             payload.get("valor_total_compra"),
             "valor_total_compra",
         )
+        if total_compra < 0:
+            raise ValueError("valor_total_compra não pode ser negativo.")
 
         produtos = payload.get("produtos")
         if not isinstance(produtos, list):
@@ -626,9 +651,10 @@ def parse_ultimo_pedido_raw(
                 )
 
             nome = normalize_value(product.get("nome")).strip()
-            if not nome:
+            codigo = normalize_value(product.get("codigo") or product.get("codProduto")).strip()
+            if not nome and not codigo:
                 raise ValueError(
-                    f"produto na posição {position} sem nome."
+                    f"produto na posição {position} sem nome ou código."
                 )
 
             quantidade = _quantity(product.get("quantidade"))
@@ -640,6 +666,8 @@ def parse_ultimo_pedido_raw(
                 product.get("valor_total"),
                 f"produto {position}.valor_total",
             )
+            if valor_unitario < 0 or valor_total < 0:
+                raise ValueError(f"produto {position} possui valor negativo.")
 
             total_itens += valor_total
             total_unidades += quantidade
@@ -657,6 +685,7 @@ def parse_ultimo_pedido_raw(
                     "cliente": client_name,
                     "produto_ordem": str(position),
                     "produto_nome": nome,
+                    "produto_codigo": codigo,
                     "quantidade": _quantity_text(quantidade),
                     "valor_unitario": _money(valor_unitario),
                     "valor_total": _money(valor_total),
@@ -664,19 +693,29 @@ def parse_ultimo_pedido_raw(
                 }
             )
 
-        difference = total_compra - total_itens
+        comparison_total = total_itens
+        if normalize_value(payload.get("farmalider_frete")).strip():
+            freight = _to_decimal(payload["farmalider_frete"], "farmalider_frete")
+            if freight < 0:
+                raise ValueError("farmalider_frete não pode ser negativo.")
+            comparison_total += freight
+        difference = total_compra - comparison_total
         status = (
             "OK"
             if abs(difference) <= Decimal("0.01")
             else "ATENÇÃO_TOTAL_DIVERGENTE"
         )
+        if "quantidade_itens" in payload:
+            reported_qty = _quantity(payload["quantidade_itens"])
+            if reported_qty != total_unidades:
+                raise ValueError("quantidade_itens diverge da soma das quantidades dos produtos.")
 
         order_row = {
             "pedido_chave": pedido_chave,
             "pedido_id": pedido_id,
             "origem_pedido": "WENI_ULTIMO_PEDIDO",
             "status_confirmacao": (
-                "AGUARDANDO_API" if pedido_id else "NAO_CONFIRMADO_SEM_PEDIDO_ID"
+                "NAO_CONFIRMADO_API" if pedido_id else "NAO_CONFIRMADO_SEM_PEDIDO_ID"
             ),
             "data_hora": data_hora,
             "data": data,
@@ -721,13 +760,32 @@ def parse_ultimo_pedido_raw(
             "quantidade_itens_api": "",
             "farmalider_confirmado_em": "",
             "farmalider_erro": "",
+            "valor_origem": "WENI",
+            "total_api": "",
+            "valor_total_weni": "",
+            "diferenca_total_weni_api": "",
             "ultimo_pedido_raw": raw,
             "weni_modified_on": modified_on,
             "capturado_em": captured_at,
         }
+        for key in (
+            "origem_pedido", "status_confirmacao", "farmalider_cancelamento",
+            "farmalider_status_pedido", "farmalider_frete", "valor_origem", "total_api",
+            "valor_total_api_itens", "quantidade_itens_api", "farmalider_cod_cliente",
+            "farmalider_cliente_id", "farmalider_emissao", "farmalider_confirmado_em",
+            "valor_total_weni", "diferenca_total_weni_api",
+            "farmalider_erro",
+        ):
+            if key in payload:
+                order_row[key] = normalize_value(payload[key])
+        upstream_validation = normalize_value(payload.get("status_validacao")).strip()
+        if upstream_validation and upstream_validation not in {"OK", "VALIDADO_WENI"}:
+            order_row["status_validacao"] = upstream_validation
+            if upstream_validation.startswith("ERRO"):
+                order_row["erro_parse"] = "Snapshot de pedido marcado com erro de validação na origem."
         return order_row, item_rows
 
-    except (json.JSONDecodeError, ValueError, TypeError) as exc:
+    except (json.JSONDecodeError, ValueError, TypeError, InvalidOperation, OverflowError) as exc:
         error_row = {
             "pedido_chave": fallback_key,
             "pedido_id": "",
@@ -776,11 +834,61 @@ def parse_ultimo_pedido_raw(
             "quantidade_itens_api": "",
             "farmalider_confirmado_em": "",
             "farmalider_erro": "",
+            "valor_origem": "",
+            "total_api": "",
+            "valor_total_weni": "",
+            "diferenca_total_weni_api": "",
             "ultimo_pedido_raw": raw,
             "weni_modified_on": modified_on,
             "capturado_em": captured_at,
         }
         return error_row, []
+
+
+def _derived_order_payload(fields: dict[str, Any]) -> dict[str, Any] | None:
+    """Read the structured snapshot without inventing missing product details."""
+    names = ("pedido_id", "pedido_data", "pedido_produtos", "pedido_quantidade_itens", "pedido_valor")
+    if not any(normalize_value(fields.get(key)).strip() for key in names):
+        return None
+    products = fields.get("pedido_produtos")
+    if isinstance(products, dict) and "value" in products:
+        products = products["value"]
+    if isinstance(products, str):
+        try:
+            products = json.loads(products)
+        except json.JSONDecodeError:
+            products = None
+    metadata = dict(products) if isinstance(products, dict) else {}
+    if isinstance(metadata.get("metadados"), dict):
+        metadata.update(metadata.pop("metadados"))
+    product_rows = metadata.pop("produtos", None) if isinstance(products, dict) else products
+    pedido_id = normalize_value(fields.get("pedido_id")).strip()
+    payload = {
+        **metadata,
+        "pedido_id": pedido_id,
+        "data_hora": normalize_value(fields.get("pedido_data")).strip(),
+        "valor_total_compra": normalize_value(fields.get("pedido_valor")).strip(),
+        "quantidade_itens": normalize_value(fields.get("pedido_quantidade_itens")).strip(),
+        "produtos": product_rows,
+    }
+    # The envelope identifies exactly which order produced the five fields.
+    # A stale or partially updated snapshot must not be attached to a new ID.
+    envelope_id = normalize_value(metadata.get("pedido_id")).strip()
+    if not pedido_id or (envelope_id and envelope_id != pedido_id):
+        payload["produtos"] = None
+    envelope_date = business_order_datetime(metadata.get("data_hora"))
+    field_date = business_order_datetime(payload["data_hora"])
+    if envelope_date is not None and envelope_date != field_date:
+        payload["produtos"] = None
+    for envelope_key, field_key in (("valor_total_compra", "valor_total_compra"),
+                                    ("quantidade_itens", "quantidade_itens")):
+        if normalize_value(metadata.get(envelope_key)).strip():
+            try:
+                if _to_decimal(metadata[envelope_key], envelope_key) != _to_decimal(payload[field_key], field_key):
+                    payload["produtos"] = None
+            except ValueError:
+                payload["produtos"] = None
+    return payload
 
 
 def parse_ultimo_pedido(
@@ -793,9 +901,6 @@ def parse_ultimo_pedido(
     fields = get_fields(contact)
     raw = normalize_value(fields.get("ultimo_pedido")).strip()
 
-    if not raw:
-        return None, []
-
     contact_uuid = normalize_value(contact.get("uuid")).strip()
     phone, _ = get_phone_and_urn(contact, fields)
     client_name = (
@@ -805,8 +910,7 @@ def parse_ultimo_pedido(
     cpf = normalize_value(fields.get("cpf")).strip()
     modified_on = normalize_value(contact.get("modified_on")).strip()
 
-    return parse_ultimo_pedido_raw(
-        raw,
+    context = dict(
         contact_uuid=contact_uuid,
         phone=phone,
         client_name=client_name,
@@ -814,6 +918,29 @@ def parse_ultimo_pedido(
         modified_on=modified_on,
         captured_at=captured_at,
     )
+    original_order, original_items = parse_ultimo_pedido_raw(raw, **context)
+    derived_payload = _derived_order_payload(fields)
+    if derived_payload is None:
+        return original_order, original_items
+    derived_order, derived_items = parse_ultimo_pedido_raw(
+        json.dumps(derived_payload, ensure_ascii=False), **context,
+    )
+    assert derived_order is not None
+    derived_order["ultimo_pedido_raw"] = raw
+    if derived_order["origem_pedido"] == "WENI_ULTIMO_PEDIDO":
+        derived_order["origem_pedido"] = "WENI_PEDIDO_FIELDS"
+    derived_valid = not str(derived_order.get("status_validacao") or "").startswith("ERRO")
+    original_valid = original_order is not None and not str(original_order.get("status_validacao") or "").startswith("ERRO")
+    if not original_valid:
+        return (derived_order, derived_items) if derived_valid or original_order is None else (original_order, original_items)
+    if derived_valid:
+        confirmation = derived_order.get("status_confirmacao", "")
+        verified = confirmation.startswith("CONFIRMADO_API") or confirmation == "CANCELADO_API"
+        derived_dt = business_order_datetime(derived_order.get("data_hora", ""))
+        original_dt = business_order_datetime(original_order.get("data_hora", ""))
+        if verified and derived_dt is not None and original_dt is not None and derived_dt >= original_dt:
+            return derived_order, derived_items
+    return original_order, original_items
 
 
 def build_sales_metrics(
@@ -830,14 +957,7 @@ def build_sales_metrics(
     units_by_date: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
 
     for record in order_records:
-        if record.get("status_validacao") not in (
-            "OK",
-            "ATENÇÃO_TOTAL_DIVERGENTE",
-        ):
-            continue
-
-        # Pedido explicitamente cancelado na FarmaLíder não entra em vendas.
-        if record.get("farmalider_cancelamento", "").strip():
+        if not _sales_order_is_valid(record):
             continue
 
         date = record.get("data", "").strip()
@@ -867,8 +987,7 @@ def build_sales_metrics(
     valid_order_keys = {
         record.get("pedido_chave", "").strip()
         for record in order_records
-        if record.get("status_validacao") in ("OK", "ATENÇÃO_TOTAL_DIVERGENTE")
-        and not record.get("farmalider_cancelamento", "").strip()
+        if _sales_order_is_valid(record)
     }
 
     for record in item_records:
@@ -918,13 +1037,25 @@ def _bi_float(value: Decimal) -> float:
     return float(value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
+def _sales_order_is_valid(record: dict[str, str]) -> bool:
+    """Share the same admission rules for revenue, units and buyers."""
+    confirmation = str(record.get("status_confirmacao") or "")
+    if confirmation.startswith(("PEDIDO_ID_DIVERGENTE", "PEDIDO_CLIENTE_DIVERGENTE", "ERRO_")):
+        return False
+    if confirmation in {"PEDIDO_NAO_ENCONTRADO_API", "CANCELADO_API"}:
+        return False
+    return (
+        record.get("status_validacao") in ("OK", "ATENÇÃO_TOTAL_DIVERGENTE")
+        and not is_order_cancelled(record)
+        and bool(str(record.get("pedido_chave") or "").strip())
+    )
+
+
 def _bi_valid_orders(order_records: list[dict[str, str]]) -> list[dict[str, str]]:
     return [
         record
         for record in order_records
-        if record.get("status_validacao") in ("OK", "ATENÇÃO_TOTAL_DIVERGENTE")
-        and not record.get("farmalider_cancelamento", "").strip()
-        and record.get("pedido_chave", "").strip()
+        if _sales_order_is_valid(record)
     ]
 
 
@@ -1019,7 +1150,8 @@ def build_bi_summary_record(
             clientes += 1
         elif status == "CPF_NAO_ENCONTRADO":
             nao_encontrados += 1
-        if parse_date(record.get("weni_created_on", "")) == snapshot_date:
+        created = business_order_datetime(record.get("weni_created_on", ""))
+        if created is not None and created.date().isoformat() == snapshot_date:
             novos += 1
         lgpd = (record.get("opt_in_lgpd") or "").strip().casefold()
         if lgpd == "ativo":

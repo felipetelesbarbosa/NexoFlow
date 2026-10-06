@@ -80,6 +80,7 @@ class UpsertResult:
     unchanged: int
     changed_records: list[dict[str, str]]
     final_records: list[dict[str, str]]
+    removed: int = 0
 
 
 class GoogleSheetsStore:
@@ -734,6 +735,17 @@ class GoogleSheetsStore:
         ignore_compare_fields: set[str] | None = None,
         value_input_option: str = "RAW",
     ) -> UpsertResult:
+        # Consolida a carga antes de agendar writes: duas entradas da mesma
+        # chave não podem atualizar uma linha futura ainda aguardando append.
+        # Campos posteriores prevalecem, como nas atualizações sequenciais.
+        unique_records: dict[str, dict[str, str]] = {}
+        for record in records:
+            key = str(record.get(key_name) or "").strip()
+            if key:
+                unique_records[key] = {**unique_records.get(key, {}), **record}
+        if len(unique_records) < len(records):
+            logging.info("Google Sheets: %s - entradas consolidadas por chave (%s → %s).", ws.title, len(records), len(unique_records))
+        records = list(unique_records.values())
         if existing_values is None:
             logging.info(
                 "Google Sheets: %s - lendo base atual para comparar %s registro(s)...",
@@ -961,12 +973,44 @@ class GoogleSheetsStore:
         self,
         items: list[dict[str, str]],
     ) -> UpsertResult:
-        return self._upsert_records_detailed(
+        # A carga de itens contém o snapshot completo de cada pedido resolvido.
+        # Uma correção da API pode reduzir a lista; um upsert sozinho deixaria
+        # posições antigas somando unidades e valores nos indicadores.
+        active_keys: dict[str, set[str]] = {}
+        for item in items:
+            order_key = str(item.get("pedido_chave") or "").strip()
+            item_key = str(item.get("item_chave") or "").strip()
+            if not order_key or not item_key:
+                raise ValueError("Snapshot de itens sem identidade do pedido ou item.")
+            active_keys.setdefault(order_key, set()).add(item_key)
+        result = self._upsert_records_detailed(
             self.order_items,
             items,
             "item_chave",
             ignore_compare_fields={"capturado_em"},
         )
+        stale_indexes = [
+            index for index, record in enumerate(result.final_records)
+            if record.get("pedido_chave") in active_keys
+            and record.get("item_chave") not in active_keys[record["pedido_chave"]]
+        ]
+        if stale_indexes:
+            headers = getattr(self, "_headers_cache", {}).get(self.order_items.title, ORDER_ITEM_COLUMNS)
+            last_col = column_letter(len(headers))
+            ranges = [f"A{index + 2}:{last_col}{index + 2}" for index in stale_indexes]
+            # Limpar valores de linhas específicas é idempotente e não desloca
+            # os demais pedidos, inclusive quando há retry da requisição.
+            for start in range(0, len(ranges), 100):
+                batch = ranges[start:start + 100]
+                self._write_with_retry(
+                    "reconciliar itens removidos dos pedidos atualizados",
+                    lambda batch=batch: self.order_items.batch_clear(batch),
+                )
+            stale = set(stale_indexes)
+            result.final_records = [record for index, record in enumerate(result.final_records) if index not in stale]
+            result.removed = len(stale_indexes)
+            logging.info("Google Sheets: %s item(ns) antigos removidos dos pedidos atualizados.", result.removed)
+        return result
 
     def upsert_order_items(
         self,

@@ -38,14 +38,21 @@ continua sendo a chave principal da Weni.
 Quando localizado, o projeto registra o `farmalider_cliente_id` e dados/status de
 vínculo na `Base_Contatos`.
 
+Quando a resposta possui `ultimoPedido`, essa referência pode ser usada para
+consultar o último pedido específico. Na resposta oficial, `cliente` e
+`ultimoPedido` são objetos separados; o objeto legado com campos do cliente
+diretamente na resposta também é aceito para validar o vínculo. O NexoFlow
+confere o CPF do retorno e o cliente antes de aceitar essa associação.
+
 ## Pedido por código
 
 ```text
 GET /api/Delivery/pedido/{codigo}?token=...
 ```
 
-Quando `ultimo_pedido` possui identificador oficial, o projeto usa esse endpoint
-para confirmar/enriquecer o pedido.
+O identificador pode vir do JSON `ultimo_pedido`, dos campos `pedido_*` da Weni
+ou do fallback `ultimoPedido` da resposta por CPF. O projeto usa esse endpoint para confirmar
+e enriquecer o pedido, conferindo o identificador retornado e o titular.
 
 O retorno usado possui informações de capa e itens. Entre os dados persistidos
 estão emissão, filial, cliente, status, forma de pagamento, cupom, frete,
@@ -59,9 +66,16 @@ de pedidos por CPF/cliente.
 Consequência:
 
 ```text
-CPF → confirma/vincula cliente
+CPF → confirma/vincula cliente → ultimoPedido, quando disponível
 pedido_id → confirma/enriquece pedido específico
 ```
+
+Se os campos da Weni não fornecerem um pedido utilizável com identificador
+oficial, a referência de último pedido do cliente pode suprir essa informação.
+Isso não recupera automaticamente todos os pedidos anteriores. Cancelamentos,
+valores, frete e origem do total são preservados; cancelamentos não entram nas
+métricas de venda. Datas de pedidos usam `America/Belem` (UTC−3).
+Consulte [Pedidos no NexoFlow 1.0](PEDIDOS.md).
 
 ## Concorrência e proteção
 
@@ -82,10 +96,10 @@ Os valores operacionais ficam em `config.py`.
 
 ## Melhoria futura: histórico de pedidos por CPF
 
-A API publicada atualmente permite localizar cliente por CPF e consultar pedido por código, mas não lista o histórico de pedidos de um cliente. Como evolução recomendada da FarmaLíder API, criar uma rota de consulta por CPF, preferencialmente paginada e com filtros de período/status, por exemplo:
+A API usada permite localizar cliente por CPF, obter sua referência de último pedido quando disponível e consultar pedido por código, mas não lista o histórico de pedidos de um cliente. Como evolução recomendada da FarmaLíder API, criar uma rota de consulta por CPF, preferencialmente paginada e com filtros de período/status, por exemplo:
 
 ```text
 GET /api/Delivery/pedidos/cpf/{cpf}
 ```
 
-Filtros desejáveis: `inicio`, `fim`, `status`, `pagina` e `tamanhoPagina`. Uma rota opcional para apenas o último pedido também pode ser útil: `GET /api/Delivery/pedidos/cpf/{cpf}/ultimo`.
+Filtros desejáveis: `inicio`, `fim`, `status`, `pagina` e `tamanhoPagina`. Essa rota é uma proposta de evolução, não uma integração atualmente implementada.
