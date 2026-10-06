@@ -571,7 +571,7 @@ class WeniUpdateTests(unittest.TestCase):
                     applied_contact, farm, captured_at="2026-10-03T13:01:00Z",
                 )
                 self.assertTrue(second.order_validated)
-                self.assertEqual(second.purchase_confirmed, status == 2)
+                self.assertEqual(second.purchase_confirmed, active)
                 self.assertEqual(second.fields, {})
                 self.assertEqual(second.evidence, {})
 
@@ -594,7 +594,7 @@ class WeniUpdateTests(unittest.TestCase):
         self.assertEqual(products["farmalider_cancelamento"], "2026-10-03T13:00:00Z")
         audit_plans([plan], opt_out_group_available=True)
 
-    def test_only_completed_api_orders_advance_latest_purchase(self) -> None:
+    def test_all_known_non_cancelled_api_orders_advance_latest_purchase(self) -> None:
         statuses = (
             (0, "Em processamento"),
             (1, "Em trânsito"),
@@ -618,13 +618,14 @@ class WeniUpdateTests(unittest.TestCase):
                 self.assertEqual(farm.get_pedido.return_value["capa"]["cancelamento"], "")
                 plan = self._purchase_plan(contact, farm)
                 self.assertTrue(plan.order_validated)
-                self.assertEqual(plan.purchase_confirmed, status == 2)
-                self.assertEqual(set(plan.fields), order_fields | ({"ultima_compra"} if status == 2 else set()))
+                active = status in {0, 1, 2, 4}
+                self.assertEqual(plan.purchase_confirmed, active)
+                self.assertEqual(set(plan.fields), order_fields | ({"ultima_compra"} if active else set()))
                 products = json.loads(plan.fields["pedido_produtos"])
                 self.assertEqual(products["farmalider_status_pedido"], str(status))
                 self.assertEqual(products["farmalider_status_pedido_nome"], label)
                 self.assertEqual(products["status_confirmacao"], "CANCELADO_API" if status == 3 else "CONFIRMADO_API")
-                if status == 2:
+                if active:
                     self.assertEqual(plan.fields["ultima_compra"], "2026-10-03T09:00:00-03:00")
                 else:
                     self.assertNotIn("ultima_compra", plan.fields)
