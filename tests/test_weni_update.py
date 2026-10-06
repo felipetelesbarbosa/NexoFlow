@@ -14,6 +14,7 @@ from weni_update import (
     _build_contact_plan,
     _load_state,
     _resolve_required_groups,
+    _track_open_order,
     _save_state,
     audit_plans,
     UpdateStats,
@@ -103,6 +104,20 @@ class WeniUpdateTests(unittest.TestCase):
         client.list_contacts.return_value = [contact]
         client.list_messages.return_value = []
         return client
+
+    def test_open_order_tracking_keeps_only_non_terminal_statuses(self) -> None:
+        tracked: set[str] = set()
+        _track_open_order(tracked, "u1", "Em processamento")
+        self.assertEqual(tracked, {"u1"})
+        _track_open_order(tracked, "u1", "Em trânsito")
+        self.assertEqual(tracked, {"u1"})
+        _track_open_order(tracked, "u1", "Pronto para rota")
+        self.assertEqual(tracked, {"u1"})
+        _track_open_order(tracked, "u1", "Concluído")
+        self.assertEqual(tracked, set())
+        _track_open_order(tracked, "u1", "Em processamento")
+        _track_open_order(tracked, "u1", "Cancelado")
+        self.assertEqual(tracked, set())
 
     def test_required_groups_are_resolved_with_one_api_listing(self) -> None:
         client = Mock()
