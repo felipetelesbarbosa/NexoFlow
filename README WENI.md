@@ -233,6 +233,8 @@ ultima_compra            YYYY-MM-DD HH:mm:ss
 
 Uma compra mais antiga nunca substitui uma `ultima_compra` mais recente.
 
+Pedidos com `pedido_status` em **Em processamento**, **Em trânsito** ou **Pronto para rota** entram numa fila persistente de rechecagem. A rotina incremental consulta novamente o mesmo `pedido_id` nas execuções seguintes, mesmo sem nova mensagem do cliente, até o pedido chegar a **Concluído** ou **Cancelado**.
+
 ## Incremental e checkpoint
 
 O estado fica em:
