@@ -35,7 +35,13 @@ from contact_enrichment import (
 )
 from farmalider_client import FarmaliderAuthError, FarmaliderClient, FarmaliderError
 from farmalider_integration import resolve_contact_order
-from pedido_utils import business_order_datetime, is_order_cancelled, is_order_made, serialize_pedido_products
+from pedido_utils import (
+    business_order_datetime,
+    farmalider_order_status_name,
+    is_order_cancelled,
+    is_order_made,
+    serialize_pedido_products,
+)
 from weni_client import WeniClient
 from urn_utils import (
     CHANNEL_FIELD_MAP,
@@ -57,6 +63,7 @@ ALLOWED_WRITE_FIELDS = {
     "opt_in_lgpd",
     "pedido_id",
     "pedido_data",
+    "pedido_status",
     "pedido_produtos",
     "pedido_quantidade_itens",
     "pedido_valor",
@@ -75,6 +82,7 @@ REQUIRED_MULTICHANNEL_FIELDS = {
 PURCHASE_FIELDS = {
     "pedido_id",
     "pedido_data",
+    "pedido_status",
     "pedido_produtos",
     "pedido_quantidade_itens",
     "pedido_valor",
@@ -632,6 +640,7 @@ def _apply_purchase_candidate(
     *,
     farm_client: FarmaliderClient | None,
     captured_at: str,
+    available_weni_fields: set[str] | None = None,
 ) -> bool:
     """Resolve o pedido; registrar um cancelamento não confirma uma compra."""
     current_fields = get_fields(contact)
@@ -685,13 +694,25 @@ def _apply_purchase_candidate(
     plan.purchase_confirmation = confirmation
     plan.purchase_confirmed = confirmation == "CONFIRMADO_API" and is_order_made(order)
     reason = "pedido resolvido e validado; somente cancelados ficam fora da compra"
-    for field_name, value in {
+
+    status_label = farmalider_order_status_name(order.get("farmalider_status_pedido"))
+    if not status_label and is_order_cancelled(order):
+        status_label = "Cancelado"
+
+    order_fields_to_write: dict[str, Any] = {
         "pedido_id": pedido_id,
         "pedido_data": proposed_date,
         "pedido_valor": order_value,
         "pedido_quantidade_itens": quantity,
         "pedido_produtos": products,
-    }.items():
+    }
+    if (
+        status_label
+        and (available_weni_fields is None or "pedido_status" in available_weni_fields)
+    ):
+        order_fields_to_write["pedido_status"] = status_label
+
+    for field_name, value in order_fields_to_write.items():
         _set_field_if_changed(plan, current_fields, field_name, value, reason=reason)
 
     if plan.purchase_confirmed:
@@ -823,10 +844,11 @@ def _build_contact_plan(
         contact,
         farm_client=farm_client,
         captured_at=captured_at,
+        available_weni_fields=available_weni_fields,
     )
     if plan.order_validated:
         # A revisão depende da identidade e das duas possíveis fontes.
-        for key in ("cpf", "ultimo_pedido", "pedido_id", "pedido_data", "pedido_produtos", "pedido_quantidade_itens", "pedido_valor"):
+        for key in ("cpf", "ultimo_pedido", "pedido_id", "pedido_data", "pedido_status", "pedido_produtos", "pedido_quantidade_itens", "pedido_valor"):
             plan.guards[key] = fields.get(key)
     return plan
 
@@ -882,6 +904,14 @@ def audit_plans(
         if "opt_in_lgpd" in plan.fields:
             if str(plan.fields["opt_in_lgpd"]).strip().casefold() not in {"ativo", "recusado"}:
                 errors.append(f"{plan.contact_uuid}: valor inválido em opt_in_lgpd")
+
+        if "pedido_status" in plan.fields:
+            allowed_statuses = {
+                "Em processamento", "Em trânsito", "Concluído",
+                "Cancelado", "Pronto para rota",
+            }
+            if str(plan.fields["pedido_status"]).strip() not in allowed_statuses:
+                errors.append(f"{plan.contact_uuid}: valor inválido em pedido_status")
 
         if "contact_canal_principal" in plan.fields:
             channel = str(plan.fields["contact_canal_principal"]).strip().casefold()
@@ -1627,6 +1657,11 @@ def run_update(
     try:
         available_weni_fields = _available_weni_fields(weni)
         _ensure_multichannel_fields(weni, available_weni_fields)
+        if "pedido_status" not in available_weni_fields:
+            logging.warning(
+                "Campo pedido_status ausente na Weni. O status continuará sendo "
+                "validado pela FarmaLíder, mas não será gravado no contato."
+            )
         missing_google_ads = _missing_google_ads_fields(available_weni_fields)
         if missing_google_ads:
             logging.warning(
