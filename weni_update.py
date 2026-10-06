@@ -35,7 +35,7 @@ from contact_enrichment import (
 )
 from farmalider_client import FarmaliderAuthError, FarmaliderClient, FarmaliderError
 from farmalider_integration import resolve_contact_order
-from pedido_utils import business_order_datetime, is_order_cancelled, is_order_completed, serialize_pedido_products
+from pedido_utils import business_order_datetime, is_order_cancelled, is_order_completed, is_order_made, serialize_pedido_products
 from weni_client import WeniClient
 from urn_utils import (
     CHANNEL_FIELD_MAP,
@@ -683,8 +683,8 @@ def _apply_purchase_candidate(
 
     plan.order_validated = True
     plan.purchase_confirmation = confirmation
-    plan.purchase_confirmed = confirmation == "CONFIRMADO_API" and is_order_completed(order)
-    reason = "pedido resolvido e validado; somente concluídos confirmam compra"
+    plan.purchase_confirmed = confirmation == "CONFIRMADO_API" and is_order_made(order)
+    reason = "pedido resolvido e validado; somente cancelados ficam fora da compra"
     for field_name, value in {
         "pedido_id": pedido_id,
         "pedido_data": proposed_date,
@@ -702,7 +702,7 @@ def _apply_purchase_candidate(
                 current_fields,
                 "ultima_compra",
                 proposed_date,
-                reason="pedido concluído confirmado pela API FarmaLíder",
+                reason="pedido não cancelado confirmado pela API FarmaLíder",
             )
     return True
 
