@@ -283,18 +283,22 @@ class PedidoResolutionTests(unittest.TestCase):
         self.assertTrue(is_order_cancelled(order))
         self.assertEqual(items[0]["produto_nome"], "Produto sintético")
 
-    def test_path_one_uses_weni_without_any_api_requests(self):
+    def test_path_one_uses_weni_and_confirms_only_same_order_id(self):
         for raw in (raw_order(), {"value": raw_order()}):
             with self.subTest(wrapped=isinstance(raw, dict)):
                 api = client()
                 order, items = resolve_contact_order(contact(raw=raw), farm_client=api, captured_at=CAPTURED_AT)
-                self.assertEqual(order["status_confirmacao"], "NAO_CONFIRMADO_API")
+                self.assertEqual(order["status_confirmacao"], "CONFIRMADO_API")
+                self.assertEqual(order["farmalider_status_pedido"], "1")
+                self.assertEqual(order["farmalider_status_pedido_nome"], "Em trânsito")
                 self.assertEqual(order["origem_pedido"], "WENI_ULTIMO_PEDIDO")
                 self.assertEqual(order["pedido_id"], "123")
                 self.assertEqual(order["valor_total_compra"], "48.89")
                 self.assertEqual(items[0]["produto_nome"], "Produto sintético")
+                # Caminho 1 nunca procura outro pedido por CPF.
                 api.get_cliente_by_cpf.assert_not_called()
-                api.get_pedido.assert_not_called()
+                # A API é usada somente para confirmar o status do mesmo ID.
+                api.get_pedido.assert_called_once_with("123")
 
     def test_api_reconciliation_preserves_weni_name_only_with_matching_code(self):
         order, items = confirm_weni_fixture(raw_order())
