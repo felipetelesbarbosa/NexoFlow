@@ -35,7 +35,7 @@ from contact_enrichment import (
 )
 from farmalider_client import FarmaliderAuthError, FarmaliderClient, FarmaliderError
 from farmalider_integration import resolve_contact_order
-from pedido_utils import business_order_datetime, is_order_cancelled, is_order_completed, is_order_made, serialize_pedido_products
+from pedido_utils import business_order_datetime, is_order_cancelled, is_order_made, serialize_pedido_products
 from weni_client import WeniClient
 from urn_utils import (
     CHANNEL_FIELD_MAP,
@@ -937,8 +937,8 @@ def audit_plans(
                     raise ValueError("pedido sem validação válida")
                 if products.get("status_confirmacao") not in {"CONFIRMADO_API", "CANCELADO_API", "NAO_CONFIRMADO_API"}:
                     raise ValueError("confirmação inválida")
-                if plan.purchase_confirmed and not is_order_completed(products):
-                    raise ValueError("somente pedido concluído confirma compra")
+                if plan.purchase_confirmed and not is_order_made(products):
+                    raise ValueError("pedido cancelado ou status desconhecido não confirma compra")
             except (ValueError, TypeError):
                 errors.append(f"{plan.contact_uuid}: estrutura inválida em pedido_produtos")
 
