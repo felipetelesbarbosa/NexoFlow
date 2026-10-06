@@ -1,4 +1,4 @@
-# Instalação e desinstalação do NexoFlow
+# NexoFlow 1.0 — Instalação e desinstalação
 
 
 ## Versão

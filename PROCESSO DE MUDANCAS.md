@@ -1,4 +1,4 @@
-# Processo de mudanças — NexoFlow 1.0
+# NexoFlow 1.0 — Processo de mudanças
 
 Este documento define como alterações devem ser feitas e validadas no NexoFlow 1.0. Ele documenta o processo atual do **NexoFlow 1.0**; o histórico público fica concentrado em `CHANGELOG.md`.
 

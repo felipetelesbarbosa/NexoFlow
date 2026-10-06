@@ -2,20 +2,19 @@
 
 Distribuição oficial do **NexoFlow 1.0**.
 
-A versão do produto permanece **1.0**.
 
 ## Downloads
 
 Use a página oficial do **NexoFlow 1.0**:
 
-- **NexoFlow-Setup-1.0.zip** — Setup validado;
+- **NexoFlow-Setup-1.0.zip** — Setup do NexoFlow 1.0;
 - **NexoFlow-1.0.zip** — projeto completo correspondente ao mesmo código;
 - **SHA256SUMS-1.0.txt** — hashes SHA-256 dos dois pacotes.
 
 NexoFlow 1.0:
 https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.0
 
-## Estabilidade do Setup
+## Setup
 
 O Setup 1.0 é validado automaticamente em Windows antes da publicação. A validação cobre:
 
