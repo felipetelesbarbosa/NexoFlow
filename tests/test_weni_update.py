@@ -560,12 +560,13 @@ class WeniUpdateTests(unittest.TestCase):
                     item.pop("nome")
                 first = self._purchase_plan(contact, farm)
                 self.assertTrue(first.order_validated)
-                self.assertEqual(first.purchase_confirmed, status == 2)
+                active = status != 3
+                self.assertEqual(first.purchase_confirmed, active)
                 expected_fields = {
                     "pedido_id", "pedido_data", "pedido_produtos",
                     "pedido_quantidade_itens", "pedido_valor",
                 }
-                self.assertEqual(set(first.fields), expected_fields | ({"ultima_compra"} if status == 2 else set()))
+                self.assertEqual(set(first.fields), expected_fields | ({"ultima_compra"} if active else set()))
                 self.assertEqual(first.fields["pedido_id"], "123")
                 self.assertEqual(first.fields["pedido_data"], "2026-10-03T09:00:00-03:00")
                 self.assertEqual(first.fields["pedido_valor"], 25.5)

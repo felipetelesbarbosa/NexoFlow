@@ -151,11 +151,18 @@ Write-Host "Assine os executaveis somente quando houver certificado corporativo 
 
 Write-Host "==> Compilando launcher do Setup"
 Push-Location $RepoRoot
+$oldGo111Module = $env:GO111MODULE
 try {
+    $env:GO111MODULE = "off"
     & go build -trimpath -tags setup -ldflags "-s -w" -o (Join-Path $SetupRoot "NexoFlow Setup.exe") ./native_launcher
     if ($LASTEXITCODE -ne 0) { throw "Falha ao compilar NexoFlow Setup.exe" }
 }
 finally {
+    if ($null -eq $oldGo111Module) {
+        Remove-Item Env:GO111MODULE -ErrorAction SilentlyContinue
+    } else {
+        $env:GO111MODULE = $oldGo111Module
+    }
     Pop-Location
 }
 

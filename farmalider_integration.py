@@ -294,6 +294,7 @@ def _empty_order(contact: dict[str, Any], captured_at: str) -> dict[str, str]:
 def resolve_contact_order(
     contact: dict[str, Any], *, farm_client: Any, captured_at: str,
     linked_cliente_id: str = "", cliente_response: dict[str, Any] | None = None,
+    pedido_responses_by_id: dict[str, dict[str, Any] | None] | None = None,
 ) -> tuple[dict[str, str] | None, list[dict[str, str]]]:
     """Use populated ultimo_pedido first; only an empty field permits CPF fallback."""
     from analytics import get_fields, is_valid_cpf, normalize_cpf, normalize_order_source, parse_ultimo_pedido
@@ -302,7 +303,7 @@ def resolve_contact_order(
     raw = normalize_order_source(fields.get("ultimo_pedido"))
     order, items = parse_ultimo_pedido(contact, captured_at=captured_at)
     valid_weni = order is not None and not order.get("status_validacao", "").startswith("ERRO")
-    if raw and not valid_weni:
+    if raw and (not valid_weni or not items):
         return order, items
     if raw and not _positive_id(order.get("pedido_id")):
         if order.get("pedido_id"):
@@ -340,7 +341,12 @@ def resolve_contact_order(
         from farmalider_client import FarmaliderAuthError, FarmaliderError
 
         try:
-            response = farm_client.get_pedido(requested_id)
+            if pedido_responses_by_id is not None and requested_id in pedido_responses_by_id:
+                response = pedido_responses_by_id[requested_id]
+            else:
+                response = farm_client.get_pedido(requested_id)
+                if pedido_responses_by_id is not None:
+                    pedido_responses_by_id[requested_id] = response
         except FarmaliderAuthError:
             raise
         except FarmaliderError:
@@ -441,7 +447,12 @@ def resolve_contact_order(
     from farmalider_client import FarmaliderAuthError, FarmaliderError
 
     try:
-        response = farm_client.get_pedido(requested_id)
+        if pedido_responses_by_id is not None and requested_id in pedido_responses_by_id:
+            response = pedido_responses_by_id[requested_id]
+        else:
+            response = farm_client.get_pedido(requested_id)
+            if pedido_responses_by_id is not None:
+                pedido_responses_by_id[requested_id] = response
     except FarmaliderAuthError:
         raise
     except FarmaliderError:
