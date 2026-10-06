@@ -12,7 +12,6 @@ from urn_utils import resolve_contact_urns
 from pedido_utils import (
     business_order_datetime,
     farmalider_order_status_name,
-    is_order_completed,
     is_order_made,
 )
 
