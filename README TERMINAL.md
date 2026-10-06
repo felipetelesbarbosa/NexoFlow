@@ -1,4 +1,4 @@
-# NexoFlow Terminal
+# NexoFlow 1.0 — Terminal
 
 O **NexoFlow Terminal** é a interface de comandos do NexoFlow para uso operacional e diagnóstico. Ele foi pensado para quem não trabalha diariamente com Python, PowerShell ou APIs.
 

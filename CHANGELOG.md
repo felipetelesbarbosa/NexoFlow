@@ -1,8 +1,8 @@
-# Changelog — NexoFlow 1.0
+# NexoFlow 1.0 — Changelog
 
 ## NexoFlow 1.0
 
-### Estabilidade do Setup
+### Setup
 
 - Setup validado em Windows com primeira instalação e atualização real;
 - atualização com rollback automático para a instalação anterior em caso de falha;

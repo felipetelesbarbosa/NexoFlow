@@ -1,4 +1,4 @@
-# NexoFlow
+# NexoFlow 1.0 — Documentação
 
 Software interno de integração, atualização de contatos e analytics da FarmaLíder.
 

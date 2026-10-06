@@ -1,4 +1,4 @@
-# Proxy e rede - NexoFlow
+# NexoFlow 1.0 — Proxy e rede
 
 Documentação atual de rede do **NexoFlow**.
 

@@ -1,4 +1,4 @@
-# VS Code - configuração recomendada
+# NexoFlow 1.0 — VS Code
 
 Documentação de desenvolvimento e manutenção do **NexoFlow**.
 

@@ -1,4 +1,4 @@
-# Launchers nativos — NexoFlow 1.0
+# NexoFlow 1.0 — Launchers nativos
 
 Fontes dos launchers Windows distribuídos no NexoFlow 1.0.
 
