@@ -105,6 +105,10 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
                           "valor_unitario": "7.50", "valor_total": "15.00"}],
         })
         first["fields"]["ultimo_pedido"] = {"value": raw}
+        # Caminho 1 consulta exclusivamente o mesmo ID para confirmar status.
+        client.get_pedido.return_value["capa"]["id"] = 400
+        client.get_pedido.return_value["capa"]["codCliente"] = 99
+        client.get_pedido.return_value["itens"][0]["codPedido"] = 400
         second = {"uuid": "synthetic-u2", "fields": dict(first["fields"])}
         contacts = [first, second]
         rows = [normalize_contact(contact, "2026-10-05T14:00:00Z") for contact in contacts]
@@ -115,7 +119,7 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
             list(reversed(contacts)), sync_time="2026-10-05T14:10:00Z", **kwargs)
         self.assertEqual(len(orders), 1)
         self.assertEqual(len(items), 1)
-        self.assertEqual(stats.confirmed_api, 0)
+        self.assertEqual(stats.confirmed_api, 1)
         self.assertEqual(orders[0]["pedido_id"], "400")
         self.assertEqual(orders[0]["pedido_chave"], "FARMALIDER:400")
         self.assertEqual(orders[0]["valor_total_compra"], "15.00")
@@ -125,7 +129,8 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
         self.assertEqual(items[0]["valor_unitario"], "7.50")
         self.assertEqual(items[0]["valor_total"], "15.00")
         client.get_cliente_by_cpf.assert_not_called()
-        client.get_pedido.assert_not_called()
+        self.assertEqual(client.get_pedido.call_count, 2)
+        client.get_pedido.assert_called_with("400")
 
         store = GoogleSheetsStore.__new__(GoogleSheetsStore)
         store.orders = MemoryWorksheet("Pedidos", ORDER_COLUMNS)
@@ -143,7 +148,7 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
         self.assertEqual(len(store.orders.values), 2)
         self.assertEqual(len(store.order_items.values), 2)
         self.assertEqual(build_sales_metrics(repeated.final_records, repeated_items.final_records),
-            [["2026-10-05", 1, 0, 1, "2", "15.00", "0.00"]])
+            [["2026-10-05", 1, 1, 1, "2", "15.00", "15.00"]])
 
     def test_textual_codproduto_is_persisted_as_name_without_changing_sales(self):
         contact, client = self.fixture()
