@@ -27,7 +27,7 @@ O Setup 1.0 é validado automaticamente em Windows antes da publicação. A vali
 
 O `NexoFlow Uninstall.exe` é opcional. Se for bloqueado ou removido, o Setup continua funcionando e a desinstalação permanece disponível por `installer\uninstall.ps1` e `desinstalar_nexoflow.cmd`.
 
-Atualizações preservam temporariamente a instalação anterior. Se a nova instalação falhar depois de iniciada, o Setup tenta restaurar automaticamente a versão anterior, evitando deixar o NexoFlow parcialmente atualizado.
+Atualizações preservam temporariamente a instalação existente. Se a nova instalação falhar depois de iniciada, o Setup tenta restaurar automaticamente o estado anterior, evitando deixar o NexoFlow parcialmente atualizado.
 
 O Setup também solicita elevação UAC automaticamente quando necessário.
 
