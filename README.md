@@ -80,6 +80,7 @@ maior_de_18_anos
 opt_in_lgpd
 pedido_id
 pedido_data
+pedido_status
 pedido_produtos
 pedido_quantidade_itens
 pedido_valor
@@ -178,7 +179,7 @@ Na operação rotineira, execute o NexoFlow Weni antes do Analytics.
 
 ### Pedidos por JSON ou campos separados
 
-O NexoFlow 1.0 usa `ultimo_pedido` como fonte prioritária quando ele está preenchido. O JSON pode fornecer diretamente ID, data/hora, nomes dos produtos, quantidades, valores unitários e valor total; desses dados são derivados `pedido_id`, `pedido_data`, `pedido_produtos`, `pedido_quantidade_itens` e `pedido_valor`. Esses campos também são preservados na `Base_Contatos`.
+O NexoFlow 1.0 usa `ultimo_pedido` como fonte prioritária quando ele está preenchido. O JSON pode fornecer diretamente ID, data/hora, nomes dos produtos, quantidades, valores unitários e valor total; desses dados são derivados `pedido_id`, `pedido_data`, `pedido_produtos`, `pedido_quantidade_itens` e `pedido_valor`. Após a consulta do mesmo ID na API, `pedido_status` recebe o estado oficial atual. Esses campos também são preservados na `Base_Contatos`.
 
 Quando `ultimo_pedido` estiver preenchido, seus dados são usados como Caminho 1 e o NexoFlow consulta somente o mesmo `pedido_id` para confirmar o status atual. O fluxo `CPF → ultimoPedido → pedido` é Caminho 2 e só é usado quando `ultimo_pedido` estiver ausente, vazio ou `null`. Produtos permanecem em JSON e os cinco campos de pedido são mantidos em qualquer estado válido.
 
