@@ -240,7 +240,7 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
         self.assertEqual(summary["pedidos_total"], 0)
         self.assertEqual(summary["clientes_compradores_total"], 0)
 
-    def test_all_api_states_are_persisted_but_only_completed_orders_reach_sales(self):
+    def test_all_api_states_are_persisted_and_only_cancelled_or_unknown_stay_out_of_sales(self):
         for status in (0, 1, 2, 3, 4, 99, None):
             with self.subTest(status=status):
                 contact, client = self.fixture()
@@ -248,7 +248,7 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
                 _, orders, items = self.resolve_and_persist(contact, client)
                 self.assertEqual(len(orders), 1)
                 self.assertEqual(len(items), 1)
-                if status == 2:
+                if status in (0, 1, 2, 4):
                     self.assertEqual(build_sales_metrics(orders, items),
                         [["2026-10-05", 1, 1, 1, "2", "29.49", "29.49"]])
                 else:
