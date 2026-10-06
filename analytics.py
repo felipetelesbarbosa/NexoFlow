@@ -62,6 +62,7 @@ BASE_COLUMNS = [
     "ultimo_pedido",
     "pedido_id",
     "pedido_data",
+    "pedido_status",
     "pedido_produtos",
     "pedido_quantidade_itens",
     "pedido_valor",
@@ -452,7 +453,7 @@ def normalize_contact(
     for key in AD_FIELDS:
         row[key] = normalize_value(fields.get(key))
 
-    for key in ("pedido_id", "pedido_data", "pedido_quantidade_itens", "pedido_valor"):
+    for key in ("pedido_id", "pedido_data", "pedido_status", "pedido_quantidade_itens", "pedido_valor"):
         row[key] = normalize_value(fields.get(key))
     products = fields.get("pedido_produtos")
     if isinstance(products, dict) and "value" in products:
