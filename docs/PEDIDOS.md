@@ -33,7 +33,7 @@ Conteúdo preenchido inválido ou incompleto não autoriza buscar outro pedido p
 CPF → GET cliente/cpf/{cpf} → resposta.ultimoPedido.id → GET pedido/{codigo}
 ```
 
-São aceitos valor nulo, espaços e texto `null`, inclusive no formato encapsulado `{"value": ...}` da Weni. Um objeto ou lista inválidos continuam sendo conteúdo preenchido, não ausência de informação. Campos `pedido_*` antigos não determinam o pedido desse caminho: a referência vem de `ultimoPedido.id`. Um snapshot válido do mesmo ID pode manter a comparação de valores; snapshots de outro ID são descartados da resolução atual. A API fornece os dados para alimentar os mesmos cinco campos da Weni antes da carga do Analytics.
+São aceitos valor nulo, espaços e texto `null`, inclusive no formato encapsulado `{"value": ...}` da Weni. Um objeto ou lista inválidos continuam sendo conteúdo preenchido, não ausência de informação. Campos `pedido_*` antigos não determinam o pedido desse caminho: a referência vem de `ultimoPedido.id`. Um snapshot válido do mesmo ID pode manter a comparação de valores; snapshots de outro ID são descartados da resolução atual. A API fornece os dados para alimentar os seis campos da Weni, incluindo `pedido_status`, antes da carga do Analytics.
 
 Na resposta oficial, `cliente` identifica o titular e `ultimoPedido` é outro objeto da resposta. O retorno legado com os campos do cliente diretamente no objeto também é aceito para validar o vínculo.
 
@@ -52,7 +52,7 @@ O registro distingue o total do pedido, a soma dos itens e o frete. `valor_orige
 - `SOMA_ITENS_API`: soma dos itens, sem frete disponível; valor parcial.
 - `WENI`: valor recebido da Weni, sem transformar sua origem em confirmação oficial.
 
-Quando só há a soma dos itens, sem total geral ou frete explícito, o estado é `ATENCAO_TOTAL_PARCIAL`. O pedido continua registrado para auditoria, mas não atualiza os cinco campos `pedido_*` na Weni nem alimenta as métricas de vendas.
+Quando só há a soma dos itens, sem total geral ou frete explícito, o estado é `ATENCAO_TOTAL_PARCIAL`. O pedido continua registrado para auditoria, mas não atualiza os seis campos `pedido_*` na Weni nem alimenta as métricas de vendas.
 
 Uma divergência entre o valor da Weni e o total resolvido pela API fica registrada em `valor_total_weni` e `diferenca_total_weni_api`, com `ATENÇÃO_TOTAL_DIVERGENTE`. O total da API prevalece; não se escolhe o maior valor entre as fontes.
 
@@ -88,7 +88,7 @@ Faturamento, pedidos, unidades vendidas e compradores consideram como **pedido f
 
 | Estado do pedido | Captura e auditoria | Indicadores de vendas |
 |---|---|---|
-| 0, 1, 2 ou 4 | Preservados e alimentam os cinco campos `pedido_*` quando os dados são válidos. | Entram como pedido feito quando o status é confirmado pela API e não há cancelamento explícito. |
+| 0, 1, 2 ou 4 | Preservados e alimentam os seis campos `pedido_*` quando os dados são válidos. | Entram como pedido feito quando o status é confirmado pela API e não há cancelamento explícito. |
 | 3 | Cancelamento preservado. | Fora dos indicadores. |
 | Ausente ou desconhecido | Informação disponível preservada, sem inferir estado. | Fora dos indicadores. |
 
