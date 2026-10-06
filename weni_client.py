@@ -352,3 +352,4 @@ class WeniClient:
                 for item in groups
             ),
         }
+# NexoFlow 1.0

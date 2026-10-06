@@ -1352,3 +1352,4 @@ def build_bi_ads_rows(
     if not rows:
         rows.append([snapshot_date, "Sem dados", "", "", "", "", "Sem conversas atribuídas a anúncios", 0, 0, 0, 0, 0.0, updated_at])
     return rows
+# NexoFlow 1.0

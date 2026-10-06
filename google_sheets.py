@@ -1305,3 +1305,4 @@ class GoogleSheetsStore:
             lambda: self.events.col_values(1),
         )
         return set(values[1:]) if len(values) > 1 else set()
+# NexoFlow 1.0

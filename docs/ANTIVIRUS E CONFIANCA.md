@@ -29,3 +29,4 @@ O Update Weni mantém revisão humana na carga completa, snapshot congelado, con
 ## NexoFlow 1.0
 
 Toda a distribuição deve ser identificada como **NexoFlow 1.0**. Os executáveis Windows usam `1.0.0.0` somente no recurso VERSIONINFO, formato de quatro componentes do Windows.
+<!-- NexoFlow 1.0 -->
