@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -29,7 +32,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
-          Copy-Item secrets_config.example.py secrets_config.py -Force
+          $cfg = Get-Content secrets_config.example.py -Raw
+          $cfg = $cfg.Replace("COLE_SEU_TOKEN_WENI_AQUI", "TOKEN_TESTE_WENI")
+          $cfg = $cfg.Replace("COLE_O_ID_DA_PLANILHA_GOOGLE_AQUI", "PLANILHA_TESTE")
+          $cfg = $cfg.Replace("COLE_SEU_TOKEN_FARMALIDER_AQUI", "TOKEN_TESTE_FARMALIDER")
+          [IO.File]::WriteAllText((Join-Path $PWD "secrets_config.py"), $cfg, (New-Object Text.UTF8Encoding($false)))
 
       - name: Executar testes
         shell: pwsh
@@ -52,12 +59,14 @@ jobs:
           ./scripts/build_release.ps1 -Version "1.0"
 
       - name: Mover tag v1.0 para a release atual
+        if: github.event_name != 'pull_request'
         shell: pwsh
         run: |
           git tag -f v1.0 "$env:GITHUB_SHA"
           git push origin refs/tags/v1.0 --force
 
       - name: Atualizar GitHub Release v1.0
+        if: github.event_name != 'pull_request'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}

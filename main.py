@@ -470,6 +470,7 @@ def build_orders(
 ) -> tuple[list[Row], list[Row], OrderStats]:
     snapshots: dict[str, tuple[Row, list[Row]]] = {}
     contacts_by_order: dict[str, set[str]] = {}
+    pedido_responses_by_id: dict[str, dict[str, Any] | None] = {}
     stats = OrderStats()
 
     # CPF duplicates can point to the same official order. Select a complete
@@ -486,6 +487,7 @@ def build_orders(
                 captured_at=sync_time,
                 linked_cliente_id=contact_row.get("farmalider_cliente_id", ""),
                 cliente_response=(cliente_responses_by_cpf or {}).get(cpf),
+                pedido_responses_by_id=pedido_responses_by_id,
             )
         except FarmaliderAuthError:
             raise
