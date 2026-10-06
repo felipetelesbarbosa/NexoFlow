@@ -9,7 +9,8 @@
 - valores oficiais de `pedido_status`: **Em processamento**, **Em trânsito**, **Concluído**, **Cancelado** e **Pronto para rota**;
 - cancelamento explícito sempre prevalece e grava **Cancelado**;
 - status 0, 1, 2 e 4 contam como pedido feito; somente status 3 fica fora dos indicadores;
-- `pedido_status` também é preservado na `Base_Contatos` para Google Sheets/Looker Studio.
+- `pedido_status` também é preservado na `Base_Contatos` para Google Sheets/Looker Studio;
+- pedidos em **Em processamento**, **Em trânsito** ou **Pronto para rota** ficam numa fila persistente de rechecagem até chegarem a **Concluído** ou **Cancelado**, mesmo sem nova mensagem na Weni.
 
 Data de consolidação: 05/10/2026.
 
