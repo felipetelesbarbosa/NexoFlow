@@ -80,6 +80,7 @@ maior_de_18_anos
 opt_in_lgpd
 pedido_id
 pedido_data
+pedido_status
 pedido_produtos
 pedido_quantidade_itens
 pedido_valor
@@ -121,8 +122,10 @@ Regras importantes:
 - quando o CPF informado recentemente difere do campo `cpf`, o valor mais recente substitui o anterior; se for o mesmo CPF apenas com outra formatação, não há regravação;
 - `Sim`, `Não` ou uma idade isolada só são usados quando existe contexto explícito na conversa;
 - `opt_in_lgpd_status` permanece controlado pelos flows/agentes da Weni;
-- `ultimo_pedido` continua sendo o JSON estruturado de origem e não é reescrito pela rotina NexoFlow Weni;
-- campos de compra só são gravados após confirmação do pedido pela API FarmaLíder;
+- `ultimo_pedido` pode ser fornecido como JSON estruturado; a rotina NexoFlow Weni não reescreve esse campo. O Analytics também aceita os campos separados `pedido_*` e deriva o JSON quando necessário;
+- quando `ultimo_pedido` está preenchido e possui ID válido, seus dados têm prioridade; a API consulta somente esse mesmo pedido por ID para confirmar o status, sem buscar outro pedido pelo CPF;
+- somente quando `ultimo_pedido` está ausente, vazio ou `null`, a rotina pode consultar o CPF confirmado, obter `ultimoPedido` na resposta da API e validar esse pedido pela FarmaLíder;
+- pedidos são validados pelo identificador e pelo vínculo com o titular. Cancelamentos são preservados no registro, mas não confirmam uma compra nem atualizam `ultima_compra`;
 - `opt_in_lgpd = ativo` garante o contato no grupo **Opt-In LGPD** e remove **Opt-Out LGPD**, se necessário;
 - `opt_in_lgpd = recusado` garante o contato no grupo **Opt-Out LGPD** e remove **Opt-In LGPD**, se necessário;
 - os dois grupos são mutuamente exclusivos e o campo `opt_in_lgpd` é a fonte de verdade para a sincronização;
@@ -173,6 +176,16 @@ O **NexoFlow Analytics** permanece separado do NexoFlow Weni.
 Ele é responsável pela sincronização analítica e pela atualização das estruturas usadas em Google Sheets/Looker Studio. O NexoFlow 1.0 expõe também os metadados de tipo de campanha e canal de destino de anúncios quando disponíveis, além de `contact_urn_whatsapp`, `contact_urn_instagram`, `contact_urn_facebook` e `contact_canal_principal`. IDs de Instagram/Facebook não são tratados como telefone. O Analytics não substitui a rotina NexoFlow Weni e não deve ser usado como mecanismo de escrita dos campos de contato.
 
 Na operação rotineira, execute o NexoFlow Weni antes do Analytics.
+
+### Pedidos por JSON ou campos separados
+
+O NexoFlow 1.0 usa `ultimo_pedido` como fonte prioritária quando ele está preenchido. O JSON pode fornecer diretamente ID, data/hora, nomes dos produtos, quantidades, valores unitários e valor total; desses dados são derivados `pedido_id`, `pedido_data`, `pedido_produtos`, `pedido_quantidade_itens` e `pedido_valor`. Após a consulta do mesmo ID na API, `pedido_status` recebe o estado oficial atual. Esses campos também são preservados na `Base_Contatos`.
+
+Quando `ultimo_pedido` estiver preenchido, seus dados são usados como Caminho 1 e o NexoFlow consulta somente o mesmo `pedido_id` para confirmar o status atual. O fluxo `CPF → ultimoPedido → pedido` é Caminho 2 e só é usado quando `ultimo_pedido` estiver ausente, vazio ou `null`. Produtos permanecem em JSON e os seis campos de pedido (`pedido_id`, `pedido_data`, `pedido_status`, `pedido_produtos`, `pedido_quantidade_itens` e `pedido_valor`) são mantidos em qualquer estado válido.
+
+Datas de pedidos usam **America/Belem (UTC−3 / GMT−3)**. Para os indicadores, **pedido feito** significa status 0, 1, 2 ou 4 confirmado pela API e não cancelado; somente status 3 fica fora. Os seis campos de pedido continuam registrados em todos os estados válidos, e `ultima_compra` avança para o pedido não cancelado mais recente confirmado pela API. A leitura do último pedido não recupera automaticamente todo o histórico comercial.
+
+Consulte [Pedidos no NexoFlow 1.0](docs/PEDIDOS.md) para o contrato e as regras de validação.
 
 ## Instalação no Windows
 

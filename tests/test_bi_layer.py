@@ -1,3 +1,4 @@
+import json
 import unittest
 
 from analytics import (
@@ -12,6 +13,8 @@ from analytics import (
     build_bi_conversion_records,
     build_bi_sales_rows,
     build_bi_summary_record,
+    build_sales_metrics,
+    parse_ultimo_pedido,
     normalize_contact,
 )
 from config import (
@@ -131,6 +134,87 @@ class BILayerTests(unittest.TestCase):
         self.assertEqual(schema[SHEET_BI_VENDAS], BI_SALES_COLUMNS)
         self.assertEqual(schema[SHEET_BI_ADS], BI_ADS_COLUMNS)
         self.assertEqual(schema[SHEET_BI_STATUS], BI_STATUS_COLUMNS)
+
+    def order_fixture(self, *, confirmation="CONFIRMADO_API", cancellation="", status=2):
+        raw = json.dumps({
+            "pedido_id": "500", "data_hora": "2026-10-05T10:00:00-03:00",
+            "valor_total_compra": "19.50", "produtos": [
+                {"nome": "Produto sintético", "codigo": "900", "quantidade": 2,
+                 "valor_unitario": "10.00", "valor_total": "19.50"}],
+            "status_confirmacao": confirmation, "farmalider_cancelamento": cancellation,
+            "farmalider_status_pedido": status,
+        })
+        order, items = parse_ultimo_pedido({"uuid": "u1", "fields": {"ultimo_pedido": raw}}, "2026-10-05T14:00:00Z")
+        order["primeiro_anuncio_id"] = "test-ad"
+        order["primeiro_anuncio_titulo"] = "Anúncio sintético"
+        base = [{"contact_uuid": "u1", "primeiro_anuncio_id": "test-ad", "primeiro_anuncio_titulo": "Anúncio sintético"}]
+        return base, order, items
+
+    def test_cancelled_and_mismatched_orders_remain_auditable_but_leave_all_sales_kpis(self):
+        cases = (
+            {"cancellation": "2026-10-05T11:00:00-03:00"},
+            {"status": "CANCELADO", "cancellation": "false"},
+            {"status": 3, "cancellation": ""},
+            {"status": "3", "cancellation": "false"},
+            {"confirmation": "CANCELADO_API"},
+            {"confirmation": "NAO_CONFIRMADO_API"},
+            {"confirmation": "PEDIDO_CLIENTE_DIVERGENTE_API"},
+            {"confirmation": "PEDIDO_ID_DIVERGENTE_API"},
+        )
+        for case in cases:
+            with self.subTest(case=case):
+                base, order, items = self.order_fixture(**case)
+                self.assertEqual(order["pedido_chave"], "FARMALIDER:500")
+                self.assertEqual(len(items), 1)
+                self.assertEqual(build_sales_metrics([order], items), [])
+                summary = build_bi_summary_record(base, [order], items,
+                    snapshot_date="2026-10-05", updated_at="2026-10-05T14:00:00Z")
+                for key in ("pedidos_total", "faturamento_total", "clientes_compradores_total",
+                            "pedidos_dia", "faturamento_dia", "unidades_vendidas_dia"):
+                    self.assertEqual(summary[key], 0)
+                conversion = build_bi_conversion_records(base, [order],
+                    snapshot_date="2026-10-05", updated_at="2026-10-05T14:00:00Z")
+                self.assertEqual(conversion[-1]["quantidade"], 0)
+                ads = build_bi_ads_rows(base, [order],
+                    snapshot_date="2026-10-05", updated_at="2026-10-05T14:00:00Z")
+                self.assertEqual(ads[0][7], 1)
+                self.assertEqual(ads[0][9:12], [0, 0, 0.0])
+
+    def test_false_cancellation_and_completed_status_do_not_remove_valid_sales(self):
+        for cancellation in (False, "False", "false", 0, "0", "null", None):
+            with self.subTest(cancellation=cancellation):
+                _, order, items = self.order_fixture(cancellation=cancellation, status=2)
+                self.assertEqual(build_sales_metrics([order], items),
+                    [["2026-10-05", 1, 1, 1, "2", "19.50", "19.50"]])
+
+    def test_new_contacts_use_business_day_at_utc_midnight(self):
+        base = [{"contact_uuid": "u1", "weni_created_on": "2026-10-06T01:30:00Z"}]
+        summary = build_bi_summary_record(base, [], [], snapshot_date="2026-10-05",
+                                         updated_at="2026-10-06T01:30:00Z")
+        self.assertEqual(summary["novos_contatos"], 1)
+
+    def test_every_documented_non_cancelled_state_enters_sales_and_bi(self):
+        for status in (0, 1, 2, 3, 4, "0", "1", "2", "3", "4", "99", "", None):
+            with self.subTest(status=status):
+                base, order, items = self.order_fixture(status=status)
+                made = str(status) in {"0", "1", "2", "4"}
+                self.assertEqual(len(items), 1)  # Every state remains auditable.
+                self.assertEqual(order["pedido_chave"], "FARMALIDER:500")
+                expected_sales = [["2026-10-05", 1, 1, 1, "2", "19.50", "19.50"]] if made else []
+                self.assertEqual(build_sales_metrics([order], items), expected_sales)
+                summary = build_bi_summary_record(base, [order], items,
+                    snapshot_date="2026-10-05", updated_at="2026-10-05T14:00:00Z")
+                for key in ("pedidos_total", "clientes_compradores_total", "pedidos_dia", "clientes_compradores_dia"):
+                    self.assertEqual(summary[key], 1 if made else 0)
+                for key in ("faturamento_total", "faturamento_dia", "faturamento_confirmado_api_dia"):
+                    self.assertEqual(summary[key], 19.50 if made else 0)
+                self.assertEqual(summary["unidades_vendidas_dia"], 2 if made else 0)
+                conversion = build_bi_conversion_records(base, [order],
+                    snapshot_date="2026-10-05", updated_at="2026-10-05T14:00:00Z")
+                self.assertEqual(conversion[-1]["quantidade"], 1 if made else 0)
+                ads = build_bi_ads_rows(base, [order],
+                    snapshot_date="2026-10-05", updated_at="2026-10-05T14:00:00Z")
+                self.assertEqual(ads[0][9:12], [1, 1, 19.5] if made else [0, 0, 0.0])
 
 
 if __name__ == "__main__":

@@ -56,7 +56,7 @@ class FarmaliderIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(order["pedido_id"], "123456")
         self.assertEqual(order["pedido_chave"], "FARMALIDER:123456")
-        self.assertEqual(order["status_confirmacao"], "AGUARDANDO_API")
+        self.assertEqual(order["status_confirmacao"], "NAO_CONFIRMADO_API")
         self.assertEqual(items[0]["pedido_id"], "123456")
 
     def test_api_confirms_order_and_customer(self):
@@ -110,7 +110,7 @@ class FarmaliderIntegrationTests(unittest.TestCase):
         )
 
         self.assertEqual(order["status_confirmacao"], "CONFIRMADO_API")
-        self.assertEqual(order["data_hora"], "2026-09-30T16:08:00Z")
+        self.assertEqual(order["data_hora"], "2026-09-30T13:08:00-03:00")
         self.assertEqual(order["valor_total_api_itens"], "110.80")
         self.assertEqual(order["quantidade_itens_api"], "2")
 

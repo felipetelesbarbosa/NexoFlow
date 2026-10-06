@@ -82,6 +82,7 @@ maior_de_18_anos
 opt_in_lgpd
 pedido_id
 pedido_data
+pedido_status
 pedido_produtos
 pedido_quantidade_itens
 pedido_valor
@@ -216,20 +217,23 @@ O primeiro anúncio válido é preservado. O último anúncio só é substituíd
 
 ## Regras de pedido e última compra
 
-`ultimo_pedido` é a fonte estruturada em JSON. A rotina não o reescreve. Se houver `pedido_id`, o NexoFlow consulta a API FarmaLíder e só atualiza os campos de compra quando a confirmação oficial for válida e o pedido não estiver cancelado.
+`ultimo_pedido` é a fonte estruturada em JSON e a rotina não o reescreve. Quando ele estiver preenchido e válido, o NexoFlow deriva dele os dados do pedido. Se houver `pedido_id`, consulta somente esse mesmo pedido na FarmaLíder API para confirmar o status e grava o rótulo oficial em `pedido_status`. Estados 0, 1, 2 e 4 contam como pedido feito; status 3 grava `pedido_status = Cancelado` e fica fora dos indicadores.
 
 Campos derivados:
 
 ```text
 pedido_id                Texto
-pedido_data              YYYY-MM-DD HH:mm:ss
+pedido_data              Data/hora ISO do pedido
+pedido_status            Em processamento | Em trânsito | Concluído | Cancelado | Pronto para rota
 pedido_valor             Número
 pedido_quantidade_itens  Soma das quantidades
-pedido_produtos          Nome xQtd | Nome xQtd
+pedido_produtos          JSON estruturado com produtos, quantidades e valores
 ultima_compra            YYYY-MM-DD HH:mm:ss
 ```
 
 Uma compra mais antiga nunca substitui uma `ultima_compra` mais recente.
+
+Pedidos com `pedido_status` em **Em processamento**, **Em trânsito** ou **Pronto para rota** entram numa fila persistente de rechecagem. A rotina incremental consulta novamente o mesmo `pedido_id` nas execuções seguintes, mesmo sem nova mensagem do cliente, até o pedido chegar a **Concluído** ou **Cancelado**.
 
 ## Incremental e checkpoint
 
