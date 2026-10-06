@@ -1,6 +1,6 @@
 # Pedidos da Weni — NexoFlow 1.0
 
-O JSON `ultimo_pedido` é a fonte prioritária. Quando estiver preenchido e válido, ele fornece diretamente o identificador, data/hora, nomes dos produtos, quantidades, valores unitários e valor total; o NexoFlow usa essas informações para preencher `pedido_id`, `pedido_data`, `pedido_produtos`, `pedido_quantidade_itens` e `pedido_valor`. A rotina Weni mantém esses campos autorizados, e o Analytics os preserva na `Base_Contatos`.
+O JSON `ultimo_pedido` é a fonte prioritária. Quando estiver preenchido e válido, ele fornece diretamente o identificador, data/hora, nomes dos produtos, quantidades, valores unitários e valor total; o NexoFlow usa essas informações para preencher `pedido_id`, `pedido_data`, `pedido_produtos`, `pedido_quantidade_itens` e `pedido_valor`. Depois de consultar o mesmo pedido pela API, também preenche `pedido_status` com o rótulo oficial do estado atual. A rotina Weni mantém esses campos autorizados, e o Analytics os preserva na `Base_Contatos`.
 
 O contrato completo, incluindo confirmação pela FarmaLíder, produtos e cancelamentos, está em [Pedidos no NexoFlow 1.0](PEDIDOS.md).
 
