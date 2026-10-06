@@ -640,7 +640,7 @@ class WeniUpdateTests(unittest.TestCase):
                 self.assertEqual(second.fields, {})
                 self.assertEqual(second.evidence, {})
 
-    def test_complete_weni_order_populates_five_fields_without_consulting_api(self) -> None:
+    def test_complete_weni_order_populates_five_fields_and_checks_same_id_status(self) -> None:
         for api_available in (False, True):
             with self.subTest(api_available=api_available):
                 contact = self._purchase_contact()
@@ -648,19 +648,27 @@ class WeniUpdateTests(unittest.TestCase):
                 farm = self._purchase_api() if api_available else None
                 plan = self._purchase_plan(contact, farm)
                 self.assertTrue(plan.order_validated)
-                self.assertFalse(plan.purchase_confirmed)
-                self.assertEqual(set(plan.fields), {
+                self.assertEqual(plan.purchase_confirmed, api_available)
+                expected = {
                     "pedido_id", "pedido_data", "pedido_produtos",
                     "pedido_quantidade_itens", "pedido_valor",
-                })
+                }
+                if api_available:
+                    expected.add("ultima_compra")
+                self.assertEqual(set(plan.fields), expected)
                 self.assertEqual(plan.fields["pedido_id"], "123")
                 self.assertEqual(plan.fields["pedido_data"], "2026-10-03T09:00:00-03:00")
                 self.assertEqual(plan.fields["pedido_valor"], 25.5)
                 self.assertEqual(plan.fields["pedido_quantidade_itens"], 3)
-                self.assertNotIn("ultima_compra", plan.fields)
-                self.assertEqual(contact["fields"]["ultima_compra"], "2026-10-01T10:00:00-03:00")
+                self.assertEqual(
+                    plan.fields.get("ultima_compra"),
+                    "2026-10-03T09:00:00-03:00" if api_available else None,
+                )
                 products = json.loads(plan.fields["pedido_produtos"])
-                self.assertEqual(products["status_confirmacao"], "NAO_CONFIRMADO_API")
+                self.assertEqual(
+                    products["status_confirmacao"],
+                    "CONFIRMADO_API" if api_available else "NAO_CONFIRMADO_API",
+                )
                 self.assertEqual(products["origem_pedido"], "WENI_ULTIMO_PEDIDO")
                 self.assertEqual(products["produtos"], [
                     {"nome": "Produto A", "codigo": None, "quantidade": "2",
@@ -670,7 +678,7 @@ class WeniUpdateTests(unittest.TestCase):
                 ])
                 if farm is not None:
                     farm.get_cliente_by_cpf.assert_not_called()
-                    farm.get_pedido.assert_not_called()
+                    farm.get_pedido.assert_called_once_with("123")
                 audit_plans([plan], opt_out_group_available=True)
 
     def test_empty_or_null_weni_order_uses_api_and_populates_five_fields(self) -> None:
