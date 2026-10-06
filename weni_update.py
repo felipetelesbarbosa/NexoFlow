@@ -708,7 +708,8 @@ def _apply_purchase_candidate(
     }
     if (
         status_label
-        and (available_weni_fields is None or "pedido_status" in available_weni_fields)
+        and available_weni_fields is not None
+        and "pedido_status" in available_weni_fields
     ):
         order_fields_to_write["pedido_status"] = status_label
 
@@ -1622,6 +1623,7 @@ def check_update_connections() -> dict[str, Any]:
         available_fields = _available_weni_fields(weni)
         result["weni"]["opt_in_group_found"] = opt_in_available
         result["weni"]["missing_multichannel_fields"] = _missing_multichannel_fields(weni, available_fields)
+        result["weni"]["pedido_status_field_found"] = "pedido_status" in available_fields
         result["weni"]["missing_google_ads_fields"] = _missing_google_ads_fields(available_fields)
         farm = _open_farmalider()
         if farm is not None:
