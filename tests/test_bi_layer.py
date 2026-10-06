@@ -157,6 +157,7 @@ class BILayerTests(unittest.TestCase):
             {"status": 3, "cancellation": ""},
             {"status": "3", "cancellation": "false"},
             {"confirmation": "CANCELADO_API"},
+            {"confirmation": "NAO_CONFIRMADO_API"},
             {"confirmation": "PEDIDO_CLIENTE_DIVERGENTE_API"},
             {"confirmation": "PEDIDO_ID_DIVERGENTE_API"},
         )
