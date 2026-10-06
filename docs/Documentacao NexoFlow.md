@@ -334,3 +334,4 @@ Toda mudança relevante deve executar:
 ```
 
 Consulte também `README.md`, `README INSTALACAO.md`, `README WENI.md` e `CHANGELOG.md`.
+<!-- NexoFlow 1.0 -->

@@ -131,3 +131,4 @@ def serialize_pedido_products(
         payload[key] = _number_text(order.get(key))
     payload["produtos"] = products
     return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+# NexoFlow 1.0

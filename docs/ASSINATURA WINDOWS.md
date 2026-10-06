@@ -53,3 +53,4 @@ Nenhuma chave privada ou certificado é incluído no projeto.
 Essas medidas melhoram transparência e integridade, mas não substituem uma assinatura Authenticode confiável para reputação do Windows.
 
 Consulte também `ANTIVIRUS E CONFIANCA.md`.
+<!-- NexoFlow 1.0 -->

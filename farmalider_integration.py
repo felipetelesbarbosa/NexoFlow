@@ -458,3 +458,4 @@ def resolve_contact_order(
     except FarmaliderError:
         return _failure(order, items, "ERRO_API", "Falha na consulta oficial do pedido.")
     return apply_pedido_api_confirmation(order, items, response, linked_cliente_id=linked_id, confirmed_at=captured_at)
+# NexoFlow 1.0

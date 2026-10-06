@@ -117,3 +117,4 @@ Execute o NexoFlow Weni antes do Analytics. As gravações da Weni continuam pas
 Confira os estados de validação e confirmação antes de interpretar uma linha como venda. Testes locais não comprovam acesso a uma API real nem o carregamento de todo o histórico. Credenciais não fazem parte dos exemplos, da documentação ou dos arquivos versionados.
 
 Leia também o [contrato da API FarmaLíder](FARMALIDER%20API.md) e o [procedimento do NexoFlow Weni](../README%20WENI.md).
+<!-- NexoFlow 1.0 -->

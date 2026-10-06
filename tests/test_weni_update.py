@@ -1641,3 +1641,4 @@ class GoogleAdsWeniUpdateTests(unittest.TestCase):
         self.assertEqual(plan.fields["ultimo_anuncio_origem"], "Google Ads")
         self.assertNotIn("ultimo_anuncio_tipo_campanha", plan.fields)
         self.assertNotIn("ultimo_anuncio_canal_destino", plan.fields)
+# NexoFlow 1.0

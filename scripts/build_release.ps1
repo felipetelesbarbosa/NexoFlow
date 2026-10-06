@@ -224,3 +224,4 @@ Recursos incluidos:
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
+# NexoFlow 1.0
