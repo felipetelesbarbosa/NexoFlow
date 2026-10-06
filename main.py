@@ -18,11 +18,11 @@ from analytics import (
     build_bi_summary_record,
     build_daily_metrics,
     build_sales_metrics,
+    get_fields,
     is_relevant_contact,
     is_valid_cpf,
     normalize_contact,
     normalize_cpf,
-    parse_ultimo_pedido,
 )
 from config import (
     FARMALIDER_BATCH_ERROR_ABORT_MIN_ERRORS,
@@ -41,8 +41,8 @@ from farmalider_client import (
     FarmaliderError,
 )
 from farmalider_integration import (
-    apply_pedido_api_confirmation,
     cliente_link_status,
+    resolve_contact_order,
 )
 from google_sheets import GoogleSheetsStore
 from logging_config import configure_logging
@@ -155,8 +155,8 @@ def split_contacts(
             with_cpf.append(contact)
 
     # Desde o NexoFlow 1.0 o Analytics preserva todos os contatos retornados pela Weni.
-    # A validação FarmaLíder continua consultando somente CPFs válidos e pedidos
-    # continuam sendo processados apenas para contatos relevantes.
+    # A validação FarmaLíder consulta somente CPFs válidos. Pedidos podem ser
+    # recuperados para estes contatos mesmo quando ultimo_pedido está vazio.
     return relevant, with_cpf, list(contacts)
 
 
@@ -180,9 +180,12 @@ def _format_ms_as_seconds(milliseconds: float) -> str:
 def _query_cliente(
     cpf: str,
     farm_client: FarmaliderClient,
+    response_cache: dict[str, dict[str, Any] | None] | None = None,
 ) -> ClienteResult:
     try:
         api_cliente = farm_client.get_cliente_by_cpf(cpf)
+        if response_cache is not None:
+            response_cache[cpf] = api_cliente
         return cliente_link_status(cpf, api_cliente)
     except FarmaliderAuthError:
         raise
@@ -257,6 +260,7 @@ def validate_contacts(
     sync_time: str,
     existing_by_uuid: dict[str, Row] | None = None,
     reuse_existing: bool = False,
+    cliente_responses_by_cpf: dict[str, dict[str, Any] | None] | None = None,
 ) -> ClienteValidationStats:
     """
     Valida CPFs com concorrência controlada e cache por CPF único.
@@ -362,7 +366,7 @@ def validate_contacts(
             ):
                 batch = unique_cpfs[start:start + batch_size]
                 futures = {
-                    executor.submit(_query_cliente, cpf, farm_client): cpf
+                    executor.submit(_query_cliente, cpf, farm_client, cliente_responses_by_cpf): cpf
                     for cpf in batch
                 }
                 batch_errors = 0
@@ -462,13 +466,32 @@ def build_orders(
     rows_by_uuid: dict[str, Row],
     farm_client: FarmaliderClient | None,
     sync_time: str,
+    cliente_responses_by_cpf: dict[str, dict[str, Any] | None] | None = None,
 ) -> tuple[list[Row], list[Row], OrderStats]:
-    order_rows: list[Row] = []
-    item_rows: list[Row] = []
+    snapshots: dict[str, tuple[Row, list[Row]]] = {}
+    contacts_by_order: dict[str, set[str]] = {}
     stats = OrderStats()
 
-    for contact in relevant_contacts:
-        order, items = parse_ultimo_pedido(contact, captured_at=sync_time)
+    # CPF duplicates can point to the same official order. Select a complete
+    # order/items snapshot consistently, regardless of Weni pagination order.
+    for contact in sorted(relevant_contacts, key=lambda row: str(row.get("uuid") or "")):
+        fields = get_fields(contact)
+        contact_uuid = str(contact.get("uuid") or "")
+        contact_row = rows_by_uuid.get(contact_uuid, {})
+        cpf = normalize_cpf(fields.get("cpf"))
+        try:
+            order, items = resolve_contact_order(
+                contact,
+                farm_client=farm_client,
+                captured_at=sync_time,
+                linked_cliente_id=contact_row.get("farmalider_cliente_id", ""),
+                cliente_response=(cliente_responses_by_cpf or {}).get(cpf),
+            )
+        except FarmaliderAuthError:
+            raise
+        except FarmaliderError:
+            stats.api_errors += 1
+            continue
         if order is None:
             continue
 
@@ -482,7 +505,7 @@ def build_orders(
         order["farmalider_cliente_id"] = contact_row.get(
             "farmalider_cliente_id",
             "",
-        )
+        ) or order.get("farmalider_cliente_id", "")
 
         for key in (
             "primeiro_anuncio_origem",
@@ -501,40 +524,38 @@ def build_orders(
             order[key] = contact_row.get(key, "")
 
         pedido_id = order.get("pedido_id", "").strip()
-        if (
-            pedido_id
-            and order.get("status_validacao") != "ERRO"
-            and farm_client is not None
-        ):
-            try:
-                pedido_api = farm_client.get_pedido(pedido_id)
-                order, items = apply_pedido_api_confirmation(
-                    order,
-                    items,
-                    pedido_api,
-                    linked_cliente_id=order.get("farmalider_cliente_id", ""),
-                    confirmed_at=sync_time,
-                )
-            except FarmaliderAuthError:
-                raise
-            except FarmaliderError as exc:
-                order["status_confirmacao"] = "ERRO_API"
-                order["farmalider_erro"] = exc.__class__.__name__
-                stats.api_errors += 1
-
-        if order.get("status_confirmacao", "").startswith("CONFIRMADO_API"):
-            stats.confirmed_api += 1
-
         for item in items:
             item["pedido_id"] = pedido_id
 
-        order_rows.append(order)
-        item_rows.extend(items)
+        order_key = order.get("pedido_chave", "").strip()
+        if not order_key:
+            continue
+        contacts_by_order.setdefault(order_key, set()).add(contact_uuid)
+        snapshots.setdefault(order_key, (order, items))
 
         if order.get("status_validacao") == "ERRO":
             stats.parse_errors += 1
 
-    return order_rows, item_rows, stats
+    order_rows: list[Row] = []
+    items_by_key: dict[str, Row] = {}
+    for order_key in sorted(snapshots):
+        order, items = snapshots[order_key]
+        if len(contacts_by_order[order_key]) > 1:
+            # A single order shared by multiple Weni contacts does not identify
+            # which contact's ad snapshot should receive that order attribution.
+            for key in order:
+                if key.startswith(("primeiro_anuncio_", "ultimo_anuncio_")):
+                    order[key] = ""
+        order_rows.append(order)
+        for item in items:
+            key = item.get("item_chave", "").strip()
+            if key:
+                items_by_key.setdefault(key, item)
+    stats.confirmed_api = sum(
+        row.get("status_confirmacao", "").startswith("CONFIRMADO_API")
+        for row in order_rows
+    )
+    return order_rows, [items_by_key[key] for key in sorted(items_by_key)], stats
 
 
 def open_farmalider_client(
@@ -697,6 +718,7 @@ def main() -> int:
             for row in base_records_before
             if row.get("contact_uuid")
         }
+        cliente_responses_by_cpf: dict[str, dict[str, Any] | None] = {}
         cliente_stats = validate_contacts(
             normalized,
             farm_client=farm_client,
@@ -704,6 +726,7 @@ def main() -> int:
             sync_time=sync_time,
             existing_by_uuid=existing_by_uuid,
             reuse_existing=not force_full,
+            cliente_responses_by_cpf=cliente_responses_by_cpf,
         )
         if cliente_stats.cache_reused:
             logging.info(
@@ -738,10 +761,15 @@ def main() -> int:
             if row.get("contact_uuid")
         }
         order_rows, item_rows, order_stats = build_orders(
-            relevant_contacts,
+            [
+                contact for contact in contacts_to_process
+                if is_relevant_contact(contact)
+                or is_valid_cpf(normalize_cpf(get_fields(contact).get("cpf")))
+            ],
             rows_by_uuid=rows_by_uuid,
             farm_client=farm_client,
             sync_time=sync_time,
+            cliente_responses_by_cpf=cliente_responses_by_cpf,
         )
 
         postprocess_started = time.monotonic()

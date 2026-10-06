@@ -1,15 +1,22 @@
 # NexoFlow 1.0
 
-Distribuição oficial do NexoFlow 1.0.
+Distribuição oficial do **NexoFlow 1.0**.
 
-- [Baixar Setup instalável](https://github.com/felipetelesbarbosa/NexoFlow/raw/refs/tags/v1.0/releases/NexoFlow-Setup-1.0.zip)
-- [Baixar projeto completo](https://github.com/felipetelesbarbosa/NexoFlow/raw/refs/tags/v1.0/releases/NexoFlow-1.0.zip)
-- [Conferir SHA-256](SHA256SUMS.txt)
+A versão do produto permanece **1.0**. O Setup atual está publicado como **instável** enquanto passa pela validação final em Windows doméstico e corporativo/EDR.
 
-Extraia **todo** o ZIP do Setup e execute `NexoFlow Setup.exe` dentro da pasta `NexoFlow Setup`, mantendo `payload`, `installer` e `prerequisites` juntos. O pacote inclui o instalador Python 3.14.8 x64. Os executáveis Windows identificam o produto como NexoFlow 1.0; VERSIONINFO usa a representação técnica 1.0.0.0.
+## Downloads
 
-As credenciais devem ser configuradas somente na instalação local; não há credenciais reais no pacote. Consulte o [changelog](../CHANGELOG.md) e a [documentação de instalação](../README%20INSTALACAO.md).
+Use a página oficial da Release **v1.0**:
 
-Os ZIPs mantêm integralmente os arquivos recebidos. Os 108 itens do manifesto do Setup e os 115 checksums globais foram validados. Os arquivos e as strings dos executáveis passaram pela varredura por segredos. A instalação e a desinstalação no Windows ainda precisam ser validadas nesse sistema.
+- **NexoFlow-Setup-1.0-Instavel.zip** — Setup mais recente para validação;
+- **NexoFlow-1.0.zip** — projeto completo correspondente ao mesmo código;
+- **SHA256SUMS-1.0.txt** — hashes SHA-256 dos dois pacotes.
 
-Os downloads ficam no repositório e são vinculados na Release porque a API de anexos recusou a transferência com `Bad Content-Length`, inclusive para o arquivo de checksum. A visibilidade do repositório foi preservada; para baixar, use uma conta com acesso.
+Release:
+https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.0
+
+O Setup inclui o NexoFlow Uninstall.exe como launcher opcional. Se um antivírus corporativo bloquear ou remover esse executável, a instalação não deve falhar; a desinstalação continua disponível por installer\uninstall.ps1 e desinstalar_nexoflow.cmd.
+
+Os pacotes são gerados automaticamente a partir da branch main após validação dos testes e auditoria. Credenciais reais não entram nos artefatos.
+
+> Importante: **instável** se refere ao estado de validação do Setup, não a uma mudança de versão. O produto continua sendo **NexoFlow 1.0**.
