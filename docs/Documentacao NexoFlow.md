@@ -45,7 +45,7 @@ A Weni é a fonte de verdade das URNs. O NexoFlow agora separa `contact_urn_what
 Como proteção operacional, os quatro campos multicanal precisam existir previamente na Weni como campos de **Texto**. O teste de conexões consulta a API de fields da Weni e, se algum estiver ausente, o NexoFlow Weni bloqueia a execução antes de qualquer escrita.
 
 ### Compatibilidade dos BATs com CMD
-Os arquivos `.bat` operacionais são distribuídos sem UTF-8 BOM inicial. Em algumas instalações do Windows, o BOM era exibido pelo `cmd.exe` como `´╗┐` e fazia a primeira diretiva `@echo off` ser tratada como comando inválido. Testes e auditoria agora bloqueiam releases que reintroduzam BOM em BATs.
+Os arquivos `.bat` operacionais são distribuídos sem UTF-8 BOM inicial. Em algumas instalações do Windows, o BOM era exibido pelo `cmd.exe` como `´╗┐` e fazia a primeira diretiva `@echo off` ser tratada como comando inválido. Testes e auditoria bloqueiam a publicação do NexoFlow 1.0 se houver BOM em BATs.
 
 
 ## Versão atual
@@ -75,7 +75,7 @@ O Analytics e o NexoFlow Weni possuem responsabilidades separadas. O NexoFlow We
 - `farmalider_client.py`: acesso à API FarmaLíder;
 - `farmalider_integration.py`: confirmação/enriquecimento de pedidos;
 - `google_sheets.py`: camada analítica;
-- `auditar_consistencia.py`: auditoria técnica obrigatória do release;
+- `auditar_consistencia.py`: auditoria técnica obrigatória da publicação;
 - `run_checkup_tests.py`: executa a suíte do check-up em modo enxuto, suprimindo somente ruído esperado dos testes.
 
 ## Executáveis Windows
@@ -318,7 +318,7 @@ senhas do proxy
 
 Os pacotes oficiais não devem conter `__pycache__`, `.pyc` ou credenciais reais.
 
-## Validação de release
+## Validação do NexoFlow 1.0
 
 Toda mudança relevante deve executar:
 

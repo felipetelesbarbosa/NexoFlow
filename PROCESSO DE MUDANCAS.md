@@ -1,6 +1,6 @@
 # Processo de mudanças — NexoFlow 1.0
 
-Este documento define como alterações devem ser feitas e validadas no NexoFlow 1.0. Ele não mantém histórico de versões; o único histórico de release distribuído é `CHANGELOG.md`.
+Este documento define como alterações devem ser feitas e validadas no NexoFlow 1.0. Ele documenta o processo atual do **NexoFlow 1.0**; o histórico público fica concentrado em `CHANGELOG.md`.
 
 ## Princípios
 
@@ -22,8 +22,8 @@ Este documento define como alterações devem ser feitas e validadas no NexoFlow
 - sincronizar o payload do Setup;
 - regenerar manifest e checksums;
 - testar integridade dos ZIPs;
-- assinar a release quando houver certificado corporativo;
-- publicar apenas os artefatos finais identificados como **NexoFlow 1.0**.
+- assinar os executáveis quando houver certificado corporativo;
+- publicar apenas artefatos identificados como **NexoFlow 1.0**.
 
 ## Mudanças de maior risco
 

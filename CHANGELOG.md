@@ -1,6 +1,6 @@
 # Changelog — NexoFlow 1.0
 
-## 1.0 — Release consolidada
+## NexoFlow 1.0
 
 ### Estabilidade do Setup
 
@@ -11,7 +11,7 @@
 - `NexoFlow Uninstall.exe` realmente opcional inclusive na validação de integridade do payload;
 - cenário de antivírus/EDR removendo o Uninstall opcional coberto por smoke test;
 - preservação de `secrets_config.py`, `credentials` e `logs` verificada em atualização;
-- publicação da Release v1.0 bloqueada se testes, auditoria, build ou smoke test falharem.
+- publicação do NexoFlow 1.0 bloqueada se testes, auditoria, build ou smoke test falharem.
 
 
 ### Pedidos e status na Weni
@@ -26,7 +26,7 @@
 
 Data de consolidação: 05/10/2026.
 
-Esta é a release pública consolidada do NexoFlow. O histórico de versões de desenvolvimento foi removido do pacote; a documentação passa a tratar esta base funcional exclusivamente como **NexoFlow 1.0**.
+Esta documentação descreve exclusivamente o **NexoFlow 1.0**.
 
 ### Analytics e BI
 
@@ -58,7 +58,7 @@ Esta é a release pública consolidada do NexoFlow. O histórico de versões de 
 - launchers nativos sem `system()`, sem packers/ofuscação e sem credenciais embutidas;
 - check-up, testes automatizados e auditoria de consistência.
 
-### Identidade da release
+### Identidade do NexoFlow 1.0
 
 - versão pública e lógica: **NexoFlow 1.0**;
 - metadados de instalação e comandos `nexo versao`/`nexo status`: **1.0**;

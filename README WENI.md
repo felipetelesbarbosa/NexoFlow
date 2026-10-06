@@ -140,7 +140,7 @@ Regras:
 - um campo específico não é apagado por ausência temporária da URN numa resposta da API;
 - clique/anúncio não é URN. `primeiro_anuncio_*` e `ultimo_anuncio_*` continuam registrando atribuição de mídia separadamente.
 
-A revisão humana mostra a URN e o canal principal, contabiliza alterações de identificação de canal e também informa quantos contatos receberam atribuição Google Ads. O snapshot de revisão do NexoFlow 1.0 usa schema 5, inclui guardas de concorrência e o corte temporal do dry-run. Snapshots de versões anteriores são rejeitados para evitar apply com semântica antiga.
+A revisão humana mostra a URN e o canal principal, contabiliza alterações de identificação de canal e também informa quantos contatos receberam atribuição Google Ads. O snapshot de revisão do NexoFlow 1.0 usa schema 5, inclui guardas de concorrência e o corte temporal do dry-run. Snapshots incompatíveis são rejeitados para evitar apply com semântica incorreta.
 
 
 

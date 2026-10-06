@@ -63,20 +63,19 @@ jobs:
         run: |
           ./scripts/test_setup_windows.ps1 -SetupZip "dist/NexoFlow-Setup-1.0.zip"
 
-      - name: Mover tag v1.0 para a release atual
+      - name: Atualizar tag v1.0
         if: github.event_name != 'pull_request'
         shell: pwsh
         run: |
           git tag -f v1.0 "$env:GITHUB_SHA"
           git push origin refs/tags/v1.0 --force
 
-      - name: Atualizar GitHub Release v1.0
+      - name: Publicar NexoFlow 1.0 no GitHub
         if: github.event_name != 'pull_request'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete-asset v1.0 "NexoFlow-Setup-1.0-Instavel.zip" -y 2>$null
           gh release upload v1.0 "dist/NexoFlow-Setup-1.0.zip" "dist/NexoFlow-1.0.zip" "dist/SHA256SUMS-1.0.txt" --clobber
           gh release edit v1.0 --title "NexoFlow 1.0" --notes-file "dist/release-notes.md"
 

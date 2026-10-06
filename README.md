@@ -255,7 +255,7 @@ No NexoFlow 1.0, os launchers Windows são nativos, não usam `system()` e inici
 
 ## Manutenção e validação
 
-Antes de qualquer release, execute:
+Antes de publicar o **NexoFlow 1.0**, execute:
 
 ```text
 check-up.bat

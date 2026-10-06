@@ -320,7 +320,7 @@ CMD</h3>
 BOM inicial. Em algumas instalações do Windows, o BOM era exibido pelo
 <code>cmd.exe</code> como <code>´╗┐</code> e fazia a primeira diretiva
 <code>@echo off</code> ser tratada como comando inválido. Testes e
-auditoria agora bloqueiam releases que reintroduzam BOM em BATs.</p>
+auditoria bloqueiam a publicação do NexoFlow 1.0 se houver BOM em BATs.</p>
 <h2 id="versão-atual">Versão atual</h2>
 <p>A versão atual é a <strong>NexoFlow 1.0</strong>.</p>
 <p>Ela mantém o <strong>NexoFlow Analytics</strong>, o <strong>NexoFlow
@@ -643,7 +643,7 @@ tokens
 senhas do proxy</code></pre>
 <p>Os pacotes oficiais não devem conter <code>__pycache__</code>,
 <code>.pyc</code> ou credenciais reais.</p>
-<h2 id="validação-de-release">Validação de release</h2>
+<h2 id="validação-do-nexoflow-10">Validação do NexoFlow 1.0</h2>
 <p>Toda mudança relevante deve executar:</p>
 <pre class="text"><code>1. compilação/sintaxe
 2. suíte de testes automatizados
