@@ -178,11 +178,11 @@ Na operação rotineira, execute o NexoFlow Weni antes do Analytics.
 
 ### Pedidos por JSON ou campos separados
 
-O NexoFlow 1.0 aceita `ultimo_pedido` e os campos `pedido_id`, `pedido_data`, `pedido_produtos`, `pedido_quantidade_itens` e `pedido_valor`. Esses campos também são preservados na `Base_Contatos`. Quando necessário, o Analytics deriva um JSON estruturado a partir deles e mantém as tabelas de pedidos e itens.
+O NexoFlow 1.0 usa `ultimo_pedido` como fonte prioritária quando ele está preenchido. O JSON pode fornecer diretamente ID, data/hora, nomes dos produtos, quantidades, valores unitários e valor total; desses dados são derivados `pedido_id`, `pedido_data`, `pedido_produtos`, `pedido_quantidade_itens` e `pedido_valor`. Esses campos também são preservados na `Base_Contatos`.
 
 Quando `ultimo_pedido` estiver preenchido, seus dados são usados como Caminho 1 e o NexoFlow consulta somente o mesmo `pedido_id` para confirmar o status atual. O fluxo `CPF → ultimoPedido → pedido` é Caminho 2 e só é usado quando `ultimo_pedido` estiver ausente, vazio ou `null`. Produtos permanecem em JSON e os cinco campos de pedido são mantidos em qualquer estado válido.
 
-Datas de pedidos usam **America/Belem (UTC−3 / GMT−3)**. Os indicadores de vendas incluem somente pedidos em **Concluído (status 2)**, confirmados pela API, válidos e não cancelados. Pedidos nos estados 0, 1, 3 e 4 continuam registrados nos cinco campos; `ultima_compra` só avança para status 2 confirmado pela API. Concluído descreve o estado operacional e não comprova pagamento. A leitura do último pedido não recupera automaticamente todo o histórico comercial.
+Datas de pedidos usam **America/Belem (UTC−3 / GMT−3)**. Para os indicadores, **pedido feito** significa status 0, 1, 2 ou 4 confirmado pela API e não cancelado; somente status 3 fica fora. Os cinco campos de pedido continuam registrados em todos os estados válidos, e `ultima_compra` avança para o pedido não cancelado mais recente confirmado pela API. A leitura do último pedido não recupera automaticamente todo o histórico comercial.
 
 Consulte [Pedidos no NexoFlow 1.0](docs/PEDIDOS.md) para o contrato e as regras de validação.
 
