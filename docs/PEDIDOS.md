@@ -10,6 +10,7 @@ O pedido pode chegar em `ultimo_pedido`, como objeto ou texto JSON, ou nos campo
 |---|---|
 | `pedido_id` | Identificador do pedido, preservado como texto. |
 | `pedido_data` | Data e hora do pedido. |
+| `pedido_status` | Status atual confirmado pela FarmaLíder API: Em processamento, Em trânsito, Concluído, Cancelado ou Pronto para rota. |
 | `pedido_produtos` | JSON estruturado com produtos e os metadados disponíveis do pedido. |
 | `pedido_quantidade_itens` | Quantidade total de unidades informada pelo pedido. |
 | `pedido_valor` | Valor total do pedido. |
@@ -18,7 +19,7 @@ O Analytics mantém esses campos na `Base_Contatos` e pode derivar `ultimo_pedid
 
 O campo `ultimo_pedido` preenchido é a fonte prioritária. Os campos separados não podem substituí-lo por outro pedido nem ocultar conteúdo inválido. Um snapshot previamente confirmado ou cancelado pela API pode ser preservado, incluindo valores, itens e estado, somente quando pertence ao mesmo ID oficial positivo, passa pelas validações do snapshot e tem data igual ou mais recente. O JSON original continua preservado em `Pedidos_FarmaLider.ultimo_pedido_raw`; isso evita que um JSON antigo apague um cancelamento já registrado do mesmo pedido.
 
-O JSON de `ultimo_pedido` é a fonte primária do Caminho 1 e pode fornecer diretamente `pedido_id`, data/hora, nomes dos produtos, quantidades, valores unitários e valor total. O NexoFlow usa esse conteúdo para derivar e preencher `pedido_id`, `pedido_data`, `pedido_produtos`, `pedido_quantidade_itens` e `pedido_valor`. O JSON produzido para `pedido_produtos` preserva a lista de produtos e os metadados de auditoria, incluindo status e cancelamento quando confirmados.
+O JSON de `ultimo_pedido` é a fonte primária do Caminho 1 e pode fornecer diretamente `pedido_id`, data/hora, nomes dos produtos, quantidades, valores unitários e valor total. O NexoFlow usa esse conteúdo para derivar e preencher `pedido_id`, `pedido_data`, `pedido_produtos`, `pedido_quantidade_itens` e `pedido_valor`. O sexto campo, `pedido_status`, vem da confirmação do mesmo ID pela FarmaLíder API. O JSON produzido para `pedido_produtos` preserva a lista de produtos e os metadados de auditoria, incluindo status e cancelamento quando confirmados.
 
 ## Resolução e confirmação
 
