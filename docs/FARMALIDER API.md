@@ -50,9 +50,7 @@ confere o CPF do retorno e o cliente antes de aceitar essa associação.
 GET /api/Delivery/pedido/{codigo}?token=...
 ```
 
-O identificador pode vir do JSON `ultimo_pedido`, dos campos `pedido_*` da Weni
-ou do fallback `ultimoPedido` da resposta por CPF. O projeto usa esse endpoint para confirmar
-e enriquecer o pedido, conferindo o identificador retornado e o titular.
+O identificador pode vir do JSON `ultimo_pedido` ou do fallback `ultimoPedido` da resposta por CPF. Quando `ultimo_pedido` já está preenchido, o projeto consulta **somente esse mesmo código** em `/pedido/{codigo}` para confirmar o status atual; não consulta `cliente/cpf/{cpf}` para procurar outro pedido. Quando `ultimo_pedido` está ausente, vazio ou `null`, o fallback consulta o cliente por CPF, lê `ultimoPedido.id` e então consulta esse pedido específico.
 
 O retorno usado possui informações de capa e itens. Entre os dados persistidos
 estão emissão, filial, cliente, status, forma de pagamento, cupom, frete,
@@ -72,7 +70,7 @@ A documentação fornecida pelo usuário, **Integração API Líder.pdf**, seç�
 
 O NexoFlow preserva o código em `farmalider_status_pedido` e acrescenta o rótulo oficial conhecido em `farmalider_status_pedido_nome`. Para código ausente ou desconhecido, o nome fica vazio; “Status não conhecido” pode ser exibido pelo dashboard como aviso derivado, sem criar um estado oficial. O código **3** é tratado como cancelado independentemente de existir timestamp de cancelamento. Valores fora desse de-para mantêm o código original sem atribuir um significado por suposição.
 
-Os indicadores de vendas do NexoFlow admitem somente **Concluído (código 2)**, com dados válidos e sem cancelamento. Estados 0, 1 e 4 continuam sendo capturados para os campos de pedido e auditoria, mas ficam fora desses indicadores; código 3, status ausente ou desconhecido também ficam fora. Um cancelamento explícito prevalece sobre um eventual código 2.
+Os indicadores de vendas do NexoFlow admitem somente **Concluído (código 2)**, com status confirmado pela API, dados válidos e sem cancelamento. Estados 0, 1 e 4 continuam sendo capturados para os cinco campos de pedido e auditoria, mas ficam fora desses indicadores; código 3, status ausente, desconhecido ou ainda não confirmado também ficam fora. Um cancelamento explícito prevalece sobre um eventual código 2.
 
 `ultima_compra` exige adicionalmente confirmação pela API. Concluído descreve o estado operacional/logístico do pedido e, por si só, não comprova pagamento. A cobertura é dos pedidos identificados pelo NexoFlow, sem presumir todas as vendas da FarmaLíder ou origem causal em anúncios. Veja as regras completas em [Pedidos no NexoFlow 1.0](PEDIDOS.md).
 
