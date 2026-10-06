@@ -504,7 +504,7 @@ Proteções principais:
 ## Documentação
 
 - [NexoFlow Weni](README%20WENI.md)
-- [NexoFlow Terminal](README%20TERMINAL.md)
+- [NexoFlow Terminal](README%20TERMINAL.md) — arquivo `README TERMINAL.md`
 - [Instalação](README%20INSTALACAO.md)
 - [Pedidos](docs/PEDIDOS.md)
 - [FarmaLíder API](docs/FARMALIDER%20API.md)
