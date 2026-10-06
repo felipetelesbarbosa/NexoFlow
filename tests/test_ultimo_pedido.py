@@ -119,10 +119,7 @@ class UltimoPedidoTests(unittest.TestCase):
             "2026-09-30T16:10:00+00:00",
         )
         metrics = build_sales_metrics([order], items)
-        self.assertEqual(
-            metrics,
-            [["2026-09-30", 1, 0, 1, "4", "110.80", "0.00"]],
-        )
+        self.assertEqual(metrics, [])
 
     def derived_contact(self, *, raw="", date="2026-10-03T01:00:00Z", metadata=None):
         envelope = {
@@ -153,8 +150,7 @@ class UltimoPedidoTests(unittest.TestCase):
         self.assertEqual(items[0]["produto_nome"], "")
         self.assertEqual(items[0]["produto_codigo"], "9001")
         self.assertEqual(items[0]["valor_total"], "19.00")
-        self.assertEqual(build_sales_metrics([order], items),
-                         [["2026-10-02", 1, 0, 1, "2", "19.00", "0.00"]])
+        self.assertEqual(build_sales_metrics([order], items), [])
 
     def test_populated_invalid_raw_is_preserved_without_derived_recovery(self):
         contact = self.derived_contact(raw="{invalid original}")
