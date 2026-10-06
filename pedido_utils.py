@@ -59,20 +59,35 @@ def is_order_cancelled(order: dict[str, Any]) -> bool:
 
 
 def is_order_completed(order: dict[str, Any]) -> bool:
-    """Only the documented completed state qualifies as a completed purchase."""
+    """Return True only for the documented completed state."""
     if is_order_cancelled(order):
         return False
     status = order.get("farmalider_status_pedido")
     if farmalider_order_status_name(status) == "Concluído":
         return True
     if isinstance(status, str):
-        # Legacy contacts can store the enum name in the status field itself.
-        # A separate display label never overrides a conflicting/unknown code.
         text = "".join(
             character for character in unicodedata.normalize("NFKD", status.strip())
             if not unicodedata.combining(character)
         ).casefold()
         return text == "concluido"
+    return False
+
+
+def is_order_made(order: dict[str, Any]) -> bool:
+    """Count every documented non-cancelled operational state as a made order."""
+    if is_order_cancelled(order):
+        return False
+    status = order.get("farmalider_status_pedido")
+    label = farmalider_order_status_name(status)
+    if label in {"Em processamento", "Em trânsito", "Concluído", "Pronto para rota"}:
+        return True
+    if isinstance(status, str):
+        text = "".join(
+            character for character in unicodedata.normalize("NFKD", status.strip())
+            if not unicodedata.combining(character)
+        ).casefold().replace(" ", "")
+        return text in {"emprocessamento", "emtransito", "concluido", "prontopararota"}
     return False
 
 
