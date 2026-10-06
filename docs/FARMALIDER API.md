@@ -70,9 +70,9 @@ A documentação fornecida pelo usuário, **Integração API Líder.pdf**, seç�
 
 O NexoFlow preserva o código em `farmalider_status_pedido` e acrescenta o rótulo oficial conhecido em `farmalider_status_pedido_nome`. Para código ausente ou desconhecido, o nome fica vazio; “Status não conhecido” pode ser exibido pelo dashboard como aviso derivado, sem criar um estado oficial. O código **3** é tratado como cancelado independentemente de existir timestamp de cancelamento. Valores fora desse de-para mantêm o código original sem atribuir um significado por suposição.
 
-Os indicadores de vendas do NexoFlow admitem somente **Concluído (código 2)**, com status confirmado pela API, dados válidos e sem cancelamento. Estados 0, 1 e 4 continuam sendo capturados para os cinco campos de pedido e auditoria, mas ficam fora desses indicadores; código 3, status ausente, desconhecido ou ainda não confirmado também ficam fora. Um cancelamento explícito prevalece sobre um eventual código 2.
+Os indicadores do NexoFlow consideram como **pedido feito** os estados **0, 1, 2 e 4**, desde que o status seja confirmado pela API, os dados sejam válidos e não exista cancelamento explícito. Somente **3 — Cancelado** fica fora. Status ausente, desconhecido ou ainda não confirmado também não é contado até que possa ser classificado com segurança.
 
-`ultima_compra` exige adicionalmente confirmação pela API. Concluído descreve o estado operacional/logístico do pedido e, por si só, não comprova pagamento. A cobertura é dos pedidos identificados pelo NexoFlow, sem presumir todas as vendas da FarmaLíder ou origem causal em anúncios. Veja as regras completas em [Pedidos no NexoFlow 1.0](PEDIDOS.md).
+`ultima_compra` usa o pedido não cancelado mais recente entre os estados 0, 1, 2 e 4, com confirmação pela API. O status é operacional/logístico e não deve ser confundido com liquidação financeira. Veja as regras completas em [Pedidos no NexoFlow 1.0](PEDIDOS.md).
 
 ## Limitação atual
 
