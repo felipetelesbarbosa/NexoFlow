@@ -395,14 +395,15 @@ class PedidoResolutionTests(unittest.TestCase):
         self.assertEqual(order["valor_origem"], "WENI")
         self.assertEqual(items[0]["produto_nome"], "Produto sintético")
 
-    def test_weni_client_hint_without_cpf_cannot_confirm_a_purchase(self):
+    def test_weni_order_with_id_checks_status_without_cpf_lookup(self):
         candidate = contact(raw=raw_order(), cpf=None)
         candidate["fields"]["id_do_cliente"] = "99"
         api = client()
         order, _ = resolve_contact_order(candidate, farm_client=api, captured_at=CAPTURED_AT, linked_cliente_id="99")
-        self.assertEqual(order["status_confirmacao"], "NAO_CONFIRMADO_API")
+        self.assertEqual(order["status_confirmacao"], "CONFIRMADO_API")
+        self.assertEqual(order["farmalider_status_pedido"], "1")
         api.get_cliente_by_cpf.assert_not_called()
-        api.get_pedido.assert_not_called()
+        api.get_pedido.assert_called_once_with("123")
 
     def test_cancelled_order_remains_auditable_but_not_a_sale(self):
         pedido = pedido_payload()
