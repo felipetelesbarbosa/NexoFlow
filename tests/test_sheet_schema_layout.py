@@ -26,7 +26,7 @@ class SheetSchemaLayoutTests(unittest.TestCase):
     def test_cached_layout_keeps_physical_order_after_columns_are_appended(self):
         layout = {title: list(headers) for title, headers in GoogleSheetsStore._schema_map().items()}
         original = layout["Base_Contatos"]
-        fields = ["pedido_id", "pedido_data", "pedido_produtos", "pedido_quantidade_itens", "pedido_valor"]
+        fields = ["pedido_id", "pedido_data", "pedido_status", "pedido_produtos", "pedido_quantidade_itens", "pedido_valor"]
         layout["Base_Contatos"] = [h for h in original if h not in fields] + fields
         store = self.store(layout)
         store._initialize_structure(validate_structure=False)
