@@ -27,7 +27,7 @@ class WeniClient:
             {
                 "Authorization": f"Token {token}",
                 "Accept": "application/json",
-                "User-Agent": "GrupoLider-NexoFlow/2.0",
+                "User-Agent": "GrupoLider-NexoFlow/1.0",
             }
         )
 
