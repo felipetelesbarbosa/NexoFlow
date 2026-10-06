@@ -81,6 +81,12 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
         client.get_pedido.assert_called_once_with("500")
         return row, repeated.final_records, stored_items.final_records
 
+    def test_pedido_status_is_preserved_in_base_contact(self):
+        contact, _ = self.fixture()
+        contact["fields"]["pedido_status"] = "Em trânsito"
+        row = normalize_contact(contact, "2026-10-05T14:00:00Z")
+        self.assertEqual(row["pedido_status"], "Em trânsito")
+
     def test_cpf_only_contact_resolves_latest_order_once_and_persists_for_bi(self):
         contact, client = self.fixture()
         row, orders, items = self.resolve_and_persist(contact, client)
