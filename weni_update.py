@@ -89,6 +89,21 @@ PURCHASE_FIELDS = {
     "ultima_compra",
 }
 
+OPEN_ORDER_STATUSES = {"Em processamento", "Em trânsito", "Pronto para rota"}
+TERMINAL_ORDER_STATUSES = {"Concluído", "Cancelado"}
+
+
+def _track_open_order(
+    open_order_uuids: set[str],
+    contact_uuid: str,
+    status: Any,
+) -> None:
+    label = normalize_value(status).strip()
+    if label in OPEN_ORDER_STATUSES:
+        open_order_uuids.add(contact_uuid)
+    elif label in TERMINAL_ORDER_STATUSES:
+        open_order_uuids.discard(contact_uuid)
+
 
 @dataclass(frozen=True)
 class GroupAction:
@@ -1692,6 +1707,13 @@ def run_update(
                 WENI_UPDATE_OPT_OUT_GROUP,
             )
 
+        state = _load_state()
+        open_order_uuids = {
+            str(item).strip()
+            for item in (state.get("open_order_uuids") or [])
+            if str(item).strip()
+        }
+
         if frozen_full_apply:
             plans, review_payload, digest = load_review_snapshot(
                 full=True,
@@ -1773,6 +1795,14 @@ def run_update(
                     continue
 
                 if not prepared.has_changes:
+                    _track_open_order(
+                        open_order_uuids,
+                        plan.contact_uuid,
+                        plan.fields.get(
+                            "pedido_status",
+                            get_fields(current_contact).get("pedido_status"),
+                        ),
+                    )
                     stats.contacts_already_satisfied += 1
                     _append_audit(
                         _audit_plan_event(
@@ -1792,6 +1822,14 @@ def run_update(
                             action=action.action,
                             group=action.group,
                         )
+                    _track_open_order(
+                        open_order_uuids,
+                        prepared.contact_uuid,
+                        prepared.fields.get(
+                            "pedido_status",
+                            get_fields(current_contact).get("pedido_status"),
+                        ),
+                    )
                     stats.contacts_updated += 1
                     _append_audit(
                         _audit_plan_event(
@@ -1833,6 +1871,7 @@ def run_update(
                     "contacts_updated": stats.contacts_updated,
                     "contacts_conflicted": stats.contacts_conflicted,
                     "pending_conflict_uuids": conflicted_uuids,
+                    "open_order_uuids": sorted(open_order_uuids),
                     "contacts_already_satisfied": stats.contacts_already_satisfied,
                     "field_changes": stats.field_changes,
                     "group_actions": stats.group_actions,
@@ -1874,7 +1913,6 @@ def run_update(
         # Conflitos isolados de uma carga completa congelada entram
         # explicitamente na próxima incremental, mesmo se a Weni não refletir
         # a mudança no modified_on do contato (por exemplo, só associação a grupo).
-        state = _load_state()
         pending_conflicts = state.get("pending_conflict_uuids") or []
         if isinstance(pending_conflicts, list) and pending_conflicts:
             unique_pending = sorted({str(item).strip() for item in pending_conflicts if str(item).strip()})
@@ -1914,6 +1952,22 @@ def run_update(
                 "Weni: %s URN(s) sem UUID resolvida(s) com cache local.",
                 len(urn_contact_cache),
             )
+
+        # Pedidos ainda operacionais precisam ser rechecados mesmo quando o
+        # contato não teve nova mensagem/modificação na Weni.
+        if open_order_uuids:
+            logging.info(
+                "Revalidando status de %s pedido(s) aberto(s).",
+                len(open_order_uuids),
+            )
+            for open_uuid in sorted(open_order_uuids):
+                if open_uuid in contacts_by_uuid:
+                    continue
+                open_contact = weni.get_contact(uuid=open_uuid)
+                if open_contact is None:
+                    open_order_uuids.discard(open_uuid)
+                    continue
+                contacts_by_uuid[open_uuid] = open_contact
 
         all_contact_uuids = set(contacts_by_uuid) | set(incoming_by_contact)
         plans: list[ContactUpdatePlan] = []
@@ -1956,6 +2010,11 @@ def run_update(
                 available_weni_fields=available_weni_fields,
             )
             stats.contacts_considered += 1
+            _track_open_order(
+                open_order_uuids,
+                contact_uuid,
+                plan.fields.get("pedido_status", get_fields(contact).get("pedido_status")),
+            )
             if plan.purchase_confirmed:
                 stats.purchase_confirmed += 1
             elif str(get_fields(contact).get("ultimo_pedido") or "").strip():
@@ -2071,6 +2130,7 @@ def run_update(
                 "contacts_updated": stats.contacts_updated,
                 "contacts_conflicted": stats.contacts_conflicted,
                 "pending_conflict_uuids": conflicted_uuids,
+                "open_order_uuids": sorted(open_order_uuids),
                 "field_changes": stats.field_changes,
                 "group_actions": stats.group_actions,
             }
