@@ -51,8 +51,6 @@ class WeniUpdateTests(unittest.TestCase):
                      "valor_unitario": 5.5, "valor_total": 5.5},
                 ],
             })
-        else:
-            fields["pedido_id"] = "123"
         return {"uuid": "u-pedido", "fields": fields}
 
     def _purchase_api(self) -> Mock:
@@ -489,7 +487,7 @@ class WeniUpdateTests(unittest.TestCase):
             self.assertEqual(_load_state(path), payload)
 
     def test_confirmed_purchase_populates_expected_fields(self) -> None:
-        contact = self._purchase_contact()
+        contact = self._purchase_contact(include_raw=False)
         farm = self._purchase_api()
         plan = self._purchase_plan(contact, farm)
         self.assertTrue(plan.order_validated)
@@ -515,7 +513,6 @@ class WeniUpdateTests(unittest.TestCase):
 
     def test_api_resolves_structured_order_without_raw_payload(self) -> None:
         contact = self._purchase_contact(include_raw=False)
-        contact["fields"].pop("pedido_id")
         farm = self._purchase_api()
         plan = self._purchase_plan(contact, farm)
         final_fields = {**contact["fields"], **plan.fields}
@@ -527,13 +524,14 @@ class WeniUpdateTests(unittest.TestCase):
         self.assertEqual(final_fields["pedido_quantidade_itens"], 3)
         self.assertEqual(len(json.loads(final_fields["pedido_produtos"])["produtos"]), 2)
         self.assertEqual(final_fields["ultima_compra"], final_fields["pedido_data"])
+        farm.get_cliente_by_cpf.assert_called_once_with("52998224725")
+        farm.get_pedido.assert_called_once_with("123")
         audit_plans([plan], opt_out_group_available=True)
 
     def test_descriptive_api_product_field_is_a_name_with_no_invented_code(self) -> None:
         for status in (2, 3):
             with self.subTest(status=status):
                 contact = self._purchase_contact(include_raw=False)
-                contact["fields"].pop("pedido_id")
                 contact["fields"]["ultima_compra"] = "2026-10-01T10:00:00-03:00"
                 farm = self._purchase_api()
                 farm.get_pedido.return_value["capa"]["status"] = status
@@ -578,7 +576,7 @@ class WeniUpdateTests(unittest.TestCase):
                 self.assertEqual(second.evidence, {})
 
     def test_cancelled_order_updates_five_fields_without_latest_purchase(self) -> None:
-        contact = self._purchase_contact()
+        contact = self._purchase_contact(include_raw=False)
         contact["fields"]["ultima_compra"] = "2026-10-01T10:00:00-03:00"
         farm = self._purchase_api()
         farm.get_pedido.return_value["capa"]["cancelamento"] = "2026-10-03T13:00:00Z"
@@ -612,7 +610,7 @@ class WeniUpdateTests(unittest.TestCase):
         }
         for status, label in statuses:
             with self.subTest(status=status):
-                contact = self._purchase_contact()
+                contact = self._purchase_contact(include_raw=False)
                 contact["fields"]["ultima_compra"] = "2026-10-01T10:00:00-03:00"
                 farm = self._purchase_api()
                 farm.get_pedido.return_value["capa"]["status"] = status
@@ -642,22 +640,110 @@ class WeniUpdateTests(unittest.TestCase):
                 self.assertEqual(second.fields, {})
                 self.assertEqual(second.evidence, {})
 
-    def test_complete_weni_order_without_api_remains_unconfirmed(self) -> None:
-        contact = self._purchase_contact()
-        plan = self._purchase_plan(contact)
-        self.assertTrue(plan.order_validated)
-        self.assertFalse(plan.purchase_confirmed)
-        self.assertEqual(set(plan.fields), {
-            "pedido_id", "pedido_data", "pedido_produtos",
-            "pedido_quantidade_itens", "pedido_valor",
-        })
-        self.assertEqual(plan.fields["pedido_valor"], 25.5)
-        self.assertEqual(plan.fields["pedido_quantidade_itens"], 3)
-        self.assertNotIn("ultima_compra", plan.fields)
-        products = json.loads(plan.fields["pedido_produtos"])
-        self.assertEqual(products["status_confirmacao"], "NAO_CONFIRMADO_API")
-        self.assertEqual(products["origem_pedido"], "WENI_ULTIMO_PEDIDO")
-        audit_plans([plan], opt_out_group_available=True)
+    def test_complete_weni_order_populates_five_fields_without_consulting_api(self) -> None:
+        for api_available in (False, True):
+            with self.subTest(api_available=api_available):
+                contact = self._purchase_contact()
+                contact["fields"]["ultima_compra"] = "2026-10-01T10:00:00-03:00"
+                farm = self._purchase_api() if api_available else None
+                plan = self._purchase_plan(contact, farm)
+                self.assertTrue(plan.order_validated)
+                self.assertFalse(plan.purchase_confirmed)
+                self.assertEqual(set(plan.fields), {
+                    "pedido_id", "pedido_data", "pedido_produtos",
+                    "pedido_quantidade_itens", "pedido_valor",
+                })
+                self.assertEqual(plan.fields["pedido_id"], "123")
+                self.assertEqual(plan.fields["pedido_data"], "2026-10-03T09:00:00-03:00")
+                self.assertEqual(plan.fields["pedido_valor"], 25.5)
+                self.assertEqual(plan.fields["pedido_quantidade_itens"], 3)
+                self.assertNotIn("ultima_compra", plan.fields)
+                self.assertEqual(contact["fields"]["ultima_compra"], "2026-10-01T10:00:00-03:00")
+                products = json.loads(plan.fields["pedido_produtos"])
+                self.assertEqual(products["status_confirmacao"], "NAO_CONFIRMADO_API")
+                self.assertEqual(products["origem_pedido"], "WENI_ULTIMO_PEDIDO")
+                self.assertEqual(products["produtos"], [
+                    {"nome": "Produto A", "codigo": None, "quantidade": "2",
+                     "valor_unitario": "10.00", "valor_total": "20.00"},
+                    {"nome": "Produto B", "codigo": None, "quantidade": "1",
+                     "valor_unitario": "5.50", "valor_total": "5.50"},
+                ])
+                if farm is not None:
+                    farm.get_cliente_by_cpf.assert_not_called()
+                    farm.get_pedido.assert_not_called()
+                audit_plans([plan], opt_out_group_available=True)
+
+    def test_empty_or_null_weni_order_uses_api_and_populates_five_fields(self) -> None:
+        for value in (None, "", "  ", "null", {"value": None}, {"value": ""}):
+            with self.subTest(value=value):
+                contact = self._purchase_contact(include_raw=False)
+                contact["fields"]["ultimo_pedido"] = value
+                farm = self._purchase_api()
+                plan = self._purchase_plan(contact, farm)
+                self.assertTrue(plan.order_validated)
+                self.assertTrue(plan.purchase_confirmed)
+                self.assertEqual(set(plan.fields), {
+                    "pedido_id", "pedido_data", "pedido_produtos",
+                    "pedido_quantidade_itens", "pedido_valor", "ultima_compra",
+                })
+                self.assertEqual(plan.fields["pedido_id"], "123")
+                self.assertEqual(plan.fields["pedido_data"], "2026-10-03T09:00:00-03:00")
+                self.assertEqual(plan.fields["pedido_quantidade_itens"], 3)
+                self.assertEqual(plan.fields["pedido_valor"], 25.5)
+                self.assertEqual(len(json.loads(plan.fields["pedido_produtos"])["produtos"]), 2)
+                farm.get_cliente_by_cpf.assert_called_once_with("52998224725")
+                farm.get_pedido.assert_called_once_with("123")
+                audit_plans([plan], opt_out_group_available=True)
+
+    def test_present_invalid_weni_order_has_no_api_fallback_or_partial_writes(self) -> None:
+        complete = json.loads(self._purchase_contact()["fields"]["ultimo_pedido"])
+        invalid_payloads = {
+            "malformed": "{",
+            "unstructured": "Produto A, quantidade 2, valor 10,00",
+            "empty_object": "{}",
+            "empty_list": "[]",
+        }
+        for missing in ("pedido_id", "data_hora"):
+            incomplete = deepcopy(complete)
+            incomplete.pop(missing)
+            invalid_payloads[f"missing_{missing}"] = json.dumps(incomplete)
+        no_items = deepcopy(complete)
+        no_items["produtos"] = []
+        invalid_payloads["no_items"] = json.dumps(no_items)
+        for label, payload in invalid_payloads.items():
+            with self.subTest(label=label):
+                contact = self._purchase_contact()
+                contact["fields"]["ultimo_pedido"] = payload
+                farm = self._purchase_api()
+                plan = self._purchase_plan(contact, farm)
+                self.assertFalse(plan.order_validated)
+                self.assertFalse(plan.purchase_confirmed)
+                self.assertEqual(plan.fields, {})
+                self.assertEqual(plan.evidence, {})
+                farm.get_cliente_by_cpf.assert_not_called()
+                farm.get_pedido.assert_not_called()
+
+    def test_invalid_weni_order_id_has_no_order_writes_or_api_fallback(self) -> None:
+        for pedido_id in ("invalid", "0", "-1", "12.5", True, 0, None):
+            with self.subTest(pedido_id=pedido_id):
+                contact = self._purchase_contact()
+                raw = json.loads(contact["fields"]["ultimo_pedido"])
+                raw["pedido_id"] = pedido_id
+                contact["fields"]["ultimo_pedido"] = json.dumps(raw)
+                contact["fields"]["ultima_compra"] = "2026-10-01T10:00:00-03:00"
+                farm = self._purchase_api()
+                plan = self._purchase_plan(contact, farm)
+                self.assertFalse(plan.order_validated)
+                self.assertFalse(plan.purchase_confirmed)
+                self.assertEqual(plan.fields, {})
+                self.assertEqual(plan.evidence, {})
+                self.assertFalse(set(plan.fields) & {
+                    "pedido_id", "pedido_data", "pedido_produtos",
+                    "pedido_quantidade_itens", "pedido_valor", "ultima_compra",
+                })
+                self.assertEqual(contact["fields"]["ultima_compra"], "2026-10-01T10:00:00-03:00")
+                farm.get_cliente_by_cpf.assert_not_called()
+                farm.get_pedido.assert_not_called()
 
     def test_purchase_dates_use_belem_day_at_utc_midnight_boundary(self) -> None:
         contact = self._purchase_contact(include_raw=False)
@@ -689,7 +775,7 @@ class WeniUpdateTests(unittest.TestCase):
     def test_purchase_plan_is_idempotent_after_applying_structured_fields(self) -> None:
         for api_available in (False, True):
             with self.subTest(api_available=api_available):
-                contact = self._purchase_contact()
+                contact = self._purchase_contact(include_raw=not api_available)
                 farm = self._purchase_api() if api_available else None
                 first = self._purchase_plan(contact, farm)
                 applied_contact = deepcopy(contact)
@@ -699,9 +785,34 @@ class WeniUpdateTests(unittest.TestCase):
                 )
                 self.assertTrue(second.order_validated)
                 self.assertEqual(second.fields, {})
+                if farm is not None:
+                    self.assertEqual(farm.get_cliente_by_cpf.call_count, 2)
+                    self.assertEqual(farm.get_pedido.call_count, 2)
+
+    def test_populated_raw_preserves_confirmed_same_order_snapshot_without_api(self) -> None:
+        contact = self._purchase_contact(include_raw=False)
+        farm = self._purchase_api()
+        first = self._purchase_plan(contact, farm)
+        self.assertTrue(first.purchase_confirmed)
+        contact["fields"].update(first.fields)
+        contact["fields"]["ultimo_pedido"] = self._purchase_contact()["fields"]["ultimo_pedido"]
+        farm.reset_mock()
+        second = self._purchase_plan(contact, farm, captured_at="2026-10-03T13:01:00Z")
+        self.assertTrue(second.order_validated)
+        self.assertTrue(second.purchase_confirmed)
+        self.assertEqual(second.fields, {})
+        self.assertEqual(second.evidence, {})
+        farm.get_cliente_by_cpf.assert_not_called()
+        farm.get_pedido.assert_not_called()
+        audit_plans([second], opt_out_group_available=True)
 
     def test_api_freight_preserves_original_weni_difference_on_idempotent_rerun(self) -> None:
         contact = self._purchase_contact()
+        # A previous Weni snapshot is retained for comparison, while an absent
+        # ultimo_pedido now permits the official CPF -> last order fallback.
+        weni_snapshot = self._purchase_plan(contact)
+        contact["fields"].update(weni_snapshot.fields)
+        contact["fields"]["ultimo_pedido"] = ""
         farm = self._purchase_api()
         farm.get_pedido.return_value["capa"]["frete"] = 5
         first = self._purchase_plan(contact, farm)

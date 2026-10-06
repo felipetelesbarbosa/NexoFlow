@@ -3,8 +3,9 @@ import json
 import unittest
 from unittest.mock import Mock
 
-from analytics import build_sales_metrics
+from analytics import build_sales_metrics, parse_ultimo_pedido
 from farmalider_integration import (
+    apply_pedido_api_confirmation,
     cliente_link_status,
     resolve_contact_order,
 )
@@ -69,6 +70,25 @@ def client(cliente=None, pedido=None):
     return api
 
 
+def confirm_weni_fixture(raw, *, pedido=None, captured_at=CAPTURED_AT):
+    """Exercise API reconciliation directly, outside the priority resolver."""
+    order, items = parse_ultimo_pedido(contact(raw=raw), captured_at=captured_at)
+    return apply_pedido_api_confirmation(
+        order, items, pedido_payload() if pedido is None else pedido,
+        linked_cliente_id="99", confirmed_at=captured_at,
+    )
+
+
+def structured_snapshot_contact(order, items):
+    candidate = contact()
+    candidate["fields"].update({
+        "pedido_id": order["pedido_id"], "pedido_data": order["data_hora"],
+        "pedido_valor": order["valor_total_compra"], "pedido_quantidade_itens": order["quantidade_itens"],
+        "pedido_produtos": serialize_pedido_products(order, items),
+    })
+    return candidate
+
+
 class PedidoResolutionTests(unittest.TestCase):
     def test_cliente_envelope_and_legacy_validate_same_identity(self):
         envelope = cliente_payload()
@@ -115,20 +135,169 @@ class PedidoResolutionTests(unittest.TestCase):
         self.assertEqual(order["status_confirmacao"], "CONFIRMADO_API")
         api.get_cliente_by_cpf.assert_not_called()
 
-    def test_malformed_weni_can_fall_back_to_official_latest_order(self):
-        order, _ = resolve_contact_order(contact(raw="{not-json"), farm_client=client(), captured_at=CAPTURED_AT)
-        self.assertEqual(order["status_confirmacao"], "CONFIRMADO_API")
+    def test_malformed_weni_does_not_fall_back_to_another_order(self):
+        api = client()
+        order, items = resolve_contact_order(contact(raw="{not-json"), farm_client=api, captured_at=CAPTURED_AT)
+        self.assertEqual(order["status_validacao"], "ERRO")
         self.assertEqual(order["ultimo_pedido_raw"], "{not-json")
+        self.assertEqual(items, [])
+        api.get_cliente_by_cpf.assert_not_called()
+        api.get_pedido.assert_not_called()
 
-    def test_no_official_id_can_fall_back_to_latest_order(self):
+    def test_nonempty_weni_without_official_id_does_not_query_latest_order(self):
         payload = json.loads(raw_order())
         del payload["pedido_id"]
-        order, _ = resolve_contact_order(contact(raw=json.dumps(payload)), farm_client=client(), captured_at=CAPTURED_AT)
+        api = client()
+        raw = json.dumps(payload)
+        order, items = resolve_contact_order(contact(raw=raw), farm_client=api, captured_at=CAPTURED_AT)
+        self.assertEqual(order["pedido_id"], "")
+        self.assertEqual(order["ultimo_pedido_raw"], raw)
+        self.assertEqual(items[0]["produto_nome"], "Produto sintético")
+        api.get_cliente_by_cpf.assert_not_called()
+        api.get_pedido.assert_not_called()
+
+    def test_empty_or_null_weni_uses_cpf_then_official_latest_order(self):
+        missing = object()
+        for raw in (missing, None, "", " \t\n ", "null", " null ",
+                    {"value": None}, {"value": " \t "}, {"value": "null"}):
+            with self.subTest(raw=raw if raw is not missing else "missing"):
+                candidate = contact()
+                if raw is not missing:
+                    candidate["fields"]["ultimo_pedido"] = raw
+                api = client()
+                order, _ = resolve_contact_order(candidate, farm_client=api, captured_at=CAPTURED_AT)
+                self.assertEqual(order["origem_pedido"], "FARMALIDER_CLIENTE_ULTIMO_PEDIDO")
+                self.assertEqual(order["pedido_id"], "123")
+                self.assertEqual(order["status_confirmacao"], "CONFIRMADO_API")
+                api.get_cliente_by_cpf.assert_called_once_with(SYNTHETIC_CPF)
+                api.get_pedido.assert_called_once_with("123")
+
+    def test_empty_raw_uses_latest_api_order_instead_of_another_structured_snapshot(self):
+        snapshot = json.loads(raw_order())
+        snapshot.update(
+            pedido_id="124", data_hora="2026-10-05T10:30:00",
+            status_confirmacao="CANCELADO_API", farmalider_status_pedido=3,
+            farmalider_status_pedido_nome="Cancelado", origem_pedido="WENI_PEDIDO_FIELDS",
+        )
+        snapshot["produtos"][0]["nome"] = "Nome antigo de outro pedido"
+        candidate = contact(raw="")
+        candidate["fields"].update({
+            "pedido_id": "124", "pedido_data": snapshot["data_hora"],
+            "pedido_valor": snapshot["valor_total_compra"], "pedido_quantidade_itens": "1",
+            "pedido_produtos": json.dumps(snapshot),
+        })
+        api = client()
+        order, items = resolve_contact_order(candidate, farm_client=api, captured_at=CAPTURED_AT)
         self.assertEqual(order["pedido_id"], "123")
         self.assertEqual(order["origem_pedido"], "FARMALIDER_CLIENTE_ULTIMO_PEDIDO")
+        self.assertEqual(order["status_confirmacao"], "CONFIRMADO_API")
+        self.assertEqual(order["farmalider_status_pedido"], "1")
+        self.assertEqual(order["data_hora"], "2026-10-06T10:30:00-03:00")
+        self.assertFalse(is_order_cancelled(order))
+        self.assertEqual(items[0]["produto_codigo"], "9001")
+        self.assertEqual(items[0]["produto_nome"], "")
+        api.get_cliente_by_cpf.assert_called_once_with(SYNTHETIC_CPF)
+        api.get_pedido.assert_called_once_with("123")
 
-    def test_path_one_preserves_name_only_with_matching_code(self):
-        order, items = resolve_contact_order(contact(raw=raw_order()), farm_client=client(), captured_at=CAPTURED_AT)
+    def test_wrapped_nonempty_weni_remains_the_priority_order(self):
+        api = client()
+        order, _ = resolve_contact_order(
+            contact(raw={"value": "{not-json"}), farm_client=api, captured_at=CAPTURED_AT,
+        )
+        self.assertEqual(order["status_validacao"], "ERRO")
+        self.assertEqual(order["ultimo_pedido_raw"], "{not-json")
+        api.get_cliente_by_cpf.assert_not_called()
+        api.get_pedido.assert_not_called()
+
+    def test_structured_newer_order_does_not_replace_priority_raw_order(self):
+        candidate = contact(raw=raw_order())
+        snapshot = json.loads(raw_order())
+        snapshot.update(
+            pedido_id="124", data_hora="2026-10-06T11:30:00",
+            status_confirmacao="CONFIRMADO_API", farmalider_status_pedido=2,
+        )
+        snapshot["produtos"][0]["nome"] = "Produto de outro pedido"
+        candidate["fields"].update({
+            "pedido_id": snapshot["pedido_id"], "pedido_data": snapshot["data_hora"],
+            "pedido_valor": snapshot["valor_total_compra"], "pedido_quantidade_itens": "1",
+            "pedido_produtos": json.dumps(snapshot),
+        })
+        order, items = parse_ultimo_pedido(candidate, captured_at=CAPTURED_AT)
+        self.assertEqual(order["pedido_id"], "123")
+        self.assertEqual(order["ultimo_pedido_raw"], raw_order())
+        self.assertEqual(items[0]["produto_nome"], "Produto sintético")
+
+    def test_structured_snapshot_does_not_hide_invalid_priority_raw(self):
+        candidate = contact(raw="{not-json")
+        snapshot = json.loads(raw_order())
+        snapshot.update(status_confirmacao="CONFIRMADO_API", farmalider_status_pedido=2)
+        candidate["fields"].update({
+            "pedido_id": "123", "pedido_data": snapshot["data_hora"],
+            "pedido_valor": snapshot["valor_total_compra"], "pedido_quantidade_itens": "1",
+            "pedido_produtos": json.dumps(snapshot),
+        })
+        api = client()
+        order, items = resolve_contact_order(candidate, farm_client=api, captured_at=CAPTURED_AT)
+        self.assertEqual(order["status_validacao"], "ERRO")
+        self.assertEqual(order["ultimo_pedido_raw"], "{not-json")
+        self.assertEqual(items, [])
+        api.get_cliente_by_cpf.assert_not_called()
+        api.get_pedido.assert_not_called()
+
+    def test_structured_snapshot_does_not_supply_missing_identity_for_priority_raw(self):
+        original = json.loads(raw_order())
+        del original["pedido_id"]
+        raw = json.dumps(original)
+        candidate = contact(raw=raw)
+        snapshot = json.loads(raw_order())
+        snapshot.update(status_confirmacao="CONFIRMADO_API", farmalider_status_pedido=2)
+        candidate["fields"].update({
+            "pedido_id": "123", "pedido_data": snapshot["data_hora"],
+            "pedido_valor": snapshot["valor_total_compra"], "pedido_quantidade_itens": "1",
+            "pedido_produtos": json.dumps(snapshot),
+        })
+        api = client()
+        order, items = resolve_contact_order(candidate, farm_client=api, captured_at=CAPTURED_AT)
+        self.assertEqual(order["pedido_id"], "")
+        self.assertEqual(order["ultimo_pedido_raw"], raw)
+        self.assertEqual(order["status_confirmacao"], "NAO_CONFIRMADO_SEM_PEDIDO_ID")
+        self.assertEqual(items[0]["produto_nome"], "Produto sintético")
+        api.get_cliente_by_cpf.assert_not_called()
+        api.get_pedido.assert_not_called()
+
+    def test_matching_snapshot_can_retain_cancellation_protection_for_priority_order(self):
+        candidate = contact(raw=raw_order())
+        snapshot = json.loads(raw_order())
+        snapshot.update(
+            status_confirmacao="CANCELADO_API", farmalider_status_pedido=3,
+            farmalider_status_pedido_nome="Cancelado",
+        )
+        candidate["fields"].update({
+            "pedido_id": "123", "pedido_data": snapshot["data_hora"],
+            "pedido_valor": snapshot["valor_total_compra"], "pedido_quantidade_itens": "1",
+            "pedido_produtos": json.dumps(snapshot),
+        })
+        order, items = parse_ultimo_pedido(candidate, captured_at=CAPTURED_AT)
+        self.assertEqual(order["pedido_id"], "123")
+        self.assertEqual(order["ultimo_pedido_raw"], raw_order())
+        self.assertTrue(is_order_cancelled(order))
+        self.assertEqual(items[0]["produto_nome"], "Produto sintético")
+
+    def test_path_one_uses_weni_without_any_api_requests(self):
+        for raw in (raw_order(), {"value": raw_order()}):
+            with self.subTest(wrapped=isinstance(raw, dict)):
+                api = client()
+                order, items = resolve_contact_order(contact(raw=raw), farm_client=api, captured_at=CAPTURED_AT)
+                self.assertEqual(order["status_confirmacao"], "NAO_CONFIRMADO_API")
+                self.assertEqual(order["origem_pedido"], "WENI_ULTIMO_PEDIDO")
+                self.assertEqual(order["pedido_id"], "123")
+                self.assertEqual(order["valor_total_compra"], "48.89")
+                self.assertEqual(items[0]["produto_nome"], "Produto sintético")
+                api.get_cliente_by_cpf.assert_not_called()
+                api.get_pedido.assert_not_called()
+
+    def test_api_reconciliation_preserves_weni_name_only_with_matching_code(self):
+        order, items = confirm_weni_fixture(raw_order())
         self.assertEqual(order["status_confirmacao"], "CONFIRMADO_API")
         self.assertEqual(items[0]["produto_nome"], "Produto sintético")
         self.assertEqual(order["origem_pedido"], "WENI_ULTIMO_PEDIDO+FARMALIDER_API")
@@ -150,7 +319,7 @@ class PedidoResolutionTests(unittest.TestCase):
     def test_official_name_replaces_stale_weni_name(self):
         pedido = pedido_payload()
         pedido["itens"][0]["codProduto"] = "Descrição Atualizada"
-        _, items = resolve_contact_order(contact(raw=raw_order()), farm_client=client(pedido=pedido), captured_at=CAPTURED_AT)
+        _, items = confirm_weni_fixture(raw_order(), pedido=pedido)
         self.assertEqual(items[0]["produto_nome"], "Descrição Atualizada")
         self.assertEqual(items[0]["produto_codigo"], "")
 
@@ -177,7 +346,7 @@ class PedidoResolutionTests(unittest.TestCase):
             with self.subTest(field=field):
                 pedido = pedido_payload()
                 pedido["itens"][0].update(codProduto=9001, **{field: "Produto com nome"})
-                _, items = resolve_contact_order(contact(raw=raw_order()), farm_client=client(pedido=pedido), captured_at=CAPTURED_AT)
+                _, items = confirm_weni_fixture(raw_order(), pedido=pedido)
                 self.assertEqual(items[0]["produto_nome"], "Produto com nome")
                 self.assertEqual(items[0]["produto_codigo"], "9001")
 
@@ -300,7 +469,7 @@ class PedidoResolutionTests(unittest.TestCase):
         cancelled = pedido_payload()
         cancelled["capa"]["cancelamento"] = "2026-10-06T11:00:00"
         old_order, old_items = resolve_contact_order(contact(), farm_client=client(pedido=cancelled), captured_at=CAPTURED_AT)
-        canonical_contact = contact(raw=serialize_pedido_products(old_order, old_items))
+        canonical_contact = structured_snapshot_contact(old_order, old_items)
         order, _ = resolve_contact_order(canonical_contact, farm_client=client(), captured_at=CAPTURED_AT)
         self.assertEqual(order["status_confirmacao"], "CONFIRMADO_API")
         self.assertFalse(is_order_cancelled(order))
@@ -334,7 +503,7 @@ class PedidoResolutionTests(unittest.TestCase):
     def test_weni_api_value_difference_is_preserved_in_audit(self):
         payload = json.loads(raw_order())
         payload["valor_total_compra"] = "38.90"
-        order, _ = resolve_contact_order(contact(raw=json.dumps(payload)), farm_client=client(), captured_at=CAPTURED_AT)
+        order, _ = confirm_weni_fixture(json.dumps(payload))
         self.assertEqual(order["valor_total_compra"], "48.89")
         self.assertEqual(order["valor_total_weni"], "38.90")
         self.assertEqual(order["diferenca_total_weni_api"], "-9.99")
@@ -343,10 +512,9 @@ class PedidoResolutionTests(unittest.TestCase):
     def test_api_rerun_preserves_original_weni_difference_and_json(self):
         payload = json.loads(raw_order())
         payload["valor_total_compra"] = "38.90"
-        order, items = resolve_contact_order(contact(raw=json.dumps(payload)), farm_client=client(), captured_at=CAPTURED_AT)
+        order, items = confirm_weni_fixture(json.dumps(payload))
         old_serialized = serialize_pedido_products(order, items)
-        canonical_contact = contact(raw=old_serialized)
-        current, current_items = resolve_contact_order(canonical_contact, farm_client=client(), captured_at="2026-10-07T18:00:00Z")
+        current, current_items = confirm_weni_fixture(old_serialized, captured_at="2026-10-07T18:00:00Z")
         self.assertEqual(current["valor_total_weni"], "38.90")
         self.assertEqual(current["diferenca_total_weni_api"], "-9.99")
         self.assertEqual(serialize_pedido_products(current, current_items), old_serialized)
@@ -390,9 +558,9 @@ class PedidoResolutionTests(unittest.TestCase):
     def test_client_api_failure_preserves_diagnostic_without_contact_data_in_error(self):
         api = client()
         api.get_cliente_by_cpf.side_effect = FarmaliderError("Synthetic API failure")
-        order, _ = resolve_contact_order(contact(raw=raw_order()), farm_client=api, captured_at=CAPTURED_AT)
+        order, _ = resolve_contact_order(contact(), farm_client=api, captured_at=CAPTURED_AT)
         self.assertEqual(order["status_confirmacao"], "ERRO_API")
-        self.assertEqual(order["ultimo_pedido_raw"], raw_order())
+        self.assertEqual(order["ultimo_pedido_raw"], "")
         self.assertNotIn(SYNTHETIC_CPF, order["farmalider_erro"])
 
     def test_order_api_failure_preserves_diagnostic(self):
@@ -442,7 +610,7 @@ class PedidoResolutionTests(unittest.TestCase):
     def test_name_cannot_be_copied_by_position(self):
         payload = json.loads(raw_order())
         payload["produtos"][0]["codigo"] = "OTHER"
-        order, items = resolve_contact_order(contact(raw=json.dumps(payload)), farm_client=client(), captured_at=CAPTURED_AT)
+        order, items = confirm_weni_fixture(json.dumps(payload))
         self.assertEqual(items[0]["produto_codigo"], "9001")
         self.assertEqual(items[0]["produto_nome"], "")
 
@@ -452,7 +620,7 @@ class PedidoResolutionTests(unittest.TestCase):
         del product["codigo"]
         payload["produtos"].append(dict(product, nome="Outro produto"))
         payload["valor_total_compra"] = "77.80"
-        _, items = resolve_contact_order(contact(raw=json.dumps(payload)), farm_client=client(), captured_at=CAPTURED_AT)
+        _, items = confirm_weni_fixture(json.dumps(payload))
         self.assertEqual(items[0]["produto_nome"], "")
 
     def test_one_weni_line_matching_two_api_codes_is_not_unique(self):
@@ -460,7 +628,7 @@ class PedidoResolutionTests(unittest.TestCase):
         del payload["produtos"][0]["codigo"]
         pedido = pedido_payload()
         pedido["itens"].append(dict(pedido["itens"][0], codProduto="9002"))
-        _, items = resolve_contact_order(contact(raw=json.dumps(payload)), farm_client=client(pedido=pedido), captured_at=CAPTURED_AT)
+        _, items = confirm_weni_fixture(json.dumps(payload), pedido=pedido)
         self.assertEqual([item["produto_nome"] for item in items], ["", ""])
 
     def test_serialized_snapshot_is_deterministic_and_contains_no_contact_pii(self):

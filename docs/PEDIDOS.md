@@ -16,23 +16,27 @@ O pedido pode chegar em `ultimo_pedido`, como objeto ou texto JSON, ou nos campo
 
 O Analytics mantém esses campos na `Base_Contatos` e pode derivar `ultimo_pedido` a partir deles. A derivação não cria um pedido histórico nem modifica o campo original na Weni.
 
-Um `ultimo_pedido` válido tem preferência sobre campos separados sem confirmação. Um envelope confirmado pela API, ou identificado como cancelado pela API, pode substituir o snapshot usado na análise quando tem data igual ou mais recente. O JSON original continua preservado em `Pedidos_FarmaLider.ultimo_pedido_raw`; isso evita que um JSON antigo prevaleça sobre um cancelamento mais recente.
+O campo `ultimo_pedido` preenchido é a fonte prioritária. Os campos separados não podem substituí-lo por outro pedido nem ocultar conteúdo inválido. Um snapshot previamente confirmado ou cancelado pela API pode ser preservado, incluindo valores, itens e estado, somente quando pertence ao mesmo ID oficial positivo, passa pelas validações do snapshot e tem data igual ou mais recente. O JSON original continua preservado em `Pedidos_FarmaLider.ultimo_pedido_raw`; isso evita que um JSON antigo apague um cancelamento já registrado do mesmo pedido.
 
 O JSON produzido para `pedido_produtos` é um envelope com a lista `produtos`, identificação e data do pedido, valores, quantidades, origem, estados de validação/confirmação, `farmalider_frete`, `farmalider_status_pedido` e `farmalider_cancelamento`. Ele não é uma descrição de produtos em texto livre. Os códigos recebidos são preservados; um nome ausente permanece ausente. O código do produto não deve ser apresentado como se fosse seu nome.
 
 ## Resolução e confirmação
 
-O caminho inicial é ler o pedido disponível em `ultimo_pedido` ou derivá-lo dos campos `pedido_*`. Quando há identificador oficial, o pedido específico pode ser confirmado e enriquecido pela FarmaLíder.
+**Caminho 1:** leia primeiro `ultimo_pedido` na Weni. Quando preenchido, use seus dados e não consulte a API para resolver esse pedido. Com ID, data, produtos, quantidades e valores válidos, o NexoFlow Weni alimenta os cinco campos `pedido_id`, `pedido_data`, `pedido_produtos`, `pedido_quantidade_itens` e `pedido_valor`, inclusive quando a API está configurada. Uma confirmação oficial já registrada no snapshot válido do mesmo pedido pode ser preservada; o conteúdo bruto não recebe confirmação API por suposição.
 
-Quando esse caminho não fornece um pedido utilizável com identificador oficial, e há CPF válido e acesso à API, o fallback é:
+Conteúdo preenchido inválido ou incompleto não autoriza buscar outro pedido pelo CPF. Registre a pendência e preserve os campos existentes, sem inventar identificação, data, frete ou status. O parser espera objeto JSON ou texto contendo JSON estruturado; uma descrição livre de produtos sem os dados obrigatórios permanece pendente.
+
+**Caminho 2:** somente quando `ultimo_pedido` estiver ausente, vazio ou `null`, e houver CPF válido e acesso à API, consulte:
 
 ```text
 CPF → GET cliente/cpf/{cpf} → resposta.ultimoPedido.id → GET pedido/{codigo}
 ```
 
+São aceitos valor nulo, espaços e texto `null`, inclusive no formato encapsulado `{"value": ...}` da Weni. Um objeto ou lista inválidos continuam sendo conteúdo preenchido, não ausência de informação. Campos `pedido_*` antigos não determinam o pedido desse caminho: a referência vem de `ultimoPedido.id`. Um snapshot válido do mesmo ID pode manter a comparação de valores; snapshots de outro ID são descartados da resolução atual. A API fornece os dados para alimentar os mesmos cinco campos da Weni antes da carga do Analytics.
+
 Na resposta oficial, `cliente` identifica o titular e `ultimoPedido` é outro objeto da resposta. O retorno legado com os campos do cliente diretamente no objeto também é aceito para validar o vínculo.
 
-O NexoFlow valida o CPF retornado, a identidade do cliente, o identificador solicitado e o titular do pedido. Um retorno divergente não confirma uma compra para o contato. Informação somente da Weni conserva sua origem e não recebe confirmação oficial por suposição.
+No caminho 2, o NexoFlow valida o CPF retornado, a identidade do cliente, o identificador solicitado e o titular do pedido. Um retorno divergente não confirma uma compra para o contato. O enriquecimento de cadastro do Analytics também pode consultar CPF independentemente; essa consulta não autoriza substituir um pedido preenchido na Weni pela referência `ultimoPedido`.
 
 `ultimoPedido` é uma referência ao último pedido disponível do cliente, não uma lista de todo o histórico. Um pedido antigo que nunca foi capturado não é reconstruído apenas pela leitura atual do contato.
 

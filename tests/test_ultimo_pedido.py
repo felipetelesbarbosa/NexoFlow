@@ -156,15 +156,17 @@ class UltimoPedidoTests(unittest.TestCase):
         self.assertEqual(build_sales_metrics([order], items),
                          [["2026-10-02", 1, 0, 1, "2", "19.00", "0.00"]])
 
-    def test_derived_order_recovers_invalid_raw_preserving_original(self):
+    def test_populated_invalid_raw_is_preserved_without_derived_recovery(self):
         contact = self.derived_contact(raw="{invalid original}")
         order, items = parse_ultimo_pedido(contact, "2026-10-03T04:00:00Z")
-        self.assertEqual(order["status_validacao"], "OK")
+        self.assertEqual(order["status_validacao"], "ERRO")
         self.assertEqual(order["ultimo_pedido_raw"], "{invalid original}")
-        self.assertEqual(len(items), 1)
+        self.assertTrue(order["erro_parse"])
+        self.assertEqual(items, [])
 
-    def test_only_verified_newer_derived_order_replaces_valid_raw(self):
-        contact = self.derived_contact(raw=EXAMPLE_JSON)
+    def test_verified_snapshot_can_update_only_the_same_official_order(self):
+        raw = json.dumps({**EXAMPLE_PAYLOAD, "pedido_id": "321"})
+        contact = self.derived_contact(raw=raw)
         order, _ = parse_ultimo_pedido(contact, "2026-10-03T04:00:00Z")
         self.assertEqual(order["data_hora"], EXAMPLE_PAYLOAD["data_hora"])
         contact["fields"]["pedido_produtos"]["value"] = json.dumps({
@@ -173,10 +175,44 @@ class UltimoPedidoTests(unittest.TestCase):
         })
         order, _ = parse_ultimo_pedido(contact, "2026-10-03T04:00:00Z")
         self.assertEqual(order["pedido_id"], "321")
-        self.assertEqual(order["ultimo_pedido_raw"], EXAMPLE_JSON)
+        self.assertEqual(order["data_hora"], "2026-10-03T01:00:00Z")
+        self.assertEqual(order["valor_total_compra"], "19.00")
+        self.assertEqual(order["ultimo_pedido_raw"], raw)
         contact["fields"]["pedido_data"]["value"] = "2026-09-29T13:00:00-03:00"
         older, _ = parse_ultimo_pedido(contact, "2026-10-03T04:00:00Z")
         self.assertEqual(older["data_hora"], EXAMPLE_PAYLOAD["data_hora"])
+
+    def test_verified_different_or_missing_order_id_cannot_replace_populated_raw(self):
+        for original_id in (None, "999", "invalid", "0"):
+            with self.subTest(original_id=original_id):
+                payload = dict(EXAMPLE_PAYLOAD)
+                if original_id is not None:
+                    payload["pedido_id"] = original_id
+                raw = json.dumps(payload)
+                contact = self.derived_contact(raw=raw, metadata={
+                    "status_confirmacao": "CONFIRMADO_API",
+                    "origem_pedido": "FARMALIDER_API",
+                })
+                order, items = parse_ultimo_pedido(contact, "2026-10-03T04:00:00Z")
+                self.assertEqual(order["data_hora"], EXAMPLE_PAYLOAD["data_hora"])
+                self.assertEqual(order["valor_total_compra"], "110.80")
+                self.assertEqual(order["ultimo_pedido_raw"], raw)
+                self.assertEqual(len(items), 3)
+
+    def test_same_order_snapshot_preserves_cancellation_without_replacing_identity(self):
+        raw = json.dumps({**EXAMPLE_PAYLOAD, "pedido_id": "321"})
+        contact = self.derived_contact(raw=raw, metadata={
+            "status_confirmacao": "CANCELADO_API",
+            "origem_pedido": "FARMALIDER_API",
+            "farmalider_status_pedido": "3",
+            "farmalider_status_pedido_nome": "Cancelado",
+        })
+        order, items = parse_ultimo_pedido(contact, "2026-10-03T04:00:00Z")
+        self.assertEqual(order["pedido_id"], "321")
+        self.assertEqual(order["ultimo_pedido_raw"], raw)
+        self.assertEqual(order["status_confirmacao"], "CANCELADO_API")
+        self.assertEqual(order["farmalider_status_pedido_nome"], "Cancelado")
+        self.assertEqual(build_sales_metrics([order], items), [])
 
     def test_derived_id_must_match_product_envelope(self):
         contact = self.derived_contact(metadata={"pedido_id": "other"})

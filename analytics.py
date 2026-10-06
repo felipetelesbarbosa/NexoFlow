@@ -338,6 +338,15 @@ def normalize_value(value: Any) -> str:
     return str(value)
 
 
+def normalize_order_source(value: Any) -> str:
+    """Normalize absent Weni order fields without treating invalid content as empty."""
+    while isinstance(value, dict) and "value" in value:
+        value = value["value"]
+    raw = (json.dumps(value, ensure_ascii=False, sort_keys=True)
+           if isinstance(value, (dict, list)) else normalize_value(value)).strip()
+    return "" if raw.casefold() == "null" else raw
+
+
 def get_fields(contact: dict[str, Any]) -> dict[str, Any]:
     fields = contact.get("fields")
     return fields if isinstance(fields, dict) else {}
@@ -910,7 +919,7 @@ def parse_ultimo_pedido(
     Lê `ultimo_pedido` de um contato da Weni e delega ao parser comum.
     """
     fields = get_fields(contact)
-    raw = normalize_value(fields.get("ultimo_pedido")).strip()
+    raw = normalize_order_source(fields.get("ultimo_pedido"))
 
     contact_uuid = normalize_value(contact.get("uuid")).strip()
     phone, _ = get_phone_and_urn(contact, fields)
@@ -930,6 +939,12 @@ def parse_ultimo_pedido(
         captured_at=captured_at,
     )
     original_order, original_items = parse_ultimo_pedido_raw(raw, **context)
+    original_valid = (
+        original_order is not None
+        and not str(original_order.get("status_validacao") or "").startswith("ERRO")
+    )
+    if raw and not original_valid:
+        return original_order, original_items
     derived_payload = _derived_order_payload(fields)
     if derived_payload is None:
         return original_order, original_items
@@ -941,7 +956,6 @@ def parse_ultimo_pedido(
     if derived_order["origem_pedido"] == "WENI_ULTIMO_PEDIDO":
         derived_order["origem_pedido"] = "WENI_PEDIDO_FIELDS"
     derived_valid = not str(derived_order.get("status_validacao") or "").startswith("ERRO")
-    original_valid = original_order is not None and not str(original_order.get("status_validacao") or "").startswith("ERRO")
     if not original_valid:
         return (derived_order, derived_items) if derived_valid or original_order is None else (original_order, original_items)
     if derived_valid:
@@ -949,7 +963,14 @@ def parse_ultimo_pedido(
         verified = confirmation.startswith("CONFIRMADO_API") or confirmation == "CANCELADO_API"
         derived_dt = business_order_datetime(derived_order.get("data_hora", ""))
         original_dt = business_order_datetime(original_order.get("data_hora", ""))
-        if verified and derived_dt is not None and original_dt is not None and derived_dt >= original_dt:
+        original_id = str(original_order.get("pedido_id") or "").strip()
+        derived_id = str(derived_order.get("pedido_id") or "").strip()
+        same_id = (
+            original_id.isascii() and original_id.isdigit() and int(original_id) > 0
+            and derived_id.isascii() and derived_id.isdigit()
+            and int(derived_id) == int(original_id)
+        )
+        if same_id and verified and derived_dt is not None and original_dt is not None and derived_dt >= original_dt:
             return derived_order, derived_items
     return original_order, original_items
 

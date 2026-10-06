@@ -1,4 +1,5 @@
 """Synthetic integration of latest order resolution, persistence and BI."""
+import json
 import re
 import unittest
 from unittest.mock import Mock
@@ -94,6 +95,55 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
             snapshot_date="2026-10-05", updated_at="2026-10-05T14:00:00Z")
         self.assertEqual(summary["faturamento_total"], 29.49)
         self.assertEqual(summary["unidades_vendidas_dia"], 2)
+
+    def test_populated_weni_order_wins_over_api_latest_and_persists_once(self):
+        first, client = self.fixture()
+        raw = json.dumps({
+            "pedido_id": "400", "data_hora": "2026-10-05T10:00:00-03:00",
+            "farmalider_status_pedido": 2, "valor_total_compra": "15.00",
+            "produtos": [{"nome": "Produto original da Weni", "quantidade": 2,
+                          "valor_unitario": "7.50", "valor_total": "15.00"}],
+        })
+        first["fields"]["ultimo_pedido"] = {"value": raw}
+        second = {"uuid": "synthetic-u2", "fields": dict(first["fields"])}
+        contacts = [first, second]
+        rows = [normalize_contact(contact, "2026-10-05T14:00:00Z") for contact in contacts]
+        kwargs = {"rows_by_uuid": {row["contact_uuid"]: row for row in rows},
+                  "farm_client": client}
+        orders, items, stats = build_orders(contacts, sync_time="2026-10-05T14:00:00Z", **kwargs)
+        next_orders, next_items, _ = build_orders(
+            list(reversed(contacts)), sync_time="2026-10-05T14:10:00Z", **kwargs)
+        self.assertEqual(len(orders), 1)
+        self.assertEqual(len(items), 1)
+        self.assertEqual(stats.confirmed_api, 0)
+        self.assertEqual(orders[0]["pedido_id"], "400")
+        self.assertEqual(orders[0]["pedido_chave"], "FARMALIDER:400")
+        self.assertEqual(orders[0]["valor_total_compra"], "15.00")
+        self.assertEqual(orders[0]["ultimo_pedido_raw"], raw)
+        self.assertEqual(items[0]["produto_nome"], "Produto original da Weni")
+        self.assertEqual(items[0]["quantidade"], "2")
+        self.assertEqual(items[0]["valor_unitario"], "7.50")
+        self.assertEqual(items[0]["valor_total"], "15.00")
+        client.get_cliente_by_cpf.assert_not_called()
+        client.get_pedido.assert_not_called()
+
+        store = GoogleSheetsStore.__new__(GoogleSheetsStore)
+        store.orders = MemoryWorksheet("Pedidos", ORDER_COLUMNS)
+        store.order_items = MemoryWorksheet("Itens_Pedido", ORDER_ITEM_COLUMNS)
+        store._read_with_retry = lambda label, operation: operation()
+        store._write_with_retry = lambda label, operation: operation()
+        store.upsert_orders_detailed(orders)
+        store.upsert_order_items_detailed(items)
+        repeated = store.upsert_orders_detailed(next_orders)
+        repeated_items = store.upsert_order_items_detailed(next_items)
+        self.assertEqual(repeated.unchanged, 1)
+        self.assertEqual(repeated.inserted, 0)
+        self.assertEqual(repeated_items.unchanged, 1)
+        self.assertEqual(repeated_items.inserted, 0)
+        self.assertEqual(len(store.orders.values), 2)
+        self.assertEqual(len(store.order_items.values), 2)
+        self.assertEqual(build_sales_metrics(repeated.final_records, repeated_items.final_records),
+            [["2026-10-05", 1, 0, 1, "2", "15.00", "0.00"]])
 
     def test_textual_codproduto_is_persisted_as_name_without_changing_sales(self):
         contact, client = self.fixture()

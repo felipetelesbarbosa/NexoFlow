@@ -272,13 +272,13 @@ def apply_pedido_api_confirmation(
 
 
 def _empty_order(contact: dict[str, Any], captured_at: str) -> dict[str, str]:
-    from analytics import ORDER_COLUMNS, get_fields, get_phone_and_urn, normalize_cpf, normalize_value
+    from analytics import ORDER_COLUMNS, get_fields, get_phone_and_urn, normalize_cpf, normalize_order_source, normalize_value
 
     fields = get_fields(contact)
     order = {field: "" for field in ORDER_COLUMNS}
     uuid = normalize_value(contact.get("uuid")).strip()
     phone, _ = get_phone_and_urn(contact, fields)
-    raw = normalize_value(fields.get("ultimo_pedido")).strip()
+    raw = normalize_order_source(fields.get("ultimo_pedido"))
     order.update({
         "contact_uuid": uuid, "telefone": phone,
         "cliente": normalize_value(fields.get("nome") or contact.get("name")).strip(),
@@ -295,12 +295,37 @@ def resolve_contact_order(
     contact: dict[str, Any], *, farm_client: Any, captured_at: str,
     linked_cliente_id: str = "", cliente_response: dict[str, Any] | None = None,
 ) -> tuple[dict[str, str] | None, list[dict[str, str]]]:
-    """Resolve Weni JSON/derived fields or official CPF -> latest order -> API."""
-    from analytics import get_fields, is_valid_cpf, normalize_cpf, parse_ultimo_pedido
+    """Use populated ultimo_pedido first; only an empty field permits CPF fallback."""
+    from analytics import get_fields, is_valid_cpf, normalize_cpf, normalize_order_source, parse_ultimo_pedido
 
     fields = get_fields(contact)
+    raw = normalize_order_source(fields.get("ultimo_pedido"))
     order, items = parse_ultimo_pedido(contact, captured_at=captured_at)
     valid_weni = order is not None and not order.get("status_validacao", "").startswith("ERRO")
+    if raw and not valid_weni:
+        return order, items
+    if raw and not _positive_id(order.get("pedido_id")):
+        if order.get("pedido_id"):
+            return _failure(order, items, "PEDIDO_ID_INVALIDO_WENI", "Identidade do pedido da Weni deve ser um inteiro positivo.")
+        return order, items
+    if raw:
+        order["valor_origem"] = order.get("valor_origem") or "WENI"
+        # Retain the official snapshot already saved for this same order, without
+        # assigning an API confirmation merely because the raw JSON claims one.
+        snapshot_contact = {**contact, "fields": {**fields, "ultimo_pedido": None}}
+        snapshot, _ = parse_ultimo_pedido(snapshot_contact, captured_at=captured_at)
+        retained_confirmation = (
+            snapshot is not None
+            and not snapshot.get("status_validacao", "").startswith("ERRO")
+            and snapshot.get("status_confirmacao") in {"CONFIRMADO_API", "CANCELADO_API"}
+            and all(order.get(key) == snapshot.get(key) for key in (
+                "pedido_id", "data_hora", "valor_total_compra", "status_confirmacao",
+                "farmalider_status_pedido", "farmalider_cancelamento",
+            ))
+        )
+        if not retained_confirmation:
+            order["status_confirmacao"] = "NAO_CONFIRMADO_API"
+        return order, items
     if valid_weni:
         order["valor_origem"] = order.get("valor_origem") or "WENI"
         if farm_client is None:
@@ -312,7 +337,7 @@ def resolve_contact_order(
     cpf = normalize_cpf(fields.get("cpf"))
     linked_id = _positive_id(linked_cliente_id)
     requested_id = _positive_id((order or {}).get("pedido_id")) if valid_weni else ""
-    fallback = not valid_weni or not requested_id
+    fallback = not raw
     if not cpf:
         if valid_weni:
             order["status_confirmacao"] = "NAO_CONFIRMADO_API"
@@ -347,8 +372,9 @@ def resolve_contact_order(
             latest_owner = _positive_id(latest.get("codCliente")) if "codCliente" in latest else linked_id
             if latest_owner != linked_id:
                 return _failure(order, items, "PEDIDO_CLIENTE_DIVERGENTE_API", "Último pedido pertence a outro cliente.")
-            order = _empty_order(contact, captured_at)
-            items = []
+            if not valid_weni or _positive_id(order.get("pedido_id")) != requested_id:
+                order = _empty_order(contact, captured_at)
+                items = []
     if not linked_id:
         return _failure(order, items, "PEDIDO_CLIENTE_NAO_VERIFICADO_API", "Proprietário do pedido não verificado.")
     if not requested_id:
