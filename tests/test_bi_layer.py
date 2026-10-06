@@ -193,28 +193,28 @@ class BILayerTests(unittest.TestCase):
                                          updated_at="2026-10-06T01:30:00Z")
         self.assertEqual(summary["novos_contatos"], 1)
 
-    def test_only_completed_orders_enter_sales_and_all_bi_sales_indicators(self):
+    def test_every_documented_non_cancelled_state_enters_sales_and_bi(self):
         for status in (0, 1, 2, 3, 4, "0", "1", "2", "3", "4", "99", "", None):
             with self.subTest(status=status):
                 base, order, items = self.order_fixture(status=status)
-                completed = str(status) == "2"
+                made = str(status) in {"0", "1", "2", "4"}
                 self.assertEqual(len(items), 1)  # Every state remains auditable.
                 self.assertEqual(order["pedido_chave"], "FARMALIDER:500")
-                expected_sales = [["2026-10-05", 1, 1, 1, "2", "19.50", "19.50"]] if completed else []
+                expected_sales = [["2026-10-05", 1, 1, 1, "2", "19.50", "19.50"]] if made else []
                 self.assertEqual(build_sales_metrics([order], items), expected_sales)
                 summary = build_bi_summary_record(base, [order], items,
                     snapshot_date="2026-10-05", updated_at="2026-10-05T14:00:00Z")
                 for key in ("pedidos_total", "clientes_compradores_total", "pedidos_dia", "clientes_compradores_dia"):
-                    self.assertEqual(summary[key], 1 if completed else 0)
+                    self.assertEqual(summary[key], 1 if made else 0)
                 for key in ("faturamento_total", "faturamento_dia", "faturamento_confirmado_api_dia"):
-                    self.assertEqual(summary[key], 19.50 if completed else 0)
-                self.assertEqual(summary["unidades_vendidas_dia"], 2 if completed else 0)
+                    self.assertEqual(summary[key], 19.50 if made else 0)
+                self.assertEqual(summary["unidades_vendidas_dia"], 2 if made else 0)
                 conversion = build_bi_conversion_records(base, [order],
                     snapshot_date="2026-10-05", updated_at="2026-10-05T14:00:00Z")
-                self.assertEqual(conversion[-1]["quantidade"], 1 if completed else 0)
+                self.assertEqual(conversion[-1]["quantidade"], 1 if made else 0)
                 ads = build_bi_ads_rows(base, [order],
                     snapshot_date="2026-10-05", updated_at="2026-10-05T14:00:00Z")
-                self.assertEqual(ads[0][9:12], [1, 1, 19.5] if completed else [0, 0, 0.0])
+                self.assertEqual(ads[0][9:12], [1, 1, 19.5] if made else [0, 0, 0.0])
 
 
 if __name__ == "__main__":
