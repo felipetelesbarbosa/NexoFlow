@@ -15,6 +15,7 @@ from pedido_utils import (
     farmalider_order_status_name,
     is_order_cancelled,
     is_order_completed,
+    is_order_made,
     serialize_pedido_products,
 )
 
@@ -447,6 +448,14 @@ class PedidoResolutionTests(unittest.TestCase):
         self.assertEqual(order["farmalider_status_pedido"], "9")
         self.assertEqual(order["farmalider_status_pedido_nome"], "")
         self.assertFalse(is_order_cancelled(order))
+
+    def test_documented_non_cancelled_states_are_made_orders(self):
+        for value in (0, 1, 2, 4, "0", "1", "2", "4", "Em processamento", "Em trânsito", "Concluído", "Pronto para rota"):
+            with self.subTest(value=value):
+                self.assertTrue(is_order_made({"farmalider_status_pedido": value, "status_confirmacao": "CONFIRMADO_API"}))
+        for value in (3, "3", "Cancelado", 9, "9", None, ""):
+            with self.subTest(value=value):
+                self.assertFalse(is_order_made({"farmalider_status_pedido": value, "status_confirmacao": "CONFIRMADO_API"}))
 
     def test_only_documented_completed_code_is_a_completed_purchase(self):
         for value in (2, "2", "02"):
