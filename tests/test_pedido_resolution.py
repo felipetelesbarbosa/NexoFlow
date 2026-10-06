@@ -36,7 +36,7 @@ def pedido_payload():
             "cancelamento": None, "status": 1, "frete": "9.99",
         },
         "itens": [{
-            "codPedido": 123, "codProduto": "A1", "quantidade": 1,
+            "codPedido": 123, "codProduto": "9001", "quantidade": 1,
             "valor": "38.90", "total": "38.90",
         }],
     }
@@ -47,7 +47,7 @@ def raw_order():
         "pedido_id": "123", "data_hora": "2026-10-06T10:30:00",
         "valor_total_compra": "48.89",
         "produtos": [{
-            "codigo": "A1", "nome": "Produto sintético",
+            "codigo": "9001", "nome": "Produto sintético",
             "quantidade": 1, "valor_unitario": "38.90", "valor_total": "38.90",
         }],
     })
@@ -100,7 +100,7 @@ class PedidoResolutionTests(unittest.TestCase):
         self.assertEqual(order["farmalider_frete"], "9.99")
         self.assertEqual(order["valor_origem"], "SOMA_ITENS_MAIS_FRETE_API")
         self.assertEqual(order["quantidade_itens"], "1")
-        self.assertEqual(items[0]["produto_codigo"], "A1")
+        self.assertEqual(items[0]["produto_codigo"], "9001")
         self.assertEqual(items[0]["produto_nome"], "")
         self.assertEqual(order["data_hora"], "2026-10-06T10:30:00-03:00")
         api.get_cliente_by_cpf.assert_called_once_with(SYNTHETIC_CPF)
@@ -132,6 +132,87 @@ class PedidoResolutionTests(unittest.TestCase):
         self.assertEqual(order["status_confirmacao"], "CONFIRMADO_API")
         self.assertEqual(items[0]["produto_nome"], "Produto sintético")
         self.assertEqual(order["origem_pedido"], "WENI_ULTIMO_PEDIDO+FARMALIDER_API")
+
+    def test_text_in_codproduto_is_the_official_name_without_an_invented_code(self):
+        pedido = pedido_payload()
+        pedido["itens"][0]["codProduto"] = "  Produto Novo 750 mg  "
+        order, items = resolve_contact_order(contact(), farm_client=client(pedido=pedido), captured_at=CAPTURED_AT)
+        self.assertEqual(order["status_validacao"], "OK")
+        self.assertEqual(items[0]["produto_nome"], "Produto Novo 750 mg")
+        self.assertEqual(items[0]["produto_codigo"], "")
+        self.assertEqual(items[0]["quantidade"], "1")
+        self.assertEqual(items[0]["valor_unitario"], "38.90")
+        self.assertEqual(items[0]["valor_total"], "38.90")
+        product = json.loads(serialize_pedido_products(order, items))["produtos"][0]
+        self.assertEqual(product["nome"], "Produto Novo 750 mg")
+        self.assertIsNone(product["codigo"])
+
+    def test_official_name_replaces_stale_weni_name(self):
+        pedido = pedido_payload()
+        pedido["itens"][0]["codProduto"] = "Descrição Atualizada"
+        _, items = resolve_contact_order(contact(raw=raw_order()), farm_client=client(pedido=pedido), captured_at=CAPTURED_AT)
+        self.assertEqual(items[0]["produto_nome"], "Descrição Atualizada")
+        self.assertEqual(items[0]["produto_codigo"], "")
+
+    def test_single_word_and_alphanumeric_product_names_follow_the_new_contract(self):
+        for name in ("Paracetamol", "B12", "Produto-500mg"):
+            with self.subTest(name=name):
+                pedido = pedido_payload()
+                pedido["itens"][0]["codProduto"] = name
+                _, items = resolve_contact_order(contact(), farm_client=client(pedido=pedido), captured_at=CAPTURED_AT)
+                self.assertEqual(items[0]["produto_nome"], name)
+                self.assertEqual(items[0]["produto_codigo"], "")
+
+    def test_numeric_codproduto_remains_a_legacy_code(self):
+        for code in (9001, "9001", " 9001 ", "009001"):
+            with self.subTest(code=code):
+                pedido = pedido_payload()
+                pedido["itens"][0]["codProduto"] = code
+                _, items = resolve_contact_order(contact(), farm_client=client(pedido=pedido), captured_at=CAPTURED_AT)
+                self.assertEqual(items[0]["produto_codigo"], str(code).strip())
+                self.assertEqual(items[0]["produto_nome"], "")
+
+    def test_legacy_numeric_code_with_explicit_name_preserves_both(self):
+        for field in ("nome", "descricao"):
+            with self.subTest(field=field):
+                pedido = pedido_payload()
+                pedido["itens"][0].update(codProduto=9001, **{field: "Produto com nome"})
+                _, items = resolve_contact_order(contact(raw=raw_order()), farm_client=client(pedido=pedido), captured_at=CAPTURED_AT)
+                self.assertEqual(items[0]["produto_nome"], "Produto com nome")
+                self.assertEqual(items[0]["produto_codigo"], "9001")
+
+    def test_invalid_product_name_types_do_not_become_descriptions(self):
+        for field in ("codProduto", "nome", "descricao"):
+            for value in (True, False, [], {"nome": "Texto"}, 9001.5):
+                with self.subTest(field=field, value=value):
+                    pedido = pedido_payload()
+                    pedido["itens"][0][field] = value
+                    order, _ = resolve_contact_order(contact(), farm_client=client(pedido=pedido), captured_at=CAPTURED_AT)
+                    self.assertEqual(order["status_validacao"], "ERRO")
+
+    def test_empty_product_name_without_any_identity_is_rejected(self):
+        for value in (None, "", "   "):
+            with self.subTest(value=value):
+                pedido = pedido_payload()
+                pedido["itens"][0]["codProduto"] = value
+                order, _ = resolve_contact_order(contact(), farm_client=client(pedido=pedido), captured_at=CAPTURED_AT)
+                self.assertEqual(order["status_validacao"], "ERRO")
+
+    def test_new_name_snapshot_is_stable_when_resolved_again(self):
+        pedido = pedido_payload()
+        pedido["itens"][0]["codProduto"] = "Produto Novo 750 mg"
+        candidate = contact()
+        api = client(pedido=pedido)
+        order, items = resolve_contact_order(candidate, farm_client=api, captured_at=CAPTURED_AT)
+        serialized = serialize_pedido_products(order, items)
+        candidate["fields"].update({
+            "pedido_id": order["pedido_id"], "pedido_data": order["data_hora"],
+            "pedido_valor": order["valor_total_compra"], "pedido_quantidade_itens": order["quantidade_itens"],
+            "pedido_produtos": serialized,
+        })
+        repeated, repeated_items = resolve_contact_order(candidate, farm_client=api, captured_at="2026-10-07T18:00:00Z")
+        self.assertEqual(serialize_pedido_products(repeated, repeated_items), serialized)
+        self.assertEqual(repeated_items[0]["item_chave"], items[0]["item_chave"])
 
     def test_raw_without_api_is_auditable_but_never_api_confirmed(self):
         payload = json.loads(raw_order())
@@ -362,7 +443,7 @@ class PedidoResolutionTests(unittest.TestCase):
         payload = json.loads(raw_order())
         payload["produtos"][0]["codigo"] = "OTHER"
         order, items = resolve_contact_order(contact(raw=json.dumps(payload)), farm_client=client(), captured_at=CAPTURED_AT)
-        self.assertEqual(items[0]["produto_codigo"], "A1")
+        self.assertEqual(items[0]["produto_codigo"], "9001")
         self.assertEqual(items[0]["produto_nome"], "")
 
     def test_ambiguous_financial_match_does_not_assign_a_name(self):
@@ -378,7 +459,7 @@ class PedidoResolutionTests(unittest.TestCase):
         payload = json.loads(raw_order())
         del payload["produtos"][0]["codigo"]
         pedido = pedido_payload()
-        pedido["itens"].append(dict(pedido["itens"][0], codProduto="B1"))
+        pedido["itens"].append(dict(pedido["itens"][0], codProduto="9002"))
         _, items = resolve_contact_order(contact(raw=json.dumps(payload)), farm_client=client(pedido=pedido), captured_at=CAPTURED_AT)
         self.assertEqual([item["produto_nome"] for item in items], ["", ""])
 
@@ -392,7 +473,7 @@ class PedidoResolutionTests(unittest.TestCase):
         self.assertNotIn("synthetic-contact", serialized)
         parsed = json.loads(serialized)
         self.assertIsNone(parsed["produtos"][0]["nome"])
-        self.assertEqual(parsed["produtos"][0]["codigo"], "A1")
+        self.assertEqual(parsed["produtos"][0]["codigo"], "9001")
         self.assertEqual(parsed["valor_total_compra"], "48.89")
         self.assertEqual(parsed["farmalider_frete"], "9.99")
 

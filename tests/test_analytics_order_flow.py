@@ -75,7 +75,7 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
         self.assertEqual(repeated.inserted, 0)
         self.assertEqual(repeated_items.inserted, 0)
         self.assertEqual(repeated.unchanged, 1)
-        self.assertEqual(repeated_items.unchanged, 1)
+        self.assertEqual(repeated_items.unchanged, len(items))
         client.get_cliente_by_cpf.assert_called_once_with("52998224725")
         client.get_pedido.assert_called_once_with("500")
         return row, repeated.final_records, stored_items.final_records
@@ -94,6 +94,68 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
             snapshot_date="2026-10-05", updated_at="2026-10-05T14:00:00Z")
         self.assertEqual(summary["faturamento_total"], 29.49)
         self.assertEqual(summary["unidades_vendidas_dia"], 2)
+
+    def test_textual_codproduto_is_persisted_as_name_without_changing_sales(self):
+        contact, client = self.fixture()
+        client.get_pedido.return_value["itens"][0]["codProduto"] = "Produto sintético A"
+        _, orders, items = self.resolve_and_persist(contact, client)
+        self.assertEqual(items[0]["produto_nome"], "Produto sintético A")
+        self.assertEqual(items[0]["produto_codigo"], "")
+        self.assertEqual(items[0]["quantidade"], "2")
+        self.assertEqual(items[0]["valor_total"], "19.50")
+        self.assertEqual(build_sales_metrics(orders, items),
+            [["2026-10-05", 1, 1, 1, "2", "29.49", "29.49"]])
+
+    def test_explicit_api_name_and_description_take_priority_over_codproduto_text(self):
+        for field in ("nome", "descricao"):
+            with self.subTest(field=field):
+                contact, client = self.fixture()
+                client.get_pedido.return_value["itens"][0].update({
+                    "codProduto": "Texto alternativo do produto", field: "Descrição explícita atual"})
+                _, _, items = self.resolve_and_persist(contact, client)
+                self.assertEqual(items[0]["produto_nome"], "Descrição explícita atual")
+                self.assertEqual(items[0]["produto_codigo"], "")
+
+    def test_repeated_product_names_keep_distinct_items_and_idempotent_sales(self):
+        contact, client = self.fixture()
+        client.get_pedido.return_value["itens"] = [
+            {"codPedido": 500, "codProduto": "Produto sintético repetido",
+             "quantidade": 2, "valor": "10.00", "total": "19.50"},
+            {"codPedido": 500, "codProduto": "Produto sintético repetido",
+             "quantidade": 1, "valor": "10.00", "total": "9.75"},
+        ]
+        row = normalize_contact(contact, "2026-10-05T14:00:00Z")
+        responses = {"52998224725": client.get_cliente_by_cpf.return_value}
+        kwargs = {"rows_by_uuid": {row["contact_uuid"]: row}, "farm_client": client,
+                  "cliente_responses_by_cpf": responses}
+        first_orders, first_items, _ = build_orders([contact], sync_time="2026-10-05T14:00:00Z", **kwargs)
+        next_orders, next_items, _ = build_orders([contact], sync_time="2026-10-05T14:10:00Z", **kwargs)
+        self.assertEqual([item["produto_ordem"] for item in first_items],
+                         [item["produto_ordem"] for item in next_items])
+        self.assertEqual(len(first_items), 2)
+        self.assertEqual({item["produto_ordem"] for item in first_items}, {"1", "2"})
+        self.assertEqual(len({item["item_chave"] for item in first_items}), 2)
+        self.assertEqual({item["produto_nome"] for item in first_items}, {"Produto sintético repetido"})
+        self.assertEqual({item["produto_codigo"] for item in first_items}, {""})
+        store = GoogleSheetsStore.__new__(GoogleSheetsStore)
+        store.orders = MemoryWorksheet("Pedidos", ORDER_COLUMNS)
+        store.order_items = MemoryWorksheet("Itens_Pedido", ORDER_ITEM_COLUMNS)
+        store._read_with_retry = lambda label, operation: operation()
+        store._write_with_retry = lambda label, operation: operation()
+        store.upsert_orders_detailed(first_orders)
+        store.upsert_order_items_detailed(first_items)
+        repeated = store.upsert_orders_detailed(next_orders)
+        repeated_items = store.upsert_order_items_detailed(next_items)
+        self.assertEqual(repeated.unchanged, 1)
+        self.assertEqual(repeated_items.unchanged, 2)
+        self.assertEqual(repeated.inserted, 0)
+        self.assertEqual(repeated_items.inserted, 0)
+        self.assertEqual(len(store.orders.values), 2)
+        self.assertEqual(len(store.order_items.values), 3)
+        self.assertEqual(build_sales_metrics(repeated.final_records, repeated_items.final_records),
+            [["2026-10-05", 1, 1, 1, "3", "39.24", "39.24"]])
+        client.get_cliente_by_cpf.assert_not_called()
+        self.assertEqual(client.get_pedido.call_count, 2)
 
     def test_cancelled_latest_order_is_saved_without_sales_or_buyers(self):
         contact, client = self.fixture(cancelled=True)

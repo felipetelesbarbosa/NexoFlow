@@ -55,6 +55,8 @@ Não se deve somar o frete novamente a um total que já o inclui, nem apresentar
 
 Nas tabelas de itens, cada linha representa um item do pedido. `produto_codigo` e `produto_nome` são campos distintos; o nome pode ficar vazio. O total do pedido não deve ser repetido nas somas dos itens. `quantidade_produtos` e quantidade de unidades não são o mesmo indicador.
 
+No novo retorno da API, confirmado pelo responsável pelo projeto, `itens[].codProduto` contém o nome do produto em texto. Esse valor alimenta `produto_nome` e `pedido_produtos.produtos[].nome`; `produto_codigo` fica vazio quando não foi fornecido. Para compatibilidade com o retorno anterior, inteiros e strings formadas somente por dígitos em `codProduto` continuam sendo códigos. Os campos explícitos `nome` e `descricao` também são aceitos como texto e têm prioridade quando preenchidos. O nome atual informado pela API prevalece sobre descrições antigas da Weni. Produtos com o mesmo nome continuam em linhas distintas conforme os itens do pedido.
+
 Os nomes da Weni só complementam itens da API quando há associação inequívoca por código ou por quantidade e valores compatíveis. Falta de nome, total ou valor unitário não autoriza inventar informação.
 
 ## Cancelamentos e métricas

@@ -77,6 +77,25 @@ def _quantity_text(value: Decimal) -> str:
     return format(value.normalize(), "f")
 
 
+def _api_product_identity(api_item: dict[str, Any]) -> tuple[str, str]:
+    """The API now puts product names in codProduto; numeric values stay legacy codes."""
+    value = api_item.get("codProduto")
+    if value is not None and (isinstance(value, bool) or not isinstance(value, (int, str))):
+        raise ValueError("Produto da API deve ser um código inteiro ou nome em texto.")
+    text = _text(value)
+    is_code = isinstance(value, int) or (text.isascii() and text.isdigit())
+    code = text if is_code else ""
+    supplied_name = text if text and not is_code else ""
+    name = ""
+    for field in ("nome", "descricao"):
+        description = api_item.get(field)
+        if description is not None and not isinstance(description, str):
+            raise ValueError(f"{field} do produto deve ser texto.")
+        if not name and description is not None:
+            name = description.strip()
+    return code, name or supplied_name
+
+
 def _failure(
     order: dict[str, str], items: list[dict[str, str]], status: str, message: str,
 ) -> tuple[dict[str, str], list[dict[str, str]]]:
@@ -87,11 +106,10 @@ def _failure(
 
 
 def _matching_name(
-    api_item: dict[str, Any], old_items: list[dict[str, str]],
+    code: str, old_items: list[dict[str, str]],
     quantity: Decimal, unit: Decimal, total: Decimal,
     api_items: list[dict[str, Any]],
 ) -> str:
-    code = _text(api_item.get("codProduto"))
     if code:
         matches = [item for item in old_items if _text(item.get("produto_codigo")) == code]
         if len(matches) == 1:
@@ -177,12 +195,9 @@ def apply_pedido_api_confirmation(
             quantity = _decimal(api_item.get("quantidade"), "quantidade", positive=True)
             unit = _decimal(api_item.get("valor"), "valor unitário")
             total = _decimal(api_item.get("total"), "total do item")
-            code = _text(api_item.get("codProduto"))
-            if isinstance(api_item.get("codProduto"), (bool, float, dict, list)):
-                raise ValueError("Código do produto inválido.")
-            name = _matching_name(api_item, items, quantity, unit, total, api_items)
-            # Explicit API descriptions are usable; this does not query a catalog.
-            name = _text(api_item.get("nome") or api_item.get("descricao")) or name
+            code, name = _api_product_identity(api_item)
+            if not name:
+                name = _matching_name(code, items, quantity, unit, total, api_items)
             if not code and not name:
                 raise ValueError("Item sem código ou nome identificável.")
             canonical_items.append({
