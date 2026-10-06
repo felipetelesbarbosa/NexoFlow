@@ -2,6 +2,15 @@
 
 ## 1.0 — Release consolidada
 
+### Pedidos e status na Weni
+
+- `ultimo_pedido` é a fonte prioritária para ID, data, produtos, quantidades e valores;
+- novo campo `pedido_status` é preenchido pelo NexoFlow Weni após consultar o mesmo `pedido_id` na FarmaLíder API;
+- valores oficiais de `pedido_status`: **Em processamento**, **Em trânsito**, **Concluído**, **Cancelado** e **Pronto para rota**;
+- cancelamento explícito sempre prevalece e grava **Cancelado**;
+- status 0, 1, 2 e 4 contam como pedido feito; somente status 3 fica fora dos indicadores;
+- `pedido_status` também é preservado na `Base_Contatos` para Google Sheets/Looker Studio.
+
 Data de consolidação: 05/10/2026.
 
 Esta é a release pública consolidada do NexoFlow. O histórico de versões de desenvolvimento foi removido do pacote; a documentação passa a tratar esta base funcional exclusivamente como **NexoFlow 1.0**.
