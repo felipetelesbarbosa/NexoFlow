@@ -1070,11 +1070,9 @@ def _bi_float(value: Decimal) -> float:
 
 
 def _sales_order_is_valid(record: dict[str, str]) -> bool:
-    """Share the same admission rules for revenue, units and buyers."""
+    """Only API-confirmed completed orders can enter sales KPIs."""
     confirmation = str(record.get("status_confirmacao") or "")
-    if confirmation.startswith(("PEDIDO_ID_DIVERGENTE", "PEDIDO_CLIENTE_DIVERGENTE", "ERRO_")):
-        return False
-    if confirmation in {"PEDIDO_NAO_ENCONTRADO_API", "CANCELADO_API"}:
+    if not confirmation.startswith("CONFIRMADO_API"):
         return False
     return (
         record.get("status_validacao") in ("OK", "ATENÇÃO_TOTAL_DIVERGENTE")
