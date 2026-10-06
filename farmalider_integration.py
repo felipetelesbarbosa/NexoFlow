@@ -310,8 +310,9 @@ def resolve_contact_order(
         return order, items
     if raw:
         order["valor_origem"] = order.get("valor_origem") or "WENI"
-        # Retain the official snapshot already saved for this same order, without
-        # assigning an API confirmation merely because the raw JSON claims one.
+        # Caminho 1: ultimo_pedido é a fonte prioritária. Nunca buscamos outro
+        # pedido pelo CPF. Quando a API está disponível, consultamos SOMENTE o
+        # mesmo pedido por ID para atualizar seu status operacional.
         snapshot_contact = {**contact, "fields": {**fields, "ultimo_pedido": None}}
         snapshot, _ = parse_ultimo_pedido(snapshot_contact, captured_at=captured_at)
         retained_confirmation = (
@@ -319,12 +320,68 @@ def resolve_contact_order(
             and not snapshot.get("status_validacao", "").startswith("ERRO")
             and snapshot.get("status_confirmacao") in {"CONFIRMADO_API", "CANCELADO_API"}
             and all(order.get(key) == snapshot.get(key) for key in (
-                "pedido_id", "data_hora", "valor_total_compra", "status_confirmacao",
-                "farmalider_status_pedido", "farmalider_cancelamento",
+                "pedido_id", "data_hora", "valor_total_compra",
             ))
         )
-        if not retained_confirmation:
+        if farm_client is None:
+            if retained_confirmation:
+                for key in (
+                    "status_confirmacao", "farmalider_status_pedido",
+                    "farmalider_status_pedido_nome", "farmalider_cancelamento",
+                    "farmalider_confirmado_em", "farmalider_erro",
+                ):
+                    if snapshot.get(key) not in (None, ""):
+                        order[key] = snapshot.get(key)
+            else:
+                order["status_confirmacao"] = "NAO_CONFIRMADO_API"
+            return order, items
+
+        requested_id = _positive_id(order.get("pedido_id"))
+        from farmalider_client import FarmaliderAuthError, FarmaliderError
+
+        try:
+            response = farm_client.get_pedido(requested_id)
+        except FarmaliderAuthError:
+            raise
+        except FarmaliderError:
+            # Falha temporária de status não invalida os dados completos já
+            # existentes na Weni. Mantemos os cinco campos, mas não promovemos
+            # uma compra sem confirmação atual da API.
+            if retained_confirmation:
+                for key in (
+                    "status_confirmacao", "farmalider_status_pedido",
+                    "farmalider_status_pedido_nome", "farmalider_cancelamento",
+                    "farmalider_confirmado_em",
+                ):
+                    if snapshot.get(key) not in (None, ""):
+                        order[key] = snapshot.get(key)
+            else:
+                order["status_confirmacao"] = "NAO_CONFIRMADO_API"
+            order["farmalider_erro"] = "Falha na consulta de status do pedido."
+            return order, items
+
+        if not isinstance(response, dict) or not isinstance(response.get("capa"), dict):
             order["status_confirmacao"] = "NAO_CONFIRMADO_API"
+            order["farmalider_erro"] = "Resposta sem objeto capa na consulta de status."
+            return order, items
+
+        capa = response["capa"]
+        api_id = _positive_id(capa.get("id"))
+        if not api_id or api_id != requested_id:
+            order["status_confirmacao"] = "NAO_CONFIRMADO_API"
+            order["farmalider_erro"] = "Identidade divergente na consulta de status do pedido."
+            return order, items
+
+        # Não substituímos produtos, quantidades, valores ou data do Caminho 1.
+        # A API é usada aqui exclusivamente para confirmar o estado do mesmo ID.
+        order["farmalider_status_pedido"] = _text(capa.get("status"))
+        order["farmalider_status_pedido_nome"] = farmalider_order_status_name(capa.get("status"))
+        order["farmalider_cancelamento"] = _text(capa.get("cancelamento"))
+        order["farmalider_confirmado_em"] = captured_at
+        order["farmalider_erro"] = ""
+        order["status_confirmacao"] = (
+            "CANCELADO_API" if is_order_cancelled(order) else "CONFIRMADO_API"
+        )
         return order, items
     if valid_weni:
         order["valor_origem"] = order.get("valor_origem") or "WENI"
