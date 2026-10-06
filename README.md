@@ -181,7 +181,7 @@ O NexoFlow 1.0 aceita `ultimo_pedido` e os campos `pedido_id`, `pedido_data`, `p
 
 Se não houver um pedido utilizável com identificador oficial, o fluxo `CPF → ultimoPedido → pedido` consulta e valida o último pedido disponível na FarmaLíder. Produtos permanecem em JSON, com os códigos reais e sem inventar nomes ausentes. Valores, frete, origem do total e cancelamento são mantidos para interpretação correta das métricas.
 
-Datas de pedidos usam **America/Belem (UTC−3 / GMT−3)**. Pedidos cancelados permanecem disponíveis para diagnóstico, mas ficam fora de receita, unidades vendidas e compradores. A leitura do último pedido não recupera automaticamente todo o histórico comercial.
+Datas de pedidos usam **America/Belem (UTC−3 / GMT−3)**. Os indicadores de vendas incluem somente pedidos identificados pelo NexoFlow em **Concluído (status 2)**, válidos e não cancelados. Pedidos em processamento e cancelamentos permanecem registrados; `ultima_compra` exige também confirmação pela API. Concluído descreve o estado operacional e não comprova pagamento. A leitura do último pedido não recupera automaticamente todo o histórico comercial.
 
 Consulte [Pedidos no NexoFlow 1.0](docs/PEDIDOS.md) para o contrato e as regras de validação.
 

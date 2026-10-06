@@ -65,7 +65,7 @@ class WeniUpdateTests(unittest.TestCase):
             "capa": {
                 "id": "123", "codCliente": "99",
                 "emissao": "2026-10-03T12:00:00Z",
-                "status": "CONFIRMADO", "cancelamento": "", "frete": 0,
+                "status": 2, "cancelamento": "", "frete": 0,
             },
             "itens": [
                 {"codPedido": "123", "codProduto": "A1", "nome": "Produto A",
@@ -503,6 +503,8 @@ class WeniUpdateTests(unittest.TestCase):
         self.assertIsInstance(products, dict)
         self.assertEqual(products["pedido_id"], "123")
         self.assertEqual(products["status_confirmacao"], "CONFIRMADO_API")
+        self.assertEqual(products["farmalider_status_pedido"], "2")
+        self.assertEqual(products["farmalider_status_pedido_nome"], "Concluído")
         self.assertEqual(float(products["valor_total_compra"]), 25.5)
         self.assertEqual(float(products["quantidade_itens"]), 3)
         self.assertEqual(len(products["produtos"]), 2)
@@ -545,6 +547,52 @@ class WeniUpdateTests(unittest.TestCase):
         self.assertEqual(products["status_confirmacao"], "CANCELADO_API")
         self.assertEqual(products["farmalider_cancelamento"], "2026-10-03T13:00:00Z")
         audit_plans([plan], opt_out_group_available=True)
+
+    def test_only_completed_api_orders_advance_latest_purchase(self) -> None:
+        statuses = (
+            (0, "Em processamento"),
+            (1, "Em trânsito"),
+            (2, "Concluído"),
+            (3, "Cancelado"),
+            (4, "Pronto para rota"),
+            (99, ""),
+            ("CONFIRMADO", ""),
+        )
+        order_fields = {
+            "pedido_id", "pedido_data", "pedido_produtos",
+            "pedido_quantidade_itens", "pedido_valor",
+        }
+        for status, label in statuses:
+            with self.subTest(status=status):
+                contact = self._purchase_contact()
+                contact["fields"]["ultima_compra"] = "2026-10-01T10:00:00-03:00"
+                farm = self._purchase_api()
+                farm.get_pedido.return_value["capa"]["status"] = status
+                # State 3 alone must preserve cancellation; no timestamp exists.
+                self.assertEqual(farm.get_pedido.return_value["capa"]["cancelamento"], "")
+                plan = self._purchase_plan(contact, farm)
+                self.assertTrue(plan.order_validated)
+                self.assertEqual(plan.purchase_confirmed, status == 2)
+                self.assertEqual(set(plan.fields), order_fields | ({"ultima_compra"} if status == 2 else set()))
+                products = json.loads(plan.fields["pedido_produtos"])
+                self.assertEqual(products["farmalider_status_pedido"], str(status))
+                self.assertEqual(products["farmalider_status_pedido_nome"], label)
+                self.assertEqual(products["status_confirmacao"], "CANCELADO_API" if status == 3 else "CONFIRMADO_API")
+                if status == 2:
+                    self.assertEqual(plan.fields["ultima_compra"], "2026-10-03T09:00:00-03:00")
+                else:
+                    self.assertNotIn("ultima_compra", plan.fields)
+                audit_plans([plan], opt_out_group_available=True)
+
+                applied_contact = deepcopy(contact)
+                applied_contact["fields"].update(plan.fields)
+                second = self._purchase_plan(
+                    applied_contact, farm, captured_at="2026-10-03T13:01:00Z",
+                )
+                self.assertTrue(second.order_validated)
+                self.assertEqual(second.purchase_confirmed, status == 2)
+                self.assertEqual(second.fields, {})
+                self.assertEqual(second.evidence, {})
 
     def test_complete_weni_order_without_api_remains_unconfirmed(self) -> None:
         contact = self._purchase_contact()

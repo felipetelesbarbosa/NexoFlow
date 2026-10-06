@@ -135,7 +135,7 @@ class BILayerTests(unittest.TestCase):
         self.assertEqual(schema[SHEET_BI_ADS], BI_ADS_COLUMNS)
         self.assertEqual(schema[SHEET_BI_STATUS], BI_STATUS_COLUMNS)
 
-    def order_fixture(self, *, confirmation="CONFIRMADO_API", cancellation="", status="CONFIRMADO"):
+    def order_fixture(self, *, confirmation="CONFIRMADO_API", cancellation="", status=2):
         raw = json.dumps({
             "pedido_id": "500", "data_hora": "2026-10-05T10:00:00-03:00",
             "valor_total_compra": "19.50", "produtos": [
@@ -154,6 +154,8 @@ class BILayerTests(unittest.TestCase):
         cases = (
             {"cancellation": "2026-10-05T11:00:00-03:00"},
             {"status": "CANCELADO", "cancellation": "false"},
+            {"status": 3, "cancellation": ""},
+            {"status": "3", "cancellation": "false"},
             {"confirmation": "CANCELADO_API"},
             {"confirmation": "PEDIDO_CLIENTE_DIVERGENTE_API"},
             {"confirmation": "PEDIDO_ID_DIVERGENTE_API"},
@@ -177,10 +179,10 @@ class BILayerTests(unittest.TestCase):
                 self.assertEqual(ads[0][7], 1)
                 self.assertEqual(ads[0][9:12], [0, 0, 0.0])
 
-    def test_false_cancellation_and_numeric_status_do_not_remove_valid_sales(self):
+    def test_false_cancellation_and_completed_status_do_not_remove_valid_sales(self):
         for cancellation in (False, "False", "false", 0, "0", "null", None):
             with self.subTest(cancellation=cancellation):
-                _, order, items = self.order_fixture(cancellation=cancellation, status=3)
+                _, order, items = self.order_fixture(cancellation=cancellation, status=2)
                 self.assertEqual(build_sales_metrics([order], items),
                     [["2026-10-05", 1, 1, 1, "2", "19.50", "19.50"]])
 
@@ -189,6 +191,29 @@ class BILayerTests(unittest.TestCase):
         summary = build_bi_summary_record(base, [], [], snapshot_date="2026-10-05",
                                          updated_at="2026-10-06T01:30:00Z")
         self.assertEqual(summary["novos_contatos"], 1)
+
+    def test_only_completed_orders_enter_sales_and_all_bi_sales_indicators(self):
+        for status in (0, 1, 2, 3, 4, "0", "1", "2", "3", "4", "99", "", None):
+            with self.subTest(status=status):
+                base, order, items = self.order_fixture(status=status)
+                completed = str(status) == "2"
+                self.assertEqual(len(items), 1)  # Every state remains auditable.
+                self.assertEqual(order["pedido_chave"], "FARMALIDER:500")
+                expected_sales = [["2026-10-05", 1, 1, 1, "2", "19.50", "19.50"]] if completed else []
+                self.assertEqual(build_sales_metrics([order], items), expected_sales)
+                summary = build_bi_summary_record(base, [order], items,
+                    snapshot_date="2026-10-05", updated_at="2026-10-05T14:00:00Z")
+                for key in ("pedidos_total", "clientes_compradores_total", "pedidos_dia", "clientes_compradores_dia"):
+                    self.assertEqual(summary[key], 1 if completed else 0)
+                for key in ("faturamento_total", "faturamento_dia", "faturamento_confirmado_api_dia"):
+                    self.assertEqual(summary[key], 19.50 if completed else 0)
+                self.assertEqual(summary["unidades_vendidas_dia"], 2 if completed else 0)
+                conversion = build_bi_conversion_records(base, [order],
+                    snapshot_date="2026-10-05", updated_at="2026-10-05T14:00:00Z")
+                self.assertEqual(conversion[-1]["quantidade"], 1 if completed else 0)
+                ads = build_bi_ads_rows(base, [order],
+                    snapshot_date="2026-10-05", updated_at="2026-10-05T14:00:00Z")
+                self.assertEqual(ads[0][9:12], [1, 1, 19.5] if completed else [0, 0, 0.0])
 
 
 if __name__ == "__main__":

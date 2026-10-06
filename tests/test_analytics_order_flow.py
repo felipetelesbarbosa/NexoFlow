@@ -37,7 +37,8 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
             "ultimoPedido": {"id": 500, "codCliente": 99},
         }
         capa = {"id": 500, "codCliente": 99, "emissao": "2026-10-05T10:00:00",
-                "status": 3, "cancelamento": "2026-10-05T11:00:00" if cancelled else None}
+                "status": 3 if cancelled else 2,
+                "cancelamento": "2026-10-05T11:00:00" if cancelled else None}
         if not partial:
             capa["frete"] = "9.99"
         client.get_pedido.return_value = {
@@ -107,6 +108,34 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
         conversion = build_bi_conversion_records([row], orders,
             snapshot_date="2026-10-05", updated_at="2026-10-05T14:00:00Z")
         self.assertEqual(conversion[-1]["quantidade"], 0)
+
+    def test_official_cancelled_enum_without_timestamp_is_saved_and_excluded(self):
+        contact, client = self.fixture()
+        client.get_pedido.return_value["capa"].update({"status": 3, "cancelamento": None})
+        row, orders, items = self.resolve_and_persist(contact, client)
+        self.assertEqual(orders[0]["farmalider_status_pedido"], "3")
+        self.assertEqual(orders[0]["farmalider_status_pedido_nome"], "Cancelado")
+        self.assertEqual(orders[0]["status_confirmacao"], "CANCELADO_API")
+        self.assertEqual(build_sales_metrics(orders, items), [])
+        summary = build_bi_summary_record([row], orders, items,
+            snapshot_date="2026-10-05", updated_at="2026-10-05T14:00:00Z")
+        self.assertEqual(summary["faturamento_total"], 0)
+        self.assertEqual(summary["pedidos_total"], 0)
+        self.assertEqual(summary["clientes_compradores_total"], 0)
+
+    def test_all_api_states_are_persisted_but_only_completed_orders_reach_sales(self):
+        for status in (0, 1, 2, 3, 4, 99, None):
+            with self.subTest(status=status):
+                contact, client = self.fixture()
+                client.get_pedido.return_value["capa"].update({"status": status, "cancelamento": None})
+                _, orders, items = self.resolve_and_persist(contact, client)
+                self.assertEqual(len(orders), 1)
+                self.assertEqual(len(items), 1)
+                if status == 2:
+                    self.assertEqual(build_sales_metrics(orders, items),
+                        [["2026-10-05", 1, 1, 1, "2", "29.49", "29.49"]])
+                else:
+                    self.assertEqual(build_sales_metrics(orders, items), [])
 
     def test_missing_freight_or_official_total_preserves_partial_audit_without_sales(self):
         contact, client = self.fixture(partial=True)

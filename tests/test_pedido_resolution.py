@@ -11,7 +11,9 @@ from farmalider_integration import (
 from farmalider_client import FarmaliderAuthError, FarmaliderError
 from pedido_utils import (
     business_order_datetime,
+    farmalider_order_status_name,
     is_order_cancelled,
+    is_order_completed,
     serialize_pedido_products,
 )
 
@@ -157,6 +159,61 @@ class PedidoResolutionTests(unittest.TestCase):
         self.assertEqual(order["valor_total_compra"], "48.89")
         self.assertTrue(is_order_cancelled(order))
         self.assertEqual(build_sales_metrics([order], items), [])
+
+    def test_documented_cancelled_code_is_cancelled_without_a_timestamp(self):
+        pedido = pedido_payload()
+        pedido["capa"]["status"] = 3
+        order, items = resolve_contact_order(contact(), farm_client=client(pedido=pedido), captured_at=CAPTURED_AT)
+        self.assertEqual(order["farmalider_status_pedido"], "3")
+        self.assertEqual(order["farmalider_status_pedido_nome"], "Cancelado")
+        self.assertEqual(order["farmalider_cancelamento"], "")
+        self.assertEqual(order["status_confirmacao"], "CANCELADO_API")
+        self.assertEqual(build_sales_metrics([order], items), [])
+        snapshot = json.loads(serialize_pedido_products(order, items))
+        self.assertEqual(snapshot["farmalider_status_pedido_nome"], "Cancelado")
+
+    def test_documented_status_names_and_unknown_codes(self):
+        expected = {
+            0: "Em processamento", 1: "Em trânsito", 2: "Concluído",
+            3: "Cancelado", 4: "Pronto para rota",
+        }
+        for value, name in expected.items():
+            with self.subTest(value=value):
+                self.assertEqual(farmalider_order_status_name(value), name)
+                self.assertEqual(farmalider_order_status_name(str(value)), name)
+        for value in (None, True, False, 3.0, float("nan"), float("inf"), -1, 5, 9, "3.0", "Cancelado", [], {}, "1" * 5000):
+            with self.subTest(value_type=type(value).__name__):
+                self.assertEqual(farmalider_order_status_name(value), "")
+
+    def test_unknown_status_preserves_code_without_an_invented_name(self):
+        pedido = pedido_payload()
+        pedido["capa"]["status"] = 9
+        order, _ = resolve_contact_order(contact(), farm_client=client(pedido=pedido), captured_at=CAPTURED_AT)
+        self.assertEqual(order["farmalider_status_pedido"], "9")
+        self.assertEqual(order["farmalider_status_pedido_nome"], "")
+        self.assertFalse(is_order_cancelled(order))
+
+    def test_only_documented_completed_code_is_a_completed_purchase(self):
+        for value in (2, "2", "02"):
+            self.assertTrue(is_order_completed({"farmalider_status_pedido": value}))
+        for value in (None, "", 0, 1, 3, 4, 9, "0", "1", "3", "4", "9", True, False, 2.0, float("nan"), float("inf")):
+            with self.subTest(value_type=type(value).__name__, value=value):
+                self.assertFalse(is_order_completed({"farmalider_status_pedido": value, "status_confirmacao": "CONFIRMADO_API"}))
+
+    def test_completed_code_is_overridden_by_cancellation_evidence(self):
+        self.assertFalse(is_order_completed({"farmalider_status_pedido": 2, "farmalider_cancelamento": "2026-10-06T11:00:00"}))
+        self.assertFalse(is_order_completed({"farmalider_status_pedido": 2, "status_confirmacao": "CANCELADO_API"}))
+        self.assertTrue(is_order_completed({"farmalider_status_pedido": 2, "farmalider_cancelamento": "false"}))
+
+    def test_completed_enum_text_in_status_field_is_supported(self):
+        for value in ("Concluído", "concluido", " CONCLUÍDO "):
+            self.assertTrue(is_order_completed({"farmalider_status_pedido": value}))
+        for value in ("Pedido concluído", "Concluído parcialmente", "Pronto para rota"):
+            self.assertFalse(is_order_completed({"farmalider_status_pedido": value}))
+
+    def test_completed_display_name_cannot_override_a_conflicting_code(self):
+        for value in (0, 1, 3, 4, 9, None, ""):
+            self.assertFalse(is_order_completed({"farmalider_status_pedido": value, "farmalider_status_pedido_nome": "Concluído"}))
 
     def test_fresh_active_api_does_not_inherit_old_cancelled_confirmation(self):
         cancelled = pedido_payload()
@@ -344,9 +401,11 @@ class PedidoResolutionTests(unittest.TestCase):
         self.assertEqual(business_order_datetime("2026-10-06T00:30:00Z").isoformat(), "2026-10-05T21:30:00-03:00")
         self.assertIsNone(business_order_datetime("not-a-date"))
 
-    def test_cancellation_false_sentinels_and_undocumented_status_codes(self):
+    def test_cancellation_false_sentinels_and_unknown_status_codes(self):
         for value in (None, "", 0, False, "false", "null", "none", "nao", "não"):
-            self.assertFalse(is_order_cancelled({"farmalider_cancelamento": value, "farmalider_status_pedido": 3}))
+            self.assertFalse(is_order_cancelled({"farmalider_cancelamento": value, "farmalider_status_pedido": 9}))
+        self.assertTrue(is_order_cancelled({"farmalider_status_pedido": 3}))
+        self.assertTrue(is_order_cancelled({"farmalider_status_pedido": "3"}))
         self.assertTrue(is_order_cancelled({"farmalider_status_pedido": "Cancelado"}))
         self.assertTrue(is_order_cancelled({"farmalider_cancelamento": "2026-10-06T11:00:00"}))
 

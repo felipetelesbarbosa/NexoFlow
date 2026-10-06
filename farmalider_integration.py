@@ -4,7 +4,7 @@ import hashlib
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from pedido_utils import business_order_datetime, is_order_cancelled
+from pedido_utils import business_order_datetime, farmalider_order_status_name, is_order_cancelled
 
 
 def _text(value: Any) -> str:
@@ -249,6 +249,7 @@ def apply_pedido_api_confirmation(
         ("farmalider_entrega", "entrega"),
     ):
         order[target] = _text(capa.get(source))
+    order["farmalider_status_pedido_nome"] = farmalider_order_status_name(capa.get("status"))
     # Only the fresh API response determines cancellation, not an old snapshot.
     order["status_confirmacao"] = ""
     order["status_confirmacao"] = "CANCELADO_API" if is_order_cancelled(order) else "CONFIRMADO_API"

@@ -4,6 +4,7 @@ import unittest
 from analytics import (
     BASE_COLUMNS,
     ORDER_ITEM_COLUMNS,
+    ORDER_COLUMNS,
     build_sales_metrics,
     normalize_contact,
     parse_ultimo_pedido,
@@ -13,6 +14,7 @@ from analytics import (
 EXAMPLE_PAYLOAD = {
     "data_hora": "2026-09-30T16:07:00Z",
     "valor_total_compra": 110.80,
+    "farmalider_status_pedido": 2,
     "produtos": [
         {
             "nome": "Dipirona Gotas 20ml",
@@ -125,6 +127,7 @@ class UltimoPedidoTests(unittest.TestCase):
     def derived_contact(self, *, raw="", date="2026-10-03T01:00:00Z", metadata=None):
         envelope = {
             "pedido_id": "321",
+            "farmalider_status_pedido": 2,
             "produtos": [{"codigo": "9001", "nome": "", "quantidade": 2,
                           "valor_unitario": "10.00", "valor_total": "19.00"}],
             **(metadata or {}),
@@ -237,6 +240,19 @@ class UltimoPedidoTests(unittest.TestCase):
         order, items = parse_ultimo_pedido(contact, "2026-10-03T04:00:00Z")
         self.assertEqual(order["status_validacao"], "ATENCAO_TOTAL_PARCIAL")
         self.assertEqual(build_sales_metrics([order], items), [])
+
+    def test_derived_snapshot_preserves_official_enum_label_without_inventing_unknowns(self):
+        self.assertIn("farmalider_status_pedido_nome", ORDER_COLUMNS)
+        contact = self.derived_contact(metadata={
+            "status_confirmacao": "CANCELADO_API", "farmalider_status_pedido": "3",
+            "farmalider_status_pedido_nome": "Cancelado", "farmalider_cancelamento": "",
+        })
+        order, items = parse_ultimo_pedido(contact, "2026-10-03T04:00:00Z")
+        self.assertEqual(order["farmalider_status_pedido_nome"], "Cancelado")
+        self.assertEqual(build_sales_metrics([order], items), [])
+        unknown = self.derived_contact(metadata={"farmalider_status_pedido": "99"})
+        unknown_order, _ = parse_ultimo_pedido(unknown, "2026-10-03T04:00:00Z")
+        self.assertEqual(unknown_order["farmalider_status_pedido_nome"], "")
 
 
 if __name__ == "__main__":

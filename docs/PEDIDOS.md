@@ -61,8 +61,36 @@ Os nomes da Weni só complementam itens da API quando há associação inequívo
 
 O cancelamento permanece registrado junto do pedido e acompanha sua representação estruturada. Registrar um pedido cancelado não significa confirmar uma venda.
 
+### Status oficial do pedido
+
+De-para da documentação fornecida pelo usuário, **Integração API Líder.pdf**, seção **Status do Pedido**:
+
+| Código | Identificador da API | Rótulo em português |
+|---|---|---|
+| 0 | `EmProcessamento` | Em processamento |
+| 1 | `EmTransito` | Em trânsito |
+| 2 | `Concluido` | Concluído |
+| 3 | `Cancelado` | Cancelado |
+| 4 | `ProntoParaRota` | Pronto para rota |
+
+`farmalider_status_pedido` preserva o código original e `farmalider_status_pedido_nome` apresenta o rótulo oficial quando conhecido. Se o código estiver ausente ou for desconhecido, o nome fica vazio. O dashboard pode mostrar “Status não conhecido” como aviso derivado dessa ausência, sem gravá-lo como um estado oficial. O código **3** identifica um pedido cancelado mesmo que a data de cancelamento esteja ausente. Códigos desconhecidos não permitem inferir cancelamento ou conclusão.
+
+### Critério dos indicadores de vendas
+
+Faturamento, pedidos, unidades vendidas e compradores incluem somente os pedidos identificados pelo NexoFlow em **Concluído (código 2)**, não cancelados e com os demais critérios de validação satisfeitos. A regra se aplica também às métricas de vendas usadas em Resumo, Conversão e Ads.
+
+| Estado do pedido | Captura e auditoria | Indicadores de vendas |
+|---|---|---|
+| 0, 1 ou 4 | Preservados; podem atualizar os cinco campos `pedido_*` quando os dados são válidos. | Fora dos indicadores enquanto não concluídos. |
+| 2 | Preservado. | Elegível quando validado e não cancelado. |
+| 3 | Cancelamento preservado. | Fora dos indicadores. |
+| Ausente ou desconhecido | Informação disponível preservada, sem inferir conclusão. | Fora dos indicadores. |
+
+**Concluído é um estado operacional/logístico:** por si só, não comprova pagamento ou liquidação financeira. Os indicadores cobrem os pedidos identificados pelo NexoFlow; não representam automaticamente todas as vendas da FarmaLíder nem comprovam uma venda originada por um anúncio.
+
 - Pedidos cancelados não compõem faturamento, unidades vendidas, compradores ou métricas de pedidos válidos.
-- `ultima_compra` somente avança para uma compra não cancelada confirmada pela API FarmaLíder.
+- `ultima_compra` somente avança para um pedido concluído, não cancelado e confirmado pela API FarmaLíder.
+- Um cancelamento explícito mantém o pedido fora das métricas mesmo que outro campo indique código 2.
 - Dados válidos não são apagados apenas porque uma fonte deixou de informar um campo.
 - Divergências de identificador ou titular são registradas para diagnóstico e não devem alimentar indicadores como pedidos confirmados.
 

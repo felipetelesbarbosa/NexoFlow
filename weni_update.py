@@ -35,7 +35,7 @@ from contact_enrichment import (
 )
 from farmalider_client import FarmaliderAuthError, FarmaliderClient, FarmaliderError
 from farmalider_integration import resolve_contact_order
-from pedido_utils import business_order_datetime, is_order_cancelled, serialize_pedido_products
+from pedido_utils import business_order_datetime, is_order_cancelled, is_order_completed, serialize_pedido_products
 from weni_client import WeniClient
 from urn_utils import (
     CHANNEL_FIELD_MAP,
@@ -683,8 +683,8 @@ def _apply_purchase_candidate(
 
     plan.order_validated = True
     plan.purchase_confirmation = confirmation
-    plan.purchase_confirmed = confirmation == "CONFIRMADO_API" and not is_order_cancelled(order)
-    reason = "pedido resolvido e validado; cancelamentos preservados sem confirmar venda"
+    plan.purchase_confirmed = confirmation == "CONFIRMADO_API" and is_order_completed(order)
+    reason = "pedido resolvido e validado; somente concluídos confirmam compra"
     for field_name, value in {
         "pedido_id": pedido_id,
         "pedido_data": proposed_date,
@@ -702,7 +702,7 @@ def _apply_purchase_candidate(
                 current_fields,
                 "ultima_compra",
                 proposed_date,
-                reason="compra não cancelada confirmada pela API FarmaLíder",
+                reason="pedido concluído confirmado pela API FarmaLíder",
             )
     return True
 
@@ -937,8 +937,8 @@ def audit_plans(
                     raise ValueError("pedido sem validação válida")
                 if products.get("status_confirmacao") not in {"CONFIRMADO_API", "CANCELADO_API", "NAO_CONFIRMADO_API"}:
                     raise ValueError("confirmação inválida")
-                if plan.purchase_confirmed and is_order_cancelled(products):
-                    raise ValueError("pedido cancelado não confirma compra")
+                if plan.purchase_confirmed and not is_order_completed(products):
+                    raise ValueError("somente pedido concluído confirma compra")
             except (ValueError, TypeError):
                 errors.append(f"{plan.contact_uuid}: estrutura inválida em pedido_produtos")
 

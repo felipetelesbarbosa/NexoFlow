@@ -85,6 +85,7 @@ class UpsertResult:
 
 class GoogleSheetsStore:
     SCHEMA_CONTROL_KEY = "_schema_fingerprint"
+    SCHEMA_HEADERS_CONTROL_KEY = "_schema_headers_layout"
 
     def __init__(
         self,
@@ -212,14 +213,26 @@ class GoogleSheetsStore:
                 control_values,
                 self.SCHEMA_CONTROL_KEY,
             )
-            if not validate_structure and stored == expected:
+            saved_layout = self._control_value_from_values(control_values, self.SCHEMA_HEADERS_CONTROL_KEY)
+            try:
+                layout = json.loads(saved_layout) if saved_layout else {}
+                schema = self._schema_map()
+                layout_valid = isinstance(layout, dict) and all(
+                    isinstance(layout.get(title), list)
+                    and all(isinstance(header, str) for header in layout[title])
+                    and len(layout[title]) == len(set(layout[title]))
+                    and set(headers).issubset(layout[title])
+                    for title, headers in schema.items()
+                )
+            except (ValueError, TypeError):
+                layout, layout_valid = {}, False
+            if not validate_structure and stored == expected and layout_valid:
                 # O fingerprint só é gravado após a estrutura ter sido validada.
                 # Portanto, em execuções normais podemos reutilizar o schema local
                 # sem reler cabeçalhos redundantes da API.
-                self._headers_cache = {
-                    title: list(headers)
-                    for title, headers in self._schema_map().items()
-                }
+                # Migrações acrescentam colunas no fim da aba existente. A
+                # ordem física validada pode diferir da declaração local.
+                self._headers_cache = {title: list(layout[title]) for title in self._schema_map()}
                 logging.info(
                     "Google Sheets: estrutura compatível pelo fingerprint; "
                     "checagem completa de cabeçalhos ignorada."
@@ -227,8 +240,9 @@ class GoogleSheetsStore:
                 return
 
         self.ensure_structure(existing_sheets=sheets_by_title)
-        if stored != expected:
-            self.set_controls({self.SCHEMA_CONTROL_KEY: expected})
+        serialized_layout = json.dumps(self._headers_cache, ensure_ascii=False, sort_keys=True)
+        if stored != expected or self._control_value_from_values(self._control_values_cache or [], self.SCHEMA_HEADERS_CONTROL_KEY) != serialized_layout:
+            self.set_controls({self.SCHEMA_CONTROL_KEY: expected, self.SCHEMA_HEADERS_CONTROL_KEY: serialized_layout})
         logging.info(
             "Google Sheets: estrutura completa validada "
             "(fingerprint=%s).",

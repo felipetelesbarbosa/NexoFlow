@@ -9,7 +9,11 @@ from typing import Any
 
 from config import TIPO_PRIMEIRO_ANUNCIO, TIPO_ULTIMO_ANUNCIO
 from urn_utils import resolve_contact_urns
-from pedido_utils import business_order_datetime, is_order_cancelled
+from pedido_utils import (
+    business_order_datetime,
+    farmalider_order_status_name,
+    is_order_completed,
+)
 
 
 AD_FIELDS = [
@@ -140,6 +144,7 @@ ORDER_COLUMNS = [
     "farmalider_public_id",
     "farmalider_emissao",
     "farmalider_status_pedido",
+    "farmalider_status_pedido_nome",
     "farmalider_cod_filial",
     "farmalider_cod_cliente",
     "farmalider_forma_pagamento",
@@ -748,6 +753,7 @@ def parse_ultimo_pedido_raw(
             "farmalider_public_id": "",
             "farmalider_emissao": "",
             "farmalider_status_pedido": "",
+            "farmalider_status_pedido_nome": "",
             "farmalider_cod_filial": "",
             "farmalider_cod_cliente": "",
             "farmalider_forma_pagamento": "",
@@ -775,9 +781,13 @@ def parse_ultimo_pedido_raw(
             "farmalider_cliente_id", "farmalider_emissao", "farmalider_confirmado_em",
             "valor_total_weni", "diferenca_total_weni_api",
             "farmalider_erro",
+            "farmalider_status_pedido_nome",
         ):
             if key in payload:
                 order_row[key] = normalize_value(payload[key])
+        official_status_name = farmalider_order_status_name(order_row["farmalider_status_pedido"])
+        if official_status_name:
+            order_row["farmalider_status_pedido_nome"] = official_status_name
         upstream_validation = normalize_value(payload.get("status_validacao")).strip()
         if upstream_validation and upstream_validation not in {"OK", "VALIDADO_WENI"}:
             order_row["status_validacao"] = upstream_validation
@@ -822,6 +832,7 @@ def parse_ultimo_pedido_raw(
             "farmalider_public_id": "",
             "farmalider_emissao": "",
             "farmalider_status_pedido": "",
+            "farmalider_status_pedido_nome": "",
             "farmalider_cod_filial": "",
             "farmalider_cod_cliente": "",
             "farmalider_forma_pagamento": "",
@@ -1046,7 +1057,7 @@ def _sales_order_is_valid(record: dict[str, str]) -> bool:
         return False
     return (
         record.get("status_validacao") in ("OK", "ATENÇÃO_TOTAL_DIVERGENTE")
-        and not is_order_cancelled(record)
+        and is_order_completed(record)
         and bool(str(record.get("pedido_chave") or "").strip())
     )
 

@@ -28,7 +28,7 @@ class OrderItemReconciliationTests(unittest.TestCase):
         self.assertEqual([r["item_chave"] for r in result.final_records], ["one", "other"])
         sales = build_sales_metrics([
             {"pedido_chave": "FARMALIDER:1", "data": "2026-10-06", "contact_uuid": "u1",
-             "status_validacao": "OK", "status_confirmacao": "CONFIRMADO_API", "valor_total_compra": "20"},
+             "status_validacao": "OK", "status_confirmacao": "CONFIRMADO_API", "farmalider_status_pedido": "2", "valor_total_compra": "20"},
         ], result.final_records)
         self.assertEqual(len(sales), 1)
         # The stale nine units are absent; other orders do not enter this sale.

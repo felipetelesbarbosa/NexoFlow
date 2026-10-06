@@ -58,6 +58,24 @@ O retorno usado possui informações de capa e itens. Entre os dados persistidos
 estão emissão, filial, cliente, status, forma de pagamento, cupom, frete,
 cancelamento, entrega e totais derivados dos itens.
 
+### Status do Pedido
+
+A documentação fornecida pelo usuário, **Integração API Líder.pdf**, seção **Status do Pedido**, define:
+
+| Código | Identificador oficial | Rótulo em português |
+|---|---|---|
+| 0 | `EmProcessamento` | Em processamento |
+| 1 | `EmTransito` | Em trânsito |
+| 2 | `Concluido` | Concluído |
+| 3 | `Cancelado` | Cancelado |
+| 4 | `ProntoParaRota` | Pronto para rota |
+
+O NexoFlow preserva o código em `farmalider_status_pedido` e acrescenta o rótulo oficial conhecido em `farmalider_status_pedido_nome`. Para código ausente ou desconhecido, o nome fica vazio; “Status não conhecido” pode ser exibido pelo dashboard como aviso derivado, sem criar um estado oficial. O código **3** é tratado como cancelado independentemente de existir timestamp de cancelamento. Valores fora desse de-para mantêm o código original sem atribuir um significado por suposição.
+
+Os indicadores de vendas do NexoFlow admitem somente **Concluído (código 2)**, com dados válidos e sem cancelamento. Estados 0, 1 e 4 continuam sendo capturados para os campos de pedido e auditoria, mas ficam fora desses indicadores; código 3, status ausente ou desconhecido também ficam fora. Um cancelamento explícito prevalece sobre um eventual código 2.
+
+`ultima_compra` exige adicionalmente confirmação pela API. Concluído descreve o estado operacional/logístico do pedido e, por si só, não comprova pagamento. A cobertura é dos pedidos identificados pelo NexoFlow, sem presumir todas as vendas da FarmaLíder ou origem causal em anúncios. Veja as regras completas em [Pedidos no NexoFlow 1.0](PEDIDOS.md).
+
 ## Limitação atual
 
 O contrato usado pelo projeto não fornece uma rota para listar todo o histórico
