@@ -22,7 +22,7 @@ O JSON produzido para `pedido_produtos` é um envelope com a lista `produtos`, i
 
 ## Resolução e confirmação
 
-**Caminho 1:** leia primeiro `ultimo_pedido` na Weni. Quando preenchido, use seus dados e não consulte a API para resolver esse pedido. Com ID, data, produtos, quantidades e valores válidos, o NexoFlow Weni alimenta os cinco campos `pedido_id`, `pedido_data`, `pedido_produtos`, `pedido_quantidade_itens` e `pedido_valor`, inclusive quando a API está configurada. Uma confirmação oficial já registrada no snapshot válido do mesmo pedido pode ser preservada; o conteúdo bruto não recebe confirmação API por suposição.
+**Caminho 1:** leia primeiro `ultimo_pedido` na Weni. Quando preenchido, ele é a fonte prioritária para ID, data, produtos, quantidades e valores. O NexoFlow alimenta os cinco campos `pedido_id`, `pedido_data`, `pedido_produtos`, `pedido_quantidade_itens` e `pedido_valor` com esses dados. Se houver um `pedido_id` oficial e a API estiver disponível, consulte **somente** `GET /api/Delivery/pedido/{codigo}` para esse mesmo ID, com a finalidade de confirmar o status atual. Não consulte `cliente/cpf/{cpf}` e não procure outro pedido nesse caminho. A consulta de status não substitui produtos, quantidades, valores ou data já obtidos do `ultimo_pedido`.
 
 Conteúdo preenchido inválido ou incompleto não autoriza buscar outro pedido pelo CPF. Registre a pendência e preserve os campos existentes, sem inventar identificação, data, frete ou status. O parser espera objeto JSON ou texto contendo JSON estruturado; uma descrição livre de produtos sem os dados obrigatórios permanece pendente.
 
@@ -83,7 +83,7 @@ De-para da documentação fornecida pelo usuário, **Integração API Líder.pdf
 
 ### Critério dos indicadores de vendas
 
-Faturamento, pedidos, unidades vendidas e compradores incluem somente os pedidos identificados pelo NexoFlow em **Concluído (código 2)**, não cancelados e com os demais critérios de validação satisfeitos. A regra se aplica também às métricas de vendas usadas em Resumo, Conversão e Ads.
+Faturamento, pedidos, unidades vendidas e compradores incluem somente pedidos identificados pelo NexoFlow em **Concluído (código 2)**, **confirmados pela consulta da API**, não cancelados e com os demais critérios de validação satisfeitos. Estados 0, 1 e 4 continuam registrados nos cinco campos de pedido, mas não entram em vendas enquanto não chegarem ao estado 2. A regra se aplica também às métricas usadas em Resumo, Conversão e Ads.
 
 | Estado do pedido | Captura e auditoria | Indicadores de vendas |
 |---|---|---|
