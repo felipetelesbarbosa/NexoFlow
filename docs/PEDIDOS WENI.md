@@ -4,6 +4,6 @@ Os dados podem vir do JSON `ultimo_pedido` ou de `pedido_id`, `pedido_data`, `pe
 
 O contrato completo, incluindo confirmação pela FarmaLíder, produtos e cancelamentos, está em [Pedidos no NexoFlow 1.0](PEDIDOS.md).
 
-O campo `ultimo_pedido` pode chegar como objeto, texto JSON ou wrapper da Weni. O parser reconhece os identificadores `pedido_id`, `pedidoId`, `codigo` e `codPedido` quando disponíveis. Com identificador oficial, a chave do pedido é `FARMALIDER:<pedido_id>`; sem ele, a rotina mantém uma chave sintética estável para o registro recebido.
+O campo `ultimo_pedido` pode chegar como objeto, texto JSON ou wrapper da Weni. O parser reconhece os identificadores `pedido_id`, `pedidoId`, `codigo` e `codPedido` quando disponíveis. Quando há ID válido, os dados desse JSON permanecem prioritários e a FarmaLíder API é consultada somente em `/pedido/{codigo}` para confirmar o status do mesmo pedido. A busca `cliente/cpf/{cpf} → ultimoPedido.id` só ocorre quando `ultimo_pedido` estiver ausente, vazio ou `null`. Com identificador oficial, a chave do pedido é `FARMALIDER:<pedido_id>`; sem ele, a rotina mantém uma chave sintética estável para o registro recebido.
 
 Produtos devem continuar estruturados em JSON, preservando códigos, quantidades e valores. Erros de parse são registrados, e informação ausente não é completada por suposição.
