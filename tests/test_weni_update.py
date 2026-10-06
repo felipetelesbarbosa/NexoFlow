@@ -75,7 +75,8 @@ class WeniUpdateTests(unittest.TestCase):
         return farm
 
     def _purchase_plan(self, contact: dict, farm: Mock | None = None,
-                       *, captured_at: str = "2026-10-03T12:01:00Z") -> ContactUpdatePlan:
+                       *, captured_at: str = "2026-10-03T12:01:00Z",
+                       available_weni_fields: set[str] | None = None) -> ContactUpdatePlan:
         return _build_contact_plan(
             contact,
             context_messages=[],
@@ -84,6 +85,7 @@ class WeniUpdateTests(unittest.TestCase):
             opt_out_group_name="Opt-Out LGPD",
             opt_out_group_uuid="g-out",
             captured_at=captured_at,
+            available_weni_fields=available_weni_fields,
         )
 
     def _incremental_purchase_client(self, contact: dict) -> Mock:
@@ -574,6 +576,52 @@ class WeniUpdateTests(unittest.TestCase):
                 self.assertEqual(second.purchase_confirmed, active)
                 self.assertEqual(second.fields, {})
                 self.assertEqual(second.evidence, {})
+
+    def test_pedido_status_is_written_from_api_for_every_documented_state(self) -> None:
+        expected = {
+            0: "Em processamento",
+            1: "Em trânsito",
+            2: "Concluído",
+            3: "Cancelado",
+            4: "Pronto para rota",
+        }
+        for status, label in expected.items():
+            with self.subTest(status=status):
+                contact = self._purchase_contact(include_raw=False)
+                farm = self._purchase_api()
+                farm.get_pedido.return_value["capa"]["status"] = status
+                plan = self._purchase_plan(
+                    contact,
+                    farm,
+                    available_weni_fields={"pedido_status"},
+                )
+                self.assertEqual(plan.fields["pedido_status"], label)
+
+        contact = self._purchase_contact(include_raw=False)
+        farm = self._purchase_api()
+        farm.get_pedido.return_value["capa"]["status"] = 2
+        farm.get_pedido.return_value["capa"]["cancelamento"] = "2026-10-03T13:00:00Z"
+        plan = self._purchase_plan(
+            contact,
+            farm,
+            available_weni_fields={"pedido_status"},
+        )
+        self.assertEqual(plan.fields["pedido_status"], "Cancelado")
+
+    def test_pedido_status_is_skipped_if_field_does_not_exist_in_weni(self) -> None:
+        contact = self._purchase_contact(include_raw=False)
+        farm = self._purchase_api()
+        plan = self._purchase_plan(contact, farm, available_weni_fields=set())
+        self.assertNotIn("pedido_status", plan.fields)
+
+    def test_audit_rejects_invalid_pedido_status(self) -> None:
+        plan = ContactUpdatePlan(
+            contact_uuid="u-pedido-status",
+            fields={"pedido_status": "Finalizado"},
+            order_validated=True,
+        )
+        with self.assertRaises(PlanAuditError):
+            audit_plans([plan], opt_out_group_available=True)
 
     def test_cancelled_order_updates_five_fields_without_latest_purchase(self) -> None:
         contact = self._purchase_contact(include_raw=False)
