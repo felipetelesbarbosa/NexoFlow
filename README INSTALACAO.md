@@ -5,6 +5,25 @@
 
 Este documento corresponde ao **NexoFlow 1.0**.
 
+
+## Ordem recomendada após instalar esta atualização
+
+Antes da carga completa, confirme que os oito campos de pedido existem na Weni: `pedido_id`, `pedido_data`, `pedido_status`, `pedido_produtos`, `pedido_quantidade_itens`, `pedido_valor_produtos`, `pedido_valor` e `pedido_forma_pagamento`.
+
+Depois execute, nesta ordem:
+
+```text
+1. testar_conexoes.bat
+2. atualizar_weni_carga_completa.bat
+3. revisar logs\weni_update_review_full.txt
+4. confirmar CARGA COMPLETA REVISADA
+5. executar_carga_completa.bat
+6. atualizar os campos das fontes de dados no Looker Studio
+```
+
+A carga completa do Weni atualiza o snapshot operacional dos contatos. A carga completa do Analytics migra os schemas do Google Sheets e preenche as estruturas analíticas, incluindo frete separado e faturamento total (produtos + frete).
+
+
 No NexoFlow 1.0, o NexoFlow mantém o fluxo 24h, a CLI amigável `nexo`, o isolamento do checkpoint, o check-up limpo e o timeout/retry do Google Sheets. O Analytics reduz leituras e escritas redundantes, usa batches adaptativos e cache seguro da FarmaLíder no incremental; o Update Weni reduz leituras auxiliares e I/O local sem agrupar ou paralelizar as escritas protegidas.
 
 

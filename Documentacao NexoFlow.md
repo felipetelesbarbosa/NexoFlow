@@ -2,6 +2,15 @@
 
 Software interno de integração, atualização de contatos e analytics da FarmaLíder.
 
+
+### Arquitetura atual de pedidos, fallback e frete
+A FarmaLíder API é a fonte de verdade. O fluxo normal usa `CPF -> GET cliente/cpf -> ultimoPedido -> GET pedido/{id}`. Se o GET por CPF não puder ser usado, `pedido_id` da Weni é o primeiro localizador de recuperação; `ultimo_pedido`, alimentado por outra integração, é o último localizador de ID. Nenhum desses campos substitui os detalhes oficiais: produtos, valores, emissão, status e pagamento só são atualizados após validação em `GET pedido/{id}`.
+
+`pedido_produtos` usa exclusivamente `itens[].descricao`; `codProduto` permanece apenas como código técnico. Na Weni, `pedido_valor` continua sendo o total dos produtos. No Google Sheets o NexoFlow mantém `farmalider_frete` separado e calcula `valor_total_faturamento = produtos + frete`. O Looker Studio recebe, em `BI_Pedidos`, `pedido_valor`, `pedido_frete` e `pedido_faturamento_total`, além da separação equivalente em `BI_Vendas` e `BI_Resumo_Diario`.
+
+Os oito campos `pedido_*` do contrato são obrigatórios na Weni; o preflight bloqueia o apply se algum estiver ausente, evitando atualização parcial do snapshot.
+
+
 ### Camada BI para Looker Studio
 O NexoFlow 1.0 transforma o NexoFlow Analytics em uma camada analítica pronta para o Looker Studio. O projeto passa a criar/manter automaticamente `BI_Resumo_Diario`, `BI_Canais`, `BI_Conversao`, `BI_Vendas`, `BI_Ads`, `BI_Pedidos` e `BI_Status`. O resumo diário usa uma linha por dia; canais e conversão mantêm snapshots diários; vendas são uma série por data; Ads apresenta uma linha zero até existir atribuição; Status registra a saúde da última execução.
 
