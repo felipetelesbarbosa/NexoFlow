@@ -180,9 +180,21 @@ def is_order_cancelled(order: dict[str, Any]) -> bool:
     if cancellation not in {"", "0", "false", "none", "null", "nao", "não"}:
         return True
     status = str(order.get("farmalider_status_pedido") or "").strip().casefold()
+    payment = order.get("farmalider_forma_pagamento")
     confirmation = str(order.get("status_confirmacao") or "").strip().casefold()
-    documented_cancel = farmalider_order_status_name(order.get("farmalider_status_pedido")) == "Cancelado"
-    return documented_cancel or "cancel" in status or confirmation == "cancelado_api"
+    documented_cancel = farmalider_order_status_name(
+        order.get("farmalider_status_pedido")
+    ) == "Cancelado"
+    unpaid_cancel = (
+        normalize_farmalider_payment_code(payment) == "0"
+        or farmalider_payment_method_display(payment) == "CANCELADO"
+    )
+    return (
+        documented_cancel
+        or unpaid_cancel
+        or "cancel" in status
+        or confirmation == "cancelado_api"
+    )
 
 
 def is_order_completed(order: dict[str, Any]) -> bool:
