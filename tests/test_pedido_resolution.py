@@ -295,11 +295,11 @@ class PedidoResolutionTests(unittest.TestCase):
 
     def test_status_mapping_is_official(self):
         expected = {
+            -1: "Pendente pagamento",
             0: "Em processamento",
             1: "Em trânsito",
             2: "Concluído",
             3: "Cancelado",
-            4: "Pronto para rota",
         }
         for code, label in expected.items():
             self.assertEqual(farmalider_order_status_name(code), label)
@@ -307,11 +307,13 @@ class PedidoResolutionTests(unittest.TestCase):
 
     def test_payment_mapping_is_official(self):
         expected = {
+            0: "CANCELADO",
             1: "Dinheiro",
             2: "Débito",
             3: "Crédito",
             4: "Ticket",
-            5: "Online/link/Pix",
+            5: "Pix por Link de Pagamento",
+            6: "PIX no POS",
         }
         for code, label in expected.items():
             self.assertEqual(farmalider_payment_method_name(code), label)
@@ -320,7 +322,7 @@ class PedidoResolutionTests(unittest.TestCase):
             self.assertEqual(farmalider_payment_method_display(str(code)), label)
 
     def test_payment_display_exposes_undocumented_nonnegative_int32_codes(self):
-        for code in (0, 6, 9, 2147483647):
+        for code in (9, 2147483647):
             for value in (code, str(code)):
                 with self.subTest(value=value):
                     self.assertEqual(
@@ -332,8 +334,8 @@ class PedidoResolutionTests(unittest.TestCase):
     def test_payment_display_normalizes_numeric_strings(self):
         for value, expected in (
             (" 0002 ", "Débito"),
-            ("0000", "Não identificado (código 0)"),
-            (" 0006 ", "Não identificado (código 6)"),
+            ("0000", "CANCELADO"),
+            (" 0006 ", "PIX no POS"),
         ):
             with self.subTest(value=value):
                 self.assertEqual(farmalider_payment_method_display(value), expected)
@@ -348,21 +350,35 @@ class PedidoResolutionTests(unittest.TestCase):
             with self.subTest(value=value):
                 self.assertEqual(farmalider_payment_method_display(value), "")
 
-    def test_unknown_pedido_payment_overrides_documented_cliente_payment(self):
-        for code in (0, 6, 9):
-            with self.subTest(code=code):
-                pedido = pedido_payload()
-                pedido["capa"]["formaPagamento"] = code
-                order, _ = resolve_contact_order(
-                    contact(),
-                    farm_client=client(pedido=pedido),
-                    captured_at=CAPTURED_AT,
-                )
-                self.assertEqual(order["farmalider_forma_pagamento"], str(code))
-                self.assertEqual(
-                    order["farmalider_forma_pagamento_nome"],
-                    f"Não identificado (código {code})",
-                )
+    def test_payment_zero_forces_cancelled_order(self):
+        pedido = pedido_payload()
+        pedido["capa"]["status"] = 0
+        pedido["capa"]["formaPagamento"] = 0
+        order, items = resolve_contact_order(
+            contact(),
+            farm_client=client(pedido=pedido),
+            captured_at=CAPTURED_AT,
+        )
+        self.assertEqual(order["farmalider_forma_pagamento"], "CANCELADO")
+        self.assertEqual(order["farmalider_forma_pagamento_nome"], "CANCELADO")
+        self.assertEqual(order["farmalider_status_pedido"], "3")
+        self.assertEqual(order["farmalider_status_pedido_nome"], "Cancelado")
+        self.assertEqual(order["status_confirmacao"], "CANCELADO_API")
+        self.assertEqual(build_sales_metrics([order], items), [])
+
+    def test_unknown_pedido_payment_is_preserved_without_invented_label(self):
+        pedido = pedido_payload()
+        pedido["capa"]["formaPagamento"] = 9
+        order, _ = resolve_contact_order(
+            contact(),
+            farm_client=client(pedido=pedido),
+            captured_at=CAPTURED_AT,
+        )
+        self.assertEqual(order["farmalider_forma_pagamento"], "9")
+        self.assertEqual(
+            order["farmalider_forma_pagamento_nome"],
+            "Não identificado (código 9)",
+        )
 
     def test_cliente_fallback_preserves_unknown_payment_code_and_display(self):
         cliente = cliente_payload()
@@ -376,7 +392,7 @@ class PedidoResolutionTests(unittest.TestCase):
         self.assertEqual(order["farmalider_forma_pagamento"], "6")
         self.assertEqual(
             order["farmalider_forma_pagamento_nome"],
-            "Não identificado (código 6)",
+            "PIX no POS",
         )
 
     def test_unknown_status_and_payment_have_no_invented_label(self):
@@ -396,7 +412,7 @@ class PedidoResolutionTests(unittest.TestCase):
         self.assertEqual(build_sales_metrics([order], items), [])
 
     def test_all_non_cancelled_documented_states_are_sales(self):
-        for status in (0, 1, 2, 4):
+        for status in (0, 1, 2):
             with self.subTest(status=status):
                 pedido = pedido_payload()
                 pedido["capa"]["status"] = status
@@ -407,6 +423,19 @@ class PedidoResolutionTests(unittest.TestCase):
                 )
                 self.assertTrue(is_order_made(order))
                 self.assertEqual(len(build_sales_metrics([order], items)), 1)
+
+    def test_pending_payment_is_not_a_sale(self):
+        pedido = pedido_payload()
+        pedido["capa"]["status"] = -1
+        order, items = resolve_contact_order(
+            contact(),
+            farm_client=client(pedido=pedido),
+            captured_at=CAPTURED_AT,
+        )
+        self.assertEqual(order["farmalider_status_pedido"], "-1")
+        self.assertEqual(order["farmalider_status_pedido_nome"], "Pendente pagamento")
+        self.assertFalse(is_order_made(order))
+        self.assertEqual(build_sales_metrics([order], items), [])
 
     def test_completed_code_is_completed(self):
         self.assertTrue(
