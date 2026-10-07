@@ -113,11 +113,11 @@ De-para da documentação oficial da integração:
 
 | Código | Identificador oficial | Rótulo |
 |---:|---|---|
+| -1 | `PendentePagamento` | Pendente pagamento |
 | 0 | `EmProcessamento` | Em processamento |
 | 1 | `EmTransito` | Em trânsito |
 | 2 | `Concluido` | Concluído |
 | 3 | `Cancelado` | Cancelado |
-| 4 | `ProntoParaRota` | Pronto para rota |
 
 A Weni armazena o código em `pedido_status`. O Analytics deriva o nome amigável.
 
@@ -133,11 +133,13 @@ De-para da documentação oficial da integração:
 | 2 | Débito |
 | 3 | Crédito |
 | 4 | Ticket |
-| 5 | Online/link/Pix |
+| 5 | Pix por Link de Pagamento |
+| 6 | PIX no POS |
+| 0 | CANCELADO |
 
 A Weni armazena o código em `pedido_forma_pagamento`. O Analytics mantém também `farmalider_forma_pagamento_nome` e disponibiliza a descrição amigável na camada BI.
 
-O Swagger define `formaPagamento` como inteiro Int32, sem enum restrito a 1–5. Se a API retornar outro código numérico não negativo, o NexoFlow preserva o código recebido na Weni e o apresenta no Google Sheets/BI como `Não identificado (código X)`. Não há de-para documentado para 0 e 6; não se presume que sejam dinheiro, Pix ou outra forma. Texto, valores fracionários, negativos e números fora de Int32 continuam inválidos, e valores ausentes ou inválidos mantêm a descrição vazia.
+O de-para operacional atual é 1 Dinheiro, 2 Débito, 3 Crédito, 4 Ticket, 5 Pix por Link de Pagamento, 6 PIX no POS e 0 CANCELADO. O enum `_` também é tratado como 0. Quando o pagamento é 0, o pedido é considerado não pago: o NexoFlow salva a forma de pagamento como `CANCELADO`, força o status para 3 Cancelado e não contabiliza a venda.
 
 O helper `farmalider_payment_method_name` retorna somente os rótulos documentados. O helper de apresentação `farmalider_payment_method_display` usa esses rótulos e acrescenta a descrição explícita para códigos válidos desconhecidos, sem modificar o código recebido.
 
