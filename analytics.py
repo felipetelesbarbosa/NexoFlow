@@ -1486,6 +1486,8 @@ def build_bi_order_rows(
             ", ".join(_bi_display_number(item.get("quantidade")) for item in items),
             ", ".join(_bi_display_number(item.get("valor_unitario")) for item in items),
             _bi_float(_bi_decimal(order.get("valor_total_compra"))),
+            _bi_float(_order_revenue_parts(order)[1]),
+            _bi_float(_order_revenue_parts(order)[2]),
             status_code,
             farmalider_order_status_name(status_code),
             payment_code,
@@ -1543,7 +1545,7 @@ def build_bi_ads_rows(
                 bucket["buyers"].add(uuid)
             if order_key:
                 bucket["orders"].add(order_key)
-            bucket["revenue"] += _bi_decimal(record.get("valor_total_compra"))
+            bucket["revenue"] += _order_revenue_parts(record)[2]
 
     rows: list[list[Any]] = []
     for key in sorted(contact_groups):
