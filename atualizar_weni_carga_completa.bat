@@ -21,7 +21,7 @@ echo As partes 25%% NAO sao incrementais.
 echo Elas usam a mesma base congelada e devem ser executadas em ordem.
 echo Cada parte gera seu proprio dry-run, relatorio e snapshot revisavel.
 echo.
-set /p "OPCAO=Opcao: "
+set "OPCAO="\nset /p "OPCAO=Opcao: " < CON
 
 set "PART="
 set "PART_ARG="
@@ -35,8 +35,7 @@ if "%OPCAO%"=="3" set "PART=3"
 if "%OPCAO%"=="4" set "PART=4"
 if not defined PART (
     echo [ERRO] Opcao invalida.
-    pause
-    exit /b 2
+    pause < CON\n    exit /b 2
 )
 
 set "PART_ARG=--quarter %PART%"
@@ -104,18 +103,21 @@ if defined PART echo Parte revisada: %PART%/4
 echo O relatorio sera aberto no Bloco de Notas.
 echo Confira especialmente LGPD, idade/maioridade, grupos, CPF e pedidos.
 echo O plano fica congelado enquanto voce revisa.
-echo Feche o Bloco de Notas somente depois de concluir a revisao.
+echo O CMD ficara aguardando a confirmacao enquanto voce revisa.
+echo Depois de concluir, feche o Bloco de Notas e volte ao CMD.
 echo.
-start "" /wait notepad.exe "%CD%\%REVIEW_TXT%"
+rem Nao usar START /WAIT: o Bloco de Notas moderno pode usar processo intermediario
+rem e encerrar/alterar a espera do console. A confirmacao abaixo bloqueia no CON.
+start "" notepad.exe "%CD%\%REVIEW_TXT%"
 
 echo.
 echo [ETAPA 4/6] Confirmacao humana
 echo ----------------------------------------------------------
-set /p "CONFIRMA=Digite CARGA COMPLETA REVISADA para aplicar exatamente o snapshot revisado: "
+set "CONFIRMA="
+set /p "CONFIRMA=Digite CARGA COMPLETA REVISADA para aplicar exatamente o snapshot revisado: " < CON
 if /I not "%CONFIRMA%"=="CARGA COMPLETA REVISADA" (
     echo [INFO] Operacao cancelada. Nenhuma alteracao foi aplicada.
-    pause
-    exit /b 2
+    pause < CON\n    exit /b 2
 )
 
 echo.
@@ -139,13 +141,11 @@ echo Relatorio: %REVIEW_TXT%
 echo Snapshot:  %REVIEW_JSON%
 echo Manifesto 25%%: logs\full_load_25_manifest.json
 echo ==========================================================
-pause
+pause < CON
 exit /b 0
 
 :erro
 echo.
 echo [ERRO] Processo interrompido. Nenhuma etapa posterior deve ser presumida como concluida.
 if defined PART echo [INFO] A Parte %PART%/4 NAO deve ser presumida como concluida.
-echo Consulte logs\nexoflow_update_weni.log.
-pause
-exit /b %RC%
+echo Consulte logs\nexoflow_update_weni.log.\npause < CON\nexit /b %RC%
