@@ -382,6 +382,7 @@ def _ultimo_pedido_locator_id(fields: dict[str, Any]) -> str:
 def resolve_contact_order(
     contact: dict[str, Any], *, farm_client: Any, captured_at: str,
     linked_cliente_id: str = "", cliente_response: dict[str, Any] | None = None,
+    cliente_lookup_status: str = "",
     pedido_responses_by_id: dict[str, dict[str, Any] | None] | None = None,
 ) -> tuple[dict[str, str] | None, list[dict[str, str]]]:
     """
@@ -500,6 +501,25 @@ def resolve_contact_order(
         return _failure(
             order, [], "CPF_INVALIDO",
             "CPF não permite consultar o pedido oficial.",
+        )
+
+    # A validação desta execução já consultou o CPF. Repetir 404 ou 500 na
+    # etapa de pedidos aumentaria a carga da API sem acrescentar informação.
+    if cliente_lookup_status in {"ERRO_API", "CPF_NAO_ENCONTRADO"}:
+        recovered_order, recovered_items = resolve_weni_locators(
+            expected_cliente_id=linked_id
+        )
+        if recovered_order is not None:
+            return recovered_order, recovered_items
+        order = _empty_order(contact, captured_at)
+        if cliente_lookup_status == "ERRO_API":
+            return _failure(
+                order, [], "ERRO_API",
+                "Falha na consulta oficial do cliente e nenhum localizador Weni pôde ser validado.",
+            )
+        return _failure(
+            order, [], "CPF_NAO_ENCONTRADO",
+            "Cliente não localizado e nenhum pedido Weni pôde ser validado.",
         )
 
     try:

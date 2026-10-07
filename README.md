@@ -450,6 +450,13 @@ O dashboard pode trabalhar diretamente sobre as abas BI para priorizar Marketing
 - circuit breaker;
 - telemetria de latência.
 
+Respostas `500` em `cliente/cpf` são erros da API, não ausência de cadastro.
+O log registra apenas referências opacas e categorias seguras da resposta.
+Se restarem consultas de cliente ou pedido com erro, a execução termina como
+`parcial` (código `3`) e mantém o marco incremental para nova tentativa. A
+próxima execução pode repetir consultas à FarmaLíder, pois o cache não guarda
+o conteúdo completo dos pedidos. Consulte [o diagnóstico da API](docs/FARMALIDER%20API.md).
+
 ### Google Sheets
 
 - timeout explícito;
