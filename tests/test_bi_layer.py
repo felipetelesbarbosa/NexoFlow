@@ -154,6 +154,8 @@ class BILayerTests(unittest.TestCase):
             "cliente": "Cliente",
             "cpf_normalizado": "52998224725",
             "valor_total_compra": "112.80",
+            "farmalider_frete": "9.90",
+            "valor_total_faturamento": "122.70",
             "farmalider_status_pedido": "3",
             "farmalider_forma_pagamento": "2",
         }]
@@ -182,6 +184,8 @@ class BILayerTests(unittest.TestCase):
         self.assertEqual(record["pedido_quantidade_itens"], "1, 1")
         self.assertEqual(record["pedido_valor_produtos"], "53.9, 58.9")
         self.assertEqual(record["pedido_valor"], 112.8)
+        self.assertEqual(record["pedido_frete"], 9.9)
+        self.assertEqual(record["pedido_faturamento_total"], 122.7)
         self.assertEqual(record["pedido_status"], "3")
         self.assertEqual(record["pedido_status_nome"], "Cancelado")
         self.assertEqual(record["pedido_forma_pagamento"], "2")
@@ -238,7 +242,7 @@ class BILayerTests(unittest.TestCase):
             with self.subTest(cancellation=cancellation):
                 _, order, items = self.order_fixture(cancellation=cancellation, status=2)
                 self.assertEqual(build_sales_metrics([order], items),
-                    [["2026-10-05", 1, 1, 1, "2", "19.50", "19.50"]])
+                    [["2026-10-05", 1, 1, 1, "2", "19.50", "0.00", "19.50", "19.50"]])
 
     def test_new_contacts_use_business_day_at_utc_midnight(self):
         base = [{"contact_uuid": "u1", "weni_created_on": "2026-10-06T01:30:00Z"}]
@@ -253,7 +257,7 @@ class BILayerTests(unittest.TestCase):
                 made = str(status) in {"0", "1", "2", "4"}
                 self.assertEqual(len(items), 1)  # Every state remains auditable.
                 self.assertEqual(order["pedido_chave"], "FARMALIDER:500")
-                expected_sales = [["2026-10-05", 1, 1, 1, "2", "19.50", "19.50"]] if made else []
+                expected_sales = [["2026-10-05", 1, 1, 1, "2", "19.50", "0.00", "19.50", "19.50"]] if made else []
                 self.assertEqual(build_sales_metrics([order], items), expected_sales)
                 summary = build_bi_summary_record(base, [order], items,
                     snapshot_date="2026-10-05", updated_at="2026-10-05T14:00:00Z")
