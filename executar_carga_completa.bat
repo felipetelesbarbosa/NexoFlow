@@ -15,5 +15,6 @@ set "FORCE_FULL_SYNC="
 
 echo.
 echo Codigo de saida: %EXIT_CODE%
+if "%EXIT_CODE%"=="3" echo [AVISO] Sincronizacao parcial; consulte logs\nexoflow.log.
 pause
 exit /b %EXIT_CODE%

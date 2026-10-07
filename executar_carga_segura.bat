@@ -36,6 +36,7 @@ echo [ETAPA 3/3] Sincronizacao incremental
 echo ----------------------------------------------------------
 call "%~dp0executar_manual.bat"
 set "RC=%ERRORLEVEL%"
+if "%RC%"=="3" goto :parcial
 if not "%RC%"=="0" goto :erro_sync
 
 echo.
@@ -46,6 +47,18 @@ echo ==========================================================
 echo.
 pause
 exit /b 0
+
+:parcial
+echo.
+echo ==========================================================
+echo [AVISO] Sincronizacao parcial: algumas consultas a FarmaLider falharam.
+echo Os dados processados foram salvos; o marco incremental anterior foi
+echo mantido para nova tentativa. Consulte logs\nexoflow.log.
+echo Codigo de saida: %RC%
+echo ==========================================================
+echo.
+pause
+exit /b %RC%
 
 :erro_checkup
 echo.

@@ -57,6 +57,7 @@ TOKEN_PLACEHOLDER = "COLE_SEU_TOKEN_WENI_AQUI"
 FARMALIDER_TOKEN_PLACEHOLDER = "COLE_SEU_TOKEN_FARMALIDER_AQUI"
 SHEET_PLACEHOLDER = "COLE_O_ID_DA_PLANILHA_GOOGLE_AQUI"
 APP_VERSION = "1.0"
+PARTIAL_SYNC_EXIT_CODE = 3
 
 
 @dataclass(frozen=True)
@@ -74,6 +75,7 @@ class ClienteValidationStats:
     not_found: int = 0
     invalid: int = 0
     api_errors: int = 0
+    prior_details_retained: int = 0
     http_requests: int = 0
     retries: int = 0
     rate_limits: int = 0
@@ -133,6 +135,18 @@ def parse_control_datetime(value: str) -> datetime | None:
 
 def utc_iso(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).isoformat(timespec="seconds")
+
+
+def _completion_controls(
+    sync_started: datetime, *, api_errors: int,
+) -> tuple[str, dict[str, str]]:
+    """Do not advance the incremental cursor while CPF lookups need a retry."""
+    if api_errors:
+        return "parcial", {"ultima_execucao_status": "parcial"}
+    return "sucesso", {
+        "ultima_execucao_status": "sucesso",
+        "ultima_sincronizacao_sucesso_utc": utc_iso(sync_started),
+    }
 
 
 def contact_has_cpf(contact: Contact) -> bool:
@@ -206,6 +220,33 @@ def _apply_cliente_result(
     row["farmalider_cliente_nome"] = cliente_nome
 
 
+def _preserve_cliente_on_api_error(
+    row: Row, existing_by_uuid: dict[str, Row] | None,
+) -> bool:
+    """Keep prior verified details, while recording the current lookup as failed."""
+    if not existing_by_uuid:
+        return False
+    existing = existing_by_uuid.get(str(row.get("contact_uuid") or "").strip())
+    if not existing:
+        return False
+    cpf = normalize_cpf(row.get("cpf_normalizado") or row.get("cpf"))
+    existing_cpf = normalize_cpf(existing.get("cpf_normalizado") or existing.get("cpf"))
+    status = str(existing.get("farmalider_cliente_status") or "").strip()
+    if not cpf or cpf != existing_cpf or status not in {
+        "CPF_CONFIRMADO", "ERRO_API",
+    }:
+        return False
+    if not str(existing.get("farmalider_cliente_id") or "").strip():
+        return False
+    row["farmalider_cliente_id"] = str(existing.get("farmalider_cliente_id") or "")
+    row["farmalider_cliente_nome"] = str(existing.get("farmalider_cliente_nome") or "")
+    # The old timestamp describes the last successful validation, not this error.
+    row["farmalider_cliente_consultado_em"] = str(
+        existing.get("farmalider_cliente_consultado_em") or ""
+    )
+    return True
+
+
 def _parse_iso_datetime(value: str) -> datetime | None:
     if not value:
         return None
@@ -262,6 +303,7 @@ def validate_contacts(
     existing_by_uuid: dict[str, Row] | None = None,
     reuse_existing: bool = False,
     cliente_responses_by_cpf: dict[str, dict[str, Any] | None] | None = None,
+    cliente_lookup_status_by_cpf: dict[str, str] | None = None,
 ) -> ClienteValidationStats:
     """
     Valida CPFs com concorrência controlada e cache por CPF único.
@@ -310,6 +352,11 @@ def validate_contacts(
                 row["farmalider_cliente_consultado_em"] = str(
                     (existing or {}).get("farmalider_cliente_consultado_em") or ""
                 )
+                if (
+                    reused[0] == "CPF_NAO_ENCONTRADO"
+                    and cliente_lookup_status_by_cpf is not None
+                ):
+                    cliente_lookup_status_by_cpf[cpf] = reused[0]
                 stats.cache_reused += 1
                 continue
 
@@ -366,25 +413,69 @@ def validate_contacts(
                 start=1,
             ):
                 batch = unique_cpfs[start:start + batch_size]
-                futures = {
-                    executor.submit(_query_cliente, cpf, farm_client, cliente_responses_by_cpf): cpf
-                    for cpf in batch
-                }
                 batch_errors = 0
+                batch_completed = 0
+                # Evaluate complete, bounded sub-batches. The first responses
+                # to finish may be fast failures while successful calls are slow.
+                for chunk_start in range(0, len(batch), 100):
+                    chunk = batch[chunk_start:chunk_start + 100]
+                    futures = {
+                        executor.submit(
+                            _query_cliente, cpf, farm_client,
+                            cliente_responses_by_cpf,
+                        ): cpf
+                        for cpf in chunk
+                    }
+                    for future in as_completed(futures):
+                        cpf = futures[future]
+                        try:
+                            result = future.result()
+                        except FarmaliderAuthError:
+                            for pending in futures:
+                                pending.cancel()
+                            raise
 
-                for future in as_completed(futures):
-                    cpf = futures[future]
-                    try:
-                        result = future.result()
-                    except FarmaliderAuthError:
-                        for pending in futures:
-                            pending.cancel()
-                        raise
+                        cache[cpf] = result
+                        if cliente_lookup_status_by_cpf is not None:
+                            cliente_lookup_status_by_cpf[cpf] = result[0]
+                        completed += 1
+                        batch_completed += 1
+                        if result[0] == "ERRO_API":
+                            batch_errors += 1
+                            contact_refs = sorted({
+                                farm_client.weni_contact_diagnostic_ref(
+                                    str(row["contact_uuid"])
+                                )
+                                for row in rows_by_cpf[cpf]
+                                if row.get("contact_uuid")
+                            }) if isinstance(farm_client, FarmaliderClient) else []
+                            lookup_ref = (
+                                farm_client.cpf_diagnostic_ref(cpf)
+                                if isinstance(farm_client, FarmaliderClient) else "-"
+                            )
+                            logging.warning(
+                                "FarmaLíder cliente/cpf [consulta %s]: falha para %s "
+                                "contato(s) Weni; contato_ref=%s%s.",
+                                lookup_ref,
+                                len(rows_by_cpf[cpf]),
+                                ",".join(contact_refs[:3]) or "indisponivel",
+                                ",..." if len(contact_refs) > 3 else "",
+                            )
 
-                    cache[cpf] = result
-                    completed += 1
-                    if result[0] == "ERRO_API":
-                        batch_errors += 1
+                    if (
+                        batch_completed >= 100
+                        and batch_errors >= FARMALIDER_BATCH_ERROR_ABORT_MIN_ERRORS
+                        and batch_errors / batch_completed
+                        >= FARMALIDER_BATCH_ERROR_ABORT_RATE
+                    ):
+                        raise FarmaliderError(
+                            "FarmaLíder apresentou taxa elevada de erros no lote "
+                            f"{batch_number}/{total_batches}: "
+                            f"{batch_errors}/{batch_completed} consultas concluídas "
+                            f"({batch_errors / batch_completed:.1%}). "
+                            "Carga interrompida antes de atualizar contatos "
+                            "e pedidos no Google Sheets."
+                        )
 
                 error_rate = batch_errors / len(batch) if batch else 0.0
                 if (
@@ -396,7 +487,7 @@ def validate_contacts(
                         f"{batch_number}/{total_batches}: "
                         f"{batch_errors}/{len(batch)} "
                         f"({error_rate:.1%}). Carga interrompida antes da "
-                        "gravação no Google Sheets."
+                        "atualização de contatos e pedidos no Google Sheets."
                     )
 
                 elapsed = max(time.monotonic() - started, 0.001)
@@ -433,6 +524,10 @@ def validate_contacts(
             result = cache.get(cpf, ("ERRO_API", "", ""))
             for row in cpf_rows:
                 _apply_cliente_result(row, result)
+                if result[0] == "ERRO_API" and _preserve_cliente_on_api_error(
+                    row, existing_by_uuid,
+                ):
+                    stats.prior_details_retained += 1
 
         metrics = farm_client.metrics_snapshot()
         stats.unique_queries = len(cache)
@@ -446,6 +541,11 @@ def validate_contacts(
         stats.p95_response_ms = float(metrics.get("p95_response_ms", 0.0))
         stats.max_response_ms = float(metrics["max_response_ms"])
         stats.effective_delay_ms = float(metrics["effective_delay_ms"])
+        stats.api_errors = sum(
+            len(rows_by_cpf[cpf])
+            for cpf, result in cache.items()
+            if result[0] == "ERRO_API"
+        )
 
     for row in rows:
         status = row.get("farmalider_cliente_status", "")
@@ -455,8 +555,6 @@ def validate_contacts(
             stats.not_found += 1
         elif status == "CPF_INVALIDO":
             stats.invalid += 1
-        elif status == "ERRO_API":
-            stats.api_errors += 1
 
     stats.elapsed_seconds = time.monotonic() - started
     return stats
@@ -468,6 +566,7 @@ def build_orders(
     farm_client: FarmaliderClient | None,
     sync_time: str,
     cliente_responses_by_cpf: dict[str, dict[str, Any] | None] | None = None,
+    cliente_lookup_status_by_cpf: dict[str, str] | None = None,
 ) -> tuple[list[Row], list[Row], OrderStats]:
     snapshots: dict[str, tuple[Row, list[Row]]] = {}
     contacts_by_order: dict[str, set[str]] = {}
@@ -488,6 +587,7 @@ def build_orders(
                 captured_at=sync_time,
                 linked_cliente_id=contact_row.get("farmalider_cliente_id", ""),
                 cliente_response=(cliente_responses_by_cpf or {}).get(cpf),
+                cliente_lookup_status=(cliente_lookup_status_by_cpf or {}).get(cpf, ""),
                 pedido_responses_by_id=pedido_responses_by_id,
             )
         except FarmaliderAuthError:
@@ -497,6 +597,9 @@ def build_orders(
             continue
         if order is None:
             continue
+
+        if order.get("status_confirmacao") == "ERRO_API":
+            stats.api_errors += 1
 
         contact_uuid = order.get("contact_uuid", "")
         contact_row = rows_by_uuid.get(contact_uuid, {})
@@ -722,6 +825,7 @@ def main() -> int:
             if row.get("contact_uuid")
         }
         cliente_responses_by_cpf: dict[str, dict[str, Any] | None] = {}
+        cliente_lookup_status_by_cpf: dict[str, str] = {}
         cliente_stats = validate_contacts(
             normalized,
             farm_client=farm_client,
@@ -730,6 +834,7 @@ def main() -> int:
             existing_by_uuid=existing_by_uuid,
             reuse_existing=not force_full,
             cliente_responses_by_cpf=cliente_responses_by_cpf,
+            cliente_lookup_status_by_cpf=cliente_lookup_status_by_cpf,
         )
         if cliente_stats.cache_reused:
             logging.info(
@@ -773,6 +878,7 @@ def main() -> int:
             farm_client=farm_client,
             sync_time=sync_time,
             cliente_responses_by_cpf=cliente_responses_by_cpf,
+            cliente_lookup_status_by_cpf=cliente_lookup_status_by_cpf,
         )
 
         postprocess_started = time.monotonic()
@@ -872,12 +978,16 @@ def main() -> int:
         logging.info("Google Sheets: BI 6/7 - BI_Pedidos atualizado.")
 
         # O status é gravado por último para refletir a própria execução do BI.
+        completion_status, completion_controls = _completion_controls(
+            sync_started,
+            api_errors=cliente_stats.api_errors + order_stats.api_errors,
+        )
         status_stats = sheets.request_stats()
         status_elapsed = time.monotonic() - total_started_monotonic
         sheets.replace_bi_status([
             sync_time,
             APP_VERSION,
-            "sucesso",
+            completion_status,
             "carga_completa" if force_full or after is None else "incremental",
             round(status_elapsed, 2),
             len(contacts),
@@ -901,8 +1011,7 @@ def main() -> int:
 
         sheets.set_controls(
             {
-                "ultima_sincronizacao_sucesso_utc": utc_iso(sync_started),
-                "ultima_execucao_status": "sucesso",
+                **completion_controls,
                 "ultima_execucao_contatos_api": str(len(contacts)),
                 "ultima_execucao_contatos_relevantes": str(
                     len(relevant_contacts)
@@ -929,6 +1038,9 @@ def main() -> int:
                 "ultima_execucao_cpfs_invalidos": str(cliente_stats.invalid),
                 "ultima_execucao_erros_cliente_farmalider": str(
                     cliente_stats.api_errors
+                ),
+                "ultima_execucao_farmalider_detalhes_anteriores_mantidos": str(
+                    cliente_stats.prior_details_retained
                 ),
                 "ultima_execucao_farmalider_http_requests": str(
                     cliente_stats.http_requests
@@ -1025,8 +1137,18 @@ def main() -> int:
             order_stats.confirmed_api,
             order_stats.parse_errors,
         )
-        logging.info("Sincronização concluída com sucesso em %.2fs.", total_elapsed)
-        return 0
+        if completion_status == "parcial":
+            logging.warning(
+                "Sincronização parcial em %.2fs: %s erro(s) em consulta de "
+                "clientes e %s em pedido(s). O marco incremental anterior foi mantido "
+                "para nova tentativa na próxima execução.",
+                total_elapsed,
+                cliente_stats.api_errors,
+                order_stats.api_errors,
+            )
+        else:
+            logging.info("Sincronização concluída com sucesso em %.2fs.", total_elapsed)
+        return PARTIAL_SYNC_EXIT_CODE if completion_status == "parcial" else 0
 
     except Exception as exc:
         logging.exception("Falha na sincronização: %s", exc)

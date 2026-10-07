@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import logging
 import math
+import secrets
 import threading
 import time
 from email.utils import parsedate_to_datetime
@@ -45,6 +49,9 @@ class FarmaliderClient:
             raise ValueError("Token da FarmaLíder API não informado.")
 
         self.base_url = farmalider_api_base_url().rstrip("/")
+        # Identificadores de diagnóstico não permitem reconstruir CPFs por
+        # enumeração e são estáveis apenas durante esta execução.
+        self._diagnostic_key = secrets.token_bytes(32)
 
         self._thread_local = threading.local()
         self._sessions: list[requests.Session] = []
@@ -180,6 +187,78 @@ class FarmaliderClient:
             return "pedido"
         return "delivery"
 
+    def _diagnostic_ref(self, kind: str, identity: str | int) -> str:
+        message = f"{kind}:{identity}".encode("utf-8")
+        return hmac.new(
+            self._diagnostic_key, message, hashlib.sha256
+        ).hexdigest()[:12]
+
+    def cpf_diagnostic_ref(self, cpf: str) -> str:
+        """Referência opaca para ligar as tentativas ao contato no log."""
+        return self._diagnostic_ref("cliente/cpf", cpf)
+
+    def weni_contact_diagnostic_ref(self, contact_uuid: str) -> str:
+        """Referência opaca do contato, sem expor ou hashear o UUID diretamente."""
+        return self._diagnostic_ref("weni/contact", contact_uuid)
+
+    def _safe_server_error_summary(self, response: requests.Response) -> str:
+        """Classifica o corpo sem registrar texto arbitrário ou dados pessoais."""
+        raw = response.content
+        if not isinstance(raw, bytes):
+            raw = (
+                raw.encode("utf-8", errors="replace")
+                if isinstance(raw, str) else b""
+            )
+        content_type = response.headers.get("Content-Type", "")
+        if not isinstance(content_type, str):
+            content_type = ""
+        content_type = content_type.split(";", 1)[0].strip().lower()
+        kind = (
+            "json" if (
+                content_type == "application/json"
+                or content_type == "text/json"
+                or content_type.endswith("+json")
+            )
+            else "texto" if content_type == "text/plain"
+            else "html" if content_type == "text/html"
+            else "outro"
+        )
+        category = "vazio" if not raw else "nao_classificado"
+        if raw and len(raw) <= 4096 and kind in {"json", "texto"}:
+            value: Any = raw.decode("utf-8", errors="replace").strip()
+            if kind == "json":
+                try:
+                    payload = json.loads(value)
+                    value = (
+                        " ".join(
+                            payload[key]
+                            for key in ("title", "message", "detail")
+                            if isinstance(payload.get(key), str)
+                        )
+                        if isinstance(payload, dict) else ""
+                    )
+                except ValueError:
+                    value = ""
+            if isinstance(value, str):
+                normalized = value.strip().casefold()
+                if (
+                    "nullreferenceexception" in normalized
+                    or "object reference not set to an instance" in normalized
+                ):
+                    category = "null_reference"
+                elif "sequence contains no elements" in normalized:
+                    category = "sequencia_vazia"
+                elif normalized == "internal server error":
+                    category = "internal_server_error"
+        signature = (
+            hmac.new(self._diagnostic_key, raw, hashlib.sha256).hexdigest()[:12]
+            if raw else "-"
+        )
+        return (
+            f"tipo={kind} bytes={len(raw)} "
+            f"categoria={category} assinatura={signature}"
+        )
+
     def _record_request(
         self,
         elapsed_seconds: float,
@@ -263,6 +342,8 @@ class FarmaliderClient:
         attempt: int,
         *,
         response: requests.Response | None = None,
+        endpoint_label: str = "delivery",
+        diagnostic_ref: str = "-",
     ) -> None:
         self._record_retry()
         status_code = response.status_code if response is not None else None
@@ -291,13 +372,12 @@ class FarmaliderClient:
             )
             return
 
-        delay = (
-            server_delay
-            if server_delay is not None
-            else float(2 ** (attempt - 1))
-        )
+        delay = max(float(2 ** (attempt - 1)), server_delay or 0.0)
         logging.warning(
-            "FarmaLíder: repetindo requisição em %.1fs (tentativa %s/%s).",
+            "FarmaLíder %s [consulta %s]: HTTP %s; nova tentativa em %.1fs (%s/%s).",
+            endpoint_label,
+            diagnostic_ref,
+            status_code if status_code is not None else "rede",
             delay,
             attempt,
             FARMALIDER_MAX_RETRIES,
@@ -309,6 +389,7 @@ class FarmaliderClient:
         path: str,
         *,
         allow_not_found: bool = False,
+        diagnostic_ref: str = "-",
     ) -> dict[str, Any] | None:
         url = f"{self.base_url}{path}"
         endpoint_label = self._endpoint_label(path)
@@ -324,7 +405,7 @@ class FarmaliderClient:
                     params={"token": self.token},
                     timeout=FARMALIDER_REQUEST_TIMEOUT_SECONDS,
                 )
-            except requests.RequestException as exc:
+            except requests.RequestException:
                 self._record_request(
                     time.monotonic() - started,
                     network_error=True,
@@ -333,8 +414,11 @@ class FarmaliderClient:
                 if attempt >= FARMALIDER_MAX_RETRIES:
                     raise FarmaliderError(
                         "Não foi possível alcançar a FarmaLíder API."
-                    ) from exc
-                self._sleep_before_retry(attempt)
+                    ) from None
+                self._sleep_before_retry(
+                    attempt, endpoint_label=endpoint_label,
+                    diagnostic_ref=diagnostic_ref,
+                )
                 continue
 
             self._record_request(
@@ -361,25 +445,39 @@ class FarmaliderClient:
                 )
 
             if response.status_code == 429 or response.status_code >= 500:
+                if response.status_code >= 500 and (
+                    attempt == 1 or attempt == FARMALIDER_MAX_RETRIES
+                ):
+                    logging.warning(
+                        "FarmaLíder %s [consulta %s]: HTTP %s; resposta %s.",
+                        endpoint_label,
+                        diagnostic_ref,
+                        response.status_code,
+                        self._safe_server_error_summary(response),
+                    )
                 if attempt >= FARMALIDER_MAX_RETRIES:
                     raise FarmaliderError(
                         f"FarmaLíder API retornou HTTP {response.status_code} "
                         "após as tentativas configuradas."
                     )
-                self._sleep_before_retry(attempt, response=response)
+                self._sleep_before_retry(
+                    attempt, response=response,
+                    endpoint_label=endpoint_label,
+                    diagnostic_ref=diagnostic_ref,
+                )
                 continue
 
             try:
                 response.raise_for_status()
                 payload = response.json()
-            except requests.RequestException as exc:
+            except requests.RequestException:
                 raise FarmaliderError(
                     f"FarmaLíder API retornou HTTP {response.status_code}."
-                ) from exc
-            except ValueError as exc:
+                ) from None
+            except ValueError:
                 raise FarmaliderError(
                     "FarmaLíder API retornou JSON inválido."
-                ) from exc
+                ) from None
 
             if not isinstance(payload, dict):
                 raise FarmaliderError(
@@ -393,12 +491,14 @@ class FarmaliderClient:
         return self._request_json(
             self._delivery_path(f"cliente/cpf/{cpf}"),
             allow_not_found=True,
+            diagnostic_ref=self.cpf_diagnostic_ref(cpf),
         )
 
     def get_pedido(self, codigo: str | int) -> dict[str, Any] | None:
         return self._request_json(
             self._delivery_path(f"pedido/{codigo}"),
             allow_not_found=True,
+            diagnostic_ref=self._diagnostic_ref("pedido", codigo),
         )
 
     def test_connection(self) -> dict[str, Any]:
@@ -414,7 +514,7 @@ class FarmaliderClient:
                 params={"token": self.token},
                 timeout=FARMALIDER_REQUEST_TIMEOUT_SECONDS,
             )
-        except requests.RequestException as exc:
+        except requests.RequestException:
             self._record_request(
                 time.monotonic() - started,
                 network_error=True,
@@ -422,7 +522,7 @@ class FarmaliderClient:
             )
             raise FarmaliderError(
                 "Não foi possível alcançar a FarmaLíder API."
-            ) from exc
+            ) from None
 
         self._record_request(
             time.monotonic() - started,

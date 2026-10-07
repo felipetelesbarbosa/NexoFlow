@@ -193,6 +193,45 @@ A integração usa concorrência controlada:
 
 Os valores operacionais ficam em `config.py`.
 
+### Diagnóstico de HTTP 500
+
+O Swagger 3.0.4 fornecido para esta integração descreve `404` como *não
+encontrado* e `500` como *erro interno*, mas não especifica o corpo nem a causa
+de uma resposta `500`. Seu schema de `200` para `cliente/cpf` também não inclui
+o envelope `cliente`, `ultimoPedido` e `itens` observado nas respostas reais.
+Por isso, um `500` não é interpretado como CPF inexistente.
+
+O cliente mantém até quatro tentativas para erros transitórios. Cada consulta
+recebe uma referência opaca, estável apenas durante a execução, para reunir
+os retries sem registrar CPF ou token. O log classifica o corpo `5xx` por tipo,
+tamanho, categoria conhecida e assinatura opaca; texto livre da resposta não
+é copiado para o log, pois pode conter dados pessoais. Após falha definitiva,
+o Analytics registra referências derivadas dos UUIDs Weni afetados.
+
+Se um CPF já havia sido confirmado e permanece igual, uma falha transitória
+preserva apenas o ID, nome e horário da **última validação bem-sucedida** na
+Base_Contatos. O status atual fica `ERRO_API`: uma confirmação ou um `404`
+antigo não é apresentado como resultado da consulta atual. O Controle registra
+separadamente quantos detalhes anteriores foram mantidos. A etapa de pedidos
+não repete o GET por CPF que já terminou em `404` ou erro nesta mesma execução;
+um pedido identificado na Weni ainda pode ser confirmado pelo endpoint por
+código. A taxa de falhas é avaliada após sublotes completos de até 100 CPFs,
+para que respostas `500` mais rápidas não distorçam a amostra. Se a taxa
+atingir o limite configurado, a carga é interrompida antes de gravar contatos
+e pedidos no Google Sheets.
+
+Se alguns CPFs ou consultas de pedido falharem abaixo desse limite, a
+execução é marcada `parcial` nas abas de status e controle e termina com
+código de saída `3`. O marco de sincronização incremental anterior permanece
+inalterado, de modo que esses contatos voltem a ser considerados na próxima
+execução. A nova tentativa pode repetir parte da consulta à Weni e da API
+FarmaLíder, pois o cache de clientes não armazena o payload do pedido.
+
+Essas medidas reduzem a carga e preservam informações, mas não corrigem um
+defeito interno da API. Para determinar a causa, a equipe FarmaLíder precisa
+correlacionar horário, rota e logs do servidor. Uma resposta com identificador
+de requisição e um schema de erro documentado tornariam isso mais preciso.
+
 ## Melhoria futura: histórico de pedidos por CPF
 
 A API usada permite localizar cliente por CPF, obter sua referência de último pedido quando disponível e consultar pedido por código, mas não lista o histórico de pedidos de um cliente. Como evolução recomendada da FarmaLíder API, criar uma rota de consulta por CPF, preferencialmente paginada e com filtros de período/status, por exemplo:

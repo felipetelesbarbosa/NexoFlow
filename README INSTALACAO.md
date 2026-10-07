@@ -23,6 +23,11 @@ Depois execute, nesta ordem:
 
 A carga completa do Weni atualiza o snapshot operacional dos contatos. A carga completa do Analytics migra os schemas do Google Sheets e preenche as estruturas analíticas, incluindo frete separado e faturamento total (produtos + frete).
 
+Se o Analytics terminar com código `3`, a carga foi **parcial**: algumas
+consultas FarmaLíder falharam, o marco incremental anterior foi mantido e a
+próxima execução tentará esses contatos novamente. Consulte
+`logs\nexoflow.log` e a aba `BI_Status` antes de interpretar os totais.
+
 
 No NexoFlow 1.0, o NexoFlow mantém o fluxo 24h, a CLI amigável `nexo`, o isolamento do checkpoint, o check-up limpo e o timeout/retry do Google Sheets. O Analytics reduz leituras e escritas redundantes, usa batches adaptativos e cache seguro da FarmaLíder no incremental; o Update Weni reduz leituras auxiliares e I/O local sem agrupar ou paralelizar as escritas protegidas.
 
