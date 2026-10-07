@@ -61,11 +61,13 @@
 
 - a FarmaLíder API é a fonte de verdade dos pedidos; `pedido_id` e `ultimo_pedido` da Weni são localizadores para recuperação;
 - novo campo `pedido_status` é preenchido pelo NexoFlow Weni após consultar o mesmo `pedido_id` na FarmaLíder API;
-- valores oficiais de `pedido_status`: **Em processamento**, **Em trânsito**, **Concluído**, **Cancelado** e **Pronto para rota**;
+- valores oficiais de `pedido_status`: **-1 Pendente pagamento**, **0 Em processamento**, **1 Em trânsito**, **2 Concluído** e **3 Cancelado**;
+- formas de pagamento: 1 Dinheiro, 2 Débito, 3 Crédito, 4 Ticket, 5 Pix por Link de Pagamento e 6 PIX no POS;
+- forma de pagamento 0 (ou enum `_`) representa pedido não pago: a Weni recebe **CANCELADO** em `pedido_forma_pagamento` e o status é forçado para **3 Cancelado**;
 - cancelamento explícito sempre prevalece e grava **Cancelado**;
-- status 0, 1, 2 e 4 contam como pedido feito; somente status 3 fica fora dos indicadores;
+- apenas status 0, 1 e 2 contam como pedido feito; -1 e 3 ficam fora dos indicadores;
 - `pedido_status` também é preservado na `Base_Contatos` para Google Sheets/Looker Studio;
-- pedidos em **Em processamento**, **Em trânsito** ou **Pronto para rota** ficam numa fila persistente de rechecagem até chegarem a **Concluído** ou **Cancelado**, mesmo sem nova mensagem na Weni.
+- pedidos em **Pendente pagamento**, **Em processamento** ou **Em trânsito** ficam numa fila persistente de rechecagem até chegarem a **Concluído** ou **Cancelado**, mesmo sem nova mensagem na Weni.
 
 Data de consolidação: 05/10/2026.
 
