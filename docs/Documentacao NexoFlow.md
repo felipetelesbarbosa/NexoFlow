@@ -3,7 +3,7 @@
 Software interno de integração, atualização de contatos e analytics da FarmaLíder.
 
 ### Camada BI para Looker Studio
-O NexoFlow 1.0 transforma o NexoFlow Analytics em uma camada analítica pronta para o Looker Studio. O projeto passa a criar/manter automaticamente `BI_Resumo_Diario`, `BI_Canais`, `BI_Conversao`, `BI_Vendas`, `BI_Ads` e `BI_Status`. O resumo diário usa uma linha por dia; canais e conversão mantêm snapshots diários; vendas são uma série por data; Ads apresenta uma linha zero até existir atribuição; Status registra a saúde da última execução.
+O NexoFlow 1.0 transforma o NexoFlow Analytics em uma camada analítica pronta para o Looker Studio. O projeto passa a criar/manter automaticamente `BI_Resumo_Diario`, `BI_Canais`, `BI_Conversao`, `BI_Vendas`, `BI_Ads`, `BI_Pedidos` e `BI_Status`. O resumo diário usa uma linha por dia; canais e conversão mantêm snapshots diários; vendas são uma série por data; Ads apresenta uma linha zero até existir atribuição; Status registra a saúde da última execução.
 
 Para que os totais do dashboard representem a base Weni completa, `Base_Contatos` passa a preservar todos os contatos retornados pela Weni, mesmo sem CPF, pedido ou anúncio. Também entram no schema analítico `idade`, `maior_de_18_anos` e `opt_in_lgpd`. Após instalar o NexoFlow 1.0, recomenda-se uma única carga completa para preencher contatos históricos antes excluídos e inicializar a camada BI; depois, o incremental mantém tudo atualizado.
 
@@ -163,7 +163,7 @@ primeiro_anuncio_*
 ultimo_anuncio_*
 ```
 
-`opt_in_lgpd_status` continua controlado pelos flows/agentes da Weni. `ultimo_pedido` continua sendo o snapshot JSON estruturado de origem e não é reescrito pelo NexoFlow Weni.
+`opt_in_lgpd_status` continua controlado pelos flows/agentes da Weni. `ultimo_pedido` é preservado apenas para compatibilidade; com a FarmaLíder API disponível, os campos `pedido_*` são alimentados pelo GET oficial por CPF/pedido.
 
 ## URNs e canais
 
@@ -185,7 +185,7 @@ O valor de `opt_in_lgpd` é a fonte de verdade para os grupos. Com `ativo`, o co
 
 ## Pedidos e última compra
 
-A rotina usa `ultimo_pedido` como fonte estruturada, mas só escreve `pedido_*` e `ultima_compra` depois de confirmar o pedido pela API FarmaLíder. Pedido cancelado, não confirmado ou sem identificação oficial válida não gera atualização transacional. Uma compra antiga não sobrescreve uma `ultima_compra` mais recente já gravada.
+A rotina usa a FarmaLíder API como fonte de verdade: consulta o cliente por CPF, obtém `ultimoPedido` e `itens`, confirma o mesmo pedido por código e então escreve os campos `pedido_*` e `ultima_compra`. `pedido_produtos` usa `descricao`; quantidades e valores unitários são listas posicionais separadas por vírgula; `pedido_valor` é a soma de `itens[].total`. Pedido cancelado não atualiza `ultima_compra`.
 
 ## Auditoria, idempotência e checkpoint
 

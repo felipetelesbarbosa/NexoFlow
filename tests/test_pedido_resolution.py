@@ -27,7 +27,15 @@ SYNTHETIC_CPF = "52998224725"
 def cliente_payload():
     return {
         "cliente": {"id": 99, "cpf": SYNTHETIC_CPF, "nome": "Cliente sintético"},
-        "ultimoPedido": {"id": 123, "codCliente": 99},
+        "ultimoPedido": {
+            "id": 123, "codCliente": 99, "emissao": "2026-10-06T10:30:00",
+            "cancelamento": None, "status": 1, "formaPagamento": 2, "frete": "9.99",
+        },
+        "itens": [{
+            "codPedido": 123, "codProduto": "9001",
+            "descricao": "Produto sintético",
+            "quantidade": 1, "valor": "38.90", "total": "38.90",
+        }],
     }
 
 
@@ -35,11 +43,12 @@ def pedido_payload():
     return {
         "capa": {
             "id": 123, "codCliente": 99, "emissao": "2026-10-06T10:30:00",
-            "cancelamento": None, "status": 1, "frete": "9.99",
+            "cancelamento": None, "status": 1, "formaPagamento": 2, "frete": "9.99",
         },
         "itens": [{
-            "codPedido": 123, "codProduto": "9001", "quantidade": 1,
-            "valor": "38.90", "total": "38.90",
+            "codPedido": 123, "codProduto": "9001",
+            "descricao": "Produto sintético",
+            "quantidade": 1, "valor": "38.90", "total": "38.90",
         }],
     }
 
