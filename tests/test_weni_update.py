@@ -608,7 +608,7 @@ class WeniUpdateTests(unittest.TestCase):
         })
 
     def test_status_is_written_as_official_code(self) -> None:
-        for status in (0, 1, 2, 3, 4):
+        for status in (-1, 0, 1, 2, 3):
             with self.subTest(status=status):
                 contact = self._purchase_contact(include_raw=False)
                 farm = self._purchase_api()
@@ -619,7 +619,7 @@ class WeniUpdateTests(unittest.TestCase):
                 audit_plans([plan], opt_out_group_available=True)
 
     def test_payment_is_written_as_official_code(self) -> None:
-        for payment in (1, 2, 3, 4, 5):
+        for payment in (1, 2, 3, 4, 5, 6):
             with self.subTest(payment=payment):
                 contact = self._purchase_contact(include_raw=False)
                 farm = self._purchase_api()
@@ -787,8 +787,20 @@ class WeniUpdateTests(unittest.TestCase):
         self.assertNotIn("ultima_compra", plan.fields)
         audit_plans([plan], opt_out_group_available=True)
 
+    def test_pending_payment_does_not_advance_latest_purchase(self) -> None:
+        contact = self._purchase_contact(include_raw=False)
+        contact["fields"]["ultima_compra"] = "2026-10-01T10:00:00-03:00"
+        farm = self._purchase_api()
+        farm.get_pedido.return_value["capa"]["status"] = -1
+        plan = self._purchase_plan(contact, farm)
+        self.assertTrue(plan.order_validated)
+        self.assertFalse(plan.purchase_confirmed)
+        self.assertEqual(plan.fields["pedido_status"], "-1")
+        self.assertNotIn("ultima_compra", plan.fields)
+        audit_plans([plan], opt_out_group_available=True)
+
     def test_non_cancelled_states_advance_latest_purchase(self) -> None:
-        for status in (0, 1, 2, 4):
+        for status in (0, 1, 2):
             with self.subTest(status=status):
                 contact = self._purchase_contact(include_raw=False)
                 contact["fields"]["ultima_compra"] = (
