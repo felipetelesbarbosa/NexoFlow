@@ -1912,10 +1912,16 @@ def run_update(
     full: bool = False,
     review_out: Path | None = None,
     require_review: Path | None = None,
+    quarter: int | None = None,
 ) -> UpdateStats:
     token = str(getattr(secrets, "WENI_API_TOKEN", "")).strip()
     if not token or token == "COLE_SEU_TOKEN_WENI_AQUI":
         raise RuntimeError("Token da Weni não configurado em secrets_config.py.")
+    if quarter is not None:
+        if not full:
+            raise RuntimeError("A carga 25% Weni exige --full.")
+        if quarter not in {1, 2, 3, 4}:
+            raise RuntimeError("A parte da carga 25% Weni deve ser 1, 2, 3 ou 4.")
 
     frozen_full_apply = bool(apply and full and require_review is not None)
     window = None if frozen_full_apply else resolve_window(full=full)
@@ -1966,6 +1972,7 @@ def run_update(
             plans, review_payload, digest = load_review_snapshot(
                 full=True,
                 json_path=Path(require_review),
+                quarter=quarter,
             )
             audit_plans(
                 plans,
@@ -1994,6 +2001,19 @@ def run_update(
                     and isinstance(count, int) and not isinstance(count, bool) and count > 0
                 }
             captured_at = str(review_payload.get("captured_at_utc") or "").strip()
+            reviewed_partition = (
+                review_payload.get("partition")
+                if isinstance(review_payload.get("partition"), dict)
+                else {}
+            )
+            quarter_campaign_id = str(reviewed_partition.get("campaign_id") or "")
+            if quarter is not None:
+                logging.info(
+                    "APPLY Weni 25%% Parte %s/4 | campanha=%s | contatos revisados=%s.",
+                    quarter,
+                    quarter_campaign_id,
+                    len(plans),
+                )
 
             logging.info(
                 "APPLY de carga completa usará o snapshot congelado; o histórico não será recalculado. "
@@ -2124,8 +2144,8 @@ def run_update(
                         stats.contacts_already_satisfied,
                     )
 
-            _save_state(
-                {
+            if quarter is None:
+                state_payload = {
                     "last_success_utc": captured_at,
                     "last_mode": "full-frozen-snapshot",
                     "review_sha256": digest,
@@ -2137,7 +2157,45 @@ def run_update(
                     "field_changes": stats.field_changes,
                     "group_actions": stats.group_actions,
                 }
-            )
+            else:
+                reviewed_uuids = {plan.contact_uuid for plan in plans}
+                previous_pending = {
+                    str(item).strip()
+                    for item in (state.get("pending_conflict_uuids") or [])
+                    if str(item).strip()
+                }
+                pending_after = (
+                    previous_pending - reviewed_uuids
+                ) | set(conflicted_uuids)
+                component_complete, campaign_complete = mark_full_load_quarter_complete(
+                    component="weni",
+                    part=quarter,
+                    campaign_id=quarter_campaign_id,
+                )
+                state_payload = {
+                    **state,
+                    "last_mode": f"full-25-part-{quarter}",
+                    "review_sha256": digest,
+                    "contacts_updated": stats.contacts_updated,
+                    "contacts_conflicted": stats.contacts_conflicted,
+                    "pending_conflict_uuids": sorted(pending_after),
+                    "open_order_uuids": sorted(open_order_uuids),
+                    "contacts_already_satisfied": stats.contacts_already_satisfied,
+                    "field_changes": stats.field_changes,
+                    "group_actions": stats.group_actions,
+                    "full_25_campaign_id": quarter_campaign_id,
+                    "full_25_weni_part": quarter,
+                }
+                if component_complete:
+                    state_payload["last_success_utc"] = captured_at
+                logging.info(
+                    "Carga 25%% Weni Parte %s/4 concluída. "
+                    "Weni completo=%s | campanha ativa concluída=%s.",
+                    quarter,
+                    "sim" if component_complete else "não",
+                    "sim" if campaign_complete else "não",
+                )
+            _save_state(state_payload)
             logging.info(
                 "Snapshot congelado concluído: aplicados=%s | conflitos ignorados=%s | já satisfeitos=%s. "
                 "O checkpoint foi mantido no corte do dry-run para que mudanças posteriores sejam reprocessadas.",
