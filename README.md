@@ -224,6 +224,10 @@ CPF
 
 O retorno de `cliente/cpf` já contém `ultimoPedido` e `itens`, portanto pode servir como fallback completo quando a segunda consulta sofre falha transitória. O endpoint de pedido é preferido como snapshot final.
 
+Se o GET por CPF não puder ser usado, o NexoFlow tenta primeiro o `pedido_id` já gravado pelo próprio NexoFlow. Somente se esse localizador não estiver disponível ou não puder ser validado, `ultimo_pedido` é usado como **último localizador de ID**. Como `ultimo_pedido` é alimentado por outra integração, ele ajuda a recuperar um pedido criado enquanto o NexoFlow esteve indisponível. Mesmo nesse fallback, os produtos, valores, status, data e pagamento só são aceitos após um GET oficial de `pedido/{id}`; `ultimo_pedido` não substitui a FarmaLíder API como fonte de verdade.
+
+Os oito campos `pedido_*` abaixo são obrigatórios na Weni. Se qualquer um estiver ausente, o NexoFlow Weni bloqueia o apply para evitar um snapshot parcial de pedido.
+
 ### Contrato dos campos Weni
 
 | Campo Weni | Origem FarmaLíder | Formato |
@@ -275,6 +279,20 @@ As três listas de item são posicionais: o primeiro produto corresponde à prim
 | 5 | Online/link/Pix |
 
 A Weni guarda os códigos oficiais. O Analytics cria os rótulos amigáveis para o Google Sheets e o Looker Studio.
+
+### Frete e faturamento
+
+`pedido_valor` continua representando **somente os produtos**, conforme o contrato da Weni. O campo `frete` retornado pela FarmaLíder é armazenado no Google Sheets em `farmalider_frete` e o Analytics calcula também `valor_total_faturamento = produtos + frete`.
+
+No BI, a separação fica explícita:
+
+```text
+pedido_valor            = total dos produtos
+pedido_frete            = frete
+pedido_faturamento_total = produtos + frete
+```
+
+As abas `BI_Resumo_Diario` e `BI_Vendas` também separam faturamento de produtos, faturamento de frete e faturamento total. O campo de faturamento usado nos indicadores gerais passa a considerar **produtos + frete**, para bater com o valor total cobrado do pedido.
 
 Para os indicadores, **0, 1, 2 e 4** contam como pedido feito quando confirmados pela API e sem cancelamento explícito. **3, Cancelado**, fica fora.
 
