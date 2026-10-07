@@ -193,7 +193,7 @@ def _activate_proxy(
         os.environ.pop("no_proxy", None)
 
 
-def configure_proxy() -> ProxyStatus:
+def configure_proxy(*, detection_attempts: int | None = None) -> ProxyStatus:
     """
     Configura proxy somente para o processo Python atual.
 
@@ -258,11 +258,16 @@ def configure_proxy() -> ProxyStatus:
         )
 
     reachable = False
-    for attempt in range(PROXY_DETECTION_ATTEMPTS):
+    attempts = (
+        PROXY_DETECTION_ATTEMPTS
+        if detection_attempts is None
+        else max(1, int(detection_attempts))
+    )
+    for attempt in range(attempts):
         if _is_reachable(host, port, timeout):
             reachable = True
             break
-        if attempt < PROXY_DETECTION_ATTEMPTS - 1:
+        if attempt < attempts - 1:
             time.sleep(PROXY_RETRY_DELAY_SECONDS)
 
     if mode == "on":
@@ -399,7 +404,7 @@ def refresh_network_route(*, reason: str = "falha de rede") -> NetworkRouteRefre
     """
     with _ROUTE_REFRESH_LOCK:
         previous_active = _proxy_active_from_env()
-        status = configure_proxy()
+        status = configure_proxy(detection_attempts=1)
         current_active = bool(status.active)
         changed = (
             previous_active is not None
