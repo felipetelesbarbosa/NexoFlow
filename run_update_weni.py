@@ -25,6 +25,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="processa o histórico completo em vez da janela incremental",
     )
     parser.add_argument(
+        "--quarter",
+        type=int,
+        choices=(1, 2, 3, 4),
+        help="na carga completa, processa somente a Parte 1/4, 2/4, 3/4 ou 4/4 da base congelada",
+    )
+    parser.add_argument(
         "--review-out",
         help="grava snapshot JSON e relatório TXT para revisão humana",
     )
@@ -40,6 +46,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = build_parser().parse_args()
+    if args.quarter is not None and not args.full:
+        raise SystemExit("--quarter exige --full.")
     status = configure_proxy()
 
     from config import WENI_UPDATE_LOG_FILE
@@ -92,18 +100,26 @@ def main() -> int:
 
         review_out = Path(args.review_out) if args.review_out else None
         require_review = Path(args.require_review) if args.require_review else None
+        default_review = (
+            Path(f"logs/weni_update_review_full_25_parte_{args.quarter}.json")
+            if args.quarter is not None
+            else Path("logs/weni_update_review_full.json")
+        )
         if args.dry_run and args.full and review_out is None:
-            review_out = Path("logs/weni_update_review_full.json")
+            review_out = default_review
         if args.apply and args.full and require_review is None:
-            require_review = Path("logs/weni_update_review_full.json")
+            require_review = default_review
 
         stats = run_update(
             apply=args.apply,
             full=args.full,
             review_out=review_out,
             require_review=require_review,
+            quarter=args.quarter,
         )
         print("\n=== Resumo NexoFlow Weni ===")
+        if args.quarter is not None:
+            print(f"Carga completa 25%: Parte {args.quarter}/4")
         print(f"Mensagens recebidas analisadas: {stats.messages_incoming}")
         print(f"Contatos modificados consultados: {stats.contacts_modified}")
         print(f"Contatos considerados: {stats.contacts_considered}")
