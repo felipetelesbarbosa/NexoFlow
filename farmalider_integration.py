@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -166,7 +167,7 @@ def _matching_name(
 def apply_pedido_api_confirmation(
     order: dict[str, str], items: list[dict[str, str]],
     pedido_api: dict[str, Any] | None, *, linked_cliente_id: str,
-    confirmed_at: str,
+    confirmed_at: str, allow_locator_without_customer: bool = False,
 ) -> tuple[dict[str, str], list[dict[str, str]]]:
     """Build the canonical order from the current FarmaLíder API response."""
     from analytics import _item_key
@@ -187,9 +188,16 @@ def apply_pedido_api_confirmation(
 
     api_cliente_id = _positive_id(capa.get("codCliente"))
     linked_id = _positive_id(linked_cliente_id)
-    if not api_cliente_id or not linked_id:
+    if not api_cliente_id:
         return _failure(order, [], "PEDIDO_CLIENTE_NAO_VERIFICADO_API", "Proprietário do pedido não verificado.")
-    if api_cliente_id != linked_id:
+    if not linked_id:
+        if not allow_locator_without_customer:
+            return _failure(order, [], "PEDIDO_CLIENTE_NAO_VERIFICADO_API", "Proprietário do pedido não verificado.")
+        # Fallback controlado: pedido_id/ultimo_pedido pertencem ao próprio
+        # contato Weni e servem apenas como localizadores. A API continua sendo
+        # a fonte dos dados do pedido; o codCliente retornado fica registrado.
+        linked_id = api_cliente_id
+    elif api_cliente_id != linked_id:
         return _failure(order, [], "PEDIDO_CLIENTE_DIVERGENTE_API", "Proprietário do pedido divergente.")
 
     emitted = business_order_datetime(capa.get("emissao"))
@@ -264,8 +272,11 @@ def apply_pedido_api_confirmation(
     except ValueError as exc:
         return _failure(order, [], "ERRO_ITENS_PEDIDO_API", str(exc))
 
-    # Contract requested for Weni/BI: pedido_valor is the sum of item totals.
+    # Contrato Weni: pedido_valor é somente produtos. Para BI/faturamento,
+    # o frete fica separado e também compõe o total cobrado do pedido.
     purchase_total = api_total
+    freight_value = freight if freight is not None else Decimal("0")
+    billing_total = purchase_total + freight_value
     provenance = "SOMA_ITENS_API"
 
     order.update({
@@ -282,6 +293,7 @@ def apply_pedido_api_confirmation(
         "farmalider_confirmado_em": confirmed_at,
         "origem_pedido": order.get("origem_pedido") or "FARMALIDER_API",
         "valor_total_compra": f"{purchase_total:.2f}",
+        "valor_total_faturamento": f"{billing_total:.2f}",
         "valor_total_itens": f"{api_total:.2f}",
         "valor_total_api_itens": f"{api_total:.2f}",
         "quantidade_itens_api": _quantity_text(api_qty),
@@ -340,78 +352,140 @@ def _empty_order(contact: dict[str, Any], captured_at: str) -> dict[str, str]:
     return order
 
 
+def _ultimo_pedido_locator_id(fields: dict[str, Any]) -> str:
+    """Extract only an order ID from ultimo_pedido; never trust it as order data."""
+    raw: Any = fields.get("ultimo_pedido")
+    if isinstance(raw, dict) and "value" in raw:
+        raw = raw.get("value")
+
+    payload: Any = raw
+    if isinstance(raw, str):
+        text = raw.strip()
+        if not text:
+            return ""
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            return ""
+
+    if not isinstance(payload, dict):
+        return ""
+    return _positive_id(
+        payload.get("pedido_id")
+        or payload.get("pedidoId")
+        or payload.get("codigo")
+        or payload.get("codPedido")
+        or payload.get("id")
+    )
+
+
 def resolve_contact_order(
     contact: dict[str, Any], *, farm_client: Any, captured_at: str,
     linked_cliente_id: str = "", cliente_response: dict[str, Any] | None = None,
     pedido_responses_by_id: dict[str, dict[str, Any] | None] | None = None,
 ) -> tuple[dict[str, str] | None, list[dict[str, str]]]:
     """
-    Resolve pedido from FarmaLíder first.
+    Resolve o pedido usando a FarmaLíder como fonte de verdade.
 
-    Primary flow:
-      CPF -> GET cliente/cpf -> ultimoPedido + itens
-          -> GET pedido/{id} for the most complete/current snapshot.
+    Ordem de descoberta:
+      1. CPF -> GET cliente/cpf -> ultimoPedido + itens;
+      2. campo Weni pedido_id, quando o GET por CPF não puder ser usado;
+      3. ultimo_pedido, somente como último localizador de pedido.
 
-    Weni pedido fields are a destination/cache and are only used as a legacy
-    fallback when the FarmaLíder API cannot be used.
+    pedido_id e ultimo_pedido nunca substituem os dados oficiais retornados por
+    GET pedido/{id}. Se a API não estiver disponível, os campos pedido_* não
+    são reconstruídos a partir do snapshot legado.
     """
-    from analytics import (
-        get_fields,
-        is_valid_cpf,
-        normalize_cpf,
-        parse_ultimo_pedido,
-    )
+    from analytics import get_fields, is_valid_cpf, normalize_cpf
     from farmalider_client import FarmaliderAuthError, FarmaliderError
 
     fields = get_fields(contact)
     cpf = normalize_cpf(fields.get("cpf"))
     linked_id = _positive_id(linked_cliente_id)
-
-    # Legacy snapshot is retained only as an offline fallback.
-    legacy_order, legacy_items = parse_ultimo_pedido(
-        contact, captured_at=captured_at
-    )
+    current_pedido_id = _positive_id(fields.get("pedido_id"))
+    ultimo_pedido_id = _ultimo_pedido_locator_id(fields)
 
     if farm_client is None:
-        if legacy_order is not None:
-            legacy_order["status_confirmacao"] = (
-                legacy_order.get("status_confirmacao") or "NAO_CONFIRMADO_API"
-            )
-        return legacy_order, legacy_items
+        return None, []
 
-    if not cpf:
-        # Without CPF we only refresh a known pedido when the cliente linkage was
-        # already validated by Analytics.
-        pedido_id = _positive_id(fields.get("pedido_id"))
-        if not pedido_id or not linked_id:
-            return legacy_order, legacy_items
-        order = _empty_order(contact, captured_at)
-        order["pedido_id"] = pedido_id
-        order["farmalider_cliente_id"] = linked_id
-        order["origem_pedido"] = "FARMALIDER_PEDIDO_API"
+    def fetch_pedido(order_id: str) -> dict[str, Any] | None:
+        if not order_id:
+            return None
+        if pedido_responses_by_id is not None and order_id in pedido_responses_by_id:
+            return pedido_responses_by_id[order_id]
+        response = farm_client.get_pedido(order_id)
+        if pedido_responses_by_id is not None:
+            pedido_responses_by_id[order_id] = response
+        return response
+
+    def resolve_locator(
+        order_id: str,
+        source: str,
+        *,
+        expected_cliente_id: str = "",
+    ) -> tuple[dict[str, str] | None, list[dict[str, str]]]:
+        if not order_id:
+            return None, []
         try:
-            if pedido_responses_by_id is not None and pedido_id in pedido_responses_by_id:
-                response = pedido_responses_by_id[pedido_id]
-            else:
-                response = farm_client.get_pedido(pedido_id)
-                if pedido_responses_by_id is not None:
-                    pedido_responses_by_id[pedido_id] = response
+            response = fetch_pedido(order_id)
         except FarmaliderAuthError:
             raise
         except FarmaliderError:
-            return legacy_order, legacy_items
-        return apply_pedido_api_confirmation(
-            order, [], response,
-            linked_cliente_id=linked_id,
-            confirmed_at=captured_at,
-        )
+            return None, []
+        if not isinstance(response, dict):
+            return None, []
 
-    if not is_valid_cpf(cpf):
         order = _empty_order(contact, captured_at)
-        return _failure(
-            order, [], "CPF_INVALIDO",
-            "CPF não permite consultar o pedido oficial.",
+        order["pedido_id"] = order_id
+        order["farmalider_cliente_id"] = expected_cliente_id
+        order["origem_pedido"] = source
+        confirmed_order, confirmed_items = apply_pedido_api_confirmation(
+            order,
+            [],
+            response,
+            linked_cliente_id=expected_cliente_id,
+            confirmed_at=captured_at,
+            allow_locator_without_customer=not bool(expected_cliente_id),
         )
+        if (
+            confirmed_order.get("status_validacao") == "OK"
+            and confirmed_items
+        ):
+            return confirmed_order, confirmed_items
+        return confirmed_order, confirmed_items
+
+    def resolve_weni_locators(
+        *,
+        expected_cliente_id: str = "",
+    ) -> tuple[dict[str, str] | None, list[dict[str, str]]]:
+        # pedido_id é um campo do próprio NexoFlow e tem precedência.
+        # ultimo_pedido vem de outra integração e é deliberadamente o último
+        # recurso para descobrir um ID que depois será validado via GET pedido.
+        tried: set[str] = set()
+        for order_id, source in (
+            (current_pedido_id, "FARMALIDER_PEDIDO_ID_WENI"),
+            (ultimo_pedido_id, "FARMALIDER_ULTIMO_PEDIDO_LOCATOR"),
+        ):
+            if not order_id or order_id in tried:
+                continue
+            tried.add(order_id)
+            resolved_order, resolved_items = resolve_locator(
+                order_id,
+                source,
+                expected_cliente_id=expected_cliente_id,
+            )
+            if (
+                resolved_order is not None
+                and resolved_order.get("status_validacao") == "OK"
+                and resolved_items
+            ):
+                return resolved_order, resolved_items
+        return None, []
+
+    # Sem CPF válido, ainda podemos revalidar um pedido que já esteja
+    # associado ao contato por pedido_id e, por último, por ultimo_pedido.
+    if not cpf or not is_valid_cpf(cpf):
+        return resolve_weni_locators(expected_cliente_id=linked_id)
 
     try:
         payload = (
@@ -422,17 +496,15 @@ def resolve_contact_order(
     except FarmaliderAuthError:
         raise
     except FarmaliderError:
-        if legacy_order is not None:
-            legacy_order["status_confirmacao"] = "ERRO_API"
-            legacy_order["farmalider_erro"] = "Falha na consulta oficial do cliente."
-            return legacy_order, legacy_items
-        order = _empty_order(contact, captured_at)
-        return _failure(
-            order, [], "ERRO_API", "Falha na consulta oficial do cliente."
-        )
+        return resolve_weni_locators(expected_cliente_id=linked_id)
+
+    if payload is None:
+        return resolve_weni_locators(expected_cliente_id=linked_id)
 
     status, confirmed_cliente_id, _ = cliente_link_status(cpf, payload)
     if status != "CPF_CONFIRMADO":
+        # Resposta concreta com CPF divergente/cliente inválido é falha dura:
+        # não tentamos contornar uma inconsistência de identidade.
         order = _empty_order(contact, captured_at)
         return _failure(
             order, [], status,
@@ -448,20 +520,9 @@ def resolve_contact_order(
     linked_id = confirmed_cliente_id
 
     latest = payload.get("ultimoPedido") if isinstance(payload, dict) else None
-    if not isinstance(latest, dict):
-        order = _empty_order(contact, captured_at)
-        return _failure(
-            order, [], "ULTIMO_PEDIDO_NAO_INFORMADO_API",
-            "Cliente não possui último pedido informado.",
-        )
-
-    pedido_id = _positive_id(latest.get("id"))
+    pedido_id = _positive_id(latest.get("id")) if isinstance(latest, dict) else ""
     if not pedido_id:
-        order = _empty_order(contact, captured_at)
-        return _failure(
-            order, [], "PEDIDO_ID_INVALIDO_API",
-            "Último pedido possui identidade inválida.",
-        )
+        return resolve_weni_locators(expected_cliente_id=linked_id)
 
     latest_owner = (
         _positive_id(latest.get("codCliente"))
@@ -475,8 +536,7 @@ def resolve_contact_order(
             "Último pedido pertence a outro cliente.",
         )
 
-    # First build a complete canonical fallback from GET cliente/cpf, which now
-    # includes ultimoPedido + itens + descricao.
+    # O GET por CPF já é suficiente para montar o snapshot completo.
     fallback_order = _empty_order(contact, captured_at)
     fallback_order["pedido_id"] = pedido_id
     fallback_order["farmalider_cliente_id"] = linked_id
@@ -484,22 +544,18 @@ def resolve_contact_order(
     fallback_response = _pedido_from_cliente_payload(payload)
     if fallback_response is not None:
         fallback_order, fallback_items = apply_pedido_api_confirmation(
-            fallback_order, [], fallback_response,
+            fallback_order,
+            [],
+            fallback_response,
             linked_cliente_id=linked_id,
             confirmed_at=captured_at,
         )
     else:
         fallback_items = []
 
-    # GET pedido/{codigo} is the preferred final snapshot because it carries the
-    # same item data and the documented payment/status fields.
+    # GET pedido/{codigo} é o snapshot final preferencial do mesmo pedido.
     try:
-        if pedido_responses_by_id is not None and pedido_id in pedido_responses_by_id:
-            response = pedido_responses_by_id[pedido_id]
-        else:
-            response = farm_client.get_pedido(pedido_id)
-            if pedido_responses_by_id is not None:
-                pedido_responses_by_id[pedido_id] = response
+        response = fetch_pedido(pedido_id)
     except FarmaliderAuthError:
         raise
     except FarmaliderError:
@@ -511,7 +567,9 @@ def resolve_contact_order(
         order["farmalider_cliente_id"] = linked_id
         order["origem_pedido"] = "FARMALIDER_PEDIDO_API"
         confirmed_order, confirmed_items = apply_pedido_api_confirmation(
-            order, [], response,
+            order,
+            [],
+            response,
             linked_cliente_id=linked_id,
             confirmed_at=captured_at,
         )
@@ -520,11 +578,9 @@ def resolve_contact_order(
             and confirmed_items
         ):
             return confirmed_order, confirmed_items
-        # A concrete but inconsistent /pedido response is a hard validation
-        # failure. Fallback is reserved for transport/not-found scenarios.
+        # Resposta concreta inconsistente do endpoint de pedido é falha dura.
         return confirmed_order, confirmed_items
 
     return fallback_order, fallback_items
-
 
 # NexoFlow 1.0
