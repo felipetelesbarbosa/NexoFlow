@@ -496,10 +496,28 @@ def resolve_contact_order(
     except FarmaliderAuthError:
         raise
     except FarmaliderError:
-        return resolve_weni_locators(expected_cliente_id=linked_id)
+        recovered_order, recovered_items = resolve_weni_locators(
+            expected_cliente_id=linked_id
+        )
+        if recovered_order is not None:
+            return recovered_order, recovered_items
+        order = _empty_order(contact, captured_at)
+        return _failure(
+            order, [], "ERRO_API",
+            "Falha na consulta oficial do cliente e nenhum localizador Weni pôde ser validado.",
+        )
 
     if payload is None:
-        return resolve_weni_locators(expected_cliente_id=linked_id)
+        recovered_order, recovered_items = resolve_weni_locators(
+            expected_cliente_id=linked_id
+        )
+        if recovered_order is not None:
+            return recovered_order, recovered_items
+        order = _empty_order(contact, captured_at)
+        return _failure(
+            order, [], "CPF_NAO_ENCONTRADO",
+            "Cliente não localizado e nenhum pedido Weni pôde ser validado.",
+        )
 
     status, confirmed_cliente_id, _ = cliente_link_status(cpf, payload)
     if status != "CPF_CONFIRMADO":
