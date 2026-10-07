@@ -1,4 +1,5 @@
 import os
+import tempfile
 import threading
 from pathlib import Path
 import unittest
@@ -9,6 +10,11 @@ from unittest.mock import Mock, patch
 from requests.exceptions import ReadTimeout, RequestException
 
 import config
+import analytics
+from analytics import (
+    mark_full_load_quarter_complete,
+    prepare_full_load_quarter,
+)
 from farmalider_client import FarmaliderClient, FarmaliderError
 from google_sheets import GoogleSheetsStore
 from weni_client import WeniClient
@@ -37,6 +43,96 @@ def _ico_images(path: Path) -> list[bytes]:
 class CurrentIntegrationTests(unittest.TestCase):
     def tearDown(self) -> None:
         os.environ.pop("WENI_PROXY_ACTIVE", None)
+
+    def test_full_load_25_partitions_cover_base_without_overlap(self) -> None:
+        contacts = [{"uuid": f"u{index:02d}"} for index in range(10)]
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest = Path(tmp) / "full_load_25_manifest.json"
+            with patch.object(analytics, "FULL_LOAD_25_MANIFEST", manifest):
+                selected: list[set[str]] = []
+                campaign_id = ""
+                for part in range(1, 5):
+                    result = prepare_full_load_quarter(
+                        contacts,
+                        part=part,
+                        component="analytics",
+                    )
+                    campaign_id = str(result["campaign_id"])
+                    selected.append(set(result["selected_uuids"]))
+                    mark_full_load_quarter_complete(
+                        component="analytics",
+                        part=part,
+                        campaign_id=campaign_id,
+                    )
+
+        self.assertEqual([len(values) for values in selected], [2, 3, 2, 3])
+        self.assertEqual(set().union(*selected), {f"u{index:02d}" for index in range(10)})
+        for left in range(4):
+            for right in range(left + 1, 4):
+                self.assertTrue(selected[left].isdisjoint(selected[right]))
+
+    def test_full_load_25_manifest_ignores_new_contacts_until_incremental(self) -> None:
+        contacts = [{"uuid": f"u{index:02d}"} for index in range(8)]
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest = Path(tmp) / "full_load_25_manifest.json"
+            with patch.object(analytics, "FULL_LOAD_25_MANIFEST", manifest):
+                first = prepare_full_load_quarter(
+                    contacts,
+                    part=1,
+                    component="analytics",
+                )
+                mark_full_load_quarter_complete(
+                    component="analytics",
+                    part=1,
+                    campaign_id=str(first["campaign_id"]),
+                )
+                changed_contacts = contacts + [{"uuid": "u99"}]
+                second = prepare_full_load_quarter(
+                    changed_contacts,
+                    part=2,
+                    component="analytics",
+                )
+
+        self.assertEqual(second["new_contacts_ignored"], 1)
+        self.assertNotIn("u99", second["selected_uuids"])
+        self.assertEqual(second["total_contacts"], 8)
+
+    def test_full_load_25_requires_parts_in_order(self) -> None:
+        contacts = [{"uuid": f"u{index:02d}"} for index in range(8)]
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest = Path(tmp) / "full_load_25_manifest.json"
+            with patch.object(analytics, "FULL_LOAD_25_MANIFEST", manifest):
+                with self.assertRaisesRegex(RuntimeError, "Parte 1"):
+                    prepare_full_load_quarter(
+                        contacts,
+                        part=2,
+                        component="analytics",
+                    )
+
+    def test_full_load_25_weni_and_analytics_share_same_partition(self) -> None:
+        contacts = [{"uuid": f"u{index:02d}"} for index in range(12)]
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest = Path(tmp) / "full_load_25_manifest.json"
+            with patch.object(analytics, "FULL_LOAD_25_MANIFEST", manifest):
+                analytics_part = prepare_full_load_quarter(
+                    contacts,
+                    part=1,
+                    component="analytics",
+                )
+                weni_part = prepare_full_load_quarter(
+                    list(reversed(contacts)),
+                    part=1,
+                    component="weni",
+                )
+
+        self.assertEqual(
+            analytics_part["campaign_id"],
+            weni_part["campaign_id"],
+        )
+        self.assertEqual(
+            analytics_part["selected_uuids"],
+            weni_part["selected_uuids"],
+        )
 
     def test_proxy_uses_internal_url(self) -> None:
         os.environ["WENI_PROXY_ACTIVE"] = "1"
