@@ -51,6 +51,9 @@ def check_farmalider_runtime() -> None:
     proxy_text = read("proxy_config.py")
     weni_text = read("weni_client.py")
     sheets_text = read("google_sheets.py")
+    analytics_text = read("analytics.py")
+    weni_update_text = read("weni_update.py")
+    run_update_text = read("run_update_weni.py")
 
     delay = numeric_config(config_text, "FARMALIDER_REQUEST_DELAY_SECONDS")
     workers = numeric_config(config_text, "FARMALIDER_MAX_WORKERS")
@@ -230,6 +233,64 @@ def check_farmalider_runtime() -> None:
         ok(
             "Carga reconhece troca direta/proxy em Weni, FarmaLíder e "
             "Google Sheets e repete a operação em andamento."
+        )
+
+    quarter_contract = {
+        "analytics.py": (
+            analytics_text,
+            [
+                "FULL_LOAD_25_PARTS = 4",
+                "full_load_25_manifest.json",
+                "prepare_full_load_quarter",
+                "mark_full_load_quarter_complete",
+                "contacts_sha256",
+            ],
+        ),
+        "main.py": (
+            main_text,
+            [
+                "FULL_SYNC_QUARTER",
+                'component="analytics"',
+                "carga_completa_25_parte_",
+                "ultima_execucao_carga_25_parte",
+            ],
+        ),
+        "weni_update.py": (
+            weni_update_text,
+            [
+                "quarter: int | None",
+                'component="weni"',
+                "selected_uuids",
+                "quarter_campaign_id",
+            ],
+        ),
+        "run_update_weni.py": (
+            run_update_text,
+            ["--quarter", "weni_update_review_full_25_parte_"],
+        ),
+        "executar_carga_completa.bat": (
+            read("executar_carga_completa.bat"),
+            ["Parte 1/4", "Parte 4/4", "FULL_SYNC_QUARTER"],
+        ),
+        "atualizar_weni_carga_completa.bat": (
+            read("atualizar_weni_carga_completa.bat"),
+            ["Parte 1/4", "Parte 4/4", "--quarter", "full_load_25_manifest.json"],
+        ),
+    }
+    missing_quarter_parts: list[str] = []
+    for file_name, (source, markers) in quarter_contract.items():
+        for marker in markers:
+            if marker not in source:
+                missing_quarter_parts.append(f"{file_name}:{marker}")
+    if missing_quarter_parts:
+        fail(
+            "Carga completa 25% incompleta: "
+            + ", ".join(missing_quarter_parts)
+        )
+    else:
+        ok(
+            "Carga completa 25% usa quatro partes determinísticas, manifesto "
+            "congelado compartilhado e menus próprios em Weni/Analytics."
         )
 
     required_main_parts = [
