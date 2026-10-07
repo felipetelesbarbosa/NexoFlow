@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import logging
 import os
 import socket
+import threading
 import time
 import urllib.request
 from dataclasses import dataclass
@@ -14,6 +16,10 @@ VALID_MODES = {"auto", "on", "off"}
 DIRECT_TEST_URL = "https://pypi.org/simple/pip/"
 PROXY_DETECTION_ATTEMPTS = 3
 PROXY_RETRY_DELAY_SECONDS = 0.35
+
+# Uma troca de rede pode ser percebida simultaneamente por vários workers.
+# Serializamos a redetecção para evitar múltiplas sondagens/proxy flips concorrentes.
+_ROUTE_REFRESH_LOCK = threading.Lock()
 
 
 @dataclass(frozen=True)
