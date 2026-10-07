@@ -15,6 +15,7 @@ from email.utils import parsedate_to_datetime
 from typing import Any
 
 import requests
+from network_diagnostics import classify_network_failure
 from private_diagnostics import append_private_failure
 
 from config import (
@@ -733,74 +734,138 @@ class FarmaliderClient:
         )
 
     def test_connection(self) -> dict[str, Any]:
-        """Valida rede e autenticação sem depender de um CPF real."""
+        """Valida rede/autenticação com a mesma resiliência das consultas reais."""
         path = self._delivery_path("cliente/cpf/00000000000")
         url = f"{self.base_url}{path}"
-
         endpoint_label = self._endpoint_label(path)
-        with self._request_slot(endpoint_label) as permit:
-            started = time.monotonic()
-            try:
-                response = self._get_session().get(
-                    url,
-                    params={"token": self.token},
-                    timeout=FARMALIDER_REQUEST_TIMEOUT_SECONDS,
-                )
-            except requests.RequestException:
-                self._record_request(
-                    time.monotonic() - started, network_error=True,
-                    endpoint_label=endpoint_label,
-                )
-                self._protect_after_failure(
-                    endpoint_label=endpoint_label, diagnostic_ref="preflight",
-                    permit=permit, delay=self._retry_delay(1), status_code=None,
-                )
-                raise FarmaliderError("Não foi possível alcançar a FarmaLíder API.") from None
-            self._record_request(
-                time.monotonic() - started,
-                status_code=response.status_code, endpoint_label=endpoint_label,
-            )
-            if response.status_code == 404:
-                self._mark_healthy(permit, endpoint_label)
-            elif response.status_code == 429 or response.status_code >= 500:
-                self._protect_after_failure(
-                    endpoint_label=endpoint_label, diagnostic_ref="preflight",
-                    permit=permit, delay=self._retry_delay(1, response),
-                    status_code=response.status_code,
-                )
-                if response.status_code >= 500:
-                    logging.warning(
-                        "FarmaLíder %s [preflight]: HTTP %s; resposta %s.",
-                        endpoint_label, response.status_code,
-                        self._safe_server_error_summary(response),
+        diagnostic_ref = "preflight"
+        last_network_summary = ""
+
+        for attempt in range(1, FARMALIDER_MAX_RETRIES + 1):
+            response: requests.Response | None = None
+
+            with self._request_slot(endpoint_label) as permit:
+                started = time.monotonic()
+                try:
+                    response = self._get_session().get(
+                        url,
+                        params={"token": self.token},
+                        timeout=FARMALIDER_REQUEST_TIMEOUT_SECONDS,
                     )
-            else:
-                self._mark_unhealthy()
+                except requests.RequestException as exc:
+                    elapsed = time.monotonic() - started
+                    self._record_request(
+                        elapsed,
+                        network_error=True,
+                        endpoint_label=endpoint_label,
+                    )
+                    failure = classify_network_failure(exc)
+                    last_network_summary = failure.summary
 
-        if response.status_code == 401:
-            raise FarmaliderAuthError(
-                "FarmaLíder API retornou 401 Unauthorized. "
-                "Verifique o token enviado por QueryString."
-            )
-        if response.status_code == 403:
-            raise FarmaliderAuthError(
-                "FarmaLíder API retornou 403 Forbidden. "
-                "Token sem permissão para a rota."
-            )
-        if response.status_code == 429:
-            raise FarmaliderError(
-                "FarmaLíder API retornou 429 Too Many Requests."
-            )
-        if response.status_code >= 500:
-            raise FarmaliderError(
-                f"FarmaLíder API retornou HTTP {response.status_code}."
+                    # Proxy 407, TLS inválido e outras falhas marcadas como não
+                    # recuperáveis não devem consumir retries inúteis.
+                    if not failure.retryable:
+                        self._mark_unhealthy()
+                        raise FarmaliderError(
+                            "Falha de rede no preflight da FarmaLíder: "
+                            + failure.summary
+                        ) from None
+
+                    self._protect_after_failure(
+                        endpoint_label=endpoint_label,
+                        diagnostic_ref=diagnostic_ref,
+                        permit=permit,
+                        delay=self._retry_delay(attempt),
+                        status_code=None,
+                    )
+                    logging.warning(
+                        "FarmaLíder %s [preflight]: %s Tentativa %s/%s.",
+                        endpoint_label,
+                        failure.summary,
+                        attempt,
+                        FARMALIDER_MAX_RETRIES,
+                    )
+
+                if response is not None:
+                    elapsed = time.monotonic() - started
+                    self._record_request(
+                        elapsed,
+                        status_code=response.status_code,
+                        endpoint_label=endpoint_label,
+                    )
+                    status = response.status_code
+
+                    if status == 401:
+                        self._mark_unhealthy()
+                        raise FarmaliderAuthError(
+                            "FarmaLíder API retornou 401 Unauthorized. "
+                            "Verifique o token enviado por QueryString."
+                        )
+                    if status == 403:
+                        self._mark_unhealthy()
+                        raise FarmaliderAuthError(
+                            "FarmaLíder API retornou 403 Forbidden. "
+                            "Token sem permissão para a rota."
+                        )
+
+                    if status == 429 or status >= 500:
+                        self._protect_after_failure(
+                            endpoint_label=endpoint_label,
+                            diagnostic_ref=diagnostic_ref,
+                            permit=permit,
+                            delay=self._retry_delay(attempt, response),
+                            status_code=status,
+                        )
+                        if status >= 500 and (
+                            attempt == 1 or attempt == FARMALIDER_MAX_RETRIES
+                        ):
+                            logging.warning(
+                                "FarmaLíder %s [preflight]: HTTP %s; resposta %s.",
+                                endpoint_label,
+                                status,
+                                self._safe_server_error_summary(response),
+                            )
+                    else:
+                        # O CPF é propositalmente fictício. 400/404 são
+                        # esperados, mas qualquer resposta não transitória prova
+                        # que rede, proxy e serviço foram alcançados.
+                        self._mark_healthy(permit, endpoint_label)
+                        return {
+                            "ok": True,
+                            "status_code": status,
+                            "environment": "hml" if self.use_hml else "producao",
+                            "auth_mode": "QueryString token only",
+                            "base_url": self.base_url,
+                            "attempts": attempt,
+                        }
+
+            if attempt >= FARMALIDER_MAX_RETRIES:
+                if response is None:
+                    detail = (
+                        f" Último diagnóstico: {last_network_summary}"
+                        if last_network_summary else ""
+                    )
+                    raise FarmaliderError(
+                        "Não foi possível alcançar a FarmaLíder API após "
+                        f"{FARMALIDER_MAX_RETRIES} tentativa(s).{detail}"
+                    ) from None
+                if response.status_code == 429:
+                    raise FarmaliderError(
+                        "FarmaLíder API retornou 429 Too Many Requests "
+                        f"após {FARMALIDER_MAX_RETRIES} tentativa(s)."
+                    )
+                raise FarmaliderError(
+                    f"FarmaLíder API retornou HTTP {response.status_code} "
+                    f"após {FARMALIDER_MAX_RETRIES} tentativa(s)."
+                )
+
+            self._sleep_before_retry(
+                attempt,
+                response=response,
+                endpoint_label=endpoint_label,
+                diagnostic_ref=diagnostic_ref,
             )
 
-        # 400/404 são aceitáveis neste teste porque o CPF é fictício.
-        return {
-            "ok": True,
-            "status_code": response.status_code,
-            "environment": "hml" if self.use_hml else "producao",
-            "auth_mode": "QueryString token only",
-            "base_url": self.base_url,
-        }
+        raise FarmaliderError(
+            "Falha inesperada no preflight da FarmaLíder API."
+        )
