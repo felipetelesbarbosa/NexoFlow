@@ -111,6 +111,7 @@ class FarmaliderServerErrorTests(unittest.TestCase):
                     side_effect=lambda _: nullcontext(RequestPermit(0, 4)),
                 ),
                 patch.object(client, "_protect_after_failure"),
+                patch.object(client, "_refresh_network_route", return_value=False),
                 patch.object(client, "_sleep_before_retry") as retry,
             ):
                 result = client.test_connection()
@@ -177,6 +178,7 @@ class FarmaliderServerErrorTests(unittest.TestCase):
                     side_effect=lambda _: nullcontext(RequestPermit(0, 4)),
                 ),
                 patch.object(client, "_protect_after_failure"),
+                patch.object(client, "_refresh_network_route", return_value=False),
                 patch.object(client, "_sleep_before_retry"),
                 patch("farmalider_client.FARMALIDER_MAX_RETRIES", 3),
             ):
