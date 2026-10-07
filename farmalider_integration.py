@@ -482,10 +482,25 @@ def resolve_contact_order(
                 return resolved_order, resolved_items
         return None, []
 
-    # Sem CPF válido, ainda podemos revalidar um pedido que já esteja
-    # associado ao contato por pedido_id e, por último, por ultimo_pedido.
-    if not cpf or not is_valid_cpf(cpf):
+    # Sem CPF, ainda podemos revalidar um pedido associado ao contato por
+    # pedido_id e, por último, por ultimo_pedido.
+    if not cpf:
         return resolve_weni_locators(expected_cliente_id=linked_id)
+
+    # CPF informado porém inválido continua sendo uma falha explícita. Só
+    # permitimos recuperação por localizador se houver de fato um ID disponível.
+    if not is_valid_cpf(cpf):
+        if current_pedido_id or ultimo_pedido_id:
+            recovered_order, recovered_items = resolve_weni_locators(
+                expected_cliente_id=linked_id
+            )
+            if recovered_order is not None:
+                return recovered_order, recovered_items
+        order = _empty_order(contact, captured_at)
+        return _failure(
+            order, [], "CPF_INVALIDO",
+            "CPF não permite consultar o pedido oficial.",
+        )
 
     try:
         payload = (
