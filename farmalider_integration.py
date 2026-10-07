@@ -422,7 +422,14 @@ def resolve_contact_order(
     except FarmaliderAuthError:
         raise
     except FarmaliderError:
-        return legacy_order, legacy_items
+        if legacy_order is not None:
+            legacy_order["status_confirmacao"] = "ERRO_API"
+            legacy_order["farmalider_erro"] = "Falha na consulta oficial do cliente."
+            return legacy_order, legacy_items
+        order = _empty_order(contact, captured_at)
+        return _failure(
+            order, [], "ERRO_API", "Falha na consulta oficial do cliente."
+        )
 
     status, confirmed_cliente_id, _ = cliente_link_status(cpf, payload)
     if status != "CPF_CONFIRMADO":

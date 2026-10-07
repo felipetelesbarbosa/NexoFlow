@@ -58,18 +58,28 @@ class WeniUpdateTests(unittest.TestCase):
         farm = Mock()
         farm.get_cliente_by_cpf.return_value = {
             "id": "99", "cpf": "52998224725", "nome": "Cliente Teste",
-            "ultimoPedido": {"id": "123", "codCliente": "99"},
+            "ultimoPedido": {
+                "id": "123", "codCliente": "99",
+                "emissao": "2026-10-03T12:00:00Z",
+                "status": 2, "formaPagamento": 2, "frete": 0,
+            },
+            "itens": [
+                {"codPedido": "123", "codProduto": "9001", "descricao": "Produto A",
+                 "quantidade": 2, "valor": 10.0, "total": 20.0},
+                {"codPedido": "123", "codProduto": "9002", "descricao": "Produto B",
+                 "quantidade": 1, "valor": 5.5, "total": 5.5},
+            ],
         }
         farm.get_pedido.return_value = {
             "capa": {
                 "id": "123", "codCliente": "99",
                 "emissao": "2026-10-03T12:00:00Z",
-                "status": 2, "cancelamento": "", "frete": 0,
+                "status": 2, "formaPagamento": 2, "cancelamento": "", "frete": 0,
             },
             "itens": [
-                {"codPedido": "123", "codProduto": "9001", "nome": "Produto A",
+                {"codPedido": "123", "codProduto": "9001", "descricao": "Produto A",
                  "quantidade": 2, "valor": 10.0, "total": 20.0},
-                {"codPedido": "123", "codProduto": "9002", "nome": "Produto B",
+                {"codPedido": "123", "codProduto": "9002", "descricao": "Produto B",
                  "quantidade": 1, "valor": 5.5, "total": 5.5},
             ],
         }

@@ -35,17 +35,26 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
         client = Mock()
         client.get_cliente_by_cpf.return_value = {
             "cliente": {"id": 99, "cpf": "52998224725", "nome": "Cliente sintético"},
-            "ultimoPedido": {"id": 500, "codCliente": 99},
+            "ultimoPedido": {
+                "id": 500, "codCliente": 99, "emissao": "2026-10-05T10:00:00",
+                "status": 2, "formaPagamento": 2, "frete": "9.99",
+            },
+            "itens": [{
+                "codPedido": 500, "codProduto": 9001,
+                "descricao": "Produto sintético",
+                "quantidade": 2, "valor": "10.00", "total": "19.50",
+            }],
         }
         capa = {"id": 500, "codCliente": 99, "emissao": "2026-10-05T10:00:00",
-                "status": 3 if cancelled else 2,
+                "status": 3 if cancelled else 2, "formaPagamento": 2,
                 "cancelamento": "2026-10-05T11:00:00" if cancelled else None}
         if not partial:
             capa["frete"] = "9.99"
         client.get_pedido.return_value = {
             "capa": capa,
-            "itens": [{"codPedido": 500, "codProduto": 9001, "quantidade": 2,
-                       "valor": "10.00", "total": "19.50"}],
+            "itens": [{"codPedido": 500, "codProduto": 9001,
+                       "descricao": "Produto sintético",
+                       "quantidade": 2, "valor": "10.00", "total": "19.50"}],
         }
         client.metrics_snapshot.return_value = {
             "total_requests": 1, "retries": 0, "rate_limits": 0, "server_errors": 0,
