@@ -5,12 +5,14 @@ from analytics import (
     BI_ADS_COLUMNS,
     BI_CHANNEL_COLUMNS,
     BI_CONVERSION_COLUMNS,
+    BI_ORDERS_COLUMNS,
     BI_SALES_COLUMNS,
     BI_STATUS_COLUMNS,
     BI_SUMMARY_COLUMNS,
     build_bi_ads_rows,
     build_bi_channel_records,
     build_bi_conversion_records,
+    build_bi_order_rows,
     build_bi_sales_rows,
     build_bi_summary_record,
     build_sales_metrics,
@@ -21,6 +23,7 @@ from config import (
     SHEET_BI_ADS,
     SHEET_BI_CANAIS,
     SHEET_BI_CONVERSAO,
+    SHEET_BI_PEDIDOS,
     SHEET_BI_RESUMO_DIARIO,
     SHEET_BI_STATUS,
     SHEET_BI_VENDAS,
@@ -133,7 +136,57 @@ class BILayerTests(unittest.TestCase):
         self.assertEqual(schema[SHEET_BI_CONVERSAO], BI_CONVERSION_COLUMNS)
         self.assertEqual(schema[SHEET_BI_VENDAS], BI_SALES_COLUMNS)
         self.assertEqual(schema[SHEET_BI_ADS], BI_ADS_COLUMNS)
+        self.assertEqual(schema[SHEET_BI_PEDIDOS], BI_ORDERS_COLUMNS)
         self.assertEqual(schema[SHEET_BI_STATUS], BI_STATUS_COLUMNS)
+
+    def test_bi_orders_exposes_friendly_order_contract(self) -> None:
+        base = [{
+            "contact_uuid": "u1",
+            "nome": "Cliente",
+            "cpf_normalizado": "52998224725",
+            "contact_canal_principal": "whatsapp",
+        }]
+        orders = [{
+            "pedido_chave": "FARMALIDER:340793",
+            "pedido_id": "340793",
+            "data_hora": "2026-06-05T15:45:27-03:00",
+            "contact_uuid": "u1",
+            "cliente": "Cliente",
+            "cpf_normalizado": "52998224725",
+            "valor_total_compra": "112.80",
+            "farmalider_status_pedido": "3",
+            "farmalider_forma_pagamento": "2",
+        }]
+        items = [
+            {
+                "pedido_chave": "FARMALIDER:340793", "produto_ordem": "1",
+                "produto_nome": "PROLOPA BD 100+25MG C/30CAP",
+                "quantidade": "1", "valor_unitario": "53.90",
+            },
+            {
+                "pedido_chave": "FARMALIDER:340793", "produto_ordem": "2",
+                "produto_nome": "TP PRAMIPEXOL PRATI 1MG C/30 CPR (G)",
+                "quantidade": "1", "valor_unitario": "58.90",
+            },
+        ]
+        rows = build_bi_order_rows(
+            base, orders, items, updated_at="2026-10-06T21:00:00-03:00",
+        )
+        self.assertEqual(len(rows), 1)
+        record = dict(zip(BI_ORDERS_COLUMNS, rows[0]))
+        self.assertEqual(record["pedido_data"], "05/06/26 15:45:27")
+        self.assertEqual(
+            record["pedido_produtos"],
+            "PROLOPA BD 100+25MG C/30CAP, TP PRAMIPEXOL PRATI 1MG C/30 CPR (G)",
+        )
+        self.assertEqual(record["pedido_quantidade_itens"], "1, 1")
+        self.assertEqual(record["pedido_valor_produtos"], "53.9, 58.9")
+        self.assertEqual(record["pedido_valor"], 112.8)
+        self.assertEqual(record["pedido_status"], "3")
+        self.assertEqual(record["pedido_status_nome"], "Cancelado")
+        self.assertEqual(record["pedido_forma_pagamento"], "2")
+        self.assertEqual(record["pedido_forma_pagamento_nome"], "Débito")
+
 
     def order_fixture(self, *, confirmation="CONFIRMADO_API", cancellation="", status=2):
         raw = json.dumps({
