@@ -426,15 +426,14 @@ class PedidoResolutionTests(unittest.TestCase):
                 contact(), farm_client=api, captured_at=CAPTURED_AT
             )
 
-    def test_no_api_keeps_legacy_snapshot_only_as_unconfirmed_fallback(self):
+    def test_no_api_preserves_existing_fields_without_using_ultimo_pedido_as_data(self):
         order, items = resolve_contact_order(
             contact(raw=legacy_raw()),
             farm_client=None,
             captured_at=CAPTURED_AT,
         )
-        self.assertEqual(order["pedido_id"], "777")
-        self.assertEqual(order["status_confirmacao"], "NAO_CONFIRMADO_API")
-        self.assertEqual(items[0]["produto_nome"], "Pedido legado")
+        self.assertIsNone(order)
+        self.assertEqual(items, [])
 
     def test_apply_confirmation_uses_descricao_not_legacy_item_name(self):
         legacy_order, legacy_items = parse_ultimo_pedido(
