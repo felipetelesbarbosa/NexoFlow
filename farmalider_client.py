@@ -145,6 +145,22 @@ class FarmaliderClient:
         """Sessão da thread atual, mantida por compatibilidade/testes."""
         return self._get_session()
 
+    def _refresh_network_route(self, *, reason: str) -> bool:
+        """Redetecta direta/proxy e atualiza a URL FarmaLíder sem reiniciar a carga."""
+        from proxy_config import refresh_network_route
+
+        previous_base_url = self.base_url
+        result = refresh_network_route(reason=reason)
+        new_base_url = farmalider_api_base_url().rstrip("/")
+        self.base_url = new_base_url
+        changed = result.changed or new_base_url != previous_base_url
+        if changed:
+            logging.warning(
+                "FarmaLíder: rota atualizada durante a execução; retomando na %s.",
+                "rota com proxy" if result.current_active else "rota direta",
+            )
+        return changed
+
     def close(self) -> None:
         with self._request_gate:
             if self._closed:
@@ -562,12 +578,12 @@ class FarmaliderClient:
         diagnostic_ref: str = "-",
         private_cpf: str | None = None,
     ) -> dict[str, Any] | None:
-        url = f"{self.base_url}{path}"
         endpoint_label = self._endpoint_label(path)
         last_server_response: requests.Response | None = None
 
         for attempt in range(1, FARMALIDER_MAX_RETRIES + 1):
             response: requests.Response | None = None
+            url = f"{self.base_url}{path}"
             with self._private_request_slot(
                 endpoint_label, private_cpf, diagnostic_ref, last_server_response, attempt,
             ) as permit:
@@ -578,14 +594,24 @@ class FarmaliderClient:
                         params={"token": self.token},
                         timeout=FARMALIDER_REQUEST_TIMEOUT_SECONDS,
                     )
-                except requests.RequestException:
+                except requests.RequestException as exc:
                     self._record_request(
                         time.monotonic() - started,
                         network_error=True, endpoint_label=endpoint_label,
                     )
+                    failure = classify_network_failure(exc)
+                    if not failure.retryable:
+                        self._mark_unhealthy()
+                        raise FarmaliderError(
+                            "Falha de rede não recuperável na FarmaLíder: "
+                            + failure.summary
+                        ) from None
                     self._protect_after_failure(
                         endpoint_label=endpoint_label, diagnostic_ref=diagnostic_ref,
                         permit=permit, delay=self._retry_delay(attempt), status_code=None,
+                    )
+                    self._refresh_network_route(
+                        reason=f"falha recuperável em {endpoint_label}"
                     )
 
                 if response is not None:
@@ -736,13 +762,13 @@ class FarmaliderClient:
     def test_connection(self) -> dict[str, Any]:
         """Valida rede/autenticação com a mesma resiliência das consultas reais."""
         path = self._delivery_path("cliente/cpf/00000000000")
-        url = f"{self.base_url}{path}"
         endpoint_label = self._endpoint_label(path)
         diagnostic_ref = "preflight"
         last_network_summary = ""
 
         for attempt in range(1, FARMALIDER_MAX_RETRIES + 1):
             response: requests.Response | None = None
+            url = f"{self.base_url}{path}"
 
             with self._request_slot(endpoint_label) as permit:
                 started = time.monotonic()
@@ -777,6 +803,9 @@ class FarmaliderClient:
                         permit=permit,
                         delay=self._retry_delay(attempt),
                         status_code=None,
+                    )
+                    self._refresh_network_route(
+                        reason="falha recuperável no preflight FarmaLíder"
                     )
                     logging.warning(
                         "FarmaLíder %s [preflight]: %s Tentativa %s/%s.",
