@@ -150,7 +150,7 @@ class WeniUpdateTests(unittest.TestCase):
         self.assertEqual(tracked, {"u1"})
         _track_open_order(tracked, "u1", "Em trânsito")
         self.assertEqual(tracked, {"u1"})
-        _track_open_order(tracked, "u1", "Pronto para rota")
+        _track_open_order(tracked, "u1", "Pendente pagamento")
         self.assertEqual(tracked, {"u1"})
         _track_open_order(tracked, "u1", "Concluído")
         self.assertEqual(tracked, set())
@@ -648,8 +648,8 @@ class WeniUpdateTests(unittest.TestCase):
         self.assertEqual(order["valor_total_compra"], "25.50")
         self.assertEqual(self._purchase_plan(applied, farm).fields, {})
 
-    def test_undocumented_numeric_payment_does_not_block_valid_order(self) -> None:
-        for payment in (0, 6, 9):
+    def test_numeric_payment_codes_do_not_block_valid_order(self) -> None:
+        for payment, expected_value in ((6, "6"), (9, "9")):
             with self.subTest(payment=payment):
                 contact = self._purchase_contact(include_raw=False)
                 farm = self._purchase_api()
@@ -659,9 +659,22 @@ class WeniUpdateTests(unittest.TestCase):
                 warning.assert_not_called()
                 self.assertTrue(plan.order_validated)
                 self.assertEqual(plan.order_payment_code, str(payment))
-                self.assertEqual(plan.fields["pedido_forma_pagamento"], str(payment))
+                self.assertEqual(plan.fields["pedido_forma_pagamento"], expected_value)
                 audit_plans([plan], opt_out_group_available=True)
                 self.assertEqual(plan.fields["pedido_valor"], 25.5)
+
+    def test_payment_zero_writes_cancelled_and_forces_status(self) -> None:
+        contact = self._purchase_contact(include_raw=False)
+        farm = self._purchase_api()
+        farm.get_pedido.return_value["capa"].update(status=0, formaPagamento=0)
+        plan = self._purchase_plan(contact, farm)
+        self.assertTrue(plan.order_validated)
+        self.assertEqual(plan.order_payment_code, "0")
+        self.assertEqual(plan.fields["pedido_forma_pagamento"], "CANCELADO")
+        self.assertEqual(plan.fields["pedido_status"], "3")
+        self.assertFalse(plan.purchase_confirmed)
+        self.assertNotIn("ultima_compra", plan.fields)
+        audit_plans([plan], opt_out_group_available=True)
 
     def test_unknown_payment_summary_counts_unchanged_and_cancelled_orders_without_writes(self) -> None:
         started = datetime(2026, 10, 3, 12, 1, tzinfo=timezone.utc)
@@ -699,13 +712,12 @@ class WeniUpdateTests(unittest.TestCase):
             self.assertEqual(result.orders_validated, 3)
             self.assertEqual(result.plans_with_changes, 2)
             self.assertEqual(result.purchase_confirmed, 0)
-            self.assertEqual(result.payment_unmapped_codes, {"0": 3})
+            self.assertEqual(result.payment_unmapped_codes, {})
             self.assertEqual(result.contacts_updated, 0)
             client.update_contact_fields.assert_not_called()
             client.contact_group_action.assert_not_called()
             payment_messages = [line for line in logs if "Descrição no Analytics:" in line]
-            self.assertEqual(len(payment_messages), 1)
-            self.assertIn("Não identificado (código 0)", payment_messages[0])
+            self.assertEqual(payment_messages, [])
             self.assertTrue(any(
                 "3 contato(s) com pedido validado" in line
                 and "Nenhuma gravação foi iniciada" in line
@@ -714,17 +726,17 @@ class WeniUpdateTests(unittest.TestCase):
             self.assertTrue(all("52998224725" not in line for line in logs))
             snapshot = json.loads(review.read_text(encoding="utf-8"))
             self.assertEqual(snapshot["summary"]["orders_validated"], 3)
-            self.assertEqual(snapshot["summary"]["payment_unmapped_codes"], {"0": 3})
+            self.assertEqual(snapshot["summary"]["payment_unmapped_codes"], {})
             self.assertTrue(all("order_payment_code" not in plan for plan in snapshot["plans"]))
             loaded, _, _ = load_review_snapshot(full=True, json_path=review)
             self.assertEqual(len(loaded), 2)
             applied = run_update(apply=True, full=True, require_review=review)
             self.assertEqual(applied.orders_validated, 3)
-            self.assertEqual(applied.payment_unmapped_codes, {"0": 3})
+            self.assertEqual(applied.payment_unmapped_codes, {})
             self.assertEqual(applied.contacts_updated, 2)
             self.assertEqual(client.update_contact_fields.call_count, 2)
             for call in client.update_contact_fields.call_args_list:
-                self.assertEqual(call.args[1]["pedido_forma_pagamento"], "0")
+                self.assertEqual(call.args[1]["pedido_forma_pagamento"], "CANCELADO")
                 self.assertEqual(call.args[1]["pedido_status"], "3")
                 self.assertNotIn("ultima_compra", call.args[1])
 
