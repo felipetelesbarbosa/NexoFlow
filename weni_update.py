@@ -2207,21 +2207,73 @@ def run_update(
 
         assert window is not None
 
-        incoming = weni.list_messages(
+        quarter_context: dict[str, Any] | None = None
+        selected_uuids: set[str] | None = None
+        if quarter is not None:
+            all_contacts = weni.list_contacts(after=None)
+            quarter_context = prepare_full_load_quarter(
+                all_contacts,
+                part=quarter,
+                component="weni",
+            )
+            cutoff = _parse_datetime(quarter_context["captured_at_utc"])
+            if cutoff is None:
+                raise RuntimeError(
+                    "Manifesto da carga 25% não possui corte temporal válido."
+                )
+            window = UpdateWindow(started_at=cutoff, after=None, full=True)
+            captured_at = iso_utc(cutoff)
+            selected_uuids = set(quarter_context["selected_uuids"])
+            modified_contacts = list(quarter_context["selected_contacts"])
+            logging.info(
+                "Carga 25%% Weni Parte %s/4: campanha=%s | "
+                "base congelada=%s | contatos desta parte=%s | "
+                "novos fora do corte=%s | ausentes=%s.",
+                quarter,
+                quarter_context["campaign_id"],
+                quarter_context["total_contacts"],
+                quarter_context["selected_count"],
+                quarter_context["new_contacts_ignored"],
+                quarter_context["missing_contacts"],
+            )
+        else:
+            modified_contacts = weni.list_contacts(after=window.after)
+
+        incoming_all = weni.list_messages(
             after=window.after,
             before=window.started_at,
             folder="incoming",
         )
+        if selected_uuids is None:
+            incoming = incoming_all
+        else:
+            # Mensagens sem UUID permanecem temporariamente para resolução por
+            # URN; após resolver, somente contatos desta parte são aceitos.
+            incoming = [
+                message
+                for message in incoming_all
+                if not _extract_contact_uuid(message)
+                or _extract_contact_uuid(message) in selected_uuids
+            ]
         stats.messages_incoming = len(incoming)
         incoming_by_contact = _group_messages_by_contact(incoming)
         full_context_by_contact: dict[str, list[dict[str, Any]]] = {}
         if window.full:
-            # Na carga completa, busca o histórico contextual uma única vez.
-            # Evita uma chamada paginada por contato.
+            # A listagem de mensagens continua global (mais eficiente que uma
+            # requisição por contato), mas somente o quarto selecionado entra
+            # no processamento pesado/FarmaLíder.
             all_context_messages = weni.list_messages(before=window.started_at)
-            full_context_by_contact = _group_messages_by_contact(all_context_messages)
+            grouped_context = _group_messages_by_contact(all_context_messages)
+            full_context_by_contact = (
+                grouped_context
+                if selected_uuids is None
+                else {
+                    uuid: messages
+                    for uuid, messages in grouped_context.items()
+                    if uuid in selected_uuids
+                }
+            )
 
-        modified_contacts = weni.list_contacts(after=window.after)
         stats.contacts_modified = len(modified_contacts)
         contacts_by_uuid = {
             str(contact.get("uuid") or "").strip(): contact
@@ -2240,6 +2292,8 @@ def run_update(
                 len(unique_pending),
             )
             for pending_uuid in unique_pending:
+                if selected_uuids is not None and pending_uuid not in selected_uuids:
+                    continue
                 if pending_uuid in contacts_by_uuid:
                     continue
                 pending_contact = weni.get_contact(uuid=pending_uuid)
@@ -2264,6 +2318,8 @@ def run_update(
             resolved_uuid = str(contact.get("uuid") or "").strip()
             if not resolved_uuid:
                 continue
+            if selected_uuids is not None and resolved_uuid not in selected_uuids:
+                continue
             contacts_by_uuid[resolved_uuid] = contact
             incoming_by_contact.setdefault(resolved_uuid, []).append(message)
         if urn_contact_cache:
@@ -2280,6 +2336,8 @@ def run_update(
                 len(open_order_uuids),
             )
             for open_uuid in sorted(open_order_uuids):
+                if selected_uuids is not None and open_uuid not in selected_uuids:
+                    continue
                 if open_uuid in contacts_by_uuid:
                     continue
                 open_contact = weni.get_contact(uuid=open_uuid)
@@ -2289,6 +2347,8 @@ def run_update(
                 contacts_by_uuid[open_uuid] = open_contact
 
         all_contact_uuids = set(contacts_by_uuid) | set(incoming_by_contact)
+        if selected_uuids is not None:
+            all_contact_uuids &= selected_uuids
         plans: list[ContactUpdatePlan] = []
         logging.info(
             "Preparando atualizações de %s contato(s): consulta e validação dos pedidos "
