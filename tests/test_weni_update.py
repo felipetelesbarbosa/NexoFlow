@@ -38,6 +38,23 @@ class WeniUpdateTests(unittest.TestCase):
         self._load_state_patcher.start()
         self.addCleanup(self._load_state_patcher.stop)
 
+    def _required_weni_fields(self) -> list[dict[str, str]]:
+        keys = [
+            "contact_urn_whatsapp",
+            "contact_urn_instagram",
+            "contact_urn_facebook",
+            "contact_canal_principal",
+            "pedido_id",
+            "pedido_data",
+            "pedido_status",
+            "pedido_produtos",
+            "pedido_quantidade_itens",
+            "pedido_valor_produtos",
+            "pedido_valor",
+            "pedido_forma_pagamento",
+        ]
+        return [{"key": key} for key in keys]
+
     def _purchase_contact(self, *, include_raw: bool = True) -> dict:
         fields = {"cpf": "52998224725"}
         if include_raw:
@@ -893,12 +910,7 @@ class WeniUpdateTests(unittest.TestCase):
             )
 
             client = client_cls.return_value
-            client.list_fields.return_value = [
-                {"key": "contact_urn_whatsapp"},
-                {"key": "contact_urn_instagram"},
-                {"key": "contact_urn_facebook"},
-                {"key": "contact_canal_principal"},
-            ]
+            client.list_fields.return_value = self._required_weni_fields()
 
             def list_groups(name=None):
                 groups = [
@@ -967,12 +979,7 @@ class WeniUpdateTests(unittest.TestCase):
             )
 
             client = client_cls.return_value
-            client.list_fields.return_value = [
-                {"key": "contact_urn_whatsapp"},
-                {"key": "contact_urn_instagram"},
-                {"key": "contact_urn_facebook"},
-                {"key": "contact_canal_principal"},
-            ]
+            client.list_fields.return_value = self._required_weni_fields()
             client.list_groups.side_effect = lambda name=None: (
                 [
                     {"uuid": "g-in", "name": "Opt-In LGPD"},
@@ -1026,12 +1033,7 @@ class WeniUpdateTests(unittest.TestCase):
             full=False,
         )
         client = client_cls.return_value
-        client.list_fields.return_value = [
-            {"key": "contact_urn_whatsapp"},
-            {"key": "contact_urn_instagram"},
-            {"key": "contact_urn_facebook"},
-            {"key": "contact_canal_principal"},
-        ]
+        client.list_fields.return_value = self._required_weni_fields()
 
         def list_groups(name=None):
             groups = [
@@ -1086,12 +1088,7 @@ class WeniUpdateTests(unittest.TestCase):
             full=False,
         )
         client = client_cls.return_value
-        client.list_fields.return_value = [
-            {"key": "contact_urn_whatsapp"},
-            {"key": "contact_urn_instagram"},
-            {"key": "contact_urn_facebook"},
-            {"key": "contact_canal_principal"},
-        ]
+        client.list_fields.return_value = self._required_weni_fields()
         client.list_groups.return_value = [{"uuid": "g1", "name": "Opt-Out LGPD"}]
         client.list_messages.return_value = []
         client.list_contacts.return_value = [
@@ -1133,12 +1130,7 @@ class WeniUpdateTests(unittest.TestCase):
             full=True,
         )
         client = client_cls.return_value
-        client.list_fields.return_value = [
-            {"key": "contact_urn_whatsapp"},
-            {"key": "contact_urn_instagram"},
-            {"key": "contact_urn_facebook"},
-            {"key": "contact_canal_principal"},
-        ]
+        client.list_fields.return_value = self._required_weni_fields()
         client.list_groups.return_value = [{"uuid": "g1", "name": "Opt-Out LGPD"}]
         client.list_messages.return_value = []
         client.list_contacts.return_value = [
@@ -1180,12 +1172,7 @@ class WeniUpdateTests(unittest.TestCase):
             full=False,
         )
         client = client_cls.return_value
-        client.list_fields.return_value = [
-            {"key": "contact_urn_whatsapp"},
-            {"key": "contact_urn_instagram"},
-            {"key": "contact_urn_facebook"},
-            {"key": "contact_canal_principal"},
-        ]
+        client.list_fields.return_value = self._required_weni_fields()
         client.list_groups.return_value = [{"uuid": "g1", "name": "Opt-Out LGPD"}]
         client.list_messages.return_value = []
         client.list_contacts.return_value = [
@@ -1204,6 +1191,34 @@ class WeniUpdateTests(unittest.TestCase):
         client.update_contact_fields.assert_called_once()
         save_state_mock.assert_not_called()
         append_audit_mock.assert_called_once()
+
+    @patch("weni_update._open_farmalider", return_value=None)
+    @patch("weni_update.resolve_window")
+    @patch("weni_update.WeniClient")
+    def test_missing_order_fields_blocks_before_contact_reads(
+        self, client_cls, resolve_window_mock, _open_farmalider_mock
+    ) -> None:
+        from datetime import datetime, timezone
+
+        started = datetime(2026, 10, 3, 12, 0, tzinfo=timezone.utc)
+        resolve_window_mock.return_value = UpdateWindow(
+            started_at=started,
+            after=started,
+            full=False,
+        )
+        client = client_cls.return_value
+        client.list_fields.return_value = [
+            item for item in self._required_weni_fields()
+            if item["key"] != "pedido_valor_produtos"
+        ]
+
+        with self.assertRaisesRegex(PlanAuditError, "pedido_valor_produtos"):
+            run_update(apply=False, full=False)
+
+        client.list_messages.assert_not_called()
+        client.list_contacts.assert_not_called()
+        client.update_contact_fields.assert_not_called()
+        client.contact_group_action.assert_not_called()
 
     @patch("weni_update._open_farmalider", return_value=None)
     @patch("weni_update.resolve_window")
