@@ -1090,8 +1090,9 @@ try {
     Write-Host '[OK] Atalhos "NexoFlow Analytics", "NexoFlow Weni" e "NexoFlow Terminal" criados na Area de Trabalho.' -ForegroundColor Green
 
     Write-Step 'Atualizando cache de icones do Windows'
-    Refresh-NexoFlowIconCache -Executables @($updateExe, $terminalExe)
-    Write-Host '[OK] Explorer notificado para reler os icones internos do NexoFlow Weni e NexoFlow Terminal.' -ForegroundColor Green
+    $uninstallExe = Join-Path $InstallDir 'NexoFlow Uninstall.exe'
+    Refresh-NexoFlowIconCache -Executables @($appExe, $updateExe, $terminalExe, $uninstallExe)
+    Write-Host '[OK] Explorer notificado para reler os icones internos dos executaveis do NexoFlow.' -ForegroundColor Green
 
     Write-Step 'Registrando NexoFlow no Windows'
     Register-Uninstaller

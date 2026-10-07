@@ -44,6 +44,12 @@ Após instalar sobre uma instalação existente, execute `check-up.bat`, `testar
 - Google Sheets: batches adaptativos de até ~1,5 MB e menos leituras redundantes;
 - Update Weni: menos consultas auxiliares e menos I/O de auditoria, sem alterar as proteções de apply.
 
+## Ícones dos executáveis
+
+Os ícones do Setup, Analytics, Weni, Terminal e Uninstall são incorporados aos próprios arquivos `.exe`, e não apenas aos atalhos. A compilação Windows verifica a extração e a identidade de cada ícone antes de publicar os ZIPs.
+
+Ao atualizar uma instalação já existente, o Setup substitui os executáveis e solicita ao Windows a atualização do cache de ícones. Caso o Explorer ainda mostre a imagem antiga imediatamente após a instalação, atualize a pasta (F5) ou reinicie o Explorer, sem apagar os arquivos da instalação.
+
 ## Instalação
 
 Extraia o pacote completo e execute:
