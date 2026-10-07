@@ -20,6 +20,7 @@ from analytics import (
     BASE_COLUMNS,
     BI_ADS_COLUMNS,
     BI_CHANNEL_COLUMNS,
+    BI_ORDERS_COLUMNS,
     BI_CONVERSION_COLUMNS,
     BI_SALES_COLUMNS,
     BI_STATUS_COLUMNS,
@@ -47,6 +48,7 @@ from config import (
     SHEET_BASE_CONTATOS,
     SHEET_BI_ADS,
     SHEET_BI_CANAIS,
+    SHEET_BI_PEDIDOS,
     SHEET_BI_CONVERSAO,
     SHEET_BI_RESUMO_DIARIO,
     SHEET_BI_STATUS,
@@ -143,6 +145,7 @@ class GoogleSheetsStore:
             SHEET_BI_CONVERSAO: BI_CONVERSION_COLUMNS,
             SHEET_BI_VENDAS: BI_SALES_COLUMNS,
             SHEET_BI_ADS: BI_ADS_COLUMNS,
+            SHEET_BI_PEDIDOS: BI_ORDERS_COLUMNS,
             SHEET_BI_STATUS: BI_STATUS_COLUMNS,
             SHEET_CONTROLE: CONTROL_COLUMNS,
         }
@@ -182,6 +185,7 @@ class GoogleSheetsStore:
             "bi_conversion": SHEET_BI_CONVERSAO,
             "bi_sales": SHEET_BI_VENDAS,
             "bi_ads": SHEET_BI_ADS,
+            "bi_orders": SHEET_BI_PEDIDOS,
             "bi_status": SHEET_BI_STATUS,
             "control": SHEET_CONTROLE,
         }
@@ -634,6 +638,9 @@ class GoogleSheetsStore:
         )
         self.bi_ads = self._get_or_create_sheet(
             SHEET_BI_ADS, BI_ADS_COLUMNS, existing_sheets=existing_sheets
+        )
+        self.bi_orders = self._get_or_create_sheet(
+            SHEET_BI_PEDIDOS, BI_ORDERS_COLUMNS, existing_sheets=existing_sheets
         )
         self.bi_status = self._get_or_create_sheet(
             SHEET_BI_STATUS, BI_STATUS_COLUMNS, rows=100, existing_sheets=existing_sheets
@@ -1207,6 +1214,11 @@ class GoogleSheetsStore:
     def replace_bi_ads(self, rows: list[list[Any]]) -> None:
         self._replace_table(
             self.bi_ads, BI_ADS_COLUMNS, rows, value_input_option="USER_ENTERED"
+        )
+
+    def replace_bi_orders(self, rows: list[list[Any]]) -> None:
+        self._replace_table(
+            self.bi_orders, BI_ORDERS_COLUMNS, rows, value_input_option="USER_ENTERED"
         )
 
     def replace_bi_status(self, row: list[Any]) -> None:

@@ -1,6 +1,6 @@
 # Looker Studio — camada BI do NexoFlow Analytics
 
-Desde o NexoFlow 1.0, o Google Sheets continua sendo a camada de dados e o Looker Studio fica responsável principalmente pela visualização. Para evitar cálculos pesados e regras espalhadas no relatório, o NexoFlow Analytics mantém seis abas específicas para BI.
+Desde o NexoFlow 1.0, o Google Sheets continua sendo a camada de dados e o Looker Studio fica responsável principalmente pela visualização. Para evitar cálculos pesados e regras espalhadas no relatório, o NexoFlow Analytics mantém sete abas específicas para BI.
 
 ## Fontes recomendadas
 
@@ -88,6 +88,34 @@ Consolidação atual por modelo de atribuição de primeiro/último anúncio:
 
 Enquanto ainda não houver conversas atribuídas a anúncios, a aba contém uma linha zero/placeholder para manter o schema disponível no Looker Studio.
 
+### BI_Pedidos
+
+Uma linha por pedido, preparada para páginas de **Pedidos**, **Compradores do dia** e detalhamento de vendas.
+
+Campos principais:
+
+- pedido_id
+- pedido_data, no formato DD/MM/YY HH:MM:SS
+- data
+- hora
+- cliente
+- cpf
+- pedido_produtos
+- pedido_quantidade_itens
+- pedido_valor_produtos
+- pedido_valor
+- pedido_status
+- pedido_status_nome
+- pedido_forma_pagamento
+- pedido_forma_pagamento_nome
+- canal
+- primeiro_anuncio_origem
+- ultimo_anuncio_origem
+
+As listas de produto, quantidade e valor unitário mantêm a mesma ordem posicional. Para cálculos por item, prefira `Itens_Pedidos_FarmaLider`; para exibição de um pedido completo em uma linha, use `BI_Pedidos`.
+
+O dashboard deve mostrar preferencialmente os nomes amigáveis, como **Cancelado** e **Débito**, mantendo os códigos disponíveis para auditoria e filtros técnicos.
+
 ### BI_Status
 
 Uma linha com a saúde da última execução do Analytics:
@@ -119,4 +147,4 @@ cd C:\NexoFlow
 .\executar_carga_completa.bat
 ```
 
-Isso cria/migra as seis abas BI, completa a Base_Contatos com os contatos historicamente excluídos e inicializa o dashboard. Depois, volte ao fluxo incremental normal com `executar_manual.bat` ou `nexo analytics`.
+Isso cria/migra as sete abas BI, incluindo `BI_Pedidos`, completa a Base_Contatos com os contatos historicamente excluídos e inicializa o dashboard. Depois, volte ao fluxo incremental normal com `executar_manual.bat` ou `nexo analytics`.

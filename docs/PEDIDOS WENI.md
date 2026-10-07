@@ -1,10 +1,48 @@
-# Pedidos da Weni — NexoFlow 1.0
+# NexoFlow 1.0 — Pedidos na Weni
 
-O JSON `ultimo_pedido` é a fonte prioritária. Quando estiver preenchido e válido, ele fornece diretamente o identificador, data/hora, nomes dos produtos, quantidades, valores unitários e valor total; o NexoFlow usa essas informações para preencher `pedido_id`, `pedido_data`, `pedido_produtos`, `pedido_quantidade_itens` e `pedido_valor`. Depois de consultar o mesmo pedido pela API, também preenche `pedido_status` com o rótulo oficial do estado atual. A rotina Weni mantém esses campos autorizados, e o Analytics os preserva na `Base_Contatos`.
+Os campos de pedido da Weni são o snapshot operacional do último pedido obtido pela FarmaLíder API. Eles não são mais a fonte prioritária da resolução quando a API está disponível.
 
-O contrato completo, incluindo confirmação pela FarmaLíder, produtos e cancelamentos, está em [Pedidos no NexoFlow 1.0](PEDIDOS.md).
+## Fluxo
 
-O campo `ultimo_pedido` pode chegar como objeto, texto JSON ou wrapper da Weni. O parser reconhece os identificadores `pedido_id`, `pedidoId`, `codigo` e `codPedido` quando disponíveis. Quando há ID válido, os dados desse JSON permanecem prioritários e a FarmaLíder API é consultada somente em `/pedido/{codigo}` para confirmar o status do mesmo pedido. A busca `cliente/cpf/{cpf} → ultimoPedido.id` só ocorre quando `ultimo_pedido` estiver ausente, vazio ou `null`. Com identificador oficial, a chave do pedido é `FARMALIDER:<pedido_id>`; sem ele, a rotina mantém uma chave sintética estável para o registro recebido.
+```text
+CPF
+-> GET cliente/cpf/{cpf}
+-> ultimoPedido + itens
+-> GET pedido/{pedido_id}
+-> plano auditado
+-> campos pedido_* na Weni
+```
 
-Produtos permanecem estruturados em JSON, preservando nomes, códigos quando existirem, quantidades e valores. Estados 0, 1, 2 e 4 confirmados pela API contam como pedido feito; status 3 é cancelado e fica fora dos indicadores e de `ultima_compra`. Erros de parse são registrados, e informação ausente não é completada por suposição.
+## Campos
+
+| Campo | Conteúdo |
+|---|---|
+| `pedido_id` | ID oficial do pedido |
+| `pedido_produtos` | `descricao` dos itens, separados por vírgula |
+| `pedido_quantidade_itens` | quantidades posicionais, separadas por vírgula |
+| `pedido_valor_produtos` | valores unitários posicionais, separados por vírgula |
+| `pedido_valor` | soma de `itens[].total` |
+| `pedido_data` | `DD/MM/YY HH:MM:SS` |
+| `pedido_status` | código 0 a 4 |
+| `pedido_forma_pagamento` | código 1 a 5 |
+
+Exemplo:
+
+```text
+pedido_id: 340793
+pedido_produtos: PROLOPA BD 100+25MG C/30CAP, TP PRAMIPEXOL PRATI 1MG C/30 CPR (G)
+pedido_quantidade_itens: 1, 1
+pedido_valor_produtos: 53.9, 58.9
+pedido_valor: 112.8
+pedido_data: 05/06/26 15:45:27
+pedido_status: 3
+pedido_forma_pagamento: 2
+```
+
+`ultimo_pedido` continua aceito apenas para compatibilidade/fallback offline. O NexoFlow Weni não depende dele para escolher o pedido quando a FarmaLíder API está disponível.
+
+A escrita continua protegida por dry-run, auditoria, confirmação e verificação de conflito por contato.
+
+Veja [PEDIDOS.md](PEDIDOS.md) para regras completas.
+
 <!-- NexoFlow 1.0 -->

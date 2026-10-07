@@ -8,7 +8,7 @@ Este documento corresponde ao **NexoFlow 1.0**.
 No NexoFlow 1.0, o NexoFlow mantém o fluxo 24h, a CLI amigável `nexo`, o isolamento do checkpoint, o check-up limpo e o timeout/retry do Google Sheets. O Analytics reduz leituras e escritas redundantes, usa batches adaptativos e cache seguro da FarmaLíder no incremental; o Update Weni reduz leituras auxiliares e I/O local sem agrupar ou paralelizar as escritas protegidas.
 
 
-Antes de usar o **NexoFlow Weni**, confirme que `contact_urn_whatsapp`, `contact_urn_instagram`, `contact_urn_facebook` e `contact_canal_principal` existem na Weni como campos de **Texto**. Para armazenar também o detalhamento de Google Ads, crie opcionalmente como Texto: `primeiro_anuncio_tipo_campanha`, `primeiro_anuncio_canal_destino`, `ultimo_anuncio_tipo_campanha` e `ultimo_anuncio_canal_destino`. O teste de conexão verifica isso automaticamente e bloqueia atualizações se algum estiver ausente.
+Antes de usar o **NexoFlow Weni**, confirme que `contact_urn_whatsapp`, `contact_urn_instagram`, `contact_urn_facebook` e `contact_canal_principal` existem na Weni como campos de **Texto**. Para o contrato completo de pedidos, mantenha também os campos `pedido_id`, `pedido_data`, `pedido_status`, `pedido_produtos`, `pedido_quantidade_itens`, `pedido_valor_produtos`, `pedido_valor` e `pedido_forma_pagamento`. Para armazenar também o detalhamento de Google Ads, crie opcionalmente como Texto: `primeiro_anuncio_tipo_campanha`, `primeiro_anuncio_canal_destino`, `ultimo_anuncio_tipo_campanha` e `ultimo_anuncio_canal_destino`. O teste de conexão verifica isso automaticamente e bloqueia atualizações se algum estiver ausente.
 
 ## Requisitos
 
@@ -16,7 +16,7 @@ O NexoFlow é executado em Windows x64 e utiliza **Python 3.11 ou superior, 64 b
 
 ### Camada BI / Looker Studio
 
-Após instalar sobre uma instalação existente, execute `check-up.bat`, `testar_conexoes.bat` e uma vez `executar_carga_completa.bat`. A carga completa cria/preenche `BI_Resumo_Diario`, `BI_Canais`, `BI_Conversao`, `BI_Vendas`, `BI_Ads` e `BI_Status`, além de completar `Base_Contatos` com todos os contatos Weni. Depois disso, volte ao fluxo incremental normal.
+Após instalar sobre uma instalação existente, execute `check-up.bat`, `testar_conexoes.bat` e uma vez `executar_carga_completa.bat`. A carga completa cria/preenche `BI_Resumo_Diario`, `BI_Canais`, `BI_Conversao`, `BI_Vendas`, `BI_Ads`, `BI_Pedidos` e `BI_Status`, além de completar `Base_Contatos` com todos os contatos Weni. Depois disso, volte ao fluxo incremental normal.
 
 ### Otimizações de desempenho
 

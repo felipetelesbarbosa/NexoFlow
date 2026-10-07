@@ -371,18 +371,21 @@ def check_google_sheets_retry_if_configured() -> None:
         'SHEET_BI_CONVERSAO',
         'SHEET_BI_VENDAS',
         'SHEET_BI_ADS',
+        'SHEET_BI_PEDIDOS',
         'SHEET_BI_STATUS',
         'BI_SUMMARY_COLUMNS',
         'BI_CHANNEL_COLUMNS',
         'BI_CONVERSION_COLUMNS',
         'BI_SALES_COLUMNS',
         'BI_ADS_COLUMNS',
+        'BI_ORDERS_COLUMNS',
         'BI_STATUS_COLUMNS',
         'build_bi_summary_record',
         'build_bi_channel_records',
         'build_bi_conversion_records',
         'build_bi_sales_rows',
         'build_bi_ads_rows',
+        'build_bi_order_rows',
         'opt_in_lgpd',
         'maior_de_18_anos',
     ]
@@ -391,7 +394,7 @@ def check_google_sheets_retry_if_configured() -> None:
     if missing_bi:
         fail("Camada BI/Looker Studio 1.0 incompleta: " + ", ".join(missing_bi))
     else:
-        ok("Camada BI/Looker Studio contém as seis tabelas, métricas e campos LGPD/maioridade.")
+        ok("Camada BI/Looker Studio contém as sete tabelas, incluindo BI_Pedidos, métricas e campos LGPD/maioridade.")
 
     diagnostico_text = read("diagnostico.py")
     if "validate_structure=True" not in diagnostico_text:

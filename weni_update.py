@@ -40,7 +40,7 @@ from pedido_utils import (
     farmalider_order_status_name,
     is_order_cancelled,
     is_order_made,
-    serialize_pedido_products,
+    weni_order_datetime_text,
 )
 from weni_client import WeniClient
 from urn_utils import (
@@ -66,7 +66,9 @@ ALLOWED_WRITE_FIELDS = {
     "pedido_status",
     "pedido_produtos",
     "pedido_quantidade_itens",
+    "pedido_valor_produtos",
     "pedido_valor",
+    "pedido_forma_pagamento",
     "ultima_compra",
     *GOOGLE_ADS_WRITE_FIELDS,
 }
@@ -85,8 +87,21 @@ PURCHASE_FIELDS = {
     "pedido_status",
     "pedido_produtos",
     "pedido_quantidade_itens",
+    "pedido_valor_produtos",
     "pedido_valor",
+    "pedido_forma_pagamento",
     "ultima_compra",
+}
+
+RECOMMENDED_ORDER_FIELDS = {
+    "pedido_id",
+    "pedido_data",
+    "pedido_status",
+    "pedido_produtos",
+    "pedido_quantidade_itens",
+    "pedido_valor_produtos",
+    "pedido_valor",
+    "pedido_forma_pagamento",
 }
 
 OPEN_ORDER_STATUSES = {"Em processamento", "Em trânsito", "Pronto para rota"}
@@ -98,7 +113,7 @@ def _track_open_order(
     contact_uuid: str,
     status: Any,
 ) -> None:
-    label = normalize_value(status).strip()
+    label = farmalider_order_status_name(status) or normalize_value(status).strip()
     if label in OPEN_ORDER_STATUSES:
         open_order_uuids.add(contact_uuid)
     elif label in TERMINAL_ORDER_STATUSES:
@@ -233,7 +248,7 @@ def _same_value(field_name: str, current: Any, proposed: Any) -> bool:
         proposed_cpf = normalize_cpf(proposed)
         if current_cpf and proposed_cpf:
             return current_cpf == proposed_cpf
-    if field_name in {"idade", "pedido_quantidade_itens", "pedido_valor"}:
+    if field_name in {"idade", "pedido_valor"}:
         current_num = _safe_number(current)
         proposed_num = _safe_number(proposed)
         if current_num is not None and proposed_num is not None:
@@ -649,6 +664,13 @@ def _purchase_is_cancelled(order: dict[str, str]) -> bool:
     return is_order_cancelled(order)
 
 
+def _weni_number_text(value: Any) -> str:
+    number = _safe_number(value)
+    if number is None:
+        return ""
+    return format(Decimal(str(number)).normalize(), "f")
+
+
 def _apply_purchase_candidate(
     plan: ContactUpdatePlan,
     contact: dict[str, Any],
@@ -657,7 +679,7 @@ def _apply_purchase_candidate(
     captured_at: str,
     available_weni_fields: set[str] | None = None,
 ) -> bool:
-    """Resolve o pedido; registrar um cancelamento não confirma uma compra."""
+    """Resolve the latest official FarmaLíder order and flatten it into Weni."""
     current_fields = get_fields(contact)
     candidate = dict(contact)
     candidate["fields"] = dict(current_fields)
@@ -678,72 +700,83 @@ def _apply_purchase_candidate(
 
     if order is None or not items:
         return False
+
     confirmation = order.get("status_confirmacao", "")
-    if confirmation not in {"CONFIRMADO_API", "CANCELADO_API", "NAO_CONFIRMADO_API"}:
+    if confirmation not in {"CONFIRMADO_API", "CANCELADO_API"}:
         return False
-    validation = order.get("status_validacao")
-    if validation != "OK" and not (
-        validation == "ATENÇÃO_TOTAL_DIVERGENTE"
-        and confirmation in {"CONFIRMADO_API", "CANCELADO_API"}
-    ):
+    if order.get("status_validacao") != "OK":
         return False
 
     pedido_id = str(order.get("pedido_id") or "").strip()
     proposed_dt = business_order_datetime(order.get("data_hora"))
     order_value = _safe_number(order.get("valor_total_compra"))
-    quantity = _safe_number(order.get("quantidade_itens"))
-    if not pedido_id or proposed_dt is None or order_value is None or quantity is None:
-        return False
-    if order_value < 0 or quantity <= 0:
+    if not pedido_id or proposed_dt is None or order_value is None or order_value < 0:
         return False
 
-    current_order_date = business_order_datetime(normalize_value(current_fields.get("pedido_data")))
+    names = [(item.get("produto_nome") or "").strip() for item in items]
+    quantities = [_weni_number_text(item.get("quantidade")) for item in items]
+    unit_values = [_weni_number_text(item.get("valor_unitario")) for item in items]
+    if (
+        not names
+        or any(not value for value in names)
+        or any(not value for value in quantities)
+        or any(not value for value in unit_values)
+        or not (len(names) == len(quantities) == len(unit_values))
+    ):
+        return False
+
+    current_order_date = business_order_datetime(
+        normalize_value(current_fields.get("pedido_data"))
+    )
     if current_order_date is not None and current_order_date > proposed_dt:
         return False
-    proposed_date = proposed_dt.isoformat()
-    products = serialize_pedido_products(order, items)
-    if not products:
+
+    proposed_date = weni_order_datetime_text(proposed_dt)
+    status_code = str(order.get("farmalider_status_pedido") or "").strip()
+    payment_code = str(order.get("farmalider_forma_pagamento") or "").strip()
+    if not farmalider_order_status_name(status_code):
         return False
 
     plan.order_validated = True
     plan.purchase_confirmation = confirmation
     plan.purchase_confirmed = confirmation == "CONFIRMADO_API" and is_order_made(order)
-    reason = "pedido resolvido e validado; somente cancelados ficam fora da compra"
-
-    status_label = farmalider_order_status_name(order.get("farmalider_status_pedido"))
-    if is_order_cancelled(order):
-        # Cancelamento explícito sempre prevalece sobre qualquer código operacional.
-        status_label = "Cancelado"
+    reason = "pedido oficial FarmaLíder atualizado por GET e normalizado para Weni"
 
     order_fields_to_write: dict[str, Any] = {
         "pedido_id": pedido_id,
         "pedido_data": proposed_date,
+        "pedido_status": status_code,
+        "pedido_produtos": ", ".join(names),
+        "pedido_quantidade_itens": ", ".join(quantities),
+        "pedido_valor_produtos": ", ".join(unit_values),
         "pedido_valor": order_value,
-        "pedido_quantidade_itens": quantity,
-        "pedido_produtos": products,
     }
-    if (
-        status_label
-        and available_weni_fields is not None
-        and "pedido_status" in available_weni_fields
-    ):
-        order_fields_to_write["pedido_status"] = status_label
+    if payment_code:
+        order_fields_to_write["pedido_forma_pagamento"] = payment_code
 
     for field_name, value in order_fields_to_write.items():
-        _set_field_if_changed(plan, current_fields, field_name, value, reason=reason)
+        if (
+            available_weni_fields is not None
+            and field_name not in available_weni_fields
+        ):
+            continue
+        _set_field_if_changed(
+            plan, current_fields, field_name, value, reason=reason
+        )
 
     if plan.purchase_confirmed:
-        current_last_purchase = business_order_datetime(normalize_value(current_fields.get("ultima_compra")))
+        current_last_purchase = business_order_datetime(
+            normalize_value(current_fields.get("ultima_compra"))
+        )
         if current_last_purchase is None or current_last_purchase <= proposed_dt:
             _set_field_if_changed(
                 plan,
                 current_fields,
                 "ultima_compra",
-                proposed_date,
+                proposed_dt.isoformat(),
                 reason="pedido não cancelado confirmado pela API FarmaLíder",
             )
     return True
-
 
 def _build_contact_plan(
     contact: dict[str, Any],
@@ -865,7 +898,11 @@ def _build_contact_plan(
     )
     if plan.order_validated:
         # A revisão depende da identidade e das duas possíveis fontes.
-        for key in ("cpf", "ultimo_pedido", "pedido_id", "pedido_data", "pedido_status", "pedido_produtos", "pedido_quantidade_itens", "pedido_valor"):
+        for key in (
+            "cpf", "ultimo_pedido", "pedido_id", "pedido_data", "pedido_status",
+            "pedido_produtos", "pedido_quantidade_itens",
+            "pedido_valor_produtos", "pedido_valor", "pedido_forma_pagamento",
+        ):
             plan.guards[key] = fields.get(key)
     return plan
 
@@ -923,12 +960,15 @@ def audit_plans(
                 errors.append(f"{plan.contact_uuid}: valor inválido em opt_in_lgpd")
 
         if "pedido_status" in plan.fields:
-            allowed_statuses = {
-                "Em processamento", "Em trânsito", "Concluído",
-                "Cancelado", "Pronto para rota",
-            }
-            if str(plan.fields["pedido_status"]).strip() not in allowed_statuses:
-                errors.append(f"{plan.contact_uuid}: valor inválido em pedido_status")
+            if not farmalider_order_status_name(plan.fields["pedido_status"]):
+                errors.append(f"{plan.contact_uuid}: código inválido em pedido_status")
+
+        if "pedido_forma_pagamento" in plan.fields:
+            payment = str(plan.fields["pedido_forma_pagamento"]).strip()
+            if payment not in {"1", "2", "3", "4", "5"}:
+                errors.append(
+                    f"{plan.contact_uuid}: código inválido em pedido_forma_pagamento"
+                )
 
         if "contact_canal_principal" in plan.fields:
             channel = str(plan.fields["contact_canal_principal"]).strip().casefold()
@@ -966,28 +1006,40 @@ def audit_plans(
         for date_field in ("pedido_data", "ultima_compra"):
             if date_field in plan.fields and business_order_datetime(plan.fields[date_field]) is None:
                 errors.append(f"{plan.contact_uuid}: data inválida em {date_field}")
-        for numeric_field in ("pedido_valor", "pedido_quantidade_itens"):
-            if numeric_field not in plan.fields:
-                continue
-            number = _safe_number(plan.fields[numeric_field])
-            if number is None or number < 0 or (numeric_field == "pedido_quantidade_itens" and number == 0):
-                errors.append(f"{plan.contact_uuid}: número inválido em {numeric_field}")
+        if "pedido_valor" in plan.fields:
+            number = _safe_number(plan.fields["pedido_valor"])
+            if number is None or number < 0:
+                errors.append(f"{plan.contact_uuid}: número inválido em pedido_valor")
+
         if "pedido_produtos" in plan.fields:
-            try:
-                products = json.loads(str(plan.fields["pedido_produtos"]))
-                if not isinstance(products, dict) or not isinstance(products.get("produtos"), list) or not products["produtos"]:
-                    raise ValueError("envelope de produtos vazio ou inválido")
-                if products.get("status_validacao") != "OK" and not (
-                    products.get("status_validacao") == "ATENÇÃO_TOTAL_DIVERGENTE"
-                    and products.get("status_confirmacao") in {"CONFIRMADO_API", "CANCELADO_API"}
+            products = [
+                value.strip()
+                for value in str(plan.fields["pedido_produtos"]).split(",")
+                if value.strip()
+            ]
+            if not products:
+                errors.append(f"{plan.contact_uuid}: lista vazia em pedido_produtos")
+
+        for list_field in ("pedido_quantidade_itens", "pedido_valor_produtos"):
+            if list_field not in plan.fields:
+                continue
+            values = [
+                value.strip()
+                for value in str(plan.fields[list_field]).split(",")
+                if value.strip()
+            ]
+            if not values:
+                errors.append(f"{plan.contact_uuid}: lista vazia em {list_field}")
+                continue
+            for value in values:
+                number = _safe_number(value)
+                if number is None or number < 0 or (
+                    list_field == "pedido_quantidade_itens" and number <= 0
                 ):
-                    raise ValueError("pedido sem validação válida")
-                if products.get("status_confirmacao") not in {"CONFIRMADO_API", "CANCELADO_API", "NAO_CONFIRMADO_API"}:
-                    raise ValueError("confirmação inválida")
-                if plan.purchase_confirmed and not is_order_made(products):
-                    raise ValueError("pedido cancelado ou status desconhecido não confirma compra")
-            except (ValueError, TypeError):
-                errors.append(f"{plan.contact_uuid}: estrutura inválida em pedido_produtos")
+                    errors.append(
+                        f"{plan.contact_uuid}: valor inválido em {list_field}"
+                    )
+                    break
 
         for action in plan.group_actions:
             if action.action not in {"add", "remove"}:
@@ -1587,6 +1639,10 @@ def _missing_google_ads_fields(available: set[str]) -> list[str]:
     return sorted(GOOGLE_ADS_WRITE_FIELDS - available)
 
 
+def _missing_order_fields(available: set[str]) -> list[str]:
+    return sorted(RECOMMENDED_ORDER_FIELDS - available)
+
+
 def _ensure_multichannel_fields(client: WeniClient, available: set[str] | None = None) -> None:
     missing = _missing_multichannel_fields(client, available)
     if not missing:
@@ -1640,6 +1696,7 @@ def check_update_connections() -> dict[str, Any]:
         result["weni"]["opt_in_group_found"] = opt_in_available
         result["weni"]["missing_multichannel_fields"] = _missing_multichannel_fields(weni, available_fields)
         result["weni"]["pedido_status_field_found"] = "pedido_status" in available_fields
+        result["weni"]["missing_order_fields"] = _missing_order_fields(available_fields)
         result["weni"]["missing_google_ads_fields"] = _missing_google_ads_fields(available_fields)
         farm = _open_farmalider()
         if farm is not None:
@@ -1675,10 +1732,12 @@ def run_update(
     try:
         available_weni_fields = _available_weni_fields(weni)
         _ensure_multichannel_fields(weni, available_weni_fields)
-        if "pedido_status" not in available_weni_fields:
+        missing_order_fields = _missing_order_fields(available_weni_fields)
+        if missing_order_fields:
             logging.warning(
-                "Campo pedido_status ausente na Weni. O status continuará sendo "
-                "validado pela FarmaLíder, mas não será gravado no contato."
+                "Campos de pedido ausentes na Weni: %s. O NexoFlow continuará "
+                "consultando a FarmaLíder, mas gravará somente os campos existentes.",
+                ", ".join(missing_order_fields),
             )
         missing_google_ads = _missing_google_ads_fields(available_weni_fields)
         if missing_google_ads:

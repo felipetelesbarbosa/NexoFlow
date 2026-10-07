@@ -14,6 +14,7 @@ from analytics import (
     build_bi_ads_rows,
     build_bi_channel_records,
     build_bi_conversion_records,
+    build_bi_order_rows,
     build_bi_sales_rows,
     build_bi_summary_record,
     build_daily_metrics,
@@ -815,7 +816,7 @@ def main() -> int:
         # Camada BI pronta para o Looker Studio. As abas são mantidas pelo próprio
         # Analytics para que o relatório não precise recalcular regras de negócio.
         bi_started = time.monotonic()
-        logging.info("Google Sheets: camada BI/Looker Studio - iniciando 6 tabelas.")
+        logging.info("Google Sheets: camada BI/Looker Studio - iniciando 7 tabelas.")
         bi_summary = build_bi_summary_record(
             contact_result.final_records,
             all_order_records,
@@ -824,7 +825,7 @@ def main() -> int:
             updated_at=sync_time,
         )
         sheets.upsert_bi_summary(bi_summary)
-        logging.info("Google Sheets: BI 1/6 - BI_Resumo_Diario atualizado.")
+        logging.info("Google Sheets: BI 1/7 - BI_Resumo_Diario atualizado.")
 
         bi_channels = build_bi_channel_records(
             contact_result.final_records,
@@ -832,7 +833,7 @@ def main() -> int:
             updated_at=sync_time,
         )
         sheets.upsert_bi_channels(bi_channels)
-        logging.info("Google Sheets: BI 2/6 - BI_Canais atualizado.")
+        logging.info("Google Sheets: BI 2/7 - BI_Canais atualizado.")
 
         bi_conversion = build_bi_conversion_records(
             contact_result.final_records,
@@ -841,7 +842,7 @@ def main() -> int:
             updated_at=sync_time,
         )
         sheets.upsert_bi_conversion(bi_conversion)
-        logging.info("Google Sheets: BI 3/6 - BI_Conversao atualizado.")
+        logging.info("Google Sheets: BI 3/7 - BI_Conversao atualizado.")
 
         bi_sales = build_bi_sales_rows(
             all_order_records,
@@ -850,7 +851,7 @@ def main() -> int:
             updated_at=sync_time,
         )
         sheets.replace_bi_sales(bi_sales)
-        logging.info("Google Sheets: BI 4/6 - BI_Vendas atualizado.")
+        logging.info("Google Sheets: BI 4/7 - BI_Vendas atualizado.")
 
         bi_ads = build_bi_ads_rows(
             contact_result.final_records,
@@ -859,7 +860,16 @@ def main() -> int:
             updated_at=sync_time,
         )
         sheets.replace_bi_ads(bi_ads)
-        logging.info("Google Sheets: BI 5/6 - BI_Ads atualizado.")
+        logging.info("Google Sheets: BI 5/7 - BI_Ads atualizado.")
+
+        bi_orders = build_bi_order_rows(
+            contact_result.final_records,
+            all_order_records,
+            all_item_records,
+            updated_at=sync_time,
+        )
+        sheets.replace_bi_orders(bi_orders)
+        logging.info("Google Sheets: BI 6/7 - BI_Pedidos atualizado.")
 
         # O status é gravado por último para refletir a própria execução do BI.
         status_stats = sheets.request_stats()
@@ -885,7 +895,7 @@ def main() -> int:
             order_stats.confirmed_api,
         ])
         logging.info(
-            "Google Sheets: BI 6/6 - BI_Status atualizado; camada BI concluída em %.2fs.",
+            "Google Sheets: BI 7/7 - BI_Status atualizado; camada BI concluída em %.2fs.",
             time.monotonic() - bi_started,
         )
 

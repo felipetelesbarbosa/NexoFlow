@@ -4,7 +4,12 @@ import hashlib
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from pedido_utils import business_order_datetime, farmalider_order_status_name, is_order_cancelled
+from pedido_utils import (
+    business_order_datetime,
+    farmalider_order_status_name,
+    farmalider_payment_method_name,
+    is_order_cancelled,
+)
 
 
 def _text(value: Any) -> str:
@@ -78,22 +83,31 @@ def _quantity_text(value: Decimal) -> str:
 
 
 def _api_product_identity(api_item: dict[str, Any]) -> tuple[str, str]:
-    """The API now puts product names in codProduto; numeric values stay legacy codes."""
-    value = api_item.get("codProduto")
-    if value is not None and (isinstance(value, bool) or not isinstance(value, (int, str))):
-        raise ValueError("Produto da API deve ser um código inteiro ou nome em texto.")
-    text = _text(value)
-    is_code = isinstance(value, int) or (text.isascii() and text.isdigit())
-    code = text if is_code else ""
-    supplied_name = text if text and not is_code else ""
-    name = ""
-    for field in ("nome", "descricao"):
-        description = api_item.get(field)
-        if description is not None and not isinstance(description, str):
-            raise ValueError(f"{field} do produto deve ser texto.")
-        if not name and description is not None:
-            name = description.strip()
-    return code, name or supplied_name
+    """Use descricao as the product name; codProduto remains only an optional code."""
+    raw_code = api_item.get("codProduto")
+    if raw_code is not None and (
+        isinstance(raw_code, bool) or not isinstance(raw_code, (int, str))
+    ):
+        raise ValueError("codProduto da API deve ser inteiro ou texto.")
+
+    description = api_item.get("descricao")
+    if not isinstance(description, str) or not description.strip():
+        raise ValueError("descricao do produto ausente ou inválida.")
+
+    return _text(raw_code), description.strip()
+
+
+def _pedido_from_cliente_payload(
+    payload: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Adapt GET cliente/cpf to the same capa+itens shape used by GET pedido."""
+    if not isinstance(payload, dict):
+        return None
+    latest = payload.get("ultimoPedido")
+    items = payload.get("itens")
+    if not isinstance(latest, dict) or not isinstance(items, list) or not items:
+        return None
+    return {"capa": dict(latest), "itens": items}
 
 
 def _failure(
@@ -154,120 +168,155 @@ def apply_pedido_api_confirmation(
     pedido_api: dict[str, Any] | None, *, linked_cliente_id: str,
     confirmed_at: str,
 ) -> tuple[dict[str, str], list[dict[str, str]]]:
-    """Replace financial details by validated API items; retain explicit provenance."""
+    """Build the canonical order from the current FarmaLíder API response."""
     from analytics import _item_key
 
     order = dict(order)
-    items = [dict(item) for item in items]
     if pedido_api is None:
-        return _failure(order, items, "PEDIDO_NAO_ENCONTRADO_API", "Pedido não encontrado na API.")
+        return _failure(order, [], "PEDIDO_NAO_ENCONTRADO_API", "Pedido não encontrado na API.")
     if not isinstance(pedido_api, dict) or not isinstance(pedido_api.get("capa"), dict):
-        return _failure(order, items, "ERRO_RESPOSTA_PEDIDO_API", "Resposta sem objeto capa.")
+        return _failure(order, [], "ERRO_RESPOSTA_PEDIDO_API", "Resposta sem objeto capa.")
+
     capa = pedido_api["capa"]
-    api_id, requested_id = _positive_id(capa.get("id")), _positive_id(order.get("pedido_id"))
+    api_id = _positive_id(capa.get("id"))
+    requested_id = _positive_id(order.get("pedido_id"))
     if not api_id or not requested_id:
-        return _failure(order, items, "PEDIDO_ID_INVALIDO_API", "Identidade do pedido ausente ou inválida.")
+        return _failure(order, [], "PEDIDO_ID_INVALIDO_API", "Identidade do pedido ausente ou inválida.")
     if api_id != requested_id:
-        return _failure(order, items, "PEDIDO_ID_DIVERGENTE_API", "Identidade do pedido divergente.")
-    api_cliente_id, linked_id = _positive_id(capa.get("codCliente")), _positive_id(linked_cliente_id)
+        return _failure(order, [], "PEDIDO_ID_DIVERGENTE_API", "Identidade do pedido divergente.")
+
+    api_cliente_id = _positive_id(capa.get("codCliente"))
+    linked_id = _positive_id(linked_cliente_id)
     if not api_cliente_id or not linked_id:
-        return _failure(order, items, "PEDIDO_CLIENTE_NAO_VERIFICADO_API", "Proprietário do pedido não verificado.")
+        return _failure(order, [], "PEDIDO_CLIENTE_NAO_VERIFICADO_API", "Proprietário do pedido não verificado.")
     if api_cliente_id != linked_id:
-        return _failure(order, items, "PEDIDO_CLIENTE_DIVERGENTE_API", "Proprietário do pedido divergente.")
+        return _failure(order, [], "PEDIDO_CLIENTE_DIVERGENTE_API", "Proprietário do pedido divergente.")
+
     emitted = business_order_datetime(capa.get("emissao"))
     if emitted is None:
-        return _failure(order, items, "PEDIDO_DATA_INVALIDA_API", "Emissão do pedido ausente ou inválida.")
+        return _failure(order, [], "PEDIDO_DATA_INVALIDA_API", "Emissão do pedido ausente ou inválida.")
+
     api_items = pedido_api.get("itens")
     if not isinstance(api_items, list) or not api_items:
-        return _failure(order, items, "ERRO_ITENS_PEDIDO_API", "Lista de itens ausente ou vazia.")
+        return _failure(order, [], "ERRO_ITENS_PEDIDO_API", "Lista de itens ausente ou vazia.")
 
-    api_total, api_qty = Decimal("0"), Decimal("0")
+    api_total = Decimal("0")
+    api_qty = Decimal("0")
     canonical_items: list[dict[str, str]] = []
     key = f"FARMALIDER:{api_id}"
     date_time = emitted.isoformat(timespec="seconds")
-    date, hour = emitted.date().isoformat(), emitted.strftime("%H:%M:%S")
+    date = emitted.date().isoformat()
+    hour = emitted.strftime("%H:%M:%S")
+
     try:
         for position, api_item in enumerate(api_items, 1):
             if not isinstance(api_item, dict):
                 raise ValueError("Item da API não é um objeto.")
             if "codPedido" in api_item and _positive_id(api_item["codPedido"]) != api_id:
-                return _failure(order, items, "ITEM_PEDIDO_DIVERGENTE_API", "Item pertence a outro pedido ou não possui identidade válida.")
+                return _failure(
+                    order, [], "ITEM_PEDIDO_DIVERGENTE_API",
+                    "Item pertence a outro pedido ou não possui identidade válida.",
+                )
+
             quantity = _decimal(api_item.get("quantidade"), "quantidade", positive=True)
             unit = _decimal(api_item.get("valor"), "valor unitário")
-            total = _decimal(api_item.get("total"), "total do item")
+            total = (
+                _decimal(api_item.get("total"), "total do item")
+                if api_item.get("total") not in (None, "")
+                else quantity * unit
+            )
             code, name = _api_product_identity(api_item)
-            if not name:
-                name = _matching_name(code, items, quantity, unit, total, api_items)
-            if not code and not name:
-                raise ValueError("Item sem código ou nome identificável.")
+
             canonical_items.append({
-                "item_chave": _item_key(key, position), "pedido_chave": key,
-                "pedido_id": api_id, "data_hora": date_time, "data": date, "hora": hour,
-                "contact_uuid": order.get("contact_uuid", ""), "telefone": order.get("telefone", ""),
-                "cliente": order.get("cliente", ""), "produto_ordem": str(position),
-                "produto_codigo": code, "produto_nome": name,
-                "quantidade": _quantity_text(quantity), "valor_unitario": f"{unit:.2f}",
-                "valor_total": f"{total:.2f}", "capturado_em": confirmed_at,
+                "item_chave": _item_key(key, position),
+                "pedido_chave": key,
+                "pedido_id": api_id,
+                "data_hora": date_time,
+                "data": date,
+                "hora": hour,
+                "contact_uuid": order.get("contact_uuid", ""),
+                "telefone": order.get("telefone", ""),
+                "cliente": order.get("cliente", ""),
+                "produto_ordem": str(position),
+                "produto_nome": name,
+                "produto_codigo": code,
+                "quantidade": _quantity_text(quantity),
+                "valor_unitario": f"{unit:.2f}",
+                "valor_total": f"{total:.2f}",
+                "capturado_em": confirmed_at,
             })
             api_total += total
             api_qty += quantity
-        freight = _decimal(capa["frete"], "frete") if capa.get("frete") not in (None, "") else None
+
+        freight = (
+            _decimal(capa["frete"], "frete")
+            if capa.get("frete") not in (None, "")
+            else None
+        )
         official_total = None
-        for field in ("valorTotal", "valorTotalPedido", "valorTotalCompra", "totalPedido", "totalGeral", "total"):
+        for field in (
+            "valorTotal", "valorTotalPedido", "valorTotalCompra",
+            "totalPedido", "totalGeral", "total",
+        ):
             if capa.get(field) not in (None, ""):
                 official_total = _decimal(capa[field], "total geral")
                 break
     except ValueError as exc:
-        return _failure(order, items, "ERRO_ITENS_PEDIDO_API", str(exc))
+        return _failure(order, [], "ERRO_ITENS_PEDIDO_API", str(exc))
 
-    if official_total is not None:
-        purchase_total, provenance = official_total, "TOTAL_GERAL_API"
-    elif freight is not None:
-        purchase_total, provenance = api_total + freight, "SOMA_ITENS_MAIS_FRETE_API"
-    else:
-        purchase_total, provenance = api_total, "SOMA_ITENS_API"
-    # Canonical API snapshots already carry the original Weni comparison.
-    # Comparing the refreshed API total to itself would erase that audit trail.
-    canonical_api = "API" in order.get("valor_origem", "")
-    previous_value = order.get("valor_total_weni", "") if canonical_api else order.get("valor_total_compra", "")
-    previous_origin = order.get("origem_pedido", "")
-    previous_total = None
-    if previous_value and "WENI" in previous_origin:
-        try:
-            previous_total = _decimal(previous_value, "total Weni")
-        except ValueError:
-            pass
-    difference = previous_total - purchase_total if previous_total is not None else Decimal("0")
-    validation = "ATENÇÃO_TOTAL_DIVERGENTE" if abs(difference) > Decimal("0.01") else "OK"
-    if provenance == "SOMA_ITENS_API":
-        validation = "ATENCAO_TOTAL_PARCIAL"
+    # Contract requested for Weni/BI: pedido_valor is the sum of item totals.
+    purchase_total = api_total
+    provenance = "SOMA_ITENS_API"
+
     order.update({
-        "pedido_id": api_id, "pedido_chave": key, "data_hora": date_time, "data": date, "hora": hour,
-        "farmalider_cliente_id": linked_id, "farmalider_cod_cliente": api_cliente_id,
-        "status_validacao": validation,
-        "erro_parse": "", "farmalider_erro": "", "farmalider_confirmado_em": confirmed_at,
-        "origem_pedido": "WENI_ULTIMO_PEDIDO+FARMALIDER_API" if "WENI" in previous_origin else "FARMALIDER_CLIENTE_ULTIMO_PEDIDO",
-        "valor_total_compra": f"{purchase_total:.2f}", "valor_total_itens": f"{api_total:.2f}",
-        "valor_total_api_itens": f"{api_total:.2f}", "quantidade_itens_api": _quantity_text(api_qty),
+        "pedido_id": api_id,
+        "pedido_chave": key,
+        "data_hora": date_time,
+        "data": date,
+        "hora": hour,
+        "farmalider_cliente_id": linked_id,
+        "farmalider_cod_cliente": api_cliente_id,
+        "status_validacao": "OK",
+        "erro_parse": "",
+        "farmalider_erro": "",
+        "farmalider_confirmado_em": confirmed_at,
+        "origem_pedido": order.get("origem_pedido") or "FARMALIDER_API",
+        "valor_total_compra": f"{purchase_total:.2f}",
+        "valor_total_itens": f"{api_total:.2f}",
+        "valor_total_api_itens": f"{api_total:.2f}",
+        "quantidade_itens_api": _quantity_text(api_qty),
         "total_api": f"{official_total:.2f}" if official_total is not None else "",
-        "quantidade_itens": _quantity_text(api_qty), "quantidade_produtos": str(len(canonical_items)),
-        "diferenca_total": f"{purchase_total - api_total:.2f}", "valor_origem": provenance,
-        "valor_total_weni": f"{previous_total:.2f}" if previous_total is not None else "",
-        "diferenca_total_weni_api": f"{difference:.2f}" if previous_total is not None else "",
+        "quantidade_itens": _quantity_text(api_qty),
+        "quantidade_produtos": str(len(canonical_items)),
+        "diferenca_total": "0.00",
+        "valor_origem": provenance,
+        "valor_total_weni": "",
+        "diferenca_total_weni_api": "",
         "farmalider_frete": f"{freight:.2f}" if freight is not None else "",
     })
+
     for target, source in (
-        ("farmalider_public_id", "publicId"), ("farmalider_emissao", "emissao"),
-        ("farmalider_status_pedido", "status"), ("farmalider_cod_filial", "codFilial"),
-        ("farmalider_forma_pagamento", "formaPagamento"), ("farmalider_cupom", "cupom"),
-        ("farmalider_pedido_web", "pedidoWeb"), ("farmalider_cancelamento", "cancelamento"),
+        ("farmalider_public_id", "publicId"),
+        ("farmalider_emissao", "emissao"),
+        ("farmalider_status_pedido", "status"),
+        ("farmalider_cod_filial", "codFilial"),
+        ("farmalider_forma_pagamento", "formaPagamento"),
+        ("farmalider_cupom", "cupom"),
+        ("farmalider_pedido_web", "pedidoWeb"),
+        ("farmalider_cancelamento", "cancelamento"),
         ("farmalider_entrega", "entrega"),
     ):
         order[target] = _text(capa.get(source))
-    order["farmalider_status_pedido_nome"] = farmalider_order_status_name(capa.get("status"))
-    # Only the fresh API response determines cancellation, not an old snapshot.
-    order["status_confirmacao"] = ""
-    order["status_confirmacao"] = "CANCELADO_API" if is_order_cancelled(order) else "CONFIRMADO_API"
+
+    order["farmalider_status_pedido_nome"] = farmalider_order_status_name(
+        capa.get("status")
+    )
+    order["farmalider_forma_pagamento_nome"] = farmalider_payment_method_name(
+        capa.get("formaPagamento")
+    )
+    order["status_confirmacao"] = (
+        "CANCELADO_API" if is_order_cancelled(order) else "CONFIRMADO_API"
+    )
     return order, canonical_items
 
 
@@ -296,166 +345,176 @@ def resolve_contact_order(
     linked_cliente_id: str = "", cliente_response: dict[str, Any] | None = None,
     pedido_responses_by_id: dict[str, dict[str, Any] | None] | None = None,
 ) -> tuple[dict[str, str] | None, list[dict[str, str]]]:
-    """Use populated ultimo_pedido first; only an empty field permits CPF fallback."""
-    from analytics import get_fields, is_valid_cpf, normalize_cpf, normalize_order_source, parse_ultimo_pedido
+    """
+    Resolve pedido from FarmaLíder first.
 
-    fields = get_fields(contact)
-    raw = normalize_order_source(fields.get("ultimo_pedido"))
-    order, items = parse_ultimo_pedido(contact, captured_at=captured_at)
-    valid_weni = order is not None and not order.get("status_validacao", "").startswith("ERRO")
-    if raw and (not valid_weni or not items):
-        return order, items
-    if raw and not _positive_id(order.get("pedido_id")):
-        if order.get("pedido_id"):
-            return _failure(order, items, "PEDIDO_ID_INVALIDO_WENI", "Identidade do pedido da Weni deve ser um inteiro positivo.")
-        return order, items
-    if raw:
-        order["valor_origem"] = order.get("valor_origem") or "WENI"
-        # Caminho 1: ultimo_pedido é a fonte prioritária. Nunca buscamos outro
-        # pedido pelo CPF. Quando a API está disponível, consultamos SOMENTE o
-        # mesmo pedido por ID para atualizar seu status operacional.
-        snapshot_contact = {**contact, "fields": {**fields, "ultimo_pedido": None}}
-        snapshot, _ = parse_ultimo_pedido(snapshot_contact, captured_at=captured_at)
-        retained_confirmation = (
-            snapshot is not None
-            and not snapshot.get("status_validacao", "").startswith("ERRO")
-            and snapshot.get("status_confirmacao") in {"CONFIRMADO_API", "CANCELADO_API"}
-            and all(order.get(key) == snapshot.get(key) for key in (
-                "pedido_id", "data_hora", "valor_total_compra",
-            ))
-        )
-        if farm_client is None:
-            if retained_confirmation:
-                for key in (
-                    "status_confirmacao", "farmalider_status_pedido",
-                    "farmalider_status_pedido_nome", "farmalider_cancelamento",
-                    "farmalider_confirmado_em", "farmalider_erro",
-                ):
-                    if snapshot.get(key) not in (None, ""):
-                        order[key] = snapshot.get(key)
-            else:
-                order["status_confirmacao"] = "NAO_CONFIRMADO_API"
-            return order, items
+    Primary flow:
+      CPF -> GET cliente/cpf -> ultimoPedido + itens
+          -> GET pedido/{id} for the most complete/current snapshot.
 
-        requested_id = _positive_id(order.get("pedido_id"))
-        from farmalider_client import FarmaliderAuthError, FarmaliderError
-
-        try:
-            if pedido_responses_by_id is not None and requested_id in pedido_responses_by_id:
-                response = pedido_responses_by_id[requested_id]
-            else:
-                response = farm_client.get_pedido(requested_id)
-                if pedido_responses_by_id is not None:
-                    pedido_responses_by_id[requested_id] = response
-        except FarmaliderAuthError:
-            raise
-        except FarmaliderError:
-            # Falha temporária de status não invalida os dados completos já
-            # existentes na Weni. Mantemos os cinco campos, mas não promovemos
-            # uma compra sem confirmação atual da API.
-            if retained_confirmation:
-                for key in (
-                    "status_confirmacao", "farmalider_status_pedido",
-                    "farmalider_status_pedido_nome", "farmalider_cancelamento",
-                    "farmalider_confirmado_em",
-                ):
-                    if snapshot.get(key) not in (None, ""):
-                        order[key] = snapshot.get(key)
-            else:
-                order["status_confirmacao"] = "NAO_CONFIRMADO_API"
-            order["farmalider_erro"] = "Falha na consulta de status do pedido."
-            return order, items
-
-        if not isinstance(response, dict) or not isinstance(response.get("capa"), dict):
-            order["status_confirmacao"] = "NAO_CONFIRMADO_API"
-            order["farmalider_erro"] = "Resposta sem objeto capa na consulta de status."
-            return order, items
-
-        capa = response["capa"]
-        api_id = _positive_id(capa.get("id"))
-        if not api_id or api_id != requested_id:
-            order["status_confirmacao"] = "NAO_CONFIRMADO_API"
-            order["farmalider_erro"] = "Identidade divergente na consulta de status do pedido."
-            return order, items
-
-        # Não substituímos produtos, quantidades, valores ou data do Caminho 1.
-        # A API é usada aqui exclusivamente para confirmar o estado do mesmo ID.
-        order["farmalider_status_pedido"] = _text(capa.get("status"))
-        order["farmalider_status_pedido_nome"] = farmalider_order_status_name(capa.get("status"))
-        order["farmalider_cancelamento"] = _text(capa.get("cancelamento"))
-        order["farmalider_confirmado_em"] = captured_at
-        order["farmalider_erro"] = ""
-        order["status_confirmacao"] = (
-            "CANCELADO_API" if is_order_cancelled(order) else "CONFIRMADO_API"
-        )
-        return order, items
-    if valid_weni:
-        order["valor_origem"] = order.get("valor_origem") or "WENI"
-        if farm_client is None:
-            order["status_confirmacao"] = "NAO_CONFIRMADO_API"
-            return order, items
-    elif farm_client is None:
-        return order, items
-
-    cpf = normalize_cpf(fields.get("cpf"))
-    linked_id = _positive_id(linked_cliente_id)
-    requested_id = _positive_id((order or {}).get("pedido_id")) if valid_weni else ""
-    fallback = not raw
-    if not cpf:
-        if valid_weni:
-            order["status_confirmacao"] = "NAO_CONFIRMADO_API"
-            return order, items
-        return order, items
-    if order is None:
-        order = _empty_order(contact, captured_at)
-    if cpf and not is_valid_cpf(cpf):
-        return _failure(order, items, "CPF_INVALIDO", "CPF não permite verificar o proprietário do pedido.")
-    if cpf:
-        from farmalider_client import FarmaliderAuthError, FarmaliderError
-
-        try:
-            payload = cliente_response if cliente_response is not None else farm_client.get_cliente_by_cpf(cpf)
-        except FarmaliderAuthError:
-            raise
-        except FarmaliderError:
-            return _failure(order, items, "ERRO_API", "Falha na consulta oficial do cliente.")
-        status, confirmed_cliente_id, _ = cliente_link_status(cpf, payload)
-        if status != "CPF_CONFIRMADO":
-            return _failure(order, items, status, "Cliente não confirmado pela consulta oficial de CPF.")
-        if linked_id and linked_id != confirmed_cliente_id:
-            return _failure(order, items, "CLIENTE_ID_DIVERGENTE_API", "Vínculo do cliente divergente da consulta oficial.")
-        linked_id = confirmed_cliente_id
-        if fallback:
-            latest = payload.get("ultimoPedido") if isinstance(payload, dict) else None
-            if not isinstance(latest, dict):
-                return _failure(order, items, "ULTIMO_PEDIDO_NAO_INFORMADO_API", "Cliente não possui último pedido informado.")
-            requested_id = _positive_id(latest.get("id"))
-            if not requested_id:
-                return _failure(order, items, "PEDIDO_ID_INVALIDO_API", "Último pedido possui identidade inválida.")
-            latest_owner = _positive_id(latest.get("codCliente")) if "codCliente" in latest else linked_id
-            if latest_owner != linked_id:
-                return _failure(order, items, "PEDIDO_CLIENTE_DIVERGENTE_API", "Último pedido pertence a outro cliente.")
-            if not valid_weni or _positive_id(order.get("pedido_id")) != requested_id:
-                order = _empty_order(contact, captured_at)
-                items = []
-    if not linked_id:
-        return _failure(order, items, "PEDIDO_CLIENTE_NAO_VERIFICADO_API", "Proprietário do pedido não verificado.")
-    if not requested_id:
-        return _failure(order, items, "PEDIDO_ID_INVALIDO_API", "Identidade do pedido ausente ou inválida.")
-    order["pedido_id"] = requested_id
-    order["farmalider_cliente_id"] = linked_id
+    Weni pedido fields are a destination/cache and are only used as a legacy
+    fallback when the FarmaLíder API cannot be used.
+    """
+    from analytics import (
+        get_fields,
+        is_valid_cpf,
+        normalize_cpf,
+        parse_ultimo_pedido,
+    )
     from farmalider_client import FarmaliderAuthError, FarmaliderError
 
+    fields = get_fields(contact)
+    cpf = normalize_cpf(fields.get("cpf"))
+    linked_id = _positive_id(linked_cliente_id)
+
+    # Legacy snapshot is retained only as an offline fallback.
+    legacy_order, legacy_items = parse_ultimo_pedido(
+        contact, captured_at=captured_at
+    )
+
+    if farm_client is None:
+        if legacy_order is not None:
+            legacy_order["status_confirmacao"] = (
+                legacy_order.get("status_confirmacao") or "NAO_CONFIRMADO_API"
+            )
+        return legacy_order, legacy_items
+
+    if not cpf:
+        # Without CPF we only refresh a known pedido when the cliente linkage was
+        # already validated by Analytics.
+        pedido_id = _positive_id(fields.get("pedido_id"))
+        if not pedido_id or not linked_id:
+            return legacy_order, legacy_items
+        order = _empty_order(contact, captured_at)
+        order["pedido_id"] = pedido_id
+        order["farmalider_cliente_id"] = linked_id
+        order["origem_pedido"] = "FARMALIDER_PEDIDO_API"
+        try:
+            if pedido_responses_by_id is not None and pedido_id in pedido_responses_by_id:
+                response = pedido_responses_by_id[pedido_id]
+            else:
+                response = farm_client.get_pedido(pedido_id)
+                if pedido_responses_by_id is not None:
+                    pedido_responses_by_id[pedido_id] = response
+        except FarmaliderAuthError:
+            raise
+        except FarmaliderError:
+            return legacy_order, legacy_items
+        return apply_pedido_api_confirmation(
+            order, [], response,
+            linked_cliente_id=linked_id,
+            confirmed_at=captured_at,
+        )
+
+    if not is_valid_cpf(cpf):
+        order = _empty_order(contact, captured_at)
+        return _failure(
+            order, [], "CPF_INVALIDO",
+            "CPF não permite consultar o pedido oficial.",
+        )
+
     try:
-        if pedido_responses_by_id is not None and requested_id in pedido_responses_by_id:
-            response = pedido_responses_by_id[requested_id]
-        else:
-            response = farm_client.get_pedido(requested_id)
-            if pedido_responses_by_id is not None:
-                pedido_responses_by_id[requested_id] = response
+        payload = (
+            cliente_response
+            if cliente_response is not None
+            else farm_client.get_cliente_by_cpf(cpf)
+        )
     except FarmaliderAuthError:
         raise
     except FarmaliderError:
-        return _failure(order, items, "ERRO_API", "Falha na consulta oficial do pedido.")
-    return apply_pedido_api_confirmation(order, items, response, linked_cliente_id=linked_id, confirmed_at=captured_at)
+        return legacy_order, legacy_items
+
+    status, confirmed_cliente_id, _ = cliente_link_status(cpf, payload)
+    if status != "CPF_CONFIRMADO":
+        order = _empty_order(contact, captured_at)
+        return _failure(
+            order, [], status,
+            "Cliente não confirmado pela consulta oficial de CPF.",
+        )
+
+    if linked_id and linked_id != confirmed_cliente_id:
+        order = _empty_order(contact, captured_at)
+        return _failure(
+            order, [], "CLIENTE_ID_DIVERGENTE_API",
+            "Vínculo do cliente divergente da consulta oficial.",
+        )
+    linked_id = confirmed_cliente_id
+
+    latest = payload.get("ultimoPedido") if isinstance(payload, dict) else None
+    if not isinstance(latest, dict):
+        order = _empty_order(contact, captured_at)
+        return _failure(
+            order, [], "ULTIMO_PEDIDO_NAO_INFORMADO_API",
+            "Cliente não possui último pedido informado.",
+        )
+
+    pedido_id = _positive_id(latest.get("id"))
+    if not pedido_id:
+        order = _empty_order(contact, captured_at)
+        return _failure(
+            order, [], "PEDIDO_ID_INVALIDO_API",
+            "Último pedido possui identidade inválida.",
+        )
+
+    latest_owner = (
+        _positive_id(latest.get("codCliente"))
+        if "codCliente" in latest
+        else linked_id
+    )
+    if latest_owner != linked_id:
+        order = _empty_order(contact, captured_at)
+        return _failure(
+            order, [], "PEDIDO_CLIENTE_DIVERGENTE_API",
+            "Último pedido pertence a outro cliente.",
+        )
+
+    # First build a complete canonical fallback from GET cliente/cpf, which now
+    # includes ultimoPedido + itens + descricao.
+    fallback_order = _empty_order(contact, captured_at)
+    fallback_order["pedido_id"] = pedido_id
+    fallback_order["farmalider_cliente_id"] = linked_id
+    fallback_order["origem_pedido"] = "FARMALIDER_CLIENTE_CPF"
+    fallback_response = _pedido_from_cliente_payload(payload)
+    if fallback_response is not None:
+        fallback_order, fallback_items = apply_pedido_api_confirmation(
+            fallback_order, [], fallback_response,
+            linked_cliente_id=linked_id,
+            confirmed_at=captured_at,
+        )
+    else:
+        fallback_items = []
+
+    # GET pedido/{codigo} is the preferred final snapshot because it carries the
+    # same item data and the documented payment/status fields.
+    try:
+        if pedido_responses_by_id is not None and pedido_id in pedido_responses_by_id:
+            response = pedido_responses_by_id[pedido_id]
+        else:
+            response = farm_client.get_pedido(pedido_id)
+            if pedido_responses_by_id is not None:
+                pedido_responses_by_id[pedido_id] = response
+    except FarmaliderAuthError:
+        raise
+    except FarmaliderError:
+        return fallback_order, fallback_items
+
+    if isinstance(response, dict):
+        order = _empty_order(contact, captured_at)
+        order["pedido_id"] = pedido_id
+        order["farmalider_cliente_id"] = linked_id
+        order["origem_pedido"] = "FARMALIDER_PEDIDO_API"
+        confirmed_order, confirmed_items = apply_pedido_api_confirmation(
+            order, [], response,
+            linked_cliente_id=linked_id,
+            confirmed_at=captured_at,
+        )
+        if (
+            confirmed_order.get("status_validacao") == "OK"
+            and confirmed_items
+        ):
+            return confirmed_order, confirmed_items
+
+    return fallback_order, fallback_items
+
+
 # NexoFlow 1.0

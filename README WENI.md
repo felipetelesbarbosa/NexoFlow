@@ -83,8 +83,10 @@ opt_in_lgpd
 pedido_id
 pedido_data
 pedido_status
+pedido_forma_pagamento
 pedido_produtos
 pedido_quantidade_itens
+pedido_valor_produtos
 pedido_valor
 ultima_compra
 primeiro_anuncio_origem
@@ -147,7 +149,7 @@ A revisão humana mostra a URN e o canal principal, contabiliza alterações de 
 ## Atendimento 24h e concorrência
 A carga completa foi adaptada para ambientes em que a Weni continua recebendo mensagens e contatos durante toda a revisão. O dry-run fixa um corte temporal (`captured_at_utc`) e gera o snapshot schema 5. O apply usa os planos armazenados nesse JSON, valida seu SHA-256 e não volta a montar o plano a partir do histórico.
 
-Antes de cada contato ser gravado, o NexoFlow consulta novamente aquele contato na Weni. Para cada campo planejado, o valor atual precisa continuar igual ao valor anterior revisado ou já ter chegado ao próprio valor proposto. Também são protegidas as URNs nativas, `opt_in_lgpd` quando governa grupos e `ultimo_pedido` quando sustenta dados de compra. Se houver divergência, o contato recebe status de auditoria `conflict_skipped` e a carga continua para os demais. Se outra automação já aplicou exatamente o mesmo resultado, o status é `already_satisfied` e não há regravação.
+Antes de cada contato ser gravado, o NexoFlow consulta novamente aquele contato na Weni. Para cada campo planejado, o valor atual precisa continuar igual ao valor anterior revisado ou já ter chegado ao próprio valor proposto. Também são protegidas as URNs nativas, `opt_in_lgpd` quando governa grupos e os campos `pedido_*` usados como snapshot operacional. Se houver divergência, o contato recebe status de auditoria `conflict_skipped` e a carga continua para os demais. Se outra automação já aplicou exatamente o mesmo resultado, o status é `already_satisfied` e não há regravação.
 
 Ao final, o checkpoint avança para o **corte do dry-run**, não para o horário final da aplicação. Assim, tudo que chegou ou mudou depois do snapshot é elegível para a próxima execução incremental, inclusive os contatos que foram isolados por conflito. Uma falha real de POST continua interrompendo a execução e impede o avanço do checkpoint.
 
@@ -217,23 +219,46 @@ O primeiro anúncio válido é preservado. O último anúncio só é substituíd
 
 ## Regras de pedido e última compra
 
-`ultimo_pedido` é a fonte estruturada em JSON e a rotina não o reescreve. Quando ele estiver preenchido e válido, o NexoFlow deriva dele os dados do pedido. Se houver `pedido_id`, consulta somente esse mesmo pedido na FarmaLíder API para confirmar o status e grava o rótulo oficial em `pedido_status`. Estados 0, 1, 2 e 4 contam como pedido feito; status 3 grava `pedido_status = Cancelado` e fica fora dos indicadores.
+A FarmaLíder API é a fonte prioritária dos dados de pedido. A Weni recebe um snapshot operacional simples, legível e alinhado por posição.
 
-Campos derivados:
+Fluxo:
 
 ```text
-pedido_id                Texto
-pedido_data              Data/hora ISO do pedido
-pedido_status            Em processamento | Em trânsito | Concluído | Cancelado | Pronto para rota
-pedido_valor             Número
-pedido_quantidade_itens  Soma das quantidades
-pedido_produtos          JSON estruturado com produtos, quantidades e valores
-ultima_compra            YYYY-MM-DD HH:mm:ss
+CPF
+-> GET cliente/cpf/{cpf}
+-> ultimoPedido + itens
+-> GET pedido/{pedido_id}
+-> campos pedido_* na Weni
 ```
 
-Uma compra mais antiga nunca substitui uma `ultima_compra` mais recente.
+O endpoint por CPF já possui dados suficientes para montar o pedido. O endpoint por código é preferido como confirmação final do mesmo pedido e fornece também `formaPagamento`.
 
-Pedidos com `pedido_status` em **Em processamento**, **Em trânsito** ou **Pronto para rota** entram numa fila persistente de rechecagem. A rotina incremental consulta novamente o mesmo `pedido_id` nas execuções seguintes, mesmo sem nova mensagem do cliente, até o pedido chegar a **Concluído** ou **Cancelado**.
+Campos atualizados:
+
+```text
+pedido_id                 340793
+pedido_produtos           Produto A, Produto B
+pedido_quantidade_itens   1, 1
+pedido_valor_produtos     53.9, 58.9
+pedido_valor              112.8
+pedido_data               05/06/26 15:45:27
+pedido_status             3
+pedido_forma_pagamento    2
+```
+
+Regras:
+
+- `pedido_produtos` usa somente `itens[].descricao`; `codProduto` não é usado como nome;
+- produtos, quantidades e valores unitários são listas separadas por vírgula e mantêm a mesma ordem;
+- `pedido_valor` é a soma de `itens[].total`, sem adicionar frete;
+- `pedido_data` é gravada no formato `DD/MM/YY HH:MM:SS`, usando America/Belem;
+- `pedido_status` guarda o código oficial: 0 Em processamento, 1 Em trânsito, 2 Concluído, 3 Cancelado, 4 Pronto para rota;
+- `pedido_forma_pagamento` guarda o código oficial: 1 Dinheiro, 2 Débito, 3 Crédito, 4 Ticket, 5 Online/link/Pix;
+- os rótulos amigáveis de status e pagamento são derivados no Analytics/BI, sem substituir os códigos na Weni;
+- `ultimo_pedido` continua aceito como compatibilidade/fallback quando a API não estiver disponível, mas não define o pedido quando a consulta oficial está funcionando;
+- `ultima_compra` avança somente para pedido não cancelado confirmado pela FarmaLíder.
+
+Pedidos com status 0, 1 ou 4 permanecem na fila de rechecagem até chegarem a 2, Concluído, ou 3, Cancelado.
 
 ## Incremental e checkpoint
 
