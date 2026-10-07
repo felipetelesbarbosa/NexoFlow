@@ -1218,10 +1218,14 @@ def build_bi_sales_rows(
     rows: list[list[Any]] = []
     dates_seen: set[str] = set()
     for row in base:
-        date, pedidos, confirmados, compradores, unidades, faturamento, fat_confirmado = row
+        (
+            date, pedidos, confirmados, compradores, unidades,
+            faturamento_produtos, faturamento_frete, faturamento_total,
+            fat_confirmado,
+        ) = row
         pedidos_i = int(pedidos or 0)
         confirmados_i = int(confirmados or 0)
-        faturamento_d = _bi_decimal(faturamento)
+        faturamento_d = _bi_decimal(faturamento_total)
         ticket = (faturamento_d / pedidos_i) if pedidos_i else Decimal("0")
         taxa = (Decimal(confirmados_i) * 100 / pedidos_i) if pedidos_i else Decimal("0")
         rows.append([
@@ -1230,6 +1234,9 @@ def build_bi_sales_rows(
             confirmados_i,
             int(compradores or 0),
             float(_bi_decimal(unidades)),
+            _bi_float(_bi_decimal(faturamento_produtos)),
+            _bi_float(_bi_decimal(faturamento_frete)),
+            _bi_float(faturamento_d),
             _bi_float(faturamento_d),
             _bi_float(_bi_decimal(fat_confirmado)),
             _bi_float(ticket),
@@ -1239,10 +1246,12 @@ def build_bi_sales_rows(
         dates_seen.add(str(date))
 
     if snapshot_date not in dates_seen:
-        rows.append([snapshot_date, 0, 0, 0, 0, 0.0, 0.0, 0.0, 0.0, updated_at])
+        rows.append([
+            snapshot_date, 0, 0, 0, 0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, updated_at,
+        ])
     rows.sort(key=lambda row: str(row[0]))
     return rows
-
 
 def _bi_channel(record: dict[str, str]) -> str:
     value = (record.get("contact_canal_principal") or "").strip().casefold()
@@ -1276,7 +1285,9 @@ def build_bi_summary_record(
     valid_orders = _bi_valid_orders(order_records)
     all_buyers = {r.get("contact_uuid", "").strip() for r in valid_orders if r.get("contact_uuid", "").strip()}
     all_order_keys = {r.get("pedido_chave", "").strip() for r in valid_orders}
-    all_revenue = sum((_bi_decimal(r.get("valor_total_compra")) for r in valid_orders), Decimal("0"))
+    all_products = sum((_order_revenue_parts(r)[0] for r in valid_orders), Decimal("0"))
+    all_freight = sum((_order_revenue_parts(r)[1] for r in valid_orders), Decimal("0"))
+    all_revenue = sum((_order_revenue_parts(r)[2] for r in valid_orders), Decimal("0"))
 
     sales_rows = build_bi_sales_rows(
         order_records, item_records, snapshot_date=snapshot_date, updated_at=updated_at
@@ -1338,14 +1349,19 @@ def build_bi_summary_record(
         "contatos_ads": ads,
         "clientes_compradores_total": len(all_buyers),
         "pedidos_total": len(all_order_keys),
+        "faturamento_produtos_total": _bi_float(all_products),
+        "faturamento_frete_total": _bi_float(all_freight),
         "faturamento_total": _bi_float(all_revenue),
         "pedidos_dia": int(today[1]),
         "pedidos_confirmados_api_dia": int(today[2]),
         "clientes_compradores_dia": int(today[3]),
         "unidades_vendidas_dia": float(today[4]),
-        "faturamento_dia": float(today[5]),
-        "faturamento_confirmado_api_dia": float(today[6]),
-        "ticket_medio_dia": float(today[7]),
+        "faturamento_produtos_dia": float(today[5]),
+        "faturamento_frete_dia": float(today[6]),
+        "faturamento_total_dia": float(today[7]),
+        "faturamento_dia": float(today[8]),
+        "faturamento_confirmado_api_dia": float(today[9]),
+        "ticket_medio_dia": float(today[10]),
     }
 
 
