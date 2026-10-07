@@ -113,7 +113,7 @@ De-para da documentação oficial da integração:
 
 | Código | Identificador oficial | Rótulo |
 |---:|---|---|
-| -1 | `PendentePagamento` | Pendente pagamento |
+| -1 | `PendentePagamento` | Pendente de pagamento |
 | 0 | `EmProcessamento` | Em processamento |
 | 1 | `EmTransito` | Em trânsito |
 | 2 | `Concluido` | Concluído |
@@ -121,7 +121,7 @@ De-para da documentação oficial da integração:
 
 A Weni armazena o código em `pedido_status`. O Analytics deriva o nome amigável.
 
-Para indicadores, 0, 1, 2 e 4 contam como pedido feito quando a resposta foi validada. O código 3 não entra nas métricas de venda.
+Para indicadores, somente 0, 1 e 2 contam como pedido feito quando a resposta foi validada e paga. O código -1 (`PendentePagamento`) ainda aguarda pagamento e não entra em venda nem em `ultima_compra`. O código 3 também fica fora das métricas de venda.
 
 ## Forma de pagamento
 
@@ -137,7 +137,7 @@ De-para da documentação oficial da integração:
 | 6 | PIX no POS |
 | 0 | CANCELADO |
 
-A Weni armazena o código em `pedido_forma_pagamento`. O Analytics mantém também `farmalider_forma_pagamento_nome` e disponibiliza a descrição amigável na camada BI.
+A Weni armazena os códigos 1 a 6 em `pedido_forma_pagamento`. Quando a API retorna 0 ou `_`, grava `CANCELADO` nesse campo e força `pedido_status = 3` (Cancelado). O Analytics mantém também `farmalider_forma_pagamento_nome` e disponibiliza a descrição amigável na camada BI.
 
 O de-para operacional atual é 1 Dinheiro, 2 Débito, 3 Crédito, 4 Ticket, 5 Pix por Link de Pagamento, 6 PIX no POS e 0 CANCELADO. O enum `_` também é tratado como 0. Quando o pagamento é 0, o pedido é considerado não pago: o NexoFlow salva a forma de pagamento como `CANCELADO`, força o status para 3 Cancelado e não contabiliza a venda.
 

@@ -35,8 +35,8 @@ Mesmo nesse fallback, `ultimo_pedido` não vira fonte de produtos, quantidade, v
 | `pedido_valor_produtos` | `itens[].valor` | valores unitários posicionais separados por vírgula |
 | `pedido_valor` | `sum(itens[].total)` | soma dos totais dos itens |
 | `pedido_data` | `emissao` | `DD/MM/YY HH:MM:SS` |
-| `pedido_status` | `status` | código oficial 0 a 4 |
-| `pedido_forma_pagamento` | `formaPagamento` | código Int32 não negativo recebido; de-para documentado de 1 a 5 |
+| `pedido_status` | `status` | código oficial -1 a 3 |
+| `pedido_forma_pagamento` | `formaPagamento` | 1 a 6; valor 0/`_` é salvo como `CANCELADO` |
 
 As listas são posicionais. Exemplo:
 
@@ -118,7 +118,7 @@ De-para oficial:
 
 | Código | API | Apresentação |
 |---:|---|---|
-| -1 | `PendentePagamento` | Pendente pagamento |
+| -1 | `PendentePagamento` | Pendente de pagamento |
 | 0 | `EmProcessamento` | Em processamento |
 | 1 | `EmTransito` | Em trânsito |
 | 2 | `Concluido` | Concluído |
@@ -126,7 +126,7 @@ De-para oficial:
 
 A Weni recebe o **código** em `pedido_status`. O Analytics deriva `pedido_status_nome` para apresentação no Google Sheets/Looker Studio.
 
-Estados 0, 1, 2 e 4 confirmados pela API contam como pedido feito. O estado 3 fica fora das métricas de venda.
+Estados 0, 1 e 2 confirmados pela API contam como pedido feito quando pagos. O estado -1 (`PendentePagamento`) fica em rechecagem e não entra em venda nem em `ultima_compra`; o estado 3 fica fora das métricas de venda.
 
 ## Forma de pagamento
 
@@ -142,7 +142,7 @@ De-para oficial:
 | 6 | PIX no POS |
 | 0 | CANCELADO |
 
-A Weni recebe o código em `pedido_forma_pagamento`. O Analytics deriva `pedido_forma_pagamento_nome`. Códigos Int32 não negativos sem de-para, como 0 e 6, são preservados e exibidos no Google Sheets/BI como `Não identificado (código X)`. Essa descrição não atribui uma forma de pagamento ao código. Pagamento ausente ou inválido mantém a descrição vazia.
+A Weni recebe os códigos 1 a 6 em `pedido_forma_pagamento`. Para `formaPagamento = 0` ou enum `_`, grava `CANCELADO` e força `pedido_status = 3` (Cancelado), pois o pedido não foi pago. Outros códigos numéricos sem de-para continuam preservados e são exibidos no Google Sheets/BI como `Não identificado (código X)`. Pagamento ausente ou inválido mantém a descrição vazia.
 
 No NexoFlow Weni, cada código sem de-para gera um registro `INFO` por execução, com totais por código no resumo. Isso não impede a atualização dos demais campos válidos.
 
@@ -239,7 +239,7 @@ Pedidos em 0, 1 ou 4 continuam sendo rechecados nas execuções seguintes até c
 - 2, Concluído; ou
 - 3, Cancelado.
 
-O status -1, Pendente pagamento, permanece em rechecagem e não entra como venda até haver pagamento e mudança de status.
+O status -1, Pendente de pagamento, permanece em rechecagem e não entra como venda até haver pagamento e mudança de status.
 
 A mudança de status atualiza o snapshot sem trocar o `pedido_id` por outro pedido arbitrariamente.
 

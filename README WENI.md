@@ -253,13 +253,13 @@ Regras:
 - `pedido_valor` é a soma de `itens[].total`, sem adicionar frete;
 - o frete não é gravado nos campos Weni de pedido; ele é preservado no Google Sheets como `farmalider_frete` e usado pelo Analytics para calcular `valor_total_faturamento = pedido_valor + frete`;
 - `pedido_data` é gravada no formato `DD/MM/YY HH:MM:SS`, usando America/Belem;
-- `pedido_status` guarda o código oficial: -1 Pendente pagamento, 0 Em processamento, 1 Em trânsito, 2 Concluído, 3 Cancelado;
+- `pedido_status` guarda o código oficial: -1 Pendente de pagamento, 0 Em processamento, 1 Em trânsito, 2 Concluído, 3 Cancelado;
 - `pedido_forma_pagamento` usa: 1 Dinheiro, 2 Débito, 3 Crédito, 4 Ticket, 5 Pix por Link de Pagamento, 6 PIX no POS; quando a API retorna 0 ou `_`, o campo recebe `CANCELADO` e o status é forçado para 3 Cancelado;
-- os rótulos amigáveis de status e pagamento são derivados no Analytics/BI, sem substituir os códigos na Weni; pagamento válido sem de-para aparece como `Não identificado (código X)`, inclusive para 0 e 6;
+- os rótulos amigáveis de status e pagamento são derivados no Analytics/BI; os códigos 1 a 6 permanecem na Weni, enquanto 0/`_` é a exceção operacional gravada como `CANCELADO`; outros códigos válidos sem de-para aparecem como `Não identificado (código X)`;
 - `pedido_id` é o primeiro localizador de fallback quando o GET por CPF não puder ser usado;
 - `ultimo_pedido` é o **último localizador**: ele pode vir de outra integração e serve somente para recuperar um ID de pedido que depois será confirmado em `GET pedido/{id}`;
 - `ultimo_pedido` nunca substitui a API como fonte de produtos, valores, status, data ou pagamento; se a FarmaLíder estiver indisponível, os campos `pedido_*` existentes são preservados e não são reconstruídos a partir do snapshot legado;
-- `ultima_compra` avança somente para pedido não cancelado confirmado pela FarmaLíder.
+- `ultima_compra` avança somente para pedido pago e não cancelado confirmado pela FarmaLíder; `PendentePagamento (-1)` não avança `ultima_compra`.
 
 Os campos `pedido_id`, `pedido_data`, `pedido_status`, `pedido_produtos`, `pedido_quantidade_itens`, `pedido_valor_produtos`, `pedido_valor` e `pedido_forma_pagamento` são obrigatórios na Weni. Se qualquer um estiver ausente, o preflight bloqueia a execução antes de qualquer atualização de pedido.
 
