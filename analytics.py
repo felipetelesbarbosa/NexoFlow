@@ -14,6 +14,8 @@ from pedido_utils import (
     farmalider_order_status_name,
     farmalider_payment_method_display,
     is_order_made,
+    normalize_farmalider_order_status_code,
+    normalize_farmalider_payment_code,
     parse_weni_order_list,
     weni_order_datetime_text,
 )
@@ -503,6 +505,18 @@ def normalize_contact(
         "pedido_valor",
     ):
         row[key] = normalize_value(fields.get(key))
+    status_code = normalize_farmalider_order_status_code(row["pedido_status"])
+    payment_code = normalize_farmalider_payment_code(
+        row["pedido_forma_pagamento"]
+    )
+    if payment_code == "0" or str(row["pedido_forma_pagamento"]).strip().casefold() == "cancelado":
+        row["pedido_forma_pagamento"] = "CANCELADO"
+        row["pedido_status"] = "3"
+    else:
+        if payment_code:
+            row["pedido_forma_pagamento"] = payment_code
+        if status_code:
+            row["pedido_status"] = status_code
     row["pedido_status_nome"] = farmalider_order_status_name(row["pedido_status"])
     row["pedido_forma_pagamento_nome"] = farmalider_payment_method_display(
         row["pedido_forma_pagamento"]
@@ -987,15 +1001,23 @@ def _derived_order_payload(fields: dict[str, Any]) -> dict[str, Any] | None:
         if rows:
             product_rows = rows
 
+    raw_status = normalize_value(fields.get("pedido_status")).strip()
+    raw_payment = normalize_value(fields.get("pedido_forma_pagamento")).strip()
+    status_code = normalize_farmalider_order_status_code(raw_status) or raw_status
+    payment_code = normalize_farmalider_payment_code(raw_payment)
+    if payment_code == "0" or raw_payment.casefold() == "cancelado":
+        status_code = "3"
+        payment_value = "CANCELADO"
+    else:
+        payment_value = payment_code or raw_payment
+
     return {
         "pedido_id": pedido_id,
         "data_hora": pedido_data,
         "valor_total_compra": pedido_valor,
         "produtos": product_rows,
-        "farmalider_status_pedido": normalize_value(fields.get("pedido_status")).strip(),
-        "farmalider_forma_pagamento": normalize_value(
-            fields.get("pedido_forma_pagamento")
-        ).strip(),
+        "farmalider_status_pedido": status_code,
+        "farmalider_forma_pagamento": payment_value,
     }
 
 def parse_ultimo_pedido(
