@@ -26,6 +26,16 @@ Depois execute, nesta ordem:
 
 A carga completa do Weni gera um novo dry-run com a política atual antes de atualizar o snapshot operacional dos contatos. Não reutilize o JSON de revisão de uma instalação ou política anterior. A carga completa do Analytics migra os schemas do Google Sheets e recalcula as estruturas analíticas, incluindo frete separado e faturamento total (produtos + frete).
 
+## Carga completa em 4 partes de 25%
+
+Os dois BATs de carga completa agora oferecem cinco opções: **100%**, **Parte 1/4**, **Parte 2/4**, **Parte 3/4** e **Parte 4/4**. As quatro partes de 25% são cargas completas fragmentadas, não incrementais.
+
+Na primeira Parte 1, o NexoFlow congela a lista de UUIDs dos contatos em `logs\full_load_25_manifest.json`, ordena essa base de forma determinística e divide em quatro intervalos sem sobreposição. As Partes 2, 3 e 4 reutilizam exatamente o mesmo manifesto. Contatos criados depois do corte não deslocam as faixas e ficam para a próxima incremental.
+
+A execução deve respeitar a ordem 1 → 2 → 3 → 4 separadamente para Weni e Analytics. Uma parte só é marcada como concluída após terminar com sucesso; em erro parcial, execute novamente a mesma parte. Os upserts e as verificações de estado tornam a repetição segura.
+
+No Analytics, as Partes 1 a 3 atualizam a parcela selecionada e recalculam o BI sobre o que já existe no Google Sheets. Portanto, durante a campanha, o dashboard pode misturar dados já renovados com registros ainda aguardando as próximas partes. **Depois da Parte 4, a carga fragmentada equivale à carga completa de 100% da base congelada.** O cursor incremental só avança ao concluir a Parte 4 e usa o corte da campanha, para capturar depois tudo que mudou enquanto as quatro partes eram executadas.
+
 Na revisão, status efetivo 4 (Pronto para rota), 1 (Em trânsito) ou 2 (Concluído), validado pela API e sem cancelamento, conta como venda e atualiza `ultima_compra`. Os estados -2, Em aberto, -1, Pendente de pagamento, 0, Em processamento, 4, Pronto para rota, e 1, Em trânsito, permanecem em rechecagem; pagamento 0 ou `_` grava `pedido_forma_pagamento=Cancelado` e força status efetivo 3. O de-para inclui 5 Pix por Link de Pagamento e 6 Pix no POS. Veja [README PEDIDOS.md](README%20PEDIDOS.md).
 
 Se o Analytics terminar com código `3`, a carga foi **parcial**: algumas
