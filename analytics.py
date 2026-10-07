@@ -1074,6 +1074,28 @@ def parse_ultimo_pedido(
             return derived_order, derived_items
     return original_order, original_items
 
+def _order_revenue_parts(record: dict[str, str]) -> tuple[Decimal, Decimal, Decimal]:
+    """Return products, freight and billed total for a validated order."""
+    try:
+        products = _to_decimal(record.get("valor_total_compra"), "valor_total_compra")
+    except ValueError:
+        products = Decimal("0")
+    try:
+        freight = _to_decimal(record.get("farmalider_frete"), "farmalider_frete")
+    except ValueError:
+        freight = Decimal("0")
+
+    explicit_total = str(record.get("valor_total_faturamento") or "").strip()
+    if explicit_total:
+        try:
+            total = _to_decimal(explicit_total, "valor_total_faturamento")
+        except ValueError:
+            total = products + freight
+    else:
+        total = products + freight
+    return products, freight, total
+
+
 def build_sales_metrics(
     order_records: list[dict[str, str]],
     item_records: list[dict[str, str]],
@@ -1081,10 +1103,10 @@ def build_sales_metrics(
     orders_by_date: dict[str, set[str]] = defaultdict(set)
     confirmed_by_date: dict[str, set[str]] = defaultdict(set)
     clients_by_date: dict[str, set[str]] = defaultdict(set)
+    product_revenue_by_date: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
+    freight_revenue_by_date: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
     revenue_by_date: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
-    confirmed_revenue_by_date: dict[str, Decimal] = defaultdict(
-        lambda: Decimal("0")
-    )
+    confirmed_revenue_by_date: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
     units_by_date: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
 
     for record in order_records:
@@ -1101,19 +1123,15 @@ def build_sales_metrics(
         if contact_uuid:
             clients_by_date[date].add(contact_uuid)
 
-        try:
-            value = _to_decimal(
-                record.get("valor_total_compra"),
-                "valor_total_compra",
-            )
-            revenue_by_date[date] += value
-        except ValueError:
-            value = Decimal("0")
+        products, freight, total = _order_revenue_parts(record)
+        product_revenue_by_date[date] += products
+        freight_revenue_by_date[date] += freight
+        revenue_by_date[date] += total
 
         confirmation = record.get("status_confirmacao", "")
         if confirmation.startswith("CONFIRMADO_API"):
             confirmed_by_date[date].add(order_key)
-            confirmed_revenue_by_date[date] += value
+            confirmed_revenue_by_date[date] += total
 
     valid_order_keys = {
         record.get("pedido_chave", "").strip()
@@ -1128,9 +1146,7 @@ def build_sales_metrics(
         if not date:
             continue
         try:
-            units_by_date[date] += _quantity(
-                record.get("quantidade", "0")
-            )
+            units_by_date[date] += _quantity(record.get("quantidade", "0"))
         except ValueError:
             pass
 
@@ -1138,6 +1154,8 @@ def build_sales_metrics(
         set(orders_by_date)
         | set(confirmed_by_date)
         | set(clients_by_date)
+        | set(product_revenue_by_date)
+        | set(freight_revenue_by_date)
         | set(revenue_by_date)
         | set(units_by_date)
     )
@@ -1149,12 +1167,13 @@ def build_sales_metrics(
             len(confirmed_by_date[date]),
             len(clients_by_date[date]),
             _quantity_text(units_by_date[date]),
+            _money(product_revenue_by_date[date]),
+            _money(freight_revenue_by_date[date]),
             _money(revenue_by_date[date]),
             _money(confirmed_revenue_by_date[date]),
         ]
         for date in dates
     ]
-
 
 
 def _bi_decimal(value: Any) -> Decimal:
