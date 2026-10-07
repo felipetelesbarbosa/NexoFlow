@@ -1710,12 +1710,12 @@ def _open_farmalider() -> FarmaliderClient | None:
     placeholder = "COLE_SEU_TOKEN_FARMALIDER_AQUI"
     if not enabled:
         logging.warning(
-            "FarmaLíder API desabilitada: somente pedidos completos da Weni podem ser derivados; compra não recebe confirmação oficial."
+            "FarmaLíder API desabilitada: campos pedido_* não serão atualizados; pedido_id/ultimo_pedido só servem como localizadores quando a API estiver disponível."
         )
         return None
     if not token or token == placeholder:
         logging.warning(
-            "Token FarmaLíder ausente: fallback por CPF e confirmação oficial indisponíveis; pedidos completos da Weni podem ser derivados."
+            "Token FarmaLíder ausente: campos pedido_* não serão atualizados; pedido_id/ultimo_pedido não substituem os dados oficiais da API."
         )
         return None
     use_hml = bool(getattr(secrets, "FARMALIDER_USE_HML", False))
