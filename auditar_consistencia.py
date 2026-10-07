@@ -124,11 +124,33 @@ def check_farmalider_runtime() -> None:
             f"({slow_request:g}s)."
         )
 
+    recovery_delay = numeric_config(config_text, "FARMALIDER_RECOVERY_MAX_DELAY_SECONDS")
+    server_cooldown = numeric_config(config_text, "FARMALIDER_5XX_COOLDOWN_SECONDS")
+    serial_successes = numeric_config(config_text, "FARMALIDER_RECOVERY_SERIAL_SUCCESSES")
+    parallel_successes = numeric_config(config_text, "FARMALIDER_RECOVERY_PARALLEL_SUCCESSES")
+    circuit_errors = numeric_config(config_text, "FARMALIDER_CIRCUIT_MIN_5XX")
+    circuit_queries = numeric_config(config_text, "FARMALIDER_CIRCUIT_MIN_DISTINCT_QUERIES")
+    if (
+        recovery_delay is None or not (delay or 0) <= recovery_delay <= 1
+        or server_cooldown is None or server_cooldown < 5
+        or serial_successes is None or serial_successes < 6
+        or parallel_successes is None or parallel_successes < serial_successes
+        or circuit_errors is None or circuit_errors < 12
+        or circuit_queries is None or circuit_queries < 3
+    ):
+        fail("Recuperação FarmaLíder deve manter cooldown, retorno gradual e circuito por várias consultas.")
+    else:
+        ok("Recuperação serial gradual, cooldown 5xx e circuito antecipado configurados.")
+
     required_client_parts = [
         "threading.local",
         "_rate_lock",
-        "_activate_global_cooldown",
-        "_increase_adaptive_delay",
+        "threading.Condition",
+        "_request_slot",
+        "_protect_after_failure",
+        "_mark_healthy",
+        "cancel_pending_requests",
+        "FarmaliderUnavailableError",
         "metrics_snapshot",
         "p95_response_ms",
         "slow_requests",

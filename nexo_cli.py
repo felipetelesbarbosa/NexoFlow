@@ -423,6 +423,9 @@ def _api_weni(args: argparse.Namespace) -> int:
 
 
 def _api_farmalider(args: argparse.Namespace) -> int:
+    from logging_config import configure_logging
+
+    configure_logging()
     client = _make_farmalider_client()
     try:
         action = args.farma_action

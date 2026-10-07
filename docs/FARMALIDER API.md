@@ -139,7 +139,9 @@ A Weni armazena o código em `pedido_forma_pagamento`. O Analytics mantém tamb�
 
 ## Data
 
-Timestamps sem offset retornados pela API são interpretados em **America/Belem**.
+Timestamps sem offset retornados pela API são interpretados em
+**America/Belem (UTC-3)**. Esse também é o fuso dos horários operacionais e
+dos logs do NexoFlow.
 
 Exemplo:
 
@@ -185,13 +187,44 @@ A integração usa concorrência controlada:
 - paralelismo somente a partir do limiar configurado;
 - delay global mínimo de 10 ms entre inícios;
 - sessão HTTP por thread;
-- retry;
-- cooldown e throttle após 429;
-- circuit breaker;
+- até quatro tentativas para erros transitórios;
+- cooldown global após 429, 5xx e falhas de conexão;
+- recuperação serial e retorno gradual da concorrência;
+- redução gradual do intervalo quando a API se recupera;
+- circuit breaker por rota e por taxa de erros do lote;
 - telemetria de latência;
 - aviso de requisição lenta acima do limite configurado.
 
 Os valores operacionais ficam em `config.py`.
+
+### Recuperação após falha
+
+Uma resposta `5xx` ativa uma pausa compartilhada por todas as threads:
+**5 segundos após a primeira tentativa, 10 após a segunda e 20 após a
+terceira**. Se a quarta e última tentativa também falhar, a pausa de
+20 segundos continua valendo para as próximas consultas. O `Retry-After`
+da API é respeitado quando pede uma espera maior.
+
+Ao mesmo tempo, novas requisições passam a entrar **uma por vez**. Requisições
+que já estavam em andamento podem concluir; a ativação do modo serial não
+cancela uma consulta que já chegou ao servidor. O limite sobe de **1 para 2
+após 6 respostas saudáveis consecutivas** e de **2 para 4 após outras 12**.
+Somente respostas de requisições iniciadas na geração atual de recuperação
+contam para liberar a concorrência: respostas antigas em andamento não
+desfazem a proteção. Uma nova falha reinicia essa contagem.
+
+Respostas `200` com JSON válido no formato esperado e respostas `404`
+representam uma rota que respondeu corretamente. `404` não recebe retry.
+Durante a recuperação de `5xx`, o intervalo global entre inícios aumenta
+até, no máximo, **1 segundo**. A cada 6 respostas saudáveis, ele é reduzido
+pela metade até voltar ao valor normal. A pausa global e o tempo de resposta
+do servidor são separados desse intervalo.
+
+O circuito avalia cada rota separadamente. Ele abre após **12 respostas
+`5xx` envolvendo pelo menos 3 referências de consulta distintas**, sem uma
+resposta válida `200` ou `404` entre elas. O Analytics interrompe a carga antes
+de gravar contatos e pedidos no Google Sheets. O limite de erros por lote
+continua sendo uma proteção adicional, avaliada após sublotes completos.
 
 ### Diagnóstico de HTTP 500
 
@@ -201,12 +234,20 @@ de uma resposta `500`. Seu schema de `200` para `cliente/cpf` também não inclu
 o envelope `cliente`, `ultimoPedido` e `itens` observado nas respostas reais.
 Por isso, um `500` não é interpretado como CPF inexistente.
 
-O cliente mantém até quatro tentativas para erros transitórios. Cada consulta
-recebe uma referência opaca, estável apenas durante a execução, para reunir
-os retries sem registrar CPF ou token. O log classifica o corpo `5xx` por tipo,
-tamanho, categoria conhecida e assinatura opaca; texto livre da resposta não
-é copiado para o log, pois pode conter dados pessoais. Após falha definitiva,
-o Analytics registra referências derivadas dos UUIDs Weni afetados.
+Cada consulta recebe uma referência HMAC, produzida com uma chave aleatória
+da execução, para reunir os retries sem registrar CPF ou token. O log
+classifica o corpo `5xx` por tipo, tamanho, categoria conhecida e assinatura
+HMAC. Texto livre da resposta não é copiado para o log, pois pode conter
+dados pessoais. Após falha definitiva, o Analytics registra referências HMAC
+dos contatos Weni afetados, sem publicar seus UUIDs. Essas referências mudam
+entre execuções.
+
+O log também informa latência e concorrência no início da requisição, para
+distinguir uma falha que começou antes da recuperação de outra ocorrida em
+modo serial. Um `X-Request-ID` ou `X-Correlation-ID` enviado pelo servidor só
+é registrado se corresponder a um UUID estrito; valores arbitrários são
+descartados. Quando disponível, esse identificador permite à equipe
+FarmaLíder localizar a requisição nos próprios logs.
 
 Se um CPF já havia sido confirmado e permanece igual, uma falha transitória
 preserva apenas o ID, nome e horário da **última validação bem-sucedida** na
@@ -227,10 +268,18 @@ inalterado, de modo que esses contatos voltem a ser considerados na próxima
 execução. A nova tentativa pode repetir parte da consulta à Weni e da API
 FarmaLíder, pois o cache de clientes não armazena o payload do pedido.
 
-Essas medidas reduzem a carga e preservam informações, mas não corrigem um
-defeito interno da API. Para determinar a causa, a equipe FarmaLíder precisa
-correlacionar horário, rota e logs do servidor. Uma resposta com identificador
-de requisição e um schema de erro documentado tornariam isso mais preciso.
+Essas medidas reduzem a carga e preservam informações. Elas podem reduzir
+erros causados por sobrecarga, mas o Swagger e os logs de status não comprovam
+a causa interna. Se a mesma referência por CPF continuar falhando em modo
+serial enquanto outras consultas retornam `200` ou `404` no mesmo intervalo,
+isso sugere uma inconsistência específica no cadastro ou pedido; não prova
+qual campo ou relacionamento falhou. Uma melhoria após reduzir a
+concorrência sugere sensibilidade à carga, sem excluir outras causas.
+
+Para confirmar a causa, a equipe FarmaLíder precisa correlacionar horário em
+**America/Belem (UTC-3)**, rota, identificador de requisição quando disponível
+e logs do servidor. Não é necessário compartilhar CPF ou tokens nos logs de
+diagnóstico. Um schema de erro documentado tornaria a análise mais precisa.
 
 ## Melhoria futura: histórico de pedidos por CPF
 

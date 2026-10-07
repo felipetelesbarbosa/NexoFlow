@@ -444,18 +444,41 @@ O dashboard pode trabalhar diretamente sobre as abas BI para priorizar Marketing
 - lotes de até 500 CPFs;
 - sessão HTTP por thread;
 - rate limiter global;
-- retry;
-- cooldown após HTTP 429;
-- throttle adaptativo;
-- circuit breaker;
+- até quatro tentativas para falhas transitórias;
+- cooldown global após HTTP 429, falhas 5xx e erros de conexão;
+- recuperação serial e retorno gradual da concorrência;
+- intervalo adaptativo limitado, com redução após a recuperação;
+- circuit breaker por rota e por taxa de erros do lote;
 - telemetria de latência.
 
-Respostas `500` em `cliente/cpf` são erros da API, não ausência de cadastro.
-O log registra apenas referências opacas e categorias seguras da resposta.
+Após uma resposta `5xx`, a espera global segue **5, 10 e 20 segundos** nas
+tentativas seguintes e permanece ativa mesmo se a última tentativa falhar.
+`Retry-After`, quando informado, pode aumentar essa espera. Novas requisições
+passam a entrar uma por vez; as que já estavam em andamento podem concluir.
+Depois de **6 respostas saudáveis consecutivas iniciadas após a falha**, o
+limite passa de 1 para 2. Outras **12 respostas saudáveis** permitem voltar
+a 4. Uma nova falha reinicia a recuperação. O intervalo entre requisições
+durante a recuperação de `5xx` chega a, no máximo, **1 segundo** e diminui
+gradualmente até o valor normal quando a API se recupera.
+
+`404` é tratado como cliente ou pedido não encontrado, sem retry. `500`
+continua sendo falha da API e nunca é convertido em ausência de cadastro.
+O circuito da rota abre após **12 respostas `5xx` envolvendo pelo menos
+3 consultas distintas**, sem uma resposta válida `200` ou `404` entre elas,
+e interrompe o Analytics antes de gravar contatos ou pedidos no Google Sheets.
+
+O log usa referências HMAC com chave aleatória por execução e categorias
+seguras da resposta, sem copiar CPF, UUID de contato, token ou texto livre do
+servidor. Um identificador de correlação enviado pela API só é registrado se
+estiver no formato UUID estrito. Datas e horários operacionais e de log usam
+**America/Belem (UTC-3)**.
+
 Se restarem consultas de cliente ou pedido com erro, a execução termina como
 `parcial` (código `3`) e mantém o marco incremental para nova tentativa. A
 próxima execução pode repetir consultas à FarmaLíder, pois o cache não guarda
-o conteúdo completo dos pedidos. Consulte [o diagnóstico da API](docs/FARMALIDER%20API.md).
+o conteúdo completo dos pedidos. Essas proteções mitigam sobrecarga e ajudam
+no diagnóstico; a causa do erro interno só pode ser confirmada com os logs
+do backend. Consulte [o diagnóstico da API](docs/FARMALIDER%20API.md).
 
 ### Google Sheets
 

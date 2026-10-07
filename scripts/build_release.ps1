@@ -17,6 +17,45 @@ if (Test-Path -LiteralPath $DistDir) {
 New-Item -ItemType Directory -Force -Path $PayloadDir | Out-Null
 New-Item -ItemType Directory -Force -Path $ProjectRoot | Out-Null
 
+function Assert-PublicTrackedFiles {
+    param([Parameter(Mandatory = $true)][string[]]$Paths)
+
+    # A lista do Git pode conter arquivos adicionados com --force. Falhe antes
+    # de copiar qualquer arquivo privado; nunca leia seu conteudo no build.
+    $publicPlaceholders = @(
+        "secrets_config.example.py",
+        "secrets_config.example_webhook.txt",
+        "secrets_config.pyi",
+        "credentials/coloque_a_credencial_google_aqui.txt",
+        "logs/.gitkeep"
+    )
+    $privatePatterns = @(
+        '(^|/)(\.git|\.venv|venv|__pycache__)(/|$)',
+        '(^|/)(credentials|secrets|logs)(/|$)',
+        '(^|/)secrets_config\.py($|\.)',
+        '(^|/)\.env($|\.)',
+        '(^|/)(google[-_]?credentials|service[-_]?account|credentials|secrets|tokens?)([-_.][^/]*)?\.json$',
+        '(^|/)(id_rsa|id_dsa|id_ecdsa|id_ed25519)($|\.)',
+        '\.(pem|key|p12|pfx|jks|keystore|ppk|log)(\.[^/]*)?$'
+    )
+    $unsafe = @()
+    foreach ($relative in $Paths) {
+        if (-not $relative) { continue }
+        $normalized = $relative.Replace("\", "/").ToLowerInvariant()
+        if ($normalized -in $publicPlaceholders) { continue }
+        foreach ($pattern in $privatePatterns) {
+            if ($normalized -match $pattern) {
+                $unsafe += $relative
+                break
+            }
+        }
+    }
+    if ($unsafe.Count -gt 0) {
+        throw ("Build bloqueado: arquivos privados estao rastreados no Git. " +
+            "Remova-os do indice antes de publicar: " + ($unsafe -join ", "))
+    }
+}
+
 function Copy-TrackedFiles {
     param([Parameter(Mandatory = $true)][string]$Destination)
 
@@ -24,6 +63,7 @@ function Copy-TrackedFiles {
     try {
         $tracked = & git ls-files
         if ($LASTEXITCODE -ne 0) { throw "git ls-files falhou." }
+        Assert-PublicTrackedFiles -Paths $tracked
 
         foreach ($relative in $tracked) {
             if (-not $relative) { continue }
@@ -224,6 +264,14 @@ $releaseNotes = @"
 Distribuicao oficial do **NexoFlow 1.0**.
 
 O arquivo `NexoFlow-Setup-$Version.zip` contem o instalador do NexoFlow 1.0 e foi validado automaticamente em Windows para primeira instalacao e atualizacao de uma instalacao existente.
+
+Melhorias desta distribuicao do NexoFlow 1.0:
+- cooldown global e recuperacao serial apos falhas 5xx da FarmaLider, com retorno gradual da concorrencia e reducao do intervalo quando a API se recupera;
+- diagnostico de HTTP 500 com referencias opacas por execucao e classificacao da resposta, sem publicar CPF, tokens ou texto livre do servidor;
+- HTTP 404 continua representando cliente nao encontrado; HTTP 500 permanece uma falha da API;
+- consultas por CPF que ja falharam nao sao repetidas na mesma carga; dados previamente confirmados sao preservados quando o CPF continua o mesmo;
+- cargas incompletas aparecem como parciais e preservam o marco incremental para uma nova tentativa;
+- empacotamento bloqueado quando arquivos privados estao rastreados no Git.
 
 Principais garantias do Setup:
 - elevacao UAC automatica quando necessaria;

@@ -40,6 +40,7 @@ from farmalider_client import (
     FarmaliderAuthError,
     FarmaliderClient,
     FarmaliderError,
+    FarmaliderUnavailableError,
 )
 from farmalider_integration import (
     cliente_link_status,
@@ -86,6 +87,12 @@ class ClienteValidationStats:
     p95_response_ms: float = 0.0
     max_response_ms: float = 0.0
     effective_delay_ms: float = 0.0
+    responses_200: int = 0
+    responses_404: int = 0
+    concurrency_limit: int = 0
+    recovery_activations: int = 0
+    server_error_unique_queries: int = 0
+    server_error_serial_queries: int = 0
     elapsed_seconds: float = 0.0
 
 
@@ -94,6 +101,24 @@ class OrderStats:
     parse_errors: int = 0
     confirmed_api: int = 0
     api_errors: int = 0
+
+
+def _apply_request_metrics(stats: ClienteValidationStats, metrics: dict[str, Any]) -> None:
+    for attribute, key in {
+        "http_requests": "total_requests",
+        "retries": "retries", "rate_limits": "rate_limits",
+        "server_errors": "server_errors", "network_errors": "network_errors",
+        "slow_requests": "slow_requests", "responses_200": "responses_200",
+        "responses_404": "responses_404", "concurrency_limit": "concurrency_limit",
+        "recovery_activations": "recovery_activations",
+        "server_error_unique_queries": "server_error_unique_queries",
+        "server_error_serial_queries": "server_error_serial_queries",
+    }.items():
+        setattr(stats, attribute, int(metrics.get(key, 0)))
+    for key in (
+        "average_response_ms", "p95_response_ms", "max_response_ms", "effective_delay_ms",
+    ):
+        setattr(stats, key, float(metrics.get(key, 0)))
 
 
 def validate_configuration() -> None:
@@ -202,7 +227,7 @@ def _query_cliente(
         if response_cache is not None:
             response_cache[cpf] = api_cliente
         return cliente_link_status(cpf, api_cliente)
-    except FarmaliderAuthError:
+    except (FarmaliderAuthError, FarmaliderUnavailableError):
         raise
     except FarmaliderError:
         # O erro individual vira status. Se a taxa de falha do lote subir
@@ -430,7 +455,9 @@ def validate_contacts(
                         cpf = futures[future]
                         try:
                             result = future.result()
-                        except FarmaliderAuthError:
+                        except (FarmaliderAuthError, FarmaliderUnavailableError):
+                            if isinstance(farm_client, FarmaliderClient):
+                                farm_client.cancel_pending_requests()
                             for pending in futures:
                                 pending.cancel()
                             raise
@@ -499,7 +526,7 @@ def validate_contacts(
                 logging.info(
                     "FarmaLíder: %s/%s CPFs concluídos | lote %s/%s | "
                     "%.1f CPF/s | ETA %s | HTTP=%s retries=%s 429=%s 5xx=%s "
-                    "lentas=%s p95=%s max=%s delay=%.0fms.",
+                    "lentas=%s p95=%s max=%s delay=%.0fms limite=%s 200=%s 404=%s.",
                     completed,
                     len(unique_cpfs),
                     batch_number,
@@ -516,6 +543,9 @@ def validate_contacts(
                     ),
                     _format_ms_as_seconds(metrics["max_response_ms"]),
                     metrics["effective_delay_ms"],
+                    metrics.get("concurrency_limit", worker_count),
+                    metrics.get("responses_200", 0),
+                    metrics.get("responses_404", 0),
                 )
         finally:
             executor.shutdown(wait=True, cancel_futures=True)
@@ -531,16 +561,7 @@ def validate_contacts(
 
         metrics = farm_client.metrics_snapshot()
         stats.unique_queries = len(cache)
-        stats.http_requests = int(metrics["total_requests"])
-        stats.retries = int(metrics["retries"])
-        stats.rate_limits = int(metrics["rate_limits"])
-        stats.server_errors = int(metrics["server_errors"])
-        stats.network_errors = int(metrics["network_errors"])
-        stats.slow_requests = int(metrics.get("slow_requests", 0))
-        stats.average_response_ms = float(metrics["average_response_ms"])
-        stats.p95_response_ms = float(metrics.get("p95_response_ms", 0.0))
-        stats.max_response_ms = float(metrics["max_response_ms"])
-        stats.effective_delay_ms = float(metrics["effective_delay_ms"])
+        _apply_request_metrics(stats, metrics)
         stats.api_errors = sum(
             len(rows_by_cpf[cpf])
             for cpf, result in cache.items()
@@ -590,7 +611,7 @@ def build_orders(
                 cliente_lookup_status=(cliente_lookup_status_by_cpf or {}).get(cpf, ""),
                 pedido_responses_by_id=pedido_responses_by_id,
             )
-        except FarmaliderAuthError:
+        except (FarmaliderAuthError, FarmaliderUnavailableError):
             raise
         except FarmaliderError:
             stats.api_errors += 1
@@ -880,6 +901,9 @@ def main() -> int:
             cliente_responses_by_cpf=cliente_responses_by_cpf,
             cliente_lookup_status_by_cpf=cliente_lookup_status_by_cpf,
         )
+        if farm_client is not None:
+            # Include order lookups in the final HTTP diagnostics, not only CPF validation.
+            _apply_request_metrics(cliente_stats, farm_client.metrics_snapshot())
 
         postprocess_started = time.monotonic()
         logging.info(
@@ -1042,6 +1066,12 @@ def main() -> int:
                 "ultima_execucao_farmalider_detalhes_anteriores_mantidos": str(
                     cliente_stats.prior_details_retained
                 ),
+                "ultima_execucao_farmalider_recuperacoes_serial": str(cliente_stats.recovery_activations),
+                "ultima_execucao_farmalider_limite_final": str(cliente_stats.concurrency_limit),
+                "ultima_execucao_farmalider_5xx_consultas_distintas": str(cliente_stats.server_error_unique_queries),
+                "ultima_execucao_farmalider_5xx_consultas_em_serial": str(cliente_stats.server_error_serial_queries),
+                "ultima_execucao_farmalider_respostas_200": str(cliente_stats.responses_200),
+                "ultima_execucao_farmalider_respostas_404": str(cliente_stats.responses_404),
                 "ultima_execucao_farmalider_http_requests": str(
                     cliente_stats.http_requests
                 ),

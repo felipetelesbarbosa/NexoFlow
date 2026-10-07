@@ -2,6 +2,19 @@
 
 ## NexoFlow 1.0
 
+### Recuperação e diagnóstico da FarmaLíder
+
+- pausas globais de 5, 10 e 20 segundos após falhas 5xx, inclusive proteção após a última tentativa;
+- recuperação com uma requisição por vez e retorno gradual para duas e quatro;
+- intervalo adaptativo reduzido após respostas saudáveis, evitando manter toda a carga em ritmo lento;
+- circuito por rota interrompe falhas persistentes em várias consultas sem respostas válidas;
+- diagnóstico por referência HMAC, categoria segura da resposta, latência, limite e quantidade em voo;
+- identificação de rastreamento do servidor registrada somente quando é um UUID válido;
+- horários de log sempre em America/Belem (UTC-3);
+- falhas individuais preservam dados de cliente anteriores, registram `ERRO_API` e evitam GET duplicado por CPF;
+- execução parcial retorna código 3 e mantém o marco incremental para nova tentativa;
+- empacotamento bloqueia arquivos privados rastreados antes da publicação.
+
 ### Setup
 
 - Setup validado em Windows com primeira instalação e atualização real;
@@ -16,7 +29,7 @@
 
 ### Pedidos e status na Weni
 
-- `ultimo_pedido` é a fonte prioritária para ID, data, produtos, quantidades e valores;
+- a FarmaLíder API é a fonte de verdade dos pedidos; `pedido_id` e `ultimo_pedido` da Weni são localizadores para recuperação;
 - novo campo `pedido_status` é preenchido pelo NexoFlow Weni após consultar o mesmo `pedido_id` na FarmaLíder API;
 - valores oficiais de `pedido_status`: **Em processamento**, **Em trânsito**, **Concluído**, **Cancelado** e **Pronto para rota**;
 - cancelamento explícito sempre prevalece e grava **Cancelado**;

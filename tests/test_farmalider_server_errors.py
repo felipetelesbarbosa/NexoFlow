@@ -5,11 +5,12 @@ import json
 import time
 import traceback
 import unittest
+from contextlib import nullcontext
 from unittest.mock import Mock, patch
 
 from requests.exceptions import ConnectionError
 
-from farmalider_client import FarmaliderClient, FarmaliderError
+from farmalider_client import FarmaliderClient, FarmaliderError, RequestPermit
 from farmalider_integration import resolve_contact_order
 from datetime import datetime, timezone
 
@@ -60,7 +61,7 @@ class FarmaliderServerErrorTests(unittest.TestCase):
         try:
             with (
                 patch.object(client.session, "get", return_value=response) as get,
-                patch.object(client, "_wait_before_request"),
+                patch.object(client, "_request_slot", side_effect=lambda _: nullcontext(RequestPermit(0, 4))),
                 patch("farmalider_client.time.sleep"),
                 patch("farmalider_client.logging.warning") as warnings,
             ):
@@ -101,12 +102,7 @@ class FarmaliderServerErrorTests(unittest.TestCase):
         response = _response(500)
         response.headers["Retry-After"] = "0"
         try:
-            with (
-                patch("farmalider_client.time.sleep") as sleep,
-                patch("farmalider_client.logging.warning"),
-            ):
-                client._sleep_before_retry(2, response=response)
-            sleep.assert_called_once_with(2.0)
+            self.assertEqual(client._retry_delay(2, response), 10.0)
         finally:
             client.close()
 
@@ -119,7 +115,7 @@ class FarmaliderServerErrorTests(unittest.TestCase):
             unsafe_url = f"https://api.example.invalid/cliente/cpf/{CPF}?token=top-secret-token"
             with (
                 patch.object(client.session, "get", side_effect=ConnectionError(unsafe_url)),
-                patch.object(client, "_wait_before_request"),
+                patch.object(client, "_request_slot", side_effect=lambda _: nullcontext(RequestPermit(0, 4))),
                 patch("farmalider_client.FARMALIDER_MAX_RETRIES", 1),
             ):
                 try:

@@ -33,7 +33,9 @@ from contact_enrichment import (
     message_created_on,
     message_id,
 )
-from farmalider_client import FarmaliderAuthError, FarmaliderClient, FarmaliderError
+from farmalider_client import (
+    FarmaliderAuthError, FarmaliderClient, FarmaliderError, FarmaliderUnavailableError,
+)
 from farmalider_integration import resolve_contact_order
 from pedido_utils import (
     business_order_datetime,
@@ -695,7 +697,7 @@ def _apply_purchase_candidate(
             farm_client=farm_client,
             captured_at=captured_at,
         )
-    except FarmaliderAuthError:
+    except (FarmaliderAuthError, FarmaliderUnavailableError):
         raise
     except FarmaliderError:
         logging.warning("Falha ao consultar ou confirmar pedido na FarmaLíder API.")

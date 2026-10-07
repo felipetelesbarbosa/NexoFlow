@@ -398,7 +398,9 @@ def resolve_contact_order(
     são reconstruídos a partir do snapshot legado.
     """
     from analytics import get_fields, is_valid_cpf, normalize_cpf
-    from farmalider_client import FarmaliderAuthError, FarmaliderError
+    from farmalider_client import (
+        FarmaliderAuthError, FarmaliderError, FarmaliderUnavailableError,
+    )
 
     fields = get_fields(contact)
     cpf = normalize_cpf(fields.get("cpf"))
@@ -429,7 +431,7 @@ def resolve_contact_order(
             return None, []
         try:
             response = fetch_pedido(order_id)
-        except FarmaliderAuthError:
+        except (FarmaliderAuthError, FarmaliderUnavailableError):
             raise
         except FarmaliderError:
             return None, []
@@ -528,7 +530,7 @@ def resolve_contact_order(
             if cliente_response is not None
             else farm_client.get_cliente_by_cpf(cpf)
         )
-    except FarmaliderAuthError:
+    except (FarmaliderAuthError, FarmaliderUnavailableError):
         raise
     except FarmaliderError:
         recovered_order, recovered_items = resolve_weni_locators(
@@ -609,7 +611,7 @@ def resolve_contact_order(
     # GET pedido/{codigo} é o snapshot final preferencial do mesmo pedido.
     try:
         response = fetch_pedido(pedido_id)
-    except FarmaliderAuthError:
+    except (FarmaliderAuthError, FarmaliderUnavailableError):
         raise
     except FarmaliderError:
         return fallback_order, fallback_items
