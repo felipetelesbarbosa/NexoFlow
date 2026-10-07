@@ -142,6 +142,7 @@ ORDER_COLUMNS = [
     "ultimo_anuncio_tipo_campanha",
     "ultimo_anuncio_canal_destino",
     "valor_total_compra",
+    "valor_total_faturamento",
     "valor_total_itens",
     "diferenca_total",
     "quantidade_produtos",
