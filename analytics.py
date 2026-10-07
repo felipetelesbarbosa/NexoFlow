@@ -134,7 +134,7 @@ def _full_load_25_new_manifest(
         )
     captured = (
         datetime.now(timezone.utc)
-        .isoformat(timespec="seconds")
+        .isoformat(timespec="microseconds")
         .replace("+00:00", "Z")
     )
     digest = _full_load_25_digest(uuids)
