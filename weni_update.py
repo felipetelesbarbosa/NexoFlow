@@ -114,7 +114,7 @@ REQUIRED_ORDER_FIELDS = {
 # Alias mantido para compatibilidade com testes/documentação anteriores.
 RECOMMENDED_ORDER_FIELDS = REQUIRED_ORDER_FIELDS
 
-OPEN_ORDER_STATUSES = {"Em processamento", "Em trânsito", "Pronto para rota"}
+OPEN_ORDER_STATUSES = {"Pendente pagamento", "Em processamento", "Em trânsito"}
 TERMINAL_ORDER_STATUSES = {"Concluído", "Cancelado"}
 
 
@@ -779,9 +779,13 @@ def _apply_purchase_candidate(
     proposed_date = weni_order_datetime_text(proposed_dt)
     status_code = str(order.get("farmalider_status_pedido") or "").strip()
     payment_code = str(order.get("farmalider_forma_pagamento") or "").strip()
-    normalized_payment = normalize_farmalider_payment_code(payment_code)
-    if normalized_payment:
-        payment_code = normalized_payment
+    if payment_code.casefold() == "cancelado":
+        normalized_payment = "0"
+        payment_code = "CANCELADO"
+    else:
+        normalized_payment = normalize_farmalider_payment_code(payment_code)
+        if normalized_payment:
+            payment_code = normalized_payment
     if not farmalider_order_status_name(status_code):
         return False
 
