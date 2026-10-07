@@ -929,9 +929,20 @@ def _derived_order_payload(fields: dict[str, Any]) -> dict[str, Any] | None:
             metadata = None
         if isinstance(metadata, dict) and isinstance(metadata.get("produtos"), list):
             payload = dict(metadata)
-            payload["pedido_id"] = pedido_id or normalize_value(metadata.get("pedido_id")).strip()
-            payload["data_hora"] = pedido_data or normalize_value(metadata.get("data_hora")).strip()
-            payload["valor_total_compra"] = pedido_valor or normalize_value(metadata.get("valor_total_compra")).strip()
+            envelope_id = normalize_value(metadata.get("pedido_id")).strip()
+            payload["pedido_id"] = pedido_id or envelope_id
+            payload["data_hora"] = (
+                pedido_data or normalize_value(metadata.get("data_hora")).strip()
+            )
+            payload["valor_total_compra"] = (
+                pedido_valor
+                or normalize_value(metadata.get("valor_total_compra")).strip()
+            )
+            payload["quantidade_itens"] = normalize_value(
+                fields.get("pedido_quantidade_itens")
+            ).strip()
+            if pedido_id and envelope_id and pedido_id != envelope_id:
+                payload["produtos"] = None
             return payload
 
     product_names = _split_weni_order_list(raw_products)
