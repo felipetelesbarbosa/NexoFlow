@@ -13,9 +13,11 @@ from analytics import (
     build_bi_summary_record,
     build_sales_metrics,
     normalize_contact,
+    parse_ultimo_pedido,
 )
 from google_sheets import GoogleSheetsStore
 from main import FarmaliderSettings, build_orders, split_contacts, validate_contacts
+from pedido_utils import serialize_pedido_products
 
 
 class MemoryWorksheet:
@@ -141,7 +143,7 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
         self.assertEqual(row["pedido_forma_pagamento_nome"], "Débito")
 
     def test_normalized_contact_identifies_undocumented_payment_codes(self):
-        for code in (0, 6, 9, 2147483647):
+        for code in (9, 2147483647):
             for value in (code, str(code)):
                 with self.subTest(value=value):
                     row = normalize_contact(
@@ -157,6 +159,20 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
                         f"Não identificado (código {code})",
                     )
 
+    def test_normalized_contact_uses_validated_payment_labels(self):
+        for code, label in (
+            (0, "CANCELADO"),
+            (5, "Pix por Link de Pagamento"),
+            (6, "PIX no POS"),
+        ):
+            with self.subTest(code=code):
+                row = normalize_contact(
+                    {"uuid": "u1", "fields": {"pedido_forma_pagamento": code}},
+                    "2026-10-05T14:00:00Z",
+                )
+                self.assertEqual(row["pedido_forma_pagamento"], str(code))
+                self.assertEqual(row["pedido_forma_pagamento_nome"], label)
+
     def test_normalized_contact_does_not_label_invalid_payment_values(self):
         for value in (None, "", " ", True, False, "Pix", -1, "-1", 2147483648):
             with self.subTest(value=value):
@@ -171,13 +187,13 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
 
     def test_api_payment_code_and_display_persist_through_to_bi(self):
         expected = {
+            0: "CANCELADO",
             1: "Dinheiro",
             2: "Débito",
             3: "Crédito",
             4: "Ticket",
-            5: "Online/link/Pix",
-            0: "Não identificado (código 0)",
-            6: "Não identificado (código 6)",
+            5: "Pix por Link de Pagamento",
+            6: "PIX no POS",
             9: "Não identificado (código 9)",
             2147483647: "Não identificado (código 2147483647)",
         }
@@ -196,6 +212,63 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
                 bi_order = dict(zip(BI_ORDERS_COLUMNS, bi_rows[0], strict=True))
                 self.assertEqual(bi_order["pedido_forma_pagamento"], str(code))
                 self.assertEqual(bi_order["pedido_forma_pagamento_nome"], label)
+                self.assertEqual(orders[0]["farmalider_status_pedido"], "2")
+                if code == 0:
+                    self.assertEqual(orders[0]["status_confirmacao"], "CANCELADO_API")
+                    self.assertEqual(orders[0]["farmalider_status_pedido_nome"], "Cancelado")
+                    self.assertEqual(bi_order["pedido_status"], "3")
+                    self.assertEqual(bi_order["pedido_status_nome"], "Cancelado")
+                    self.assertEqual(build_sales_metrics(orders, items), [])
+                else:
+                    self.assertEqual(orders[0]["status_confirmacao"], "CONFIRMADO_API")
+                    self.assertEqual(bi_order["pedido_status"], "2")
+                    self.assertEqual(len(build_sales_metrics(orders, items)), 1)
+
+    def test_pending_payment_order_is_preserved_in_bi_without_sale(self):
+        contact, client = self.fixture(status=-1, payment=6)
+        row, orders, items = self.resolve_and_persist(contact, client)
+        self.assertEqual(orders[0]["status_validacao"], "OK")
+        self.assertNotEqual(orders[0]["status_confirmacao"], "CANCELADO_API")
+        self.assertEqual(orders[0]["farmalider_status_pedido"], "-1")
+        self.assertEqual(orders[0]["farmalider_status_pedido_nome"], "Pendente pagamento")
+        self.assertEqual(build_sales_metrics(orders, items), [])
+        bi_rows = build_bi_order_rows(
+            [row], orders, items, updated_at="2026-10-05T14:00:00Z"
+        )
+        self.assertEqual(len(bi_rows), 1)
+        bi_order = dict(zip(BI_ORDERS_COLUMNS, bi_rows[0], strict=True))
+        self.assertEqual(bi_order["pedido_status"], "-1")
+        self.assertEqual(bi_order["pedido_status_nome"], "Pendente pagamento")
+        self.assertEqual(bi_order["pedido_forma_pagamento"], "6")
+        self.assertEqual(bi_order["pedido_forma_pagamento_nome"], "PIX no POS")
+
+    def test_payment_zero_overrides_pending_status_in_persisted_order_and_bi(self):
+        contact, client = self.fixture(status=-1, payment=0)
+        row, orders, items = self.resolve_and_persist(contact, client)
+        self.assertEqual(orders[0]["farmalider_status_pedido"], "-1")
+        self.assertEqual(orders[0]["farmalider_status_pedido_nome"], "Cancelado")
+        self.assertEqual(orders[0]["status_confirmacao"], "CANCELADO_API")
+        self.assertEqual(build_sales_metrics(orders, items), [])
+        bi_rows = build_bi_order_rows(
+            [row], orders, items, updated_at="2026-10-05T14:00:00Z"
+        )
+        self.assertEqual(len(bi_rows), 1)
+        bi_order = dict(zip(BI_ORDERS_COLUMNS, bi_rows[0], strict=True))
+        self.assertEqual(bi_order["pedido_status"], "3")
+        self.assertEqual(bi_order["pedido_forma_pagamento"], "0")
+        self.assertEqual(bi_order["pedido_forma_pagamento_nome"], "CANCELADO")
+
+    def test_cancelled_payment_round_trips_through_serialized_weni_snapshot(self):
+        contact, client = self.fixture(status=2, payment=0)
+        _, orders, items = self.resolve_and_persist(contact, client)
+        contact["fields"]["ultimo_pedido"] = serialize_pedido_products(orders[0], items)
+        restored, restored_items = parse_ultimo_pedido(contact, "2026-10-05T15:00:00Z")
+        self.assertEqual(restored["farmalider_status_pedido"], "2")
+        self.assertEqual(restored["farmalider_forma_pagamento"], "0")
+        self.assertEqual(restored["farmalider_forma_pagamento_nome"], "CANCELADO")
+        self.assertEqual(restored["status_confirmacao"], "CANCELADO_API")
+        self.assertEqual(restored["farmalider_status_pedido_nome"], "Cancelado")
+        self.assertEqual(build_sales_metrics([restored], restored_items), [])
 
     def test_missing_api_payment_does_not_invent_payment_in_orders_or_bi(self):
         for missing in (False, True):
@@ -303,12 +376,12 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
         )
         self.assertEqual(conversion[-1]["quantidade"], 0)
 
-    def test_documented_non_cancelled_states_enter_sales(self):
-        for status in (0, 1, 2, 4):
+    def test_only_completed_state_enters_sales(self):
+        for status in (-1, 0, 1, 2, 4):
             with self.subTest(status=status):
                 contact, client = self.fixture(status=status)
                 _, orders, items = self.resolve_and_persist(contact, client)
-                self.assertEqual(len(build_sales_metrics(orders, items)), 1)
+                self.assertEqual(len(build_sales_metrics(orders, items)), int(status == 2))
 
     def test_cancelled_and_unknown_states_stay_out_of_sales(self):
         for status in (3, 99):

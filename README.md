@@ -240,8 +240,8 @@ Os oito campos `pedido_*` abaixo são obrigatórios na Weni. Se qualquer um esti
 | `pedido_valor_produtos` | `itens[].valor` | valores unitários na mesma ordem, separados por vírgula |
 | `pedido_valor` | soma de `itens[].total` | valor total dos itens do pedido |
 | `pedido_data` | `emissao` | `DD/MM/YY HH:MM:SS` |
-| `pedido_status` | `status` | código oficial 0 a 4 |
-| `pedido_forma_pagamento` | `formaPagamento` | código Int32 recebido; de-para documentado de 1 a 5 |
+| `pedido_status` | `status` e regra de cancelamento | status efetivo: -1 a 3; 4 aceito como legado |
+| `pedido_forma_pagamento` | `formaPagamento` | código Int32 não negativo recebido; 0 grava `CANCELADO` |
 
 `codProduto` não é usado como nome do produto. O nome exibido vem exclusivamente de `descricao`. O código do produto pode continuar armazenado internamente para auditoria, sem alimentar `pedido_produtos`.
 
@@ -262,29 +262,32 @@ pedido_forma_pagamento: 2
 
 As três listas de item são posicionais: o primeiro produto corresponde à primeira quantidade e ao primeiro valor, o segundo produto corresponde à segunda quantidade e ao segundo valor, e assim por diante.
 
-### Status oficiais
+### Status do pedido
 
 | Código | Status |
 |---:|---|
+| -1 | Pendente pagamento |
 | 0 | Em processamento |
 | 1 | Em trânsito |
 | 2 | Concluído |
 | 3 | Cancelado |
-| 4 | Pronto para rota |
+| 4 | Pronto para rota (legado, fora do enum atual) |
 
 ### Formas de pagamento
 
 | Código | Forma de pagamento |
 |---:|---|
+| 0 | CANCELADO (regra de negócio) |
 | 1 | Dinheiro |
 | 2 | Débito |
 | 3 | Crédito |
 | 4 | Ticket |
-| 5 | Online/link/Pix |
+| 5 | Pix por Link de Pagamento |
+| 6 | PIX no POS |
 
-A Weni guarda os códigos oficiais. O Analytics cria os rótulos amigáveis para o Google Sheets e o Looker Studio.
+A Weni guarda os códigos de pagamento, exceto `formaPagamento=0`, que grava o texto `CANCELADO` em `pedido_forma_pagamento` e o status efetivo `3`, Cancelado. O Analytics cria os rótulos amigáveis para o Google Sheets e o Looker Studio. `Pedidos_FarmaLider` preserva os códigos brutos de pagamento e status da API; Weni e `BI_Pedidos` usam o status efetivo, inclusive o cancelamento por pagamento 0.
 
-O Swagger define `formaPagamento` como Int32 sem enum. Códigos numéricos não negativos fora do de-para são preservados na Weni e exibidos no Google Sheets/BI como `Não identificado (código X)`, sem impedir a atualização dos demais campos válidos. Para 0 e 6, por exemplo, não há forma de pagamento documentada. Pagamento ausente ou inválido mantém a descrição vazia.
+O Swagger define `formaPagamento` como Int32 sem enum. Códigos válidos sem de-para a partir de 7 são preservados na Weni e exibidos no Google Sheets/BI como `Não identificado (código X)`, sem impedir a atualização dos demais campos válidos. Pagamento ausente ou inválido mantém a descrição vazia.
 
 Cada código sem de-para aparece em `INFO` uma vez por execução, seguido dos totais por código; esse registro informa a falta de descrição documentada e não indica falha na atualização.
 
@@ -302,9 +305,9 @@ pedido_faturamento_total = produtos + frete
 
 As abas `BI_Resumo_Diario` e `BI_Vendas` também separam faturamento de produtos, faturamento de frete e faturamento total. O campo de faturamento usado nos indicadores gerais passa a considerar **produtos + frete**, para bater com o valor total cobrado do pedido.
 
-Para os indicadores, **0, 1, 2 e 4** contam como pedido feito quando confirmados pela API e sem cancelamento explícito. **3, Cancelado**, fica fora.
+Somente pedidos validados pela API com status efetivo **2, Concluído**, sem cancelamento explícito e sem pagamento 0 entram nas métricas de venda e atualizam `ultima_compra`. Pedidos pendentes, em processamento, em trânsito, no estado legado de rota ou cancelados ficam fora.
 
-Pedidos abertos em **Em processamento**, **Em trânsito** ou **Pronto para rota** permanecem em fila de rechecagem até chegarem a **Concluído** ou **Cancelado**.
+Pedidos abertos em **Pendente pagamento**, **Em processamento**, **Em trânsito** ou no estado legado **Pronto para rota** permanecem em fila de rechecagem até chegarem a **Concluído** ou **Cancelado**.
 
 Datas operacionais de pedidos usam **America/Belem (UTC-3)**.
 

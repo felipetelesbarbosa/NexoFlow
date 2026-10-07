@@ -16,6 +16,7 @@ from weni_update import (
     PlanAuditError,
     _build_contact_plan,
     _load_state,
+    _prepare_frozen_plan_for_apply,
     _resolve_required_groups,
     _track_open_order,
     _save_state,
@@ -146,11 +147,15 @@ class WeniUpdateTests(unittest.TestCase):
 
     def test_open_order_tracking_keeps_only_non_terminal_statuses(self) -> None:
         tracked: set[str] = set()
+        _track_open_order(tracked, "u1", "Pendente pagamento")
+        self.assertEqual(tracked, {"u1"})
+        _track_open_order(tracked, "u1", "-1")
+        self.assertEqual(tracked, {"u1"})
         _track_open_order(tracked, "u1", "Em processamento")
         self.assertEqual(tracked, {"u1"})
         _track_open_order(tracked, "u1", "Em trânsito")
         self.assertEqual(tracked, {"u1"})
-        _track_open_order(tracked, "u1", "Pronto para rota")
+        _track_open_order(tracked, "u1", "4")
         self.assertEqual(tracked, {"u1"})
         _track_open_order(tracked, "u1", "Concluído")
         self.assertEqual(tracked, set())
@@ -608,7 +613,7 @@ class WeniUpdateTests(unittest.TestCase):
         })
 
     def test_status_is_written_as_official_code(self) -> None:
-        for status in (0, 1, 2, 3, 4):
+        for status in (-1, 0, 1, 2, 3):
             with self.subTest(status=status):
                 contact = self._purchase_contact(include_raw=False)
                 farm = self._purchase_api()
@@ -619,7 +624,7 @@ class WeniUpdateTests(unittest.TestCase):
                 audit_plans([plan], opt_out_group_available=True)
 
     def test_payment_is_written_as_official_code(self) -> None:
-        for payment in (1, 2, 3, 4, 5):
+        for payment in (1, 2, 3, 4, 5, 6):
             with self.subTest(payment=payment):
                 contact = self._purchase_contact(include_raw=False)
                 farm = self._purchase_api()
@@ -649,7 +654,7 @@ class WeniUpdateTests(unittest.TestCase):
         self.assertEqual(self._purchase_plan(applied, farm).fields, {})
 
     def test_undocumented_numeric_payment_does_not_block_valid_order(self) -> None:
-        for payment in (0, 6, 9):
+        for payment in (7, 9):
             with self.subTest(payment=payment):
                 contact = self._purchase_contact(include_raw=False)
                 farm = self._purchase_api()
@@ -663,14 +668,150 @@ class WeniUpdateTests(unittest.TestCase):
                 audit_plans([plan], opt_out_group_available=True)
                 self.assertEqual(plan.fields["pedido_valor"], 25.5)
 
+    def test_zero_payment_cancels_order_without_warning_or_latest_purchase(self) -> None:
+        for status in (-1, 0, 1, 2, 3):
+            with self.subTest(status=status):
+                contact = self._purchase_contact(include_raw=False)
+                contact["fields"]["ultima_compra"] = "2026-10-01T10:00:00-03:00"
+                farm = self._purchase_api()
+                farm.get_cliente_by_cpf.return_value["ultimoPedido"].update(
+                    status=status, formaPagamento=0,
+                )
+                farm.get_pedido.return_value["capa"].update(
+                    status=status, formaPagamento=0,
+                )
+                with patch("weni_update.logging.warning") as warning:
+                    plan = self._purchase_plan(contact, farm)
+                warning.assert_not_called()
+                self.assertTrue(plan.order_validated)
+                self.assertFalse(plan.purchase_confirmed)
+                self.assertEqual(plan.order_payment_code, "0")
+                self.assertEqual(plan.fields["pedido_forma_pagamento"], "CANCELADO")
+                self.assertEqual(plan.fields["pedido_status"], "3")
+                self.assertNotIn("ultima_compra", plan.fields)
+                audit_plans([plan], opt_out_group_available=True)
+                applied = deepcopy(contact)
+                applied["fields"].update(plan.fields)
+                self.assertEqual(self._purchase_plan(applied, farm).fields, {})
+
+    def test_audit_rejects_cancelled_payment_without_cancelled_order_status(self) -> None:
+        for status in (None, "-1", "0", "1", "2"):
+            with self.subTest(status=status):
+                plan = ContactUpdatePlan(
+                    contact_uuid="u-order",
+                    order_validated=True,
+                    fields={"pedido_forma_pagamento": "CANCELADO"},
+                    guards={"pedido_status": status},
+                )
+                with self.assertRaises(PlanAuditError):
+                    audit_plans([plan], opt_out_group_available=True)
+
+    def test_cancelled_payment_only_change_keeps_order_status_guard(self) -> None:
+        contact = self._purchase_contact(include_raw=False)
+        farm = self._purchase_api()
+        farm.get_pedido.return_value["capa"].update(status=3, formaPagamento=0)
+        farm.get_cliente_by_cpf.return_value["ultimoPedido"].update(
+            status=3, formaPagamento=0,
+        )
+        existing = self._purchase_plan(contact, farm)
+        contact["fields"].update(existing.fields)
+        contact["fields"]["pedido_forma_pagamento"] = "0"
+        plan = self._purchase_plan(contact, farm)
+        self.assertEqual(plan.fields, {"pedido_forma_pagamento": "CANCELADO"})
+        self.assertEqual(plan.guards["pedido_status"], "3")
+        audit_plans([plan], opt_out_group_available=True)
+        plan.guards["pedido_status"] = "2"
+        with self.assertRaises(PlanAuditError):
+            audit_plans([plan], opt_out_group_available=True)
+
+    def test_partial_apply_cancelled_status_keeps_pending_payment_auditable(self) -> None:
+        plan = ContactUpdatePlan(
+            contact_uuid="u-order",
+            order_validated=True,
+            fields={"pedido_status": "3", "pedido_forma_pagamento": "CANCELADO"},
+            previous={"pedido_status": "0", "pedido_forma_pagamento": "0"},
+            guards={"pedido_status": "0", "pedido_forma_pagamento": "0"},
+        )
+        original_guards = deepcopy(plan.guards)
+        audit_plans([plan], opt_out_group_available=True)
+        prepared, conflict = _prepare_frozen_plan_for_apply(
+            plan,
+            {"uuid": "u-order", "fields": {
+                "pedido_status": "3", "pedido_forma_pagamento": "0",
+            }},
+            opt_in_group_name="Opt-In", opt_in_group_uuid="",
+            opt_out_group_name="Opt-Out", opt_out_group_uuid="",
+        )
+        self.assertEqual(conflict, "")
+        self.assertIsNotNone(prepared)
+        self.assertEqual(prepared.fields, {"pedido_forma_pagamento": "CANCELADO"})
+        self.assertEqual(prepared.guards["pedido_status"], "3")
+        self.assertEqual(prepared.guards["pedido_forma_pagamento"], "0")
+        audit_plans([prepared], opt_out_group_available=True)
+        self.assertEqual(plan.guards, original_guards)
+        self.assertEqual(plan.fields["pedido_status"], "3")
+
+    def test_partial_apply_completed_status_keeps_pending_latest_purchase_auditable(self) -> None:
+        previous_purchase = "2026-10-01T09:00:00-03:00"
+        proposed_purchase = "2026-10-03T09:00:00-03:00"
+        plan = ContactUpdatePlan(
+            contact_uuid="u-order",
+            order_validated=True,
+            purchase_confirmed=True,
+            fields={"pedido_status": "2", "ultima_compra": proposed_purchase},
+            previous={"pedido_status": "-1", "ultima_compra": previous_purchase},
+            guards={"pedido_status": "-1", "pedido_forma_pagamento": "6"},
+        )
+        original_guards = deepcopy(plan.guards)
+        audit_plans([plan], opt_out_group_available=True)
+        prepared, conflict = _prepare_frozen_plan_for_apply(
+            plan,
+            {"uuid": "u-order", "fields": {
+                "pedido_status": "2", "pedido_forma_pagamento": "6",
+                "ultima_compra": previous_purchase,
+            }},
+            opt_in_group_name="Opt-In", opt_in_group_uuid="",
+            opt_out_group_name="Opt-Out", opt_out_group_uuid="",
+        )
+        self.assertEqual(conflict, "")
+        self.assertIsNotNone(prepared)
+        self.assertEqual(prepared.fields, {"ultima_compra": proposed_purchase})
+        self.assertEqual(prepared.guards["pedido_status"], "2")
+        self.assertEqual(prepared.guards["pedido_forma_pagamento"], "6")
+        audit_plans([prepared], opt_out_group_available=True)
+        self.assertEqual(plan.guards, original_guards)
+        self.assertEqual(plan.fields["pedido_status"], "2")
+
+    def test_audit_rejects_old_snapshot_with_unpaid_order_in_unchanged_fields(self) -> None:
+        for fields in (
+            {"pedido_quantidade_itens": "2, 1"},
+            {"ultima_compra": "2026-10-03T09:00:00-03:00"},
+        ):
+            with self.subTest(fields=fields):
+                plan = ContactUpdatePlan(
+                    contact_uuid="u-order",
+                    order_validated=True,
+                    purchase_confirmed=True,
+                    fields=fields,
+                    guards={
+                        "pedido_forma_pagamento": "0",
+                        "pedido_status": "2",
+                        "pedido_produtos": "A, B",
+                        "pedido_quantidade_itens": "2, 1",
+                        "pedido_valor_produtos": "10, 20",
+                    },
+                )
+                with self.assertRaises(PlanAuditError):
+                    audit_plans([plan], opt_out_group_available=True)
+
     def test_unknown_payment_summary_counts_unchanged_and_cancelled_orders_without_writes(self) -> None:
         started = datetime(2026, 10, 3, 12, 1, tzinfo=timezone.utc)
         contact = self._purchase_contact(include_raw=False)
         farm = self._purchase_api()
         farm.get_cliente_by_cpf.return_value["ultimoPedido"].update(
-            status=3, formaPagamento=0,
+            status=3, formaPagamento=9,
         )
-        farm.get_pedido.return_value["capa"].update(status=3, formaPagamento=0)
+        farm.get_pedido.return_value["capa"].update(status=3, formaPagamento=9)
         pending = self._purchase_plan(contact, farm)
         unchanged = deepcopy(contact)
         unchanged["uuid"] = "u-unchanged"
@@ -699,13 +840,13 @@ class WeniUpdateTests(unittest.TestCase):
             self.assertEqual(result.orders_validated, 3)
             self.assertEqual(result.plans_with_changes, 2)
             self.assertEqual(result.purchase_confirmed, 0)
-            self.assertEqual(result.payment_unmapped_codes, {"0": 3})
+            self.assertEqual(result.payment_unmapped_codes, {"9": 3})
             self.assertEqual(result.contacts_updated, 0)
             client.update_contact_fields.assert_not_called()
             client.contact_group_action.assert_not_called()
             payment_messages = [line for line in logs if "Descrição no Analytics:" in line]
             self.assertEqual(len(payment_messages), 1)
-            self.assertIn("Não identificado (código 0)", payment_messages[0])
+            self.assertIn("Não identificado (código 9)", payment_messages[0])
             self.assertTrue(any(
                 "3 contato(s) com pedido validado" in line
                 and "Nenhuma gravação foi iniciada" in line
@@ -714,17 +855,17 @@ class WeniUpdateTests(unittest.TestCase):
             self.assertTrue(all("52998224725" not in line for line in logs))
             snapshot = json.loads(review.read_text(encoding="utf-8"))
             self.assertEqual(snapshot["summary"]["orders_validated"], 3)
-            self.assertEqual(snapshot["summary"]["payment_unmapped_codes"], {"0": 3})
+            self.assertEqual(snapshot["summary"]["payment_unmapped_codes"], {"9": 3})
             self.assertTrue(all("order_payment_code" not in plan for plan in snapshot["plans"]))
             loaded, _, _ = load_review_snapshot(full=True, json_path=review)
             self.assertEqual(len(loaded), 2)
             applied = run_update(apply=True, full=True, require_review=review)
             self.assertEqual(applied.orders_validated, 3)
-            self.assertEqual(applied.payment_unmapped_codes, {"0": 3})
+            self.assertEqual(applied.payment_unmapped_codes, {"9": 3})
             self.assertEqual(applied.contacts_updated, 2)
             self.assertEqual(client.update_contact_fields.call_count, 2)
             for call in client.update_contact_fields.call_args_list:
-                self.assertEqual(call.args[1]["pedido_forma_pagamento"], "0")
+                self.assertEqual(call.args[1]["pedido_forma_pagamento"], "9")
                 self.assertEqual(call.args[1]["pedido_status"], "3")
                 self.assertNotIn("ultima_compra", call.args[1])
 
@@ -775,8 +916,8 @@ class WeniUpdateTests(unittest.TestCase):
         self.assertNotIn("ultima_compra", plan.fields)
         audit_plans([plan], opt_out_group_available=True)
 
-    def test_non_cancelled_states_advance_latest_purchase(self) -> None:
-        for status in (0, 1, 2, 4):
+    def test_only_completed_order_advances_latest_purchase(self) -> None:
+        for status in (-1, 0, 1, 2, 3, 4):
             with self.subTest(status=status):
                 contact = self._purchase_contact(include_raw=False)
                 contact["fields"]["ultima_compra"] = (
@@ -785,11 +926,43 @@ class WeniUpdateTests(unittest.TestCase):
                 farm = self._purchase_api()
                 farm.get_pedido.return_value["capa"]["status"] = status
                 plan = self._purchase_plan(contact, farm)
-                self.assertTrue(plan.purchase_confirmed)
-                self.assertEqual(
-                    plan.fields["ultima_compra"],
-                    "2026-10-03T09:00:00-03:00",
-                )
+                self.assertEqual(plan.purchase_confirmed, status == 2)
+                if status == 2:
+                    self.assertEqual(
+                        plan.fields["ultima_compra"],
+                        "2026-10-03T09:00:00-03:00",
+                    )
+                else:
+                    self.assertNotIn("ultima_compra", plan.fields)
+
+    def test_pending_payment_is_saved_and_queued_without_latest_purchase(self) -> None:
+        started = datetime(2026, 10, 3, 12, 1, tzinfo=timezone.utc)
+        contact = self._purchase_contact(include_raw=False)
+        contact["fields"]["ultima_compra"] = "2026-10-01T10:00:00-03:00"
+        farm = self._purchase_api()
+        farm.get_pedido.return_value["capa"]["status"] = -1
+        farm.get_cliente_by_cpf.return_value["ultimoPedido"]["status"] = -1
+        client = self._incremental_purchase_client(contact)
+        client.get_contact.return_value = deepcopy(contact)
+        with (
+            patch("weni_update.WeniClient", return_value=client),
+            patch("weni_update._open_farmalider", return_value=farm),
+            patch("weni_update.resolve_window", return_value=UpdateWindow(
+                started_at=started, after=started, full=False,
+            )),
+            patch("weni_update._append_audit"),
+            patch("weni_update._save_state") as save_mock,
+        ):
+            result = run_update(apply=True, full=False)
+        self.assertEqual(result.orders_validated, 1)
+        self.assertEqual(result.purchase_confirmed, 0)
+        self.assertEqual(result.contacts_updated, 1)
+        saved_fields = client.update_contact_fields.call_args.args[1]
+        self.assertEqual(saved_fields["pedido_status"], "-1")
+        self.assertNotIn("ultima_compra", saved_fields)
+        self.assertEqual(
+            save_mock.call_args.args[0]["open_order_uuids"], ["u-pedido"],
+        )
 
     def test_freight_is_not_added_to_pedido_valor(self) -> None:
         contact = self._purchase_contact(include_raw=False)
@@ -839,6 +1012,7 @@ class WeniUpdateTests(unittest.TestCase):
 
     def test_audit_rejects_invalid_status_and_payment_codes(self) -> None:
         for fields in (
+            {"pedido_status": "8"},
             {"pedido_status": "9"},
             {"pedido_forma_pagamento": "1.5"},
             {"pedido_forma_pagamento": "NaN"},

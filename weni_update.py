@@ -39,11 +39,12 @@ from farmalider_client import (
 from farmalider_integration import resolve_contact_order
 from pedido_utils import (
     business_order_datetime,
+    effective_order_status_code,
     farmalider_order_status_name,
     farmalider_payment_method_display,
     farmalider_payment_method_name,
     is_order_cancelled,
-    is_order_made,
+    is_order_completed,
     normalize_farmalider_payment_code,
     parse_weni_order_list,
     serialize_weni_order_list,
@@ -114,7 +115,7 @@ REQUIRED_ORDER_FIELDS = {
 # Alias mantido para compatibilidade com testes/documentação anteriores.
 RECOMMENDED_ORDER_FIELDS = REQUIRED_ORDER_FIELDS
 
-OPEN_ORDER_STATUSES = {"Em processamento", "Em trânsito", "Pronto para rota"}
+OPEN_ORDER_STATUSES = {"Pendente pagamento", "Em processamento", "Em trânsito", "Pronto para rota"}
 TERMINAL_ORDER_STATUSES = {"Concluído", "Cancelado"}
 
 
@@ -176,6 +177,8 @@ class UpdateStats:
     purchase_skipped: int = 0
     orders_validated: int = 0
     payment_unmapped_codes: dict[str, int] = field(default_factory=dict)
+    orders_cancelled_payment_zero: int = 0
+    orders_pending_payment: int = 0
 
 
 def _record_validated_order(stats: UpdateStats, plan: ContactUpdatePlan) -> None:
@@ -183,7 +186,21 @@ def _record_validated_order(stats: UpdateStats, plan: ContactUpdatePlan) -> None
     if not plan.order_validated:
         return
     stats.orders_validated += 1
+    status = normalize_value(plan.fields.get(
+        "pedido_status", plan.guards.get("pedido_status"),
+    )).strip()
+    if status == "-1":
+        stats.orders_pending_payment += 1
     code = normalize_farmalider_payment_code(plan.order_payment_code)
+    if code == "0":
+        stats.orders_cancelled_payment_zero += 1
+        if stats.orders_cancelled_payment_zero == 1:
+            logging.info(
+                "FarmaLíder: regra de pagamento 0 aplicada. "
+                "Pedido tratado como Cancelado; forma de pagamento CANCELADO "
+                "e pedido_status=3 no plano Weni. Fora das vendas e de ultima_compra. "
+                "Nenhuma gravação foi iniciada; o plano será auditado.",
+            )
     if not code or farmalider_payment_method_name(code):
         return
     count = stats.payment_unmapped_codes.get(code, 0) + 1
@@ -777,18 +794,18 @@ def _apply_purchase_candidate(
         return False
 
     proposed_date = weni_order_datetime_text(proposed_dt)
-    status_code = str(order.get("farmalider_status_pedido") or "").strip()
+    status_code = effective_order_status_code(order)
     payment_code = str(order.get("farmalider_forma_pagamento") or "").strip()
     normalized_payment = normalize_farmalider_payment_code(payment_code)
     if normalized_payment:
-        payment_code = normalized_payment
+        payment_code = "CANCELADO" if normalized_payment == "0" else normalized_payment
     if not farmalider_order_status_name(status_code):
         return False
 
     plan.order_validated = True
     plan.order_payment_code = normalized_payment
     plan.purchase_confirmation = confirmation
-    plan.purchase_confirmed = confirmation == "CONFIRMADO_API" and is_order_made(order)
+    plan.purchase_confirmed = confirmation == "CONFIRMADO_API" and is_order_completed(order)
     reason = "pedido oficial FarmaLíder atualizado por GET e normalizado para Weni"
 
     order_fields_to_write: dict[str, Any] = {
@@ -1015,9 +1032,33 @@ def audit_plans(
         if "pedido_forma_pagamento" in plan.fields:
             payment = str(plan.fields["pedido_forma_pagamento"]).strip()
             normalized_payment = normalize_farmalider_payment_code(payment)
-            if not normalized_payment or normalized_payment != payment:
+            if payment != "CANCELADO" and (
+                not normalized_payment or normalized_payment != payment or normalized_payment == "0"
+            ):
                 errors.append(
                     f"{plan.contact_uuid}: código inválido em pedido_forma_pagamento"
+                )
+
+        if plan.order_validated and set(plan.fields) & PURCHASE_FIELDS:
+            payment = normalize_value(plan.fields.get(
+                "pedido_forma_pagamento", plan.guards.get(
+                    "pedido_forma_pagamento", plan.previous.get("pedido_forma_pagamento"),
+                ),
+            )).strip()
+            status = normalize_value(plan.fields.get(
+                "pedido_status", plan.guards.get("pedido_status", plan.previous.get("pedido_status")),
+            )).strip()
+            if normalize_farmalider_payment_code(payment) == "0":
+                errors.append(
+                    f"{plan.contact_uuid}: pagamento 0 exige novo plano com CANCELADO e pedido_status=3"
+                )
+            if payment == "CANCELADO" and status != "3":
+                errors.append(
+                    f"{plan.contact_uuid}: pagamento CANCELADO exige pedido_status=3"
+                )
+            if "ultima_compra" in plan.fields and (status != "2" or payment == "CANCELADO"):
+                errors.append(
+                    f"{plan.contact_uuid}: ultima_compra exige pedido concluído (pedido_status=2) e não cancelado"
                 )
 
         if "contact_canal_principal" in plan.fields:
@@ -1260,6 +1301,8 @@ def _review_summary(plans: list[ContactUpdatePlan], stats: UpdateStats) -> dict[
         "purchase_confirmed": stats.purchase_confirmed,
         "orders_validated": stats.orders_validated,
         "payment_unmapped_codes": dict(sorted(stats.payment_unmapped_codes.items())),
+        "orders_cancelled_payment_zero": stats.orders_cancelled_payment_zero,
+        "orders_pending_payment": stats.orders_pending_payment,
         "field_counts": dict(sorted(field_counts.items())),
         "lgpd_contacts": lgpd_contacts,
         "cpf_contacts": cpf_contacts,
@@ -1355,6 +1398,8 @@ def write_review_snapshot(
         f"Pedidos confirmados pela FarmaLíder: {summary['purchase_confirmed']}",
         f"Contatos com pedido validado (inclusive sem alteração): {summary['orders_validated']}",
         f"Pagamento não identificado por código: {summary['payment_unmapped_codes']}",
+        f"Contatos com pedido cancelado por pagamento 0: {summary['orders_cancelled_payment_zero']}",
+        f"Contatos com pedido pendente de pagamento: {summary['orders_pending_payment']}",
         "",
         "ALTERAÇÕES POR CAMPO",
         "----------------------------------------------------------",
@@ -1621,6 +1666,17 @@ def _prepare_frozen_plan_for_apply(
             )
         )
 
+    # A field already set to the approved value leaves pending_fields, but its
+    # current value still participates in the audit of remaining writes. Keep
+    # the frozen snapshot untouched and use a new set of effective guards.
+    effective_guards = {
+        **plan.guards,
+        **{
+            name: current_fields.get(name)
+            for name in plan.fields
+            if name not in pending_fields
+        },
+    }
     prepared = ContactUpdatePlan(
         contact_uuid=plan.contact_uuid,
         contact_name=plan.contact_name,
@@ -1628,10 +1684,11 @@ def _prepare_frozen_plan_for_apply(
         contact_channel=plan.contact_channel,
         fields=pending_fields,
         previous=plan.previous,
-        guards=plan.guards,
+        guards=effective_guards,
         evidence=plan.evidence,
         group_actions=pending_actions,
         order_validated=plan.order_validated,
+        order_payment_code=plan.order_payment_code,
         purchase_confirmed=plan.purchase_confirmed,
         purchase_confirmation=plan.purchase_confirmation,
     )
@@ -1872,6 +1929,8 @@ def run_update(
             stats.orders_validated = int(summary.get("orders_validated") or sum(
                 1 for plan in plans if plan.order_validated
             ))
+            stats.orders_cancelled_payment_zero = int(summary.get("orders_cancelled_payment_zero") or 0)
+            stats.orders_pending_payment = int(summary.get("orders_pending_payment") or 0)
             unmapped = summary.get("payment_unmapped_codes")
             if isinstance(unmapped, dict):
                 stats.payment_unmapped_codes = {
@@ -2189,6 +2248,12 @@ def run_update(
             "Nenhuma gravação foi iniciada; iniciando auditoria do plano.",
             stats.orders_validated,
             dict(sorted(stats.payment_unmapped_codes.items())),
+        )
+        logging.info(
+            "Pedidos no plano por contato: cancelados por pagamento 0=%s; "
+            "pendentes de pagamento=%s; concluídos confirmados=%s. "
+            "Os valores não representam pedidos únicos nem gravações realizadas.",
+            stats.orders_cancelled_payment_zero, stats.orders_pending_payment, stats.purchase_confirmed,
         )
 
         # ETAPA OBRIGATÓRIA: nenhum POST é feito antes desta auditoria completa.

@@ -112,6 +112,8 @@ def main() -> int:
         print(f"Ações de grupo: {stats.group_actions}")
         print(f"Pedidos confirmados pela FarmaLíder: {stats.purchase_confirmed}")
         print(f"Contatos com pedido validado (inclusive sem alteração): {stats.orders_validated}")
+        print(f"Contatos com pedido cancelado por pagamento 0: {stats.orders_cancelled_payment_zero}")
+        print(f"Contatos com pedido pendente de pagamento: {stats.orders_pending_payment}")
         if stats.payment_unmapped_codes:
             print(
                 "Pagamento não identificado por código: "

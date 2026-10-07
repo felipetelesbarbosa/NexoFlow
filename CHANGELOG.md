@@ -27,7 +27,9 @@
 - listas separadas por vírgula usam aspas CSV quando o nome contém vírgula, aspas ou quebra de linha, preservando o nome completo e a correspondência com quantidade e valor;
 - Weni e Analytics compartilham a mesma leitura das listas, incluindo nomes como `Produto 0,5 MG`;
 - auditoria verifica também atualizações parciais das listas e informa as contagens sem expor produtos;
-- códigos numéricos de pagamento não documentados são preservados como Int32 não negativo na Weni e apresentados no Google Sheets/BI como `Não identificado (código X)`, sem inventar o de-para;
+- pagamento 5 corresponde a **Pix por Link de Pagamento** e pagamento 6 a **PIX no POS**;
+- pagamento 0 é tratado como cancelamento: Weni recebe `pedido_forma_pagamento=CANCELADO` e `pedido_status=3`, sem venda nem atualização de `ultima_compra`;
+- códigos numéricos de pagamento sem de-para a partir de 7 são preservados como Int32 não negativo na Weni e apresentados no Google Sheets/BI como `Não identificado (código X)`, sem inventar o de-para;
 - pagamentos sem de-para geram `INFO` uma vez por código em cada execução, com totais por código no resumo;
 - resumo distingue contatos com pedido validado pela API, inclusive sem alterações, de contatos com alterações; preparação e auditoria acontecem antes das gravações;
 - listas realmente desalinhadas, CSV malformado, elementos vazios e códigos inválidos continuam bloqueados antes de qualquer gravação.
@@ -61,11 +63,12 @@
 
 - a FarmaLíder API é a fonte de verdade dos pedidos; `pedido_id` e `ultimo_pedido` da Weni são localizadores para recuperação;
 - novo campo `pedido_status` é preenchido pelo NexoFlow Weni após consultar o mesmo `pedido_id` na FarmaLíder API;
-- valores oficiais de `pedido_status`: **Em processamento**, **Em trânsito**, **Concluído**, **Cancelado** e **Pronto para rota**;
-- cancelamento explícito sempre prevalece e grava **Cancelado**;
-- status 0, 1, 2 e 4 contam como pedido feito; somente status 3 fica fora dos indicadores;
+- valores atuais de `pedido_status`: **-1 Pendente pagamento**, **0 Em processamento**, **1 Em trânsito**, **2 Concluído** e **3 Cancelado**; **4 Pronto para rota** permanece aceito como legado, fora do enum atual;
+- cancelamento explícito ou pagamento 0 prevalece e grava o status efetivo **3, Cancelado** na Weni/BI;
+- `Pedidos_FarmaLider` preserva os códigos brutos de status e pagamento retornados pela API para auditoria;
+- somente status efetivo 2, Concluído, validado pela API e sem cancelamento entra nos indicadores de venda e atualiza `ultima_compra`;
 - `pedido_status` também é preservado na `Base_Contatos` para Google Sheets/Looker Studio;
-- pedidos em **Em processamento**, **Em trânsito** ou **Pronto para rota** ficam numa fila persistente de rechecagem até chegarem a **Concluído** ou **Cancelado**, mesmo sem nova mensagem na Weni.
+- pedidos em **Pendente pagamento**, **Em processamento**, **Em trânsito** ou no estado legado **Pronto para rota** ficam numa fila persistente de rechecagem até chegarem a **Concluído** ou **Cancelado**, mesmo sem nova mensagem na Weni.
 
 Data de consolidação: 05/10/2026.
 

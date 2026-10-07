@@ -34,6 +34,8 @@ Principais campos:
 
 Use esta aba para a página **Visão Geral** e para séries de evolução diária da base.
 
+Os indicadores de compradores, pedidos e faturamento consideram somente pedidos validados pela API com status efetivo 2, Concluído, sem cancelamento. Pagamento 0 força Cancelado e fica fora das vendas; -1, Pendente pagamento, também fica fora até a conclusão.
+
 ### BI_Canais
 
 Snapshot diário por canal de contato:
@@ -133,7 +135,11 @@ O campo legado `faturamento` permanece como alias do faturamento total para não
 
 O dashboard deve mostrar preferencialmente os nomes amigáveis, como **Cancelado** e **Débito**, mantendo os códigos disponíveis para auditoria e filtros técnicos.
 
-Para pagamento Int32 não negativo sem de-para documentado, como 0 e 6, `pedido_forma_pagamento_nome` exibe `Não identificado (código X)` e `pedido_forma_pagamento` preserva o código. Essa descrição distingue códigos recebidos da API sem forma de pagamento documentada de pagamentos ausentes ou inválidos, cuja descrição permanece vazia.
+Pagamento 5 aparece como **Pix por Link de Pagamento** e pagamento 6 como **PIX no POS**. Pagamento 0 representa **CANCELADO**: Weni grava esse texto literal em `pedido_forma_pagamento` e o status efetivo 3, Cancelado. `BI_Pedidos` também usa o status efetivo 3; `Pedidos_FarmaLider` preserva os códigos brutos de status e pagamento retornados pela API.
+
+Para pagamento Int32 não negativo sem de-para a partir de 7, `pedido_forma_pagamento_nome` exibe `Não identificado (código X)` e o código é preservado. Pagamentos ausentes ou inválidos mantêm a descrição vazia.
+
+`BI_Pedidos` mantém os pedidos para consulta, inclusive pendentes e cancelados. Páginas de compradores e vendas devem filtrar status efetivo 2, Concluído; o status -1, Pendente pagamento, permanece em rechecagem e fora das vendas.
 
 ### BI_Status
 

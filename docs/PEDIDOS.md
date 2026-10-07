@@ -35,8 +35,8 @@ Mesmo nesse fallback, `ultimo_pedido` não vira fonte de produtos, quantidade, v
 | `pedido_valor_produtos` | `itens[].valor` | valores unitários posicionais separados por vírgula |
 | `pedido_valor` | `sum(itens[].total)` | soma dos totais dos itens |
 | `pedido_data` | `emissao` | `DD/MM/YY HH:MM:SS` |
-| `pedido_status` | `status` | código oficial 0 a 4 |
-| `pedido_forma_pagamento` | `formaPagamento` | código Int32 não negativo recebido; de-para documentado de 1 a 5 |
+| `pedido_status` | `status` e regra de cancelamento | status efetivo -1 a 3; 4 aceito como legado |
+| `pedido_forma_pagamento` | `formaPagamento` | código Int32 não negativo recebido; pagamento 0 grava `CANCELADO` |
 
 As listas são posicionais. Exemplo:
 
@@ -114,33 +114,36 @@ Nas tabelas analíticas, o NexoFlow também mantém `data` e `hora` separadas pa
 
 ## Status
 
-De-para oficial:
+De-para usado pela integração:
 
 | Código | API | Apresentação |
 |---:|---|---|
+| -1 | — | Pendente pagamento |
 | 0 | `EmProcessamento` | Em processamento |
 | 1 | `EmTransito` | Em trânsito |
 | 2 | `Concluido` | Concluído |
 | 3 | `Cancelado` | Cancelado |
-| 4 | `ProntoParaRota` | Pronto para rota |
+| 4 | `ProntoParaRota` (legado, fora do enum atual) | Pronto para rota |
 
-A Weni recebe o **código** em `pedido_status`. O Analytics deriva `pedido_status_nome` para apresentação no Google Sheets/Looker Studio.
+A Weni recebe o **código efetivo** em `pedido_status`. O Analytics deriva `pedido_status_nome` para apresentação no Google Sheets/Looker Studio. Se `formaPagamento=0`, o status efetivo é 3, Cancelado, mesmo que a API informe outro status. Cancelamento explícito também prevalece. `Pedidos_FarmaLider` preserva o status bruto em `farmalider_status_pedido`; Weni e `BI_Pedidos` aplicam o status efetivo.
 
-Estados 0, 1, 2 e 4 confirmados pela API contam como pedido feito. O estado 3 fica fora das métricas de venda.
+Somente status efetivo 2, Concluído, validado pela API e sem cancelamento conta como venda e atualiza `ultima_compra`. Os estados -1, 0, 1, 3 e o legado 4 ficam fora das métricas de venda.
 
 ## Forma de pagamento
 
-De-para oficial:
+De-para confirmado para a integração:
 
 | Código | Apresentação |
 |---:|---|
+| 0 | CANCELADO (regra de negócio) |
 | 1 | Dinheiro |
 | 2 | Débito |
 | 3 | Crédito |
 | 4 | Ticket |
-| 5 | Online/link/Pix |
+| 5 | Pix por Link de Pagamento |
+| 6 | PIX no POS |
 
-A Weni recebe o código em `pedido_forma_pagamento`. O Analytics deriva `pedido_forma_pagamento_nome`. Códigos Int32 não negativos sem de-para, como 0 e 6, são preservados e exibidos no Google Sheets/BI como `Não identificado (código X)`. Essa descrição não atribui uma forma de pagamento ao código. Pagamento ausente ou inválido mantém a descrição vazia.
+A Weni recebe o código em `pedido_forma_pagamento`, exceto pagamento 0, que grava o texto literal `CANCELADO` e força `pedido_status=3`. `Pedidos_FarmaLider` preserva o código bruto 0 em `farmalider_forma_pagamento`. O Analytics deriva a descrição em `pedido_forma_pagamento_nome`. Códigos Int32 não negativos sem de-para a partir de 7 são preservados e exibidos no Google Sheets/BI como `Não identificado (código X)`. Pagamento ausente ou inválido mantém a descrição vazia.
 
 No NexoFlow Weni, cada código sem de-para gera um registro `INFO` por execução, com totais por código no resumo. Isso não impede a atualização dos demais campos válidos.
 
@@ -172,7 +175,7 @@ sem alterar os códigos armazenados na Weni.
 
 ### Pedidos_FarmaLider
 
-Uma linha por pedido oficial. Mantém identificação, emissão, status, forma de pagamento, total dos itens, vínculo do cliente, origem e dados técnicos de confirmação.
+Uma linha por pedido oficial. Mantém identificação, emissão, status e forma de pagamento brutos da API, total dos itens, vínculo do cliente, origem e dados técnicos de confirmação. O cancelamento por pagamento 0 altera o status efetivo na Weni/BI e não substitui o status bruto armazenado nesta aba.
 
 ### Itens_Pedidos_FarmaLider
 
@@ -188,7 +191,7 @@ Uma linha por item, com:
 
 ### Metricas_Vendas
 
-Agregação diária para pedidos válidos, compradores, unidades e faturamento.
+Agregação diária para pedidos validados pela API com status efetivo 2, Concluído, sem cancelamento, compradores, unidades e faturamento.
 
 ### BI_Pedidos
 
@@ -232,12 +235,14 @@ Os oito campos do contrato de pedido são obrigatórios na Weni: `pedido_id`, `p
 
 ## Rechecagem
 
-Pedidos em 0, 1 ou 4 continuam sendo rechecados nas execuções seguintes até chegar a:
+Pedidos em -1, Pendente pagamento, 0, Em processamento, 1, Em trânsito, ou no estado legado 4, Pronto para rota, continuam sendo rechecados nas execuções seguintes até chegar a:
 
 - 2, Concluído; ou
 - 3, Cancelado.
 
 A mudança de status atualiza o snapshot sem trocar o `pedido_id` por outro pedido arbitrariamente.
+
+Pagamento 0 encerra a rechecagem como Cancelado, mesmo quando o status bruto da API ainda indica um estado aberto.
 
 ## Segurança
 

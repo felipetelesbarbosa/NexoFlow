@@ -195,7 +195,7 @@ O valor de `opt_in_lgpd` é a fonte de verdade para os grupos. Com `ativo`, o co
 
 ## Pedidos e última compra
 
-A rotina usa a FarmaLíder API como fonte de verdade: consulta o cliente por CPF, obtém `ultimoPedido` e `itens`, confirma o mesmo pedido por código e então escreve os campos `pedido_*` e `ultima_compra`. `pedido_produtos` usa `descricao`; quantidades e valores unitários são listas posicionais separadas por vírgula; `pedido_valor` é a soma de `itens[].total`. Pedido cancelado não atualiza `ultima_compra`.
+A rotina usa a FarmaLíder API como fonte de verdade: consulta o cliente por CPF, obtém `ultimoPedido` e `itens`, confirma o mesmo pedido por código e então escreve os campos `pedido_*`. `pedido_produtos` usa `descricao`; quantidades e valores unitários são listas posicionais separadas por vírgula; `pedido_valor` é a soma de `itens[].total`. Somente status efetivo 2, Concluído, validado pela API e sem cancelamento conta como venda e atualiza `ultima_compra`. Pagamento 0 grava `pedido_forma_pagamento=CANCELADO` e força status efetivo 3 na Weni/BI; `Pedidos_FarmaLider` mantém o status e o pagamento brutos da API. Status -1, Pendente pagamento, fica fora das vendas e permanece em rechecagem até Concluído ou Cancelado.
 
 ## Auditoria, idempotência e checkpoint
 

@@ -93,8 +93,8 @@ Se o GET por CPF não puder ser usado, a recuperação segue a ordem `pedido_id`
 | `pedido_valor_produtos` | `itens[].valor` |
 | `pedido_valor` | soma de `itens[].total` |
 | `pedido_data` | `emissao` |
-| `pedido_status` | `status` |
-| `pedido_forma_pagamento` | `formaPagamento` |
+| `pedido_status` | status efetivo de `status`; cancelamento explícito ou pagamento 0 força 3 |
+| `pedido_forma_pagamento` | `formaPagamento`; pagamento 0 grava o texto `CANCELADO` |
 
 Produtos, quantidades e valores unitários são serializados como listas separadas por vírgula, preservando a mesma ordem posicional.
 
@@ -109,35 +109,38 @@ Assim, o Looker Studio consegue exibir produto e frete separadamente e, ao mesmo
 
 ## Status do pedido
 
-De-para da documentação oficial da integração:
+De-para usado pela integração:
 
 | Código | Identificador oficial | Rótulo |
 |---:|---|---|
+| -1 | `PendentePagamento` | Pendente pagamento |
 | 0 | `EmProcessamento` | Em processamento |
 | 1 | `EmTransito` | Em trânsito |
 | 2 | `Concluido` | Concluído |
 | 3 | `Cancelado` | Cancelado |
-| 4 | `ProntoParaRota` | Pronto para rota |
+| 4 | `ProntoParaRota` (legado, fora do enum atual) | Pronto para rota |
 
-A Weni armazena o código em `pedido_status`. O Analytics deriva o nome amigável.
+A Weni armazena o código efetivo em `pedido_status`. Cancelamento explícito ou `formaPagamento=0` força o código 3, Cancelado. O helper `effective_order_status_code(order)` aplica essa regra para Weni/BI; o Analytics deriva o nome amigável. `Pedidos_FarmaLider` preserva o status bruto retornado pela API em `farmalider_status_pedido`, inclusive quando ele difere do status efetivo.
 
-Para indicadores, 0, 1, 2 e 4 contam como pedido feito quando a resposta foi validada. O código 3 não entra nas métricas de venda.
+Somente status efetivo 2, Concluído, validado pela API e sem cancelamento entra nas métricas de venda e atualiza `ultima_compra`. Os estados -1, 0, 1 e o legado 4 permanecem em rechecagem até Concluído ou Cancelado e não contam como venda. O estado 3 e o pagamento 0 ficam fora das vendas e encerram a rechecagem.
 
 ## Forma de pagamento
 
-De-para da documentação oficial da integração:
+De-para confirmado para a integração:
 
 | Código | Forma |
 |---:|---|
+| 0 | CANCELADO (regra de negócio) |
 | 1 | Dinheiro |
 | 2 | Débito |
 | 3 | Crédito |
 | 4 | Ticket |
-| 5 | Online/link/Pix |
+| 5 | Pix por Link de Pagamento |
+| 6 | PIX no POS |
 
-A Weni armazena o código em `pedido_forma_pagamento`. O Analytics mantém também `farmalider_forma_pagamento_nome` e disponibiliza a descrição amigável na camada BI.
+A Weni armazena o código em `pedido_forma_pagamento`, exceto `formaPagamento=0`, que grava o texto literal `CANCELADO` e força `pedido_status=3`. `Pedidos_FarmaLider` preserva o código bruto em `farmalider_forma_pagamento`, inclusive 0. O Analytics mantém também `farmalider_forma_pagamento_nome` e disponibiliza a descrição amigável na camada BI.
 
-O Swagger define `formaPagamento` como inteiro Int32, sem enum restrito a 1–5. Se a API retornar outro código numérico não negativo, o NexoFlow preserva o código recebido na Weni e o apresenta no Google Sheets/BI como `Não identificado (código X)`. Não há de-para documentado para 0 e 6; não se presume que sejam dinheiro, Pix ou outra forma. Texto, valores fracionários, negativos e números fora de Int32 continuam inválidos, e valores ausentes ou inválidos mantêm a descrição vazia.
+O Swagger define `formaPagamento` como inteiro Int32, sem enum. Códigos válidos sem de-para a partir de 7 são preservados na Weni e apresentados no Google Sheets/BI como `Não identificado (código X)`. Texto livre, valores fracionários, negativos e números fora de Int32 continuam inválidos; o literal operacional `CANCELADO` na Weni é aceito como resultado da regra de pagamento 0. Valores ausentes ou inválidos mantêm a descrição vazia.
 
 O helper `farmalider_payment_method_name` retorna somente os rótulos documentados. O helper de apresentação `farmalider_payment_method_display` usa esses rótulos e acrescenta a descrição explícita para códigos válidos desconhecidos, sem modificar o código recebido.
 

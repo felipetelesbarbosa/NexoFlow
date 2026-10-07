@@ -13,7 +13,8 @@ from pedido_utils import (
     business_order_datetime,
     farmalider_order_status_name,
     farmalider_payment_method_display,
-    is_order_made,
+    effective_order_status_code,
+    is_order_completed,
     parse_weni_order_list,
     weni_order_datetime_text,
 )
@@ -503,6 +504,7 @@ def normalize_contact(
         "pedido_valor",
     ):
         row[key] = normalize_value(fields.get(key))
+    row["pedido_status"] = effective_order_status_code(row) or row["pedido_status"]
     row["pedido_status_nome"] = farmalider_order_status_name(row["pedido_status"])
     row["pedido_forma_pagamento_nome"] = farmalider_payment_method_display(
         row["pedido_forma_pagamento"]
@@ -838,12 +840,16 @@ def parse_ultimo_pedido_raw(
             "valor_total_weni", "diferenca_total_weni_api",
             "farmalider_erro",
             "farmalider_status_pedido_nome",
+            "farmalider_forma_pagamento", "farmalider_forma_pagamento_nome",
         ):
             if key in payload:
                 order_row[key] = normalize_value(payload[key])
-        official_status_name = farmalider_order_status_name(order_row["farmalider_status_pedido"])
+        official_status_name = farmalider_order_status_name(effective_order_status_code(order_row))
         if official_status_name:
             order_row["farmalider_status_pedido_nome"] = official_status_name
+        order_row["farmalider_forma_pagamento_nome"] = farmalider_payment_method_display(
+            order_row["farmalider_forma_pagamento"]
+        )
         upstream_validation = normalize_value(payload.get("status_validacao")).strip()
         if upstream_validation and upstream_validation not in {"OK", "VALIDADO_WENI"}:
             order_row["status_validacao"] = upstream_validation
@@ -1193,13 +1199,13 @@ def _bi_float(value: Decimal) -> float:
 
 
 def _sales_order_is_valid(record: dict[str, str]) -> bool:
-    """Every API-confirmed non-cancelled documented state enters sales KPIs."""
+    """Only completed, API-confirmed orders enter sales KPIs."""
     confirmation = str(record.get("status_confirmacao") or "")
     if not confirmation.startswith("CONFIRMADO_API"):
         return False
     return (
         record.get("status_validacao") in ("OK", "ATENÇÃO_TOTAL_DIVERGENTE")
-        and is_order_made(record)
+        and is_order_completed(record)
         and bool(str(record.get("pedido_chave") or "").strip())
     )
 
@@ -1476,7 +1482,7 @@ def build_bi_order_rows(
         dt = business_order_datetime(order.get("data_hora"))
         contact_uuid = (order.get("contact_uuid") or "").strip()
         base = base_by_uuid.get(contact_uuid, {})
-        status_code = (order.get("farmalider_status_pedido") or "").strip()
+        status_code = effective_order_status_code(order)
         payment_code = (order.get("farmalider_forma_pagamento") or "").strip()
 
         rows.append([

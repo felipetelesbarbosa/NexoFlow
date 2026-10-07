@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 
 BUSINESS_TIMEZONE = ZoneInfo("America/Belem")
 FARMALIDER_ORDER_STATUS_NAMES = {
+    -1: "Pendente pagamento",
     0: "Em processamento",
     1: "Em trânsito",
     2: "Concluído",
@@ -20,11 +21,13 @@ FARMALIDER_ORDER_STATUS_NAMES = {
 }
 
 FARMALIDER_PAYMENT_METHOD_NAMES = {
+    0: "CANCELADO",
     1: "Dinheiro",
     2: "Débito",
     3: "Crédito",
     4: "Ticket",
-    5: "Online/link/Pix",
+    5: "Pix por Link de Pagamento",
+    6: "PIX no POS",
 }
 
 
@@ -65,22 +68,32 @@ def normalize_farmalider_payment_code(value: Any) -> str:
     return normalized
 
 
-def farmalider_order_status_name(value: Any) -> str:
-    """Return the documented StatusPedido label; unknown codes stay unknown."""
+def normalize_farmalider_order_status_code(value: Any) -> str:
+    """Recognize pending -1 and known order states; retain legacy state 4."""
     if isinstance(value, bool) or not isinstance(value, (int, str)):
         return ""
     text = str(value).strip()
+    if text == "-1":
+        return text
     if not text.isascii() or not text.isdigit():
         return ""
     # Bound the conversion rather than accepting arbitrarily long numeric input.
     normalized = text.lstrip("0") or "0"
     if len(normalized) != 1:
         return ""
-    return FARMALIDER_ORDER_STATUS_NAMES.get(int(normalized), "")
+    return normalized if int(normalized) in FARMALIDER_ORDER_STATUS_NAMES else ""
+
+
+def farmalider_order_status_name(value: Any) -> str:
+    """Return the documented StatusPedido label; unknown codes stay unknown."""
+    code = normalize_farmalider_order_status_code(value)
+    return FARMALIDER_ORDER_STATUS_NAMES.get(int(code), "") if code else ""
 
 
 def farmalider_payment_method_name(value: Any) -> str:
-    """Return the documented payment label; unknown codes stay unknown."""
+    """Return a known payment label, including the Weni cancellation sentinel."""
+    if isinstance(value, str) and value.strip().casefold() == "cancelado":
+        return "CANCELADO"
     if isinstance(value, bool) or not isinstance(value, (int, str)):
         return ""
     text = str(value).strip()
@@ -94,6 +107,8 @@ def farmalider_payment_method_name(value: Any) -> str:
 
 def farmalider_payment_method_display(value: Any) -> str:
     """Show an unmapped API code without inventing a payment method."""
+    if isinstance(value, str) and value.strip().casefold() == "cancelado":
+        return "CANCELADO"
     code = normalize_farmalider_payment_code(value)
     if not code:
         return ""
@@ -132,13 +147,28 @@ def weni_order_datetime_text(value: Any) -> str:
 
 
 def is_order_cancelled(order: dict[str, Any]) -> bool:
+    payment = order.get("farmalider_forma_pagamento", order.get("pedido_forma_pagamento"))
+    if normalize_farmalider_payment_code(payment) == "0" or (
+        isinstance(payment, str) and payment.strip().casefold() == "cancelado"
+    ):
+        return True
     cancellation = str(order.get("farmalider_cancelamento") or "").strip().casefold()
     if cancellation not in {"", "0", "false", "none", "null", "nao", "não"}:
         return True
-    status = str(order.get("farmalider_status_pedido") or "").strip().casefold()
+    raw_status = order.get("farmalider_status_pedido", order.get("pedido_status"))
+    status = str(raw_status if raw_status is not None else "").strip().casefold()
     confirmation = str(order.get("status_confirmacao") or "").strip().casefold()
-    documented_cancel = farmalider_order_status_name(order.get("farmalider_status_pedido")) == "Cancelado"
+    documented_cancel = farmalider_order_status_name(raw_status) == "Cancelado"
     return documented_cancel or "cancel" in status or confirmation == "cancelado_api"
+
+
+def effective_order_status_code(order: dict[str, Any]) -> str:
+    """Apply payment-0 cancellation without discarding the raw API status."""
+    if is_order_cancelled(order):
+        return "3"
+    return normalize_farmalider_order_status_code(
+        order.get("farmalider_status_pedido", order.get("pedido_status"))
+    )
 
 
 def is_order_completed(order: dict[str, Any]) -> bool:
