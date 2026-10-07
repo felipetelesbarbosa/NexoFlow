@@ -71,6 +71,13 @@ def main() -> int:
                 print("       Crie-os como campos Texto antes de executar o NexoFlow Weni.")
                 return 1
             print("[OK] Campos multicanal da Weni localizados.")
+            missing_order_fields = list(weni.get("missing_order_fields") or [])
+            if missing_order_fields:
+                print("[ERRO] Campos de pedido obrigatórios ausentes na Weni: " + ", ".join(missing_order_fields))
+                print("       Crie todos os campos antes de executar o NexoFlow Weni.")
+                print("       O NexoFlow não grava snapshot parcial de pedido.")
+                return 1
+            print("[OK] Campos obrigatórios de pedido localizados.")
             missing_google_ads = list(weni.get("missing_google_ads_fields") or [])
             if missing_google_ads:
                 print("[AVISO] Campos de atribuição Google Ads ausentes: " + ", ".join(missing_google_ads))
