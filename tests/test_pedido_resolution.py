@@ -93,10 +93,12 @@ def legacy_raw():
     })
 
 
-def contact(*, cpf=SYNTHETIC_CPF, raw=None):
+def contact(*, cpf=SYNTHETIC_CPF, raw=None, pedido_id=None):
     fields = {}
     if cpf is not None:
         fields["cpf"] = cpf
+    if pedido_id is not None:
+        fields["pedido_id"] = pedido_id
     if raw is not None:
         fields["ultimo_pedido"] = raw
     return {"uuid": "synthetic-contact", "fields": fields}
@@ -150,6 +152,56 @@ class PedidoResolutionTests(unittest.TestCase):
         self.assertEqual(order["origem_pedido"], "FARMALIDER_CLIENTE_CPF")
         self.assertEqual(order["status_validacao"], "OK")
         self.assertEqual(items[0]["produto_nome"], "Produto sintético")
+
+    def test_pedido_id_locator_is_used_when_cpf_get_fails(self):
+        api = client()
+        api.get_cliente_by_cpf.side_effect = FarmaliderError("offline")
+        order, items = resolve_contact_order(
+            contact(pedido_id="123", raw=legacy_raw()),
+            farm_client=api,
+            captured_at=CAPTURED_AT,
+        )
+        self.assertEqual(order["pedido_id"], "123")
+        self.assertEqual(order["origem_pedido"], "FARMALIDER_PEDIDO_ID_WENI")
+        self.assertEqual(items[0]["produto_nome"], "Produto sintético")
+        api.get_pedido.assert_called_once_with("123")
+
+    def test_ultimo_pedido_is_last_locator_when_pedido_id_is_missing(self):
+        api = client()
+        api.get_cliente_by_cpf.side_effect = FarmaliderError("offline")
+        fallback = pedido_payload()
+        fallback["capa"]["id"] = 777
+        fallback["itens"][0]["codPedido"] = 777
+        api.get_pedido.return_value = fallback
+        order, items = resolve_contact_order(
+            contact(raw=legacy_raw()),
+            farm_client=api,
+            captured_at=CAPTURED_AT,
+        )
+        self.assertEqual(order["pedido_id"], "777")
+        self.assertEqual(order["origem_pedido"], "FARMALIDER_ULTIMO_PEDIDO_LOCATOR")
+        self.assertEqual(items[0]["produto_nome"], "Produto sintético")
+        api.get_pedido.assert_called_once_with("777")
+
+    def test_pedido_id_has_precedence_over_ultimo_pedido_locator(self):
+        api = client()
+        api.get_cliente_by_cpf.side_effect = FarmaliderError("offline")
+        order, _ = resolve_contact_order(
+            contact(pedido_id="123", raw=legacy_raw()),
+            farm_client=api,
+            captured_at=CAPTURED_AT,
+        )
+        self.assertEqual(order["pedido_id"], "123")
+        api.get_pedido.assert_called_once_with("123")
+
+    def test_ultimo_pedido_is_not_used_as_order_data_without_api(self):
+        order, items = resolve_contact_order(
+            contact(raw=legacy_raw()),
+            farm_client=None,
+            captured_at=CAPTURED_AT,
+        )
+        self.assertIsNone(order)
+        self.assertEqual(items, [])
 
     def test_pedido_get_is_preferred_over_cliente_snapshot(self):
         cliente = cliente_payload()
@@ -210,6 +262,7 @@ class PedidoResolutionTests(unittest.TestCase):
         self.assertEqual(order["valor_total_compra"], "58.90")
         self.assertEqual(order["valor_total_api_itens"], "58.90")
         self.assertEqual(order["farmalider_frete"], "20.00")
+        self.assertEqual(order["valor_total_faturamento"], "78.90")
         self.assertEqual(order["valor_origem"], "SOMA_ITENS_API")
         self.assertEqual(len(items), 2)
 
@@ -222,6 +275,7 @@ class PedidoResolutionTests(unittest.TestCase):
             captured_at=CAPTURED_AT,
         )
         self.assertEqual(order["valor_total_compra"], "38.90")
+        self.assertEqual(order["valor_total_faturamento"], "48.89")
         self.assertEqual(order["total_api"], "999.00")
 
     def test_fractional_quantities_remain_exact(self):
