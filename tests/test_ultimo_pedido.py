@@ -260,7 +260,8 @@ class UltimoPedidoTests(unittest.TestCase):
         order, items = parse_ultimo_pedido(contact, "2026-10-03T04:00:00Z")
         self.assertEqual(order["status_validacao"], "OK")
         self.assertEqual(order["valor_total_itens"], "19.00")
-        self.assertEqual(order["valor_total_compra"], "28.99")
+        self.assertEqual(order["valor_total_compra"], "19.00")
+        self.assertEqual(order["valor_total_faturamento"], "28.99")
         self.assertEqual(order["diferenca_total"], "0.00")
         self.assertEqual(items[0]["valor_total"], "19.00")
 
