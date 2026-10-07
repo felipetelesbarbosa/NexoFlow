@@ -94,6 +94,7 @@ class FarmaliderIntegrationTests(unittest.TestCase):
             "itens": [{
                 "codPedido": 123456,
                 "codProduto": 9999,
+                "descricao": "Produto oficial",
                 "quantidade": 2,
                 "valor": 55.40,
                 "total": 110.80,
@@ -113,6 +114,9 @@ class FarmaliderIntegrationTests(unittest.TestCase):
         self.assertEqual(order["data_hora"], "2026-09-30T13:08:00-03:00")
         self.assertEqual(order["valor_total_api_itens"], "110.80")
         self.assertEqual(order["quantidade_itens_api"], "2")
+        self.assertEqual(order["farmalider_forma_pagamento"], "1")
+        self.assertEqual(order["farmalider_forma_pagamento_nome"], "Dinheiro")
+        self.assertEqual(items[0]["produto_nome"], "Produto oficial")
 
     def test_cancelled_order_is_not_counted_in_sales_metric(self):
         order = {

@@ -520,6 +520,9 @@ def resolve_contact_order(
             and confirmed_items
         ):
             return confirmed_order, confirmed_items
+        # A concrete but inconsistent /pedido response is a hard validation
+        # failure. Fallback is reserved for transport/not-found scenarios.
+        return confirmed_order, confirmed_items
 
     return fallback_order, fallback_items
 
