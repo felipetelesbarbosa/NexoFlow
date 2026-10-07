@@ -40,8 +40,12 @@ from farmalider_integration import resolve_contact_order
 from pedido_utils import (
     business_order_datetime,
     farmalider_order_status_name,
+    farmalider_payment_method_name,
     is_order_cancelled,
     is_order_made,
+    normalize_farmalider_payment_code,
+    parse_weni_order_list,
+    serialize_weni_order_list,
     weni_order_datetime_text,
 )
 from weni_client import WeniClient
@@ -739,6 +743,15 @@ def _apply_purchase_candidate(
     proposed_date = weni_order_datetime_text(proposed_dt)
     status_code = str(order.get("farmalider_status_pedido") or "").strip()
     payment_code = str(order.get("farmalider_forma_pagamento") or "").strip()
+    normalized_payment = normalize_farmalider_payment_code(payment_code)
+    if normalized_payment:
+        payment_code = normalized_payment
+        if not farmalider_payment_method_name(payment_code):
+            logging.warning(
+                "FarmaLíder: formaPagamento=%s sem de-para documentado; "
+                "código original mantido, sem atribuir uma forma de pagamento.",
+                payment_code,
+            )
     if not farmalider_order_status_name(status_code):
         return False
 
@@ -751,9 +764,9 @@ def _apply_purchase_candidate(
         "pedido_id": pedido_id,
         "pedido_data": proposed_date,
         "pedido_status": status_code,
-        "pedido_produtos": ", ".join(names),
-        "pedido_quantidade_itens": ", ".join(quantities),
-        "pedido_valor_produtos": ", ".join(unit_values),
+        "pedido_produtos": serialize_weni_order_list(names),
+        "pedido_quantidade_itens": serialize_weni_order_list(quantities),
+        "pedido_valor_produtos": serialize_weni_order_list(unit_values),
         "pedido_valor": order_value,
     }
     if payment_code:
@@ -970,7 +983,8 @@ def audit_plans(
 
         if "pedido_forma_pagamento" in plan.fields:
             payment = str(plan.fields["pedido_forma_pagamento"]).strip()
-            if payment not in {"1", "2", "3", "4", "5"}:
+            normalized_payment = normalize_farmalider_payment_code(payment)
+            if not normalized_payment or normalized_payment != payment:
                 errors.append(
                     f"{plan.contact_uuid}: código inválido em pedido_forma_pagamento"
                 )
@@ -1016,23 +1030,31 @@ def audit_plans(
             if number is None or number < 0:
                 errors.append(f"{plan.contact_uuid}: número inválido em pedido_valor")
 
+        aligned_fields = (
+            "pedido_produtos", "pedido_quantidade_itens", "pedido_valor_produtos",
+        )
+        effective_fields = {**plan.guards, **plan.fields}
+        parsed_lists: dict[str, list[str]] = {}
+        if set(plan.fields) & set(aligned_fields):
+            for list_field in aligned_fields:
+                if list_field not in effective_fields or effective_fields[list_field] is None:
+                    continue
+                try:
+                    parsed_lists[list_field] = parse_weni_order_list(
+                        normalize_value(effective_fields[list_field])
+                    )
+                except ValueError:
+                    errors.append(f"{plan.contact_uuid}: CSV inválido em {list_field}")
+
         if "pedido_produtos" in plan.fields:
-            products = [
-                value.strip()
-                for value in str(plan.fields["pedido_produtos"]).split(",")
-                if value.strip()
-            ]
-            if not products:
+            products = parsed_lists.get("pedido_produtos", [])
+            if not products or not all(products):
                 errors.append(f"{plan.contact_uuid}: lista vazia em pedido_produtos")
 
         for list_field in ("pedido_quantidade_itens", "pedido_valor_produtos"):
             if list_field not in plan.fields:
                 continue
-            values = [
-                value.strip()
-                for value in str(plan.fields[list_field]).split(",")
-                if value.strip()
-            ]
+            values = parsed_lists.get(list_field, [])
             if not values:
                 errors.append(f"{plan.contact_uuid}: lista vazia em {list_field}")
                 continue
@@ -1046,30 +1068,14 @@ def audit_plans(
                     )
                     break
 
-        aligned_fields = (
-            "pedido_produtos",
-            "pedido_quantidade_itens",
-            "pedido_valor_produtos",
-        )
-        if all(field in plan.fields for field in aligned_fields):
-            product_count = len([
-                value.strip()
-                for value in str(plan.fields["pedido_produtos"]).split(",")
-                if value.strip()
-            ])
-            quantity_count = len([
-                value.strip()
-                for value in str(plan.fields["pedido_quantidade_itens"]).split(",")
-                if value.strip()
-            ])
-            value_count = len([
-                value.strip()
-                for value in str(plan.fields["pedido_valor_produtos"]).split(",")
-                if value.strip()
-            ])
+        if all(field in parsed_lists for field in aligned_fields):
+            product_count = len(parsed_lists["pedido_produtos"])
+            quantity_count = len(parsed_lists["pedido_quantidade_itens"])
+            value_count = len(parsed_lists["pedido_valor_produtos"])
             if len({product_count, quantity_count, value_count}) != 1:
                 errors.append(
-                    f"{plan.contact_uuid}: listas de produto/quantidade/valor desalinhadas"
+                    f"{plan.contact_uuid}: listas de produto/quantidade/valor desalinhadas "
+                    f"(produtos={product_count}; quantidades={quantity_count}; valores={value_count})"
                 )
 
         for action in plan.group_actions:

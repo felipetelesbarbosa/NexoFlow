@@ -137,6 +137,21 @@ De-para da documentação oficial da integração:
 
 A Weni armazena o código em `pedido_forma_pagamento`. O Analytics mantém também `farmalider_forma_pagamento_nome` e disponibiliza a descrição amigável na camada BI.
 
+O Swagger define `formaPagamento` como inteiro Int32, sem enum restrito a 1–5. Se a API retornar outro código numérico não negativo, o NexoFlow preserva o código recebido e registra um aviso. A descrição permanece sem mapeamento até confirmação na documentação; não se presume que 0, por exemplo, seja dinheiro ou Pix. Texto, valores fracionários, negativos e números fora de Int32 continuam inválidos.
+
+## Listas de itens na Weni
+
+Os campos `pedido_produtos`, `pedido_quantidade_itens` e `pedido_valor_produtos` mantêm a mesma ordem dos itens e usam listas CSV separadas por vírgula. Nomes contendo vírgula são delimitados por aspas; aspas internas são duplicadas. Exemplo de dois produtos:
+
+```text
+pedido_produtos: "Produto 0,5 MG", Produto B
+pedido_quantidade_itens: 2, 1
+pedido_valor_produtos: 10, 5.5
+pedido_valor: 25.5
+```
+
+A vírgula em `0,5 MG` faz parte do nome. Weni e Analytics usam o mesmo parser CSV para não transformá-la em outro item. Listas simples anteriores continuam compatíveis. Snapshots legados ambíguos não são reconstruídos por adivinhação; uma nova consulta validada à API pode regravá-los no formato correto. A auditoria mantém o bloqueio de desalinhamento real, inclusive quando apenas uma das listas muda.
+
 ## Data
 
 Timestamps sem offset retornados pela API são interpretados em

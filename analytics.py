@@ -14,6 +14,7 @@ from pedido_utils import (
     farmalider_order_status_name,
     farmalider_payment_method_name,
     is_order_made,
+    parse_weni_order_list,
     weni_order_datetime_text,
 )
 
@@ -916,7 +917,7 @@ def _split_weni_order_list(value: Any) -> list[str]:
     raw = normalize_value(value).strip()
     if not raw:
         return []
-    return [part.strip() for part in raw.split(",") if part.strip()]
+    return parse_weni_order_list(raw)
 
 
 def _derived_order_payload(fields: dict[str, Any]) -> dict[str, Any] | None:
@@ -960,12 +961,16 @@ def _derived_order_payload(fields: dict[str, Any]) -> dict[str, Any] | None:
                 payload["produtos"] = None
             return payload
 
-    product_names = _split_weni_order_list(raw_products)
-    quantities = _split_weni_order_list(fields.get("pedido_quantidade_itens"))
-    unit_values = _split_weni_order_list(fields.get("pedido_valor_produtos"))
+    try:
+        product_names = _split_weni_order_list(raw_products)
+        quantities = _split_weni_order_list(fields.get("pedido_quantidade_itens"))
+        unit_values = _split_weni_order_list(fields.get("pedido_valor_produtos"))
+    except ValueError:
+        # Keep order-level data without inventing item relationships from bad CSV.
+        product_names, quantities, unit_values = [], [], []
 
     product_rows: list[dict[str, Any]] | None = None
-    if product_names and len(product_names) == len(quantities) == len(unit_values):
+    if product_names and all(product_names) and len(product_names) == len(quantities) == len(unit_values):
         rows: list[dict[str, Any]] = []
         try:
             for name, qty_raw, unit_raw in zip(product_names, quantities, unit_values):

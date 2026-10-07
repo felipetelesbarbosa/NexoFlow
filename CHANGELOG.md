@@ -2,6 +2,14 @@
 
 ## NexoFlow 1.0
 
+### Auditoria dos campos de pedido
+
+- listas separadas por vírgula usam aspas CSV quando o nome contém vírgula, aspas ou quebra de linha, preservando o nome completo e a correspondência com quantidade e valor;
+- Weni e Analytics compartilham a mesma leitura das listas, incluindo nomes como `Produto 0,5 MG`;
+- auditoria verifica também atualizações parciais das listas e informa as contagens sem expor produtos;
+- códigos numéricos de pagamento não documentados são preservados como Int32, com aviso e sem inventar o de-para;
+- listas realmente desalinhadas, CSV malformado, elementos vazios e códigos inválidos continuam bloqueados antes de qualquer gravação.
+
 ### Recuperação e diagnóstico da FarmaLíder
 
 - pausas globais de 5, 10 e 20 segundos após falhas 5xx, inclusive proteção após a última tentativa;

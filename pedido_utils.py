@@ -1,6 +1,8 @@
 """Shared order semantics, independent of API clients and analytics schemas."""
 from __future__ import annotations
 
+import csv
+import io
 import json
 import unicodedata
 from datetime import datetime
@@ -24,6 +26,43 @@ FARMALIDER_PAYMENT_METHOD_NAMES = {
     4: "Ticket",
     5: "Online/link/Pix",
 }
+
+
+def serialize_weni_order_list(values: list[str]) -> str:
+    """Keep comma-separated fields reversible, including punctuation in names."""
+    return ", ".join(
+        '"' + value.replace('"', '""') + '"'
+        if any(char in value for char in ',"\r\n') else value
+        for value in values
+    )
+
+
+def parse_weni_order_list(value: str) -> list[str]:
+    """Read one CSV record; empty elements remain visible to the auditor."""
+    if not value.strip():
+        return []
+    try:
+        records = list(csv.reader(
+            io.StringIO(value, newline=""), skipinitialspace=True, strict=True,
+        ))
+    except csv.Error as exc:
+        raise ValueError("Lista de pedido com CSV inválido.") from exc
+    if len(records) != 1:
+        raise ValueError("Lista de pedido deve conter um único registro CSV.")
+    return [part.strip() for part in records[0]]
+
+
+def normalize_farmalider_payment_code(value: Any) -> str:
+    """Preserve a nonnegative Int32 from the API even without a documented label."""
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        return ""
+    text = str(value).strip()
+    if not text.isascii() or not text.isdigit():
+        return ""
+    normalized = text.lstrip("0") or "0"
+    if len(normalized) > 10 or int(normalized) > 2147483647:
+        return ""
+    return normalized
 
 
 def farmalider_order_status_name(value: Any) -> str:

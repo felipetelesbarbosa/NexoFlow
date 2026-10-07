@@ -7,6 +7,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from analytics import parse_ultimo_pedido
+from pedido_utils import parse_weni_order_list
+
 from weni_update import (
     ContactUpdatePlan,
     GroupAction,
@@ -204,7 +207,9 @@ class WeniUpdateTests(unittest.TestCase):
             {"pedido_produtos": ""},
             {"pedido_valor_produtos": "10, inválido"},
             {"pedido_status": "Finalizado"},
-            {"pedido_forma_pagamento": "9"},
+            {"pedido_forma_pagamento": "Pix"},
+            {"pedido_forma_pagamento": "-1"},
+            {"pedido_forma_pagamento": "2147483648"},
         )
         for fields in malformed_fields:
             with self.subTest(fields=fields):
@@ -624,6 +629,74 @@ class WeniUpdateTests(unittest.TestCase):
                     plan.fields["pedido_forma_pagamento"], str(payment)
                 )
 
+    def test_product_commas_and_quotes_round_trip_into_analytics(self) -> None:
+        contact = self._purchase_contact(include_raw=False)
+        farm = self._purchase_api()
+        names = ['Produto 0,5 MG', 'Produto "Especial", 30 CPR']
+        for payload in (farm.get_cliente_by_cpf.return_value, farm.get_pedido.return_value):
+            for item, name in zip(payload["itens"], names):
+                item["descricao"] = name
+        plan = self._purchase_plan(contact, farm)
+        audit_plans([plan], opt_out_group_available=True)
+        self.assertEqual(parse_weni_order_list(plan.fields["pedido_produtos"]), names)
+        applied = deepcopy(contact)
+        applied["fields"].update(plan.fields)
+        order, items = parse_ultimo_pedido(applied, "2026-10-03T13:00:00Z")
+        self.assertEqual([item["produto_nome"] for item in items], names)
+        self.assertEqual([item["quantidade"] for item in items], ["2", "1"])
+        self.assertEqual([item["valor_unitario"] for item in items], ["10.00", "5.50"])
+        self.assertEqual(order["valor_total_compra"], "25.50")
+        self.assertEqual(self._purchase_plan(applied, farm).fields, {})
+
+    def test_undocumented_numeric_payment_does_not_block_valid_order(self) -> None:
+        for payment in (0, 6, 9):
+            with self.subTest(payment=payment):
+                contact = self._purchase_contact(include_raw=False)
+                farm = self._purchase_api()
+                farm.get_pedido.return_value["capa"]["formaPagamento"] = payment
+                with patch("weni_update.logging.warning") as warning:
+                    plan = self._purchase_plan(contact, farm)
+                warning.assert_called_once()
+                self.assertEqual(warning.call_args.args[1], str(payment))
+                self.assertEqual(plan.fields["pedido_forma_pagamento"], str(payment))
+                audit_plans([plan], opt_out_group_available=True)
+                self.assertEqual(plan.fields["pedido_valor"], 25.5)
+
+    def test_audit_rejects_misalignment_when_only_one_list_changes(self) -> None:
+        plan = ContactUpdatePlan(
+            contact_uuid="u-order", order_validated=True,
+            fields={"pedido_quantidade_itens": "1"},
+            guards={"pedido_produtos": "A, B", "pedido_valor_produtos": "10, 20"},
+        )
+        with self.assertRaisesRegex(PlanAuditError, "produtos=2; quantidades=1; valores=2"):
+            audit_plans([plan], opt_out_group_available=True)
+
+    def test_audit_reads_wrapped_unchanged_fields_when_one_list_changes(self) -> None:
+        plan = ContactUpdatePlan(
+            contact_uuid="u-order", order_validated=True,
+            fields={"pedido_quantidade_itens": "2, 1"},
+            guards={
+                "pedido_produtos": {"value": '"Produto 0,5 MG", B'},
+                "pedido_valor_produtos": {"value": "10, 20"},
+            },
+        )
+        audit_plans([plan], opt_out_group_available=True)
+
+    def test_audit_rejects_malformed_csv_and_empty_item_slots(self) -> None:
+        for products, quantities, values in (
+            ('"Produto 0,5 MG', "1", "10"),
+            ("A, , B", "1, 1, 1", "10, 20, 30"),
+            ("A, B", "1, ", "10, 20"),
+            ("A, B", "1, 1", "10, "),
+        ):
+            with self.subTest(products=products, quantities=quantities, values=values):
+                plan = ContactUpdatePlan(
+                    contact_uuid="u-order", order_validated=True,
+                    fields={"pedido_produtos": products, "pedido_quantidade_itens": quantities, "pedido_valor_produtos": values},
+                )
+                with self.assertRaises(PlanAuditError):
+                    audit_plans([plan], opt_out_group_available=True)
+
     def test_cancelled_order_updates_snapshot_without_latest_purchase(self) -> None:
         contact = self._purchase_contact(include_raw=False)
         contact["fields"]["ultima_compra"] = "2026-10-01T10:00:00-03:00"
@@ -701,7 +774,8 @@ class WeniUpdateTests(unittest.TestCase):
     def test_audit_rejects_invalid_status_and_payment_codes(self) -> None:
         for fields in (
             {"pedido_status": "9"},
-            {"pedido_forma_pagamento": "0"},
+            {"pedido_forma_pagamento": "1.5"},
+            {"pedido_forma_pagamento": "NaN"},
         ):
             with self.subTest(fields=fields):
                 plan = ContactUpdatePlan(

@@ -233,15 +233,17 @@ Os oito campos `pedido_*` abaixo são obrigatórios na Weni. Se qualquer um esti
 | Campo Weni | Origem FarmaLíder | Formato |
 |---|---|---|
 | `pedido_id` | `ultimoPedido.id` / `capa.id` | código do pedido |
-| `pedido_produtos` | `itens[].descricao` | nomes separados por vírgula |
+| `pedido_produtos` | `itens[].descricao` | nomes em lista CSV; aspas preservam vírgulas no nome |
 | `pedido_quantidade_itens` | `itens[].quantidade` | quantidades na mesma ordem, separadas por vírgula |
 | `pedido_valor_produtos` | `itens[].valor` | valores unitários na mesma ordem, separados por vírgula |
 | `pedido_valor` | soma de `itens[].total` | valor total dos itens do pedido |
 | `pedido_data` | `emissao` | `DD/MM/YY HH:MM:SS` |
 | `pedido_status` | `status` | código oficial 0 a 4 |
-| `pedido_forma_pagamento` | `formaPagamento` | código oficial 1 a 5 |
+| `pedido_forma_pagamento` | `formaPagamento` | código Int32 recebido; de-para documentado de 1 a 5 |
 
 `codProduto` não é usado como nome do produto. O nome exibido vem exclusivamente de `descricao`. O código do produto pode continuar armazenado internamente para auditoria, sem alimentar `pedido_produtos`.
+
+Nomes como `Produto 0,5 MG` são escritos entre aspas na lista: `"Produto 0,5 MG", Produto B`. A Weni e o Analytics interpretam isso como dois produtos, preservando a ordem das quantidades e dos valores. A auditoria informa as contagens e continua bloqueando desalinhamentos reais, inclusive em alterações parciais.
 
 Exemplo de um pedido com dois itens:
 
@@ -279,6 +281,8 @@ As três listas de item são posicionais: o primeiro produto corresponde à prim
 | 5 | Online/link/Pix |
 
 A Weni guarda os códigos oficiais. O Analytics cria os rótulos amigáveis para o Google Sheets e o Looker Studio.
+
+O Swagger define `formaPagamento` como Int32 sem enum. Códigos numéricos não negativos fora do de-para são preservados com aviso e descrição sem mapeamento, sem impedir a atualização dos demais campos válidos. Não se inventa uma forma de pagamento para 0 ou outro código desconhecido.
 
 ### Frete e faturamento
 
