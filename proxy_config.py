@@ -361,3 +361,68 @@ def configure_proxy() -> ProxyStatus:
             "conexão direta forçada"
         ),
     )
+
+
+@dataclass(frozen=True)
+class NetworkRouteRefresh:
+    status: ProxyStatus
+    changed: bool
+    previous_active: bool | None
+    current_active: bool
+
+    @property
+    def transition(self) -> str:
+        before = (
+            "proxy" if self.previous_active is True
+            else "direta" if self.previous_active is False
+            else "desconhecida"
+        )
+        after = "proxy" if self.current_active else "direta"
+        return f"{before} -> {after}"
+
+
+def _proxy_active_from_env() -> bool | None:
+    value = os.getenv("WENI_PROXY_ACTIVE", "").strip()
+    if value == "1":
+        return True
+    if value == "0":
+        return False
+    return None
+
+
+def refresh_network_route(*, reason: str = "falha de rede") -> NetworkRouteRefresh:
+    """
+    Redetecta a rota durante uma execução já em andamento.
+
+    É acionada após uma falha de rede recuperável. Assim uma carga longa pode
+    migrar direta <-> proxy sem reiniciar o processo.
+    """
+    with _ROUTE_REFRESH_LOCK:
+        previous_active = _proxy_active_from_env()
+        status = configure_proxy()
+        current_active = bool(status.active)
+        changed = (
+            previous_active is not None
+            and previous_active != current_active
+        )
+
+        if changed:
+            logging.warning(
+                "NexoFlow detectou mudança de rede durante a execução (%s): %s. "
+                "A operação atual será repetida na nova rota.",
+                reason,
+                "direta -> proxy" if current_active else "proxy -> direta",
+            )
+        else:
+            logging.info(
+                "NexoFlow revalidou a rota após %s; mantendo conexão %s.",
+                reason,
+                "via proxy" if current_active else "direta",
+            )
+
+        return NetworkRouteRefresh(
+            status=status,
+            changed=changed,
+            previous_active=previous_active,
+            current_active=current_active,
+        )
