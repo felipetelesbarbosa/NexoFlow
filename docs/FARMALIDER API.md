@@ -81,6 +81,8 @@ itens -> produtos do pedido
 
 Se o GET por pedido falhar temporariamente e o GET por CPF trouxe `ultimoPedido + itens` válidos, o NexoFlow pode usar esse primeiro retorno como fallback completo.
 
+Se o GET por CPF não puder ser usado, a recuperação segue a ordem `pedido_id` da Weni e, por último, o ID extraído de `ultimo_pedido`. Esses campos servem apenas como **localizadores**. O conteúdo oficial do pedido ainda precisa vir de `GET /api/Delivery/pedido/{codigo}`.
+
 ## Mapeamento para Weni
 
 | Campo Weni | Campo API |
@@ -96,7 +98,14 @@ Se o GET por pedido falhar temporariamente e o GET por CPF trouxe `ultimoPedido 
 
 Produtos, quantidades e valores unitários são serializados como listas separadas por vírgula, preservando a mesma ordem posicional.
 
-`pedido_valor` representa a soma dos totais dos itens. O frete continua separado nos dados técnicos e não é somado ao campo Weni.
+`pedido_valor` representa a soma dos totais dos itens. O frete continua separado e não é somado ao campo Weni.
+
+No Google Sheets o pedido mantém:
+- `valor_total_compra`: total dos produtos;
+- `farmalider_frete`: frete retornado pela API;
+- `valor_total_faturamento`: produtos + frete.
+
+Assim, o Looker Studio consegue exibir produto e frete separadamente e, ao mesmo tempo, usar o total faturado correto.
 
 ## Status do pedido
 
@@ -140,6 +149,18 @@ Weni: 05/06/26 15:45:27
 ```
 
 Internamente, o NexoFlow preserva data/hora canônica para agregações e filtros.
+
+## Recuperação por campos Weni
+
+Quando o endpoint por CPF estiver temporariamente indisponível, o NexoFlow tenta:
+
+```text
+1. pedido_id
+2. ultimo_pedido -> extrair somente o ID
+3. GET pedido/{id}
+```
+
+`ultimo_pedido` pode ser alimentado por outra integração e por isso é útil para recuperar um pedido ocorrido enquanto o NexoFlow estava fora do ar. Ele nunca substitui a FarmaLíder API como fonte dos detalhes. Se `GET pedido/{id}` também estiver indisponível, os campos `pedido_*` não são sobrescritos.
 
 ## Limitação de histórico
 
