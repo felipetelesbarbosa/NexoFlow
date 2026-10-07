@@ -1018,11 +1018,23 @@ def audit_plans(
 
         if "pedido_forma_pagamento" in plan.fields:
             payment = str(plan.fields["pedido_forma_pagamento"]).strip()
-            normalized_payment = normalize_farmalider_payment_code(payment)
-            if not normalized_payment or normalized_payment != payment:
-                errors.append(
-                    f"{plan.contact_uuid}: código inválido em pedido_forma_pagamento"
-                )
+            if payment.casefold() == "cancelado":
+                effective_status = str(
+                    plan.fields.get(
+                        "pedido_status",
+                        plan.guards.get("pedido_status", ""),
+                    )
+                ).strip()
+                if effective_status != "3":
+                    errors.append(
+                        f"{plan.contact_uuid}: pagamento CANCELADO exige pedido_status=3"
+                    )
+            else:
+                normalized_payment = normalize_farmalider_payment_code(payment)
+                if not normalized_payment or normalized_payment != payment:
+                    errors.append(
+                        f"{plan.contact_uuid}: código inválido em pedido_forma_pagamento"
+                    )
 
         if "contact_canal_principal" in plan.fields:
             channel = str(plan.fields["contact_canal_principal"]).strip().casefold()
