@@ -622,6 +622,14 @@ Proteções principais:
 
 ## Operação recomendada
 
+### Carga completa fragmentada em 25%
+
+Para reduzir o tempo e o risco operacional de uma carga integral longa, `atualizar_weni_carga_completa.bat` e `executar_carga_completa.bat` permitem escolher **100%** ou uma das quatro partes de **25%**.
+
+As partes 1/4 a 4/4 usam um manifesto compartilhado em `logs\full_load_25_manifest.json`. A base é congelada na primeira parte, ordenada por UUID e dividida por limites inteiros determinísticos. Assim, as quatro partes cobrem a base uma única vez, sem sobreposição. Novos contatos após o corte não entram no meio da campanha e permanecem elegíveis para a incremental posterior.
+
+Cada componente mantém sua própria sequência de conclusão: Weni 1→2→3→4 e Analytics 1→2→3→4. Se uma parte falhar, ela não é marcada como concluída e pode ser executada novamente. No Analytics, o BI intermediário reflete a base acumulada até aquele ponto; a visão final equivalente à carga integral ocorre após a Parte 4.
+
 ### Primeira carga ou revalidação após atualização
 
 ```text
