@@ -151,8 +151,10 @@ opt_in_lgpd
 pedido_id
 pedido_data
 pedido_status
+pedido_forma_pagamento
 pedido_produtos
 pedido_quantidade_itens
+pedido_valor_produtos
 pedido_valor
 ultima_compra
 ```
@@ -187,7 +189,7 @@ Qualquer tentativa de escrever fora da allowlist bloqueia a execução antes do 
 
 ### Campos preservados
 
-`ultimo_pedido` é tratado como fonte estruturada e não é reescrito pelo NexoFlow Weni.
+`ultimo_pedido` continua preservado por compatibilidade, mas não é mais a fonte prioritária do pedido quando a FarmaLíder API está disponível.
 
 `opt_in_lgpd_status` permanece sob controle dos flows/agentes da Weni.
 
@@ -206,29 +208,51 @@ O NexoFlow usa interpretação conservadora:
 
 ## Pedidos e FarmaLíder API
 
-O NexoFlow usa dois caminhos controlados.
+A **FarmaLíder API é a fonte de verdade dos pedidos**. Os campos de pedido da Weni funcionam como destino/cache operacional e são atualizados pela rotina auditada.
 
-### Caminho 1 — `ultimo_pedido`
-
-Quando `ultimo_pedido` está preenchido e possui ID válido:
-
-1. o JSON da Weni fornece ID, data, produtos, quantidades e valores;
-2. o NexoFlow consulta **somente o mesmo `pedido_id`** na FarmaLíder API;
-3. a API confirma o status atual;
-4. os campos `pedido_*` são preservados/atualizados com o mesmo pedido.
-
-### Caminho 2 — CPF
-
-Somente quando `ultimo_pedido` estiver ausente, vazio ou `null`:
+Fluxo principal:
 
 ```text
 CPF
--> GET cliente/cpf/{cpf}
--> ultimoPedido.id
--> GET pedido/{codigo}
+-> GET /api/Delivery/cliente/cpf/{cpf}
+-> valida cliente e obtém ultimoPedido + itens
+-> GET /api/Delivery/pedido/{pedido_id}
+-> confirma o snapshot mais atual do mesmo pedido
+-> atualiza Weni
+-> alimenta Google Sheets / Looker Studio
 ```
 
-O NexoFlow valida vínculo do titular, CPF e identificador antes de considerar o pedido confirmado.
+O retorno de `cliente/cpf` já contém `ultimoPedido` e `itens`, portanto pode servir como fallback completo quando a segunda consulta sofre falha transitória. O endpoint de pedido é preferido como snapshot final.
+
+### Contrato dos campos Weni
+
+| Campo Weni | Origem FarmaLíder | Formato |
+|---|---|---|
+| `pedido_id` | `ultimoPedido.id` / `capa.id` | código do pedido |
+| `pedido_produtos` | `itens[].descricao` | nomes separados por vírgula |
+| `pedido_quantidade_itens` | `itens[].quantidade` | quantidades na mesma ordem, separadas por vírgula |
+| `pedido_valor_produtos` | `itens[].valor` | valores unitários na mesma ordem, separados por vírgula |
+| `pedido_valor` | soma de `itens[].total` | valor total dos itens do pedido |
+| `pedido_data` | `emissao` | `DD/MM/YY HH:MM:SS` |
+| `pedido_status` | `status` | código oficial 0 a 4 |
+| `pedido_forma_pagamento` | `formaPagamento` | código oficial 1 a 5 |
+
+`codProduto` não é usado como nome do produto. O nome exibido vem exclusivamente de `descricao`. O código do produto pode continuar armazenado internamente para auditoria, sem alimentar `pedido_produtos`.
+
+Exemplo de um pedido com dois itens:
+
+```text
+pedido_id: 340793
+pedido_produtos: PROLOPA BD 100+25MG C/30CAP, TP PRAMIPEXOL PRATI 1MG C/30 CPR (G)
+pedido_quantidade_itens: 1, 1
+pedido_valor_produtos: 53.9, 58.9
+pedido_valor: 112.8
+pedido_data: 05/06/26 15:45:27
+pedido_status: 3
+pedido_forma_pagamento: 2
+```
+
+As três listas de item são posicionais: o primeiro produto corresponde à primeira quantidade e ao primeiro valor, o segundo produto corresponde à segunda quantidade e ao segundo valor, e assim por diante.
 
 ### Status oficiais
 
@@ -240,7 +264,19 @@ O NexoFlow valida vínculo do titular, CPF e identificador antes de considerar o
 | 3 | Cancelado |
 | 4 | Pronto para rota |
 
-Para os indicadores, **0, 1, 2 e 4** contam como pedido feito quando confirmados pela API e sem cancelamento explícito. **3 — Cancelado** fica fora.
+### Formas de pagamento
+
+| Código | Forma de pagamento |
+|---:|---|
+| 1 | Dinheiro |
+| 2 | Débito |
+| 3 | Crédito |
+| 4 | Ticket |
+| 5 | Online/link/Pix |
+
+A Weni guarda os códigos oficiais. O Analytics cria os rótulos amigáveis para o Google Sheets e o Looker Studio.
+
+Para os indicadores, **0, 1, 2 e 4** contam como pedido feito quando confirmados pela API e sem cancelamento explícito. **3, Cancelado**, fica fora.
 
 Pedidos abertos em **Em processamento**, **Em trânsito** ou **Pronto para rota** permanecem em fila de rechecagem até chegarem a **Concluído** ou **Cancelado**.
 
@@ -328,6 +364,7 @@ BI_Canais
 BI_Conversao
 BI_Vendas
 BI_Ads
+BI_Pedidos
 BI_Status
 ```
 
@@ -373,7 +410,9 @@ O dashboard pode trabalhar diretamente sobre as abas BI para priorizar Marketing
 - canais;
 - origem e atribuição de anúncios;
 - compradores do dia;
-- status dos pedidos;
+- detalhe do pedido, produtos, quantidades e valores;
+- status dos pedidos com código e descrição;
+- forma de pagamento com código e descrição;
 - saúde da sincronização.
 
 `BI_Status` é indicada para uma página técnica opcional.

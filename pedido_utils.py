@@ -17,6 +17,14 @@ FARMALIDER_ORDER_STATUS_NAMES = {
     4: "Pronto para rota",
 }
 
+FARMALIDER_PAYMENT_METHOD_NAMES = {
+    1: "Dinheiro",
+    2: "Débito",
+    3: "Crédito",
+    4: "Ticket",
+    5: "Online/link/Pix",
+}
+
 
 def farmalider_order_status_name(value: Any) -> str:
     """Return the documented StatusPedido label; unknown codes stay unknown."""
@@ -32,20 +40,48 @@ def farmalider_order_status_name(value: Any) -> str:
     return FARMALIDER_ORDER_STATUS_NAMES.get(int(normalized), "")
 
 
+def farmalider_payment_method_name(value: Any) -> str:
+    """Return the documented payment label; unknown codes stay unknown."""
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        return ""
+    text = str(value).strip()
+    if not text.isascii() or not text.isdigit():
+        return ""
+    normalized = text.lstrip("0") or "0"
+    if len(normalized) != 1:
+        return ""
+    return FARMALIDER_PAYMENT_METHOD_NAMES.get(int(normalized), "")
+
+
 def business_order_datetime(value: Any) -> datetime | None:
-    """Interpret naive order timestamps as local business time, never as UTC."""
+    """Interpret API ISO or Weni display timestamps as America/Belem time."""
     if isinstance(value, datetime):
         parsed = value
     elif isinstance(value, str) and value.strip():
-        try:
-            parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
-        except (ValueError, OverflowError):
-            return None
+        raw = value.strip()
+        parsed = None
+        for fmt in ("%d/%m/%y %H:%M:%S", "%d/%m/%Y %H:%M:%S"):
+            try:
+                parsed = datetime.strptime(raw, fmt)
+                break
+            except ValueError:
+                pass
+        if parsed is None:
+            try:
+                parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            except (ValueError, OverflowError):
+                return None
     else:
         return None
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=BUSINESS_TIMEZONE)
     return parsed.astimezone(BUSINESS_TIMEZONE)
+
+
+def weni_order_datetime_text(value: Any) -> str:
+    """Format an order timestamp for the Weni pedido_data contract."""
+    parsed = business_order_datetime(value)
+    return parsed.strftime("%d/%m/%y %H:%M:%S") if parsed is not None else ""
 
 
 def is_order_cancelled(order: dict[str, Any]) -> bool:
@@ -122,6 +158,7 @@ def serialize_pedido_products(
     metadata_fields = (
         "pedido_id", "data_hora", "status_confirmacao", "status_validacao",
         "origem_pedido", "farmalider_cancelamento", "farmalider_status_pedido", "farmalider_status_pedido_nome",
+        "farmalider_forma_pagamento", "farmalider_forma_pagamento_nome",
         "valor_origem", "valor_total_weni", "diferenca_total_weni_api",
     )
     payload = {key: "" if order.get(key) is None else str(order.get(key)) for key in metadata_fields}

@@ -32,17 +32,37 @@ https://api.farmalider.net.br:3200/farmalider
 GET /api/Delivery/cliente/cpf/{cpf}?token=...
 ```
 
-O CPF normalizado é a ponte de identidade entre os sistemas. O `contact_uuid`
-continua sendo a chave principal da Weni.
+O CPF normalizado é a ponte de identidade entre Weni e FarmaLíder. O `contact_uuid` continua sendo a chave principal do contato na Weni.
 
-Quando localizado, o projeto registra o `farmalider_cliente_id` e dados/status de
-vínculo na `Base_Contatos`.
+O retorno atual possui três blocos relevantes:
 
-Quando a resposta possui `ultimoPedido`, essa referência pode ser usada para
-consultar o último pedido específico. Na resposta oficial, `cliente` e
-`ultimoPedido` são objetos separados; o objeto legado com campos do cliente
-diretamente na resposta também é aceito para validar o vínculo. O NexoFlow
-confere o CPF do retorno e o cliente antes de aceitar essa associação.
+```text
+cliente
+ultimoPedido
+itens
+```
+
+O NexoFlow valida `cliente.cpf` e `cliente.id`, usa `ultimoPedido.id` como o pedido oficial mais recente e já consegue montar um snapshot completo usando os `itens` retornados pelo mesmo GET.
+
+Dados consumidos:
+
+```text
+ultimoPedido.id
+ultimoPedido.emissao
+ultimoPedido.status
+ultimoPedido.formaPagamento
+ultimoPedido.codCliente
+ultimoPedido.frete
+
+itens[].codPedido
+itens[].codProduto
+itens[].descricao
+itens[].quantidade
+itens[].valor
+itens[].total
+```
+
+`itens[].descricao` é o nome do produto. `codProduto` permanece somente como código técnico e não é usado como descrição/nome.
 
 ## Pedido por código
 
@@ -50,48 +70,90 @@ confere o CPF do retorno e o cliente antes de aceitar essa associação.
 GET /api/Delivery/pedido/{codigo}?token=...
 ```
 
-O identificador pode vir do JSON `ultimo_pedido` ou do fallback `ultimoPedido` da resposta por CPF. Quando `ultimo_pedido` já está preenchido, o projeto consulta **somente esse mesmo código** em `/pedido/{codigo}` para confirmar o status atual; não consulta `cliente/cpf/{cpf}` para procurar outro pedido. Quando `ultimo_pedido` está ausente, vazio ou `null`, o fallback consulta o cliente por CPF, lê `ultimoPedido.id` e então consulta esse pedido específico.
+Depois de obter `ultimoPedido.id` pela consulta de CPF, o NexoFlow consulta o mesmo pedido por código. Este endpoint é o snapshot final preferencial.
 
-O retorno usado possui informações de capa e itens. Entre os dados persistidos
-estão emissão, filial, cliente, status, forma de pagamento, cupom, frete,
-cancelamento, entrega e totais derivados dos itens.
+O retorno é normalizado no mesmo formato do endpoint por CPF:
 
-### Status do Pedido
+```text
+capa -> dados do pedido
+itens -> produtos do pedido
+```
 
-A documentação fornecida pelo usuário, **Integração API Líder.pdf**, seção **Status do Pedido**, define:
+Se o GET por pedido falhar temporariamente e o GET por CPF trouxe `ultimoPedido + itens` válidos, o NexoFlow pode usar esse primeiro retorno como fallback completo.
 
-| Código | Identificador oficial | Rótulo em português |
-|---|---|---|
+## Mapeamento para Weni
+
+| Campo Weni | Campo API |
+|---|---|
+| `pedido_id` | `capa.id` / `ultimoPedido.id` |
+| `pedido_produtos` | `itens[].descricao` |
+| `pedido_quantidade_itens` | `itens[].quantidade` |
+| `pedido_valor_produtos` | `itens[].valor` |
+| `pedido_valor` | soma de `itens[].total` |
+| `pedido_data` | `emissao` |
+| `pedido_status` | `status` |
+| `pedido_forma_pagamento` | `formaPagamento` |
+
+Produtos, quantidades e valores unitários são serializados como listas separadas por vírgula, preservando a mesma ordem posicional.
+
+`pedido_valor` representa a soma dos totais dos itens. O frete continua separado nos dados técnicos e não é somado ao campo Weni.
+
+## Status do pedido
+
+De-para da documentação oficial da integração:
+
+| Código | Identificador oficial | Rótulo |
+|---:|---|---|
 | 0 | `EmProcessamento` | Em processamento |
 | 1 | `EmTransito` | Em trânsito |
 | 2 | `Concluido` | Concluído |
 | 3 | `Cancelado` | Cancelado |
 | 4 | `ProntoParaRota` | Pronto para rota |
 
-O NexoFlow preserva o código em `farmalider_status_pedido` e acrescenta o rótulo oficial conhecido em `farmalider_status_pedido_nome`. Para código ausente ou desconhecido, o nome fica vazio; “Status não conhecido” pode ser exibido pelo dashboard como aviso derivado, sem criar um estado oficial. O código **3** é tratado como cancelado independentemente de existir timestamp de cancelamento. Valores fora desse de-para mantêm o código original sem atribuir um significado por suposição.
+A Weni armazena o código em `pedido_status`. O Analytics deriva o nome amigável.
 
-Os indicadores do NexoFlow consideram como **pedido feito** os estados **0, 1, 2 e 4**, desde que o status seja confirmado pela API, os dados sejam válidos e não exista cancelamento explícito. Somente **3 — Cancelado** fica fora. Status ausente, desconhecido ou ainda não confirmado também não é contado até que possa ser classificado com segurança.
+Para indicadores, 0, 1, 2 e 4 contam como pedido feito quando a resposta foi validada. O código 3 não entra nas métricas de venda.
 
-`ultima_compra` usa o pedido não cancelado mais recente entre os estados 0, 1, 2 e 4, com confirmação pela API. O status é operacional/logístico e não deve ser confundido com liquidação financeira. Veja as regras completas em [Pedidos no NexoFlow 1.0](PEDIDOS.md).
+## Forma de pagamento
 
-## Limitação atual
+De-para da documentação oficial da integração:
 
-O contrato usado pelo projeto não fornece uma rota para listar todo o histórico
-de pedidos por CPF/cliente.
+| Código | Forma |
+|---:|---|
+| 1 | Dinheiro |
+| 2 | Débito |
+| 3 | Crédito |
+| 4 | Ticket |
+| 5 | Online/link/Pix |
+
+A Weni armazena o código em `pedido_forma_pagamento`. O Analytics mantém também `farmalider_forma_pagamento_nome` e disponibiliza a descrição amigável na camada BI.
+
+## Data
+
+Timestamps sem offset retornados pela API são interpretados em **America/Belem**.
+
+Exemplo:
+
+```text
+API:  2026-06-05T15:45:27.497
+Weni: 05/06/26 15:45:27
+```
+
+Internamente, o NexoFlow preserva data/hora canônica para agregações e filtros.
+
+## Limitação de histórico
+
+O endpoint por CPF retorna o **último pedido** disponível e seus itens. Isso não equivale a uma listagem histórica paginada de todos os pedidos do cliente.
 
 Consequência:
 
 ```text
-CPF → confirma/vincula cliente → ultimoPedido, quando disponível
-pedido_id → confirma/enriquece pedido específico
+CPF -> último pedido atual
+pedido_id -> confirmação/enriquecimento do mesmo pedido
 ```
 
-Se os campos da Weni não fornecerem um pedido utilizável com identificador
-oficial, a referência de último pedido do cliente pode suprir essa informação.
-Isso não recupera automaticamente todos os pedidos anteriores. Cancelamentos,
-valores, frete e origem do total são preservados; cancelamentos não entram nas
-métricas de venda. Datas de pedidos usam `America/Belem` (UTC−3).
-Consulte [Pedidos no NexoFlow 1.0](PEDIDOS.md).
+O NexoFlow não inventa pedidos anteriores que não estejam disponíveis nas fontes consultadas.
+
 
 ## Concorrência e proteção
 

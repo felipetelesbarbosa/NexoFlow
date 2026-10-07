@@ -48,6 +48,7 @@ SHEET_BI_CANAIS: Final = "BI_Canais"
 SHEET_BI_CONVERSAO: Final = "BI_Conversao"
 SHEET_BI_VENDAS: Final = "BI_Vendas"
 SHEET_BI_ADS: Final = "BI_Ads"
+SHEET_BI_PEDIDOS: Final = "BI_Pedidos"
 SHEET_BI_STATUS: Final = "BI_Status"
 
 TIPO_PRIMEIRO_ANUNCIO: Final = "Primeiro anúncio que trouxe o cliente"

@@ -12,7 +12,9 @@ from urn_utils import resolve_contact_urns
 from pedido_utils import (
     business_order_datetime,
     farmalider_order_status_name,
+    farmalider_payment_method_name,
     is_order_made,
+    weni_order_datetime_text,
 )
 
 
@@ -63,8 +65,12 @@ BASE_COLUMNS = [
     "pedido_id",
     "pedido_data",
     "pedido_status",
+    "pedido_status_nome",
+    "pedido_forma_pagamento",
+    "pedido_forma_pagamento_nome",
     "pedido_produtos",
     "pedido_quantidade_itens",
+    "pedido_valor_produtos",
     "pedido_valor",
     "voltou_por_outro_anuncio",
     "weni_created_on",
@@ -149,6 +155,7 @@ ORDER_COLUMNS = [
     "farmalider_cod_filial",
     "farmalider_cod_cliente",
     "farmalider_forma_pagamento",
+    "farmalider_forma_pagamento_nome",
     "farmalider_cupom",
     "farmalider_frete",
     "farmalider_pedido_web",
@@ -281,6 +288,29 @@ BI_ADS_COLUMNS = [
     "faturamento",
     "atualizado_em",
 ]
+
+BI_ORDERS_COLUMNS = [
+    "pedido_chave",
+    "pedido_id",
+    "pedido_data",
+    "data",
+    "hora",
+    "cliente",
+    "cpf",
+    "pedido_produtos",
+    "pedido_quantidade_itens",
+    "pedido_valor_produtos",
+    "pedido_valor",
+    "pedido_status",
+    "pedido_status_nome",
+    "pedido_forma_pagamento",
+    "pedido_forma_pagamento_nome",
+    "canal",
+    "primeiro_anuncio_origem",
+    "ultimo_anuncio_origem",
+    "atualizado_em",
+]
+
 
 BI_STATUS_COLUMNS = [
     "atualizado_em",
@@ -453,14 +483,15 @@ def normalize_contact(
     for key in AD_FIELDS:
         row[key] = normalize_value(fields.get(key))
 
-    for key in ("pedido_id", "pedido_data", "pedido_status", "pedido_quantidade_itens", "pedido_valor"):
+    for key in (
+        "pedido_id", "pedido_data", "pedido_status", "pedido_forma_pagamento",
+        "pedido_produtos", "pedido_quantidade_itens", "pedido_valor_produtos",
+        "pedido_valor",
+    ):
         row[key] = normalize_value(fields.get(key))
-    products = fields.get("pedido_produtos")
-    if isinstance(products, dict) and "value" in products:
-        products = products["value"]
-    row["pedido_produtos"] = (
-        json.dumps(products, ensure_ascii=False, sort_keys=True)
-        if isinstance(products, (list, dict)) else normalize_value(products)
+    row["pedido_status_nome"] = farmalider_order_status_name(row["pedido_status"])
+    row["pedido_forma_pagamento_nome"] = farmalider_payment_method_name(
+        row["pedido_forma_pagamento"]
     )
 
     return row
@@ -866,59 +897,81 @@ def parse_ultimo_pedido_raw(
         return error_row, []
 
 
+def _split_weni_order_list(value: Any) -> list[str]:
+    raw = normalize_value(value).strip()
+    if not raw:
+        return []
+    return [part.strip() for part in raw.split(",") if part.strip()]
+
+
 def _derived_order_payload(fields: dict[str, Any]) -> dict[str, Any] | None:
-    """Read the structured snapshot without inventing missing product details."""
-    names = ("pedido_id", "pedido_data", "pedido_produtos", "pedido_quantidade_itens", "pedido_valor")
+    """Build a legacy-compatible order object from the flat Weni order fields."""
+    names = (
+        "pedido_id", "pedido_data", "pedido_produtos",
+        "pedido_quantidade_itens", "pedido_valor_produtos", "pedido_valor",
+    )
     if not any(normalize_value(fields.get(key)).strip() for key in names):
         return None
-    products = fields.get("pedido_produtos")
-    if isinstance(products, dict) and "value" in products:
-        products = products["value"]
-    if isinstance(products, str):
-        try:
-            products = json.loads(products)
-        except json.JSONDecodeError:
-            products = None
-    metadata = dict(products) if isinstance(products, dict) else {}
-    if isinstance(metadata.get("metadados"), dict):
-        metadata.update(metadata.pop("metadados"))
-    product_rows = metadata.pop("produtos", None) if isinstance(products, dict) else products
-    pedido_id = normalize_value(fields.get("pedido_id")).strip()
-    payload = {
-        **metadata,
-        "pedido_id": pedido_id,
-        "data_hora": normalize_value(fields.get("pedido_data")).strip(),
-        "valor_total_compra": normalize_value(fields.get("pedido_valor")).strip(),
-        "quantidade_itens": normalize_value(fields.get("pedido_quantidade_itens")).strip(),
-        "produtos": product_rows,
-    }
-    # The envelope identifies exactly which order produced the five fields.
-    # A stale or partially updated snapshot must not be attached to a new ID.
-    envelope_id = normalize_value(metadata.get("pedido_id")).strip()
-    if not pedido_id or (envelope_id and envelope_id != pedido_id):
-        payload["produtos"] = None
-    envelope_date = business_order_datetime(metadata.get("data_hora"))
-    field_date = business_order_datetime(payload["data_hora"])
-    if envelope_date is not None and envelope_date != field_date:
-        payload["produtos"] = None
-    for envelope_key, field_key in (("valor_total_compra", "valor_total_compra"),
-                                    ("quantidade_itens", "quantidade_itens")):
-        if normalize_value(metadata.get(envelope_key)).strip():
-            try:
-                if _to_decimal(metadata[envelope_key], envelope_key) != _to_decimal(payload[field_key], field_key):
-                    payload["produtos"] = None
-            except ValueError:
-                payload["produtos"] = None
-    return payload
 
+    pedido_id = normalize_value(fields.get("pedido_id")).strip()
+    pedido_data = normalize_value(fields.get("pedido_data")).strip()
+    pedido_valor = normalize_value(fields.get("pedido_valor")).strip()
+
+    raw_products = fields.get("pedido_produtos")
+    if isinstance(raw_products, dict) and "value" in raw_products:
+        raw_products = raw_products["value"]
+
+    # Backward compatibility for snapshots written before the flat Weni contract.
+    if isinstance(raw_products, str) and raw_products.strip().startswith("{"):
+        try:
+            metadata = json.loads(raw_products)
+        except json.JSONDecodeError:
+            metadata = None
+        if isinstance(metadata, dict) and isinstance(metadata.get("produtos"), list):
+            payload = dict(metadata)
+            payload["pedido_id"] = pedido_id or normalize_value(metadata.get("pedido_id")).strip()
+            payload["data_hora"] = pedido_data or normalize_value(metadata.get("data_hora")).strip()
+            payload["valor_total_compra"] = pedido_valor or normalize_value(metadata.get("valor_total_compra")).strip()
+            return payload
+
+    product_names = _split_weni_order_list(raw_products)
+    quantities = _split_weni_order_list(fields.get("pedido_quantidade_itens"))
+    unit_values = _split_weni_order_list(fields.get("pedido_valor_produtos"))
+
+    product_rows: list[dict[str, Any]] | None = None
+    if product_names and len(product_names) == len(quantities) == len(unit_values):
+        rows: list[dict[str, Any]] = []
+        try:
+            for name, qty_raw, unit_raw in zip(product_names, quantities, unit_values):
+                qty = _to_decimal(qty_raw, "quantidade")
+                unit = _to_decimal(unit_raw, "valor_unitario")
+                rows.append({
+                    "nome": name,
+                    "quantidade": _quantity_text(qty),
+                    "valor_unitario": _money(unit),
+                    "valor_total": _money(qty * unit),
+                })
+        except ValueError:
+            rows = []
+        if rows:
+            product_rows = rows
+
+    return {
+        "pedido_id": pedido_id,
+        "data_hora": pedido_data,
+        "valor_total_compra": pedido_valor,
+        "produtos": product_rows,
+        "farmalider_status_pedido": normalize_value(fields.get("pedido_status")).strip(),
+        "farmalider_forma_pagamento": normalize_value(
+            fields.get("pedido_forma_pagamento")
+        ).strip(),
+    }
 
 def parse_ultimo_pedido(
     contact: dict[str, Any],
     captured_at: str,
 ) -> tuple[dict[str, str] | None, list[dict[str, str]]]:
-    """
-    Lê `ultimo_pedido` de um contato da Weni e delega ao parser comum.
-    """
+    """Prefer the current flat Weni pedido fields; ultimo_pedido is legacy fallback."""
     fields = get_fields(contact)
     raw = normalize_order_source(fields.get("ultimo_pedido"))
 
@@ -928,53 +981,41 @@ def parse_ultimo_pedido(
         normalize_value(fields.get("nome")).strip()
         or normalize_value(contact.get("name")).strip()
     )
-    cpf = normalize_value(fields.get("cpf")).strip()
-    modified_on = normalize_value(contact.get("modified_on")).strip()
-
     context = dict(
         contact_uuid=contact_uuid,
         phone=phone,
         client_name=client_name,
-        cpf=cpf,
-        modified_on=modified_on,
+        cpf=normalize_value(fields.get("cpf")).strip(),
+        modified_on=normalize_value(contact.get("modified_on")).strip(),
         captured_at=captured_at,
     )
-    original_order, original_items = parse_ultimo_pedido_raw(raw, **context)
-    original_valid = (
-        original_order is not None
-        and not str(original_order.get("status_validacao") or "").startswith("ERRO")
-    )
-    if raw and not original_valid:
-        return original_order, original_items
-    derived_payload = _derived_order_payload(fields)
-    if derived_payload is None:
-        return original_order, original_items
-    derived_order, derived_items = parse_ultimo_pedido_raw(
-        json.dumps(derived_payload, ensure_ascii=False), **context,
-    )
-    assert derived_order is not None
-    derived_order["ultimo_pedido_raw"] = raw
-    if derived_order["origem_pedido"] == "WENI_ULTIMO_PEDIDO":
-        derived_order["origem_pedido"] = "WENI_PEDIDO_FIELDS"
-    derived_valid = not str(derived_order.get("status_validacao") or "").startswith("ERRO")
-    if not original_valid:
-        return (derived_order, derived_items) if derived_valid or original_order is None else (original_order, original_items)
-    if derived_valid:
-        confirmation = derived_order.get("status_confirmacao", "")
-        verified = confirmation.startswith("CONFIRMADO_API") or confirmation == "CANCELADO_API"
-        derived_dt = business_order_datetime(derived_order.get("data_hora", ""))
-        original_dt = business_order_datetime(original_order.get("data_hora", ""))
-        original_id = str(original_order.get("pedido_id") or "").strip()
-        derived_id = str(derived_order.get("pedido_id") or "").strip()
-        same_id = (
-            original_id.isascii() and original_id.isdigit() and int(original_id) > 0
-            and derived_id.isascii() and derived_id.isdigit()
-            and int(derived_id) == int(original_id)
-        )
-        if same_id and verified and derived_dt is not None and original_dt is not None and derived_dt >= original_dt:
-            return derived_order, derived_items
-    return original_order, original_items
 
+    derived_payload = _derived_order_payload(fields)
+    if derived_payload is not None:
+        derived_order, derived_items = parse_ultimo_pedido_raw(
+            json.dumps(derived_payload, ensure_ascii=False), **context,
+        )
+        if derived_order is not None:
+            derived_order["ultimo_pedido_raw"] = raw
+            derived_order["origem_pedido"] = "WENI_PEDIDO_FIELDS"
+            if not str(derived_order.get("status_validacao") or "").startswith("ERRO"):
+                status_code = normalize_value(fields.get("pedido_status")).strip()
+                payment_code = normalize_value(
+                    fields.get("pedido_forma_pagamento")
+                ).strip()
+                derived_order["farmalider_status_pedido"] = status_code
+                derived_order["farmalider_status_pedido_nome"] = (
+                    farmalider_order_status_name(status_code)
+                )
+                derived_order["farmalider_forma_pagamento"] = payment_code
+                derived_order["farmalider_forma_pagamento_nome"] = (
+                    farmalider_payment_method_name(payment_code)
+                )
+                return derived_order, derived_items
+
+    if raw:
+        return parse_ultimo_pedido_raw(raw, **context)
+    return None, []
 
 def build_sales_metrics(
     order_records: list[dict[str, str]],
@@ -1289,6 +1330,80 @@ def build_bi_conversion_records(
         })
         previous = qty
     return result
+
+
+def _bi_display_number(value: Any) -> str:
+    try:
+        number = _to_decimal(value, "display")
+    except ValueError:
+        return ""
+    return format(number.normalize(), "f")
+
+
+def build_bi_order_rows(
+    base_records: list[dict[str, str]],
+    order_records: list[dict[str, str]],
+    item_records: list[dict[str, str]],
+    *,
+    updated_at: str,
+) -> list[list[Any]]:
+    """Order-level table ready for Looker Studio detail/buyers pages."""
+    base_by_uuid = {
+        (record.get("contact_uuid") or "").strip(): record
+        for record in base_records
+        if (record.get("contact_uuid") or "").strip()
+    }
+    items_by_order: dict[str, list[dict[str, str]]] = defaultdict(list)
+    for item in item_records:
+        key = (item.get("pedido_chave") or "").strip()
+        if key:
+            items_by_order[key].append(item)
+
+    rows: list[list[Any]] = []
+    for order in sorted(
+        order_records,
+        key=lambda row: (
+            str(row.get("data_hora") or ""),
+            str(row.get("pedido_id") or ""),
+        ),
+        reverse=True,
+    ):
+        key = (order.get("pedido_chave") or "").strip()
+        pedido_id = (order.get("pedido_id") or "").strip()
+        if not key or not pedido_id:
+            continue
+        items = sorted(
+            items_by_order.get(key, []),
+            key=lambda item: int(item.get("produto_ordem") or 0),
+        )
+        dt = business_order_datetime(order.get("data_hora"))
+        contact_uuid = (order.get("contact_uuid") or "").strip()
+        base = base_by_uuid.get(contact_uuid, {})
+        status_code = (order.get("farmalider_status_pedido") or "").strip()
+        payment_code = (order.get("farmalider_forma_pagamento") or "").strip()
+
+        rows.append([
+            key,
+            pedido_id,
+            weni_order_datetime_text(dt) if dt is not None else "",
+            dt.date().isoformat() if dt is not None else "",
+            dt.strftime("%H:%M:%S") if dt is not None else "",
+            (order.get("cliente") or base.get("nome") or base.get("weni_name") or "").strip(),
+            (order.get("cpf_normalizado") or order.get("cpf") or base.get("cpf_normalizado") or base.get("cpf") or "").strip(),
+            ", ".join((item.get("produto_nome") or "").strip() for item in items if (item.get("produto_nome") or "").strip()),
+            ", ".join(_bi_display_number(item.get("quantidade")) for item in items),
+            ", ".join(_bi_display_number(item.get("valor_unitario")) for item in items),
+            _bi_float(_bi_decimal(order.get("valor_total_compra"))),
+            status_code,
+            farmalider_order_status_name(status_code),
+            payment_code,
+            farmalider_payment_method_name(payment_code),
+            (base.get("contact_canal_principal") or "outro").strip().casefold(),
+            (order.get("primeiro_anuncio_origem") or "").strip(),
+            (order.get("ultimo_anuncio_origem") or "").strip(),
+            updated_at,
+        ])
+    return rows
 
 
 def build_bi_ads_rows(
