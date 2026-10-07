@@ -32,6 +32,26 @@ public static class NexoFlowIconResources
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool EndUpdateResourceW(
         IntPtr handle, [MarshalAs(UnmanagedType.Bool)] bool discard);
+
+    [DllImport("kernel32.dll", EntryPoint = "LoadLibraryExW", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern IntPtr LoadLibraryExW(string fileName, IntPtr hFile, uint flags);
+
+    [DllImport("kernel32.dll", EntryPoint = "FindResourceExW", SetLastError = true)]
+    public static extern IntPtr FindResourceExW(
+        IntPtr module, IntPtr type, IntPtr name, ushort language);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool FreeLibrary(IntPtr module);
+
+    [DllImport("shell32.dll", EntryPoint = "ExtractIconExW", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern uint ExtractIconExW(
+        string fileName, int iconIndex,
+        ref IntPtr largeIcon, ref IntPtr smallIcon, uint icons);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool DestroyIcon(IntPtr icon);
 }
 '@
 }
@@ -71,6 +91,12 @@ try {
         ) {
             throw "Imagem ICO invalida na posicao $i ($ico)"
         }
+
+        # Alguns ICOs baseados em PNG trazem planes/bits como zero. O shell do
+        # Windows e mais consistente quando o GRPICONDIR informa 1/32.
+        if ($planes -eq 0) { $planes = 1 }
+        if ($bits -eq 0) { $bits = 32 }
+
         $payload = [byte[]]::new($size)
         [Array]::Copy($iconBytes, $offset, $payload, 0, $size)
         $images += [pscustomobject]@{
@@ -115,6 +141,11 @@ finally {
     $groupStream.Dispose()
 }
 
+# O build anterior gravava apenas en-US (1033). Em Windows pt-BR isso pode
+# resultar em Explorer/atalhos exibindo o icone generico. Gravamos a mesma
+# arvore como neutral (0), pt-BR (1046) e en-US (1033).
+$languages = @([uint16]0, [uint16]1046, [uint16]1033)
+
 $handle = [NexoFlowIconResources]::BeginUpdateResourceW($exe, $false)
 if ($handle -eq [IntPtr]::Zero) {
     $code = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
@@ -123,24 +154,26 @@ if ($handle -eq [IntPtr]::Zero) {
 
 $committed = $false
 try {
-    foreach ($item in $images) {
+    foreach ($language in $languages) {
+        foreach ($item in $images) {
+            $ok = [NexoFlowIconResources]::UpdateResourceW(
+                $handle, [IntPtr]3, [IntPtr]$item.Id, $language,
+                [byte[]]$item.Bytes, [uint32]$item.Size
+            )
+            if (-not $ok) {
+                $code = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+                throw "Nao foi possivel embutir RT_ICON $($item.Id), lang=$language em $exe ($code)"
+            }
+        }
+
         $ok = [NexoFlowIconResources]::UpdateResourceW(
-            $handle, [IntPtr]3, [IntPtr]$item.Id, [uint16]1033,
-            [byte[]]$item.Bytes, [uint32]$item.Size
+            $handle, [IntPtr]14, [IntPtr]1, $language,
+            [byte[]]$groupBytes, [uint32]$groupBytes.Length
         )
         if (-not $ok) {
             $code = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
-            throw "Nao foi possivel embutir RT_ICON $($item.Id) em $exe ($code)"
+            throw "Nao foi possivel embutir RT_GROUP_ICON, lang=$language em $exe ($code)"
         }
-    }
-
-    $ok = [NexoFlowIconResources]::UpdateResourceW(
-        $handle, [IntPtr]14, [IntPtr]1, [uint16]1033,
-        [byte[]]$groupBytes, [uint32]$groupBytes.Length
-    )
-    if (-not $ok) {
-        $code = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
-        throw "Nao foi possivel embutir RT_GROUP_ICON em $exe ($code)"
     }
 
     if (-not [NexoFlowIconResources]::EndUpdateResourceW($handle, $false)) {
@@ -155,4 +188,43 @@ finally {
     }
 }
 
-Write-Host "[OK] Icone PE embutido: $([IO.Path]::GetFileName($exe)) ($count tamanhos)"
+# Validacao real do PE depois da gravacao. A release deve falhar se o recurso
+# neutral/pt-BR nao existir ou se o shell32 nao conseguir extrair o icone.
+$LOAD_LIBRARY_AS_DATAFILE = [uint32]2
+$module = [NexoFlowIconResources]::LoadLibraryExW(
+    $exe, [IntPtr]::Zero, $LOAD_LIBRARY_AS_DATAFILE
+)
+if ($module -eq [IntPtr]::Zero) {
+    $code = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+    throw "Nao foi possivel reabrir o PE para validar o icone ($code): $exe"
+}
+try {
+    foreach ($language in @([uint16]0, [uint16]1046)) {
+        $resource = [NexoFlowIconResources]::FindResourceExW(
+            $module, [IntPtr]14, [IntPtr]1, $language
+        )
+        if ($resource -eq [IntPtr]::Zero) {
+            throw "RT_GROUP_ICON ausente apos o build (lang=$language): $exe"
+        }
+    }
+}
+finally {
+    [void][NexoFlowIconResources]::FreeLibrary($module)
+}
+
+$large = [IntPtr]::Zero
+$small = [IntPtr]::Zero
+$extracted = [NexoFlowIconResources]::ExtractIconExW(
+    $exe, 0, [ref]$large, [ref]$small, [uint32]1
+)
+try {
+    if ($extracted -lt 1 -or ($large -eq [IntPtr]::Zero -and $small -eq [IntPtr]::Zero)) {
+        throw "shell32 nao conseguiu extrair o icone do executavel: $exe"
+    }
+}
+finally {
+    if ($large -ne [IntPtr]::Zero) { [void][NexoFlowIconResources]::DestroyIcon($large) }
+    if ($small -ne [IntPtr]::Zero) { [void][NexoFlowIconResources]::DestroyIcon($small) }
+}
+
+Write-Host "[OK] Icone PE embutido e validado: $([IO.Path]::GetFileName($exe)) ($count tamanhos; neutral/pt-BR/en-US)"
