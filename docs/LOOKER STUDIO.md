@@ -22,8 +22,13 @@ Principais campos:
 - contatos_ads
 - clientes_compradores_total
 - pedidos_total
+- faturamento_produtos_total
+- faturamento_frete_total
 - faturamento_total
 - pedidos_dia
+- faturamento_produtos_dia
+- faturamento_frete_dia
+- faturamento_total_dia
 - faturamento_dia
 - ticket_medio_dia
 
@@ -63,6 +68,9 @@ Série diária de vendas:
 - pedidos_confirmados_api
 - clientes_compradores
 - unidades_vendidas
+- faturamento_produtos
+- faturamento_frete
+- faturamento_total
 - faturamento
 - faturamento_confirmado_api
 - ticket_medio
@@ -103,7 +111,9 @@ Campos principais:
 - pedido_produtos
 - pedido_quantidade_itens
 - pedido_valor_produtos
-- pedido_valor
+- pedido_valor, total dos produtos
+- pedido_frete
+- pedido_faturamento_total, produtos + frete
 - pedido_status
 - pedido_status_nome
 - pedido_forma_pagamento
@@ -113,6 +123,13 @@ Campos principais:
 - ultimo_anuncio_origem
 
 As listas de produto, quantidade e valor unitário mantêm a mesma ordem posicional. Para cálculos por item, prefira `Itens_Pedidos_FarmaLider`; para exibição de um pedido completo em uma linha, use `BI_Pedidos`.
+
+Para faturamento, use preferencialmente os campos explícitos:
+- **Produtos**: `pedido_valor` / `faturamento_produtos`;
+- **Frete**: `pedido_frete` / `faturamento_frete`;
+- **Total cobrado**: `pedido_faturamento_total` / `faturamento_total`.
+
+O campo legado `faturamento` permanece como alias do faturamento total para não quebrar componentes existentes. O ticket médio também usa o total cobrado, incluindo frete.
 
 O dashboard deve mostrar preferencialmente os nomes amigáveis, como **Cancelado** e **Débito**, mantendo os códigos disponíveis para auditoria e filtros técnicos.
 
