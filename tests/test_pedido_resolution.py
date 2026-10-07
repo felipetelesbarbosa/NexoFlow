@@ -296,16 +296,40 @@ class PedidoResolutionTests(unittest.TestCase):
 
     def test_status_mapping_is_official(self):
         expected = {
-            -1: "Pendente pagamento",
+            -2: "Em aberto",
+            -1: "Pendente de pagamento",
             0: "Em processamento",
             1: "Em trânsito",
             2: "Concluído",
             3: "Cancelado",
-            4: "",
+            4: "Pronto para rota",
         }
         for code, label in expected.items():
             self.assertEqual(farmalider_order_status_name(code), label)
             self.assertEqual(farmalider_order_status_name(str(code)), label)
+
+    def test_official_status_enum_names_survive_api_resolution(self):
+        for name, code, label in (
+            ("EmAberto", -2, "Em aberto"),
+            ("PendenteDePagamento", -1, "Pendente de pagamento"),
+            ("EmProcessamento", 0, "Em processamento"),
+            ("ProntoParaRota", 4, "Pronto para rota"),
+            ("EmTransito", 1, "Em trânsito"),
+            ("Concluido", 2, "Concluído"),
+            ("Cancelado", 3, "Cancelado"),
+            ("PendentePagamento", -1, "Pendente de pagamento"),
+        ):
+            with self.subTest(name=name):
+                pedido = pedido_payload()
+                pedido["capa"]["status"] = name
+                order, items = resolve_contact_order(
+                    contact(), farm_client=client(pedido=pedido), captured_at=CAPTURED_AT
+                )
+                self.assertEqual(order["status_validacao"], "OK")
+                self.assertEqual(order["farmalider_status_pedido"], name)
+                self.assertEqual(effective_order_status_code(order), str(code))
+                self.assertEqual(order["farmalider_status_pedido_nome"], label)
+                self.assertEqual(bool(build_sales_metrics([order], items)), code in (4, 1, 2))
 
     def test_payment_mapping_is_official(self):
         expected = {
@@ -405,8 +429,8 @@ class PedidoResolutionTests(unittest.TestCase):
         self.assertTrue(is_order_cancelled(order))
         self.assertEqual(build_sales_metrics([order], items), [])
 
-    def test_only_completed_documented_state_is_sale(self):
-        for status in (-1, 0, 1, 2, 4):
+    def test_configured_documented_states_are_sales(self):
+        for status in (-2, -1, 0, 1, 2, 4):
             with self.subTest(status=status):
                 pedido = pedido_payload()
                 pedido["capa"]["status"] = status
@@ -415,13 +439,13 @@ class PedidoResolutionTests(unittest.TestCase):
                     farm_client=client(pedido=pedido),
                     captured_at=CAPTURED_AT,
                 )
-                self.assertEqual(is_order_made(order), status in (0, 1, 2))
+                self.assertEqual(is_order_made(order), status in (0, 1, 2, 4))
                 self.assertEqual(is_order_completed(order), status == 2)
                 self.assertFalse(is_order_cancelled(order))
-                self.assertEqual(len(build_sales_metrics([order], items)), int(status == 2))
+                self.assertEqual(len(build_sales_metrics([order], items)), int(status in (4, 1, 2)))
 
     def test_payment_zero_or_cancelled_literal_cancels_any_api_status(self):
-        for status in (-1, 0, 1, 2, 4):
+        for status in (-2, -1, 0, 1, 2, 4):
             for payment in (0, "0", "CANCELADO"):
                 with self.subTest(status=status, payment=payment):
                     pedido = pedido_payload()
@@ -440,7 +464,7 @@ class PedidoResolutionTests(unittest.TestCase):
                     self.assertEqual(build_sales_metrics([order], items), [])
 
     def test_effective_order_status_normalizes_documented_codes(self):
-        for status in (-1, 0, 1, 2, 3):
+        for status in (-2, -1, 0, 1, 2, 3, 4):
             for value in (status, str(status)):
                 with self.subTest(value=value):
                     self.assertEqual(
@@ -451,8 +475,8 @@ class PedidoResolutionTests(unittest.TestCase):
                         str(status),
                     )
 
-    def test_removed_status_four_has_no_effective_code(self):
-        for value in (4, "4", "Pronto para rota"):
+    def test_unknown_status_has_no_effective_code(self):
+        for value in (5, "5", "Estado desconhecido"):
             with self.subTest(value=value):
                 order = {"farmalider_status_pedido": value}
                 self.assertEqual(farmalider_order_status_name(value), "")
@@ -462,7 +486,7 @@ class PedidoResolutionTests(unittest.TestCase):
 
     def test_api_enum_aliases_preserve_raw_values_and_effective_status(self):
         for payment, status_code, status_name, confirmation, payment_name in (
-            ("PIX no POS", "-1", "Pendente pagamento", "CONFIRMADO_API", "Pix no POS"),
+            ("PIX no POS", "-1", "Pendente de pagamento", "CONFIRMADO_API", "Pix no POS"),
             ("_", "3", "Cancelado", "CANCELADO_API", "Cancelado"),
         ):
             with self.subTest(payment=payment):

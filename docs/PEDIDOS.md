@@ -35,7 +35,7 @@ Mesmo nesse fallback, `ultimo_pedido` não vira fonte de produtos, quantidade, v
 | `pedido_valor_produtos` | `itens[].valor` | valores unitários posicionais separados por vírgula |
 | `pedido_valor` | `sum(itens[].total)` | soma dos totais dos itens |
 | `pedido_data` | `emissao` | `DD/MM/YY HH:MM:SS` |
-| `pedido_status` | `status` e regra de cancelamento | status efetivo de -1 a 3 |
+| `pedido_status` | `status` e regra de cancelamento | status efetivo de -2 a 4 |
 | `pedido_forma_pagamento` | `formaPagamento` | código Int32 não negativo normalizado; pagamento 0 grava `Cancelado` |
 
 As listas são posicionais. Exemplo:
@@ -118,15 +118,17 @@ De-para usado pela integração:
 
 | Código | API | Apresentação |
 |---:|---|---|
-| -1 | `PendentePagamento` | Pendente de pagamento |
+| -2 | `EmAberto` | Em aberto |
+| -1 | `PendenteDePagamento` | Pendente de pagamento |
 | 0 | `EmProcessamento` | Em processamento |
+| 4 | `ProntoParaRota` | Pronto para rota |
 | 1 | `EmTransito` | Em trânsito |
 | 2 | `Concluido` | Concluído |
 | 3 | `Cancelado` | Cancelado |
 
-A Weni recebe o **código efetivo** em `pedido_status`. Os nomes oficiais do enum, como `PendentePagamento`, `EmProcessamento`, `EmTransito`, `Concluido` e `Cancelado`, são normalizados para -1 a 3. O Analytics deriva `pedido_status_nome` para apresentação no Google Sheets/Looker Studio. Se `formaPagamento=0` ou `_`, o status efetivo é 3, Cancelado, mesmo que a API informe outro status. Cancelamento explícito também prevalece. `Pedidos_FarmaLider` preserva o status bruto em `farmalider_status_pedido`; Weni e `BI_Pedidos` aplicam o status efetivo.
+A Weni recebe o **código efetivo** em `pedido_status`. Os nomes oficiais do enum, como `EmAberto`, `PendenteDePagamento`, `EmProcessamento`, `ProntoParaRota`, `EmTransito`, `Concluido` e `Cancelado`, são normalizados para -2 a 4. O Analytics deriva `pedido_status_nome` para apresentação no Google Sheets/Looker Studio. Se `formaPagamento=0` ou `_`, o status efetivo é 3, Cancelado, mesmo que a API informe outro status. Cancelamento explícito também prevalece. `Pedidos_FarmaLider` preserva o status bruto em `farmalider_status_pedido`; Weni e `BI_Pedidos` aplicam o status efetivo.
 
-Somente status efetivo 2, Concluído, validado pela API e sem cancelamento conta como venda e atualiza `ultima_compra`. Os estados -1, 0, 1 e 3 ficam fora das métricas de venda.
+Pedidos validados pela API com status efetivo 4 (Pronto para rota), 1 (Em trânsito) ou 2 (Concluído), sem cancelamento, contam como venda e atualizam `ultima_compra`. Os estados -2, -1, 0 e 3 ficam fora das métricas de venda.
 
 ## Forma de pagamento
 
@@ -190,7 +192,7 @@ Uma linha por item, com:
 
 ### Metricas_Vendas
 
-Agregação diária para pedidos validados pela API com status efetivo 2, Concluído, sem cancelamento, compradores, unidades e faturamento.
+Agregação diária para pedidos validados pela API com status efetivo 4, 1 ou 2, sem cancelamento, compradores, unidades e faturamento.
 
 ### BI_Pedidos
 
@@ -234,7 +236,7 @@ Os oito campos do contrato de pedido são obrigatórios na Weni: `pedido_id`, `p
 
 ## Rechecagem
 
-Pedidos em -1, Pendente pagamento, 0, Em processamento, ou 1, Em trânsito, continuam sendo rechecados nas execuções seguintes até chegar a:
+Pedidos em -2, Em aberto, -1, Pendente de pagamento, 0, Em processamento, 4, Pronto para rota, ou 1, Em trânsito, continuam sendo rechecados nas execuções seguintes até chegar a:
 
 - 2, Concluído; ou
 - 3, Cancelado.

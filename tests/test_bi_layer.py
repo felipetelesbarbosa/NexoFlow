@@ -250,11 +250,11 @@ class BILayerTests(unittest.TestCase):
                                          updated_at="2026-10-06T01:30:00Z")
         self.assertEqual(summary["novos_contatos"], 1)
 
-    def test_only_completed_state_enters_sales_and_bi(self):
-        for status in (-1, 0, 1, 2, 3, 4, "-1", "0", "1", "2", "3", "4", "99", "", None):
+    def test_configured_states_enter_sales_and_bi(self):
+        for status in (-2, -1, 0, 1, 2, 3, 4, "-2", "-1", "0", "1", "2", "3", "4", "99", "", None):
             with self.subTest(status=status):
                 base, order, items = self.order_fixture(status=status)
-                made = str(status) == "2"
+                made = str(status) in {"4", "1", "2"}
                 self.assertEqual(len(items), 1)  # Every state remains auditable.
                 self.assertEqual(order["pedido_chave"], "FARMALIDER:500")
                 expected_sales = [["2026-10-05", 1, 1, 1, "2", "19.50", "0.00", "19.50", "19.50"]] if made else []

@@ -14,7 +14,7 @@ from pedido_utils import (
     farmalider_order_status_name,
     farmalider_payment_method_display,
     effective_order_status_code,
-    is_order_completed,
+    is_order_sale,
     normalize_farmalider_order_status_code,
     normalize_farmalider_payment_code,
     parse_weni_order_list,
@@ -1211,13 +1211,13 @@ def _bi_float(value: Decimal) -> float:
 
 
 def _sales_order_is_valid(record: dict[str, str]) -> bool:
-    """Only completed, API-confirmed orders enter sales KPIs."""
+    """API-confirmed ready-for-route, in-transit and completed orders enter sales KPIs."""
     confirmation = str(record.get("status_confirmacao") or "")
     if not confirmation.startswith("CONFIRMADO_API"):
         return False
     return (
         record.get("status_validacao") in ("OK", "ATENÇÃO_TOTAL_DIVERGENTE")
-        and is_order_completed(record)
+        and is_order_sale(record)
         and bool(str(record.get("pedido_chave") or "").strip())
     )
 

@@ -2,6 +2,12 @@
 
 ## NexoFlow 1.0
 
+### Status de pedido e vendas
+
+- de-para atualizado: `EmAberto=-2`, `PendenteDePagamento=-1`, `EmProcessamento=0`, `ProntoParaRota=4`, `EmTransito=1`, `Concluido=2` e `Cancelado=3`;
+- pedidos validados pela API em 4, 1 ou 2 contam como venda e atualizam `ultima_compra`; cancelamento ou pagamento 0 prevalece;
+- estados -2, -1, 0, 4 e 1 permanecem em rechecagem; o alias legado `PendentePagamento` continua aceito.
+
 ### Diagnóstico privado dos CPFs com HTTP 500
 
 - arquivo JSONL privado por execução identifica CPFs com falhas 5xx persistentes e correlaciona as referências do log;
@@ -64,12 +70,12 @@
 
 - a FarmaLíder API é a fonte de verdade dos pedidos; `pedido_id` e `ultimo_pedido` da Weni são localizadores para recuperação;
 - novo campo `pedido_status` é preenchido pelo NexoFlow Weni após consultar o mesmo `pedido_id` na FarmaLíder API;
-- valores atuais de `pedido_status`: **-1 Pendente pagamento**, **0 Em processamento**, **1 Em trânsito**, **2 Concluído** e **3 Cancelado**;
+- valores atuais de `pedido_status`: **-2 Em aberto**, **-1 Pendente de pagamento**, **0 Em processamento**, **4 Pronto para rota**, **1 Em trânsito**, **2 Concluído** e **3 Cancelado**;
 - cancelamento explícito ou pagamento 0 prevalece e grava o status efetivo **3, Cancelado** na Weni/BI;
 - `Pedidos_FarmaLider` preserva os valores brutos de status e pagamento retornados pela API para auditoria;
-- somente status efetivo 2, Concluído, validado pela API e sem cancelamento entra nos indicadores de venda e atualiza `ultima_compra`;
+- status efetivo 4 (Pronto para rota), 1 (Em trânsito) ou 2 (Concluído), validado pela API e sem cancelamento entra nos indicadores de venda e atualiza `ultima_compra`;
 - `pedido_status` também é preservado na `Base_Contatos` para Google Sheets/Looker Studio;
-- pedidos em **Pendente pagamento (-1)**, **Em processamento (0)** ou **Em trânsito (1)** ficam numa fila persistente de rechecagem até chegarem a **Concluído** ou **Cancelado**, mesmo sem nova mensagem na Weni.
+- pedidos em **Em aberto (-2)**, **Pendente de pagamento (-1)**, **Em processamento (0)**, **Pronto para rota (4)** ou **Em trânsito (1)** ficam numa fila persistente de rechecagem até chegarem a **Concluído** ou **Cancelado**, mesmo sem nova mensagem na Weni.
 
 Data de consolidação: 05/10/2026.
 

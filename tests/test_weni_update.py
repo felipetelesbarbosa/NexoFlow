@@ -147,7 +147,7 @@ class WeniUpdateTests(unittest.TestCase):
 
     def test_open_order_tracking_keeps_only_non_terminal_statuses(self) -> None:
         tracked: set[str] = set()
-        _track_open_order(tracked, "u1", "Pendente pagamento")
+        _track_open_order(tracked, "u1", "Pendente de pagamento")
         self.assertEqual(tracked, {"u1"})
         _track_open_order(tracked, "u1", "-1")
         self.assertEqual(tracked, {"u1"})
@@ -158,7 +158,9 @@ class WeniUpdateTests(unittest.TestCase):
         _track_open_order(tracked, "u1", "Concluído")
         self.assertEqual(tracked, set())
         _track_open_order(tracked, "u1", "4")
-        self.assertEqual(tracked, set())
+        self.assertEqual(tracked, {"u1"})
+        _track_open_order(tracked, "u1", "-2")
+        self.assertEqual(tracked, {"u1"})
         _track_open_order(tracked, "u1", "Em processamento")
         _track_open_order(tracked, "u1", "Cancelado")
         self.assertEqual(tracked, set())
@@ -613,7 +615,7 @@ class WeniUpdateTests(unittest.TestCase):
         })
 
     def test_status_is_written_as_official_code(self) -> None:
-        for status in (-1, 0, 1, 2, 3):
+        for status in (-2, -1, 0, 1, 2, 3, 4):
             with self.subTest(status=status):
                 contact = self._purchase_contact(include_raw=False)
                 farm = self._purchase_api()
@@ -634,11 +636,11 @@ class WeniUpdateTests(unittest.TestCase):
                     plan.fields["pedido_forma_pagamento"], str(payment)
                 )
 
-    def test_removed_status_four_from_api_does_not_validate_or_write_order(self) -> None:
+    def test_unknown_status_from_api_does_not_validate_or_write_order(self) -> None:
         contact = self._purchase_contact(include_raw=False)
         farm = self._purchase_api()
-        farm.get_pedido.return_value["capa"]["status"] = 4
-        farm.get_cliente_by_cpf.return_value["ultimoPedido"]["status"] = 4
+        farm.get_pedido.return_value["capa"]["status"] = 99
+        farm.get_cliente_by_cpf.return_value["ultimoPedido"]["status"] = 99
         plan = self._purchase_plan(contact, farm)
         self.assertFalse(plan.order_validated)
         self.assertFalse(plan.purchase_confirmed)
@@ -683,7 +685,7 @@ class WeniUpdateTests(unittest.TestCase):
                 self.assertEqual(plan.fields["pedido_valor"], 25.5)
 
     def test_zero_payment_cancels_order_without_warning_or_latest_purchase(self) -> None:
-        for status in (-1, 0, 1, 2, 3):
+        for status in (-2, -1, 0, 1, 2, 3, 4):
             with self.subTest(status=status):
                 contact = self._purchase_contact(include_raw=False)
                 contact["fields"]["ultima_compra"] = "2026-10-01T10:00:00-03:00"
@@ -930,8 +932,8 @@ class WeniUpdateTests(unittest.TestCase):
         self.assertNotIn("ultima_compra", plan.fields)
         audit_plans([plan], opt_out_group_available=True)
 
-    def test_only_completed_order_advances_latest_purchase(self) -> None:
-        for status in (-1, 0, 1, 2, 3):
+    def test_configured_sales_states_advance_latest_purchase(self) -> None:
+        for status in (-2, -1, 0, 1, 2, 3, 4):
             with self.subTest(status=status):
                 contact = self._purchase_contact(include_raw=False)
                 contact["fields"]["ultima_compra"] = (
@@ -940,8 +942,8 @@ class WeniUpdateTests(unittest.TestCase):
                 farm = self._purchase_api()
                 farm.get_pedido.return_value["capa"]["status"] = status
                 plan = self._purchase_plan(contact, farm)
-                self.assertEqual(plan.purchase_confirmed, status == 2)
-                if status == 2:
+                self.assertEqual(plan.purchase_confirmed, status in (4, 1, 2))
+                if status in (4, 1, 2):
                     self.assertEqual(
                         plan.fields["ultima_compra"],
                         "2026-10-03T09:00:00-03:00",
@@ -949,34 +951,39 @@ class WeniUpdateTests(unittest.TestCase):
                 else:
                     self.assertNotIn("ultima_compra", plan.fields)
 
-    def test_pending_payment_is_saved_and_queued_without_latest_purchase(self) -> None:
-        started = datetime(2026, 10, 3, 12, 1, tzinfo=timezone.utc)
-        contact = self._purchase_contact(include_raw=False)
-        contact["fields"]["ultima_compra"] = "2026-10-01T10:00:00-03:00"
-        farm = self._purchase_api()
-        farm.get_pedido.return_value["capa"]["status"] = -1
-        farm.get_cliente_by_cpf.return_value["ultimoPedido"]["status"] = -1
-        client = self._incremental_purchase_client(contact)
-        client.get_contact.return_value = deepcopy(contact)
-        with (
-            patch("weni_update.WeniClient", return_value=client),
-            patch("weni_update._open_farmalider", return_value=farm),
-            patch("weni_update.resolve_window", return_value=UpdateWindow(
-                started_at=started, after=started, full=False,
-            )),
-            patch("weni_update._append_audit"),
-            patch("weni_update._save_state") as save_mock,
-        ):
-            result = run_update(apply=True, full=False)
-        self.assertEqual(result.orders_validated, 1)
-        self.assertEqual(result.purchase_confirmed, 0)
-        self.assertEqual(result.contacts_updated, 1)
-        saved_fields = client.update_contact_fields.call_args.args[1]
-        self.assertEqual(saved_fields["pedido_status"], "-1")
-        self.assertNotIn("ultima_compra", saved_fields)
-        self.assertEqual(
-            save_mock.call_args.args[0]["open_order_uuids"], ["u-pedido"],
-        )
+    def test_open_states_are_saved_queued_and_use_configured_sales_policy(self) -> None:
+        for status in (-2, -1, 0, 4, 1):
+            with self.subTest(status=status):
+                started = datetime(2026, 10, 3, 12, 1, tzinfo=timezone.utc)
+                contact = self._purchase_contact(include_raw=False)
+                contact["fields"]["ultima_compra"] = "2026-10-01T10:00:00-03:00"
+                farm = self._purchase_api()
+                farm.get_pedido.return_value["capa"]["status"] = status
+                farm.get_cliente_by_cpf.return_value["ultimoPedido"]["status"] = status
+                client = self._incremental_purchase_client(contact)
+                client.get_contact.return_value = deepcopy(contact)
+                with (
+                    patch("weni_update.WeniClient", return_value=client),
+                    patch("weni_update._open_farmalider", return_value=farm),
+                    patch("weni_update.resolve_window", return_value=UpdateWindow(
+                        started_at=started, after=started, full=False,
+                    )),
+                    patch("weni_update._append_audit"),
+                    patch("weni_update._save_state") as save_mock,
+                ):
+                    result = run_update(apply=True, full=False)
+                self.assertEqual(result.orders_validated, 1)
+                self.assertEqual(result.purchase_confirmed, int(status in (4, 1, 2)))
+                self.assertEqual(result.contacts_updated, 1)
+                saved_fields = client.update_contact_fields.call_args.args[1]
+                self.assertEqual(saved_fields["pedido_status"], str(status))
+                if status in (4, 1, 2):
+                    self.assertIn("ultima_compra", saved_fields)
+                else:
+                    self.assertNotIn("ultima_compra", saved_fields)
+                self.assertEqual(
+                    save_mock.call_args.args[0]["open_order_uuids"], ["u-pedido"],
+                )
 
     def test_freight_is_not_added_to_pedido_valor(self) -> None:
         contact = self._purchase_contact(include_raw=False)
@@ -1026,7 +1033,8 @@ class WeniUpdateTests(unittest.TestCase):
 
     def test_audit_rejects_invalid_status_and_payment_codes(self) -> None:
         for fields in (
-            {"pedido_status": "4"},
+            {"pedido_status": "5"},
+            {"pedido_status": "-3"},
             {"pedido_status": "8"},
             {"pedido_status": "9"},
             {"pedido_forma_pagamento": "1.5"},

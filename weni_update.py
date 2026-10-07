@@ -44,7 +44,7 @@ from pedido_utils import (
     farmalider_payment_method_display,
     farmalider_payment_method_name,
     is_order_cancelled,
-    is_order_completed,
+    is_order_sale,
     normalize_farmalider_payment_code,
     parse_weni_order_list,
     serialize_weni_order_list,
@@ -115,7 +115,7 @@ REQUIRED_ORDER_FIELDS = {
 # Alias mantido para compatibilidade com testes/documentação anteriores.
 RECOMMENDED_ORDER_FIELDS = REQUIRED_ORDER_FIELDS
 
-OPEN_ORDER_STATUSES = {"Pendente pagamento", "Em processamento", "Em trânsito"}
+OPEN_ORDER_STATUSES = {"Em aberto", "Pendente de pagamento", "Em processamento", "Pronto para rota", "Em trânsito"}
 TERMINAL_ORDER_STATUSES = {"Concluído", "Cancelado"}
 
 
@@ -805,7 +805,7 @@ def _apply_purchase_candidate(
     plan.order_validated = True
     plan.order_payment_code = normalized_payment
     plan.purchase_confirmation = confirmation
-    plan.purchase_confirmed = confirmation == "CONFIRMADO_API" and is_order_completed(order)
+    plan.purchase_confirmed = confirmation == "CONFIRMADO_API" and is_order_sale(order)
     reason = "pedido oficial FarmaLíder atualizado por GET e normalizado para Weni"
 
     order_fields_to_write: dict[str, Any] = {
@@ -1056,9 +1056,9 @@ def audit_plans(
                 errors.append(
                     f"{plan.contact_uuid}: pagamento Cancelado exige pedido_status=3"
                 )
-            if "ultima_compra" in plan.fields and (status != "2" or payment.casefold() == "cancelado"):
+            if "ultima_compra" in plan.fields and (status not in {"4", "1", "2"} or payment.casefold() == "cancelado"):
                 errors.append(
-                    f"{plan.contact_uuid}: ultima_compra exige pedido concluído (pedido_status=2) e não cancelado"
+                    f"{plan.contact_uuid}: ultima_compra exige venda realizada (pedido_status=4, 1 ou 2) e não cancelada"
                 )
 
         if "contact_canal_principal" in plan.fields:

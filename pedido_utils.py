@@ -12,15 +12,20 @@ from zoneinfo import ZoneInfo
 
 BUSINESS_TIMEZONE = ZoneInfo("America/Belem")
 FARMALIDER_ORDER_STATUS_NAMES = {
-    -1: "Pendente pagamento",
+    -2: "Em aberto",
+    -1: "Pendente de pagamento",
     0: "Em processamento",
     1: "Em trânsito",
     2: "Concluído",
     3: "Cancelado",
+    4: "Pronto para rota",
 }
 
 FARMALIDER_ORDER_STATUS_ALIASES = {
+    "emaberto": -2,
+    "pendentedepagamento": -1,
     "pendentepagamento": -1,
+    "prontopararota": 4,
     "emprocessamento": 0,
     "emtransito": 1,
     "concluido": 2,
@@ -94,11 +99,11 @@ def normalize_farmalider_payment_code(value: Any) -> str:
 
 
 def normalize_farmalider_order_status_code(value: Any) -> str:
-    """Recognize the current -1..3 order codes and official enum names."""
+    """Recognize the documented -2..4 order codes and official enum names."""
     if isinstance(value, bool) or not isinstance(value, (int, str)):
         return ""
     text = str(value).strip()
-    if text == "-1":
+    if text in {"-2", "-1"}:
         return text
     if not text.isascii() or not text.isdigit():
         code = FARMALIDER_ORDER_STATUS_ALIASES.get(_enum_key(text))
@@ -206,20 +211,25 @@ def is_order_completed(order: dict[str, Any]) -> bool:
     return False
 
 
+def is_order_sale(order: dict[str, Any]) -> bool:
+    """Business sales include ready-for-route, in-transit and completed orders."""
+    return not is_order_cancelled(order) and effective_order_status_code(order) in {"4", "1", "2"}
+
+
 def is_order_made(order: dict[str, Any]) -> bool:
     """Count every documented non-cancelled operational state as a made order."""
     if is_order_cancelled(order):
         return False
     status = order.get("farmalider_status_pedido")
     label = farmalider_order_status_name(status)
-    if label in {"Em processamento", "Em trânsito", "Concluído"}:
+    if label in {"Em processamento", "Pronto para rota", "Em trânsito", "Concluído"}:
         return True
     if isinstance(status, str):
         text = "".join(
             character for character in unicodedata.normalize("NFKD", status.strip())
             if not unicodedata.combining(character)
         ).casefold().replace(" ", "")
-        return text in {"emprocessamento", "emtransito", "concluido"}
+        return text in {"emprocessamento", "prontopararota", "emtransito", "concluido"}
     return False
 
 

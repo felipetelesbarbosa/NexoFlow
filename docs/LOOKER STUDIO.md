@@ -34,7 +34,7 @@ Principais campos:
 
 Use esta aba para a página **Visão Geral** e para séries de evolução diária da base.
 
-Os indicadores de compradores, pedidos e faturamento consideram somente pedidos validados pela API com status efetivo 2, Concluído, sem cancelamento. Pagamento 0 força Cancelado e fica fora das vendas; -1, Pendente pagamento, também fica fora até a conclusão.
+Os indicadores de compradores, pedidos e faturamento consideram pedidos validados pela API com status efetivo 4 (Pronto para rota), 1 (Em trânsito) ou 2 (Concluído), sem cancelamento. Pagamento 0 força Cancelado e fica fora das vendas; -2 (Em aberto), -1 (Pendente de pagamento) e 0 (Em processamento) também ficam fora enquanto permanecerem nesses estados.
 
 ### BI_Canais
 
@@ -139,7 +139,7 @@ Pagamento 5 aparece como **Pix por Link de Pagamento** e pagamento 6 como **Pix 
 
 Para pagamento Int32 não negativo sem de-para a partir de 7, `pedido_forma_pagamento_nome` exibe `Não identificado (código X)` e o código é preservado. Pagamentos ausentes ou inválidos mantêm a descrição vazia.
 
-`BI_Pedidos` mantém os pedidos para consulta, inclusive pendentes e cancelados. Páginas de compradores e vendas devem filtrar status efetivo 2, Concluído; os estados -1, Pendente pagamento, 0, Em processamento, e 1, Em trânsito, permanecem em rechecagem e fora das vendas. Nomes oficiais do enum de status, como `PendentePagamento` e `Concluido`, são normalizados para os códigos -1 a 3.
+`BI_Pedidos` mantém os pedidos para consulta, inclusive pendentes e cancelados. Páginas de compradores e vendas devem filtrar status efetivo 4 (Pronto para rota), 1 (Em trânsito) e 2 (Concluído); os estados -2, Em aberto, -1, Pendente de pagamento, 0, Em processamento, 4, Pronto para rota, e 1, Em trânsito, permanecem em rechecagem; -2, -1 e 0 ficam fora das vendas, e 4 e 1 já são vendas realizadas. Nomes oficiais do enum de status, como `PendenteDePagamento` e `Concluido`, são normalizados para os códigos -2 a 4.
 
 ### BI_Status
 

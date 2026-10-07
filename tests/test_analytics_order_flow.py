@@ -229,13 +229,28 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
                     self.assertEqual(bi_order["pedido_status"], "2")
                     self.assertEqual(len(build_sales_metrics(orders, items)), 1)
 
+    def test_new_open_states_persist_to_bi_with_configured_sales(self):
+        for status, label in ((-2, "Em aberto"), (4, "Pronto para rota")):
+            with self.subTest(status=status):
+                contact, client = self.fixture(status=status, payment=6)
+                row, orders, items = self.resolve_and_persist(contact, client)
+                self.assertEqual(orders[0]["status_validacao"], "OK")
+                self.assertEqual(orders[0]["farmalider_status_pedido"], str(status))
+                bi_rows = build_bi_order_rows(
+                    [row], orders, items, updated_at="2026-10-05T14:00:00Z"
+                )
+                bi_order = dict(zip(BI_ORDERS_COLUMNS, bi_rows[0], strict=True))
+                self.assertEqual(bi_order["pedido_status"], str(status))
+                self.assertEqual(bi_order["pedido_status_nome"], label)
+                self.assertEqual(len(build_sales_metrics(orders, items)), int(status == 4))
+
     def test_pending_payment_order_is_preserved_in_bi_without_sale(self):
         contact, client = self.fixture(status=-1, payment=6)
         row, orders, items = self.resolve_and_persist(contact, client)
         self.assertEqual(orders[0]["status_validacao"], "OK")
         self.assertNotEqual(orders[0]["status_confirmacao"], "CANCELADO_API")
         self.assertEqual(orders[0]["farmalider_status_pedido"], "-1")
-        self.assertEqual(orders[0]["farmalider_status_pedido_nome"], "Pendente pagamento")
+        self.assertEqual(orders[0]["farmalider_status_pedido_nome"], "Pendente de pagamento")
         self.assertEqual(build_sales_metrics(orders, items), [])
         bi_rows = build_bi_order_rows(
             [row], orders, items, updated_at="2026-10-05T14:00:00Z"
@@ -243,7 +258,7 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
         self.assertEqual(len(bi_rows), 1)
         bi_order = dict(zip(BI_ORDERS_COLUMNS, bi_rows[0], strict=True))
         self.assertEqual(bi_order["pedido_status"], "-1")
-        self.assertEqual(bi_order["pedido_status_nome"], "Pendente pagamento")
+        self.assertEqual(bi_order["pedido_status_nome"], "Pendente de pagamento")
         self.assertEqual(bi_order["pedido_forma_pagamento"], "6")
         self.assertEqual(bi_order["pedido_forma_pagamento_nome"], "Pix no POS")
 
@@ -381,12 +396,12 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
         )
         self.assertEqual(conversion[-1]["quantidade"], 0)
 
-    def test_only_completed_state_enters_sales(self):
-        for status in (-1, 0, 1, 2, 4):
+    def test_configured_states_enter_sales(self):
+        for status in (-2, -1, 0, 1, 2, 4):
             with self.subTest(status=status):
                 contact, client = self.fixture(status=status)
                 _, orders, items = self.resolve_and_persist(contact, client)
-                self.assertEqual(len(build_sales_metrics(orders, items)), int(status == 2))
+                self.assertEqual(len(build_sales_metrics(orders, items)), int(status in (4, 1, 2)))
 
     def test_cancelled_and_unknown_states_stay_out_of_sales(self):
         for status in (3, 99):

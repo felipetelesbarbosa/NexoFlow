@@ -194,7 +194,7 @@ O valor de `opt_in_lgpd` é a fonte de verdade para os grupos. Com `ativo`, o co
 
 ## Pedidos e última compra
 
-A rotina usa a FarmaLíder API como fonte de verdade: consulta o cliente por CPF, obtém `ultimoPedido` e `itens`, confirma o mesmo pedido por código e então escreve os campos `pedido_*`. `pedido_produtos` usa `descricao`; quantidades e valores unitários são listas posicionais separadas por vírgula; `pedido_valor` é a soma de `itens[].total`. Somente status efetivo 2, Concluído, validado pela API e sem cancelamento conta como venda e atualiza `ultima_compra`. Pagamento 0 grava `pedido_forma_pagamento=Cancelado` e força status efetivo 3 na Weni/BI; `Pedidos_FarmaLider` mantém o status e o pagamento brutos da API. Status -1, Pendente pagamento, fica fora das vendas e permanece em rechecagem até Concluído ou Cancelado.
+A rotina usa a FarmaLíder API como fonte de verdade: consulta o cliente por CPF, obtém `ultimoPedido` e `itens`, confirma o mesmo pedido por código e então escreve os campos `pedido_*`. `pedido_produtos` usa `descricao`; quantidades e valores unitários são listas posicionais separadas por vírgula; `pedido_valor` é a soma de `itens[].total`. Pedidos validados pela API com status efetivo 4 (Pronto para rota), 1 (Em trânsito) ou 2 (Concluído), sem cancelamento, contam como venda e atualizam `ultima_compra`. Pagamento 0 grava `pedido_forma_pagamento=Cancelado` e força status efetivo 3 na Weni/BI; `Pedidos_FarmaLider` mantém o status e o pagamento brutos da API. Os estados -2, Em aberto, -1, Pendente de pagamento, 0, Em processamento, 4, Pronto para rota, e 1, Em trânsito, permanecem em rechecagem até Concluído ou Cancelado; somente -2, -1 e 0 ficam fora das vendas.
 
 ## Auditoria, idempotência e checkpoint
 

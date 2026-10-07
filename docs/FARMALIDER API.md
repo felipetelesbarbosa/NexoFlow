@@ -113,15 +113,17 @@ De-para usado pela integração:
 
 | Código | Identificador oficial | Rótulo |
 |---:|---|---|
-| -1 | `PendentePagamento` | Pendente de pagamento |
+| -2 | `EmAberto` | Em aberto |
+| -1 | `PendenteDePagamento` | Pendente de pagamento |
 | 0 | `EmProcessamento` | Em processamento |
+| 4 | `ProntoParaRota` | Pronto para rota |
 | 1 | `EmTransito` | Em trânsito |
 | 2 | `Concluido` | Concluído |
 | 3 | `Cancelado` | Cancelado |
 
-A Weni armazena o código efetivo em `pedido_status`. O normalizador aceita os códigos -1 a 3 e os nomes oficiais `PendentePagamento`, `EmProcessamento`, `EmTransito`, `Concluido` e `Cancelado`. Cancelamento explícito ou `formaPagamento=0` ou `_` força o código 3, Cancelado. O helper `effective_order_status_code(order)` aplica essa regra para Weni/BI; o Analytics deriva o nome amigável. `Pedidos_FarmaLider` preserva o status bruto retornado pela API em `farmalider_status_pedido`, inclusive quando ele difere do status efetivo.
+A Weni armazena o código efetivo em `pedido_status`. O normalizador aceita os códigos -2 a 4 e os nomes oficiais `EmAberto`, `PendenteDePagamento`, `EmProcessamento`, `ProntoParaRota`, `EmTransito`, `Concluido` e `Cancelado`. Cancelamento explícito ou `formaPagamento=0` ou `_` força o código 3, Cancelado. O helper `effective_order_status_code(order)` aplica essa regra para Weni/BI; o Analytics deriva o nome amigável. `Pedidos_FarmaLider` preserva o status bruto retornado pela API em `farmalider_status_pedido`, inclusive quando ele difere do status efetivo.
 
-Somente status efetivo 2, Concluído, validado pela API e sem cancelamento entra nas métricas de venda e atualiza `ultima_compra`. Os estados -1, 0 e 1 permanecem em rechecagem até Concluído ou Cancelado e não contam como venda. O estado 3 e o pagamento 0 ficam fora das vendas e encerram a rechecagem.
+Pedidos validados pela API com status efetivo 4 (Pronto para rota), 1 (Em trânsito) ou 2 (Concluído), sem cancelamento, entram nas métricas de venda e atualizam `ultima_compra`. Os estados -2, -1, 0, 1 e 4 permanecem em rechecagem até Concluído ou Cancelado. Os estados -2, -1 e 0 não contam como venda; 4 e 1 já contam. O estado 3 e o pagamento 0 ficam fora das vendas e encerram a rechecagem.
 
 ## Forma de pagamento
 
@@ -141,7 +143,7 @@ A Weni armazena o código normalizado em `pedido_forma_pagamento`, exceto `forma
 
 Além dos nomes oficiais, o normalizador de `formaPagamento` aceita códigos Int32 não negativos. Códigos numéricos válidos sem de-para a partir de 7 continuam sendo preservados como Int32 na Weni e apresentados no Google Sheets/BI como `Não identificado (código X)`. Textos fora dos nomes de enum aceitos, valores fracionários, negativos e números fora de Int32 continuam inválidos; o literal operacional `Cancelado` na Weni é aceito como resultado da regra de pagamento 0. A leitura e a auditoria ignoram diferenças entre maiúsculas e minúsculas e continuam aceitando o valor legado `CANCELADO`. Valores ausentes ou inválidos mantêm a descrição vazia.
 
-O helper `farmalider_payment_method_name` retorna somente os rótulos documentados. O helper de apresentação `farmalider_payment_method_display` usa esses rótulos e acrescenta a descrição explícita para códigos válidos desconhecidos, sem modificar o código recebido.
+O nome antigo `PendentePagamento` permanece aceito como alias de `PendenteDePagamento` para leitura de registros existentes. O helper `farmalider_payment_method_name` retorna somente os rótulos documentados. O helper de apresentação `farmalider_payment_method_display` usa esses rótulos e acrescenta a descrição explícita para códigos válidos desconhecidos, sem modificar o código recebido.
 
 No NexoFlow Weni, cada código sem de-para gera `INFO` uma vez por execução, com totais por código no resumo. A contagem usa o código retornado pela API para cada contato com pedido validado, inclusive quando não há alteração; não representa pedidos únicos. A falta de de-para não bloqueia a preparação, a auditoria ou a gravação dos demais campos válidos.
 

@@ -28,7 +28,7 @@ pedido_valor
 
 Produtos, quantidades e valores unitários são separados por vírgula e mantêm a mesma ordem posicional. `pedido_valor` é a soma de `itens[].total`. A data é gravada como `DD/MM/YY HH:MM:SS`.
 
-O status efetivo usa o enum atual: -1 Pendente pagamento, 0 Em processamento, 1 Em trânsito, 2 Concluído e 3 Cancelado. Somente pedidos validados pela API com status efetivo 2, sem cancelamento, contam como venda e atualizam `ultima_compra`. Os estados -1, 0 e 1 permanecem em rechecagem até Concluído ou Cancelado.
+O status efetivo usa o enum atual: -2 Em aberto, -1 Pendente de pagamento, 0 Em processamento, 4 Pronto para rota, 1 Em trânsito, 2 Concluído e 3 Cancelado. Pedidos validados pela API com status efetivo 4, 1 ou 2, sem cancelamento, contam como venda e atualizam `ultima_compra`. Os estados -2, -1, 0, 1 e 4 permanecem em rechecagem até Concluído ou Cancelado.
 
 | Código de pagamento | Descrição |
 |---:|---|

@@ -255,19 +255,19 @@ Regras:
 - `pedido_valor` é a soma de `itens[].total`, sem adicionar frete;
 - o frete não é gravado nos campos Weni de pedido; ele é preservado no Google Sheets como `farmalider_frete` e usado pelo Analytics para calcular `valor_total_faturamento = pedido_valor + frete`;
 - `pedido_data` é gravada no formato `DD/MM/YY HH:MM:SS`, usando America/Belem;
-- `pedido_status` guarda o status efetivo: -1 Pendente pagamento, 0 Em processamento, 1 Em trânsito, 2 Concluído, 3 Cancelado;
+- `pedido_status` guarda o status efetivo: -2 Em aberto, -1 Pendente de pagamento, 0 Em processamento, 4 Pronto para rota, 1 Em trânsito, 2 Concluído, 3 Cancelado;
 - `pedido_forma_pagamento` guarda o código Int32 não negativo normalizado da API: 1 Dinheiro, 2 Débito, 3 Crédito, 4 Ticket, 5 Pix por Link de Pagamento, 6 Pix no POS; a exceção é pagamento 0 ou `_`, que grava o texto `Cancelado` e força `pedido_status=3`;
-- os normalizadores aceitam os nomes oficiais dos enums, como `PendentePagamento`, `EmProcessamento`, `Concluido`, `PixPorLinkDePagamento` e `PixNoPOS`; pagamento `_` é normalizado para 0;
+- os normalizadores aceitam os nomes oficiais dos enums, como `PendenteDePagamento`, `EmProcessamento`, `Concluido`, `PixPorLinkDePagamento` e `PixNoPOS`; pagamento `_` é normalizado para 0;
 - `Pedidos_FarmaLider` preserva status e pagamento brutos da API; Weni e `BI_Pedidos` usam o status efetivo Cancelado quando o pagamento é 0;
 - os rótulos amigáveis de status e pagamento são derivados no Analytics/BI; pagamento válido sem de-para a partir de 7 aparece como `Não identificado (código X)`;
 - `pedido_id` é o primeiro localizador de fallback quando o GET por CPF não puder ser usado;
 - `ultimo_pedido` é o **último localizador**: ele pode vir de outra integração e serve somente para recuperar um ID de pedido que depois será confirmado em `GET pedido/{id}`;
 - `ultimo_pedido` nunca substitui a API como fonte de produtos, valores, status, data ou pagamento; se a FarmaLíder estiver indisponível, os campos `pedido_*` existentes são preservados e não são reconstruídos a partir do snapshot legado;
-- `ultima_compra` avança somente para pedido confirmado pela FarmaLíder com status efetivo 2, Concluído, sem cancelamento explícito e sem pagamento 0; somente esses pedidos entram nas métricas de venda.
+- `ultima_compra` avança somente para pedido confirmado pela FarmaLíder com status efetivo 4, 1 ou 2, sem cancelamento explícito e sem pagamento 0; somente esses pedidos entram nas métricas de venda.
 
 Os campos `pedido_id`, `pedido_data`, `pedido_status`, `pedido_produtos`, `pedido_quantidade_itens`, `pedido_valor_produtos`, `pedido_valor` e `pedido_forma_pagamento` são obrigatórios na Weni. Se qualquer um estiver ausente, o preflight bloqueia a execução antes de qualquer atualização de pedido.
 
-Pedidos com status -1, 0 ou 1 permanecem na fila de rechecagem até chegarem a 2, Concluído, ou 3, Cancelado. Esses estados abertos não contam como vendas.
+Pedidos com status -2, -1, 0, 1 ou 4 permanecem na fila de rechecagem até chegarem a 2, Concluído, ou 3, Cancelado. Os estados -2, -1 e 0 não contam como vendas; 4 e 1 já contam, mas continuam em rechecagem.
 
 ## Incremental e checkpoint
 

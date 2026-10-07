@@ -162,7 +162,7 @@ A rotina de write-back fica separada da sincronização analítica. `contact_enr
 
 Antes de publicar o NexoFlow 1.0, valide especialmente que `audit_plans(plans)` aparece antes de `update_contact_fields`, que o checkpoint vem depois das escritas e que o dry-run não executa POST.
 
-Mudanças em pedidos devem manter o enum de status -1 a 3, os nomes oficiais aceitos pelos normalizadores e a separação entre dados brutos da API e status efetivo na Weni/BI. Verifique a rechecagem de -1, 0 e 1, o cancelamento por pagamento 0/`_` e a elegibilidade de vendas e `ultima_compra` somente para status efetivo 2. O contrato detalhado está em [docs/PEDIDOS.md](docs/PEDIDOS.md).
+Mudanças em pedidos devem manter o enum de status -2 a 4, os nomes oficiais aceitos pelos normalizadores e a separação entre dados brutos da API e status efetivo na Weni/BI. Verifique a rechecagem de -2, -1, 0, 1 e 4, o cancelamento por pagamento 0/`_` e a elegibilidade de vendas e `ultima_compra` para status efetivo 4, 1 ou 2. O contrato detalhado está em [docs/PEDIDOS.md](docs/PEDIDOS.md).
 
 Depois de atualizar ou reinstalar uma instalação de validação, gere um novo dry-run completo com `atualizar_weni_carga_completa.bat`, revise o plano sob a política atual e só então confirme o apply. Execute depois `executar_carga_completa.bat` para recalcular o Analytics/BI.
 

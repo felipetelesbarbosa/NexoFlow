@@ -248,7 +248,7 @@ Os oito campos `pedido_*` abaixo são obrigatórios na Weni. Se qualquer um esti
 | `pedido_valor_produtos` | `itens[].valor` | valores unitários na mesma ordem, separados por vírgula |
 | `pedido_valor` | soma de `itens[].total` | valor total dos itens do pedido |
 | `pedido_data` | `emissao` | `DD/MM/YY HH:MM:SS` |
-| `pedido_status` | `status` e regra de cancelamento | status efetivo de -1 a 3 |
+| `pedido_status` | `status` e regra de cancelamento | status efetivo de -2 a 4 |
 | `pedido_forma_pagamento` | `formaPagamento` | código Int32 não negativo normalizado; 0 grava `Cancelado` |
 
 `codProduto` não é usado como nome do produto. O nome exibido vem exclusivamente de `descricao`. O código do produto pode continuar armazenado internamente para auditoria, sem alimentar `pedido_produtos`.
@@ -274,8 +274,10 @@ As três listas de item são posicionais: o primeiro produto corresponde à prim
 
 | Código | Status |
 |---:|---|
-| -1 | Pendente pagamento |
+| -2 | Em aberto |
+| -1 | Pendente de pagamento |
 | 0 | Em processamento |
+| 4 | Pronto para rota |
 | 1 | Em trânsito |
 | 2 | Concluído |
 | 3 | Cancelado |
@@ -294,7 +296,7 @@ As três listas de item são posicionais: o primeiro produto corresponde à prim
 
 A Weni guarda os códigos de pagamento normalizados, exceto `formaPagamento=0` ou `_`, que grava o texto `Cancelado` em `pedido_forma_pagamento` e o status efetivo `3`, Cancelado. O Analytics cria os rótulos amigáveis para o Google Sheets e o Looker Studio. `Pedidos_FarmaLider` preserva os valores brutos de pagamento e status da API; Weni e `BI_Pedidos` usam o status efetivo, inclusive o cancelamento por pagamento 0.
 
-Os normalizadores aceitam códigos e nomes dos enums oficiais, como `PendentePagamento`, `EmProcessamento`, `Concluido`, `PixPorLinkDePagamento` e `PixNoPOS`. O nome de pagamento `_` corresponde ao código 0 e aplica a mesma regra de cancelamento.
+Os normalizadores aceitam códigos e nomes dos enums oficiais, como `PendenteDePagamento`, `EmProcessamento`, `Concluido`, `PixPorLinkDePagamento` e `PixNoPOS`. O nome antigo `PendentePagamento` permanece aceito como alias de `PendenteDePagamento` para leitura de registros existentes. O nome de pagamento `_` corresponde ao código 0 e aplica a mesma regra de cancelamento.
 
 Códigos numéricos de pagamento válidos sem de-para a partir de 7 continuam sendo preservados como Int32 na Weni e exibidos no Google Sheets/BI como `Não identificado (código X)`, sem impedir a atualização dos demais campos válidos. Pagamento ausente ou inválido mantém a descrição vazia.
 
@@ -314,9 +316,9 @@ pedido_faturamento_total = produtos + frete
 
 As abas `BI_Resumo_Diario` e `BI_Vendas` também separam faturamento de produtos, faturamento de frete e faturamento total. O campo de faturamento usado nos indicadores gerais passa a considerar **produtos + frete**, para bater com o valor total cobrado do pedido.
 
-Somente pedidos validados pela API com status efetivo **2, Concluído**, sem cancelamento explícito e sem pagamento 0 entram nas métricas de venda e atualizam `ultima_compra`. Pedidos pendentes, em processamento, em trânsito ou cancelados ficam fora.
+Pedidos validados pela API com status efetivo **4, Pronto para rota**, **1, Em trânsito**, ou **2, Concluído**, sem cancelamento explícito e sem pagamento 0 entram nas métricas de venda e atualizam `ultima_compra`. Pedidos em aberto, pendentes de pagamento, em processamento ou cancelados ficam fora.
 
-Pedidos abertos em **Pendente pagamento (-1)**, **Em processamento (0)** ou **Em trânsito (1)** permanecem em fila de rechecagem até chegarem a **Concluído** ou **Cancelado**.
+Pedidos abertos em **Em aberto (-2)**, **Pendente de pagamento (-1)**, **Em processamento (0)**, **Pronto para rota (4)** ou **Em trânsito (1)** permanecem em fila de rechecagem até chegarem a **Concluído** ou **Cancelado**.
 
 Datas operacionais de pedidos usam **America/Belem (UTC-3)**.
 
