@@ -118,11 +118,11 @@ De-para oficial:
 
 | Código | API | Apresentação |
 |---:|---|---|
+| -1 | `PendentePagamento` | Pendente pagamento |
 | 0 | `EmProcessamento` | Em processamento |
 | 1 | `EmTransito` | Em trânsito |
 | 2 | `Concluido` | Concluído |
 | 3 | `Cancelado` | Cancelado |
-| 4 | `ProntoParaRota` | Pronto para rota |
 
 A Weni recebe o **código** em `pedido_status`. O Analytics deriva `pedido_status_nome` para apresentação no Google Sheets/Looker Studio.
 
@@ -138,7 +138,9 @@ De-para oficial:
 | 2 | Débito |
 | 3 | Crédito |
 | 4 | Ticket |
-| 5 | Online/link/Pix |
+| 5 | Pix por Link de Pagamento |
+| 6 | PIX no POS |
+| 0 | CANCELADO |
 
 A Weni recebe o código em `pedido_forma_pagamento`. O Analytics deriva `pedido_forma_pagamento_nome`. Códigos Int32 não negativos sem de-para, como 0 e 6, são preservados e exibidos no Google Sheets/BI como `Não identificado (código X)`. Essa descrição não atribui uma forma de pagamento ao código. Pagamento ausente ou inválido mantém a descrição vazia.
 
@@ -236,6 +238,8 @@ Pedidos em 0, 1 ou 4 continuam sendo rechecados nas execuções seguintes até c
 
 - 2, Concluído; ou
 - 3, Cancelado.
+
+O status -1, Pendente pagamento, permanece em rechecagem e não entra como venda até haver pagamento e mudança de status.
 
 A mudança de status atualiza o snapshot sem trocar o `pedido_id` por outro pedido arbitrariamente.
 
