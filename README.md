@@ -240,8 +240,8 @@ Os oito campos `pedido_*` abaixo são obrigatórios na Weni. Se qualquer um esti
 | `pedido_valor_produtos` | `itens[].valor` | valores unitários na mesma ordem, separados por vírgula |
 | `pedido_valor` | soma de `itens[].total` | valor total dos itens do pedido |
 | `pedido_data` | `emissao` | `DD/MM/YY HH:MM:SS` |
-| `pedido_status` | `status` | código oficial 0 a 4 |
-| `pedido_forma_pagamento` | `formaPagamento` | código Int32 recebido; de-para documentado de 1 a 5 |
+| `pedido_status` | `status` | código oficial -1 a 3; forma de pagamento 0 força status 3 |
+| `pedido_forma_pagamento` | `formaPagamento` | 1–6; valor 0 é salvo como `CANCELADO` |
 
 `codProduto` não é usado como nome do produto. O nome exibido vem exclusivamente de `descricao`. O código do produto pode continuar armazenado internamente para auditoria, sem alimentar `pedido_produtos`.
 
@@ -266,11 +266,11 @@ As três listas de item são posicionais: o primeiro produto corresponde à prim
 
 | Código | Status |
 |---:|---|
+| -1 | Pendente pagamento |
 | 0 | Em processamento |
 | 1 | Em trânsito |
 | 2 | Concluído |
 | 3 | Cancelado |
-| 4 | Pronto para rota |
 
 ### Formas de pagamento
 
@@ -280,11 +280,13 @@ As três listas de item são posicionais: o primeiro produto corresponde à prim
 | 2 | Débito |
 | 3 | Crédito |
 | 4 | Ticket |
-| 5 | Online/link/Pix |
+| 5 | Pix por Link de Pagamento |
+| 6 | PIX no POS |
+| 0 | CANCELADO |
 
 A Weni guarda os códigos oficiais. O Analytics cria os rótulos amigáveis para o Google Sheets e o Looker Studio.
 
-O Swagger define `formaPagamento` como Int32 sem enum. Códigos numéricos não negativos fora do de-para são preservados na Weni e exibidos no Google Sheets/BI como `Não identificado (código X)`, sem impedir a atualização dos demais campos válidos. Para 0 e 6, por exemplo, não há forma de pagamento documentada. Pagamento ausente ou inválido mantém a descrição vazia.
+O de-para atual de pagamento é: 1 Dinheiro, 2 Débito, 3 Crédito, 4 Ticket, 5 Pix por Link de Pagamento, 6 PIX no POS e 0 CANCELADO. O valor 0 (ou enum `_`) indica pedido não pago: o NexoFlow grava `pedido_forma_pagamento = CANCELADO` e força `pedido_status = 3` (Cancelado). Pagamento ausente continua sem descrição.
 
 Cada código sem de-para aparece em `INFO` uma vez por execução, seguido dos totais por código; esse registro informa a falta de descrição documentada e não indica falha na atualização.
 
@@ -302,9 +304,9 @@ pedido_faturamento_total = produtos + frete
 
 As abas `BI_Resumo_Diario` e `BI_Vendas` também separam faturamento de produtos, faturamento de frete e faturamento total. O campo de faturamento usado nos indicadores gerais passa a considerar **produtos + frete**, para bater com o valor total cobrado do pedido.
 
-Para os indicadores, **0, 1, 2 e 4** contam como pedido feito quando confirmados pela API e sem cancelamento explícito. **3, Cancelado**, fica fora.
+Para os indicadores, **0, 1 e 2** contam como pedido feito quando confirmados pela API e sem cancelamento explícito. **-1, Pendente pagamento**, e **3, Cancelado**, ficam fora.
 
-Pedidos abertos em **Em processamento**, **Em trânsito** ou **Pronto para rota** permanecem em fila de rechecagem até chegarem a **Concluído** ou **Cancelado**.
+Pedidos em **Pendente pagamento**, **Em processamento** ou **Em trânsito** permanecem em fila de rechecagem até chegarem a **Concluído** ou **Cancelado**.
 
 Datas operacionais de pedidos usam **America/Belem (UTC-3)**.
 
