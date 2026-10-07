@@ -251,10 +251,10 @@ class BILayerTests(unittest.TestCase):
         self.assertEqual(summary["novos_contatos"], 1)
 
     def test_every_documented_non_cancelled_state_enters_sales_and_bi(self):
-        for status in (0, 1, 2, 3, 4, "0", "1", "2", "3", "4", "99", "", None):
+        for status in (-1, 0, 1, 2, 3, 4, "-1", "0", "1", "2", "3", "4", "99", "", None):
             with self.subTest(status=status):
                 base, order, items = self.order_fixture(status=status)
-                made = str(status) in {"0", "1", "2", "4"}
+                made = str(status) in {"0", "1", "2"}
                 self.assertEqual(len(items), 1)  # Every state remains auditable.
                 self.assertEqual(order["pedido_chave"], "FARMALIDER:500")
                 expected_sales = [["2026-10-05", 1, 1, 1, "2", "19.50", "0.00", "19.50", "19.50"]] if made else []
