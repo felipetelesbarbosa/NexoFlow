@@ -145,15 +145,29 @@ class FarmaliderClient:
         """Sessão da thread atual, mantida por compatibilidade/testes."""
         return self._get_session()
 
+    def _sync_base_url_from_environment(self) -> bool:
+        """Sincroniza a URL FarmaLíder caso outra integração tenha trocado a rota."""
+        new_base_url = farmalider_api_base_url().rstrip("/")
+        if new_base_url == self.base_url:
+            return False
+        previous_base_url = self.base_url
+        self.base_url = new_base_url
+        logging.warning(
+            "FarmaLíder: mudança de rota detectada por outra etapa da carga; "
+            "URL operacional atualizada de %s para %s.",
+            "proxy" if ":3200" not in previous_base_url else "direta",
+            "proxy" if ":3200" not in new_base_url else "direta",
+        )
+        return True
+
     def _refresh_network_route(self, *, reason: str) -> bool:
         """Redetecta direta/proxy e atualiza a URL FarmaLíder sem reiniciar a carga."""
         from proxy_config import refresh_network_route
 
         previous_base_url = self.base_url
         result = refresh_network_route(reason=reason)
-        new_base_url = farmalider_api_base_url().rstrip("/")
-        self.base_url = new_base_url
-        changed = result.changed or new_base_url != previous_base_url
+        self._sync_base_url_from_environment()
+        changed = result.changed or self.base_url != previous_base_url
         if changed:
             logging.warning(
                 "FarmaLíder: rota atualizada durante a execução; retomando na %s.",
@@ -583,6 +597,7 @@ class FarmaliderClient:
 
         for attempt in range(1, FARMALIDER_MAX_RETRIES + 1):
             response: requests.Response | None = None
+            self._sync_base_url_from_environment()
             url = f"{self.base_url}{path}"
             with self._private_request_slot(
                 endpoint_label, private_cpf, diagnostic_ref, last_server_response, attempt,
@@ -768,6 +783,7 @@ class FarmaliderClient:
 
         for attempt in range(1, FARMALIDER_MAX_RETRIES + 1):
             response: requests.Response | None = None
+            self._sync_base_url_from_environment()
             url = f"{self.base_url}{path}"
 
             with self._request_slot(endpoint_label) as permit:
