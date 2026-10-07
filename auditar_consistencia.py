@@ -947,6 +947,36 @@ def check_weni_update_safety() -> None:
         return
     ok("Preflight valida os campos multicanal na Weni antes de processar/aplicar o plano.")
 
+    for required in [
+        "REQUIRED_ORDER_FIELDS",
+        "_missing_order_fields",
+        "_ensure_order_fields",
+        "pedido_valor_produtos",
+        "pedido_forma_pagamento",
+    ]:
+        if required not in update_text:
+            fail(f"Preflight de pedidos da Weni está incompleto: {required}")
+            return
+    if "Campos de pedido obrigatórios ausentes na Weni" not in run_update_text:
+        fail("CLI do NexoFlow Weni não informa campos obrigatórios de pedido ausentes.")
+        return
+    ok("Preflight exige o contrato completo de campos pedido_* antes do apply.")
+
+    integration_text = read("farmalider_integration.py")
+    analytics_text = read("analytics.py")
+    for required in [
+        "_ultimo_pedido_locator_id",
+        "FARMALIDER_PEDIDO_ID_WENI",
+        "FARMALIDER_ULTIMO_PEDIDO_LOCATOR",
+        "valor_total_faturamento",
+        "farmalider_frete",
+    ]:
+        source = integration_text + "\n" + analytics_text
+        if required not in source:
+            fail(f"Arquitetura de recuperação/frete dos pedidos está incompleta: {required}")
+            return
+    ok("Pedidos usam pedido_id/ultimo_pedido como localizadores e separam produtos, frete e faturamento total.")
+
     if "Opt-In LGPD" not in update_text or "Opt-Out LGPD" not in update_text:
         fail("Update Weni precisa sincronizar os grupos Opt-In LGPD e Opt-Out LGPD.")
         return
