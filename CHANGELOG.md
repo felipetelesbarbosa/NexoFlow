@@ -2,6 +2,16 @@
 
 ## NexoFlow 1.0
 
+### Diagnóstico de rede e proxy
+
+- diagnóstico sanitizado da Weni distingue HTTP 407/403 no proxy, certificado TLS, DNS, timeout e conexão recusada, incluindo exceções aninhadas;
+- causas explícitas não transitórias encerram o retry da Weni sem repetir a mesma falha;
+- diagnóstico mostra a rota efetiva da Weni, respeitando exceções de proxy;
+- logs do diagnóstico usam America/Belem (UTC-3) e persistência local;
+- avisos de rede do Google Sheets incluem categoria segura, sem texto bruto da exceção;
+- HTTP 400/404 no CPF fictício da FarmaLíder é apresentado como resposta de rede, com autenticação não confirmada;
+- diagnóstico não desativa TLS nem altera automaticamente a rota escolhida.
+
 ### Auditoria dos campos de pedido
 
 - listas separadas por vírgula usam aspas CSV quando o nome contém vírgula, aspas ou quebra de linha, preservando o nome completo e a correspondência com quantidade e valor;

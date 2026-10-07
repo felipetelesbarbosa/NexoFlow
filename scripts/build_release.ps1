@@ -266,6 +266,7 @@ Distribuicao oficial do **NexoFlow 1.0**.
 O arquivo `NexoFlow-Setup-$Version.zip` contem o instalador do NexoFlow 1.0 e foi validado automaticamente em Windows para primeira instalacao e atualizacao de uma instalacao existente.
 
 Melhorias desta distribuicao do NexoFlow 1.0:
+- diagnostico seguro de proxy identifica autenticacao 407, bloqueio de tunel 403, TLS, DNS, timeout e conexao recusada; resposta 400/404 da FarmaLider nao e apresentada como autenticacao confirmada;
 - listas de pedido com leitura CSV preservam virgulas e aspas nos nomes dos produtos, sem desalinhamento artificial na Weni e no Analytics;
 - codigos numericos de pagamento nao documentados sao preservados com aviso, sem inventar a forma de pagamento; a auditoria continua bloqueando listas realmente inconsistentes;
 - cooldown global e recuperacao serial apos falhas 5xx da FarmaLider, com retorno gradual da concorrencia e reducao do intervalo quando a API se recupera;

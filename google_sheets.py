@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from gspread.worksheet import Worksheet
 from gspread.exceptions import APIError, SpreadsheetNotFound, WorksheetNotFound
 from requests.exceptions import RequestException
+from network_diagnostics import classify_network_failure
 
 from analytics import (
     BASE_COLUMNS,
@@ -353,7 +354,7 @@ class GoogleSheetsStore:
                     "Tentativa %s/%s. Aguardando %.1f s.",
                     elapsed,
                     description,
-                    exc.__class__.__name__,
+                    classify_network_failure(exc).summary,
                     attempt,
                     attempts,
                     wait,

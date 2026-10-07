@@ -514,6 +514,20 @@ https://api.farmalider.net.br:3200/farmalider
 
 O modo `auto` detecta o ambiente e seleciona a rota adequada.
 
+O teste TCP do proxy confirma somente que sua porta responde. `nexo diagnostico` testa cada serviço separadamente e mostra a rota efetiva para a Weni. Os logs usam America/Belem (UTC-3).
+
+| Diagnóstico | Significado e ação |
+|---|---|
+| `PROXY_AUTENTICACAO` / HTTP 407 | Proxy exige autenticação ou recusou as credenciais; conferir usuário, senha e método de autenticação. |
+| `PROXY_ACESSO_NEGADO` / HTTP 403 no túnel | Proxy negou HTTPS; conferir liberação do domínio com a equipe de rede. |
+| `TLS_CERTIFICADO` | Conferir certificados, CA corporativa e relógio; não desativar validação TLS. |
+| `DNS` | Conferir resolução dos endereços na rota. |
+| `TIMEOUT` | Conexão ou resposta excedeu o limite. |
+| `CONEXAO_RECUSADA` | Conferir host, porta, firewall e disponibilidade. |
+| `PROXY_CONEXAO` | Falha do proxy sem detalhe suficiente para identificar a causa. |
+
+A classificação analisa erros aninhados sem imprimir mensagens originais, URLs autenticadas, senhas ou tokens. A Weni evita repetir falhas explícitas de autenticação do proxy, bloqueio do túnel e certificado; falhas transitórias continuam com retry. O diagnóstico não muda a rota nem tenta contornar o proxy automaticamente. HTTP 400/404 da FarmaLíder no CPF fictício confirma uma resposta do servidor, mas não confirma autenticação e aparece como aviso.
+
 ## Instalação
 
 O pacote **NexoFlow Setup** instala o projeto em:

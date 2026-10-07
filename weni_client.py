@@ -18,6 +18,11 @@ from config import (
     WENI_GROUPS_API_URL,
     WENI_MESSAGES_API_URL,
 )
+from network_diagnostics import classify_network_failure
+
+
+class WeniError(RuntimeError):
+    """Controlled user-facing messages, without raw HTTP exception text."""
 
 
 class WeniClient:
@@ -63,12 +68,12 @@ class WeniClient:
                 )
 
                 if response.status_code == 401:
-                    raise RuntimeError(
+                    raise WeniError(
                         "Weni retornou 401. Verifique o token da API."
                     )
                 if response.status_code == 403:
-                    raise RuntimeError(
-                        "Weni retornou 403. O token não tem permissão."
+                    raise WeniError(
+                        "Weni retornou 403 (acesso negado). Confira permissões do token e regras de acesso."
                     )
 
                 if response.status_code == 429 or response.status_code >= 500:
@@ -76,8 +81,9 @@ class WeniClient:
                         response.raise_for_status()
                     wait = float(2 ** (attempt - 1))
                     logging.warning(
-                        "Weni indisponível/limitando requisições. "
+                        "Weni HTTP %s indisponível/limitando requisições. "
                         "Tentativa %s/%s. Repetindo em %.1fs.",
+                        response.status_code,
                         attempt,
                         MAX_RETRIES,
                         wait,
@@ -93,23 +99,30 @@ class WeniClient:
             except RuntimeError:
                 raise
             except (requests.RequestException, ValueError) as exc:
-                last_error = exc.__class__.__name__
+                if isinstance(exc, requests.RequestException):
+                    failure = classify_network_failure(exc)
+                    last_error = failure.summary
+                    if not failure.retryable:
+                        break
+                else:
+                    last_error = "[RESPOSTA_INVALIDA] A resposta da Weni não contém JSON válido."
                 if attempt >= MAX_RETRIES:
                     break
                 wait = float(2 ** (attempt - 1))
                 logging.warning(
-                    "Falha temporária ao acessar Weni. Tentativa %s/%s. "
+                    "Falha temporária ao acessar Weni: %s Tentativa %s/%s. "
                     "Repetindo em %.1fs.",
+                    last_error,
                     attempt,
                     MAX_RETRIES,
                     wait,
                 )
                 time.sleep(wait)
 
-        raise RuntimeError(
+        raise WeniError(
             "Não foi possível acessar a API da Weni. "
-            f"Último tipo de erro: {last_error}."
-        )
+            f"Diagnóstico: {last_error}"
+        ) from None
 
     def _get_json(
         self,

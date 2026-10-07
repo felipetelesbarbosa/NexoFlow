@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import sys
 
+import requests
+from urllib.parse import urlsplit
+
 import secrets_config as secrets
 from config import (
     FARMALIDER_BATCH_SIZE,
@@ -9,10 +12,20 @@ from config import (
     FARMALIDER_MAX_WORKERS,
     FARMALIDER_REQUEST_DELAY_SECONDS,
     GOOGLE_CREDENTIALS_FILE,
+    WENI_CONTACTS_API_URL,
 )
-from farmalider_client import FarmaliderClient
+from farmalider_client import FarmaliderClient, FarmaliderError
 from google_sheets import GoogleSheetsStore
-from weni_client import WeniClient
+from weni_client import WeniClient, WeniError
+from network_diagnostics import classify_network_failure
+
+
+def safe_failure(error: Exception) -> str:
+    if isinstance(error, requests.RequestException):
+        return classify_network_failure(error).summary
+    if isinstance(error, (WeniError, FarmaliderError)):
+        return str(error)
+    return f"Falha do tipo {type(error).__name__}; consulte o diagnóstico local."
 
 
 def ok(text: str) -> None:
@@ -29,7 +42,10 @@ def fail(text: str) -> None:
 
 def main() -> int:
     errors = 0
+    farm_auth_unconfirmed = False
     print("=== Diagnóstico NexoFlow ===\n")
+    print("[INFO] Proxy TCP acessível não comprova autenticação nem acesso a cada serviço HTTPS.")
+    print("[INFO] TLS permanece validado; o diagnóstico não muda automaticamente a rota de rede.\n")
 
     weni_token = str(getattr(secrets, "WENI_API_TOKEN", "")).strip()
     spreadsheet_id = str(
@@ -89,6 +105,9 @@ def main() -> int:
         return 1
 
     print("\nTestando Weni...")
+    proxies = requests.utils.get_environ_proxies(WENI_CONTACTS_API_URL)
+    route = "proxy" if proxies.get("https") or proxies.get("all") else "direta"
+    print(f"[INFO] Destino: {urlsplit(WENI_CONTACTS_API_URL).hostname} | conexão: {route}")
     client = WeniClient(weni_token)
     try:
         result = client.test_connection()
@@ -97,7 +116,7 @@ def main() -> int:
             f"(amostra retornada: {result['sample_count']})"
         )
     except Exception as exc:
-        fail(f"Falha na Weni: {exc}")
+        fail(f"Falha na Weni: {safe_failure(exc)}")
         errors += 1
     finally:
         client.close()
@@ -107,14 +126,18 @@ def main() -> int:
         farm = FarmaliderClient(farm_token, use_hml=farm_hml)
         try:
             result = farm.test_connection()
-            ok(
-                "FarmaLíder API acessível "
-                f"({result['environment']}, HTTP {result['status_code']}; "
-                "token não foi explicitamente rejeitado)"
-            )
+            if result["status_code"] in {400, 404}:
+                farm_auth_unconfirmed = True
+                warn(
+                    "FarmaLíder respondeu ao teste com CPF fictício "
+                    f"({result['environment']}, HTTP {result['status_code']}). "
+                    "Rede acessível; autenticação não confirmada por este teste."
+                )
+            else:
+                ok(f"FarmaLíder respondeu ao teste ({result['environment']}, HTTP {result['status_code']}).")
             ok(f"URL selecionada FarmaLíder: {result['base_url']}")
         except Exception as exc:
-            fail(f"Falha na FarmaLíder API: {exc}")
+            fail(f"Falha na FarmaLíder API: {safe_failure(exc)}")
             errors += 1
         finally:
             farm.close()
@@ -124,7 +147,7 @@ def main() -> int:
         GoogleSheetsStore(spreadsheet_id, validate_structure=True)
         ok("Conexão com Google Sheets funcionando e estrutura completa validada")
     except Exception as exc:
-        fail(f"Falha no Google Sheets: {exc}")
+        fail(f"Falha no Google Sheets: {safe_failure(exc)}")
         errors += 1
 
     print()
@@ -132,7 +155,10 @@ def main() -> int:
         print(f"Diagnóstico concluído com {errors} erro(s).")
         return 1
 
-    print("Tudo certo. O projeto está pronto para sincronizar.")
+    if farm_auth_unconfirmed:
+        warn("Conexões testadas; autenticação FarmaLíder ainda precisa ser confirmada em uma consulta real.")
+    else:
+        print("Tudo certo. O projeto está pronto para sincronizar.")
     return 0
 
 
