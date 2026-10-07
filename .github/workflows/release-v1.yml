@@ -64,6 +64,18 @@ jobs:
         run: |
           ./scripts/test_setup_windows.ps1 -SetupZip "dist/NexoFlow-Setup-1.0.zip"
 
+      - name: Disponibilizar pacotes do NexoFlow 1.0
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: NexoFlow-1.0-pacotes
+          path: |
+            dist/NexoFlow-Setup-1.0.zip
+            dist/NexoFlow-1.0.zip
+            dist/SHA256SUMS-1.0.txt
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Atualizar tag v1.0
         if: github.event_name != 'pull_request'
         shell: pwsh
