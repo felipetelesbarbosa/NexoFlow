@@ -97,6 +97,51 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertNotIn("u99", second["selected_uuids"])
         self.assertEqual(second["total_contacts"], 8)
 
+    def test_full_load_25_does_not_rollover_until_weni_and_analytics_finish(self) -> None:
+        contacts = [{"uuid": f"u{index:02d}"} for index in range(8)]
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest = Path(tmp) / "full_load_25_manifest.json"
+            with patch.object(analytics, "FULL_LOAD_25_MANIFEST", manifest):
+                campaign_id = ""
+                for part in range(1, 5):
+                    result = prepare_full_load_quarter(
+                        contacts,
+                        part=part,
+                        component="weni",
+                    )
+                    campaign_id = str(result["campaign_id"])
+                    mark_full_load_quarter_complete(
+                        component="weni",
+                        part=part,
+                        campaign_id=campaign_id,
+                    )
+
+                with self.assertRaisesRegex(RuntimeError, "pendentes"):
+                    prepare_full_load_quarter(
+                        contacts,
+                        part=1,
+                        component="weni",
+                    )
+
+                for part in range(1, 5):
+                    result = prepare_full_load_quarter(
+                        contacts,
+                        part=part,
+                        component="analytics",
+                    )
+                    mark_full_load_quarter_complete(
+                        component="analytics",
+                        part=part,
+                        campaign_id=str(result["campaign_id"]),
+                    )
+
+                fresh = prepare_full_load_quarter(
+                    contacts,
+                    part=1,
+                    component="weni",
+                )
+                self.assertNotEqual(fresh["campaign_id"], campaign_id)
+
     def test_full_load_25_requires_parts_in_order(self) -> None:
         contacts = [{"uuid": f"u{index:02d}"} for index in range(8)]
         with tempfile.TemporaryDirectory() as tmp:
