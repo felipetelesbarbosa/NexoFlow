@@ -143,6 +143,7 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
         row, orders, items = self.resolve_and_persist(contact, client)
         self.assertEqual(orders[0]["pedido_chave"], "FARMALIDER:500")
         self.assertEqual(orders[0]["valor_total_compra"], "19.50")
+        self.assertEqual(orders[0]["valor_total_faturamento"], "29.49")
         self.assertEqual(orders[0]["valor_origem"], "SOMA_ITENS_API")
         self.assertEqual(orders[0]["farmalider_frete"], "9.99")
         self.assertEqual(orders[0]["farmalider_forma_pagamento"], "2")
@@ -153,7 +154,7 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
         self.assertEqual(items[0]["produto_nome"], "Produto sintético")
         self.assertEqual(
             build_sales_metrics(orders, items),
-            [["2026-10-05", 1, 1, 1, "2", "19.50", "19.50"]],
+            [["2026-10-05", 1, 1, 1, "2", "19.50", "9.99", "29.49", "29.49"]],
         )
         summary = build_bi_summary_record(
             [row],
@@ -162,7 +163,10 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
             snapshot_date="2026-10-05",
             updated_at="2026-10-05T14:00:00Z",
         )
-        self.assertEqual(summary["faturamento_total"], 19.5)
+        self.assertEqual(summary["faturamento_produtos_total"], 19.5)
+        self.assertEqual(summary["faturamento_frete_total"], 9.99)
+        self.assertEqual(summary["faturamento_total"], 29.49)
+        self.assertEqual(summary["faturamento_total_dia"], 29.49)
         self.assertEqual(summary["unidades_vendidas_dia"], 2)
 
     def test_api_first_ignores_stale_weni_order_identity(self):
@@ -255,6 +259,7 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
             ["Produto sintético", "Produto sintético"],
         )
         self.assertEqual(orders[0]["valor_total_compra"], "24.50")
+        self.assertEqual(orders[0]["valor_total_faturamento"], "34.49")
 
     def test_two_contacts_same_cpf_keep_single_official_order(self):
         first, client = self.fixture()
