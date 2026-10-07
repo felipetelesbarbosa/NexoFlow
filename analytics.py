@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import tempfile
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
+from pathlib import Path
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Any
 
@@ -43,6 +46,245 @@ AD_FIELDS = [
 
 # Alias mantido para compatibilidade com integrações antigas do projeto.
 META_FIELDS = AD_FIELDS
+
+
+FULL_LOAD_25_PARTS = 4
+FULL_LOAD_25_MANIFEST = Path("logs/full_load_25_manifest.json")
+_FULL_LOAD_25_COMPONENTS = {"weni", "analytics"}
+
+
+def _full_load_25_uuid(contact: dict[str, Any]) -> str:
+    return str(contact.get("uuid") or contact.get("contact_uuid") or "").strip()
+
+
+def _full_load_25_uuids(contacts: list[dict[str, Any]]) -> list[str]:
+    return sorted({
+        _full_load_25_uuid(contact)
+        for contact in contacts
+        if _full_load_25_uuid(contact)
+    })
+
+
+def _full_load_25_digest(uuids: list[str]) -> str:
+    return hashlib.sha256("\n".join(uuids).encode("utf-8")).hexdigest()
+
+
+def _full_load_25_write(payload: dict[str, Any]) -> None:
+    path = FULL_LOAD_25_MANIFEST
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp_name = tempfile.mkstemp(
+        prefix="full-load-25-", suffix=".json", dir=path.parent
+    )
+    os.close(fd)
+    temp_path = Path(temp_name)
+    try:
+        temp_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        temp_path.replace(path)
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+
+def _full_load_25_load() -> dict[str, Any]:
+    path = FULL_LOAD_25_MANIFEST
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(
+            f"Manifesto da carga completa 25% inválido: {path}."
+        ) from exc
+    if not isinstance(payload, dict) or payload.get("schema_version") != 1:
+        raise RuntimeError("Manifesto da carga completa 25% incompatível.")
+    uuids = payload.get("contact_uuids")
+    if not isinstance(uuids, list) or not uuids:
+        raise RuntimeError("Manifesto da carga completa 25% sem contatos.")
+    canonical = [str(item).strip() for item in uuids if str(item).strip()]
+    if canonical != sorted(set(canonical)):
+        raise RuntimeError("Manifesto da carga completa 25% fora da ordem canônica.")
+    if _full_load_25_digest(canonical) != str(payload.get("contacts_sha256") or ""):
+        raise RuntimeError("Manifesto da carga completa 25% falhou no SHA-256.")
+    return payload
+
+
+def _full_load_25_completed(
+    payload: dict[str, Any], component: str,
+) -> set[int]:
+    completed = payload.get("completed")
+    if not isinstance(completed, dict):
+        return set()
+    values = completed.get(component)
+    if not isinstance(values, list):
+        return set()
+    return {
+        int(item)
+        for item in values
+        if str(item).isdigit() and 1 <= int(item) <= FULL_LOAD_25_PARTS
+    }
+
+
+def _full_load_25_new_manifest(
+    contacts: list[dict[str, Any]],
+) -> dict[str, Any]:
+    uuids = _full_load_25_uuids(contacts)
+    if not uuids:
+        raise RuntimeError(
+            "A Weni não retornou contatos para criar a carga completa 25%."
+        )
+    captured = (
+        datetime.now(timezone.utc)
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z")
+    )
+    digest = _full_load_25_digest(uuids)
+    campaign_id = hashlib.sha256(
+        f"{captured}|{digest}".encode("utf-8")
+    ).hexdigest()[:16]
+    return {
+        "schema_version": 1,
+        "campaign_id": campaign_id,
+        "captured_at_utc": captured,
+        "total_parts": FULL_LOAD_25_PARTS,
+        "contact_count": len(uuids),
+        "contacts_sha256": digest,
+        "contact_uuids": uuids,
+        "completed": {"weni": [], "analytics": []},
+    }
+
+
+def prepare_full_load_quarter(
+    contacts: list[dict[str, Any]],
+    *,
+    part: int,
+    component: str,
+) -> dict[str, Any]:
+    if component not in _FULL_LOAD_25_COMPONENTS:
+        raise ValueError(f"Componente inválido na carga 25%: {component}")
+    if part not in range(1, FULL_LOAD_25_PARTS + 1):
+        raise ValueError("A parte da carga completa 25% deve ser 1, 2, 3 ou 4.")
+
+    if FULL_LOAD_25_MANIFEST.exists():
+        payload = _full_load_25_load()
+        completed = _full_load_25_completed(payload, component)
+        if part == 1 and part in completed:
+            active = [
+                name
+                for name in _FULL_LOAD_25_COMPONENTS
+                if _full_load_25_completed(payload, name)
+            ]
+            all_active_complete = bool(active) and all(
+                _full_load_25_completed(payload, name)
+                == set(range(1, FULL_LOAD_25_PARTS + 1))
+                for name in active
+            )
+            if not all_active_complete:
+                raise RuntimeError(
+                    "A Parte 1 já foi concluída nesta campanha 25%. "
+                    "Finalize as partes pendentes antes de iniciar uma nova."
+                )
+            FULL_LOAD_25_MANIFEST.with_name(
+                "full_load_25_manifest.previous.json"
+            ).write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            payload = _full_load_25_new_manifest(contacts)
+            _full_load_25_write(payload)
+    else:
+        if part != 1:
+            raise RuntimeError(
+                "A carga completa 25% ainda não foi iniciada. "
+                "Execute primeiro a Parte 1."
+            )
+        payload = _full_load_25_new_manifest(contacts)
+        _full_load_25_write(payload)
+
+    completed = _full_load_25_completed(payload, component)
+    missing = sorted(set(range(1, part)) - completed)
+    if missing:
+        raise RuntimeError(
+            "A carga completa 25% deve ser executada em ordem. "
+            f"Antes da Parte {part}, conclua: {', '.join(map(str, missing))}."
+        )
+
+    manifest_uuids = [str(item) for item in payload["contact_uuids"]]
+    start = ((part - 1) * len(manifest_uuids)) // FULL_LOAD_25_PARTS
+    end = (part * len(manifest_uuids)) // FULL_LOAD_25_PARTS
+    selected_manifest = manifest_uuids[start:end]
+    selected_set = frozenset(selected_manifest)
+    current_map = {
+        _full_load_25_uuid(contact): contact
+        for contact in contacts
+        if _full_load_25_uuid(contact)
+    }
+    current_set = set(current_map)
+    manifest_set = set(manifest_uuids)
+    selected_contacts = [
+        current_map[uuid]
+        for uuid in selected_manifest
+        if uuid in current_map
+    ]
+    return {
+        "part": part,
+        "total_parts": FULL_LOAD_25_PARTS,
+        "campaign_id": str(payload.get("campaign_id") or ""),
+        "captured_at_utc": str(payload.get("captured_at_utc") or ""),
+        "total_contacts": len(manifest_uuids),
+        "selected_contacts": selected_contacts,
+        "selected_uuids": selected_set,
+        "selected_count": len(selected_contacts),
+        "new_contacts_ignored": len(current_set - manifest_set),
+        "missing_contacts": len(selected_set - current_set),
+        "completed_parts": tuple(sorted(completed)),
+    }
+
+
+def mark_full_load_quarter_complete(
+    *,
+    component: str,
+    part: int,
+    campaign_id: str,
+) -> tuple[bool, bool]:
+    payload = _full_load_25_load()
+    if str(payload.get("campaign_id") or "") != str(campaign_id or ""):
+        raise RuntimeError(
+            "A campanha completa 25% mudou durante a execução."
+        )
+    completed = _full_load_25_completed(payload, component)
+    if not set(range(1, part)).issubset(completed):
+        raise RuntimeError("Não é possível concluir uma parte 25% fora de ordem.")
+    completed.add(part)
+    payload.setdefault("completed", {})[component] = sorted(completed)
+    payload.setdefault("completed_at_utc", {})[
+        f"{component}_{part}"
+    ] = (
+        datetime.now(timezone.utc)
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z")
+    )
+    _full_load_25_write(payload)
+
+    component_complete = completed == set(range(1, FULL_LOAD_25_PARTS + 1))
+    active = [
+        name
+        for name in _FULL_LOAD_25_COMPONENTS
+        if _full_load_25_completed(payload, name)
+    ]
+    campaign_complete = bool(active) and all(
+        _full_load_25_completed(payload, name)
+        == set(range(1, FULL_LOAD_25_PARTS + 1))
+        for name in active
+    )
+    return component_complete, campaign_complete
+
+
+def full_load_quarter_datetime(value: str) -> datetime:
+    parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
 
 BASE_COLUMNS = [
     "contact_uuid",
