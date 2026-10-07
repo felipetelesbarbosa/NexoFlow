@@ -99,7 +99,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release upload v1.0 "dist/NexoFlow-Setup-1.0.zip" "dist/NexoFlow-1.0.zip" "dist/SHA256SUMS-1.0.txt" --clobber
+          if ($LASTEXITCODE -ne 0) { throw "Falha ao enviar os pacotes do NexoFlow 1.0." }
           gh release edit v1.0 --title "NexoFlow 1.0" --notes-file "dist/release-notes.md"
+          if ($LASTEXITCODE -ne 0) { throw "Falha ao atualizar as notas do NexoFlow 1.0." }
+          # Republicar preserva a tag e os arquivos, atualizando a data exibida.
+          gh release edit v1.0 --draft
+          if ($LASTEXITCODE -ne 0) { throw "Falha ao preparar a republicacao do NexoFlow 1.0." }
+          gh release edit v1.0 --draft=false --latest
+          if ($LASTEXITCODE -ne 0) {
+            # Uma segunda tentativa evita deixar o release em rascunho por falha temporaria.
+            gh release edit v1.0 --draft=false --latest
+            if ($LASTEXITCODE -ne 0) { throw "Falha ao republicar o NexoFlow 1.0." }
+          }
 
       - name: Resumo
         shell: pwsh

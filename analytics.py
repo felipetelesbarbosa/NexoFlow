@@ -508,7 +508,7 @@ def normalize_contact(
         row[key] = normalize_value(fields.get(key))
     payment_code = normalize_farmalider_payment_code(row["pedido_forma_pagamento"])
     if payment_code == "0" or row["pedido_forma_pagamento"].strip().casefold() == "cancelado":
-        row["pedido_forma_pagamento"] = "CANCELADO"
+        row["pedido_forma_pagamento"] = "Cancelado"
     elif payment_code:
         row["pedido_forma_pagamento"] = payment_code
     row["pedido_status"] = effective_order_status_code(row) or row["pedido_status"]
@@ -1003,7 +1003,7 @@ def _derived_order_payload(fields: dict[str, Any]) -> dict[str, Any] | None:
     raw_status = normalize_value(fields.get("pedido_status")).strip()
     raw_payment = normalize_value(fields.get("pedido_forma_pagamento")).strip()
     payment_code = normalize_farmalider_payment_code(raw_payment)
-    payment_value = "CANCELADO" if payment_code == "0" or raw_payment.casefold() == "cancelado" else payment_code or raw_payment
+    payment_value = "Cancelado" if payment_code == "0" or raw_payment.casefold() == "cancelado" else payment_code or raw_payment
     status_code = effective_order_status_code({
         "pedido_status": raw_status, "pedido_forma_pagamento": payment_value,
     }) or raw_status

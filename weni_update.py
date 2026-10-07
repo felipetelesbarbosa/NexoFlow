@@ -197,7 +197,7 @@ def _record_validated_order(stats: UpdateStats, plan: ContactUpdatePlan) -> None
         if stats.orders_cancelled_payment_zero == 1:
             logging.info(
                 "FarmaLíder: regra de pagamento 0 aplicada. "
-                "Pedido tratado como Cancelado; forma de pagamento CANCELADO "
+                "Pedido tratado como Cancelado; forma de pagamento Cancelado "
                 "e pedido_status=3 no plano Weni. Fora das vendas e de ultima_compra. "
                 "Nenhuma gravação foi iniciada; o plano será auditado.",
             )
@@ -798,7 +798,7 @@ def _apply_purchase_candidate(
     payment_code = str(order.get("farmalider_forma_pagamento") or "").strip()
     normalized_payment = normalize_farmalider_payment_code(payment_code)
     if normalized_payment:
-        payment_code = "CANCELADO" if normalized_payment == "0" else normalized_payment
+        payment_code = "Cancelado" if normalized_payment == "0" else normalized_payment
     if not farmalider_order_status_name(status_code):
         return False
 
@@ -1032,7 +1032,7 @@ def audit_plans(
         if "pedido_forma_pagamento" in plan.fields:
             payment = str(plan.fields["pedido_forma_pagamento"]).strip()
             normalized_payment = normalize_farmalider_payment_code(payment)
-            if payment != "CANCELADO" and (
+            if payment.casefold() != "cancelado" and (
                 not normalized_payment or normalized_payment != payment or normalized_payment == "0"
             ):
                 errors.append(
@@ -1050,13 +1050,13 @@ def audit_plans(
             )).strip()
             if normalize_farmalider_payment_code(payment) == "0":
                 errors.append(
-                    f"{plan.contact_uuid}: pagamento 0 exige novo plano com CANCELADO e pedido_status=3"
+                    f"{plan.contact_uuid}: pagamento 0 exige novo plano com Cancelado e pedido_status=3"
                 )
-            if payment == "CANCELADO" and status != "3":
+            if payment.casefold() == "cancelado" and status != "3":
                 errors.append(
-                    f"{plan.contact_uuid}: pagamento CANCELADO exige pedido_status=3"
+                    f"{plan.contact_uuid}: pagamento Cancelado exige pedido_status=3"
                 )
-            if "ultima_compra" in plan.fields and (status != "2" or payment == "CANCELADO"):
+            if "ultima_compra" in plan.fields and (status != "2" or payment.casefold() == "cancelado"):
                 errors.append(
                     f"{plan.contact_uuid}: ultima_compra exige pedido concluído (pedido_status=2) e não cancelado"
                 )

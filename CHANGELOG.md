@@ -27,8 +27,8 @@
 - listas separadas por vírgula usam aspas CSV quando o nome contém vírgula, aspas ou quebra de linha, preservando o nome completo e a correspondência com quantidade e valor;
 - Weni e Analytics compartilham a mesma leitura das listas, incluindo nomes como `Produto 0,5 MG`;
 - auditoria verifica também atualizações parciais das listas e informa as contagens sem expor produtos;
-- pagamento 5 corresponde a **Pix por Link de Pagamento** e pagamento 6 a **PIX no POS**;
-- pagamento 0 é tratado como cancelamento: Weni recebe `pedido_forma_pagamento=CANCELADO` e `pedido_status=3`, sem venda nem atualização de `ultima_compra`;
+- pagamento 5 corresponde a **Pix por Link de Pagamento** e pagamento 6 a **Pix no POS**;
+- pagamento 0 é tratado como cancelamento: Weni recebe `pedido_forma_pagamento=Cancelado` e `pedido_status=3`, sem venda nem atualização de `ultima_compra`;
 - normalizadores aceitam os nomes oficiais dos enums de status e pagamento; o nome de pagamento `_` equivale a 0 e aplica o cancelamento;
 - códigos numéricos de pagamento sem de-para a partir de 7 são preservados como Int32 não negativo na Weni e apresentados no Google Sheets/BI como `Não identificado (código X)`, sem inventar o de-para;
 - pagamentos sem de-para geram `INFO` uma vez por código em cada execução, com totais por código no resumo;

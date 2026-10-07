@@ -309,13 +309,13 @@ class PedidoResolutionTests(unittest.TestCase):
 
     def test_payment_mapping_is_official(self):
         expected = {
-            0: "CANCELADO",
+            0: "Cancelado",
             1: "Dinheiro",
             2: "Débito",
             3: "Crédito",
             4: "Ticket",
             5: "Pix por Link de Pagamento",
-            6: "PIX no POS",
+            6: "Pix no POS",
         }
         for code, label in expected.items():
             self.assertEqual(farmalider_payment_method_name(code), label)
@@ -336,15 +336,17 @@ class PedidoResolutionTests(unittest.TestCase):
     def test_payment_display_normalizes_numeric_strings(self):
         for value, expected in (
             (" 0002 ", "Débito"),
-            ("0000", "CANCELADO"),
-            (" 0006 ", "PIX no POS"),
+            ("0000", "Cancelado"),
+            (" 0006 ", "Pix no POS"),
         ):
             with self.subTest(value=value):
                 self.assertEqual(farmalider_payment_method_display(value), expected)
 
     def test_cancelled_payment_literal_is_recognized(self):
-        self.assertEqual(farmalider_payment_method_name("CANCELADO"), "CANCELADO")
-        self.assertEqual(farmalider_payment_method_display("CANCELADO"), "CANCELADO")
+        for value in ("CANCELADO", "Cancelado", "cancelado"):
+            with self.subTest(value=value):
+                self.assertEqual(farmalider_payment_method_name(value), "Cancelado")
+                self.assertEqual(farmalider_payment_method_display(value), "Cancelado")
 
     def test_payment_display_rejects_missing_and_invalid_codes(self):
         invalid = (
@@ -460,8 +462,8 @@ class PedidoResolutionTests(unittest.TestCase):
 
     def test_api_enum_aliases_preserve_raw_values_and_effective_status(self):
         for payment, status_code, status_name, confirmation, payment_name in (
-            ("PIX no POS", "-1", "Pendente pagamento", "CONFIRMADO_API", "PIX no POS"),
-            ("_", "3", "Cancelado", "CANCELADO_API", "CANCELADO"),
+            ("PIX no POS", "-1", "Pendente pagamento", "CONFIRMADO_API", "Pix no POS"),
+            ("_", "3", "Cancelado", "CANCELADO_API", "Cancelado"),
         ):
             with self.subTest(payment=payment):
                 pedido = pedido_payload()
@@ -636,7 +638,7 @@ class PedidoResolutionTests(unittest.TestCase):
         self.assertEqual(order["farmalider_status_pedido"], "2")
         self.assertEqual(order["farmalider_status_pedido_nome"], "Concluído")
         self.assertEqual(order["farmalider_forma_pagamento"], "6")
-        self.assertEqual(order["farmalider_forma_pagamento_nome"], "PIX no POS")
+        self.assertEqual(order["farmalider_forma_pagamento_nome"], "Pix no POS")
         self.assertFalse(is_order_cancelled(order))
         self.assertEqual(len(build_sales_metrics([order], items)), 1)
 

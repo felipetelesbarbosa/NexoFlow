@@ -700,7 +700,7 @@ class WeniUpdateTests(unittest.TestCase):
                 self.assertTrue(plan.order_validated)
                 self.assertFalse(plan.purchase_confirmed)
                 self.assertEqual(plan.order_payment_code, "0")
-                self.assertEqual(plan.fields["pedido_forma_pagamento"], "CANCELADO")
+                self.assertEqual(plan.fields["pedido_forma_pagamento"], "Cancelado")
                 self.assertEqual(plan.fields["pedido_status"], "3")
                 self.assertNotIn("ultima_compra", plan.fields)
                 audit_plans([plan], opt_out_group_available=True)
@@ -731,7 +731,7 @@ class WeniUpdateTests(unittest.TestCase):
         contact["fields"].update(existing.fields)
         contact["fields"]["pedido_forma_pagamento"] = "0"
         plan = self._purchase_plan(contact, farm)
-        self.assertEqual(plan.fields, {"pedido_forma_pagamento": "CANCELADO"})
+        self.assertEqual(plan.fields, {"pedido_forma_pagamento": "Cancelado"})
         self.assertEqual(plan.guards["pedido_status"], "3")
         audit_plans([plan], opt_out_group_available=True)
         plan.guards["pedido_status"] = "2"

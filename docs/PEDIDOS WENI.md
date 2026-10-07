@@ -24,9 +24,9 @@ CPF
 | `pedido_valor` | soma de `itens[].total` |
 | `pedido_data` | `DD/MM/YY HH:MM:SS` |
 | `pedido_status` | status efetivo de -1 a 3 |
-| `pedido_forma_pagamento` | código Int32 não negativo normalizado; pagamento 0 grava `CANCELADO` |
+| `pedido_forma_pagamento` | código Int32 não negativo normalizado; pagamento 0 grava `Cancelado` |
 
-Pagamento 5 é **Pix por Link de Pagamento** e pagamento 6 é **PIX no POS**. Pagamento 0 grava o texto literal `CANCELADO` em `pedido_forma_pagamento` e força o status efetivo 3, Cancelado. `Pedidos_FarmaLider` mantém os valores brutos de pagamento e status da API; Weni e `BI_Pedidos` usam o status efetivo.
+Pagamento 5 é **Pix por Link de Pagamento** e pagamento 6 é **Pix no POS**. Pagamento 0 grava o texto literal `Cancelado` em `pedido_forma_pagamento` e força o status efetivo 3, Cancelado. `Pedidos_FarmaLider` mantém os valores brutos de pagamento e status da API; Weni e `BI_Pedidos` usam o status efetivo.
 
 Pagamentos válidos sem de-para a partir de 7 mantêm seu código na Weni e recebem a descrição `Não identificado (código X)` no Google Sheets/BI. Pagamento ausente ou inválido mantém a descrição vazia.
 

@@ -256,7 +256,7 @@ Regras:
 - o frete não é gravado nos campos Weni de pedido; ele é preservado no Google Sheets como `farmalider_frete` e usado pelo Analytics para calcular `valor_total_faturamento = pedido_valor + frete`;
 - `pedido_data` é gravada no formato `DD/MM/YY HH:MM:SS`, usando America/Belem;
 - `pedido_status` guarda o status efetivo: -1 Pendente pagamento, 0 Em processamento, 1 Em trânsito, 2 Concluído, 3 Cancelado;
-- `pedido_forma_pagamento` guarda o código Int32 não negativo normalizado da API: 1 Dinheiro, 2 Débito, 3 Crédito, 4 Ticket, 5 Pix por Link de Pagamento, 6 PIX no POS; a exceção é pagamento 0 ou `_`, que grava o texto `CANCELADO` e força `pedido_status=3`;
+- `pedido_forma_pagamento` guarda o código Int32 não negativo normalizado da API: 1 Dinheiro, 2 Débito, 3 Crédito, 4 Ticket, 5 Pix por Link de Pagamento, 6 Pix no POS; a exceção é pagamento 0 ou `_`, que grava o texto `Cancelado` e força `pedido_status=3`;
 - os normalizadores aceitam os nomes oficiais dos enums, como `PendentePagamento`, `EmProcessamento`, `Concluido`, `PixPorLinkDePagamento` e `PixNoPOS`; pagamento `_` é normalizado para 0;
 - `Pedidos_FarmaLider` preserva status e pagamento brutos da API; Weni e `BI_Pedidos` usam o status efetivo Cancelado quando o pagamento é 0;
 - os rótulos amigáveis de status e pagamento são derivados no Analytics/BI; pagamento válido sem de-para a partir de 7 aparece como `Não identificado (código X)`;

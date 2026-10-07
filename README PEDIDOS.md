@@ -32,15 +32,15 @@ O status efetivo usa o enum atual: -1 Pendente pagamento, 0 Em processamento, 1 
 
 | Código de pagamento | Descrição |
 |---:|---|
-| 0 ou `_` | CANCELADO |
+| 0 | Cancelado |
 | 1 | Dinheiro |
 | 2 | Débito |
 | 3 | Crédito |
 | 4 | Ticket |
 | 5 | Pix por Link de Pagamento |
-| 6 | PIX no POS |
+| 6 | Pix no POS |
 
-Pagamento 0 ou `_` grava o texto literal `CANCELADO` em `pedido_forma_pagamento` e força o status efetivo 3 na Weni/BI. `Pedidos_FarmaLider` preserva status e pagamento brutos da API. Os normalizadores aceitam códigos e nomes oficiais dos enums; códigos de pagamento Int32 válidos sem de-para a partir de 7 aparecem como `Não identificado (código X)`.
+Pagamento 0 ou `_` grava o texto literal `Cancelado` em `pedido_forma_pagamento` e força o status efetivo 3 na Weni/BI. `Pedidos_FarmaLider` preserva status e pagamento brutos da API. Os normalizadores aceitam códigos e nomes oficiais dos enums; códigos de pagamento Int32 válidos sem de-para a partir de 7 aparecem como `Não identificado (código X)`.
 
 Depois de atualizar ou reinstalar, gere um novo dry-run completo com `atualizar_weni_carga_completa.bat`, revise o relatório e confirme o apply para revalidar os snapshots com essa política. Em seguida, execute `executar_carga_completa.bat` para recalcular o Analytics/BI. Não reutilize um snapshot de revisão gerado pela política anterior.
 

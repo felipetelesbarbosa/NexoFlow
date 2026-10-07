@@ -28,13 +28,13 @@ FARMALIDER_ORDER_STATUS_ALIASES = {
 }
 
 FARMALIDER_PAYMENT_METHOD_NAMES = {
-    0: "CANCELADO",
+    0: "Cancelado",
     1: "Dinheiro",
     2: "Débito",
     3: "Crédito",
     4: "Ticket",
     5: "Pix por Link de Pagamento",
-    6: "PIX no POS",
+    6: "Pix no POS",
 }
 
 FARMALIDER_PAYMENT_METHOD_ALIASES = {
@@ -119,7 +119,7 @@ def farmalider_order_status_name(value: Any) -> str:
 def farmalider_payment_method_name(value: Any) -> str:
     """Return a known payment label, including the Weni cancellation sentinel."""
     if isinstance(value, str) and value.strip().casefold() == "cancelado":
-        return "CANCELADO"
+        return "Cancelado"
     code = normalize_farmalider_payment_code(value)
     return FARMALIDER_PAYMENT_METHOD_NAMES.get(int(code), "") if code else ""
 
@@ -127,7 +127,7 @@ def farmalider_payment_method_name(value: Any) -> str:
 def farmalider_payment_method_display(value: Any) -> str:
     """Show an unmapped API code without inventing a payment method."""
     if isinstance(value, str) and value.strip().casefold() == "cancelado":
-        return "CANCELADO"
+        return "Cancelado"
     code = normalize_farmalider_payment_code(value)
     if not code:
         return ""

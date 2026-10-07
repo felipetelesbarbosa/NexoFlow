@@ -94,7 +94,7 @@ Se o GET por CPF não puder ser usado, a recuperação segue a ordem `pedido_id`
 | `pedido_valor` | soma de `itens[].total` |
 | `pedido_data` | `emissao` |
 | `pedido_status` | status efetivo de `status`; cancelamento explícito ou pagamento 0 força 3 |
-| `pedido_forma_pagamento` | `formaPagamento`; pagamento 0 grava o texto `CANCELADO` |
+| `pedido_forma_pagamento` | `formaPagamento`; pagamento 0 grava o texto `Cancelado` |
 
 Produtos, quantidades e valores unitários são serializados como listas separadas por vírgula, preservando a mesma ordem posicional.
 
@@ -129,17 +129,17 @@ De-para confirmado para a integração:
 
 | Código | Nome oficial do enum | Forma |
 |---:|---|---|
-| 0 | `_` | CANCELADO (regra de negócio) |
+| 0 | `_` | Cancelado |
 | 1 | `Dinheiro` | Dinheiro |
 | 2 | `Debito` | Débito |
 | 3 | `Credito` | Crédito |
 | 4 | `Ticket` | Ticket |
 | 5 | `PixPorLinkDePagamento` | Pix por Link de Pagamento |
-| 6 | `PixNoPOS` | PIX no POS |
+| 6 | `PixNoPOS` | Pix no POS |
 
-A Weni armazena o código normalizado em `pedido_forma_pagamento`, exceto `formaPagamento=0` ou `_`, que grava o texto literal `CANCELADO` e força `pedido_status=3`. O normalizador aceita os nomes oficiais do enum acima, inclusive `_` como equivalente a 0. `Pedidos_FarmaLider` preserva o valor bruto em `farmalider_forma_pagamento`. O Analytics mantém também `farmalider_forma_pagamento_nome` e disponibiliza a descrição amigável na camada BI.
+A Weni armazena o código normalizado em `pedido_forma_pagamento`, exceto `formaPagamento=0` ou `_`, que grava o texto literal `Cancelado` e força `pedido_status=3`. O normalizador aceita os nomes oficiais do enum acima, inclusive `_` como equivalente a 0. `Pedidos_FarmaLider` preserva o valor bruto em `farmalider_forma_pagamento`. O Analytics mantém também `farmalider_forma_pagamento_nome` e disponibiliza a descrição amigável na camada BI.
 
-Além dos nomes oficiais, o normalizador de `formaPagamento` aceita códigos Int32 não negativos. Códigos numéricos válidos sem de-para a partir de 7 continuam sendo preservados como Int32 na Weni e apresentados no Google Sheets/BI como `Não identificado (código X)`. Textos fora dos nomes de enum aceitos, valores fracionários, negativos e números fora de Int32 continuam inválidos; o literal operacional `CANCELADO` na Weni é aceito como resultado da regra de pagamento 0. Valores ausentes ou inválidos mantêm a descrição vazia.
+Além dos nomes oficiais, o normalizador de `formaPagamento` aceita códigos Int32 não negativos. Códigos numéricos válidos sem de-para a partir de 7 continuam sendo preservados como Int32 na Weni e apresentados no Google Sheets/BI como `Não identificado (código X)`. Textos fora dos nomes de enum aceitos, valores fracionários, negativos e números fora de Int32 continuam inválidos; o literal operacional `Cancelado` na Weni é aceito como resultado da regra de pagamento 0. A leitura e a auditoria ignoram diferenças entre maiúsculas e minúsculas e continuam aceitando o valor legado `CANCELADO`. Valores ausentes ou inválidos mantêm a descrição vazia.
 
 O helper `farmalider_payment_method_name` retorna somente os rótulos documentados. O helper de apresentação `farmalider_payment_method_display` usa esses rótulos e acrescenta a descrição explícita para códigos válidos desconhecidos, sem modificar o código recebido.
 

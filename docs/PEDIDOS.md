@@ -36,7 +36,7 @@ Mesmo nesse fallback, `ultimo_pedido` não vira fonte de produtos, quantidade, v
 | `pedido_valor` | `sum(itens[].total)` | soma dos totais dos itens |
 | `pedido_data` | `emissao` | `DD/MM/YY HH:MM:SS` |
 | `pedido_status` | `status` e regra de cancelamento | status efetivo de -1 a 3 |
-| `pedido_forma_pagamento` | `formaPagamento` | código Int32 não negativo normalizado; pagamento 0 grava `CANCELADO` |
+| `pedido_forma_pagamento` | `formaPagamento` | código Int32 não negativo normalizado; pagamento 0 grava `Cancelado` |
 
 As listas são posicionais. Exemplo:
 
@@ -134,15 +134,15 @@ De-para confirmado para a integração:
 
 | Código | Apresentação |
 |---:|---|
-| 0 | CANCELADO (regra de negócio) |
+| 0 | Cancelado |
 | 1 | Dinheiro |
 | 2 | Débito |
 | 3 | Crédito |
 | 4 | Ticket |
 | 5 | Pix por Link de Pagamento |
-| 6 | PIX no POS |
+| 6 | Pix no POS |
 
-A Weni recebe o código normalizado em `pedido_forma_pagamento`, exceto pagamento 0 ou `_`, que grava o texto literal `CANCELADO` e força `pedido_status=3`. Os normalizadores aceitam os nomes oficiais `Dinheiro`, `Debito`, `Credito`, `Ticket`, `PixPorLinkDePagamento`, `PixNoPOS` e `_`, sendo `_` equivalente a 0. `Pedidos_FarmaLider` preserva o valor bruto em `farmalider_forma_pagamento`. O Analytics deriva a descrição em `pedido_forma_pagamento_nome`. Códigos Int32 não negativos sem de-para a partir de 7 são preservados e exibidos no Google Sheets/BI como `Não identificado (código X)`. Pagamento ausente ou inválido mantém a descrição vazia.
+A Weni recebe o código normalizado em `pedido_forma_pagamento`, exceto pagamento 0 ou `_`, que grava o texto literal `Cancelado` e força `pedido_status=3`. Os normalizadores aceitam os nomes oficiais `Dinheiro`, `Debito`, `Credito`, `Ticket`, `PixPorLinkDePagamento`, `PixNoPOS` e `_`, sendo `_` equivalente a 0. `Pedidos_FarmaLider` preserva o valor bruto em `farmalider_forma_pagamento`. O Analytics deriva a descrição em `pedido_forma_pagamento_nome`. Códigos Int32 não negativos sem de-para a partir de 7 são preservados e exibidos no Google Sheets/BI como `Não identificado (código X)`. Pagamento ausente ou inválido mantém a descrição vazia.
 
 No NexoFlow Weni, cada código sem de-para gera um registro `INFO` por execução, com totais por código no resumo. Isso não impede a atualização dos demais campos válidos.
 

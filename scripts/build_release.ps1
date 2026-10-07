@@ -268,8 +268,8 @@ Distribuicao oficial do **NexoFlow 1.0**.
 O arquivo `NexoFlow-Setup-$Version.zip` contem o instalador do NexoFlow 1.0 e foi validado automaticamente em Windows para primeira instalacao e atualizacao de uma instalacao existente.
 
 Melhorias desta distribuicao do NexoFlow 1.0:
-- de-para de pagamento atualizado: 5 Pix por Link de Pagamento; 6 PIX no POS;
-- pagamento 0 cancela o pedido: forma de pagamento CANCELADO e status 3 na Weni e no BI, preservando os codigos brutos da API na tabela de pedidos;
+- de-para de pagamento atualizado: 0 Cancelado; 1 Dinheiro; 2 Débito; 3 Crédito; 4 Ticket; 5 Pix por Link de Pagamento; 6 Pix no POS;
+- pagamento 0 cancela o pedido: forma de pagamento Cancelado e status 3 na Weni e no BI, preservando os codigos brutos da API na tabela de pedidos;
 - status -1 representa pedido pendente de pagamento e permanece em rechecagem; vendas e ultima_compra consideram somente pedidos concluidos e nao cancelados;
 - diagnostico privado local identifica CPFs com falhas 5xx persistentes e captura campos seguros da resposta, fora dos logs publicos e dos pacotes;
 - diagnostico seguro de proxy identifica autenticacao 407, bloqueio de tunel 403, TLS, DNS, timeout e conexao recusada; resposta 400/404 da FarmaLider nao e apresentada como autenticacao confirmada;

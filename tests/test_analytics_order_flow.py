@@ -161,9 +161,9 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
 
     def test_normalized_contact_uses_validated_payment_labels(self):
         for code, label in (
-            (0, "CANCELADO"),
+            (0, "Cancelado"),
             (5, "Pix por Link de Pagamento"),
-            (6, "PIX no POS"),
+            (6, "Pix no POS"),
         ):
             with self.subTest(code=code):
                 row = normalize_contact(
@@ -171,7 +171,7 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
                     "2026-10-05T14:00:00Z",
                 )
                 self.assertEqual(
-                    row["pedido_forma_pagamento"], "CANCELADO" if code == 0 else str(code)
+                    row["pedido_forma_pagamento"], "Cancelado" if code == 0 else str(code)
                 )
                 self.assertEqual(row["pedido_forma_pagamento_nome"], label)
                 if code == 0:
@@ -192,13 +192,13 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
 
     def test_api_payment_code_and_display_persist_through_to_bi(self):
         expected = {
-            0: "CANCELADO",
+            0: "Cancelado",
             1: "Dinheiro",
             2: "Débito",
             3: "Crédito",
             4: "Ticket",
             5: "Pix por Link de Pagamento",
-            6: "PIX no POS",
+            6: "Pix no POS",
             9: "Não identificado (código 9)",
             2147483647: "Não identificado (código 2147483647)",
         }
@@ -245,7 +245,7 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
         self.assertEqual(bi_order["pedido_status"], "-1")
         self.assertEqual(bi_order["pedido_status_nome"], "Pendente pagamento")
         self.assertEqual(bi_order["pedido_forma_pagamento"], "6")
-        self.assertEqual(bi_order["pedido_forma_pagamento_nome"], "PIX no POS")
+        self.assertEqual(bi_order["pedido_forma_pagamento_nome"], "Pix no POS")
 
     def test_payment_zero_overrides_pending_status_in_persisted_order_and_bi(self):
         contact, client = self.fixture(status=-1, payment=0)
@@ -261,7 +261,7 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
         bi_order = dict(zip(BI_ORDERS_COLUMNS, bi_rows[0], strict=True))
         self.assertEqual(bi_order["pedido_status"], "3")
         self.assertEqual(bi_order["pedido_forma_pagamento"], "0")
-        self.assertEqual(bi_order["pedido_forma_pagamento_nome"], "CANCELADO")
+        self.assertEqual(bi_order["pedido_forma_pagamento_nome"], "Cancelado")
 
     def test_cancelled_payment_round_trips_through_serialized_weni_snapshot(self):
         contact, client = self.fixture(status=2, payment=0)
@@ -270,7 +270,7 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
         restored, restored_items = parse_ultimo_pedido(contact, "2026-10-05T15:00:00Z")
         self.assertEqual(restored["farmalider_status_pedido"], "2")
         self.assertEqual(restored["farmalider_forma_pagamento"], "0")
-        self.assertEqual(restored["farmalider_forma_pagamento_nome"], "CANCELADO")
+        self.assertEqual(restored["farmalider_forma_pagamento_nome"], "Cancelado")
         self.assertEqual(restored["status_confirmacao"], "CANCELADO_API")
         self.assertEqual(restored["farmalider_status_pedido_nome"], "Cancelado")
         self.assertEqual(build_sales_metrics([restored], restored_items), [])

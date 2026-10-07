@@ -249,7 +249,7 @@ Os oito campos `pedido_*` abaixo são obrigatórios na Weni. Se qualquer um esti
 | `pedido_valor` | soma de `itens[].total` | valor total dos itens do pedido |
 | `pedido_data` | `emissao` | `DD/MM/YY HH:MM:SS` |
 | `pedido_status` | `status` e regra de cancelamento | status efetivo de -1 a 3 |
-| `pedido_forma_pagamento` | `formaPagamento` | código Int32 não negativo normalizado; 0 grava `CANCELADO` |
+| `pedido_forma_pagamento` | `formaPagamento` | código Int32 não negativo normalizado; 0 grava `Cancelado` |
 
 `codProduto` não é usado como nome do produto. O nome exibido vem exclusivamente de `descricao`. O código do produto pode continuar armazenado internamente para auditoria, sem alimentar `pedido_produtos`.
 
@@ -284,15 +284,15 @@ As três listas de item são posicionais: o primeiro produto corresponde à prim
 
 | Código | Forma de pagamento |
 |---:|---|
-| 0 | CANCELADO (regra de negócio) |
+| 0 | Cancelado |
 | 1 | Dinheiro |
 | 2 | Débito |
 | 3 | Crédito |
 | 4 | Ticket |
 | 5 | Pix por Link de Pagamento |
-| 6 | PIX no POS |
+| 6 | Pix no POS |
 
-A Weni guarda os códigos de pagamento normalizados, exceto `formaPagamento=0` ou `_`, que grava o texto `CANCELADO` em `pedido_forma_pagamento` e o status efetivo `3`, Cancelado. O Analytics cria os rótulos amigáveis para o Google Sheets e o Looker Studio. `Pedidos_FarmaLider` preserva os valores brutos de pagamento e status da API; Weni e `BI_Pedidos` usam o status efetivo, inclusive o cancelamento por pagamento 0.
+A Weni guarda os códigos de pagamento normalizados, exceto `formaPagamento=0` ou `_`, que grava o texto `Cancelado` em `pedido_forma_pagamento` e o status efetivo `3`, Cancelado. O Analytics cria os rótulos amigáveis para o Google Sheets e o Looker Studio. `Pedidos_FarmaLider` preserva os valores brutos de pagamento e status da API; Weni e `BI_Pedidos` usam o status efetivo, inclusive o cancelamento por pagamento 0.
 
 Os normalizadores aceitam códigos e nomes dos enums oficiais, como `PendentePagamento`, `EmProcessamento`, `Concluido`, `PixPorLinkDePagamento` e `PixNoPOS`. O nome de pagamento `_` corresponde ao código 0 e aplica a mesma regra de cancelamento.
 

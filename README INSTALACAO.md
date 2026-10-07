@@ -26,7 +26,7 @@ Depois execute, nesta ordem:
 
 A carga completa do Weni gera um novo dry-run com a política atual antes de atualizar o snapshot operacional dos contatos. Não reutilize o JSON de revisão de uma instalação ou política anterior. A carga completa do Analytics migra os schemas do Google Sheets e recalcula as estruturas analíticas, incluindo frete separado e faturamento total (produtos + frete).
 
-Na revisão, somente status efetivo 2, Concluído, validado pela API e sem cancelamento, conta como venda e atualiza `ultima_compra`. O estado -1, Pendente pagamento, permanece em rechecagem; pagamento 0 ou `_` grava `pedido_forma_pagamento=CANCELADO` e força status efetivo 3. O de-para inclui 5 Pix por Link de Pagamento e 6 PIX no POS. Veja [README PEDIDOS.md](README%20PEDIDOS.md).
+Na revisão, somente status efetivo 2, Concluído, validado pela API e sem cancelamento, conta como venda e atualiza `ultima_compra`. O estado -1, Pendente pagamento, permanece em rechecagem; pagamento 0 ou `_` grava `pedido_forma_pagamento=Cancelado` e força status efetivo 3. O de-para inclui 5 Pix por Link de Pagamento e 6 Pix no POS. Veja [README PEDIDOS.md](README%20PEDIDOS.md).
 
 Se o Analytics terminar com código `3`, a carga foi **parcial**: algumas
 consultas FarmaLíder falharam, o marco incremental anterior foi mantido e a

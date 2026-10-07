@@ -135,7 +135,7 @@ O campo legado `faturamento` permanece como alias do faturamento total para não
 
 O dashboard deve mostrar preferencialmente os nomes amigáveis, como **Cancelado** e **Débito**, mantendo os códigos disponíveis para auditoria e filtros técnicos.
 
-Pagamento 5 aparece como **Pix por Link de Pagamento** e pagamento 6 como **PIX no POS**. Os normalizadores aceitam também nomes oficiais como `PixPorLinkDePagamento` e `PixNoPOS`. Pagamento 0 ou `_` representa **CANCELADO**: Weni grava esse texto literal em `pedido_forma_pagamento` e o status efetivo 3, Cancelado. `BI_Pedidos` também usa o status efetivo 3; `Pedidos_FarmaLider` preserva os valores brutos de status e pagamento retornados pela API.
+Pagamento 5 aparece como **Pix por Link de Pagamento** e pagamento 6 como **Pix no POS**. Os normalizadores aceitam também nomes oficiais como `PixPorLinkDePagamento` e `PixNoPOS`. Pagamento 0 ou `_` representa **Cancelado**: Weni grava esse texto literal em `pedido_forma_pagamento` e o status efetivo 3, Cancelado. `BI_Pedidos` também usa o status efetivo 3; `Pedidos_FarmaLider` preserva os valores brutos de status e pagamento retornados pela API.
 
 Para pagamento Int32 não negativo sem de-para a partir de 7, `pedido_forma_pagamento_nome` exibe `Não identificado (código X)` e o código é preservado. Pagamentos ausentes ou inválidos mantêm a descrição vazia.
 
