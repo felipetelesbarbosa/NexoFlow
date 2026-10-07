@@ -10,6 +10,8 @@ from pedido_utils import (
     farmalider_order_status_name,
     farmalider_payment_method_display,
     is_order_cancelled,
+    normalize_farmalider_order_status_code,
+    normalize_farmalider_payment_code,
 )
 
 
@@ -310,9 +312,7 @@ def apply_pedido_api_confirmation(
     for target, source in (
         ("farmalider_public_id", "publicId"),
         ("farmalider_emissao", "emissao"),
-        ("farmalider_status_pedido", "status"),
         ("farmalider_cod_filial", "codFilial"),
-        ("farmalider_forma_pagamento", "formaPagamento"),
         ("farmalider_cupom", "cupom"),
         ("farmalider_pedido_web", "pedidoWeb"),
         ("farmalider_cancelamento", "cancelamento"),
@@ -320,11 +320,26 @@ def apply_pedido_api_confirmation(
     ):
         order[target] = _text(capa.get(source))
 
+    raw_status = capa.get("status")
+    raw_payment = capa.get("formaPagamento")
+    status_code = normalize_farmalider_order_status_code(raw_status)
+    payment_code = normalize_farmalider_payment_code(raw_payment)
+
+    # Regra FarmaLíder: formaPagamento 0 (ou enum "_") significa que o
+    # pedido não foi pago. O snapshot deve ser tratado como cancelado.
+    if payment_code == "0":
+        status_code = "3"
+        payment_value = "CANCELADO"
+    else:
+        payment_value = payment_code or _text(raw_payment)
+
+    order["farmalider_status_pedido"] = status_code or _text(raw_status)
     order["farmalider_status_pedido_nome"] = farmalider_order_status_name(
-        capa.get("status")
+        order["farmalider_status_pedido"]
     )
+    order["farmalider_forma_pagamento"] = payment_value
     order["farmalider_forma_pagamento_nome"] = farmalider_payment_method_display(
-        capa.get("formaPagamento")
+        payment_value
     )
     order["status_confirmacao"] = (
         "CANCELADO_API" if is_order_cancelled(order) else "CONFIRMADO_API"
