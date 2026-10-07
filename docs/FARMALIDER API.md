@@ -113,7 +113,7 @@ De-para usado pela integração:
 
 | Código | Identificador oficial | Rótulo |
 |---:|---|---|
-| -1 | `PendentePagamento` | Pendente pagamento |
+| -1 | `PendentePagamento` | Pendente de pagamento |
 | 0 | `EmProcessamento` | Em processamento |
 | 1 | `EmTransito` | Em trânsito |
 | 2 | `Concluido` | Concluído |
