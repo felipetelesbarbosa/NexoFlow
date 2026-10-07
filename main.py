@@ -24,6 +24,8 @@ from analytics import (
     is_valid_cpf,
     normalize_contact,
     normalize_cpf,
+    prepare_full_load_quarter,
+    mark_full_load_quarter_complete,
 )
 from config import (
     FARMALIDER_BATCH_ERROR_ABORT_MIN_ERRORS,
@@ -734,6 +736,24 @@ def main() -> int:
         )
 
         force_full = os.getenv("FORCE_FULL_SYNC", "").strip() == "1"
+        full_quarter: int | None = None
+        raw_quarter = os.getenv("FULL_SYNC_QUARTER", "").strip()
+        if raw_quarter:
+            if not force_full:
+                raise RuntimeError(
+                    "FULL_SYNC_QUARTER só pode ser usado junto com FORCE_FULL_SYNC=1."
+                )
+            try:
+                full_quarter = int(raw_quarter)
+            except ValueError as exc:
+                raise RuntimeError(
+                    "FULL_SYNC_QUARTER deve ser 1, 2, 3 ou 4."
+                ) from exc
+            if full_quarter not in {1, 2, 3, 4}:
+                raise RuntimeError(
+                    "FULL_SYNC_QUARTER deve ser 1, 2, 3 ou 4."
+                )
+
         last_success = None
         if not force_full:
             last_success = parse_control_datetime(
@@ -742,7 +762,13 @@ def main() -> int:
 
         if force_full:
             after = None
-            logging.info("Carga completa forçada.")
+            if full_quarter is None:
+                logging.info("Carga completa forçada (100%%).")
+            else:
+                logging.info(
+                    "Carga completa fracionada: Parte %s/4 (25%% da base congelada).",
+                    full_quarter,
+                )
         elif last_success is not None:
             after = last_success - timedelta(minutes=SYNC_OVERLAP_MINUTES)
             logging.info(
@@ -775,6 +801,26 @@ def main() -> int:
                 contacts = weni_client.list_contacts(after=after)
             finally:
                 weni_client.close()
+            contacts_api_total = len(contacts)
+            quarter_context: dict[str, Any] | None = None
+            if full_quarter is not None:
+                quarter_context = prepare_full_load_quarter(
+                    contacts,
+                    part=full_quarter,
+                    component="analytics",
+                )
+                contacts = list(quarter_context["selected_contacts"])
+                logging.info(
+                    "Carga 25%% Analytics Parte %s/4: campanha=%s | "
+                    "base congelada=%s | contatos desta parte=%s | "
+                    "novos fora do corte=%s | ausentes=%s.",
+                    full_quarter,
+                    quarter_context["campaign_id"],
+                    quarter_context["total_contacts"],
+                    quarter_context["selected_count"],
+                    quarter_context["new_contacts_ignored"],
+                    quarter_context["missing_contacts"],
+                )
             logging.info(
                 "Weni concluída em %.2fs.",
                 time.monotonic() - weni_started,
@@ -810,7 +856,7 @@ def main() -> int:
                     {
                         "ultima_sincronizacao_sucesso_utc": utc_iso(sync_started),
                         "ultima_execucao_status": "sucesso",
-                        "ultima_execucao_contatos_api": str(len(contacts)),
+                        "ultima_execucao_contatos_api": str(contacts_api_total),
                         "ultima_execucao_contatos_processados": "0",
                         "ultima_execucao_contatos_inseridos": "0",
                         "ultima_execucao_contatos_atualizados": "0",
@@ -1006,15 +1052,29 @@ def main() -> int:
             sync_started,
             api_errors=cliente_stats.api_errors + order_stats.api_errors,
         )
+        if full_quarter is not None:
+            # Partes 1-3 não podem avançar o cursor incremental. Na Parte 4,
+            # o cursor volta ao corte da campanha para que mudanças ocorridas
+            # durante as quatro cargas sejam capturadas pela próxima incremental.
+            completion_controls.pop("ultima_sincronizacao_sucesso_utc", None)
+            if completion_status == "sucesso" and full_quarter == 4:
+                assert quarter_context is not None
+                completion_controls["ultima_sincronizacao_sucesso_utc"] = str(
+                    quarter_context["captured_at_utc"]
+                )
         status_stats = sheets.request_stats()
         status_elapsed = time.monotonic() - total_started_monotonic
         sheets.replace_bi_status([
             sync_time,
             APP_VERSION,
             completion_status,
-            "carga_completa" if force_full or after is None else "incremental",
+            (
+                f"carga_completa_25_parte_{full_quarter}"
+                if full_quarter is not None
+                else ("carga_completa" if force_full or after is None else "incremental")
+            ),
             round(status_elapsed, 2),
-            len(contacts),
+            contacts_api_total,
             len(contacts_to_process),
             cliente_stats.unique_queries,
             cliente_stats.http_requests,
@@ -1121,8 +1181,42 @@ def main() -> int:
                 ),
                 "ultima_execucao_metricas_ads": str(len(ad_metrics)),
                 "ultima_execucao_metricas_vendas": str(sales_metrics_count),
+                **(
+                    {
+                        "ultima_execucao_carga_25_parte": f"{full_quarter}/4",
+                        "ultima_execucao_carga_25_campanha": str(
+                            quarter_context["campaign_id"]
+                        ),
+                        "ultima_execucao_carga_25_total_contatos": str(
+                            quarter_context["total_contacts"]
+                        ),
+                        "ultima_execucao_carga_25_contatos_parte": str(
+                            quarter_context["selected_count"]
+                        ),
+                    }
+                    if full_quarter is not None and quarter_context is not None
+                    else {}
+                ),
             }
         )
+
+        if (
+            full_quarter is not None
+            and quarter_context is not None
+            and completion_status == "sucesso"
+        ):
+            component_complete, campaign_complete = mark_full_load_quarter_complete(
+                component="analytics",
+                part=full_quarter,
+                campaign_id=str(quarter_context["campaign_id"]),
+            )
+            logging.info(
+                "Carga 25%% Analytics Parte %s/4 concluída. "
+                "Analytics completo=%s | campanha ativa concluída=%s.",
+                full_quarter,
+                "sim" if component_complete else "não",
+                "sim" if campaign_complete else "não",
+            )
 
         total_elapsed = time.monotonic() - total_started_monotonic
         logging.info("Resumo da execução:")
