@@ -13,6 +13,7 @@ from farmalider_integration import (
 from pedido_utils import (
     business_order_datetime,
     farmalider_order_status_name,
+    farmalider_payment_method_display,
     farmalider_payment_method_name,
     is_order_cancelled,
     is_order_completed,
@@ -315,6 +316,68 @@ class PedidoResolutionTests(unittest.TestCase):
         for code, label in expected.items():
             self.assertEqual(farmalider_payment_method_name(code), label)
             self.assertEqual(farmalider_payment_method_name(str(code)), label)
+            self.assertEqual(farmalider_payment_method_display(code), label)
+            self.assertEqual(farmalider_payment_method_display(str(code)), label)
+
+    def test_payment_display_exposes_undocumented_nonnegative_int32_codes(self):
+        for code in (0, 6, 9, 2147483647):
+            for value in (code, str(code)):
+                with self.subTest(value=value):
+                    self.assertEqual(
+                        farmalider_payment_method_display(value),
+                        f"Não identificado (código {code})",
+                    )
+                    self.assertEqual(farmalider_payment_method_name(value), "")
+
+    def test_payment_display_normalizes_numeric_strings(self):
+        for value, expected in (
+            (" 0002 ", "Débito"),
+            ("0000", "Não identificado (código 0)"),
+            (" 0006 ", "Não identificado (código 6)"),
+        ):
+            with self.subTest(value=value):
+                self.assertEqual(farmalider_payment_method_display(value), expected)
+
+    def test_payment_display_rejects_missing_and_invalid_codes(self):
+        invalid = (
+            None, "", " ", True, False, "Pix", "1.5", 1.5, 2.0,
+            -1, "-1", 2147483648, "2147483648", "9" * 100,
+            "６", [], {},
+        )
+        for value in invalid:
+            with self.subTest(value=value):
+                self.assertEqual(farmalider_payment_method_display(value), "")
+
+    def test_unknown_pedido_payment_overrides_documented_cliente_payment(self):
+        for code in (0, 6, 9):
+            with self.subTest(code=code):
+                pedido = pedido_payload()
+                pedido["capa"]["formaPagamento"] = code
+                order, _ = resolve_contact_order(
+                    contact(),
+                    farm_client=client(pedido=pedido),
+                    captured_at=CAPTURED_AT,
+                )
+                self.assertEqual(order["farmalider_forma_pagamento"], str(code))
+                self.assertEqual(
+                    order["farmalider_forma_pagamento_nome"],
+                    f"Não identificado (código {code})",
+                )
+
+    def test_cliente_fallback_preserves_unknown_payment_code_and_display(self):
+        cliente = cliente_payload()
+        cliente["ultimoPedido"]["formaPagamento"] = 6
+        api = client(cliente=cliente)
+        api.get_pedido.return_value = None
+        order, _ = resolve_contact_order(
+            contact(), farm_client=api, captured_at=CAPTURED_AT
+        )
+        self.assertEqual(order["origem_pedido"], "FARMALIDER_CLIENTE_CPF")
+        self.assertEqual(order["farmalider_forma_pagamento"], "6")
+        self.assertEqual(
+            order["farmalider_forma_pagamento_nome"],
+            "Não identificado (código 6)",
+        )
 
     def test_unknown_status_and_payment_have_no_invented_label(self):
         self.assertEqual(farmalider_order_status_name(9), "")

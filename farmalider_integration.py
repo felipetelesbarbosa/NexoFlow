@@ -8,7 +8,7 @@ from typing import Any
 from pedido_utils import (
     business_order_datetime,
     farmalider_order_status_name,
-    farmalider_payment_method_name,
+    farmalider_payment_method_display,
     is_order_cancelled,
 )
 
@@ -323,7 +323,7 @@ def apply_pedido_api_confirmation(
     order["farmalider_status_pedido_nome"] = farmalider_order_status_name(
         capa.get("status")
     )
-    order["farmalider_forma_pagamento_nome"] = farmalider_payment_method_name(
+    order["farmalider_forma_pagamento_nome"] = farmalider_payment_method_display(
         capa.get("formaPagamento")
     )
     order["status_confirmacao"] = (

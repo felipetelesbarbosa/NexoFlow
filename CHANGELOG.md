@@ -27,7 +27,9 @@
 - listas separadas por vírgula usam aspas CSV quando o nome contém vírgula, aspas ou quebra de linha, preservando o nome completo e a correspondência com quantidade e valor;
 - Weni e Analytics compartilham a mesma leitura das listas, incluindo nomes como `Produto 0,5 MG`;
 - auditoria verifica também atualizações parciais das listas e informa as contagens sem expor produtos;
-- códigos numéricos de pagamento não documentados são preservados como Int32, com aviso e sem inventar o de-para;
+- códigos numéricos de pagamento não documentados são preservados como Int32 não negativo na Weni e apresentados no Google Sheets/BI como `Não identificado (código X)`, sem inventar o de-para;
+- pagamentos sem de-para geram `INFO` uma vez por código em cada execução, com totais por código no resumo;
+- resumo distingue contatos com pedido validado pela API, inclusive sem alterações, de contatos com alterações; preparação e auditoria acontecem antes das gravações;
 - listas realmente desalinhadas, CSV malformado, elementos vazios e códigos inválidos continuam bloqueados antes de qualquer gravação.
 
 ### Recuperação e diagnóstico da FarmaLíder

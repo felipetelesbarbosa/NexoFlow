@@ -44,6 +44,8 @@ check-up
 
 Na carga completa, o plano é congelado em JSON, protegido por SHA-256 e revisado antes da aplicação. Cada contato é relido imediatamente antes da gravação para evitar sobrescrever alterações ocorridas durante a revisão.
 
+Os logs de preparação e auditoria aparecem antes das gravações. O total de contatos com pedido validado pela API inclui os que já estavam atualizados; ele é diferente do total de contatos com alterações.
+
 ### NexoFlow Analytics
 
 Executa a sincronização analítica e mantém as estruturas usadas por Google Sheets e Looker Studio.
@@ -282,7 +284,9 @@ As três listas de item são posicionais: o primeiro produto corresponde à prim
 
 A Weni guarda os códigos oficiais. O Analytics cria os rótulos amigáveis para o Google Sheets e o Looker Studio.
 
-O Swagger define `formaPagamento` como Int32 sem enum. Códigos numéricos não negativos fora do de-para são preservados com aviso e descrição sem mapeamento, sem impedir a atualização dos demais campos válidos. Não se inventa uma forma de pagamento para 0 ou outro código desconhecido.
+O Swagger define `formaPagamento` como Int32 sem enum. Códigos numéricos não negativos fora do de-para são preservados na Weni e exibidos no Google Sheets/BI como `Não identificado (código X)`, sem impedir a atualização dos demais campos válidos. Para 0 e 6, por exemplo, não há forma de pagamento documentada. Pagamento ausente ou inválido mantém a descrição vazia.
+
+Cada código sem de-para aparece em `INFO` uma vez por execução, seguido dos totais por código; esse registro informa a falta de descrição documentada e não indica falha na atualização.
 
 ### Frete e faturamento
 

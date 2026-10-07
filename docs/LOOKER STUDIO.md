@@ -133,6 +133,8 @@ O campo legado `faturamento` permanece como alias do faturamento total para não
 
 O dashboard deve mostrar preferencialmente os nomes amigáveis, como **Cancelado** e **Débito**, mantendo os códigos disponíveis para auditoria e filtros técnicos.
 
+Para pagamento Int32 não negativo sem de-para documentado, como 0 e 6, `pedido_forma_pagamento_nome` exibe `Não identificado (código X)` e `pedido_forma_pagamento` preserva o código. Essa descrição distingue códigos recebidos da API sem forma de pagamento documentada de pagamentos ausentes ou inválidos, cuja descrição permanece vazia.
+
 ### BI_Status
 
 Uma linha com a saúde da última execução do Analytics:

@@ -40,6 +40,7 @@ from farmalider_integration import resolve_contact_order
 from pedido_utils import (
     business_order_datetime,
     farmalider_order_status_name,
+    farmalider_payment_method_display,
     farmalider_payment_method_name,
     is_order_cancelled,
     is_order_made,
@@ -149,6 +150,8 @@ class ContactUpdatePlan:
     evidence: dict[str, dict[str, str]] = field(default_factory=dict)
     group_actions: list[GroupAction] = field(default_factory=list)
     order_validated: bool = False
+    # Diagnostic metadata from this GET; never written to Weni or plan digest.
+    order_payment_code: str = ""
     purchase_confirmed: bool = False
     purchase_confirmation: str = ""
 
@@ -171,6 +174,39 @@ class UpdateStats:
     contacts_already_satisfied: int = 0
     purchase_confirmed: int = 0
     purchase_skipped: int = 0
+    orders_validated: int = 0
+    payment_unmapped_codes: dict[str, int] = field(default_factory=dict)
+
+
+def _record_validated_order(stats: UpdateStats, plan: ContactUpdatePlan) -> None:
+    """Count contacts with a validated order, including unchanged/cancelled ones."""
+    if not plan.order_validated:
+        return
+    stats.orders_validated += 1
+    code = normalize_farmalider_payment_code(plan.order_payment_code)
+    if not code or farmalider_payment_method_name(code):
+        return
+    count = stats.payment_unmapped_codes.get(code, 0) + 1
+    stats.payment_unmapped_codes[code] = count
+    if count == 1:
+        logging.info(
+            "FarmaLíder: pedido validado com formaPagamento=%s. "
+            "Descrição no Analytics: %s. Código preservado; "
+            "preparação dos campos de pedido continua normalmente. "
+            "Este aviso informativo aparece uma vez por código nesta execução.",
+            code,
+            farmalider_payment_method_display(code),
+        )
+
+
+def _log_planning_progress(stats: UpdateStats, *, processed: int, total: int) -> None:
+    if processed == 1 or processed % 100 == 0 or processed == total:
+        logging.info(
+            "Preparação Weni: %s/%s contato(s) percorrido(s); "
+            "%s contato(s) com pedido validado; %s contato(s) com alterações propostas. "
+            "Nenhuma gravação foi iniciada.",
+            processed, total, stats.orders_validated, stats.plans_with_changes,
+        )
 
 
 @dataclass(frozen=True)
@@ -746,16 +782,11 @@ def _apply_purchase_candidate(
     normalized_payment = normalize_farmalider_payment_code(payment_code)
     if normalized_payment:
         payment_code = normalized_payment
-        if not farmalider_payment_method_name(payment_code):
-            logging.warning(
-                "FarmaLíder: formaPagamento=%s sem de-para documentado; "
-                "código original mantido, sem atribuir uma forma de pagamento.",
-                payment_code,
-            )
     if not farmalider_order_status_name(status_code):
         return False
 
     plan.order_validated = True
+    plan.order_payment_code = normalized_payment
     plan.purchase_confirmation = confirmation
     plan.purchase_confirmed = confirmation == "CONFIRMADO_API" and is_order_made(order)
     reason = "pedido oficial FarmaLíder atualizado por GET e normalizado para Weni"
@@ -1227,6 +1258,8 @@ def _review_summary(plans: list[ContactUpdatePlan], stats: UpdateStats) -> dict[
         "field_changes": sum(len(plan.fields) for plan in plans),
         "group_actions": sum(len(plan.group_actions) for plan in plans),
         "purchase_confirmed": stats.purchase_confirmed,
+        "orders_validated": stats.orders_validated,
+        "payment_unmapped_codes": dict(sorted(stats.payment_unmapped_codes.items())),
         "field_counts": dict(sorted(field_counts.items())),
         "lgpd_contacts": lgpd_contacts,
         "cpf_contacts": cpf_contacts,
@@ -1320,6 +1353,8 @@ def write_review_snapshot(
         f"Remoções de Opt-Out LGPD: {summary['opt_out_removals']}",
         f"Contatos com campos de pedido: {summary['purchase_contacts']}",
         f"Pedidos confirmados pela FarmaLíder: {summary['purchase_confirmed']}",
+        f"Contatos com pedido validado (inclusive sem alteração): {summary['orders_validated']}",
+        f"Pagamento não identificado por código: {summary['payment_unmapped_codes']}",
         "",
         "ALTERAÇÕES POR CAMPO",
         "----------------------------------------------------------",
@@ -1834,6 +1869,17 @@ def run_update(
             stats.field_changes = sum(len(plan.fields) for plan in plans)
             stats.group_actions = sum(len(plan.group_actions) for plan in plans)
             stats.purchase_confirmed = sum(1 for plan in plans if plan.purchase_confirmed)
+            stats.orders_validated = int(summary.get("orders_validated") or sum(
+                1 for plan in plans if plan.order_validated
+            ))
+            unmapped = summary.get("payment_unmapped_codes")
+            if isinstance(unmapped, dict):
+                stats.payment_unmapped_codes = {
+                    code: count for code, count in unmapped.items()
+                    if normalize_farmalider_payment_code(code) == code
+                    and not farmalider_payment_method_name(code)
+                    and isinstance(count, int) and not isinstance(count, bool) and count > 0
+                }
             captured_at = str(review_payload.get("captured_at_utc") or "").strip()
 
             logging.info(
@@ -2073,13 +2119,19 @@ def run_update(
 
         all_contact_uuids = set(contacts_by_uuid) | set(incoming_by_contact)
         plans: list[ContactUpdatePlan] = []
+        logging.info(
+            "Preparando atualizações de %s contato(s): consulta e validação dos pedidos "
+            "antes da auditoria. Nenhuma gravação foi iniciada.",
+            len(all_contact_uuids),
+        )
 
-        for contact_uuid in sorted(all_contact_uuids):
+        for index, contact_uuid in enumerate(sorted(all_contact_uuids), start=1):
             contact = contacts_by_uuid.get(contact_uuid)
             if contact is None:
                 contact = weni.get_contact(uuid=contact_uuid)
             if contact is None:
                 logging.warning("Contato %s não foi localizado; ignorando.", contact_uuid)
+                _log_planning_progress(stats, processed=index, total=len(all_contact_uuids))
                 continue
 
             candidate_messages = incoming_by_contact.get(contact_uuid, [])
@@ -2112,6 +2164,7 @@ def run_update(
                 available_weni_fields=available_weni_fields,
             )
             stats.contacts_considered += 1
+            _record_validated_order(stats, plan)
             _track_open_order(
                 open_order_uuids,
                 contact_uuid,
@@ -2124,10 +2177,19 @@ def run_update(
 
             if plan.has_changes:
                 plans.append(plan)
+            stats.plans_with_changes = len(plans)
+            _log_planning_progress(stats, processed=index, total=len(all_contact_uuids))
 
         stats.plans_with_changes = len(plans)
         stats.field_changes = sum(len(plan.fields) for plan in plans)
         stats.group_actions = sum(len(plan.group_actions) for plan in plans)
+        logging.info(
+            "Preparação concluída: %s contato(s) com pedido validado "
+            "(inclusive sem alteração); pagamento não identificado por código: %s. "
+            "Nenhuma gravação foi iniciada; iniciando auditoria do plano.",
+            stats.orders_validated,
+            dict(sorted(stats.payment_unmapped_codes.items())),
+        )
 
         # ETAPA OBRIGATÓRIA: nenhum POST é feito antes desta auditoria completa.
         audit_plans(

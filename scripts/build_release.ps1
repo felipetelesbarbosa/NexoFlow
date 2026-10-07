@@ -271,7 +271,9 @@ Melhorias desta distribuicao do NexoFlow 1.0:
 - diagnostico privado local identifica CPFs com falhas 5xx persistentes e captura campos seguros da resposta, fora dos logs publicos e dos pacotes;
 - diagnostico seguro de proxy identifica autenticacao 407, bloqueio de tunel 403, TLS, DNS, timeout e conexao recusada; resposta 400/404 da FarmaLider nao e apresentada como autenticacao confirmada;
 - listas de pedido com leitura CSV preservam virgulas e aspas nos nomes dos produtos, sem desalinhamento artificial na Weni e no Analytics;
-- codigos numericos de pagamento nao documentados sao preservados com aviso, sem inventar a forma de pagamento; a auditoria continua bloqueando listas realmente inconsistentes;
+- codigos numericos de pagamento nao documentados sao preservados e exibidos como nao identificados, com o codigo recebido, sem inventar a forma de pagamento;
+- pagamento sem de-para aparece em INFO uma vez por codigo; resumo por codigo e progresso distinguem contatos com pedido validado de alteracoes propostas e gravadas;
+- preparacao e auditoria continuam antes de qualquer gravacao; listas realmente inconsistentes permanecem bloqueadas;
 - cooldown global e recuperacao serial apos falhas 5xx da FarmaLider, com retorno gradual da concorrencia e reducao do intervalo quando a API se recupera;
 - diagnostico de HTTP 500 com referencias opacas por execucao e classificacao da resposta, sem publicar CPF, tokens ou texto livre do servidor;
 - HTTP 404 continua representando cliente nao encontrado; HTTP 500 permanece uma falha da API;

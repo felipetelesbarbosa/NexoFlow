@@ -12,7 +12,7 @@ from urn_utils import resolve_contact_urns
 from pedido_utils import (
     business_order_datetime,
     farmalider_order_status_name,
-    farmalider_payment_method_name,
+    farmalider_payment_method_display,
     is_order_made,
     parse_weni_order_list,
     weni_order_datetime_text,
@@ -504,7 +504,7 @@ def normalize_contact(
     ):
         row[key] = normalize_value(fields.get(key))
     row["pedido_status_nome"] = farmalider_order_status_name(row["pedido_status"])
-    row["pedido_forma_pagamento_nome"] = farmalider_payment_method_name(
+    row["pedido_forma_pagamento_nome"] = farmalider_payment_method_display(
         row["pedido_forma_pagamento"]
     )
 
@@ -1496,7 +1496,7 @@ def build_bi_order_rows(
             status_code,
             farmalider_order_status_name(status_code),
             payment_code,
-            farmalider_payment_method_name(payment_code),
+            farmalider_payment_method_display(payment_code),
             (base.get("contact_canal_principal") or "outro").strip().casefold(),
             (order.get("primeiro_anuncio_origem") or "").strip(),
             (order.get("ultimo_anuncio_origem") or "").strip(),

@@ -254,8 +254,8 @@ Regras:
 - o frete não é gravado nos campos Weni de pedido; ele é preservado no Google Sheets como `farmalider_frete` e usado pelo Analytics para calcular `valor_total_faturamento = pedido_valor + frete`;
 - `pedido_data` é gravada no formato `DD/MM/YY HH:MM:SS`, usando America/Belem;
 - `pedido_status` guarda o código oficial: 0 Em processamento, 1 Em trânsito, 2 Concluído, 3 Cancelado, 4 Pronto para rota;
-- `pedido_forma_pagamento` guarda o código oficial: 1 Dinheiro, 2 Débito, 3 Crédito, 4 Ticket, 5 Online/link/Pix;
-- os rótulos amigáveis de status e pagamento são derivados no Analytics/BI, sem substituir os códigos na Weni;
+- `pedido_forma_pagamento` guarda o código Int32 não negativo recebido da API; o de-para documentado é 1 Dinheiro, 2 Débito, 3 Crédito, 4 Ticket, 5 Online/link/Pix;
+- os rótulos amigáveis de status e pagamento são derivados no Analytics/BI, sem substituir os códigos na Weni; pagamento válido sem de-para aparece como `Não identificado (código X)`, inclusive para 0 e 6;
 - `pedido_id` é o primeiro localizador de fallback quando o GET por CPF não puder ser usado;
 - `ultimo_pedido` é o **último localizador**: ele pode vir de outra integração e serve somente para recuperar um ID de pedido que depois será confirmado em `GET pedido/{id}`;
 - `ultimo_pedido` nunca substitui a API como fonte de produtos, valores, status, data ou pagamento; se a FarmaLíder estiver indisponível, os campos `pedido_*` existentes são preservados e não são reconstruídos a partir do snapshot legado;
@@ -290,6 +290,10 @@ logs\weni_update_audit.jsonl
 ```
 
 A auditoria registra contato, campos anteriores/novos, evidência técnica, ações de grupo e confirmação de pedido. O corpo completo das mensagens do cliente não é salvo nessa trilha.
+
+Preparação e auditoria do plano acontecem antes das gravações. O total de contatos com pedido validado pela API inclui os que não precisam de alteração; o total de contatos com alterações é informado separadamente.
+
+Pagamento sem de-para é informativo: cada código aparece em `INFO` uma vez por execução, com totais por código no resumo. O código é preservado e esse registro não bloqueia a atualização.
 
 ## Princípios de segurança
 

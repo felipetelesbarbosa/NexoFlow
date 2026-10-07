@@ -24,7 +24,9 @@ CPF
 | `pedido_valor` | soma de `itens[].total` |
 | `pedido_data` | `DD/MM/YY HH:MM:SS` |
 | `pedido_status` | código 0 a 4 |
-| `pedido_forma_pagamento` | código 1 a 5 |
+| `pedido_forma_pagamento` | código Int32 não negativo recebido; de-para documentado de 1 a 5 |
+
+Pagamentos válidos sem de-para, como 0 e 6, mantêm seu código na Weni e recebem a descrição `Não identificado (código X)` no Google Sheets/BI. Pagamento ausente ou inválido mantém a descrição vazia.
 
 Exemplo:
 
@@ -42,6 +44,8 @@ pedido_forma_pagamento: 2
 `ultimo_pedido` continua aceito apenas para compatibilidade/fallback offline. O NexoFlow Weni não depende dele para escolher o pedido quando a FarmaLíder API está disponível.
 
 A escrita continua protegida por dry-run, auditoria, confirmação e verificação de conflito por contato.
+
+Os logs de preparação e auditoria precedem as gravações. O total de contatos com pedido validado pela API inclui os que não precisam de alteração. Cada código de pagamento sem de-para aparece em `INFO` uma vez por execução, com totais por código no resumo, sem bloquear a atualização.
 
 Veja [PEDIDOS.md](PEDIDOS.md) para regras completas.
 

@@ -36,7 +36,7 @@ Mesmo nesse fallback, `ultimo_pedido` não vira fonte de produtos, quantidade, v
 | `pedido_valor` | `sum(itens[].total)` | soma dos totais dos itens |
 | `pedido_data` | `emissao` | `DD/MM/YY HH:MM:SS` |
 | `pedido_status` | `status` | código oficial 0 a 4 |
-| `pedido_forma_pagamento` | `formaPagamento` | código oficial 1 a 5 |
+| `pedido_forma_pagamento` | `formaPagamento` | código Int32 não negativo recebido; de-para documentado de 1 a 5 |
 
 As listas são posicionais. Exemplo:
 
@@ -140,7 +140,9 @@ De-para oficial:
 | 4 | Ticket |
 | 5 | Online/link/Pix |
 
-A Weni recebe o código em `pedido_forma_pagamento`. O Analytics deriva `pedido_forma_pagamento_nome`.
+A Weni recebe o código em `pedido_forma_pagamento`. O Analytics deriva `pedido_forma_pagamento_nome`. Códigos Int32 não negativos sem de-para, como 0 e 6, são preservados e exibidos no Google Sheets/BI como `Não identificado (código X)`. Essa descrição não atribui uma forma de pagamento ao código. Pagamento ausente ou inválido mantém a descrição vazia.
+
+No NexoFlow Weni, cada código sem de-para gera um registro `INFO` por execução, com totais por código no resumo. Isso não impede a atualização dos demais campos válidos.
 
 ## Exemplo real do contrato
 
@@ -223,6 +225,8 @@ GET FarmaLíder
 ```
 
 Nenhum campo de pedido é gravado fora da allowlist.
+
+A preparação e a auditoria do plano terminam antes das gravações. O resumo de contatos com pedido validado pela API também conta os que já estavam atualizados. Esse total não representa pedidos únicos nem contatos alterados; as alterações são contabilizadas separadamente.
 
 Os oito campos do contrato de pedido são obrigatórios na Weni: `pedido_id`, `pedido_data`, `pedido_status`, `pedido_produtos`, `pedido_quantidade_itens`, `pedido_valor_produtos`, `pedido_valor` e `pedido_forma_pagamento`. Se qualquer um estiver ausente, o preflight bloqueia o NexoFlow Weni antes do apply, evitando snapshot parcial.
 

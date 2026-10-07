@@ -92,6 +92,14 @@ def farmalider_payment_method_name(value: Any) -> str:
     return FARMALIDER_PAYMENT_METHOD_NAMES.get(int(normalized), "")
 
 
+def farmalider_payment_method_display(value: Any) -> str:
+    """Show an unmapped API code without inventing a payment method."""
+    code = normalize_farmalider_payment_code(value)
+    if not code:
+        return ""
+    return farmalider_payment_method_name(code) or f"Não identificado (código {code})"
+
+
 def business_order_datetime(value: Any) -> datetime | None:
     """Interpret API ISO or Weni display timestamps as America/Belem time."""
     if isinstance(value, datetime):

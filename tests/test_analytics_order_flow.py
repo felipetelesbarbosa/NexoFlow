@@ -5,9 +5,11 @@ import unittest
 from unittest.mock import Mock
 
 from analytics import (
+    BI_ORDERS_COLUMNS,
     ORDER_COLUMNS,
     ORDER_ITEM_COLUMNS,
     build_bi_conversion_records,
+    build_bi_order_rows,
     build_bi_summary_record,
     build_sales_metrics,
     normalize_contact,
@@ -34,7 +36,7 @@ class MemoryWorksheet:
 
 
 class AnalyticsOrderFlowTests(unittest.TestCase):
-    def fixture(self, *, status=2, cancelled=False, freight="9.99"):
+    def fixture(self, *, status=2, cancelled=False, freight="9.99", payment=2):
         contact = {"uuid": "synthetic-u1", "fields": {"cpf": "52998224725"}}
         client = Mock()
         cliente_items = [{
@@ -56,7 +58,7 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
                 "codCliente": 99,
                 "emissao": "2026-10-05T10:00:00",
                 "status": status,
-                "formaPagamento": 2,
+                "formaPagamento": payment,
                 "frete": freight,
                 "cancelamento": (
                     "2026-10-05T11:00:00" if cancelled else None
@@ -70,7 +72,7 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
                 "codCliente": 99,
                 "emissao": "2026-10-05T10:00:00",
                 "status": status,
-                "formaPagamento": 2,
+                "formaPagamento": payment,
                 "frete": freight,
                 "cancelamento": (
                     "2026-10-05T11:00:00" if cancelled else None
@@ -137,6 +139,81 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
         self.assertEqual(row["pedido_status_nome"], "Cancelado")
         self.assertEqual(row["pedido_forma_pagamento"], "2")
         self.assertEqual(row["pedido_forma_pagamento_nome"], "Débito")
+
+    def test_normalized_contact_identifies_undocumented_payment_codes(self):
+        for code in (0, 6, 9, 2147483647):
+            for value in (code, str(code)):
+                with self.subTest(value=value):
+                    row = normalize_contact(
+                        {
+                            "uuid": "u1",
+                            "fields": {"pedido_forma_pagamento": value},
+                        },
+                        "2026-10-05T14:00:00Z",
+                    )
+                    self.assertEqual(row["pedido_forma_pagamento"], str(code))
+                    self.assertEqual(
+                        row["pedido_forma_pagamento_nome"],
+                        f"Não identificado (código {code})",
+                    )
+
+    def test_normalized_contact_does_not_label_invalid_payment_values(self):
+        for value in (None, "", " ", True, False, "Pix", -1, "-1", 2147483648):
+            with self.subTest(value=value):
+                row = normalize_contact(
+                    {
+                        "uuid": "u1",
+                        "fields": {"pedido_forma_pagamento": value},
+                    },
+                    "2026-10-05T14:00:00Z",
+                )
+                self.assertEqual(row["pedido_forma_pagamento_nome"], "")
+
+    def test_api_payment_code_and_display_persist_through_to_bi(self):
+        expected = {
+            1: "Dinheiro",
+            2: "Débito",
+            3: "Crédito",
+            4: "Ticket",
+            5: "Online/link/Pix",
+            0: "Não identificado (código 0)",
+            6: "Não identificado (código 6)",
+            9: "Não identificado (código 9)",
+            2147483647: "Não identificado (código 2147483647)",
+        }
+        for code, label in expected.items():
+            with self.subTest(code=code):
+                contact, client = self.fixture(payment=code)
+                row, orders, items = self.resolve_and_persist(contact, client)
+                self.assertEqual(orders[0]["farmalider_forma_pagamento"], str(code))
+                self.assertEqual(
+                    orders[0]["farmalider_forma_pagamento_nome"], label
+                )
+                bi_rows = build_bi_order_rows(
+                    [row], orders, items, updated_at="2026-10-05T14:00:00Z"
+                )
+                self.assertEqual(len(bi_rows), 1)
+                bi_order = dict(zip(BI_ORDERS_COLUMNS, bi_rows[0], strict=True))
+                self.assertEqual(bi_order["pedido_forma_pagamento"], str(code))
+                self.assertEqual(bi_order["pedido_forma_pagamento_nome"], label)
+
+    def test_missing_api_payment_does_not_invent_payment_in_orders_or_bi(self):
+        for missing in (False, True):
+            with self.subTest(field_missing=missing):
+                contact, client = self.fixture(payment=None)
+                if missing:
+                    del client.get_cliente_by_cpf.return_value["ultimoPedido"]["formaPagamento"]
+                    del client.get_pedido.return_value["capa"]["formaPagamento"]
+                row, orders, items = self.resolve_and_persist(contact, client)
+                self.assertEqual(orders[0]["farmalider_forma_pagamento"], "")
+                self.assertEqual(orders[0]["farmalider_forma_pagamento_nome"], "")
+                bi_rows = build_bi_order_rows(
+                    [row], orders, items, updated_at="2026-10-05T14:00:00Z"
+                )
+                self.assertEqual(len(bi_rows), 1)
+                bi_order = dict(zip(BI_ORDERS_COLUMNS, bi_rows[0], strict=True))
+                self.assertEqual(bi_order["pedido_forma_pagamento"], "")
+                self.assertEqual(bi_order["pedido_forma_pagamento_nome"], "")
 
     def test_cpf_contact_uses_description_and_item_total_without_freight(self):
         contact, client = self.fixture()

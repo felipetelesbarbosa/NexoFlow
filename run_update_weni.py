@@ -111,6 +111,12 @@ def main() -> int:
         print(f"Campos propostos: {stats.field_changes}")
         print(f"Ações de grupo: {stats.group_actions}")
         print(f"Pedidos confirmados pela FarmaLíder: {stats.purchase_confirmed}")
+        print(f"Contatos com pedido validado (inclusive sem alteração): {stats.orders_validated}")
+        if stats.payment_unmapped_codes:
+            print(
+                "Pagamento não identificado por código: "
+                f"{dict(sorted(stats.payment_unmapped_codes.items()))}"
+            )
         if args.dry_run:
             print("Modo: DRY-RUN. Nenhuma alteração foi gravada.")
             if review_out is not None:

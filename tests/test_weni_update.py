@@ -656,11 +656,77 @@ class WeniUpdateTests(unittest.TestCase):
                 farm.get_pedido.return_value["capa"]["formaPagamento"] = payment
                 with patch("weni_update.logging.warning") as warning:
                     plan = self._purchase_plan(contact, farm)
-                warning.assert_called_once()
-                self.assertEqual(warning.call_args.args[1], str(payment))
+                warning.assert_not_called()
+                self.assertTrue(plan.order_validated)
+                self.assertEqual(plan.order_payment_code, str(payment))
                 self.assertEqual(plan.fields["pedido_forma_pagamento"], str(payment))
                 audit_plans([plan], opt_out_group_available=True)
                 self.assertEqual(plan.fields["pedido_valor"], 25.5)
+
+    def test_unknown_payment_summary_counts_unchanged_and_cancelled_orders_without_writes(self) -> None:
+        started = datetime(2026, 10, 3, 12, 1, tzinfo=timezone.utc)
+        contact = self._purchase_contact(include_raw=False)
+        farm = self._purchase_api()
+        farm.get_cliente_by_cpf.return_value["ultimoPedido"].update(
+            status=3, formaPagamento=0,
+        )
+        farm.get_pedido.return_value["capa"].update(status=3, formaPagamento=0)
+        pending = self._purchase_plan(contact, farm)
+        unchanged = deepcopy(contact)
+        unchanged["uuid"] = "u-unchanged"
+        unchanged["fields"].update(pending.fields)
+        duplicate = deepcopy(contact)
+        duplicate["uuid"] = "u-duplicate"
+        client = self._incremental_purchase_client(contact)
+        client.list_contacts.return_value = [contact, duplicate, unchanged]
+        current_by_uuid = {item["uuid"]: item for item in client.list_contacts.return_value}
+        client.get_contact.side_effect = lambda *, uuid: deepcopy(current_by_uuid[uuid])
+
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch("weni_update.WeniClient", return_value=client),
+            patch("weni_update._open_farmalider", return_value=farm),
+            patch("weni_update.resolve_window", return_value=UpdateWindow(
+                started_at=started, after=None, full=True,
+            )),
+            patch("weni_update._append_audit"),
+            patch("weni_update._save_state"),
+        ):
+            review = Path(tmp) / "review.json"
+            with patch("weni_update.logging.info") as log_info:
+                result = run_update(apply=False, full=True, review_out=review)
+            logs = [call.args[0] % call.args[1:] for call in log_info.call_args_list]
+            self.assertEqual(result.orders_validated, 3)
+            self.assertEqual(result.plans_with_changes, 2)
+            self.assertEqual(result.purchase_confirmed, 0)
+            self.assertEqual(result.payment_unmapped_codes, {"0": 3})
+            self.assertEqual(result.contacts_updated, 0)
+            client.update_contact_fields.assert_not_called()
+            client.contact_group_action.assert_not_called()
+            payment_messages = [line for line in logs if "Descrição no Analytics:" in line]
+            self.assertEqual(len(payment_messages), 1)
+            self.assertIn("Não identificado (código 0)", payment_messages[0])
+            self.assertTrue(any(
+                "3 contato(s) com pedido validado" in line
+                and "Nenhuma gravação foi iniciada" in line
+                for line in logs
+            ))
+            self.assertTrue(all("52998224725" not in line for line in logs))
+            snapshot = json.loads(review.read_text(encoding="utf-8"))
+            self.assertEqual(snapshot["summary"]["orders_validated"], 3)
+            self.assertEqual(snapshot["summary"]["payment_unmapped_codes"], {"0": 3})
+            self.assertTrue(all("order_payment_code" not in plan for plan in snapshot["plans"]))
+            loaded, _, _ = load_review_snapshot(full=True, json_path=review)
+            self.assertEqual(len(loaded), 2)
+            applied = run_update(apply=True, full=True, require_review=review)
+            self.assertEqual(applied.orders_validated, 3)
+            self.assertEqual(applied.payment_unmapped_codes, {"0": 3})
+            self.assertEqual(applied.contacts_updated, 2)
+            self.assertEqual(client.update_contact_fields.call_count, 2)
+            for call in client.update_contact_fields.call_args_list:
+                self.assertEqual(call.args[1]["pedido_forma_pagamento"], "0")
+                self.assertEqual(call.args[1]["pedido_status"], "3")
+                self.assertNotIn("ultima_compra", call.args[1])
 
     def test_audit_rejects_misalignment_when_only_one_list_changes(self) -> None:
         plan = ContactUpdatePlan(
