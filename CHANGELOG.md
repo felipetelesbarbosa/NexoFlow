@@ -2,6 +2,14 @@
 
 ## NexoFlow 1.0
 
+### Carga completa 25%
+
+- Weni e Analytics podem ser executados em quatro cargas completas de 25%, além do modo tradicional de 100%;
+- a Parte 1 congela a lista de contatos em um manifesto SHA-256 compartilhado, e as Partes 2–4 reutilizam a mesma base;
+- a divisão é determinística por UUID, sem sobreposição, e exige execução em ordem por componente;
+- partes com erro não são marcadas como concluídas e podem ser repetidas com segurança;
+- o cursor incremental só avança quando a Parte 4 do componente termina, usando o corte inicial da campanha para não perder mudanças ocorridas durante as quatro execuções.
+
 ### Status de pedido e vendas
 
 - de-para atualizado: `EmAberto=-2`, `PendenteDePagamento=-1`, `EmProcessamento=0`, `ProntoParaRota=4`, `EmTransito=1`, `Concluido=2` e `Cancelado=3`;
