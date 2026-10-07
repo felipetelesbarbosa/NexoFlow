@@ -498,6 +498,22 @@ do backend. Consulte [o diagnóstico da API](docs/FARMALIDER%20API.md).
 
 ## Rede e proxy
 
+### Identificar CPFs com falhas persistentes da FarmaLíder
+
+Após esgotar tentativas por CPF com respostas 5xx, o NexoFlow registra um diagnóstico **privado local**, separado do log normal. Consultas com 5xx interrompidas pelo circuito também são registradas. Uma consulta recuperada por retry não cria registro de falha persistente.
+
+No Windows, abra no Explorador:
+
+```text
+%LOCALAPPDATA%\NexoFlow\diagnosticos_privados
+```
+
+Cada execução cria `farmalider_falhas_<execucao_id>.jsonl`. Cada linha é um JSON com `cpf`, `consulta_ref`, horário em America/Belem, ambiente, último HTTP 5xx, tentativas, motivo do encerramento, assinatura e campos diagnósticos sanitizados da resposta. O log normal mostra a referência e o caminho do arquivo, sem CPF nem corpo da resposta. A mesma referência é gravada uma única vez por execução.
+
+O arquivo contém CPF e deve permanecer privado. URLs, credenciais, objetos de cliente e identificadores no texto da resposta são removidos; somente campos diagnósticos conhecidos são preservados. Corpos maiores que 4 KiB, HTML, formatos desconhecidos e conteúdo sensível não são copiados integralmente. Em Linux, o diretório é `logs/privado`, criado com permissões restritas.
+
+Os arquivos começam a ser criados nas próximas execuções; referências de logs antigos não permitem recuperar CPFs. A gravação do diagnóstico não altera o tratamento de HTTP 500 como falha da API nem os dados existentes na Weni. O Git ignora esses arquivos, e o empacotamento bloqueia sua inclusão mesmo se forem adicionados ao índice por engano. A pasta Windows fica fora da instalação e não é enviada automaticamente para nenhum serviço.
+
 O NexoFlow pode operar em rede corporativa ou conexão direta.
 
 Com proxy corporativo:

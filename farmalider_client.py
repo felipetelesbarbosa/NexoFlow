@@ -15,6 +15,7 @@ from email.utils import parsedate_to_datetime
 from typing import Any
 
 import requests
+from private_diagnostics import append_private_failure
 
 from config import (
     FARMALIDER_429_COOLDOWN_SECONDS,
@@ -73,6 +74,9 @@ class FarmaliderClient:
         # Identificadores de diagnóstico não permitem reconstruir CPFs por
         # enumeração e são estáveis apenas durante esta execução.
         self._diagnostic_key = secrets.token_bytes(32)
+        self._diagnostic_execution_id = secrets.token_hex(8)
+        self._private_diagnostic_lock = threading.Lock()
+        self._private_recorded_refs: set[str] = set()
 
         self._thread_local = threading.local()
         self._sessions: list[requests.Session] = []
@@ -388,9 +392,10 @@ class FarmaliderClient:
                     payload = json.loads(value)
                     value = (
                         " ".join(
-                            payload[key]
-                            for key in ("title", "message", "detail", "error", "exceptionMessage", "ExceptionMessage")
-                            if isinstance(payload.get(key), str)
+                            item
+                            for key, item in payload.items()
+                            if key.casefold() in {"title", "message", "mensagem", "msg", "detail", "error", "erro", "exceptionmessage", "errormessage"}
+                            and isinstance(item, str)
                         )
                         if isinstance(payload, dict) else ""
                     )
@@ -413,6 +418,8 @@ class FarmaliderClient:
                     category = "registro_duplicado"
                 elif normalized == "internal server error":
                     category = "internal_server_error"
+                elif normalized in {"an error has occurred.", "an error has occurred", "erro interno do servidor"}:
+                    category = "erro_generico_backend"
         signature = (
             hmac.new(self._diagnostic_key, raw, hashlib.sha256).hexdigest()[:12]
             if raw else "-"
@@ -552,13 +559,17 @@ class FarmaliderClient:
         *,
         allow_not_found: bool = False,
         diagnostic_ref: str = "-",
+        private_cpf: str | None = None,
     ) -> dict[str, Any] | None:
         url = f"{self.base_url}{path}"
         endpoint_label = self._endpoint_label(path)
+        last_server_response: requests.Response | None = None
 
         for attempt in range(1, FARMALIDER_MAX_RETRIES + 1):
             response: requests.Response | None = None
-            with self._request_slot(endpoint_label) as permit:
+            with self._private_request_slot(
+                endpoint_label, private_cpf, diagnostic_ref, last_server_response, attempt,
+            ) as permit:
                 started = time.monotonic()
                 try:
                     response = self._get_session().get(
@@ -602,6 +613,8 @@ class FarmaliderClient:
                         self._mark_unhealthy()
                         raise FarmaliderError("FarmaLíder API retornou HTTP 400 para a consulta.")
                     if status == 429 or status >= 500:
+                        if status >= 500:
+                            last_server_response = response
                         self._protect_after_failure(
                             endpoint_label=endpoint_label, diagnostic_ref=diagnostic_ref,
                             permit=permit, delay=self._retry_delay(attempt, response),
@@ -620,6 +633,10 @@ class FarmaliderClient:
                         with self._rate_lock:
                             circuit_open = endpoint_label in self._open_circuits
                         if circuit_open:
+                            self._record_private_failure(
+                                private_cpf, diagnostic_ref, last_server_response,
+                                attempt, "circuito_aberto",
+                            )
                             raise FarmaliderUnavailableError(
                                 f"FarmaLíder: falhas 5xx persistentes em várias consultas "
                                 f"da rota {endpoint_label}, inclusive após redução de ritmo. "
@@ -644,6 +661,11 @@ class FarmaliderClient:
                         return payload
 
             if attempt >= FARMALIDER_MAX_RETRIES:
+                if last_server_response is not None:
+                    self._record_private_failure(
+                        private_cpf, diagnostic_ref, last_server_response,
+                        attempt, "tentativas_esgotadas" if response is not None else "rede_sem_resposta_apos_5xx",
+                    )
                 if response is None:
                     raise FarmaliderError("Não foi possível alcançar a FarmaLíder API.") from None
                 raise FarmaliderError(
@@ -662,7 +684,46 @@ class FarmaliderClient:
             self._delivery_path(f"cliente/cpf/{cpf}"),
             allow_not_found=True,
             diagnostic_ref=self.cpf_diagnostic_ref(cpf),
+            private_cpf=cpf,
         )
+
+    def _record_private_failure(self, cpf: str | None, reference: str,
+                                response: requests.Response | None,
+                                attempts: int, reason: str) -> None:
+        if cpf is None or response is None:
+            return
+        with self._private_diagnostic_lock:
+            if reference in self._private_recorded_refs:
+                return
+            try:
+                raw = response.content if isinstance(response.content, bytes) else b""
+                path = append_private_failure(
+                    execution_id=self._diagnostic_execution_id, reference=reference,
+                    cpf=cpf, status=response.status_code, attempts=attempts,
+                    reason=reason, environment="homologacao" if self.use_hml else "producao",
+                    raw=raw, token=self.token, summary=self._safe_server_error_summary(response),
+                )
+                if path is not None:
+                    self._private_recorded_refs.add(reference)
+                    logging.warning("FarmaLíder [consulta %s]: diagnóstico privado local gravado em %s; contém CPF, acesso restrito.", reference, path)
+            except Exception as exc:
+                logging.warning("FarmaLíder [consulta %s]: diagnóstico privado não pôde ser gravado (%s); a falha original foi preservada.", reference, type(exc).__name__)
+
+    @contextmanager
+    def _private_request_slot(self, endpoint: str, cpf: str | None,
+                              reference: str, previous_response: requests.Response | None,
+                              attempt: int):
+        admitted = False
+        try:
+            with self._request_slot(endpoint) as permit:
+                admitted = True
+                yield permit
+        except FarmaliderUnavailableError:
+            if not admitted and previous_response is not None:
+                self._record_private_failure(
+                    cpf, reference, previous_response, attempt - 1, "circuito_aberto_na_fila",
+                )
+            raise
 
     def get_pedido(self, codigo: str | int) -> dict[str, Any] | None:
         return self._request_json(

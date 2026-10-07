@@ -2,6 +2,16 @@
 
 ## NexoFlow 1.0
 
+### Diagnóstico privado dos CPFs com HTTP 500
+
+- arquivo JSONL privado por execução identifica CPFs com falhas 5xx persistentes e correlaciona as referências do log;
+- registro inclui horário de Belém, último HTTP 5xx, tentativas, motivo de encerramento e campos sanitizados da resposta;
+- captura também consultas interrompidas pelo circuito enquanto aguardam nova tentativa;
+- consultas recuperadas e testes com CPF fictício não criam registros privados de falha;
+- Windows usa a pasta privada do usuário em LocalAppData, separada da instalação;
+- logs normais mantêm referências anônimas; CPF e corpo diagnóstico não são impressos;
+- Git e build protegem os registros contra publicação; falha de disco não substitui o erro original da API.
+
 ### Diagnóstico de rede e proxy
 
 - diagnóstico sanitizado da Weni distingue HTTP 407/403 no proxy, certificado TLS, DNS, timeout e conexão recusada, incluindo exceções aninhadas;
