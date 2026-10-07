@@ -59,6 +59,11 @@ jobs:
         run: |
           ./scripts/build_release.ps1 -Version "1.0"
 
+      - name: Validar icones incorporados nos executaveis
+        shell: pwsh
+        run: |
+          ./scripts/test_executable_icons.ps1 -Version "1.0"
+
       - name: Smoke test do Setup 1.0 no Windows
         shell: pwsh
         run: |

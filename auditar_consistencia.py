@@ -761,11 +761,11 @@ def check_windows_lifecycle() -> None:
         or "SHChangeNotify" not in install
         or "-ClearIconCache" not in install
         or "-show" not in install
-        or "Refresh-NexoFlowIconCache -Executables @($updateExe, $terminalExe)" not in install
+        or "Refresh-NexoFlowIconCache -Executables @($appExe, $updateExe, $terminalExe, $uninstallExe)" not in install
     ):
-        fail("Instalador precisa invalidar/recarregar o cache de ícones do Windows após instalar NexoFlow Weni/Terminal.")
+        fail("Instalador precisa invalidar/recarregar os ícones do Windows após instalar Analytics, Weni, Terminal e Uninstall.")
         return
-    ok("Instalador força o Explorer a reler os ícones internos do NexoFlow Weni e Terminal.")
+    ok("Instalador força o Explorer a reler os ícones internos de todos os executáveis do NexoFlow.")
 
     active_docs = [
         read("README.md"),

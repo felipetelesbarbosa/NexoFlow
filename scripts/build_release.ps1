@@ -114,6 +114,25 @@ Copy-TrackedFiles -Destination $ProjectRoot
 
 Write-Host "==> Montando payload do Setup"
 Copy-TrackedFiles -Destination $PayloadDir
+
+# Um .ico ao lado do EXE nao altera o icone exibido pelo Explorer.
+# Cada launcher deve incorporar seu proprio RT_ICON + RT_GROUP_ICON.
+$launcherIcons = @(
+    @{ Executable = "NexoFlow Analytics.exe"; Icon = "NexoFlow.ico" },
+    @{ Executable = "NexoFlow Weni.exe"; Icon = "NexoFlow_Weni.ico" },
+    @{ Executable = "NexoFlow Terminal.exe"; Icon = "NexoFlow_Terminal.ico" },
+    @{ Executable = "NexoFlow Uninstall.exe"; Icon = "uninstaller.ico" }
+)
+Write-Host "==> Incorporando icones PE dos executaveis no projeto e no payload"
+foreach ($folder in @($ProjectRoot, $PayloadDir)) {
+    foreach ($item in $launcherIcons) {
+        & (Join-Path $PSScriptRoot "embed_windows_icon.ps1") `
+            -ExecutablePath (Join-Path $folder $item.Executable) `
+            -IconPath (Join-Path (Join-Path $RepoRoot "assets") $item.Icon)
+    }
+}
+
+# O manifest deve refletir os EXEs depois da incorporacao dos icones.
 Write-PayloadManifest -Payload $PayloadDir
 
 New-Item -ItemType Directory -Force -Path (Join-Path $SetupRoot "installer") | Out-Null
@@ -166,6 +185,11 @@ finally {
     }
     Pop-Location
 }
+
+Write-Host "==> Incorporando icone proprio no NexoFlow Setup.exe"
+& (Join-Path $PSScriptRoot "embed_windows_icon.ps1") `
+    -ExecutablePath (Join-Path $SetupRoot "NexoFlow Setup.exe") `
+    -IconPath (Join-Path (Join-Path $RepoRoot "assets") "installer.ico")
 
 Write-Host "==> Gerando checksums internos do Setup"
 Write-Checksums -Root $SetupRoot -OutputFile (Join-Path $SetupRoot "checksums SHA256.txt")

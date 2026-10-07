@@ -17,6 +17,20 @@ Objetivos:
 
 O `NexoFlow Terminal.exe` inicia diretamente `run_terminal.py` com o Python da `.venv` quando disponível e utiliza `assets/NexoFlow_Terminal.ico`.
 
+### Ícones incorporados nos executáveis
+
+Os ícones dos cinco programas são incorporados ao próprio PE como recursos `RT_ICON` e `RT_GROUP_ICON` durante a criação dos ZIPs. Assim, o Explorador do Windows exibe o ícone específico mesmo ao visualizar o arquivo `.exe`, sem depender de um atalho ou de um arquivo `.ico` ao lado.
+
+| Executável | Ícone |
+|---|---|
+| `NexoFlow Setup.exe` | `assets/installer.ico` |
+| `NexoFlow Analytics.exe` | `assets/NexoFlow.ico` |
+| `NexoFlow Weni.exe` | `assets/NexoFlow_Weni.ico` |
+| `NexoFlow Terminal.exe` | `assets/NexoFlow_Terminal.ico` |
+| `NexoFlow Uninstall.exe` | `assets/uninstaller.ico` |
+
+A criação dos pacotes usa `scripts/embed_windows_icon.ps1`. O GitHub Actions executa `scripts/test_executable_icons.ps1` e **bloqueia a publicação** se o Windows não conseguir extrair algum ícone do executável ou se o PE não contiver as imagens correspondentes. O Setup também atualiza o cache de ícones do Explorer ao instalar.
+
 O Setup usa `ExecutionPolicy Bypass` somente para iniciar o script PowerShell local quando ele não estiver assinado com Authenticode. Analytics e NexoFlow Weni não contêm essa lógica.
 
 
