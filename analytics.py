@@ -168,17 +168,12 @@ def prepare_full_load_quarter(
         payload = _full_load_25_load()
         completed = _full_load_25_completed(payload, component)
         if part == 1 and part in completed:
-            active = [
-                name
-                for name in _FULL_LOAD_25_COMPONENTS
-                if _full_load_25_completed(payload, name)
-            ]
-            all_active_complete = bool(active) and all(
+            all_components_complete = all(
                 _full_load_25_completed(payload, name)
                 == set(range(1, FULL_LOAD_25_PARTS + 1))
-                for name in active
+                for name in _FULL_LOAD_25_COMPONENTS
             )
-            if not all_active_complete:
+            if not all_components_complete:
                 raise RuntimeError(
                     "A Parte 1 já foi concluída nesta campanha 25%. "
                     "Finalize as partes pendentes antes de iniciar uma nova."
@@ -266,15 +261,10 @@ def mark_full_load_quarter_complete(
     _full_load_25_write(payload)
 
     component_complete = completed == set(range(1, FULL_LOAD_25_PARTS + 1))
-    active = [
-        name
-        for name in _FULL_LOAD_25_COMPONENTS
-        if _full_load_25_completed(payload, name)
-    ]
-    campaign_complete = bool(active) and all(
+    campaign_complete = all(
         _full_load_25_completed(payload, name)
         == set(range(1, FULL_LOAD_25_PARTS + 1))
-        for name in active
+        for name in _FULL_LOAD_25_COMPONENTS
     )
     return component_complete, campaign_complete
 
