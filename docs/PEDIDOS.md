@@ -21,7 +21,9 @@ O retorno do endpoint por CPF já contém `ultimoPedido` e `itens`. Ele é sufic
 
 O endpoint por código é preferido como snapshot final porque confirma o mesmo pedido e fornece os metadados operacionais atuais, incluindo `status` e `formaPagamento`.
 
-Os campos antigos da Weni, inclusive `ultimo_pedido`, deixam de decidir qual é o pedido quando a API oficial está disponível. Eles são destino/cache e compatibilidade offline.
+Os campos atuais da Weni são usados apenas como localizadores de recuperação quando necessário. Se o GET por CPF não puder ser usado, o NexoFlow tenta primeiro `pedido_id`. Se esse campo não existir ou não puder ser validado, `ultimo_pedido` é consultado como **último localizador de ID**, inclusive para recuperar pedidos ocorridos enquanto o NexoFlow esteve fora do ar e outra integração continuou alimentando `ultimo_pedido`.
+
+Mesmo nesse fallback, `ultimo_pedido` não vira fonte de produtos, quantidade, valores, status, data ou forma de pagamento. O ID localizado precisa ser validado por `GET /api/Delivery/pedido/{codigo}`. Se a FarmaLíder API estiver indisponível, o NexoFlow preserva os campos `pedido_*` existentes e não os reconstrói a partir do snapshot legado.
 
 ## Contrato dos campos Weni
 
@@ -80,7 +82,17 @@ Portanto:
 pedido_valor = soma de todos os itens[].total
 ```
 
-O frete continua disponível separadamente nos dados técnicos da FarmaLíder, mas **não é somado ao campo Weni `pedido_valor`**.
+O frete continua disponível separadamente nos dados técnicos da FarmaLíder e **não é somado ao campo Weni `pedido_valor`**.
+
+No Google Sheets/BI, o NexoFlow mantém três valores distintos:
+
+```text
+valor_total_compra      = total dos produtos
+farmalider_frete        = frete
+valor_total_faturamento = produtos + frete
+```
+
+Em `BI_Pedidos`, isso é apresentado como `pedido_valor`, `pedido_frete` e `pedido_faturamento_total`. Em `BI_Vendas` e `BI_Resumo_Diario`, produtos e frete aparecem separados e o faturamento total usa a soma dos dois.
 
 ## Data
 
@@ -186,7 +198,9 @@ Tabela pronta para o Looker Studio, uma linha por pedido, contendo:
 - produtos;
 - quantidades;
 - valores unitários;
-- valor total;
+- valor dos produtos;
+- frete;
+- faturamento total do pedido, com produtos + frete;
 - código e nome do status;
 - código e nome da forma de pagamento;
 - canal;
@@ -210,7 +224,7 @@ GET FarmaLíder
 
 Nenhum campo de pedido é gravado fora da allowlist.
 
-Se um campo novo, como `pedido_valor_produtos` ou `pedido_forma_pagamento`, ainda não existir na Weni, o preflight informa a ausência. A coleta e o Analytics continuam funcionando e o NexoFlow grava apenas os campos disponíveis.
+Os oito campos do contrato de pedido são obrigatórios na Weni: `pedido_id`, `pedido_data`, `pedido_status`, `pedido_produtos`, `pedido_quantidade_itens`, `pedido_valor_produtos`, `pedido_valor` e `pedido_forma_pagamento`. Se qualquer um estiver ausente, o preflight bloqueia o NexoFlow Weni antes do apply, evitando snapshot parcial.
 
 ## Rechecagem
 
