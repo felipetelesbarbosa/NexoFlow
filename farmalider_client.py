@@ -625,9 +625,10 @@ class FarmaliderClient:
                         endpoint_label=endpoint_label, diagnostic_ref=diagnostic_ref,
                         permit=permit, delay=self._retry_delay(attempt), status_code=None,
                     )
-                    self._refresh_network_route(
-                        reason=f"falha recuperável em {endpoint_label}"
-                    )
+                    if attempt < FARMALIDER_MAX_RETRIES:
+                        self._refresh_network_route(
+                            reason=f"falha recuperável em {endpoint_label}"
+                        )
 
                 if response is not None:
                     elapsed = time.monotonic() - started
@@ -820,9 +821,10 @@ class FarmaliderClient:
                         delay=self._retry_delay(attempt),
                         status_code=None,
                     )
-                    self._refresh_network_route(
-                        reason="falha recuperável no preflight FarmaLíder"
-                    )
+                    if attempt < FARMALIDER_MAX_RETRIES:
+                        self._refresh_network_route(
+                            reason="falha recuperável no preflight FarmaLíder"
+                        )
                     logging.warning(
                         "FarmaLíder %s [preflight]: %s Tentativa %s/%s.",
                         endpoint_label,
