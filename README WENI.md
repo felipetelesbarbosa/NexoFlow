@@ -48,6 +48,16 @@ logs\weni_update_review_full.json  snapshot verificável do plano revisado
 
 O TXT é aberto automaticamente no Bloco de Notas. Ele mostra, por contato, valores anteriores e propostos, evidência técnica, ações de grupo e confirmação FarmaLíder. No NexoFlow 1.0, o plano revisado fica **congelado**. Depois da confirmação, o NexoFlow não recalcula mensagens nem inclui novos contatos no mesmo apply. Em vez disso, relê cada contato imediatamente antes de gravá-lo. Se os campos/URNs/fontes relevantes daquele contato mudaram, somente aquele contato é marcado como conflito e ignorado. Os demais continuam normalmente. O checkpoint usa o corte temporal do dry-run, permitindo que mensagens, contatos e conflitos posteriores sejam reprocessados na próxima incremental.
 
+### Carga completa fragmentada em quatro partes
+
+Ao abrir `atualizar_weni_carga_completa.bat`, escolha entre a carga tradicional de 100% ou as Partes 1/4, 2/4, 3/4 e 4/4. Cada parte continua usando o mesmo fluxo seguro de dry-run, auditoria, relatório humano, confirmação e apply do snapshot congelado.
+
+A Parte 1 cria `logs\full_load_25_manifest.json` com a lista congelada de UUIDs da campanha. A segmentação usa ordem canônica por UUID, e não a ordem mutável de `modified_on` da API. Por isso, alterações ou novos contatos entre uma parte e outra não mudam os limites. A Parte 2 exige a Parte 1 concluída; a Parte 3 exige 1 e 2; a Parte 4 exige 1, 2 e 3.
+
+Na carga Weni de 25%, o processamento pesado de contatos, pedidos e FarmaLíder fica restrito à parte selecionada. A listagem paginada global de mensagens pode continuar sendo lida para preservar o contexto com menos chamadas do que consultar milhares de contatos individualmente; somente mensagens/contatos pertencentes ao fragmento entram no plano e na validação de pedidos.
+
+Se uma parte falhar, o manifesto não avança. Execute novamente a mesma parte; contatos já satisfeitos continuam protegidos pelas verificações `already_satisfied` e pelo snapshot revisado.
+
 ### Somente simulação
 
 Use:
