@@ -124,6 +124,35 @@ autenticação HTTP simples por usuário/senha.
 Antes de adicionar bibliotecas ou mecanismos NTLM/Kerberos/Negotiate, confirme a
 política com a equipe de TI.
 
+## Mudança de rede durante uma carga
+
+Em `PROXY_MODE = "auto"`, a rota não fica congelada no início da execução.
+Quando Weni, FarmaLíder ou Google Sheets encontram uma falha de rede
+recuperável, o NexoFlow executa nova detecção de conectividade.
+
+Exemplos suportados:
+
+```text
+internet direta -> proxy corporativo
+proxy corporativo -> internet direta
+```
+
+Quando a mudança é confirmada, o processo atualiza as variáveis de proxy e
+repete **a operação que estava em andamento**. Na FarmaLíder também troca
+automaticamente entre a URL externa com `:3200` e a URL via proxy sem
+`:3200`.
+
+A carga não volta ao primeiro contato: a paginação/requisição atual é repetida,
+CPFs já concluídos permanecem em memória, e escritas do Google Sheets continuam
+no lote em execução. Na aplicação do snapshot completo da Weni, contatos já
+gravados continuam protegidos pela verificação de estado
+`already_satisfied`; se for necessário reiniciar o processo depois de uma
+falha prolongada, o mesmo snapshot pode ser aplicado novamente sem refazer
+alterações que já estão satisfeitas.
+
+A redetecção é serializada para que vários workers da FarmaLíder não tentem
+alterar a rota ao mesmo tempo.
+
 ## Relação com a concorrência FarmaLíder
 
 A concorrência controlada da FarmaLíder continua respeitando o ambiente de rede.

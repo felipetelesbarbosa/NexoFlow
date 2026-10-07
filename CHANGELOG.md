@@ -18,6 +18,14 @@
 - logs normais mantêm referências anônimas; CPF e corpo diagnóstico não são impressos;
 - Git e build protegem os registros contra publicação; falha de disco não substitui o erro original da API.
 
+### Continuidade após troca de rede
+
+- cargas longas agora redetectam conectividade após falha recuperável e alternam automaticamente entre internet direta e proxy corporativo;
+- Weni repete a requisição/página em andamento após a troca;
+- FarmaLíder atualiza também a URL operacional, alternando porta externa `:3200` e rota via proxy sem `:3200`, e repete o mesmo CPF/pedido;
+- Google Sheets redetecta a rota antes dos retries de leitura e escrita;
+- a redetecção é serializada entre workers e mantém o progresso já concluído pela execução.
+
 ### Diagnóstico de rede e proxy
 
 - diagnóstico sanitizado da Weni distingue HTTP 407/403 no proxy, certificado TLS, DNS, timeout e conexão recusada, incluindo exceções aninhadas;

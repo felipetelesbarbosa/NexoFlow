@@ -6,11 +6,12 @@ from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import Mock, patch
 
-from requests.exceptions import RequestException
+from requests.exceptions import ReadTimeout, RequestException
 
 import config
 from farmalider_client import FarmaliderClient, FarmaliderError
 from google_sheets import GoogleSheetsStore
+from weni_client import WeniClient
 from main import (
     FarmaliderSettings,
     _format_ms_as_seconds,
@@ -87,6 +88,82 @@ class CurrentIntegrationTests(unittest.TestCase):
             config.FARMALIDER_MAX_ADAPTIVE_DELAY_SECONDS,
             config.FARMALIDER_REQUEST_DELAY_SECONDS,
         )
+
+    def test_weni_rechecks_network_route_and_retries_same_operation(self) -> None:
+        client = WeniClient("synthetic")
+        response = Mock(status_code=200, content=b"{}")
+        response.raise_for_status.return_value = None
+        response.json.return_value = {"ok": True}
+        try:
+            with (
+                patch.object(
+                    client.session,
+                    "request",
+                    side_effect=[ReadTimeout("switching network"), response],
+                ) as request,
+                patch("weni_client.refresh_network_route") as refresh,
+                patch("weni_client.time.sleep", return_value=None),
+            ):
+                result = client._get_json("https://example.invalid/test")
+            self.assertEqual(result, {"ok": True})
+            self.assertEqual(request.call_count, 2)
+            refresh.assert_called_once()
+        finally:
+            client.close()
+
+    def test_google_sheets_rechecks_route_and_retries_read_and_write(self) -> None:
+        store = GoogleSheetsStore.__new__(GoogleSheetsStore)
+        store._read_requests = 0
+        store._write_requests = 0
+        store._last_write_started_at = 0.0
+
+        read = Mock(side_effect=[ReadTimeout("switching network"), "read-ok"])
+        write = Mock(side_effect=[ReadTimeout("switching network"), "write-ok"])
+        with (
+            patch("google_sheets.refresh_network_route") as refresh,
+            patch("google_sheets.time.sleep", return_value=None),
+            patch.object(store, "_wait_before_write", return_value=None),
+        ):
+            self.assertEqual(store._read_with_retry("teste leitura", read), "read-ok")
+            self.assertEqual(store._write_with_retry("teste escrita", write), "write-ok")
+        self.assertEqual(read.call_count, 2)
+        self.assertEqual(write.call_count, 2)
+        self.assertEqual(refresh.call_count, 2)
+
+    def test_farmalider_resumes_same_cpf_after_direct_to_proxy_switch(self) -> None:
+        os.environ["WENI_PROXY_ACTIVE"] = "0"
+        client = FarmaliderClient("abc123")
+        response_404 = Mock(status_code=404, headers={})
+        initial_base = client.base_url
+
+        def switch_route(*, reason: str) -> bool:
+            self.assertTrue(reason)
+            os.environ["WENI_PROXY_ACTIVE"] = "1"
+            return client._sync_base_url_from_environment()
+
+        try:
+            with (
+                patch.object(
+                    client.session,
+                    "get",
+                    side_effect=[ReadTimeout("switching network"), response_404],
+                ) as get,
+                patch.object(client, "_refresh_network_route", side_effect=switch_route),
+                patch.object(client, "_protect_after_failure", return_value=None),
+                patch.object(client, "_sleep_before_retry", return_value=None),
+            ):
+                result = client.get_cliente_by_cpf("52998224725")
+
+            self.assertIsNone(result)
+            self.assertEqual(get.call_count, 2)
+            first_url = get.call_args_list[0].args[0]
+            second_url = get.call_args_list[1].args[0]
+            self.assertIn(":3200/farmalider", initial_base)
+            self.assertIn(":3200/farmalider", first_url)
+            self.assertNotIn(":3200", second_url)
+            self.assertIn("/farmalider/api/Delivery/cliente/cpf/", second_url)
+        finally:
+            client.close()
 
     def test_farmalider_uses_query_token_without_bearer(self) -> None:
         os.environ["WENI_PROXY_ACTIVE"] = "1"

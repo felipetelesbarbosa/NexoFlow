@@ -60,6 +60,44 @@ class ProxyConfigTests(unittest.TestCase):
         self.assertNotIn("s@nh:a/complexa", os.environ["HTTP_PROXY"])
         self.assertIn("s%40nh%3Aa%2Fcomplexa", os.environ["HTTP_PROXY"])
 
+    def test_refresh_switches_direct_to_proxy(self) -> None:
+        module = self.load_module()
+        with (
+            patch.object(module, "_is_reachable", return_value=False),
+            patch.object(module, "_direct_internet_available", return_value=True),
+            patch.object(module.time, "sleep", return_value=None),
+        ):
+            initial = module.configure_proxy()
+        self.assertFalse(initial.active)
+
+        with patch.object(module, "_is_reachable", return_value=True):
+            refreshed = module.refresh_network_route(reason="teste")
+
+        self.assertTrue(refreshed.changed)
+        self.assertFalse(refreshed.previous_active)
+        self.assertTrue(refreshed.current_active)
+        self.assertEqual(os.environ.get("WENI_PROXY_ACTIVE"), "1")
+        self.assertEqual(refreshed.transition, "direta -> proxy")
+
+    def test_refresh_switches_proxy_to_direct(self) -> None:
+        module = self.load_module()
+        with patch.object(module, "_is_reachable", return_value=True):
+            initial = module.configure_proxy()
+        self.assertTrue(initial.active)
+
+        with (
+            patch.object(module, "_is_reachable", return_value=False),
+            patch.object(module, "_direct_internet_available", return_value=True),
+            patch.object(module.time, "sleep", return_value=None),
+        ):
+            refreshed = module.refresh_network_route(reason="teste")
+
+        self.assertTrue(refreshed.changed)
+        self.assertTrue(refreshed.previous_active)
+        self.assertFalse(refreshed.current_active)
+        self.assertEqual(os.environ.get("WENI_PROXY_ACTIVE"), "0")
+        self.assertEqual(refreshed.transition, "proxy -> direta")
+
     def test_off_never_activates(self) -> None:
         module = self.load_module(PROXY_MODE="off")
         status = module.configure_proxy()

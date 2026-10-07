@@ -48,6 +48,9 @@ def check_farmalider_runtime() -> None:
     config_text = read("config.py")
     client_text = read("farmalider_client.py")
     main_text = read("main.py")
+    proxy_text = read("proxy_config.py")
+    weni_text = read("weni_client.py")
+    sheets_text = read("google_sheets.py")
 
     delay = numeric_config(config_text, "FARMALIDER_REQUEST_DELAY_SECONDS")
     workers = numeric_config(config_text, "FARMALIDER_MAX_WORKERS")
@@ -189,6 +192,44 @@ def check_farmalider_runtime() -> None:
         ok(
             "Preflight FarmaLíder repete falhas transitórias e preserva "
             "falha imediata para causas não recuperáveis."
+        )
+
+    route_switch_contract = {
+        "proxy_config.py": (
+            proxy_text,
+            ["NetworkRouteRefresh", "_ROUTE_REFRESH_LOCK", "refresh_network_route"],
+        ),
+        "farmalider_client.py": (
+            client_text,
+            [
+                "_sync_base_url_from_environment",
+                "_refresh_network_route",
+                "refresh_network_route",
+            ],
+        ),
+        "weni_client.py": (
+            weni_text,
+            ["refresh_network_route", "falha recuperável ao acessar Weni"],
+        ),
+        "google_sheets.py": (
+            sheets_text,
+            ["refresh_network_route", "falha recuperável no Google Sheets"],
+        ),
+    }
+    missing_route_parts: list[str] = []
+    for file_name, (source, markers) in route_switch_contract.items():
+        for marker in markers:
+            if marker not in source:
+                missing_route_parts.append(f"{file_name}:{marker}")
+    if missing_route_parts:
+        fail(
+            "Troca dinâmica direta/proxy incompleta: "
+            + ", ".join(missing_route_parts)
+        )
+    else:
+        ok(
+            "Carga reconhece troca direta/proxy em Weni, FarmaLíder e "
+            "Google Sheets e repete a operação em andamento."
         )
 
     required_main_parts = [
