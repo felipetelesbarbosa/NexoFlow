@@ -12,19 +12,39 @@ from zoneinfo import ZoneInfo
 
 BUSINESS_TIMEZONE = ZoneInfo("America/Belem")
 FARMALIDER_ORDER_STATUS_NAMES = {
+    -1: "Pendente pagamento",
     0: "Em processamento",
     1: "Em trânsito",
     2: "Concluído",
     3: "Cancelado",
-    4: "Pronto para rota",
+}
+
+FARMALIDER_ORDER_STATUS_ALIASES = {
+    "pendentepagamento": -1,
+    "emprocessamento": 0,
+    "emtransito": 1,
+    "concluido": 2,
+    "cancelado": 3,
 }
 
 FARMALIDER_PAYMENT_METHOD_NAMES = {
+    0: "CANCELADO",
     1: "Dinheiro",
     2: "Débito",
     3: "Crédito",
     4: "Ticket",
-    5: "Online/link/Pix",
+    5: "Pix por Link de Pagamento",
+    6: "PIX no POS",
+}
+
+FARMALIDER_PAYMENT_METHOD_ALIASES = {
+    "_": 0,
+    "dinheiro": 1,
+    "debito": 2,
+    "credito": 3,
+    "ticket": 4,
+    "pixporlinkdepagamento": 5,
+    "pixnopos": 6,
 }
 
 
@@ -52,48 +72,72 @@ def parse_weni_order_list(value: str) -> list[str]:
     return [part.strip() for part in records[0]]
 
 
-def normalize_farmalider_payment_code(value: Any) -> str:
-    """Preserve a nonnegative Int32 from the API even without a documented label."""
+def _enum_key(value: Any) -> str:
     if isinstance(value, bool) or not isinstance(value, (int, str)):
         return ""
     text = str(value).strip()
-    if not text.isascii() or not text.isdigit():
+    if not text:
         return ""
-    normalized = text.lstrip("0") or "0"
-    if len(normalized) > 10 or int(normalized) > 2147483647:
+    return "".join(
+        character
+        for character in unicodedata.normalize("NFKD", text)
+        if not unicodedata.combining(character)
+    ).casefold().replace(" ", "").replace("_", "_")
+
+
+def normalize_farmalider_order_status_code(value: Any) -> str:
+    """Normalize StatusPedido names/codes to -1..3."""
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
         return ""
-    return normalized
+    text = str(value).strip()
+    if text in {"-1", "0", "1", "2", "3"}:
+        return text
+    key = _enum_key(value)
+    code = FARMALIDER_ORDER_STATUS_ALIASES.get(key)
+    return "" if code is None else str(code)
+
+
+def normalize_farmalider_payment_code(value: Any) -> str:
+    """Normalize FormaPagamento names/codes while preserving unknown Int32 codes."""
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        return ""
+    text = str(value).strip()
+    if not text:
+        return ""
+    if text == "_":
+        return "0"
+    if text.isascii() and text.isdigit():
+        normalized = text.lstrip("0") or "0"
+        if len(normalized) > 10 or int(normalized) > 2147483647:
+            return ""
+        return normalized
+    key = _enum_key(value)
+    code = FARMALIDER_PAYMENT_METHOD_ALIASES.get(key)
+    return "" if code is None else str(code)
 
 
 def farmalider_order_status_name(value: Any) -> str:
     """Return the documented StatusPedido label; unknown codes stay unknown."""
-    if isinstance(value, bool) or not isinstance(value, (int, str)):
+    code = normalize_farmalider_order_status_code(value)
+    if not code:
         return ""
-    text = str(value).strip()
-    if not text.isascii() or not text.isdigit():
-        return ""
-    # Bound the conversion rather than accepting arbitrarily long numeric input.
-    normalized = text.lstrip("0") or "0"
-    if len(normalized) != 1:
-        return ""
-    return FARMALIDER_ORDER_STATUS_NAMES.get(int(normalized), "")
+    return FARMALIDER_ORDER_STATUS_NAMES.get(int(code), "")
 
 
 def farmalider_payment_method_name(value: Any) -> str:
     """Return the documented payment label; unknown codes stay unknown."""
-    if isinstance(value, bool) or not isinstance(value, (int, str)):
+    if isinstance(value, str) and value.strip().casefold() == "cancelado":
+        return "CANCELADO"
+    code = normalize_farmalider_payment_code(value)
+    if not code:
         return ""
-    text = str(value).strip()
-    if not text.isascii() or not text.isdigit():
-        return ""
-    normalized = text.lstrip("0") or "0"
-    if len(normalized) != 1:
-        return ""
-    return FARMALIDER_PAYMENT_METHOD_NAMES.get(int(normalized), "")
+    return FARMALIDER_PAYMENT_METHOD_NAMES.get(int(code), "")
 
 
 def farmalider_payment_method_display(value: Any) -> str:
-    """Show an unmapped API code without inventing a payment method."""
+    """Show a documented payment label or expose an unmapped numeric code."""
+    if isinstance(value, str) and value.strip().casefold() == "cancelado":
+        return "CANCELADO"
     code = normalize_farmalider_payment_code(value)
     if not code:
         return ""
@@ -163,14 +207,14 @@ def is_order_made(order: dict[str, Any]) -> bool:
         return False
     status = order.get("farmalider_status_pedido")
     label = farmalider_order_status_name(status)
-    if label in {"Em processamento", "Em trânsito", "Concluído", "Pronto para rota"}:
+    if label in {"Em processamento", "Em trânsito", "Concluído"}:
         return True
     if isinstance(status, str):
         text = "".join(
             character for character in unicodedata.normalize("NFKD", status.strip())
             if not unicodedata.combining(character)
         ).casefold().replace(" ", "")
-        return text in {"emprocessamento", "emtransito", "concluido", "prontopararota"}
+        return text in {"emprocessamento", "emtransito", "concluido"}
     return False
 
 
