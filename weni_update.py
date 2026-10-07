@@ -12,7 +12,14 @@ from pathlib import Path
 from typing import Any
 
 import secrets_config as secrets
-from analytics import get_fields, is_valid_cpf, normalize_cpf, normalize_value
+from analytics import (
+    get_fields,
+    is_valid_cpf,
+    normalize_cpf,
+    normalize_value,
+    prepare_full_load_quarter,
+    mark_full_load_quarter_complete,
+)
 from ad_attribution import (
     GOOGLE_ADS_ORIGIN,
     GOOGLE_ADS_WRITE_FIELDS,
@@ -1325,6 +1332,10 @@ def write_review_snapshot(
     full: bool,
     json_path: Path,
     captured_at_utc: str = "",
+    quarter: int | None = None,
+    quarter_campaign_id: str = "",
+    quarter_total_contacts: int = 0,
+    quarter_selected_contacts: int = 0,
 ) -> tuple[Path, Path, str]:
     """Grava snapshot verificável e relatório TXT para revisão humana antes do apply."""
     json_path = Path(json_path)
@@ -1354,6 +1365,15 @@ def write_review_snapshot(
             for plan in sorted(plans, key=lambda item: item.contact_uuid)
         ],
     }
+    if quarter is not None:
+        payload["partition"] = {
+            "kind": "full_25",
+            "part": quarter,
+            "total_parts": 4,
+            "campaign_id": quarter_campaign_id,
+            "total_contacts": quarter_total_contacts,
+            "selected_contacts": quarter_selected_contacts,
+        }
     json_path.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2, default=str),
         encoding="utf-8",
@@ -1367,6 +1387,16 @@ def write_review_snapshot(
         f"Gerado em UTC: {payload['created_at_utc']}",
         f"Corte do snapshot em UTC: {payload['captured_at_utc']}",
         f"Modo: {'CARGA COMPLETA' if full else 'INCREMENTAL'}",
+        *(
+            [
+                f"Fragmento: PARTE {quarter}/4 (25%)",
+                f"Campanha 25%: {quarter_campaign_id}",
+                f"Base congelada: {quarter_total_contacts} contatos",
+                f"Contatos desta parte: {quarter_selected_contacts}",
+            ]
+            if quarter is not None
+            else []
+        ),
         f"Plano SHA-256: {digest}",
         "",
         "IMPORTANTE:",
@@ -1463,6 +1493,7 @@ def verify_review_snapshot(
     *,
     full: bool,
     json_path: Path,
+    quarter: int | None = None,
 ) -> str:
     """Impede aplicar um plano diferente daquele que foi exibido ao operador."""
     path = Path(json_path)
@@ -1480,6 +1511,17 @@ def verify_review_snapshot(
     expected_mode = "full" if full else "incremental"
     if payload.get("mode") != expected_mode:
         raise PlanAuditError("O snapshot revisado pertence a outro modo de execução.")
+    partition = payload.get("partition")
+    if quarter is None:
+        if isinstance(partition, dict) and partition.get("kind") == "full_25":
+            raise PlanAuditError("O snapshot revisado pertence a uma carga completa 25%.")
+    else:
+        if not isinstance(partition, dict) or partition.get("kind") != "full_25":
+            raise PlanAuditError("O snapshot revisado não pertence à carga completa 25%.")
+        if int(partition.get("part") or 0) != quarter:
+            raise PlanAuditError(
+                f"O snapshot revisado pertence à Parte {partition.get('part')}, não à Parte {quarter}."
+            )
 
     reviewed_digest = str(payload.get("plan_sha256") or "").strip().lower()
     current_digest = _plan_digest(plans)
@@ -1496,6 +1538,7 @@ def load_review_snapshot(
     *,
     full: bool,
     json_path: Path,
+    quarter: int | None = None,
 ) -> tuple[list[ContactUpdatePlan], dict[str, Any], str]:
     """Carrega exatamente o plano revisado e valida a integridade do snapshot."""
     path = Path(json_path)
@@ -1515,6 +1558,17 @@ def load_review_snapshot(
     expected_mode = "full" if full else "incremental"
     if payload.get("mode") != expected_mode:
         raise PlanAuditError("O snapshot revisado pertence a outro modo de execução.")
+    partition = payload.get("partition")
+    if quarter is None:
+        if isinstance(partition, dict) and partition.get("kind") == "full_25":
+            raise PlanAuditError("O snapshot revisado pertence a uma carga completa 25%.")
+    else:
+        if not isinstance(partition, dict) or partition.get("kind") != "full_25":
+            raise PlanAuditError("O snapshot revisado não pertence à carga completa 25%.")
+        if int(partition.get("part") or 0) != quarter:
+            raise PlanAuditError(
+                f"O snapshot revisado pertence à Parte {partition.get('part')}, não à Parte {quarter}."
+            )
 
     raw_plans = payload.get("plans")
     if not isinstance(raw_plans, list):
