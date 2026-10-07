@@ -2448,6 +2448,22 @@ def run_update(
                 full=full,
                 json_path=Path(review_out),
                 captured_at_utc=captured_at,
+                quarter=quarter,
+                quarter_campaign_id=(
+                    str(quarter_context["campaign_id"])
+                    if quarter_context is not None
+                    else ""
+                ),
+                quarter_total_contacts=(
+                    int(quarter_context["total_contacts"])
+                    if quarter_context is not None
+                    else 0
+                ),
+                quarter_selected_contacts=(
+                    int(quarter_context["selected_count"])
+                    if quarter_context is not None
+                    else 0
+                ),
             )
             logging.info(
                 "Relatório de revisão humana gerado: %s | snapshot=%s | sha256=%s",
@@ -2462,7 +2478,12 @@ def run_update(
                 "Execute primeiro o dry-run completo e revise o relatório."
             )
         if require_review is not None:
-            verify_review_snapshot(plans, full=full, json_path=Path(require_review))
+            verify_review_snapshot(
+                plans,
+                full=full,
+                json_path=Path(require_review),
+                quarter=quarter,
+            )
 
         mode = "apply" if apply else "dry-run"
         if not apply:
