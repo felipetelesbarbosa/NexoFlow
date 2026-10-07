@@ -23,14 +23,14 @@ CPF
 | `pedido_valor_produtos` | valores unitários posicionais, separados por vírgula |
 | `pedido_valor` | soma de `itens[].total` |
 | `pedido_data` | `DD/MM/YY HH:MM:SS` |
-| `pedido_status` | status efetivo -1 a 3; 4 aceito como legado |
-| `pedido_forma_pagamento` | código Int32 não negativo recebido; pagamento 0 grava `CANCELADO` |
+| `pedido_status` | status efetivo de -1 a 3 |
+| `pedido_forma_pagamento` | código Int32 não negativo normalizado; pagamento 0 grava `CANCELADO` |
 
-Pagamento 5 é **Pix por Link de Pagamento** e pagamento 6 é **PIX no POS**. Pagamento 0 grava o texto literal `CANCELADO` em `pedido_forma_pagamento` e força o status efetivo 3, Cancelado. `Pedidos_FarmaLider` mantém os códigos brutos de pagamento e status da API; Weni e `BI_Pedidos` usam o status efetivo.
+Pagamento 5 é **Pix por Link de Pagamento** e pagamento 6 é **PIX no POS**. Pagamento 0 grava o texto literal `CANCELADO` em `pedido_forma_pagamento` e força o status efetivo 3, Cancelado. `Pedidos_FarmaLider` mantém os valores brutos de pagamento e status da API; Weni e `BI_Pedidos` usam o status efetivo.
 
 Pagamentos válidos sem de-para a partir de 7 mantêm seu código na Weni e recebem a descrição `Não identificado (código X)` no Google Sheets/BI. Pagamento ausente ou inválido mantém a descrição vazia.
 
-Somente status efetivo 2, Concluído, validado pela API e sem cancelamento conta como venda e atualiza `ultima_compra`. O status -1, Pendente pagamento, fica fora das vendas e permanece em rechecagem, assim como 0, 1 e o estado legado 4, até Concluído ou Cancelado.
+Somente status efetivo 2, Concluído, validado pela API e sem cancelamento conta como venda e atualiza `ultima_compra`. O status -1, Pendente pagamento, fica fora das vendas e permanece em rechecagem, assim como 0 e 1, até Concluído ou Cancelado.
 
 Exemplo:
 

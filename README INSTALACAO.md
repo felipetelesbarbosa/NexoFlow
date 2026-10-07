@@ -5,23 +5,28 @@
 
 Este documento corresponde ao **NexoFlow 1.0**.
 
+Baixe a distribuição estável na [release v1.0](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.0): [NexoFlow-Setup-1.0.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.0/NexoFlow-Setup-1.0.zip). Os hashes estão em [SHA256SUMS-1.0.txt](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.0/SHA256SUMS-1.0.txt).
 
-## Ordem recomendada após instalar esta atualização
+
+## Ordem recomendada após instalar ou reinstalar esta atualização
 
 Antes da carga completa, confirme que os oito campos de pedido existem na Weni: `pedido_id`, `pedido_data`, `pedido_status`, `pedido_produtos`, `pedido_quantidade_itens`, `pedido_valor_produtos`, `pedido_valor` e `pedido_forma_pagamento`.
 
 Depois execute, nesta ordem:
 
 ```text
-1. testar_conexoes.bat
-2. atualizar_weni_carga_completa.bat
-3. revisar logs\weni_update_review_full.txt
-4. confirmar CARGA COMPLETA REVISADA
-5. executar_carga_completa.bat
-6. atualizar os campos das fontes de dados no Looker Studio
+1. check-up.bat
+2. testar_conexoes.bat
+3. atualizar_weni_carga_completa.bat
+4. revisar logs\weni_update_review_full.txt
+5. confirmar CARGA COMPLETA REVISADA
+6. executar_carga_completa.bat
+7. atualizar os campos das fontes de dados no Looker Studio
 ```
 
-A carga completa do Weni atualiza o snapshot operacional dos contatos. A carga completa do Analytics migra os schemas do Google Sheets e preenche as estruturas analíticas, incluindo frete separado e faturamento total (produtos + frete).
+A carga completa do Weni gera um novo dry-run com a política atual antes de atualizar o snapshot operacional dos contatos. Não reutilize o JSON de revisão de uma instalação ou política anterior. A carga completa do Analytics migra os schemas do Google Sheets e recalcula as estruturas analíticas, incluindo frete separado e faturamento total (produtos + frete).
+
+Na revisão, somente status efetivo 2, Concluído, validado pela API e sem cancelamento, conta como venda e atualiza `ultima_compra`. O estado -1, Pendente pagamento, permanece em rechecagem; pagamento 0 ou `_` grava `pedido_forma_pagamento=CANCELADO` e força status efetivo 3. O de-para inclui 5 Pix por Link de Pagamento e 6 PIX no POS. Veja [README PEDIDOS.md](README%20PEDIDOS.md).
 
 Se o Analytics terminar com código `3`, a carga foi **parcial**: algumas
 consultas FarmaLíder falharam, o marco incremental anterior foi mantido e a
@@ -40,7 +45,7 @@ O NexoFlow é executado em Windows x64 e utiliza **Python 3.11 ou superior, 64 b
 
 ### Camada BI / Looker Studio
 
-Após instalar sobre uma instalação existente, execute `check-up.bat`, `testar_conexoes.bat` e uma vez `executar_carga_completa.bat`. A carga completa cria/preenche `BI_Resumo_Diario`, `BI_Canais`, `BI_Conversao`, `BI_Vendas`, `BI_Ads`, `BI_Pedidos` e `BI_Status`, além de completar `Base_Contatos` com todos os contatos Weni. Depois disso, volte ao fluxo incremental normal.
+Após atualizar ou reinstalar, siga a ordem acima: check-up e conexões, novo dry-run completo do Weni com revisão e confirmação, depois uma execução de `executar_carga_completa.bat`. A carga completa do Analytics cria/preenche `BI_Resumo_Diario`, `BI_Canais`, `BI_Conversao`, `BI_Vendas`, `BI_Ads`, `BI_Pedidos` e `BI_Status`, além de completar `Base_Contatos` com todos os contatos Weni. Depois disso, volte ao fluxo incremental normal.
 
 ### Otimizações de desempenho
 
@@ -191,7 +196,7 @@ Os executáveis não contêm credenciais. No NexoFlow 1.0, os launchers deixaram
 Essas medidas reduzem padrões comuns de falso positivo, mas um binário novo e sem reputação ainda pode ser alertado ou colocado em quarentena. Não desative SmartScreen, UAC ou antivírus para contornar isso. A medida mais importante para distribuição corporativa é assinar os executáveis com Authenticode usando o certificado real da empresa.
 
 ## Revisão humana da carga completa
-Na primeira carga/backfill, execute `atualizar_weni_carga_completa.bat`. Antes do apply, o NexoFlow gera e abre `logs\weni_update_review_full.txt`. Revise especialmente LGPD, idade/maioridade, entradas/saídas dos grupos Opt-In LGPD e Opt-Out LGPD e campos de pedido.
+Na primeira carga/backfill ou após reinstalar com a política atual, execute `atualizar_weni_carga_completa.bat`. Antes do apply, o NexoFlow gera um novo dry-run completo e abre `logs\weni_update_review_full.txt`. Revise especialmente LGPD, idade/maioridade, entradas/saídas dos grupos Opt-In LGPD e Opt-Out LGPD e campos de pedido.
 
 A confirmação exigida é `CARGA COMPLETA REVISADA`. No NexoFlow 1.0, depois dela o NexoFlow carrega exatamente `logs\weni_update_review_full.json` e não recalcula o histórico. Cada contato é relido imediatamente antes da gravação. Se aquele contato mudou desde a revisão, somente ele é ignorado e registrado como conflito; os demais continuam. O checkpoint permanece no corte temporal do dry-run para que tudo que mudou depois seja reprocessado pela próxima incremental.
 

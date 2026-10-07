@@ -118,29 +118,28 @@ De-para usado pela integração:
 | 1 | `EmTransito` | Em trânsito |
 | 2 | `Concluido` | Concluído |
 | 3 | `Cancelado` | Cancelado |
-| 4 | `ProntoParaRota` (legado, fora do enum atual) | Pronto para rota |
 
-A Weni armazena o código efetivo em `pedido_status`. Cancelamento explícito ou `formaPagamento=0` força o código 3, Cancelado. O helper `effective_order_status_code(order)` aplica essa regra para Weni/BI; o Analytics deriva o nome amigável. `Pedidos_FarmaLider` preserva o status bruto retornado pela API em `farmalider_status_pedido`, inclusive quando ele difere do status efetivo.
+A Weni armazena o código efetivo em `pedido_status`. O normalizador aceita os códigos -1 a 3 e os nomes oficiais `PendentePagamento`, `EmProcessamento`, `EmTransito`, `Concluido` e `Cancelado`. Cancelamento explícito ou `formaPagamento=0` ou `_` força o código 3, Cancelado. O helper `effective_order_status_code(order)` aplica essa regra para Weni/BI; o Analytics deriva o nome amigável. `Pedidos_FarmaLider` preserva o status bruto retornado pela API em `farmalider_status_pedido`, inclusive quando ele difere do status efetivo.
 
-Somente status efetivo 2, Concluído, validado pela API e sem cancelamento entra nas métricas de venda e atualiza `ultima_compra`. Os estados -1, 0, 1 e o legado 4 permanecem em rechecagem até Concluído ou Cancelado e não contam como venda. O estado 3 e o pagamento 0 ficam fora das vendas e encerram a rechecagem.
+Somente status efetivo 2, Concluído, validado pela API e sem cancelamento entra nas métricas de venda e atualiza `ultima_compra`. Os estados -1, 0 e 1 permanecem em rechecagem até Concluído ou Cancelado e não contam como venda. O estado 3 e o pagamento 0 ficam fora das vendas e encerram a rechecagem.
 
 ## Forma de pagamento
 
 De-para confirmado para a integração:
 
-| Código | Forma |
-|---:|---|
-| 0 | CANCELADO (regra de negócio) |
-| 1 | Dinheiro |
-| 2 | Débito |
-| 3 | Crédito |
-| 4 | Ticket |
-| 5 | Pix por Link de Pagamento |
-| 6 | PIX no POS |
+| Código | Nome oficial do enum | Forma |
+|---:|---|---|
+| 0 | `_` | CANCELADO (regra de negócio) |
+| 1 | `Dinheiro` | Dinheiro |
+| 2 | `Debito` | Débito |
+| 3 | `Credito` | Crédito |
+| 4 | `Ticket` | Ticket |
+| 5 | `PixPorLinkDePagamento` | Pix por Link de Pagamento |
+| 6 | `PixNoPOS` | PIX no POS |
 
-A Weni armazena o código em `pedido_forma_pagamento`, exceto `formaPagamento=0`, que grava o texto literal `CANCELADO` e força `pedido_status=3`. `Pedidos_FarmaLider` preserva o código bruto em `farmalider_forma_pagamento`, inclusive 0. O Analytics mantém também `farmalider_forma_pagamento_nome` e disponibiliza a descrição amigável na camada BI.
+A Weni armazena o código normalizado em `pedido_forma_pagamento`, exceto `formaPagamento=0` ou `_`, que grava o texto literal `CANCELADO` e força `pedido_status=3`. O normalizador aceita os nomes oficiais do enum acima, inclusive `_` como equivalente a 0. `Pedidos_FarmaLider` preserva o valor bruto em `farmalider_forma_pagamento`. O Analytics mantém também `farmalider_forma_pagamento_nome` e disponibiliza a descrição amigável na camada BI.
 
-O Swagger define `formaPagamento` como inteiro Int32, sem enum. Códigos válidos sem de-para a partir de 7 são preservados na Weni e apresentados no Google Sheets/BI como `Não identificado (código X)`. Texto livre, valores fracionários, negativos e números fora de Int32 continuam inválidos; o literal operacional `CANCELADO` na Weni é aceito como resultado da regra de pagamento 0. Valores ausentes ou inválidos mantêm a descrição vazia.
+Além dos nomes oficiais, o normalizador de `formaPagamento` aceita códigos Int32 não negativos. Códigos numéricos válidos sem de-para a partir de 7 continuam sendo preservados como Int32 na Weni e apresentados no Google Sheets/BI como `Não identificado (código X)`. Textos fora dos nomes de enum aceitos, valores fracionários, negativos e números fora de Int32 continuam inválidos; o literal operacional `CANCELADO` na Weni é aceito como resultado da regra de pagamento 0. Valores ausentes ou inválidos mantêm a descrição vazia.
 
 O helper `farmalider_payment_method_name` retorna somente os rótulos documentados. O helper de apresentação `farmalider_payment_method_display` usa esses rótulos e acrescenta a descrição explícita para códigos válidos desconhecidos, sem modificar o código recebido.
 

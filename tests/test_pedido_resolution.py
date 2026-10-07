@@ -301,7 +301,7 @@ class PedidoResolutionTests(unittest.TestCase):
             1: "Em trânsito",
             2: "Concluído",
             3: "Cancelado",
-            4: "Pronto para rota",
+            4: "",
         }
         for code, label in expected.items():
             self.assertEqual(farmalider_order_status_name(code), label)
@@ -413,7 +413,7 @@ class PedidoResolutionTests(unittest.TestCase):
                     farm_client=client(pedido=pedido),
                     captured_at=CAPTURED_AT,
                 )
-                self.assertEqual(is_order_made(order), status != -1)
+                self.assertEqual(is_order_made(order), status in (0, 1, 2))
                 self.assertEqual(is_order_completed(order), status == 2)
                 self.assertFalse(is_order_cancelled(order))
                 self.assertEqual(len(build_sales_metrics([order], items)), int(status == 2))
@@ -438,7 +438,7 @@ class PedidoResolutionTests(unittest.TestCase):
                     self.assertEqual(build_sales_metrics([order], items), [])
 
     def test_effective_order_status_normalizes_documented_codes(self):
-        for status in (-1, 0, 1, 2, 3, 4):
+        for status in (-1, 0, 1, 2, 3):
             for value in (status, str(status)):
                 with self.subTest(value=value):
                     self.assertEqual(
@@ -448,6 +448,36 @@ class PedidoResolutionTests(unittest.TestCase):
                         }),
                         str(status),
                     )
+
+    def test_removed_status_four_has_no_effective_code(self):
+        for value in (4, "4", "Pronto para rota"):
+            with self.subTest(value=value):
+                order = {"farmalider_status_pedido": value}
+                self.assertEqual(farmalider_order_status_name(value), "")
+                self.assertEqual(effective_order_status_code(order), "")
+                self.assertFalse(is_order_made(order))
+                self.assertFalse(is_order_completed(order))
+
+    def test_api_enum_aliases_preserve_raw_values_and_effective_status(self):
+        for payment, status_code, status_name, confirmation, payment_name in (
+            ("PIX no POS", "-1", "Pendente pagamento", "CONFIRMADO_API", "PIX no POS"),
+            ("_", "3", "Cancelado", "CANCELADO_API", "CANCELADO"),
+        ):
+            with self.subTest(payment=payment):
+                pedido = pedido_payload()
+                pedido["capa"].update(status="PendentePagamento", formaPagamento=payment)
+                order, items = resolve_contact_order(
+                    contact(), farm_client=client(pedido=pedido), captured_at=CAPTURED_AT
+                )
+                self.assertEqual(order["status_validacao"], "OK")
+                self.assertEqual(order["farmalider_status_pedido"], "PendentePagamento")
+                self.assertEqual(order["farmalider_forma_pagamento"], payment)
+                self.assertEqual(effective_order_status_code(order), status_code)
+                self.assertEqual(order["farmalider_status_pedido_nome"], status_name)
+                self.assertEqual(order["farmalider_forma_pagamento_nome"], payment_name)
+                self.assertEqual(order["status_confirmacao"], confirmation)
+                self.assertEqual(is_order_cancelled(order), payment == "_")
+                self.assertEqual(build_sales_metrics([order], items), [])
 
     def test_effective_order_status_uses_each_cancellation_signal(self):
         for cancellation in (

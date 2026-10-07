@@ -155,9 +155,9 @@ class WeniUpdateTests(unittest.TestCase):
         self.assertEqual(tracked, {"u1"})
         _track_open_order(tracked, "u1", "Em trânsito")
         self.assertEqual(tracked, {"u1"})
-        _track_open_order(tracked, "u1", "4")
-        self.assertEqual(tracked, {"u1"})
         _track_open_order(tracked, "u1", "Concluído")
+        self.assertEqual(tracked, set())
+        _track_open_order(tracked, "u1", "4")
         self.assertEqual(tracked, set())
         _track_open_order(tracked, "u1", "Em processamento")
         _track_open_order(tracked, "u1", "Cancelado")
@@ -634,6 +634,20 @@ class WeniUpdateTests(unittest.TestCase):
                     plan.fields["pedido_forma_pagamento"], str(payment)
                 )
 
+    def test_removed_status_four_from_api_does_not_validate_or_write_order(self) -> None:
+        contact = self._purchase_contact(include_raw=False)
+        farm = self._purchase_api()
+        farm.get_pedido.return_value["capa"]["status"] = 4
+        farm.get_cliente_by_cpf.return_value["ultimoPedido"]["status"] = 4
+        plan = self._purchase_plan(contact, farm)
+        self.assertFalse(plan.order_validated)
+        self.assertFalse(plan.purchase_confirmed)
+        self.assertFalse(set(plan.fields) & {
+            "pedido_id", "pedido_data", "pedido_status", "pedido_produtos",
+            "pedido_quantidade_itens", "pedido_valor_produtos", "pedido_valor",
+            "pedido_forma_pagamento", "ultima_compra",
+        })
+
     def test_product_commas_and_quotes_round_trip_into_analytics(self) -> None:
         contact = self._purchase_contact(include_raw=False)
         farm = self._purchase_api()
@@ -917,7 +931,7 @@ class WeniUpdateTests(unittest.TestCase):
         audit_plans([plan], opt_out_group_available=True)
 
     def test_only_completed_order_advances_latest_purchase(self) -> None:
-        for status in (-1, 0, 1, 2, 3, 4):
+        for status in (-1, 0, 1, 2, 3):
             with self.subTest(status=status):
                 contact = self._purchase_contact(include_raw=False)
                 contact["fields"]["ultima_compra"] = (
@@ -1012,6 +1026,7 @@ class WeniUpdateTests(unittest.TestCase):
 
     def test_audit_rejects_invalid_status_and_payment_codes(self) -> None:
         for fields in (
+            {"pedido_status": "4"},
             {"pedido_status": "8"},
             {"pedido_status": "9"},
             {"pedido_forma_pagamento": "1.5"},

@@ -13,6 +13,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: nexoflow-release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validar-e-publicar:
     runs-on: windows-latest

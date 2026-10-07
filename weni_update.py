@@ -115,7 +115,7 @@ REQUIRED_ORDER_FIELDS = {
 # Alias mantido para compatibilidade com testes/documentação anteriores.
 RECOMMENDED_ORDER_FIELDS = REQUIRED_ORDER_FIELDS
 
-OPEN_ORDER_STATUSES = {"Pendente pagamento", "Em processamento", "Em trânsito", "Pronto para rota"}
+OPEN_ORDER_STATUSES = {"Pendente pagamento", "Em processamento", "Em trânsito"}
 TERMINAL_ORDER_STATUSES = {"Concluído", "Cancelado"}
 
 

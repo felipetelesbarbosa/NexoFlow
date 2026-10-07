@@ -104,6 +104,10 @@ nexo weni carga-completa
 
 Executa o backfill completo com relatório para revisão humana e snapshot congelado. É a rotina indicada para primeira carga ou reconstrução geral.
 
+Depois de atualizar ou reinstalar o NexoFlow 1.0, execute essa rotina para gerar um novo dry-run completo com a política atual. Revise o relatório antes de confirmar `CARGA COMPLETA REVISADA`; não reutilize o snapshot da instalação anterior. Em seguida, execute `executar_carga_completa.bat` em `C:\NexoFlow` para recalcular o Analytics/BI e retome o incremental.
+
+Na revisão, somente pedidos com status efetivo 2, Concluído, entram em vendas e `ultima_compra`. Pendente pagamento (-1) permanece em rechecagem; pagamento 0 ou `_` grava `CANCELADO` e força status 3. Consulte [README PEDIDOS.md](README%20PEDIDOS.md) para o contrato completo.
+
 ## Analytics
 
 ```text

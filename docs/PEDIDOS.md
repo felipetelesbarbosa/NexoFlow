@@ -35,8 +35,8 @@ Mesmo nesse fallback, `ultimo_pedido` não vira fonte de produtos, quantidade, v
 | `pedido_valor_produtos` | `itens[].valor` | valores unitários posicionais separados por vírgula |
 | `pedido_valor` | `sum(itens[].total)` | soma dos totais dos itens |
 | `pedido_data` | `emissao` | `DD/MM/YY HH:MM:SS` |
-| `pedido_status` | `status` e regra de cancelamento | status efetivo -1 a 3; 4 aceito como legado |
-| `pedido_forma_pagamento` | `formaPagamento` | código Int32 não negativo recebido; pagamento 0 grava `CANCELADO` |
+| `pedido_status` | `status` e regra de cancelamento | status efetivo de -1 a 3 |
+| `pedido_forma_pagamento` | `formaPagamento` | código Int32 não negativo normalizado; pagamento 0 grava `CANCELADO` |
 
 As listas são posicionais. Exemplo:
 
@@ -118,16 +118,15 @@ De-para usado pela integração:
 
 | Código | API | Apresentação |
 |---:|---|---|
-| -1 | — | Pendente pagamento |
+| -1 | `PendentePagamento` | Pendente pagamento |
 | 0 | `EmProcessamento` | Em processamento |
 | 1 | `EmTransito` | Em trânsito |
 | 2 | `Concluido` | Concluído |
 | 3 | `Cancelado` | Cancelado |
-| 4 | `ProntoParaRota` (legado, fora do enum atual) | Pronto para rota |
 
-A Weni recebe o **código efetivo** em `pedido_status`. O Analytics deriva `pedido_status_nome` para apresentação no Google Sheets/Looker Studio. Se `formaPagamento=0`, o status efetivo é 3, Cancelado, mesmo que a API informe outro status. Cancelamento explícito também prevalece. `Pedidos_FarmaLider` preserva o status bruto em `farmalider_status_pedido`; Weni e `BI_Pedidos` aplicam o status efetivo.
+A Weni recebe o **código efetivo** em `pedido_status`. Os nomes oficiais do enum, como `PendentePagamento`, `EmProcessamento`, `EmTransito`, `Concluido` e `Cancelado`, são normalizados para -1 a 3. O Analytics deriva `pedido_status_nome` para apresentação no Google Sheets/Looker Studio. Se `formaPagamento=0` ou `_`, o status efetivo é 3, Cancelado, mesmo que a API informe outro status. Cancelamento explícito também prevalece. `Pedidos_FarmaLider` preserva o status bruto em `farmalider_status_pedido`; Weni e `BI_Pedidos` aplicam o status efetivo.
 
-Somente status efetivo 2, Concluído, validado pela API e sem cancelamento conta como venda e atualiza `ultima_compra`. Os estados -1, 0, 1, 3 e o legado 4 ficam fora das métricas de venda.
+Somente status efetivo 2, Concluído, validado pela API e sem cancelamento conta como venda e atualiza `ultima_compra`. Os estados -1, 0, 1 e 3 ficam fora das métricas de venda.
 
 ## Forma de pagamento
 
@@ -143,7 +142,7 @@ De-para confirmado para a integração:
 | 5 | Pix por Link de Pagamento |
 | 6 | PIX no POS |
 
-A Weni recebe o código em `pedido_forma_pagamento`, exceto pagamento 0, que grava o texto literal `CANCELADO` e força `pedido_status=3`. `Pedidos_FarmaLider` preserva o código bruto 0 em `farmalider_forma_pagamento`. O Analytics deriva a descrição em `pedido_forma_pagamento_nome`. Códigos Int32 não negativos sem de-para a partir de 7 são preservados e exibidos no Google Sheets/BI como `Não identificado (código X)`. Pagamento ausente ou inválido mantém a descrição vazia.
+A Weni recebe o código normalizado em `pedido_forma_pagamento`, exceto pagamento 0 ou `_`, que grava o texto literal `CANCELADO` e força `pedido_status=3`. Os normalizadores aceitam os nomes oficiais `Dinheiro`, `Debito`, `Credito`, `Ticket`, `PixPorLinkDePagamento`, `PixNoPOS` e `_`, sendo `_` equivalente a 0. `Pedidos_FarmaLider` preserva o valor bruto em `farmalider_forma_pagamento`. O Analytics deriva a descrição em `pedido_forma_pagamento_nome`. Códigos Int32 não negativos sem de-para a partir de 7 são preservados e exibidos no Google Sheets/BI como `Não identificado (código X)`. Pagamento ausente ou inválido mantém a descrição vazia.
 
 No NexoFlow Weni, cada código sem de-para gera um registro `INFO` por execução, com totais por código no resumo. Isso não impede a atualização dos demais campos válidos.
 
@@ -235,7 +234,7 @@ Os oito campos do contrato de pedido são obrigatórios na Weni: `pedido_id`, `p
 
 ## Rechecagem
 
-Pedidos em -1, Pendente pagamento, 0, Em processamento, 1, Em trânsito, ou no estado legado 4, Pronto para rota, continuam sendo rechecados nas execuções seguintes até chegar a:
+Pedidos em -1, Pendente pagamento, 0, Em processamento, ou 1, Em trânsito, continuam sendo rechecados nas execuções seguintes até chegar a:
 
 - 2, Concluído; ou
 - 3, Cancelado.

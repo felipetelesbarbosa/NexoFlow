@@ -12,6 +12,14 @@ Weni -> NexoFlow Analytics -> FarmaLíder API -> Google Sheets -> Looker Studio
 O **NexoFlow Weni** enriquece e atualiza contatos com regras controladas.  
 O **NexoFlow Analytics** organiza os dados operacionais, pedidos, atribuição de anúncios e indicadores usados no Google Sheets e no Looker Studio.
 
+## Downloads do NexoFlow 1.0
+
+- [Setup instalável](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.0/NexoFlow-Setup-1.0.zip)
+- [Projeto completo](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.0/NexoFlow-1.0.zip)
+- [Checksums SHA-256](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.0/SHA256SUMS-1.0.txt)
+
+Os pacotes são atualizados no [release NexoFlow 1.0](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.0) após testes, auditoria e validação do Setup no Windows. A versão permanece **1.0**.
+
 ## Integrações do NexoFlow 1.0
 
 | Integração | Uso no NexoFlow |
@@ -240,8 +248,8 @@ Os oito campos `pedido_*` abaixo são obrigatórios na Weni. Se qualquer um esti
 | `pedido_valor_produtos` | `itens[].valor` | valores unitários na mesma ordem, separados por vírgula |
 | `pedido_valor` | soma de `itens[].total` | valor total dos itens do pedido |
 | `pedido_data` | `emissao` | `DD/MM/YY HH:MM:SS` |
-| `pedido_status` | `status` e regra de cancelamento | status efetivo: -1 a 3; 4 aceito como legado |
-| `pedido_forma_pagamento` | `formaPagamento` | código Int32 não negativo recebido; 0 grava `CANCELADO` |
+| `pedido_status` | `status` e regra de cancelamento | status efetivo de -1 a 3 |
+| `pedido_forma_pagamento` | `formaPagamento` | código Int32 não negativo normalizado; 0 grava `CANCELADO` |
 
 `codProduto` não é usado como nome do produto. O nome exibido vem exclusivamente de `descricao`. O código do produto pode continuar armazenado internamente para auditoria, sem alimentar `pedido_produtos`.
 
@@ -271,7 +279,6 @@ As três listas de item são posicionais: o primeiro produto corresponde à prim
 | 1 | Em trânsito |
 | 2 | Concluído |
 | 3 | Cancelado |
-| 4 | Pronto para rota (legado, fora do enum atual) |
 
 ### Formas de pagamento
 
@@ -285,9 +292,11 @@ As três listas de item são posicionais: o primeiro produto corresponde à prim
 | 5 | Pix por Link de Pagamento |
 | 6 | PIX no POS |
 
-A Weni guarda os códigos de pagamento, exceto `formaPagamento=0`, que grava o texto `CANCELADO` em `pedido_forma_pagamento` e o status efetivo `3`, Cancelado. O Analytics cria os rótulos amigáveis para o Google Sheets e o Looker Studio. `Pedidos_FarmaLider` preserva os códigos brutos de pagamento e status da API; Weni e `BI_Pedidos` usam o status efetivo, inclusive o cancelamento por pagamento 0.
+A Weni guarda os códigos de pagamento normalizados, exceto `formaPagamento=0` ou `_`, que grava o texto `CANCELADO` em `pedido_forma_pagamento` e o status efetivo `3`, Cancelado. O Analytics cria os rótulos amigáveis para o Google Sheets e o Looker Studio. `Pedidos_FarmaLider` preserva os valores brutos de pagamento e status da API; Weni e `BI_Pedidos` usam o status efetivo, inclusive o cancelamento por pagamento 0.
 
-O Swagger define `formaPagamento` como Int32 sem enum. Códigos válidos sem de-para a partir de 7 são preservados na Weni e exibidos no Google Sheets/BI como `Não identificado (código X)`, sem impedir a atualização dos demais campos válidos. Pagamento ausente ou inválido mantém a descrição vazia.
+Os normalizadores aceitam códigos e nomes dos enums oficiais, como `PendentePagamento`, `EmProcessamento`, `Concluido`, `PixPorLinkDePagamento` e `PixNoPOS`. O nome de pagamento `_` corresponde ao código 0 e aplica a mesma regra de cancelamento.
+
+Códigos numéricos de pagamento válidos sem de-para a partir de 7 continuam sendo preservados como Int32 na Weni e exibidos no Google Sheets/BI como `Não identificado (código X)`, sem impedir a atualização dos demais campos válidos. Pagamento ausente ou inválido mantém a descrição vazia.
 
 Cada código sem de-para aparece em `INFO` uma vez por execução, seguido dos totais por código; esse registro informa a falta de descrição documentada e não indica falha na atualização.
 
@@ -305,9 +314,9 @@ pedido_faturamento_total = produtos + frete
 
 As abas `BI_Resumo_Diario` e `BI_Vendas` também separam faturamento de produtos, faturamento de frete e faturamento total. O campo de faturamento usado nos indicadores gerais passa a considerar **produtos + frete**, para bater com o valor total cobrado do pedido.
 
-Somente pedidos validados pela API com status efetivo **2, Concluído**, sem cancelamento explícito e sem pagamento 0 entram nas métricas de venda e atualizam `ultima_compra`. Pedidos pendentes, em processamento, em trânsito, no estado legado de rota ou cancelados ficam fora.
+Somente pedidos validados pela API com status efetivo **2, Concluído**, sem cancelamento explícito e sem pagamento 0 entram nas métricas de venda e atualizam `ultima_compra`. Pedidos pendentes, em processamento, em trânsito ou cancelados ficam fora.
 
-Pedidos abertos em **Pendente pagamento**, **Em processamento**, **Em trânsito** ou no estado legado **Pronto para rota** permanecem em fila de rechecagem até chegarem a **Concluído** ou **Cancelado**.
+Pedidos abertos em **Pendente pagamento (-1)**, **Em processamento (0)** ou **Em trânsito (1)** permanecem em fila de rechecagem até chegarem a **Concluído** ou **Cancelado**.
 
 Datas operacionais de pedidos usam **America/Belem (UTC-3)**.
 
@@ -611,7 +620,7 @@ Proteções principais:
 
 ## Operação recomendada
 
-### Primeira carga
+### Primeira carga ou revalidação após atualização
 
 ```text
 1. Instalar NexoFlow 1.0
@@ -621,6 +630,8 @@ Proteções principais:
 5. confirmar CARGA COMPLETA REVISADA
 6. executar carga completa do Analytics
 ```
+
+Após atualizar ou reinstalar, essa sequência gera um novo dry-run com o de-para atual antes do apply. Refaça a revisão do plano e execute o Analytics completo; snapshots antigos não devem aplicar a política anterior de pagamento 0.
 
 ### Rotina
 

@@ -2,6 +2,8 @@
 
 Índice da documentação técnica do NexoFlow 1.0.
 
+Para operação, instalação e geração de um novo dry-run/carga completa após reinstalar, consulte [Instalação](../README%20INSTALACAO.md), [Terminal](../README%20TERMINAL.md) e [Pedidos](../README%20PEDIDOS.md). A distribuição estável permanece na [release v1.0](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.0).
+
 - [FarmaLíder API](FARMALIDER%20API.md)
 - [Pedidos](PEDIDOS.md)
 - [Pedidos Weni](PEDIDOS%20WENI.md)

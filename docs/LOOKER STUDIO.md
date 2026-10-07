@@ -135,11 +135,11 @@ O campo legado `faturamento` permanece como alias do faturamento total para não
 
 O dashboard deve mostrar preferencialmente os nomes amigáveis, como **Cancelado** e **Débito**, mantendo os códigos disponíveis para auditoria e filtros técnicos.
 
-Pagamento 5 aparece como **Pix por Link de Pagamento** e pagamento 6 como **PIX no POS**. Pagamento 0 representa **CANCELADO**: Weni grava esse texto literal em `pedido_forma_pagamento` e o status efetivo 3, Cancelado. `BI_Pedidos` também usa o status efetivo 3; `Pedidos_FarmaLider` preserva os códigos brutos de status e pagamento retornados pela API.
+Pagamento 5 aparece como **Pix por Link de Pagamento** e pagamento 6 como **PIX no POS**. Os normalizadores aceitam também nomes oficiais como `PixPorLinkDePagamento` e `PixNoPOS`. Pagamento 0 ou `_` representa **CANCELADO**: Weni grava esse texto literal em `pedido_forma_pagamento` e o status efetivo 3, Cancelado. `BI_Pedidos` também usa o status efetivo 3; `Pedidos_FarmaLider` preserva os valores brutos de status e pagamento retornados pela API.
 
 Para pagamento Int32 não negativo sem de-para a partir de 7, `pedido_forma_pagamento_nome` exibe `Não identificado (código X)` e o código é preservado. Pagamentos ausentes ou inválidos mantêm a descrição vazia.
 
-`BI_Pedidos` mantém os pedidos para consulta, inclusive pendentes e cancelados. Páginas de compradores e vendas devem filtrar status efetivo 2, Concluído; o status -1, Pendente pagamento, permanece em rechecagem e fora das vendas.
+`BI_Pedidos` mantém os pedidos para consulta, inclusive pendentes e cancelados. Páginas de compradores e vendas devem filtrar status efetivo 2, Concluído; os estados -1, Pendente pagamento, 0, Em processamento, e 1, Em trânsito, permanecem em rechecagem e fora das vendas. Nomes oficiais do enum de status, como `PendentePagamento` e `Concluido`, são normalizados para os códigos -1 a 3.
 
 ### BI_Status
 

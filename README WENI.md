@@ -37,6 +37,8 @@ atualizar_weni_carga_completa.bat
 
 A rotina faz dry-run completo, gera um relatório detalhado para revisão humana e exige a confirmação literal `CARGA COMPLETA REVISADA` antes do apply. Use para primeira implantação, backfill ou revalidação integral.
 
+Depois de atualizar ou reinstalar o NexoFlow 1.0, gere um novo dry-run completo com a política atual de pagamento/status e revise o novo relatório. Em seguida, execute a carga completa do Analytics para atualizar Google Sheets e BI. Snapshots anteriores à nova política de cancelamento por pagamento 0 devem ser regenerados.
+
 Arquivos gerados:
 
 ```text
@@ -147,7 +149,7 @@ A revisão humana mostra a URN e o canal principal, contabiliza alterações de 
 
 
 ## Atendimento 24h e concorrência
-A carga completa foi adaptada para ambientes em que a Weni continua recebendo mensagens e contatos durante toda a revisão. O dry-run fixa um corte temporal (`captured_at_utc`) e gera o snapshot schema 5. O apply usa os planos armazenados nesse JSON, valida seu SHA-256 e não volta a montar o plano a partir do histórico.
+A carga completa foi adaptada para ambientes em que a Weni continua recebendo mensagens e contatos durante toda a revisão. O dry-run fixa um corte temporal (`captured_at_utc`) e gera o snapshot schema 6. O apply usa os planos armazenados nesse JSON, valida seu SHA-256 e não volta a montar o plano a partir do histórico.
 
 Antes de cada contato ser gravado, o NexoFlow consulta novamente aquele contato na Weni. Para cada campo planejado, o valor atual precisa continuar igual ao valor anterior revisado ou já ter chegado ao próprio valor proposto. Também são protegidas as URNs nativas, `opt_in_lgpd` quando governa grupos e os campos `pedido_*` usados como snapshot operacional. Se houver divergência, o contato recebe status de auditoria `conflict_skipped` e a carga continua para os demais. Se outra automação já aplicou exatamente o mesmo resultado, o status é `already_satisfied` e não há regravação.
 
@@ -253,8 +255,9 @@ Regras:
 - `pedido_valor` é a soma de `itens[].total`, sem adicionar frete;
 - o frete não é gravado nos campos Weni de pedido; ele é preservado no Google Sheets como `farmalider_frete` e usado pelo Analytics para calcular `valor_total_faturamento = pedido_valor + frete`;
 - `pedido_data` é gravada no formato `DD/MM/YY HH:MM:SS`, usando America/Belem;
-- `pedido_status` guarda o status efetivo: -1 Pendente pagamento, 0 Em processamento, 1 Em trânsito, 2 Concluído, 3 Cancelado; 4 Pronto para rota é aceito como legado, fora do enum atual;
-- `pedido_forma_pagamento` guarda o código Int32 não negativo recebido da API: 1 Dinheiro, 2 Débito, 3 Crédito, 4 Ticket, 5 Pix por Link de Pagamento, 6 PIX no POS; a exceção é pagamento 0, que grava o texto `CANCELADO` e força `pedido_status=3`;
+- `pedido_status` guarda o status efetivo: -1 Pendente pagamento, 0 Em processamento, 1 Em trânsito, 2 Concluído, 3 Cancelado;
+- `pedido_forma_pagamento` guarda o código Int32 não negativo normalizado da API: 1 Dinheiro, 2 Débito, 3 Crédito, 4 Ticket, 5 Pix por Link de Pagamento, 6 PIX no POS; a exceção é pagamento 0 ou `_`, que grava o texto `CANCELADO` e força `pedido_status=3`;
+- os normalizadores aceitam os nomes oficiais dos enums, como `PendentePagamento`, `EmProcessamento`, `Concluido`, `PixPorLinkDePagamento` e `PixNoPOS`; pagamento `_` é normalizado para 0;
 - `Pedidos_FarmaLider` preserva status e pagamento brutos da API; Weni e `BI_Pedidos` usam o status efetivo Cancelado quando o pagamento é 0;
 - os rótulos amigáveis de status e pagamento são derivados no Analytics/BI; pagamento válido sem de-para a partir de 7 aparece como `Não identificado (código X)`;
 - `pedido_id` é o primeiro localizador de fallback quando o GET por CPF não puder ser usado;
@@ -264,7 +267,7 @@ Regras:
 
 Os campos `pedido_id`, `pedido_data`, `pedido_status`, `pedido_produtos`, `pedido_quantidade_itens`, `pedido_valor_produtos`, `pedido_valor` e `pedido_forma_pagamento` são obrigatórios na Weni. Se qualquer um estiver ausente, o preflight bloqueia a execução antes de qualquer atualização de pedido.
 
-Pedidos com status -1, 0, 1 ou o estado legado 4 permanecem na fila de rechecagem até chegarem a 2, Concluído, ou 3, Cancelado. Esses estados abertos não contam como vendas.
+Pedidos com status -1, 0 ou 1 permanecem na fila de rechecagem até chegarem a 2, Concluído, ou 3, Cancelado. Esses estados abertos não contam como vendas.
 
 ## Incremental e checkpoint
 
@@ -333,4 +336,3 @@ nexo api weni campos
 ```
 
 As consultas `nexo api` são somente leitura. Consulte `README TERMINAL.md` para a referência completa.
-

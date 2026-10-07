@@ -170,8 +170,13 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
                     {"uuid": "u1", "fields": {"pedido_forma_pagamento": code}},
                     "2026-10-05T14:00:00Z",
                 )
-                self.assertEqual(row["pedido_forma_pagamento"], str(code))
+                self.assertEqual(
+                    row["pedido_forma_pagamento"], "CANCELADO" if code == 0 else str(code)
+                )
                 self.assertEqual(row["pedido_forma_pagamento_nome"], label)
+                if code == 0:
+                    self.assertEqual(row["pedido_status"], "3")
+                    self.assertEqual(row["pedido_status_nome"], "Cancelado")
 
     def test_normalized_contact_does_not_label_invalid_payment_values(self):
         for value in (None, "", " ", True, False, "Pix", -1, "-1", 2147483648):

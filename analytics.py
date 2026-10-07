@@ -15,6 +15,8 @@ from pedido_utils import (
     farmalider_payment_method_display,
     effective_order_status_code,
     is_order_completed,
+    normalize_farmalider_order_status_code,
+    normalize_farmalider_payment_code,
     parse_weni_order_list,
     weni_order_datetime_text,
 )
@@ -504,6 +506,11 @@ def normalize_contact(
         "pedido_valor",
     ):
         row[key] = normalize_value(fields.get(key))
+    payment_code = normalize_farmalider_payment_code(row["pedido_forma_pagamento"])
+    if payment_code == "0" or row["pedido_forma_pagamento"].strip().casefold() == "cancelado":
+        row["pedido_forma_pagamento"] = "CANCELADO"
+    elif payment_code:
+        row["pedido_forma_pagamento"] = payment_code
     row["pedido_status"] = effective_order_status_code(row) or row["pedido_status"]
     row["pedido_status_nome"] = farmalider_order_status_name(row["pedido_status"])
     row["pedido_forma_pagamento_nome"] = farmalider_payment_method_display(
@@ -993,15 +1000,20 @@ def _derived_order_payload(fields: dict[str, Any]) -> dict[str, Any] | None:
         if rows:
             product_rows = rows
 
+    raw_status = normalize_value(fields.get("pedido_status")).strip()
+    raw_payment = normalize_value(fields.get("pedido_forma_pagamento")).strip()
+    payment_code = normalize_farmalider_payment_code(raw_payment)
+    payment_value = "CANCELADO" if payment_code == "0" or raw_payment.casefold() == "cancelado" else payment_code or raw_payment
+    status_code = effective_order_status_code({
+        "pedido_status": raw_status, "pedido_forma_pagamento": payment_value,
+    }) or raw_status
     return {
         "pedido_id": pedido_id,
         "data_hora": pedido_data,
         "valor_total_compra": pedido_valor,
         "produtos": product_rows,
-        "farmalider_status_pedido": normalize_value(fields.get("pedido_status")).strip(),
-        "farmalider_forma_pagamento": normalize_value(
-            fields.get("pedido_forma_pagamento")
-        ).strip(),
+        "farmalider_status_pedido": status_code,
+        "farmalider_forma_pagamento": payment_value,
     }
 
 def parse_ultimo_pedido(

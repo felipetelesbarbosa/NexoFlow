@@ -5,14 +5,13 @@ Distribuição oficial do **NexoFlow 1.0**.
 
 ## Downloads
 
-Use a página oficial do **NexoFlow 1.0**:
+Use os links estáveis da [release v1.0 do NexoFlow 1.0](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.0):
 
-- **NexoFlow-Setup-1.0.zip** — Setup do NexoFlow 1.0;
-- **NexoFlow-1.0.zip** — projeto completo correspondente ao mesmo código;
-- **SHA256SUMS-1.0.txt** — hashes SHA-256 dos dois pacotes.
+- [NexoFlow-Setup-1.0.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.0/NexoFlow-Setup-1.0.zip) — Setup do NexoFlow 1.0;
+- [NexoFlow-1.0.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.0/NexoFlow-1.0.zip) — projeto completo correspondente ao mesmo código;
+- [SHA256SUMS-1.0.txt](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.0/SHA256SUMS-1.0.txt) — hashes SHA-256 dos dois pacotes.
 
-NexoFlow 1.0:
-https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.0
+Confira o SHA-256 do pacote baixado com o arquivo de hashes da mesma release antes de instalar.
 
 ## Setup
 
@@ -29,5 +28,7 @@ O `NexoFlow Uninstall.exe` é opcional. Se for bloqueado ou removido, o Setup co
 Atualizações preservam temporariamente a instalação existente. Se a nova instalação falhar depois de iniciada, o Setup tenta restaurar automaticamente o estado anterior, evitando deixar o NexoFlow parcialmente atualizado.
 
 O Setup também solicita elevação UAC automaticamente quando necessário.
+
+Após instalar, atualizar ou reinstalar, faça os testes de conexão e a revalidação completa descritos em [Instalação](../README%20INSTALACAO.md). A carga Weni exige dry-run, auditoria e revisão humana antes da aplicação; depois execute a carga completa do Analytics para recalcular os dados sob as regras atuais.
 
 Os pacotes são gerados automaticamente a partir da `main` somente depois de testes, auditoria e smoke test do instalador. Credenciais reais não entram nos artefatos.
