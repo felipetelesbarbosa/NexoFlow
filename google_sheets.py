@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 from gspread.exceptions import APIError, SpreadsheetNotFound, WorksheetNotFound
 from requests.exceptions import RequestException
 from network_diagnostics import classify_network_failure
+from proxy_config import refresh_network_route
 
 from analytics import (
     BASE_COLUMNS,
@@ -345,16 +346,20 @@ class GoogleSheetsStore:
                 time.sleep(wait)
             except RequestException as exc:
                 elapsed = time.monotonic() - attempt_started
-                if attempt >= attempts:
+                failure = classify_network_failure(exc)
+                if not failure.retryable or attempt >= attempts:
                     raise
 
+                refresh_network_route(
+                    reason=f"falha recuperável no Google Sheets ({description})"
+                )
                 wait = min(2 ** attempt, 30)
                 logging.warning(
                     "Google Sheets teve falha de rede/timeout após %.1fs durante %s: %s. "
                     "Tentativa %s/%s. Aguardando %.1f s.",
                     elapsed,
                     description,
-                    classify_network_failure(exc).summary,
+                    failure.summary,
                     attempt,
                     attempts,
                     wait,
@@ -462,15 +467,19 @@ class GoogleSheetsStore:
                 )
                 time.sleep(wait)
             except RequestException as exc:
-                if attempt >= attempts:
+                failure = classify_network_failure(exc)
+                if not failure.retryable or attempt >= attempts:
                     raise
 
+                refresh_network_route(
+                    reason=f"falha recuperável na escrita Google Sheets ({description})"
+                )
                 wait = min(2 ** attempt, 30)
                 logging.warning(
                     "Google Sheets teve falha de rede/timeout durante escrita %s: %s. "
                     "Tentativa %s/%s. Aguardando %.1f s.",
                     description,
-                    exc.__class__.__name__,
+                    failure.summary,
                     attempt,
                     attempts,
                     wait,
