@@ -19,6 +19,7 @@ from config import (
     WENI_MESSAGES_API_URL,
 )
 from network_diagnostics import classify_network_failure
+from proxy_config import refresh_network_route
 
 
 class WeniError(RuntimeError):
@@ -104,6 +105,10 @@ class WeniClient:
                     last_error = failure.summary
                     if not failure.retryable:
                         break
+                    if attempt < MAX_RETRIES:
+                        refresh_network_route(
+                            reason="falha recuperável ao acessar Weni"
+                        )
                 else:
                     last_error = "[RESPOSTA_INVALIDA] A resposta da Weni não contém JSON válido."
                 if attempt >= MAX_RETRIES:
