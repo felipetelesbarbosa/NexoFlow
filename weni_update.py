@@ -1041,6 +1041,32 @@ def audit_plans(
                     )
                     break
 
+        aligned_fields = (
+            "pedido_produtos",
+            "pedido_quantidade_itens",
+            "pedido_valor_produtos",
+        )
+        if all(field in plan.fields for field in aligned_fields):
+            product_count = len([
+                value.strip()
+                for value in str(plan.fields["pedido_produtos"]).split(",")
+                if value.strip()
+            ])
+            quantity_count = len([
+                value.strip()
+                for value in str(plan.fields["pedido_quantidade_itens"]).split(",")
+                if value.strip()
+            ])
+            value_count = len([
+                value.strip()
+                for value in str(plan.fields["pedido_valor_produtos"]).split(",")
+                if value.strip()
+            ])
+            if len({product_count, quantity_count, value_count}) != 1:
+                errors.append(
+                    f"{plan.contact_uuid}: listas de produto/quantidade/valor desalinhadas"
+                )
+
         for action in plan.group_actions:
             if action.action not in {"add", "remove"}:
                 errors.append(f"{plan.contact_uuid}: ação de grupo inválida")

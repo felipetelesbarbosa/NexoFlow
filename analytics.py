@@ -971,7 +971,7 @@ def parse_ultimo_pedido(
     contact: dict[str, Any],
     captured_at: str,
 ) -> tuple[dict[str, str] | None, list[dict[str, str]]]:
-    """Prefer the current flat Weni pedido fields; ultimo_pedido is legacy fallback."""
+    """Parse legacy ultimo_pedido and the current flat Weni order snapshot."""
     fields = get_fields(contact)
     raw = normalize_order_source(fields.get("ultimo_pedido"))
 
@@ -990,32 +990,63 @@ def parse_ultimo_pedido(
         captured_at=captured_at,
     )
 
-    derived_payload = _derived_order_payload(fields)
-    if derived_payload is not None:
-        derived_order, derived_items = parse_ultimo_pedido_raw(
-            json.dumps(derived_payload, ensure_ascii=False), **context,
-        )
-        if derived_order is not None:
-            derived_order["ultimo_pedido_raw"] = raw
-            derived_order["origem_pedido"] = "WENI_PEDIDO_FIELDS"
-            if not str(derived_order.get("status_validacao") or "").startswith("ERRO"):
-                status_code = normalize_value(fields.get("pedido_status")).strip()
-                payment_code = normalize_value(
-                    fields.get("pedido_forma_pagamento")
-                ).strip()
-                derived_order["farmalider_status_pedido"] = status_code
-                derived_order["farmalider_status_pedido_nome"] = (
-                    farmalider_order_status_name(status_code)
-                )
-                derived_order["farmalider_forma_pagamento"] = payment_code
-                derived_order["farmalider_forma_pagamento_nome"] = (
-                    farmalider_payment_method_name(payment_code)
-                )
-                return derived_order, derived_items
+    original_order, original_items = parse_ultimo_pedido_raw(raw, **context)
+    original_valid = (
+        original_order is not None
+        and not str(original_order.get("status_validacao") or "").startswith("ERRO")
+    )
+    if raw and not original_valid:
+        return original_order, original_items
 
-    if raw:
-        return parse_ultimo_pedido_raw(raw, **context)
-    return None, []
+    derived_payload = _derived_order_payload(fields)
+    if derived_payload is None:
+        return original_order, original_items
+
+    derived_order, derived_items = parse_ultimo_pedido_raw(
+        json.dumps(derived_payload, ensure_ascii=False), **context,
+    )
+    assert derived_order is not None
+    derived_order["ultimo_pedido_raw"] = raw
+    if derived_order["origem_pedido"] == "WENI_ULTIMO_PEDIDO":
+        derived_order["origem_pedido"] = "WENI_PEDIDO_FIELDS"
+
+    derived_valid = not str(
+        derived_order.get("status_validacao") or ""
+    ).startswith("ERRO")
+    if not original_valid:
+        return (
+            (derived_order, derived_items)
+            if derived_valid or original_order is None
+            else (original_order, original_items)
+        )
+
+    if derived_valid:
+        confirmation = derived_order.get("status_confirmacao", "")
+        verified = (
+            confirmation.startswith("CONFIRMADO_API")
+            or confirmation == "CANCELADO_API"
+        )
+        derived_dt = business_order_datetime(derived_order.get("data_hora", ""))
+        original_dt = business_order_datetime(original_order.get("data_hora", ""))
+        original_id = str(original_order.get("pedido_id") or "").strip()
+        derived_id = str(derived_order.get("pedido_id") or "").strip()
+        same_id = (
+            original_id.isascii()
+            and original_id.isdigit()
+            and int(original_id) > 0
+            and derived_id.isascii()
+            and derived_id.isdigit()
+            and int(derived_id) == int(original_id)
+        )
+        if (
+            same_id
+            and verified
+            and derived_dt is not None
+            and original_dt is not None
+            and derived_dt >= original_dt
+        ):
+            return derived_order, derived_items
+    return original_order, original_items
 
 def build_sales_metrics(
     order_records: list[dict[str, str]],
