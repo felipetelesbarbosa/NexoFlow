@@ -93,7 +93,7 @@ PURCHASE_FIELDS = {
     "ultima_compra",
 }
 
-RECOMMENDED_ORDER_FIELDS = {
+REQUIRED_ORDER_FIELDS = {
     "pedido_id",
     "pedido_data",
     "pedido_status",
@@ -103,6 +103,9 @@ RECOMMENDED_ORDER_FIELDS = {
     "pedido_valor",
     "pedido_forma_pagamento",
 }
+
+# Alias mantido para compatibilidade com testes/documentação anteriores.
+RECOMMENDED_ORDER_FIELDS = REQUIRED_ORDER_FIELDS
 
 OPEN_ORDER_STATUSES = {"Em processamento", "Em trânsito", "Pronto para rota"}
 TERMINAL_ORDER_STATUSES = {"Concluído", "Cancelado"}
@@ -1666,7 +1669,19 @@ def _missing_google_ads_fields(available: set[str]) -> list[str]:
 
 
 def _missing_order_fields(available: set[str]) -> list[str]:
-    return sorted(RECOMMENDED_ORDER_FIELDS - available)
+    return sorted(REQUIRED_ORDER_FIELDS - available)
+
+
+def _ensure_order_fields(available: set[str]) -> None:
+    missing = _missing_order_fields(available)
+    if not missing:
+        return
+    raise PlanAuditError(
+        "Campos de pedido obrigatórios não existem na Weni: "
+        + ", ".join(missing)
+        + ". Crie todos esses campos antes de executar o NexoFlow Weni. "
+        "Nenhum snapshot parcial de pedido será gravado."
+    )
 
 
 def _ensure_multichannel_fields(client: WeniClient, available: set[str] | None = None) -> None:
@@ -1758,13 +1773,7 @@ def run_update(
     try:
         available_weni_fields = _available_weni_fields(weni)
         _ensure_multichannel_fields(weni, available_weni_fields)
-        missing_order_fields = _missing_order_fields(available_weni_fields)
-        if missing_order_fields:
-            logging.warning(
-                "Campos de pedido ausentes na Weni: %s. O NexoFlow continuará "
-                "consultando a FarmaLíder, mas gravará somente os campos existentes.",
-                ", ".join(missing_order_fields),
-            )
+        _ensure_order_fields(available_weni_fields)
         missing_google_ads = _missing_google_ads_fields(available_weni_fields)
         if missing_google_ads:
             logging.warning(
