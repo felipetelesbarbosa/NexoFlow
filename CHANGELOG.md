@@ -27,6 +27,7 @@
 - avisos de rede do Google Sheets incluem categoria segura, sem texto bruto da exceção;
 - HTTP 400/404 no CPF fictício da FarmaLíder é apresentado como resposta de rede, com autenticação não confirmada;
 - diagnóstico não desativa TLS nem altera automaticamente a rota escolhida.
+- preflight da FarmaLíder agora repete timeout/falha transitória, HTTP 429 e 5xx antes de interromper a carga; proxy 407/TLS inválido continuam falhando imediatamente com diagnóstico sanitizado.
 
 ### Auditoria dos campos de pedido
 

@@ -83,6 +83,21 @@ Depois testa separadamente:
 A FarmaLíder também registra aviso quando uma chamada ultrapassa o limite de
 requisição lenta configurado.
 
+### Preflight resiliente da FarmaLíder
+
+O teste inicial da FarmaLíder usa a mesma política de resiliência das consultas
+reais. Falhas transitórias de rede/timeout, HTTP 429 e HTTP 5xx são tentadas
+novamente até o limite de `FARMALIDER_MAX_RETRIES` (4 por padrão), com
+backoff/cooldown e recuperação serial.
+
+Falhas não recuperáveis identificadas com segurança, como proxy 407 ou erro de
+certificado TLS, interrompem imediatamente para evitar repetir uma falha que
+exige correção de configuração.
+
+Uma falha isolada no primeiro GET de `cliente/cpf` não encerra mais o
+NexoFlow Weni; o processo só falha no preflight depois de esgotar as tentativas
+configuradas ou encontrar uma causa não recuperável.
+
 ## Segurança
 
 As credenciais de proxy ficam somente em `secrets_config.py`.

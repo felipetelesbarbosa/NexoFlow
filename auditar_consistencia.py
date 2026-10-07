@@ -167,6 +167,30 @@ def check_farmalider_runtime() -> None:
     else:
         ok("Cliente FarmaLíder usa sessões por thread e limitador global.")
 
+    preflight_start = client_text.find("def test_connection")
+    preflight_text = client_text[preflight_start:] if preflight_start >= 0 else ""
+    required_preflight_parts = [
+        "classify_network_failure",
+        "for attempt in range(1, FARMALIDER_MAX_RETRIES + 1):",
+        "if not failure.retryable",
+        "_protect_after_failure",
+        "_sleep_before_retry",
+        "\"attempts\": attempt",
+    ]
+    missing_preflight = [
+        item for item in required_preflight_parts if item not in preflight_text
+    ]
+    if missing_preflight:
+        fail(
+            "Preflight FarmaLíder sem retry/diagnóstico resiliente: "
+            + ", ".join(missing_preflight)
+        )
+    else:
+        ok(
+            "Preflight FarmaLíder repete falhas transitórias e preserva "
+            "falha imediata para causas não recuperáveis."
+        )
+
     required_main_parts = [
         "ThreadPoolExecutor",
         "FARMALIDER_MAX_WORKERS",

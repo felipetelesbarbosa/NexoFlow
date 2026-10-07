@@ -8,7 +8,7 @@ import unittest
 from contextlib import nullcontext
 from unittest.mock import Mock, patch
 
-from requests.exceptions import ConnectionError
+from requests.exceptions import ConnectionError, ReadTimeout
 
 from farmalider_client import FarmaliderClient, FarmaliderError, RequestPermit
 from farmalider_integration import resolve_contact_order
@@ -94,6 +94,97 @@ class FarmaliderServerErrorTests(unittest.TestCase):
                 "categoria=sequencia_vazia",
                 client._safe_server_error_summary(nested),
             )
+        finally:
+            client.close()
+
+    def test_preflight_retries_timeout_and_recovers(self) -> None:
+        client = FarmaliderClient("synthetic")
+        try:
+            recovered = _response(404)
+            with (
+                patch.object(
+                    client.session, "get",
+                    side_effect=[ReadTimeout("slow"), recovered],
+                ) as get,
+                patch.object(
+                    client, "_request_slot",
+                    side_effect=lambda _: nullcontext(RequestPermit(0, 4)),
+                ),
+                patch.object(client, "_protect_after_failure"),
+                patch.object(client, "_sleep_before_retry") as retry,
+            ):
+                result = client.test_connection()
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["status_code"], 404)
+            self.assertEqual(result["attempts"], 2)
+            self.assertEqual(get.call_count, 2)
+            retry.assert_called_once()
+        finally:
+            client.close()
+
+    def test_preflight_retries_5xx_and_recovers(self) -> None:
+        client = FarmaliderClient("synthetic")
+        try:
+            failure = _response(500)
+            recovered = _response(404)
+            with (
+                patch.object(
+                    client.session, "get",
+                    side_effect=[failure, recovered],
+                ) as get,
+                patch.object(
+                    client, "_request_slot",
+                    side_effect=lambda _: nullcontext(RequestPermit(0, 4)),
+                ),
+                patch.object(client, "_protect_after_failure"),
+                patch.object(client, "_sleep_before_retry") as retry,
+            ):
+                result = client.test_connection()
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["attempts"], 2)
+            self.assertEqual(get.call_count, 2)
+            retry.assert_called_once()
+        finally:
+            client.close()
+
+    def test_preflight_auth_failure_does_not_retry(self) -> None:
+        client = FarmaliderClient("synthetic")
+        try:
+            with (
+                patch.object(
+                    client.session, "get", return_value=_response(401)
+                ) as get,
+                patch.object(
+                    client, "_request_slot",
+                    side_effect=lambda _: nullcontext(RequestPermit(0, 4)),
+                ),
+            ):
+                with self.assertRaisesRegex(FarmaliderError, "401"):
+                    client.test_connection()
+            self.assertEqual(get.call_count, 1)
+        finally:
+            client.close()
+
+    def test_preflight_exhausts_network_retries_before_failing(self) -> None:
+        client = FarmaliderClient("synthetic")
+        try:
+            with (
+                patch.object(
+                    client.session, "get", side_effect=ReadTimeout("slow")
+                ) as get,
+                patch.object(
+                    client, "_request_slot",
+                    side_effect=lambda _: nullcontext(RequestPermit(0, 4)),
+                ),
+                patch.object(client, "_protect_after_failure"),
+                patch.object(client, "_sleep_before_retry"),
+                patch("farmalider_client.FARMALIDER_MAX_RETRIES", 3),
+            ):
+                with self.assertRaisesRegex(
+                    FarmaliderError, r"após 3 tentativa\(s\)"
+                ):
+                    client.test_connection()
+            self.assertEqual(get.call_count, 3)
         finally:
             client.close()
 
