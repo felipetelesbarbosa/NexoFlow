@@ -93,6 +93,19 @@ class InvalidCpfBatchSummaryTests(unittest.TestCase):
         self.assertEqual(stats.invalid_cpf_orders_found, 1)
         self.assertEqual(stats.invalid_cpf_orders_validated, 0)
 
+    def test_valid_cpf_identity_ambiguity_keeps_visible_warning(self):
+        import logging
+        plan = ContactUpdatePlan("synthetic")
+        with patch("weni_update.resolve_contact_order", return_value=(
+            {"status_confirmacao": "CPF_IDENTIDADE_AMBIGUA"}, [],
+        )), patch("weni_update.logging.log") as log:
+            _apply_purchase_candidate(
+                plan, {"uuid": "synthetic", "fields": {"cpf": "52998224725"}},
+                farm_client=Mock(), captured_at="2026-10-08T10:00:00Z",
+            )
+        self.assertEqual(log.call_args.args[0], logging.WARNING)
+        self.assertFalse(plan.order_validated)
+
     def test_diagnostic_metadata_does_not_change_frozen_plan_digest(self):
         plan = ContactUpdatePlan("synthetic")
         original = _plan_digest([plan])

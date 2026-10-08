@@ -845,10 +845,14 @@ def _apply_purchase_candidate(
         else "API_DESABILITADA"
     )
     if order is not None and str(order.get("status_confirmacao") or "").startswith("CPF_IDENTIDADE_"):
-        if logging.getLogger().isEnabledFor(logging.DEBUG):
+        identity_level = (
+            logging.DEBUG if cpf_query_priority(candidate["fields"].get("cpf")) == 1
+            else logging.WARNING
+        )
+        if logging.getLogger().isEnabledFor(identity_level):
             reference = farm_client.weni_contact_diagnostic_ref(str(contact.get("uuid") or "")) if isinstance(farm_client, FarmaliderClient) else "-"
-            logging.debug("Weni [contato_ref=%s]: pedido bloqueado: %s; nome e e-mail ou telefone não identificaram um cliente único.",
-                          reference, order["status_confirmacao"])
+            logging.log(identity_level, "Weni [contato_ref=%s]: pedido bloqueado: %s; nome e e-mail ou telefone não identificaram um cliente único.",
+                        reference, order["status_confirmacao"])
     if order is None or not items:
         return False
 
