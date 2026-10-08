@@ -46,8 +46,7 @@ def cliente_link_status(
     normalized_weni = normalize_cpf(weni_cpf)
     if not normalized_weni:
         return "CPF_NAO_INFORMADO", "", ""
-    if not is_valid_cpf(normalized_weni):
-        return "CPF_INVALIDO", "", ""
+    valid = is_valid_cpf(normalized_weni)
     if api_cliente is None:
         return "CPF_NAO_ENCONTRADO", "", ""
     cliente = _cliente_object(api_cliente)
@@ -56,16 +55,22 @@ def cliente_link_status(
     raw_cpf = cliente.get("cpf")
     if isinstance(raw_cpf, bool) or not isinstance(raw_cpf, (int, str)):
         return "CPF_NAO_INFORMADO_API", "", ""
-    api_cpf = normalize_cpf(raw_cpf, pad_to_11=True)
+    api_cpf = normalize_cpf(raw_cpf, pad_to_11=valid)
     cliente_id = _positive_id(cliente.get("id"))
     cliente_nome = _text(cliente.get("nome"))
     if not api_cpf:
         return "CPF_NAO_INFORMADO_API", "", ""
-    if api_cpf != normalized_weni:
+    # Numeric JSON loses leading zeros. Accept only the same numeric identifier;
+    # never change the original Weni value or its mathematical validity.
+    same_identifier = api_cpf == normalized_weni or (
+        isinstance(raw_cpf, int)
+        and api_cpf.lstrip("0") == normalized_weni.lstrip("0")
+    )
+    if not same_identifier:
         return "CPF_DIVERGENTE_API", "", ""
     if not cliente_id:
         return "CLIENTE_ID_INVALIDO_API", "", ""
-    return "CPF_CONFIRMADO", cliente_id, cliente_nome
+    return ("CPF_CONFIRMADO" if valid else "CPF_INVALIDO_ENCONTRADO"), cliente_id, cliente_nome
 
 
 def _decimal(value: Any, label: str, *, positive: bool = False) -> Decimal:
@@ -401,9 +406,9 @@ def resolve_contact_order(
     GET pedido/{id}. Se a API não estiver disponível, os campos pedido_* não
     são reconstruídos a partir do snapshot legado.
     """
-    from analytics import get_fields, is_valid_cpf, normalize_cpf
+    from analytics import get_fields, normalize_cpf
     from farmalider_client import (
-        FarmaliderAuthError, FarmaliderError, FarmaliderUnavailableError,
+        FarmaliderBadRequestError, FarmaliderAuthError, FarmaliderError, FarmaliderUnavailableError,
     )
 
     fields = get_fields(contact)
@@ -494,30 +499,17 @@ def resolve_contact_order(
     if not cpf:
         return resolve_weni_locators(expected_cliente_id=linked_id)
 
-    # CPF informado porém inválido continua sendo uma falha explícita. Só
-    # permitimos recuperação por localizador se houver de fato um ID disponível.
-    if not is_valid_cpf(cpf):
-        if current_pedido_id or ultimo_pedido_id:
-            recovered_order, recovered_items = resolve_weni_locators(
-                expected_cliente_id=linked_id
-            )
-            if recovered_order is not None:
-                return recovered_order, recovered_items
-        order = _empty_order(contact, captured_at)
-        return _failure(
-            order, [], "CPF_INVALIDO",
-            "CPF não permite consultar o pedido oficial.",
-        )
-
     # A validação desta execução já consultou o CPF. Repetir 404 ou 500 na
     # etapa de pedidos aumentaria a carga da API sem acrescentar informação.
-    if cliente_lookup_status in {"ERRO_API", "CPF_NAO_ENCONTRADO"}:
+    if cliente_lookup_status in {"ERRO_API", "CPF_NAO_ENCONTRADO", "CPF_REJEITADO_API"}:
         recovered_order, recovered_items = resolve_weni_locators(
             expected_cliente_id=linked_id
         )
         if recovered_order is not None:
             return recovered_order, recovered_items
         order = _empty_order(contact, captured_at)
+        if cliente_lookup_status == "CPF_REJEITADO_API":
+            return _failure(order, [], "CPF_REJEITADO_API", "Consulta de CPF rejeitada pela API (HTTP 400).")
         if cliente_lookup_status == "ERRO_API":
             return _failure(
                 order, [], "ERRO_API",
@@ -536,6 +528,9 @@ def resolve_contact_order(
         )
     except (FarmaliderAuthError, FarmaliderUnavailableError):
         raise
+    except FarmaliderBadRequestError:
+        order = _empty_order(contact, captured_at)
+        return _failure(order, [], "CPF_REJEITADO_API", "Consulta de CPF rejeitada pela API (HTTP 400).")
     except FarmaliderError:
         recovered_order, recovered_items = resolve_weni_locators(
             expected_cliente_id=linked_id
@@ -561,7 +556,7 @@ def resolve_contact_order(
         )
 
     status, confirmed_cliente_id, _ = cliente_link_status(cpf, payload)
-    if status != "CPF_CONFIRMADO":
+    if status not in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO"}:
         # Resposta concreta com CPF divergente/cliente inválido é falha dura:
         # não tentamos contornar uma inconsistência de identidade.
         order = _empty_order(contact, captured_at)

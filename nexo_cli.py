@@ -199,8 +199,8 @@ def _show_farmalider_payload(title: str, payload: dict[str, Any] | None) -> None
 
 def _normalize_cpf(raw: str) -> str:
     cpf = re.sub(r"\D", "", raw or "")
-    if len(cpf) != 11:
-        raise RuntimeError("CPF deve conter 11 dígitos.")
+    if not cpf:
+        raise RuntimeError("Informe os dígitos do CPF cadastrado, mesmo que inválido.")
     return cpf
 
 

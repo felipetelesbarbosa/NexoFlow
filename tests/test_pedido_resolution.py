@@ -573,15 +573,15 @@ class PedidoResolutionTests(unittest.TestCase):
         self.assertEqual(order["status_confirmacao"], "ITEM_PEDIDO_DIVERGENTE_API")
         self.assertEqual(items, [])
 
-    def test_invalid_cpf_does_not_call_api(self):
+    def test_invalid_cpf_queries_api_but_rejects_different_customer(self):
         api = client()
         order, _ = resolve_contact_order(
             contact(cpf="11111111111"),
             farm_client=api,
             captured_at=CAPTURED_AT,
         )
-        self.assertEqual(order["status_confirmacao"], "CPF_INVALIDO")
-        api.get_cliente_by_cpf.assert_not_called()
+        self.assertEqual(order["status_confirmacao"], "CPF_DIVERGENTE_API")
+        api.get_cliente_by_cpf.assert_called_once_with("11111111111")
         api.get_pedido.assert_not_called()
 
     def test_client_api_error_returns_structured_diagnostic(self):

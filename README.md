@@ -1,5 +1,15 @@
 # NexoFlow 1.0
 
+## Consulta de CPFs válidos e inválidos
+
+Nas cargas Weni e Analytics, o NexoFlow consulta primeiro os CPFs matematicamente válidos e aguarda essa etapa terminar antes de consultar os inválidos preenchidos. A classificação usa 11 dígitos, rejeição de sequências repetidas e os dois dígitos verificadores. CPFs curtos, dígitos incorretos e valores como `0` ou `00000000000` também são consultados, na segunda etapa. Valores sem dígitos não geram GET. O CPF original permanece no cadastro; a consulta remove a formatação, sem completar, corrigir ou inventar dígitos.
+
+O Analytics deduplica os identificadores por execução e separa os lotes das duas etapas. As cargas Weni em partes seguem essa prioridade dentro da parte selecionada, preservando o manifesto e a revisão humana. Evidência válida de CPF em mensagens entra na primeira etapa quando for o valor efetivo do plano. O incremental mantém o cache recente; a carga completa reconsulta os identificadores.
+
+`CPF_CONFIRMADO` identifica um CPF matematicamente válido encontrado na API; `CPF_INVALIDO_ENCONTRADO` identifica um número inválido encontrado na base FarmaLíder. Ambos alimentam o total de clientes encontrados, mas somente CPFs matematicamente válidos entram em `cpfs_validos`. HTTP 400 registra `CPF_REJEITADO_API`, sem retry e sem contar como falha 500; HTTP 404 registra `CPF_NAO_ENCONTRADO`; falhas de servidor/rede registram `ERRO_API`, preservando os dados anteriores. Os logs públicos mostram etapas e contagens, sem CPF. O diagnóstico privado de falhas 5xx aceita também identificadores curtos e zeros.
+
+Para aproveitar um pedido, o CPF retornado precisa corresponder ao identificador consultado, o cliente deve ter ID positivo e o pedido deve pertencer ao mesmo cliente. CPF numérico no JSON pode perder zeros à esquerda: somente essa representação numérica equivalente é aceita, sem mudar a classificação nem o CPF na Weni. A consulta não comprova emissão oficial do CPF ou titularidade da pessoa; identificadores genéricos como zero exigem atenção na revisão humana. A extração de mensagens e a gravação de um novo CPF na Weni continuam exigindo validade matemática e contexto explícito.
+
 O **NexoFlow 1.0** é a camada de integração, atualização de dados e analytics que conecta **Weni**, **FarmaLíder API**, **Google Sheets** e **Looker Studio** em um fluxo único, auditável e preparado para operação contínua.
 
 Ele possui duas responsabilidades principais:
@@ -211,7 +221,7 @@ Qualquer tentativa de escrever fora da allowlist bloqueia a execução antes do 
 
 O NexoFlow usa interpretação conservadora:
 
-- CPF precisa ser válido pelos dígitos verificadores;
+- CPF extraído de mensagens para atualizar o cadastro precisa ser válido pelos dígitos verificadores;
 - CPF em mensagem livre precisa estar explicitamente identificado ou responder a uma solicitação contextual;
 - mensagens ambíguas não atualizam cadastro;
 - idade explícita pode preencher `idade` e `maior_de_18_anos`;

@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>Documentação NexoFlow 1.0</title>
+  <title>NexoFlow 1.0 - Documentação</title>
   <style>
     html {
       color: #1a1a1a;
@@ -170,20 +170,80 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">Documentação NexoFlow 1.0</h1>
+<h1 class="title">NexoFlow 1.0 - Documentação</h1>
 </header>
 <h1 id="nexoflow">NexoFlow</h1>
+<h2 id="consulta-de-cpfs-válidos-e-inválidos">Consulta de CPFs válidos e
+inválidos</h2>
+<p>Nas cargas Weni e Analytics, o NexoFlow consulta primeiro os CPFs
+matematicamente válidos e aguarda essa etapa terminar antes de consultar
+os inválidos preenchidos. A classificação usa 11 dígitos, rejeição de
+sequências repetidas e os dois dígitos verificadores. CPFs curtos,
+dígitos incorretos e valores como <code>0</code> ou
+<code>00000000000</code> também são consultados, na segunda etapa.
+Valores sem dígitos não geram GET. O CPF original permanece no cadastro;
+a consulta remove a formatação, sem completar, corrigir ou inventar
+dígitos.</p>
+<p>O Analytics deduplica os identificadores por execução e separa os
+lotes das duas etapas. As cargas Weni em partes seguem essa prioridade
+dentro da parte selecionada, preservando o manifesto e a revisão humana.
+Evidência válida de CPF em mensagens entra na primeira etapa quando for
+o valor efetivo do plano. O incremental mantém o cache recente; a carga
+completa reconsulta os identificadores.</p>
+<p><code>CPF_CONFIRMADO</code> identifica um CPF matematicamente válido
+encontrado na API; <code>CPF_INVALIDO_ENCONTRADO</code> identifica um
+número inválido encontrado na base FarmaLíder. Ambos alimentam o total
+de clientes encontrados, mas somente CPFs matematicamente válidos entram
+em <code>cpfs_validos</code>. HTTP 400 registra
+<code>CPF_REJEITADO_API</code>, sem retry e sem contar como falha 500;
+HTTP 404 registra <code>CPF_NAO_ENCONTRADO</code>; falhas de
+servidor/rede registram <code>ERRO_API</code>, preservando os dados
+anteriores. Os logs públicos mostram etapas e contagens, sem CPF. O
+diagnóstico privado de falhas 5xx aceita também identificadores curtos e
+zeros.</p>
+<p>Para aproveitar um pedido, o CPF retornado precisa corresponder ao
+identificador consultado, o cliente deve ter ID positivo e o pedido deve
+pertencer ao mesmo cliente. CPF numérico no JSON pode perder zeros à
+esquerda: somente essa representação numérica equivalente é aceita, sem
+mudar a classificação nem o CPF na Weni. A consulta não comprova emissão
+oficial do CPF ou titularidade da pessoa; identificadores genéricos como
+zero exigem atenção na revisão humana. A extração de mensagens e a
+gravação de um novo CPF na Weni continuam exigindo validade matemática e
+contexto explícito.</p>
 <p>Software interno de integração, atualização de contatos e analytics
 da FarmaLíder.</p>
+<h3 id="arquitetura-atual-de-pedidos-fallback-e-frete">Arquitetura atual
+de pedidos, fallback e frete</h3>
+<p>A FarmaLíder API é a fonte de verdade. O fluxo normal usa
+<code>CPF -&gt; GET cliente/cpf -&gt; ultimoPedido -&gt; GET pedido/{id}</code>.
+Se o GET por CPF não puder ser usado, <code>pedido_id</code> da Weni é o
+primeiro localizador de recuperação; <code>ultimo_pedido</code>,
+alimentado por outra integração, é o último localizador de ID. Nenhum
+desses campos substitui os detalhes oficiais: produtos, valores,
+emissão, status e pagamento só são atualizados após validação em
+<code>GET pedido/{id}</code>.</p>
+<p><code>pedido_produtos</code> usa exclusivamente
+<code>itens[].descricao</code>; <code>codProduto</code> permanece apenas
+como código técnico. Na Weni, <code>pedido_valor</code> continua sendo o
+total dos produtos. No Google Sheets o NexoFlow mantém
+<code>farmalider_frete</code> separado e calcula
+<code>valor_total_faturamento = produtos + frete</code>. O Looker Studio
+recebe, em <code>BI_Pedidos</code>, <code>pedido_valor</code>,
+<code>pedido_frete</code> e <code>pedido_faturamento_total</code>, além
+da separação equivalente em <code>BI_Vendas</code> e
+<code>BI_Resumo_Diario</code>.</p>
+<p>Os oito campos <code>pedido_*</code> do contrato são obrigatórios na
+Weni; o preflight bloqueia o apply se algum estiver ausente, evitando
+atualização parcial do snapshot.</p>
 <h3 id="camada-bi-para-looker-studio">Camada BI para Looker Studio</h3>
 <p>O NexoFlow 1.0 transforma o NexoFlow Analytics em uma camada
 analítica pronta para o Looker Studio. O projeto passa a criar/manter
 automaticamente <code>BI_Resumo_Diario</code>, <code>BI_Canais</code>,
-<code>BI_Conversao</code>, <code>BI_Vendas</code>, <code>BI_Ads</code> e
-<code>BI_Status</code>. O resumo diário usa uma linha por dia; canais e
-conversão mantêm snapshots diários; vendas são uma série por data; Ads
-apresenta uma linha zero até existir atribuição; Status registra a saúde
-da última execução.</p>
+<code>BI_Conversao</code>, <code>BI_Vendas</code>, <code>BI_Ads</code>,
+<code>BI_Pedidos</code> e <code>BI_Status</code>. O resumo diário usa
+uma linha por dia; canais e conversão mantêm snapshots diários; vendas
+são uma série por data; Ads apresenta uma linha zero até existir
+atribuição; Status registra a saúde da última execução.</p>
 <p>Para que os totais do dashboard representem a base Weni completa,
 <code>Base_Contatos</code> passa a preservar todos os contatos
 retornados pela Weni, mesmo sem CPF, pedido ou anúncio. Também entram no
@@ -320,7 +380,8 @@ CMD</h3>
 BOM inicial. Em algumas instalações do Windows, o BOM era exibido pelo
 <code>cmd.exe</code> como <code>´╗┐</code> e fazia a primeira diretiva
 <code>@echo off</code> ser tratada como comando inválido. Testes e
-auditoria bloqueiam a publicação do NexoFlow 1.0 se houver BOM em BATs.</p>
+auditoria bloqueiam a publicação do NexoFlow 1.0 se houver BOM em
+BATs.</p>
 <h2 id="versão-atual">Versão atual</h2>
 <p>A versão atual é a <strong>NexoFlow 1.0</strong>.</p>
 <p>Ela mantém o <strong>NexoFlow Analytics</strong>, o <strong>NexoFlow
@@ -356,7 +417,7 @@ pedidos, grupos e write-back;</li>
 de pedidos;</li>
 <li><code>google_sheets.py</code>: camada analítica;</li>
 <li><code>auditar_consistencia.py</code>: auditoria técnica obrigatória
-do release;</li>
+da publicação;</li>
 <li><code>run_checkup_tests.py</code>: executa a suíte do check-up em
 modo enxuto, suprimindo somente ruído esperado dos testes.</li>
 </ul>
@@ -426,9 +487,10 @@ ultima_compra
 primeiro_anuncio_*
 ultimo_anuncio_*</code></pre>
 <p><code>opt_in_lgpd_status</code> continua controlado pelos
-flows/agentes da Weni. <code>ultimo_pedido</code> continua sendo o
-snapshot JSON estruturado de origem e não é reescrito pelo NexoFlow
-Weni.</p>
+flows/agentes da Weni. <code>ultimo_pedido</code> é preservado apenas
+para compatibilidade; com a FarmaLíder API disponível, os campos
+<code>pedido_*</code> são alimentados pelo GET oficial por
+CPF/pedido.</p>
 <h2 id="urns-e-canais">URNs e canais</h2>
 <p>A resolução de identidade usa somente URNs retornadas pela Weni. A
 prioridade da URN principal é:</p>
@@ -463,12 +525,21 @@ fora de <strong>Opt-In LGPD</strong>. O NexoFlow Weni corrige
 associações incompatíveis mesmo quando o campo já estava preenchido
 antes da execução.</p>
 <h2 id="pedidos-e-última-compra">Pedidos e última compra</h2>
-<p>A rotina usa <code>ultimo_pedido</code> como fonte estruturada, mas
-só escreve <code>pedido_*</code> e <code>ultima_compra</code> depois de
-confirmar o pedido pela API FarmaLíder. Pedido cancelado, não confirmado
-ou sem identificação oficial válida não gera atualização transacional.
-Uma compra antiga não sobrescreve uma <code>ultima_compra</code> mais
-recente já gravada.</p>
+<p>A rotina usa a FarmaLíder API como fonte de verdade: consulta o
+cliente por CPF, obtém <code>ultimoPedido</code> e <code>itens</code>,
+confirma o mesmo pedido por código e então escreve os campos
+<code>pedido_*</code>. <code>pedido_produtos</code> usa
+<code>descricao</code>; quantidades e valores unitários são listas
+posicionais separadas por vírgula; <code>pedido_valor</code> é a soma de
+<code>itens[].total</code>. Pedidos validados pela API com status
+efetivo 4 (Pronto para rota), 1 (Em trânsito) ou 2 (Concluído), sem
+cancelamento, contam como venda e atualizam <code>ultima_compra</code>.
+Pagamento 0 grava <code>pedido_forma_pagamento=Cancelado</code> e força
+status efetivo 3 na Weni/BI; <code>Pedidos_FarmaLider</code> mantém o
+status e o pagamento brutos da API. Os estados -2, Em aberto, -1,
+Pendente de pagamento, 0, Em processamento, 4, Pronto para rota, e 1, Em
+trânsito, permanecem em rechecagem até Concluído ou Cancelado; somente
+-2, -1 e 0 ficam fora das vendas.</p>
 <h2 id="auditoria-idempotência-e-checkpoint">Auditoria, idempotência e
 checkpoint</h2>
 <p>Antes de qualquer escrita, <code>audit_plans</code> valida todos os
@@ -643,7 +714,7 @@ tokens
 senhas do proxy</code></pre>
 <p>Os pacotes oficiais não devem conter <code>__pycache__</code>,
 <code>.pyc</code> ou credenciais reais.</p>
-<h2 id="validação-do-nexoflow-10">Validação do NexoFlow 1.0</h2>
+<h2 id="validação-do-nexoflow-1.0">Validação do NexoFlow 1.0</h2>
 <p>Toda mudança relevante deve executar:</p>
 <pre class="text"><code>1. compilação/sintaxe
 2. suíte de testes automatizados
@@ -655,7 +726,6 @@ senhas do proxy</code></pre>
 8. verificação de ausência de caches e credenciais reais</code></pre>
 <p>Consulte também <code>README.md</code>,
 <code>README INSTALACAO.md</code>, <code>README WENI.md</code> e
-<code>CHANGELOG.md</code>.</p>
+<code>CHANGELOG.md</code>. <!-- NexoFlow 1.0 --></p>
 </body>
 </html>
-<!-- NexoFlow 1.0 -->

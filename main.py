@@ -22,6 +22,7 @@ from analytics import (
     get_fields,
     is_relevant_contact,
     is_valid_cpf,
+    cpf_query_priority,
     normalize_contact,
     normalize_cpf,
     prepare_full_load_quarter,
@@ -39,6 +40,7 @@ from config import (
     SYNC_OVERLAP_MINUTES,
 )
 from farmalider_client import (
+    FarmaliderBadRequestError,
     FarmaliderAuthError,
     FarmaliderClient,
     FarmaliderError,
@@ -197,7 +199,7 @@ def split_contacts(
             with_cpf.append(contact)
 
     # Desde o NexoFlow 1.0 o Analytics preserva todos os contatos retornados pela Weni.
-    # A validação FarmaLíder consulta somente CPFs válidos. Pedidos podem ser
+    # Consulta CPFs válidos primeiro e depois os demais informados. Pedidos podem ser
     # recuperados para estes contatos mesmo quando ultimo_pedido está vazio.
     return relevant, with_cpf, list(contacts)
 
@@ -231,6 +233,8 @@ def _query_cliente(
         return cliente_link_status(cpf, api_cliente)
     except (FarmaliderAuthError, FarmaliderUnavailableError):
         raise
+    except FarmaliderBadRequestError:
+        return "CPF_REJEITADO_API", "", ""
     except FarmaliderError:
         # O erro individual vira status. Se a taxa de falha do lote subir
         # demais, validate_contacts interrompe a carga antes de gravar.
@@ -260,7 +264,7 @@ def _preserve_cliente_on_api_error(
     existing_cpf = normalize_cpf(existing.get("cpf_normalizado") or existing.get("cpf"))
     status = str(existing.get("farmalider_cliente_status") or "").strip()
     if not cpf or cpf != existing_cpf or status not in {
-        "CPF_CONFIRMADO", "ERRO_API",
+        "CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO", "ERRO_API",
     }:
         return False
     if not str(existing.get("farmalider_cliente_id") or "").strip():
@@ -300,7 +304,7 @@ def _reusable_farmalider_result(
         return None
 
     status = str(existing.get("farmalider_cliente_status") or "").strip()
-    if status not in {"CPF_CONFIRMADO", "CPF_DIVERGENTE_API", "CPF_NAO_ENCONTRADO"}:
+    if status not in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO", "CPF_DIVERGENTE_API", "CPF_NAO_ENCONTRADO"}:
         return None
     consulted = _parse_iso_datetime(
         str(existing.get("farmalider_cliente_consultado_em") or "")
@@ -333,7 +337,7 @@ def validate_contacts(
     cliente_lookup_status_by_cpf: dict[str, str] | None = None,
 ) -> ClienteValidationStats:
     """
-    Valida CPFs com concorrência controlada e cache por CPF único.
+    Consulta CPFs válidos primeiro, depois inválidos, com cache por CPF único.
 
     A API recebe um CPF por requisição. O projeto agrupa até
     FARMALIDER_BATCH_SIZE CPFs por lote e executa no máximo
@@ -353,10 +357,6 @@ def validate_contacts(
 
         if not cpf:
             row["farmalider_cliente_status"] = "CPF_NAO_INFORMADO"
-            continue
-
-        if not is_valid_cpf(cpf):
-            row["farmalider_cliente_status"] = "CPF_INVALIDO"
             continue
 
         if farm_client is None:
@@ -410,13 +410,24 @@ def validate_contacts(
             if FARMALIDER_REQUEST_DELAY_SECONDS > 0
             else 0
         )
-        total_batches = (len(unique_cpfs) + batch_size - 1) // batch_size
+        valid_cpfs = [cpf for cpf in unique_cpfs if is_valid_cpf(cpf)]
+        invalid_cpfs = [cpf for cpf in unique_cpfs if not is_valid_cpf(cpf)]
+        # Separate batches are a completion barrier, including when a phase is
+        # smaller than the batch/chunk size. Never mix phases in the executor.
+        batches = [
+            (label, phase[start:start + batch_size])
+            for label, phase in (("válidos", valid_cpfs), ("inválidos", invalid_cpfs))
+            for start in range(0, len(phase), batch_size)
+        ]
+        total_batches = len(batches)
 
         logging.info(
-            "FarmaLíder: %s CPFs únicos válidos. "
+            "FarmaLíder: %s CPFs únicos: %s válidos primeiro, %s inválidos depois. "
             "Concorrência controlada com %s workers, lotes de até %s CPFs, "
             "paralelismo a partir de %s CPFs, intervalo global mínimo de %s ms%s.",
             len(unique_cpfs),
+            len(valid_cpfs),
+            len(invalid_cpfs),
             worker_count,
             batch_size,
             parallel_min,
@@ -435,11 +446,9 @@ def validate_contacts(
         completed = 0
 
         try:
-            for batch_number, start in enumerate(
-                range(0, len(unique_cpfs), batch_size),
-                start=1,
-            ):
-                batch = unique_cpfs[start:start + batch_size]
+            for batch_number, (phase, batch) in enumerate(batches, start=1):
+                logging.info("FarmaLíder: etapa de CPFs %s | lote %s/%s | %s consultas.",
+                             phase, batch_number, total_batches, len(batch))
                 batch_errors = 0
                 batch_completed = 0
                 # Evaluate complete, bounded sub-batches. The first responses
@@ -572,11 +581,11 @@ def validate_contacts(
 
     for row in rows:
         status = row.get("farmalider_cliente_status", "")
-        if status == "CPF_CONFIRMADO":
+        if status in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO"}:
             stats.confirmed += 1
         elif status == "CPF_NAO_ENCONTRADO":
             stats.not_found += 1
-        elif status == "CPF_INVALIDO":
+        if normalize_cpf(row.get("cpf")) and not is_valid_cpf(row.get("cpf")):
             stats.invalid += 1
 
     stats.elapsed_seconds = time.monotonic() - started
@@ -598,7 +607,7 @@ def build_orders(
 
     # CPF duplicates can point to the same official order. Select a complete
     # order/items snapshot consistently, regardless of Weni pagination order.
-    for contact in sorted(relevant_contacts, key=lambda row: str(row.get("uuid") or "")):
+    for contact in sorted(relevant_contacts, key=lambda row: (cpf_query_priority(get_fields(row).get("cpf")), str(row.get("uuid") or ""))):
         fields = get_fields(contact)
         contact_uuid = str(contact.get("uuid") or "")
         contact_row = rows_by_uuid.get(contact_uuid, {})
@@ -851,6 +860,12 @@ def main() -> int:
                 len(valid_unique_cpfs),
             )
 
+            logging.info(
+                "FarmaLíder: CPFs inválidos únicos para consulta posterior=%s.",
+                len({normalize_cpf(row.get("cpf")) for row in normalized
+                     if normalize_cpf(row.get("cpf")) and not is_valid_cpf(row.get("cpf"))}),
+            )
+
             if not force_full and after is not None and not contacts_to_process:
                 sheets.set_controls(
                     {
@@ -939,7 +954,7 @@ def main() -> int:
             [
                 contact for contact in contacts_to_process
                 if is_relevant_contact(contact)
-                or is_valid_cpf(normalize_cpf(get_fields(contact).get("cpf")))
+                or bool(normalize_cpf(get_fields(contact).get("cpf")))
             ],
             rows_by_uuid=rows_by_uuid,
             farm_client=farm_client,
@@ -1227,10 +1242,12 @@ def main() -> int:
             len(cpf_contacts),
         )
         logging.info(
-            "  FarmaLíder | CPFs válidos=%s | consultas=%s | cache=%s | confirmados=%s | "
+            "  FarmaLíder | CPFs válidos únicos=%s | contatos com CPF inválido=%s | "
+            "consultas=%s | cache=%s | clientes encontrados=%s | "
             "HTTP=%s | retries=%s | 429=%s | 5xx=%s | lentas=%s | "
             "latência média/p95/máx=%s/%s/%s | tempo=%.2fs.",
             len(valid_unique_cpfs),
+            cliente_stats.invalid,
             cliente_stats.unique_queries,
             cliente_stats.cache_reused,
             cliente_stats.confirmed,

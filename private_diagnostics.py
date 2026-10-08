@@ -75,7 +75,7 @@ def append_private_failure(*, execution_id: str, reference: str, cpf: str,
                            status: int, attempts: int, reason: str,
                            environment: str, raw: bytes, token: str,
                            summary: str) -> Path | None:
-    if not re.fullmatch(r"[0-9]{11}", cpf):
+    if not re.fullmatch(r"[0-9]+", cpf):
         return None
     record = {
         "execucao_id": execution_id,

@@ -40,6 +40,10 @@ class FarmaliderError(RuntimeError):
     """Erro base da integração FarmaLíder."""
 
 
+class FarmaliderBadRequestError(FarmaliderError):
+    """Consulta rejeitada com HTTP 400, sem retry nem inferência de inexistência."""
+
+
 class FarmaliderAuthError(FarmaliderError):
     """Token ausente, inválido ou sem permissão."""
 
@@ -654,7 +658,7 @@ class FarmaliderClient:
                         return None
                     if status == 400:
                         self._mark_unhealthy()
-                        raise FarmaliderError("FarmaLíder API retornou HTTP 400 para a consulta.")
+                        raise FarmaliderBadRequestError("FarmaLíder API retornou HTTP 400 para a consulta.")
                     if status == 429 or status >= 500:
                         if status >= 500:
                             last_server_response = response

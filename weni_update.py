@@ -15,6 +15,7 @@ import secrets_config as secrets
 from analytics import (
     get_fields,
     is_valid_cpf,
+    cpf_query_priority,
     normalize_cpf,
     normalize_value,
     prepare_full_load_quarter,
@@ -2356,13 +2357,13 @@ def run_update(
             len(all_contact_uuids),
         )
 
-        for index, contact_uuid in enumerate(sorted(all_contact_uuids), start=1):
+        prepared_contacts = []
+        for preparation_index, contact_uuid in enumerate(sorted(all_contact_uuids), start=1):
             contact = contacts_by_uuid.get(contact_uuid)
             if contact is None:
                 contact = weni.get_contact(uuid=contact_uuid)
             if contact is None:
                 logging.warning("Contato %s não foi localizado; ignorando.", contact_uuid)
-                _log_planning_progress(stats, processed=index, total=len(all_contact_uuids))
                 continue
 
             candidate_messages = incoming_by_contact.get(contact_uuid, [])
@@ -2382,6 +2383,27 @@ def run_update(
                 if not context:
                     context = candidate_messages
 
+            # Determine priority from the effective CPF, including a valid CPF
+            # inferred from messages. Preparation performs no FarmaLíder GET.
+            evidences = infer_contact_fields(context, candidate_message_ids=candidate_ids)
+            effective_cpf = (
+                evidences["cpf"].value if "cpf" in evidences
+                else get_fields(contact).get("cpf")
+            )
+            prepared_contacts.append((cpf_query_priority(effective_cpf), contact_uuid,
+                                      contact, context, candidate_ids))
+            if preparation_index % 100 == 0:
+                logging.info("Weni: preparando fila de consultas: %s/%s contatos.",
+                             preparation_index, len(all_contact_uuids))
+
+        previous_phase = None
+        for index, (priority, contact_uuid, contact, context, candidate_ids) in enumerate(
+            sorted(prepared_contacts, key=lambda entry: (entry[0], entry[1])), start=1
+        ):
+            if priority != previous_phase:
+                logging.info("Weni: etapa de consulta FarmaLíder: %s.",
+                             ("CPFs válidos", "CPFs inválidos", "contatos sem CPF")[priority])
+                previous_phase = priority
             plan = _build_contact_plan(
                 contact,
                 context_messages=context,

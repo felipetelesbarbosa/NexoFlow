@@ -2,6 +2,13 @@
 
 ## NexoFlow 1.0
 
+### Consulta de CPFs na FarmaLíder
+
+- CPFs válidos são consultados primeiro; inválidos preenchidos, inclusive zeros e números curtos, entram depois;
+- consulta preserva o identificador e mantém a validade matemática separada do cliente encontrado;
+- HTTP 400, 404 e 500 têm diagnósticos distintos; proteção de identidade e revisão humana permanecem obrigatórias;
+- consulta manual no terminal e diagnóstico privado aceitam também identificadores inválidos.
+
 ### Português brasileiro
 
 - acentos e cedilha corrigidos na revisão humana, nos scripts, no instalador e nos launchers;

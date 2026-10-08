@@ -12,3 +12,5 @@ Ao atualizar este repositório, mantenha a identificação pública **NexoFlow 1
 - Status de pedido: EmAberto=-2, PendenteDePagamento=-1, EmProcessamento=0, ProntoParaRota=4, EmTransito=1, Concluido=2, Cancelado=3. Estados abertos permanecem em rechecagem; ProntoParaRota, EmTransito e Concluido contam como venda, sem cancelamento nem pagamento 0.
 
 - Textos apresentados ao usuário devem usar português brasileiro (pt-BR), com acentos e cedilha. Preserve identificadores técnicos. BAT/CMD em UTF-8 sem BOM com `chcp 65001`; PowerShell em UTF-8 com BOM; HTML com `lang="pt-BR"`; metadados dos executáveis em pt-BR.
+
+- Consultar primeiro CPFs válidos; depois inválidos preenchidos, incluindo zeros. Não corrigir/completar o CPF nem confundir presença na API com validade matemática.

@@ -606,6 +606,12 @@ def is_valid_cpf(value: Any) -> bool:
     return cpf[9] == digit(cpf[:9], 10) and cpf[10] == digit(cpf[:10], 11)
 
 
+def cpf_query_priority(value: Any) -> int:
+    """Valid identifiers first, invalid populated identifiers next, absent last."""
+    cpf = normalize_cpf(value)
+    return 0 if is_valid_cpf(cpf) else (1 if cpf else 2)
+
+
 def normalize_value(value: Any) -> str:
     if value is None:
         return ""
@@ -1560,7 +1566,7 @@ def build_bi_summary_record(
         if is_valid_cpf(cpf):
             cpfs_validos += 1
         status = (record.get("farmalider_cliente_status") or "").strip()
-        if status == "CPF_CONFIRMADO":
+        if status in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO"}:
             clientes += 1
         elif status == "CPF_NAO_ENCONTRADO":
             nao_encontrados += 1
@@ -1636,7 +1642,7 @@ def build_bi_channel_records(
             "canal": channel,
             "contatos": len(rows),
             "contatos_com_cpf": sum(1 for r in rows if normalize_cpf(r.get("cpf_normalizado") or r.get("cpf"))),
-            "clientes_farmalider": sum(1 for r in rows if (r.get("farmalider_cliente_status") or "").strip() == "CPF_CONFIRMADO"),
+            "clientes_farmalider": sum(1 for r in rows if (r.get("farmalider_cliente_status") or "").strip() in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO"}),
             "contatos_ads": sum(1 for r in rows if _bi_is_ad_contact(r)),
             "opt_in_lgpd": sum(1 for r in rows if (r.get("opt_in_lgpd") or "").strip().casefold() == "ativo"),
             "atualizado_em": updated_at,
@@ -1656,7 +1662,7 @@ def build_bi_conversion_records(
     stages = [
         (1, "Contatos", len(base_records)),
         (2, "CPF válido", sum(1 for r in base_records if is_valid_cpf(normalize_cpf(r.get("cpf_normalizado") or r.get("cpf"))))),
-        (3, "Cliente FarmaLíder", sum(1 for r in base_records if (r.get("farmalider_cliente_status") or "").strip() == "CPF_CONFIRMADO")),
+        (3, "Cliente FarmaLíder", sum(1 for r in base_records if (r.get("farmalider_cliente_status") or "").strip() in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO"})),
         (4, "Cliente comprador", len(buyers)),
     ]
     base = stages[0][2] or 0
@@ -1780,7 +1786,7 @@ def build_bi_ads_rows(
             key = (label, origin, campaign, destination, ad_id, title)
             bucket = contact_groups.setdefault(key, {"contatos": 0, "clientes": 0, "buyers": set(), "orders": set(), "revenue": Decimal("0")})
             bucket["contatos"] += 1
-            if (record.get("farmalider_cliente_status") or "").strip() == "CPF_CONFIRMADO":
+            if (record.get("farmalider_cliente_status") or "").strip() in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO"}:
                 bucket["clientes"] += 1
 
     for label, prefix in dimensions:
