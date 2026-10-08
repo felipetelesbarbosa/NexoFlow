@@ -1036,7 +1036,7 @@ try {
     if ($installRc -ne 0) { throw "A preparacao do ambiente Python falhou (codigo $installRc). Os arquivos e dados privados foram preservados." }
 
     Write-Step 'Validando componentes instalados'
-    foreach ($requiredFile in @('NexoFlow Analytics.exe','NexoFlow Weni.exe','NexoFlow Terminal.exe','installer\uninstall.ps1','desinstalar_nexoflow.cmd')) {
+    foreach ($requiredFile in @('NexoFlow Analytics.exe','NexoFlow Weni.exe','NexoFlow Terminal.exe','installer\uninstall.ps1','desinstalar_nexoflow.cmd','scripts\confirmar_revisao_weni.ps1')) {
         Ensure-InstalledPayloadFile -RelativePath $requiredFile
     }
 

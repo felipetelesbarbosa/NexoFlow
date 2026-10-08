@@ -2,6 +2,13 @@
 
 ## NexoFlow 1.0
 
+### Revisão humana da carga completa Weni
+
+- confirmação síncrona mantém o CMD aguardando a revisão do relatório, tanto na carga de 100% quanto nas quatro partes;
+- cancelamento ou falha da confirmação não inicia o apply e mantém o diagnóstico visível antes de encerrar;
+- componente PowerShell de confirmação incluído e validado nos dois ZIPs e na instalação;
+- testes Windows exercitam o fluxo do CMD com dependências simuladas, sem gravações na Weni.
+
 ### Carga completa 25%
 
 - Weni e Analytics podem ser executados em quatro cargas completas de 25%, além do modo tradicional de 100%;

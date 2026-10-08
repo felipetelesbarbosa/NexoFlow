@@ -71,7 +71,7 @@ function Copy-TrackedFiles {
             if (-not $relative) { continue }
             if ($relative -like "releases/*") { continue }
             if ($relative -like ".github/*") { continue }
-            if ($relative -like "scripts/*") { continue }
+            if ($relative -like "scripts/*" -and $relative -ne "scripts/confirmar_revisao_weni.ps1") { continue }
 
             $source = Join-Path $RepoRoot $relative
             if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { continue }
@@ -250,6 +250,8 @@ Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/NexoFlow Setup.exe
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/payload manifest.json"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/weni_update.py"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/analytics.py"
+Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/confirmar_revisao_weni.ps1"
+Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/confirmar_revisao_weni.ps1"
 
 $setupHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $SetupZip).Hash.ToLowerInvariant()
 $projectHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $ProjectZip).Hash.ToLowerInvariant()
@@ -268,6 +270,8 @@ Distribuicao oficial do **NexoFlow 1.0**.
 O arquivo `NexoFlow-Setup-$Version.zip` contem o instalador do NexoFlow 1.0 e foi validado automaticamente em Windows para primeira instalacao e atualizacao de uma instalacao existente.
 
 Melhorias desta distribuicao do NexoFlow 1.0:
+- carga completa Weni 100% ou em partes mantem o CMD aguardando a revisao humana; cancelar ou falhar nao aplica o snapshot e preserva o diagnostico;
+- componente de confirmacao incluido e validado no projeto completo e no Setup;
 - de-para de pagamento atualizado: 0 Cancelado; 1 Dinheiro; 2 Débito; 3 Crédito; 4 Ticket; 5 Pix por Link de Pagamento; 6 Pix no POS;
 - pagamento 0 cancela o pedido: forma de pagamento Cancelado e status 3 na Weni e no BI, preservando os codigos brutos da API na tabela de pedidos;
 - de-para de status atualizado: EmAberto=-2; PendenteDePagamento=-1; EmProcessamento=0; ProntoParaRota=4; EmTransito=1; Concluido=2; Cancelado=3;

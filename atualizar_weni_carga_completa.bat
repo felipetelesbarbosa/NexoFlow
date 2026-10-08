@@ -45,6 +45,12 @@ set "REVIEW_JSON=logs\weni_update_review_full_25_parte_%PART%.json"
 set "REVIEW_TXT=logs\weni_update_review_full_25_parte_%PART%.txt"
 
 :configurado
+if not exist "%~dp0scripts\confirmar_revisao_weni.ps1" (
+    echo [ERRO] Componente de revisao ausente: scripts\confirmar_revisao_weni.ps1
+    echo Reinstale o Setup atualizado do NexoFlow 1.0 antes de continuar.
+    set "RC=3"
+    goto :erro
+)
 echo.
 if defined PART (
     echo [INFO] Carga completa Weni 25%% - Parte %PART%/4.
@@ -111,19 +117,20 @@ echo.
 rem Nao usar START /WAIT: o Bloco de Notas moderno pode usar processo intermediario
 rem e encerrar/alterar a espera do console. A confirmacao abaixo bloqueia no CON.
 start "" notepad.exe "%CD%\%REVIEW_TXT%"
+set "RC=%ERRORLEVEL%"
+if not "%RC%"=="0" goto :erro
 
 echo.
 echo [ETAPA 4/6] Confirmacao humana
 echo ----------------------------------------------------------
 echo [INFO] O CMD permanecera aguardando uma confirmacao em janela separada.
+echo Digite CARGA COMPLETA REVISADA nessa janela somente depois de revisar o relatorio.
 set "CONFIRM_PART="
 if defined PART set "CONFIRM_PART=-Part %PART%"
-"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\confirmar_revisao_weni.ps1" %CONFIRM_PART%
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -STA -ExecutionPolicy Bypass -File "%~dp0scripts\confirmar_revisao_weni.ps1" %CONFIRM_PART%
 set "RC=%ERRORLEVEL%"
-if not "%RC%"=="0" (
-    echo [INFO] Operacao cancelada. Nenhuma alteracao foi aplicada.
-    exit /b 2
-)
+if "%RC%"=="2" goto :cancelado
+if not "%RC%"=="0" goto :erro
 
 echo.
 echo [ETAPA 5/6] Aplicando snapshot congelado com validacao por contato
@@ -149,8 +156,16 @@ echo ==========================================================
 pause < CON
 exit /b 0
 
+:cancelado
+echo.
+echo [INFO] Operacao cancelada. Nenhuma alteracao foi aplicada.
+echo O snapshot permanece disponivel para consulta. Execute novamente para gerar uma nova revisao.
+pause < CON
+exit /b 2
+
 :erro
 echo.
+echo [ERRO] Codigo de saida: %RC%
 echo [ERRO] Processo interrompido. Nenhuma etapa posterior deve ser presumida como concluida.
 if defined PART echo [INFO] A Parte %PART%/4 NAO deve ser presumida como concluida.
 echo Consulte logs\nexoflow_update_weni.log.

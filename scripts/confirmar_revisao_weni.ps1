@@ -4,43 +4,46 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$Expected = "CARGA COMPLETA REVISADA"
-$title = "NexoFlow Weni - Revisao Humana"
 
-try {
+function Show-WeniReviewDialog {
+    param([string]$Message, [string]$Title)
+
     Add-Type -AssemblyName Microsoft.VisualBasic
+    return [Microsoft.VisualBasic.Interaction]::InputBox($Message, $Title, "")
+}
 
-    $partText = ""
-    if ($Part) {
-        $partText = " da Parte $Part/4"
-    }
+function Confirm-WeniReview {
+    param([string]$Part = "")
 
-    $message = @"
+    $expected = "CARGA COMPLETA REVISADA"
+    $title = "NexoFlow Weni - Revisao Humana"
+    try {
+        $partText = ""
+        if ($Part) { $partText = " da Parte $Part/4" }
+        $message = @"
 Revise o relatorio aberto no Bloco de Notas$partText.
 
 Depois de concluir a revisao, digite exatamente:
 
-$Expected
+$expected
 
 Fechar ou cancelar esta janela NAO aplica nenhuma alteracao.
 "@
-
-    $response = [Microsoft.VisualBasic.Interaction]::InputBox(
-        $message,
-        $title,
-        ""
-    )
-
-    if ($response.Trim().Equals($Expected, [System.StringComparison]::OrdinalIgnoreCase)) {
-        Write-Host "[OK] Revisao humana confirmada."
-        exit 0
+        $response = [string](Show-WeniReviewDialog -Message $message -Title $title)
+        if ($response.Trim().Equals($expected, [System.StringComparison]::OrdinalIgnoreCase)) {
+            Write-Host "[OK] Revisao humana confirmada."
+            return 0
+        }
+        Write-Host "[INFO] Confirmacao humana nao recebida. Nenhuma alteracao sera aplicada."
+        return 2
     }
-
-    Write-Host "[INFO] Confirmacao humana nao recebida. Nenhuma alteracao sera aplicada."
-    exit 2
+    catch {
+        Write-Host "[ERRO] Nao foi possivel abrir a confirmacao humana grafica."
+        Write-Host "[ERRO] Nenhuma alteracao sera aplicada."
+        return 3
+    }
 }
-catch {
-    Write-Host "[ERRO] Nao foi possivel abrir a confirmacao humana grafica."
-    Write-Host "[ERRO] Nenhuma alteracao sera aplicada."
-    exit 3
+
+if ($MyInvocation.InvocationName -ne '.') {
+    exit (Confirm-WeniReview -Part $Part)
 }

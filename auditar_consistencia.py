@@ -1174,6 +1174,18 @@ def check_weni_update_safety() -> None:
     if full_batch_text.find("--review-out") > full_batch_text.find("--require-review"):
         fail("Carga completa deve gerar o snapshot revisável antes do apply protegido.")
         return
+    confirmation_text = read("scripts/confirmar_revisao_weni.ps1")
+    release_text = read("scripts/build_release.ps1")
+    if (
+        "CARGA COMPLETA REVISADA" not in confirmation_text
+        or "-STA" not in full_batch_text
+        or 'if "%RC%"=="2" goto :cancelado' not in full_batch_text
+        or 'if not "%RC%"=="0" goto :erro' not in full_batch_text
+        or '"scripts/confirmar_revisao_weni.ps1"' not in release_text
+        or "payload/scripts/confirmar_revisao_weni.ps1" not in release_text
+    ):
+        fail("Revisão Weni deve aguardar confirmação, preservar erros e incluir o componente nos pacotes.")
+        return
     for required in [
         "write_review_snapshot",
         "load_review_snapshot",

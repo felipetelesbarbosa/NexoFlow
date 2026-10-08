@@ -807,7 +807,7 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn("function Install-OptionalUninstaller", install)
         self.assertIn("NexoFlow Uninstall.exe", install)
         self.assertIn("A instalação continuará normalmente", install)
-        required_line = "foreach ($requiredFile in @('NexoFlow Analytics.exe','NexoFlow Weni.exe','NexoFlow Terminal.exe','installer\\uninstall.ps1','desinstalar_nexoflow.cmd'))"
+        required_line = "foreach ($requiredFile in @('NexoFlow Analytics.exe','NexoFlow Weni.exe','NexoFlow Terminal.exe','installer\\uninstall.ps1','desinstalar_nexoflow.cmd','scripts\\confirmar_revisao_weni.ps1'))"
         self.assertIn(required_line, install)
         self.assertNotIn("'NexoFlow Uninstall.exe')) {\n        Ensure-InstalledPayloadFile", install)
         self.assertIn("Verifique antivírus/EDR e tente novamente", install)

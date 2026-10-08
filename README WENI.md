@@ -37,6 +37,10 @@ atualizar_weni_carga_completa.bat
 
 A rotina faz dry-run completo, gera um relatório detalhado para revisão humana e exige a confirmação literal `CARGA COMPLETA REVISADA` antes do apply. Use para primeira implantação, backfill ou revalidação integral.
 
+Na carga de 100% ou em partes de 25%, o Bloco de Notas abre o relatório e o CMD aguarda a janela de confirmação. Depois de revisar, digite `CARGA COMPLETA REVISADA` nessa janela. Fechar o editor não autoriza o apply. Cancelar ou fechar a confirmação impede a gravação e mantém o CMD aberto até você pressionar uma tecla. Se a confirmação falhar, o código de erro também permanece visível.
+
+O componente `scripts\confirmar_revisao_weni.ps1` faz parte do projeto completo e do Setup. Se ele estiver ausente, a rotina interrompe a carga antes da revisão e solicita a reinstalação do Setup atualizado.
+
 Depois de atualizar ou reinstalar o NexoFlow 1.0, gere um novo dry-run completo com a política atual de pagamento/status e revise o novo relatório. Em seguida, execute a carga completa do Analytics para atualizar Google Sheets e BI. Snapshots anteriores à nova política de cancelamento por pagamento 0 devem ser regenerados.
 
 Arquivos gerados:
