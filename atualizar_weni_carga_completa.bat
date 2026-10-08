@@ -115,11 +115,13 @@ start "" notepad.exe "%CD%\%REVIEW_TXT%"
 echo.
 echo [ETAPA 4/6] Confirmacao humana
 echo ----------------------------------------------------------
-set "CONFIRMA="
-set /p "CONFIRMA=Digite CARGA COMPLETA REVISADA para aplicar exatamente o snapshot revisado: " < CON
-if /I not "%CONFIRMA%"=="CARGA COMPLETA REVISADA" (
+echo [INFO] O CMD permanecera aguardando uma confirmacao em janela separada.
+set "CONFIRM_PART="
+if defined PART set "CONFIRM_PART=-Part %PART%"
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\confirmar_revisao_weni.ps1" %CONFIRM_PART%
+set "RC=%ERRORLEVEL%"
+if not "%RC%"=="0" (
     echo [INFO] Operacao cancelada. Nenhuma alteracao foi aplicada.
-    pause < CON
     exit /b 2
 )
 
