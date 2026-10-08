@@ -593,9 +593,10 @@ class FarmaliderClient:
         path: str,
         *,
         allow_not_found: bool = False,
+        allow_customer_list: bool = False,
         diagnostic_ref: str = "-",
         private_cpf: str | None = None,
-    ) -> dict[str, Any] | None:
+    ) -> dict[str, Any] | list[dict[str, Any]] | None:
         endpoint_label = self._endpoint_label(path)
         last_server_response: requests.Response | None = None
 
@@ -701,7 +702,10 @@ class FarmaliderClient:
                         except ValueError:
                             self._mark_unhealthy()
                             raise FarmaliderError("FarmaLíder API retornou JSON inválido.") from None
-                        if not isinstance(payload, dict):
+                        if not isinstance(payload, dict) and not (
+                            allow_customer_list and isinstance(payload, list)
+                            and all(isinstance(candidate, dict) for candidate in payload)
+                        ):
                             self._mark_unhealthy()
                             raise FarmaliderError("FarmaLíder API retornou um formato inesperado.")
                         self._mark_healthy(permit, endpoint_label)
@@ -726,10 +730,11 @@ class FarmaliderClient:
 
         raise FarmaliderError("Falha inesperada ao consultar a FarmaLíder API.")
 
-    def get_cliente_by_cpf(self, cpf: str) -> dict[str, Any] | None:
+    def get_cliente_by_cpf(self, cpf: str) -> dict[str, Any] | list[dict[str, Any]] | None:
         return self._request_json(
             self._delivery_path(f"cliente/cpf/{cpf}"),
             allow_not_found=True,
+            allow_customer_list=True,
             diagnostic_ref=self.cpf_diagnostic_ref(cpf),
             private_cpf=cpf,
         )

@@ -49,6 +49,7 @@ from farmalider_client import (
 from farmalider_integration import (
     cliente_link_status,
     resolve_contact_order,
+    weni_customer_identity,
 )
 from google_sheets import GoogleSheetsStore
 from logging_config import configure_logging
@@ -224,7 +225,7 @@ def _format_ms_as_seconds(milliseconds: float) -> str:
 def _query_cliente(
     cpf: str,
     farm_client: FarmaliderClient,
-    response_cache: dict[str, dict[str, Any] | None] | None = None,
+    response_cache: dict[str, dict[str, Any] | list[dict[str, Any]] | None] | None = None,
 ) -> ClienteResult:
     try:
         api_cliente = farm_client.get_cliente_by_cpf(cpf)
@@ -263,7 +264,7 @@ def _preserve_cliente_on_api_error(
     cpf = normalize_cpf(row.get("cpf_normalizado") or row.get("cpf"))
     existing_cpf = normalize_cpf(existing.get("cpf_normalizado") or existing.get("cpf"))
     status = str(existing.get("farmalider_cliente_status") or "").strip()
-    if not cpf or cpf != existing_cpf or status not in {
+    if not is_valid_cpf(cpf) or cpf != existing_cpf or status not in {
         "CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO", "ERRO_API",
     }:
         return False
@@ -300,7 +301,7 @@ def _reusable_farmalider_result(
         return None
     cpf = normalize_cpf(row.get("cpf", ""))
     existing_cpf = normalize_cpf(existing.get("cpf_normalizado") or existing.get("cpf", ""))
-    if not cpf or cpf != existing_cpf:
+    if not is_valid_cpf(cpf) or cpf != existing_cpf:
         return None
 
     status = str(existing.get("farmalider_cliente_status") or "").strip()
@@ -333,8 +334,9 @@ def validate_contacts(
     sync_time: str,
     existing_by_uuid: dict[str, Row] | None = None,
     reuse_existing: bool = False,
-    cliente_responses_by_cpf: dict[str, dict[str, Any] | None] | None = None,
+    cliente_responses_by_cpf: dict[str, dict[str, Any] | list[dict[str, Any]] | None] | None = None,
     cliente_lookup_status_by_cpf: dict[str, str] | None = None,
+    identity_by_uuid: dict[str, dict[str, Any]] | None = None,
 ) -> ClienteValidationStats:
     """
     Consulta CPFs válidos primeiro, depois inválidos, com cache por CPF único.
@@ -392,6 +394,7 @@ def validate_contacts(
 
     unique_cpfs = list(rows_by_cpf)
     cache: dict[str, ClienteResult] = {}
+    response_cache = cliente_responses_by_cpf if cliente_responses_by_cpf is not None else {}
 
     if unique_cpfs and farm_client is not None:
         parallel_min = max(1, int(FARMALIDER_PARALLEL_MIN_CPFS))
@@ -458,7 +461,7 @@ def validate_contacts(
                     futures = {
                         executor.submit(
                             _query_cliente, cpf, farm_client,
-                            cliente_responses_by_cpf,
+                            response_cache,
                         ): cpf
                         for cpf in chunk
                     }
@@ -562,8 +565,12 @@ def validate_contacts(
             executor.shutdown(wait=True, cancel_futures=True)
 
         for cpf, cpf_rows in rows_by_cpf.items():
-            result = cache.get(cpf, ("ERRO_API", "", ""))
+            query_result = cache.get(cpf, ("ERRO_API", "", ""))
             for row in cpf_rows:
+                result = query_result
+                if not is_valid_cpf(cpf) and cpf in response_cache:
+                    identity = (identity_by_uuid or {}).get(str(row.get("contact_uuid") or ""), row)
+                    result = cliente_link_status(cpf, response_cache[cpf], weni_identity=identity)
                 _apply_cliente_result(row, result)
                 if result[0] == "ERRO_API" and _preserve_cliente_on_api_error(
                     row, existing_by_uuid,
@@ -588,6 +595,13 @@ def validate_contacts(
         if normalize_cpf(row.get("cpf")) and not is_valid_cpf(row.get("cpf")):
             stats.invalid += 1
 
+    identity_counts = {
+        status: sum(row.get("farmalider_cliente_status") == status for row in rows)
+        for status in ("CPF_INVALIDO_ENCONTRADO", "CPF_IDENTIDADE_INSUFICIENTE",
+                       "CPF_IDENTIDADE_DIVERGENTE", "CPF_IDENTIDADE_AMBIGUA")
+    }
+    if stats.invalid:
+        logging.info("FarmaLíder: identidade de contatos com CPF inválido: %s.", identity_counts)
     stats.elapsed_seconds = time.monotonic() - started
     return stats
 
@@ -597,12 +611,12 @@ def build_orders(
     rows_by_uuid: dict[str, Row],
     farm_client: FarmaliderClient | None,
     sync_time: str,
-    cliente_responses_by_cpf: dict[str, dict[str, Any] | None] | None = None,
+    cliente_responses_by_cpf: dict[str, dict[str, Any] | list[dict[str, Any]] | None] | None = None,
     cliente_lookup_status_by_cpf: dict[str, str] | None = None,
 ) -> tuple[list[Row], list[Row], OrderStats]:
     snapshots: dict[str, tuple[Row, list[Row]]] = {}
     contacts_by_order: dict[str, set[str]] = {}
-    pedido_responses_by_id: dict[str, dict[str, Any] | None] = {}
+    pedido_responses_by_id: dict[str, dict[str, Any] | list[dict[str, Any]] | None] = {}
     stats = OrderStats()
 
     # CPF duplicates can point to the same official order. Select a complete
@@ -619,7 +633,11 @@ def build_orders(
                 captured_at=sync_time,
                 linked_cliente_id=contact_row.get("farmalider_cliente_id", ""),
                 cliente_response=(cliente_responses_by_cpf or {}).get(cpf),
-                cliente_lookup_status=(cliente_lookup_status_by_cpf or {}).get(cpf, ""),
+                cliente_lookup_status=(
+                    contact_row.get("farmalider_cliente_status", "")
+                    if cpf and not is_valid_cpf(cpf)
+                    else (cliente_lookup_status_by_cpf or {}).get(cpf, "")
+                ),
                 pedido_responses_by_id=pedido_responses_by_id,
             )
         except (FarmaliderAuthError, FarmaliderUnavailableError):
@@ -906,7 +924,7 @@ def main() -> int:
             for row in base_records_before
             if row.get("contact_uuid")
         }
-        cliente_responses_by_cpf: dict[str, dict[str, Any] | None] = {}
+        cliente_responses_by_cpf: dict[str, dict[str, Any] | list[dict[str, Any]] | None] = {}
         cliente_lookup_status_by_cpf: dict[str, str] = {}
         cliente_stats = validate_contacts(
             normalized,
@@ -915,6 +933,8 @@ def main() -> int:
             sync_time=sync_time,
             existing_by_uuid=existing_by_uuid,
             reuse_existing=not force_full,
+            identity_by_uuid={str(contact.get("uuid") or ""): weni_customer_identity(contact)
+                              for contact in contacts_to_process},
             cliente_responses_by_cpf=cliente_responses_by_cpf,
             cliente_lookup_status_by_cpf=cliente_lookup_status_by_cpf,
         )

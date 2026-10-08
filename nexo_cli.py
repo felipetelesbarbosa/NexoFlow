@@ -176,10 +176,14 @@ def _show_simple_records(title: str, records: Iterable[dict[str, Any]], keys: li
         print(f"{index:>3}. " + " | ".join(values))
 
 
-def _show_farmalider_payload(title: str, payload: dict[str, Any] | None) -> None:
+def _show_farmalider_payload(title: str, payload: dict[str, Any] | list[dict[str, Any]] | None) -> None:
     _title(title)
     if payload is None:
         print("Nenhum registro encontrado.")
+        return
+    if isinstance(payload, list):
+        print(f"Clientes retornados: {len(payload)}. Nenhum cliente selecionado automaticamente.")
+        print("Use --json para comparar os dados com o contato da Weni.")
         return
     scalar_items: list[tuple[str, Any]] = []
     nested: list[str] = []

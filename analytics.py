@@ -657,7 +657,7 @@ def get_phone_and_urn(
     elif whatsapp_urn.startswith("whatsapp:"):
         phone = whatsapp_urn.split(":", 1)[1]
     else:
-        phone = ""
+        phone = normalize_value(fields.get("telefone") or fields.get("celular")).strip()
     return phone, resolved.principal_urn
 
 
@@ -720,7 +720,7 @@ def normalize_contact(
         "maior_de_18_anos": normalize_value(fields.get("maior_de_18_anos")),
         "opt_in_lgpd": normalize_value(fields.get("opt_in_lgpd")),
         "contact_urn": urn,
-        "contact_urn_whatsapp": normalize_value(fields.get("contact_urn_whatsapp")) or resolved_urns.channel_urns.get("whatsapp", ""),
+        "contact_urn_whatsapp": resolved_urns.channel_urns.get("whatsapp", "") or normalize_value(fields.get("contact_urn_whatsapp")),
         "contact_urn_instagram": normalize_value(fields.get("contact_urn_instagram")) or resolved_urns.channel_urns.get("instagram", ""),
         "contact_urn_facebook": normalize_value(fields.get("contact_urn_facebook")) or resolved_urns.channel_urns.get("facebook", ""),
         "contact_canal_principal": normalize_value(fields.get("contact_canal_principal")) or resolved_urns.principal_channel,
@@ -1448,10 +1448,15 @@ def _bi_float(value: Decimal) -> float:
     return float(value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
+def _order_customer_identity_verified(record: dict[str, str]) -> bool:
+    cpf = normalize_cpf(record.get("cpf_normalizado") or record.get("cpf"))
+    return not cpf or is_valid_cpf(cpf) or str(record.get("origem_pedido") or "").endswith("_IDENTIDADE_VALIDADA")
+
+
 def _sales_order_is_valid(record: dict[str, str]) -> bool:
     """API-confirmed ready-for-route, in-transit and completed orders enter sales KPIs."""
     confirmation = str(record.get("status_confirmacao") or "")
-    if not confirmation.startswith("CONFIRMADO_API"):
+    if not confirmation.startswith("CONFIRMADO_API") or not _order_customer_identity_verified(record):
         return False
     return (
         record.get("status_validacao") in ("OK", "ATENÇÃO_TOTAL_DIVERGENTE")
@@ -1721,6 +1726,8 @@ def build_bi_order_rows(
         ),
         reverse=True,
     ):
+        if not _order_customer_identity_verified(order):
+            continue
         key = (order.get("pedido_chave") or "").strip()
         pedido_id = (order.get("pedido_id") or "").strip()
         if not key or not pedido_id:

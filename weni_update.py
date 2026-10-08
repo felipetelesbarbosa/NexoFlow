@@ -44,7 +44,7 @@ from contact_enrichment import (
 from farmalider_client import (
     FarmaliderAuthError, FarmaliderClient, FarmaliderError, FarmaliderUnavailableError,
 )
-from farmalider_integration import resolve_contact_order
+from farmalider_integration import resolve_contact_order, weni_identity_guard
 from pedido_utils import (
     business_order_datetime,
     effective_order_status_code,
@@ -768,6 +768,10 @@ def _apply_purchase_candidate(
         logging.warning("Falha ao consultar ou confirmar pedido na FarmaLíder API.")
         return False
 
+    if order is not None and str(order.get("status_confirmacao") or "").startswith("CPF_IDENTIDADE_"):
+        reference = farm_client.weni_contact_diagnostic_ref(str(contact.get("uuid") or "")) if isinstance(farm_client, FarmaliderClient) else "-"
+        logging.warning("Weni [contato_ref=%s]: pedido bloqueado: %s; nome e e-mail ou telefone não identificaram um cliente único.",
+                        reference, order["status_confirmacao"])
     if order is None or not items:
         return False
 
@@ -971,6 +975,10 @@ def _build_contact_plan(
         available_weni_fields=available_weni_fields,
     )
     if plan.order_validated:
+        effective_cpf = normalize_cpf(plan.fields.get("cpf", fields.get("cpf")))
+        if effective_cpf and not is_valid_cpf(effective_cpf):
+            plan.guards["__invalid_cpf_identity"] = weni_identity_guard(contact)
+            plan.guards["__native_urns"] = sorted(native_contact_urns(contact))
         # A revisão depende da identidade e das duas possíveis fontes.
         for key in (
             "cpf", "ultimo_pedido", "pedido_id", "pedido_data", "pedido_status",
@@ -1048,6 +1056,9 @@ def audit_plans(
                 )
 
         if plan.order_validated and set(plan.fields) & PURCHASE_FIELDS:
+            cpf = normalize_cpf(plan.fields.get("cpf", plan.guards.get("cpf")))
+            if cpf and not is_valid_cpf(cpf) and not plan.guards.get("__invalid_cpf_identity"):
+                errors.append(f"{plan.contact_uuid}: CPF inválido exige nova validação de nome e e-mail ou telefone; gere outro dry-run")
             payment = normalize_value(plan.fields.get(
                 "pedido_forma_pagamento", plan.guards.get(
                     "pedido_forma_pagamento", plan.previous.get("pedido_forma_pagamento"),
@@ -1675,6 +1686,10 @@ def _prepare_frozen_plan_for_apply(
         )
 
     for guard_name, expected in plan.guards.items():
+        if guard_name == "__invalid_cpf_identity":
+            if weni_identity_guard(current_contact) != expected:
+                conflicts.append("nome, e-mail ou telefone usados para identificar o cliente mudaram após a revisão")
+            continue
         if guard_name == "__native_urns":
             current_native = sorted(native_contact_urns(current_contact))
             expected_native = sorted(str(item) for item in (expected or []) if str(item).strip())

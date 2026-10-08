@@ -188,19 +188,57 @@ dígitos.</p>
 lotes das duas etapas. As cargas Weni em partes seguem essa prioridade
 dentro da parte selecionada, preservando o manifesto e a revisão humana.
 Evidência válida de CPF em mensagens entra na primeira etapa quando for
-o valor efetivo do plano. O incremental mantém o cache recente; a carga
+o valor efetivo do plano. O incremental mantém o cache recente de CPFs
+válidos; CPFs inválidos exigem nova seleção por identidade. A carga
 completa reconsulta os identificadores.</p>
 <p><code>CPF_CONFIRMADO</code> identifica um CPF matematicamente válido
 encontrado na API; <code>CPF_INVALIDO_ENCONTRADO</code> identifica um
-número inválido encontrado na base FarmaLíder. Ambos alimentam o total
-de clientes encontrados, mas somente CPFs matematicamente válidos entram
-em <code>cpfs_validos</code>. HTTP 400 registra
+CPF inválido cujo cliente foi confirmado também pelo nome e pelo e-mail
+ou telefone. Ambos alimentam o total de clientes encontrados, mas
+somente CPFs matematicamente válidos entram em
+<code>cpfs_validos</code>. HTTP 400 registra
 <code>CPF_REJEITADO_API</code>, sem retry e sem contar como falha 500;
 HTTP 404 registra <code>CPF_NAO_ENCONTRADO</code>; falhas de
-servidor/rede registram <code>ERRO_API</code>, preservando os dados
-anteriores. Os logs públicos mostram etapas e contagens, sem CPF. O
-diagnóstico privado de falhas 5xx aceita também identificadores curtos e
-zeros.</p>
+servidor/rede registram <code>ERRO_API</code>, sem autorizar um vínculo
+de cliente por CPF inválido. Os logs públicos mostram etapas e
+contagens, sem CPF. O diagnóstico privado de falhas 5xx aceita também
+identificadores curtos e zeros.</p>
+<p>Para CPF inválido, a coincidência do CPF não confirma a pessoa. É
+obrigatório comparar <strong>nome completo + e-mail</strong>, ou
+<strong>nome completo + telefone</strong>. O nome é comparado
+integralmente após normalizar acentos, maiúsculas e espaços; não há
+aproximação por primeiro nome ou sobrenome. O e-mail precisa estar
+preenchido e ter formato de e-mail. O telefone compara número completo
+com DDD, aceitando a formatação e o prefixo brasileiro 55, sem completar
+dígitos nem inserir o nono dígito. Números nativos da Weni têm
+precedência sobre campos antigos de telefone/WhatsApp.</p>
+<p>A resposta pode conter um cliente, uma lista de clientes ou listas em
+<code>cliente</code>/<code>clientes</code>. A seleção e a validação
+acontecem <strong>por contato Weni</strong>, mesmo quando a resposta GET
+é compartilhada por CPF. Somente uma correspondência é aceita; dados
+insuficientes geram <code>CPF_IDENTIDADE_INSUFICIENTE</code>, nenhuma
+correspondência gera <code>CPF_IDENTIDADE_DIVERGENTE</code> e múltiplas
+correspondências geram <code>CPF_IDENTIDADE_AMBIGUA</code>. Nesses
+casos, nenhuma atualização de pedido é autorizada. Um pedido de outro
+candidato nunca é aproveitado; a capa e os itens continuam sujeitos ao
+mesmo ID do cliente. Se a API devolver apenas um cadastro diferente, o
+NexoFlow bloqueia o vínculo: não presume que outros cadastros existam
+nem inventa uma consulta alternativa.</p>
+<p>O cache persistente de vínculos por CPF inválido não é reutilizado,
+incluindo vínculos antigos que usavam somente o CPF. Falha na
+identificação também não pode ser contornada por <code>pedido_id</code>
+ou <code>ultimo_pedido</code>. A revisão humana guarda a identidade
+usada na validação; alterações relevantes de nome, e-mail ou
+telefone/URN após a revisão bloqueiam o apply daquele contato. Snapshots
+antigos de pedidos com CPF inválido exigem novo dry-run.</p>
+<p>Pedidos antigos com CPF inválido permanecem preservados nas tabelas
+de origem, mas não entram nas vendas, na atribuição de anúncios nem em
+<code>BI_Pedidos</code> até serem revalidados pela nova regra. A origem
+de um novo pedido validado com CPF inválido recebe o marcador técnico
+<code>_IDENTIDADE_VALIDADA</code>, usado para distinguir esses
+registros. Após reinstalar, execute <strong>carga completa da Weni, com
+revisão humana, e depois carga completa do Analytics</strong> para
+revalidar a base e atualizar os indicadores.</p>
 <p>Para aproveitar um pedido, o CPF retornado precisa corresponder ao
 identificador consultado, o cliente deve ter ID positivo e o pedido deve
 pertencer ao mesmo cliente. CPF numérico no JSON pode perder zeros à

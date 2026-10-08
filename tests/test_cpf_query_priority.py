@@ -37,7 +37,7 @@ class PriorityClient:
             self.both_valid_started.wait(timeout=5)
         with self.lock:
             self.finished.add(cpf)
-        return {"cliente": {"id": 99, "cpf": int(cpf), "nome": "Cliente sintético"}}
+        return {"cliente": {"id": 99, "cpf": int(cpf), "nome": "Cliente sintético", "email": "cliente@example.invalid"}}
 
     def metrics_snapshot(self):
         return dict(total_requests=len(self.calls), retries=0, rate_limits=0,
@@ -47,7 +47,7 @@ class PriorityClient:
 
 class CpfQueryPriorityTests(unittest.TestCase):
     def test_parallel_valid_phase_completes_before_any_invalid_request(self):
-        rows = [{"contact_uuid": str(i), "cpf": cpf} for i, cpf in enumerate(
+        rows = [{"contact_uuid": str(i), "cpf": cpf, "nome": "Cliente sintético", "email": "cliente@example.invalid"} for i, cpf in enumerate(
             ["00000000000", VALID, "123", OTHER_VALID, "0", VALID, "123", None]
         )]
         farm = PriorityClient()
@@ -71,7 +71,8 @@ class CpfQueryPriorityTests(unittest.TestCase):
         for cpf in ["0", "00000000000", "123", "11111111111", "52998224724"]:
             with self.subTest(cpf=cpf):
                 status, identifier, _ = cliente_link_status(
-                    cpf, {"cliente": {"id": 99, "cpf": int(cpf), "nome": "Sintético"}})
+                    cpf, {"cliente": {"id": 99, "cpf": int(cpf), "nome": "Sintético", "email": "teste@example.invalid"}},
+                    weni_identity={"nome": "Sintético", "email": "teste@example.invalid"})
                 self.assertEqual(status, "CPF_INVALIDO_ENCONTRADO")
                 self.assertEqual(identifier, "99")
                 self.assertFalse(is_valid_cpf(cpf))
@@ -100,7 +101,7 @@ class CpfQueryPriorityTests(unittest.TestCase):
         self.assertEqual(stats.api_errors, 1)
 
     def test_invalid_customer_order_can_be_validated_without_changing_cpf(self):
-        payload = {"cliente": {"id": 99, "cpf": 0},
+        payload = {"cliente": {"id": 99, "cpf": 0, "nome": "Cliente sintético", "email": "teste@example.invalid"},
                    "ultimoPedido": {"id": 123, "codCliente": 99,
                                     "emissao": "2026-10-08T10:00:00", "status": 2,
                                     "formaPagamento": 1, "frete": 0},
@@ -109,7 +110,7 @@ class CpfQueryPriorityTests(unittest.TestCase):
         farm = Mock()
         farm.get_cliente_by_cpf.return_value = payload
         farm.get_pedido.return_value = {"capa": payload["ultimoPedido"], "itens": payload["itens"]}
-        contact = {"uuid": "synthetic", "fields": {"cpf": "00000000000"}}
+        contact = {"uuid": "synthetic", "fields": {"cpf": "00000000000", "nome": "Cliente sintético", "email": "teste@example.invalid"}}
         order, items = resolve_contact_order(contact, farm_client=farm,
                                              captured_at="2026-10-08T10:00:00-03:00")
         self.assertEqual(order["status_validacao"], "OK")

@@ -37,40 +37,177 @@ def _cliente_object(payload: dict[str, Any] | None) -> dict[str, Any] | None:
     return payload
 
 
-def cliente_link_status(
-    weni_cpf: str, api_cliente: dict[str, Any] | None,
-) -> tuple[str, str, str]:
-    """Validate either the official cliente envelope or a legacy flat response."""
-    from analytics import is_valid_cpf, normalize_cpf
+def _identity_text(value: Any) -> str:
+    from analytics import normalize_value
+    return normalize_value(value).strip()
 
-    normalized_weni = normalize_cpf(weni_cpf)
-    if not normalized_weni:
-        return "CPF_NAO_INFORMADO", "", ""
-    valid = is_valid_cpf(normalized_weni)
-    if api_cliente is None:
-        return "CPF_NAO_ENCONTRADO", "", ""
-    cliente = _cliente_object(api_cliente)
-    if cliente is None:
-        return "ERRO_RESPOSTA_CLIENTE_API", "", ""
+
+def _identity_name(value: Any) -> str:
+    import unicodedata
+    text = unicodedata.normalize("NFKD", _identity_text(value)).casefold()
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    return " ".join(text.split())
+
+
+def _identity_email(value: Any) -> str:
+    import re
+    email = _identity_text(value).casefold()
+    return email if re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email) else ""
+
+
+def _identity_phone(value: Any) -> str:
+    import re
+    text = _identity_text(value)
+    for prefix in ("tel:", "whatsapp:"):
+        if text.startswith(prefix):
+            text = text[len(prefix):]
+            break
+    if not re.fullmatch(r"[+0-9()\s.-]+", text):
+        return ""
+    digits = re.sub(r"[^0-9]", "", text)
+    if len(digits) in {12, 13} and digits.startswith("55"):
+        digits = digits[2:]
+    # Never discard DDD or add a ninth digit. Repeated placeholders aren't evidence.
+    return digits if 10 <= len(digits) <= 15 and len(set(digits)) > 1 else ""
+
+
+def _identity_values(identity: dict[str, Any]) -> tuple[str, set[str], set[str]]:
+    name = _identity_name(identity.get("nome")) or _identity_name(identity.get("weni_name"))
+    email = _identity_email(identity.get("email"))
+    phones = {_identity_phone(identity.get(key)) for key in (
+        "telefone", "celular", "contact_urn_whatsapp",
+    )}
+    phones.discard("")
+    return name, {email} if email else set(), phones
+
+
+def weni_customer_identity(contact: dict[str, Any]) -> dict[str, Any]:
+    from analytics import get_fields, get_phone_and_urn
+    from urn_utils import native_contact_urns, resolve_contact_urns
+    fields = get_fields(contact)
+    phone, _ = get_phone_and_urn(contact, fields)
+    resolved = resolve_contact_urns(contact, fields)
+    native = native_contact_urns(contact)
+    native_tel = next((urn for urn in native if urn.startswith("tel:")), "")
+    native_whatsapp = next((urn for urn in native if urn.startswith("whatsapp:")), "")
+    native_phone = bool(native_tel or native_whatsapp)
+    if native_tel:
+        phone = native_tel[4:]
+    elif native_whatsapp:
+        phone = native_whatsapp.split(":", 1)[1]
+    return {
+        "nome": fields.get("nome"), "weni_name": contact.get("name"),
+        "email": fields.get("email"), "telefone": phone,
+        "celular": "" if native_phone else fields.get("celular"),
+        "contact_urn_whatsapp": native_whatsapp if native_phone else resolved.channel_urns.get("whatsapp", ""),
+    }
+
+
+def weni_identity_guard(contact: dict[str, Any]) -> str:
+    name, emails, phones = _identity_values(weni_customer_identity(contact))
+    value = json.dumps([name, sorted(emails), sorted(phones)], ensure_ascii=False)
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _identity_matches(identity: dict[str, Any], cliente: dict[str, Any]) -> bool:
+    name, emails, phones = _identity_values(identity)
+    api_name, api_emails, api_phones = _identity_values(cliente)
+    return bool(name and api_name == name and (
+        emails & api_emails or phones & api_phones
+    ))
+
+
+def _cliente_candidates(payload: Any) -> list[dict[str, Any]] | None:
+    """Keep each customer's order snapshot isolated from other candidates."""
+    if isinstance(payload, list):
+        entries = payload
+    elif isinstance(payload, dict) and "clientes" in payload:
+        entries = payload["clientes"]
+    elif isinstance(payload, dict) and isinstance(payload.get("cliente"), list):
+        entries = payload["cliente"]
+    elif isinstance(payload, dict):
+        entries = [payload]
+    else:
+        return None
+    if not isinstance(entries, list) or any(not isinstance(entry, dict) for entry in entries):
+        return None
+    candidates = []
+    for entry in entries:
+        cliente = _cliente_object(entry)
+        if cliente is None:
+            return None
+        if "cliente" in entry:
+            candidates.append(dict(entry))
+        else:
+            candidates.append({"cliente": cliente, **{
+                key: entry[key] for key in ("ultimoPedido", "itens") if key in entry
+            }})
+    return candidates
+
+
+def _cpf_customer_status(cpf: str, cliente: dict[str, Any]) -> tuple[str, str, str]:
+    from analytics import is_valid_cpf, normalize_cpf
     raw_cpf = cliente.get("cpf")
     if isinstance(raw_cpf, bool) or not isinstance(raw_cpf, (int, str)):
         return "CPF_NAO_INFORMADO_API", "", ""
-    api_cpf = normalize_cpf(raw_cpf, pad_to_11=valid)
-    cliente_id = _positive_id(cliente.get("id"))
-    cliente_nome = _text(cliente.get("nome"))
+    api_cpf = normalize_cpf(raw_cpf, pad_to_11=is_valid_cpf(cpf))
     if not api_cpf:
         return "CPF_NAO_INFORMADO_API", "", ""
-    # Numeric JSON loses leading zeros. Accept only the same numeric identifier;
-    # never change the original Weni value or its mathematical validity.
-    same_identifier = api_cpf == normalized_weni or (
-        isinstance(raw_cpf, int)
-        and api_cpf.lstrip("0") == normalized_weni.lstrip("0")
-    )
-    if not same_identifier:
+    if not (api_cpf == cpf or (
+        isinstance(raw_cpf, int) and api_cpf.lstrip("0") == cpf.lstrip("0")
+    )):
         return "CPF_DIVERGENTE_API", "", ""
+    cliente_id = _positive_id(cliente.get("id"))
     if not cliente_id:
         return "CLIENTE_ID_INVALIDO_API", "", ""
-    return ("CPF_CONFIRMADO" if valid else "CPF_INVALIDO_ENCONTRADO"), cliente_id, cliente_nome
+    status = "CPF_CONFIRMADO" if is_valid_cpf(cpf) else "CPF_INVALIDO_ENCONTRADO"
+    return status, cliente_id, _text(cliente.get("nome"))
+
+
+def select_cliente_response(
+    weni_cpf: str, api_cliente: Any, *, weni_identity: dict[str, Any] | None = None,
+) -> tuple[tuple[str, str, str], dict[str, Any] | None]:
+    """Select one official customer; invalid CPFs require independent identity."""
+    from analytics import is_valid_cpf, normalize_cpf
+    cpf = normalize_cpf(weni_cpf)
+    if not cpf:
+        return ("CPF_NAO_INFORMADO", "", ""), None
+    if api_cliente is None:
+        return ("CPF_NAO_ENCONTRADO", "", ""), None
+    candidates = _cliente_candidates(api_cliente)
+    if candidates is None:
+        return ("ERRO_RESPOSTA_CLIENTE_API", "", ""), None
+    if not candidates:
+        return ("CPF_NAO_ENCONTRADO", "", ""), None
+    checked = [(_cpf_customer_status(cpf, candidate["cliente"]), candidate)
+               for candidate in candidates]
+    eligible = [(result, candidate) for result, candidate in checked
+                if result[0] in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO"}]
+    if not eligible:
+        return checked[0][0], None
+    if not is_valid_cpf(cpf):
+        name, emails, phones = _identity_values(weni_identity or {})
+        if not name or not (emails or phones):
+            return ("CPF_IDENTIDADE_INSUFICIENTE", "", ""), None
+        # A matching person with a broken API ID cannot be silently discarded.
+        if any(result[0] == "CLIENTE_ID_INVALIDO_API" and
+               _identity_matches(weni_identity or {}, candidate["cliente"])
+               for result, candidate in checked):
+            return ("CLIENTE_ID_INVALIDO_API", "", ""), None
+        eligible = [(result, candidate) for result, candidate in eligible
+                    if _identity_matches(weni_identity or {}, candidate["cliente"])]
+        if not eligible:
+            return ("CPF_IDENTIDADE_DIVERGENTE", "", ""), None
+    if len(eligible) != 1:
+        return ("CPF_IDENTIDADE_AMBIGUA", "", ""), None
+    return eligible[0]
+
+
+def cliente_link_status(
+    weni_cpf: str, api_cliente: Any, *, weni_identity: dict[str, Any] | None = None,
+) -> tuple[str, str, str]:
+    result, _ = select_cliente_response(weni_cpf, api_cliente, weni_identity=weni_identity)
+    return result
 
 
 def _decimal(value: Any, label: str, *, positive: bool = False) -> Decimal:
@@ -406,13 +543,15 @@ def resolve_contact_order(
     GET pedido/{id}. Se a API não estiver disponível, os campos pedido_* não
     são reconstruídos a partir do snapshot legado.
     """
-    from analytics import get_fields, normalize_cpf
+    from analytics import get_fields, is_valid_cpf, normalize_cpf
     from farmalider_client import (
         FarmaliderBadRequestError, FarmaliderAuthError, FarmaliderError, FarmaliderUnavailableError,
     )
 
     fields = get_fields(contact)
     cpf = normalize_cpf(fields.get("cpf"))
+    invalid_cpf = bool(cpf) and not is_valid_cpf(cpf)
+    identity_verified = False
     linked_id = _positive_id(linked_cliente_id)
     current_pedido_id = _positive_id(fields.get("pedido_id"))
     ultimo_pedido_id = _ultimo_pedido_locator_id(fields)
@@ -450,7 +589,7 @@ def resolve_contact_order(
         order = _empty_order(contact, captured_at)
         order["pedido_id"] = order_id
         order["farmalider_cliente_id"] = expected_cliente_id
-        order["origem_pedido"] = source
+        order["origem_pedido"] = source + ("_IDENTIDADE_VALIDADA" if invalid_cpf and identity_verified else "")
         confirmed_order, confirmed_items = apply_pedido_api_confirmation(
             order,
             [],
@@ -499,6 +638,18 @@ def resolve_contact_order(
     if not cpf:
         return resolve_weni_locators(expected_cliente_id=linked_id)
 
+    identity_failure_statuses = {
+        "CPF_IDENTIDADE_INSUFICIENTE", "CPF_IDENTIDADE_DIVERGENTE", "CPF_IDENTIDADE_AMBIGUA",
+        "CPF_DIVERGENTE_API", "CLIENTE_ID_INVALIDO_API", "ERRO_RESPOSTA_CLIENTE_API",
+        "CPF_NAO_INFORMADO_API",
+    }
+    if invalid_cpf and cliente_lookup_status in identity_failure_statuses | {
+        "ERRO_API", "CPF_NAO_ENCONTRADO", "CPF_REJEITADO_API",
+    }:
+        order = _empty_order(contact, captured_at)
+        return _failure(order, [], cliente_lookup_status,
+                        "CPF inválido: identidade do cliente não confirmada; pedido bloqueado.")
+
     # A validação desta execução já consultou o CPF. Repetir 404 ou 500 na
     # etapa de pedidos aumentaria a carga da API sem acrescentar informação.
     if cliente_lookup_status in {"ERRO_API", "CPF_NAO_ENCONTRADO", "CPF_REJEITADO_API"}:
@@ -532,6 +683,9 @@ def resolve_contact_order(
         order = _empty_order(contact, captured_at)
         return _failure(order, [], "CPF_REJEITADO_API", "Consulta de CPF rejeitada pela API (HTTP 400).")
     except FarmaliderError:
+        if invalid_cpf:
+            order = _empty_order(contact, captured_at)
+            return _failure(order, [], "ERRO_API", "CPF inválido: falha na confirmação de identidade; pedido bloqueado.")
         recovered_order, recovered_items = resolve_weni_locators(
             expected_cliente_id=linked_id
         )
@@ -544,6 +698,9 @@ def resolve_contact_order(
         )
 
     if payload is None:
+        if invalid_cpf:
+            order = _empty_order(contact, captured_at)
+            return _failure(order, [], "CPF_NAO_ENCONTRADO", "CPF inválido: cliente não encontrado; pedido bloqueado.")
         recovered_order, recovered_items = resolve_weni_locators(
             expected_cliente_id=linked_id
         )
@@ -555,7 +712,10 @@ def resolve_contact_order(
             "Cliente não localizado e nenhum pedido Weni pôde ser validado.",
         )
 
-    status, confirmed_cliente_id, _ = cliente_link_status(cpf, payload)
+    result, selected_payload = select_cliente_response(
+        cpf, payload, weni_identity=weni_customer_identity(contact),
+    )
+    status, confirmed_cliente_id, _ = result
     if status not in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO"}:
         # Resposta concreta com CPF divergente/cliente inválido é falha dura:
         # não tentamos contornar uma inconsistência de identidade.
@@ -565,6 +725,8 @@ def resolve_contact_order(
             "Cliente não confirmado pela consulta oficial de CPF.",
         )
 
+    payload = selected_payload
+
     if linked_id and linked_id != confirmed_cliente_id:
         order = _empty_order(contact, captured_at)
         return _failure(
@@ -572,6 +734,7 @@ def resolve_contact_order(
             "Vínculo do cliente divergente da consulta oficial.",
         )
     linked_id = confirmed_cliente_id
+    identity_verified = True
 
     latest = payload.get("ultimoPedido") if isinstance(payload, dict) else None
     pedido_id = _positive_id(latest.get("id")) if isinstance(latest, dict) else ""
@@ -594,7 +757,7 @@ def resolve_contact_order(
     fallback_order = _empty_order(contact, captured_at)
     fallback_order["pedido_id"] = pedido_id
     fallback_order["farmalider_cliente_id"] = linked_id
-    fallback_order["origem_pedido"] = "FARMALIDER_CLIENTE_CPF"
+    fallback_order["origem_pedido"] = "FARMALIDER_CLIENTE_CPF" + ("_IDENTIDADE_VALIDADA" if invalid_cpf else "")
     fallback_response = _pedido_from_cliente_payload(payload)
     if fallback_response is not None:
         fallback_order, fallback_items = apply_pedido_api_confirmation(
@@ -619,7 +782,7 @@ def resolve_contact_order(
         order = _empty_order(contact, captured_at)
         order["pedido_id"] = pedido_id
         order["farmalider_cliente_id"] = linked_id
-        order["origem_pedido"] = "FARMALIDER_PEDIDO_API"
+        order["origem_pedido"] = "FARMALIDER_PEDIDO_API" + ("_IDENTIDADE_VALIDADA" if invalid_cpf else "")
         confirmed_order, confirmed_items = apply_pedido_api_confirmation(
             order,
             [],

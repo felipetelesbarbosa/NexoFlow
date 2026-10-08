@@ -2,6 +2,14 @@
 
 ## NexoFlow 1.0
 
+### Identidade de clientes com CPF inválido
+
+- nome completo e e-mail, ou nome completo e telefone, são obrigatórios para confirmar o cliente;
+- respostas com múltiplos candidatos são selecionadas por contato Weni, preservando o pedido e os itens do mesmo cliente;
+- falta de dados, divergência ou ambiguidade bloqueiam o pedido, inclusive no fallback e no cache;
+- revisão humana bloqueia mudanças relevantes na identidade após o dry-run;
+- pedidos antigos confirmados somente pelo CPF inválido ficam fora dos indicadores até nova validação, preservando os dados de origem.
+
 ### Consulta de CPFs na FarmaLíder
 
 - CPFs válidos são consultados primeiro; inválidos preenchidos, inclusive zeros e números curtos, entram depois;
