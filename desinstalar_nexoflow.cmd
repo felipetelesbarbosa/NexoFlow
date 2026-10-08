@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 setlocal
 set "NEXOFLOW_HOME=%~dp0"
 set "POWERSHELL_EXE=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"

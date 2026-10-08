@@ -172,7 +172,7 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
                     (directory / "review_decision.txt").write_text(str(decision), encoding="ascii")
                     expected_output = {
                         0: "[ETAPA 6/6]",
-                        2: "Operacao cancelada",
+                        2: "Operação cancelada",
                         3: "Processo interrompido",
                     }[decision]
                     self._wait_until(
@@ -221,7 +221,7 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
                     process.stdin.write(b"0\r\n")
                     process.stdin.flush()
                     self._wait_until(
-                        lambda: "[ERRO] Codigo de saida: 3" in output_path.read_text(encoding="utf-8", errors="replace"),
+                        lambda: "[ERRO] Código de saída: 3" in output_path.read_text(encoding="utf-8", errors="replace"),
                         process,
                         output_path,
                         "the missing-helper diagnostic and console pause",
@@ -306,6 +306,15 @@ class WeniReviewDialogWindowsTests(unittest.TestCase):
 
     def test_empty_confirmation_is_cancelled(self) -> None:
         self._run_dialog("return ''", 2)
+
+    def test_windows_powershell_decodes_accented_brazilian_portuguese(self) -> None:
+        self._run_dialog(
+            "if ($Title -cne 'NexoFlow Weni - Revisão Humana') { throw 'Incorrect title encoding' }; "
+            "foreach ($text in @('relatório', 'revisão', 'NÃO', 'alteração')) { "
+            "if (-not $Message.Contains($text)) { throw 'Incorrect message encoding' } }; "
+            "return 'CARGA COMPLETA REVISADA'",
+            0,
+        )
 
     def test_inexact_confirmation_is_cancelled(self) -> None:
         self._run_dialog("return 'CARGA COMPLETA REVISADA depois'", 2)

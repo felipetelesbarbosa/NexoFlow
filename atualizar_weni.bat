@@ -1,5 +1,7 @@
 @echo off
+chcp 65001 >nul
 setlocal EnableExtensions
+set "PYTHONIOENCODING=utf-8"
 cd /d "%~dp0"
 title NexoFlow Weni
 set "NEXOFLOW_LAUNCHER=1"
@@ -9,12 +11,12 @@ echo ==========================================================
 echo NexoFlow Weni
 echo ==========================================================
 echo.
-echo Rotina segura de atualizacao de contatos/campos da Weni:
+echo Rotina segura de atualização de contatos/campos da Weni:
 echo   1. Check-up completo do projeto
-echo   2. Teste das conexoes do NexoFlow Weni
-echo   3. Dry-run + auditoria obrigatoria do plano
-echo   4. Confirmacao manual
-echo   5. Nova auditoria + aplicacao incremental
+echo   2. Teste das conexões do NexoFlow Weni
+echo   3. Dry-run + auditoria obrigatória do plano
+echo   4. Confirmação manual
+echo   5. Nova auditoria + aplicação incremental
 echo.
 echo Nenhum POST na Weni ocorre antes da auditoria do plano.
 echo ==========================================================
@@ -38,19 +40,19 @@ if not "%RC%"=="0" goto :erro_dryrun
 
 echo.
 echo ==========================================================
-echo DRY-RUN APROVADO. Nenhum dado foi alterado ate aqui.
+echo DRY-RUN APROVADO. Nenhum dado foi alterado até aqui.
 echo ==========================================================
 echo.
 set /p "CONFIRMA=Digite ATUALIZAR para gravar as mudancas na Weni: "
 if /I not "%CONFIRMA%"=="ATUALIZAR" (
     echo.
-    echo [INFO] Operacao cancelada. Nenhuma alteracao foi aplicada.
+    echo [INFO] Operação cancelada. Nenhuma alteração foi aplicada.
     pause
     exit /b 2
 )
 
 echo.
-echo [ETAPA 5/5] Auditoria final e aplicacao incremental
+echo [ETAPA 5/5] Auditoria final e aplicação incremental
 echo ----------------------------------------------------------
 ".venv\Scripts\python.exe" run_update_weni.py --apply
 set "RC=%ERRORLEVEL%"
@@ -58,8 +60,8 @@ if not "%RC%"=="0" goto :erro_apply
 
 echo.
 echo ==========================================================
-echo [OK] NexoFlow Weni concluido com sucesso.
-echo Auditoria: OK ^| Gravacao: OK
+echo [OK] NexoFlow Weni concluído com sucesso.
+echo Auditoria: OK ^| Gravação: OK
 echo ==========================================================
 echo.
 pause
@@ -67,26 +69,26 @@ exit /b 0
 
 :erro_checkup
 echo.
-echo [ERRO] Check-up falhou. Nenhuma alteracao foi feita na Weni.
+echo [ERRO] Check-up falhou. Nenhuma alteração foi feita na Weni.
 pause
 exit /b %RC%
 
 :erro_conexoes
 echo.
-echo [ERRO] Teste de conexoes falhou. Nenhuma alteracao foi feita na Weni.
+echo [ERRO] Teste de conexões falhou. Nenhuma alteração foi feita na Weni.
 pause
 exit /b %RC%
 
 :erro_dryrun
 echo.
-echo [ERRO] Dry-run/auditoria falhou. Nenhuma alteracao foi feita na Weni.
+echo [ERRO] Dry-run/auditoria falhou. Nenhuma alteração foi feita na Weni.
 pause
 exit /b %RC%
 
 :erro_apply
 echo.
-echo [ERRO] A aplicacao foi interrompida.
-echo O checkpoint NAO foi avancado. Execute novamente apos corrigir o problema.
+echo [ERRO] A aplicação foi interrompida.
+echo O checkpoint NÃO foi avançado. Execute novamente após corrigir o problema.
 echo Consulte logs\nexoflow_update_weni.log e logs\weni_update_audit.jsonl.
 pause
 exit /b %RC%

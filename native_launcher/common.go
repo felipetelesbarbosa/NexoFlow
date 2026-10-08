@@ -24,6 +24,12 @@ var (
     procGetLastError = kernel32.NewProc("GetLastError")
 )
 
+// UTF-8 keeps accented Portuguese readable in CMD and redirected diagnostics.
+func init() {
+    kernel32.NewProc("SetConsoleCP").Call(65001)
+    kernel32.NewProc("SetConsoleOutputCP").Call(65001)
+}
+
 const errorAlreadyExists = 183
 
 func utf16Ptr(s string) *uint16 {
@@ -72,7 +78,7 @@ func runChild(name string, args ...string) int {
         if exitErr, ok := err.(*exec.ExitError); ok {
             return exitErr.ExitCode()
         }
-        fmt.Fprintf(os.Stderr, "[ERRO] Nao foi possivel iniciar o processo: %v\n", err)
+        fmt.Fprintf(os.Stderr, "[ERRO] Não foi possível iniciar o processo: %v\n", err)
         return 1
     }
     if cmd.ProcessState == nil {
@@ -89,14 +95,14 @@ func prepareLauncher() (string, func(), int) {
 
     exe, err := os.Executable()
     if err != nil {
-        fmt.Fprintf(os.Stderr, "[ERRO] Nao foi possivel localizar o executavel: %v\n", err)
+        fmt.Fprintf(os.Stderr, "[ERRO] Não foi possível localizar o executável: %v\n", err)
         waitEnter()
         return "", func(){}, 1
     }
     exe, _ = filepath.Abs(exe)
     installDir := filepath.Dir(exe)
     if err := os.Chdir(installDir); err != nil {
-        fmt.Fprintf(os.Stderr, "[ERRO] Nao foi possivel acessar a pasta do NexoFlow: %v\n", err)
+        fmt.Fprintf(os.Stderr, "[ERRO] Não foi possível acessar a pasta do NexoFlow: %v\n", err)
         waitEnter()
         return "", func(){}, 1
     }
@@ -108,7 +114,7 @@ func prepareLauncher() (string, func(), int) {
         }
     }
     if !acquired {
-        fmt.Println("[AVISO] Existe uma sincronizacao, instalacao ou desinstalacao do NexoFlow em andamento.")
+        fmt.Println("[AVISO] Existe uma sincronização, instalação ou desinstalação do NexoFlow em andamento.")
         waitEnter()
         cleanup()
         return "", func(){}, 2
@@ -118,7 +124,7 @@ func prepareLauncher() (string, func(), int) {
 
 func requireFile(path string) bool {
     if _, err := os.Stat(path); err != nil {
-        fmt.Printf("[ERRO] Arquivo nao encontrado: %s\n", path)
+        fmt.Printf("[ERRO] Arquivo não encontrado: %s\n", path)
         waitEnter()
         return false
     }

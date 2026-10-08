@@ -779,7 +779,7 @@ def check_windows_lifecycle() -> None:
         "function Install-OptionalUninstaller",
         "NexoFlow Uninstall.exe",
         "OptionalUninstallerValidated",
-        "Como ele e opcional, o Setup continuara normalmente",
+        "Como ele é opcional, o Setup continuará normalmente",
         "Where-Object { $_.Name -notin @('payload manifest.json','NexoFlow Uninstall.exe') }",
     ]:
         if required_text not in install:
@@ -1259,6 +1259,25 @@ def check_terminal_cli() -> None:
         return
     ok("NexoFlow Terminal oferece CLI amigável, ajuda integrada e consultas API somente leitura.")
 
+def check_portuguese_encoding() -> None:
+    # PowerShell 5.1 defaults to ANSI without a BOM; CMD needs an explicit page.
+    paths = list((ROOT / "installer").glob("*.ps1")) + list((ROOT / "scripts").glob("*.ps1"))
+    for path in paths:
+        if not path.read_bytes().startswith(b"\xef\xbb\xbf"):
+            fail(f"PowerShell sem UTF-8 com BOM: {path.relative_to(ROOT)}")
+            return
+    for path in list(ROOT.glob("*.bat")) + list(ROOT.glob("*.cmd")):
+        if "chcp 65001" not in path.read_text(encoding="utf-8").lower():
+            fail(f"CMD sem seleção explícita de UTF-8: {path.name}")
+            return
+    for name in ("Documentacao NexoFlow.html", "docs/Documentacao NexoFlow.html"):
+        path = ROOT / name
+        if path.exists() and 'lang="pt-BR"' not in path.read_text(encoding="utf-8"):
+            fail(f"Documentação HTML sem idioma português brasileiro: {name}")
+            return
+    ok("Interface Windows e documentação usam UTF-8 e português brasileiro (pt-BR).")
+
+
 def main() -> int:
     print("=== Auditoria de consistência do projeto ===")
     check_farmalider_runtime()
@@ -1267,6 +1286,7 @@ def main() -> int:
     check_windows_lifecycle()
     check_terminal_cli()
     check_weni_update_safety()
+    check_portuguese_encoding()
 
     print()
     if ERRORS:

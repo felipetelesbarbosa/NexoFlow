@@ -1,9 +1,10 @@
 @echo off
+chcp 65001 >nul
 setlocal
 cd /d "%~dp0"
 
 if not exist ".venv\Scripts\python.exe" (
-    echo Ambiente virtual nao encontrado. Execute instalar.bat primeiro.
+    echo Ambiente virtual não encontrado. Execute instalar.bat primeiro.
     if not defined NEXOFLOW_LAUNCHER pause
     exit /b 1
 )

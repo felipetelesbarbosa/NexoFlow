@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Version = "1.0"
 )
 
@@ -21,7 +21,7 @@ function Assert-PublicTrackedFiles {
     param([Parameter(Mandatory = $true)][string[]]$Paths)
 
     # A lista do Git pode conter arquivos adicionados com --force. Falhe antes
-    # de copiar qualquer arquivo privado; nunca leia seu conteudo no build.
+    # de copiar qualquer arquivo privado; nunca leia seu conteúdo no build.
     $publicPlaceholders = @(
         "secrets_config.example.py",
         "secrets_config.example_webhook.txt",
@@ -53,7 +53,7 @@ function Assert-PublicTrackedFiles {
         }
     }
     if ($unsafe.Count -gt 0) {
-        throw ("Build bloqueado: arquivos privados estao rastreados no Git. " +
+        throw ("Build bloqueado: arquivos privados estão rastreados no Git. " +
             "Remova-os do indice antes de publicar: " + ($unsafe -join ", "))
     }
 }
@@ -144,11 +144,37 @@ function Assert-ZipEntry {
     $zip = [IO.Compression.ZipFile]::OpenRead($ZipPath)
     try {
         $found = $zip.Entries | Where-Object { $_.FullName -eq $EntryName }
-        if (-not $found) { throw "Entrada obrigatoria ausente no ZIP: $EntryName" }
+        if (-not $found) { throw "Entrada obrigatória ausente no ZIP: $EntryName" }
     }
     finally {
         $zip.Dispose()
     }
+}
+
+Write-Host "==> Compilando launchers com textos em português brasileiro"
+$LauncherDir = Join-Path $DistDir "launchers"
+New-Item -ItemType Directory -Force -Path $LauncherDir | Out-Null
+$launcherTargets = @(
+    @{ Name = "NexoFlow Analytics.exe"; Tag = "analytics"; Description = "NexoFlow Analytics — análise de dados" },
+    @{ Name = "NexoFlow Weni.exe"; Tag = "updateweni"; Description = "NexoFlow Weni — atualização de contatos" },
+    @{ Name = "NexoFlow Terminal.exe"; Tag = "terminal"; Description = "NexoFlow Terminal — consultas e diagnóstico" },
+    @{ Name = "NexoFlow Uninstall.exe"; Tag = "uninstall"; Description = "NexoFlow — desinstalação" }
+)
+Push-Location $RepoRoot
+$previousGoModule = $env:GO111MODULE
+try {
+    $env:GO111MODULE = "off"
+    foreach ($target in $launcherTargets) {
+        $output = Join-Path $LauncherDir $target.Name
+        & go build -trimpath -tags $target.Tag -ldflags "-s -w" -o $output ./native_launcher
+        if ($LASTEXITCODE -ne 0) { throw "Falha ao compilar $($target.Name)" }
+        & (Join-Path $PSScriptRoot "embed_windows_version.ps1") -ExecutablePath $output -Description $target.Description
+    }
+}
+finally {
+    if ($null -eq $previousGoModule) { Remove-Item Env:GO111MODULE -ErrorAction SilentlyContinue }
+    else { $env:GO111MODULE = $previousGoModule }
+    Pop-Location
 }
 
 Write-Host "==> Montando projeto completo NexoFlow $Version"
@@ -157,15 +183,21 @@ Copy-TrackedFiles -Destination $ProjectRoot
 Write-Host "==> Montando payload do Setup"
 Copy-TrackedFiles -Destination $PayloadDir
 
-# Um .ico ao lado do EXE nao altera o icone exibido pelo Explorer.
-# Cada launcher deve incorporar seu proprio RT_ICON + RT_GROUP_ICON.
+foreach ($folder in @($ProjectRoot, $PayloadDir)) {
+    foreach ($target in $launcherTargets) {
+        Copy-Item -LiteralPath (Join-Path $LauncherDir $target.Name) -Destination (Join-Path $folder $target.Name) -Force
+    }
+}
+
+# Um .ico ao lado do EXE não altera o ícone exibido pelo Explorer.
+# Cada launcher deve incorporar seu próprio RT_ICON + RT_GROUP_ICON.
 $launcherIcons = @(
     @{ Executable = "NexoFlow Analytics.exe"; Icon = "NexoFlow.ico" },
     @{ Executable = "NexoFlow Weni.exe"; Icon = "NexoFlow_Weni.ico" },
     @{ Executable = "NexoFlow Terminal.exe"; Icon = "NexoFlow_Terminal.ico" },
     @{ Executable = "NexoFlow Uninstall.exe"; Icon = "uninstaller.ico" }
 )
-Write-Host "==> Incorporando icones PE dos executaveis no projeto e no payload"
+Write-Host "==> Incorporando ícones PE dos executáveis no projeto e no payload"
 foreach ($folder in @($ProjectRoot, $PayloadDir)) {
     foreach ($item in $launcherIcons) {
         & (Join-Path $PSScriptRoot "embed_windows_icon.ps1") `
@@ -174,7 +206,7 @@ foreach ($folder in @($ProjectRoot, $PayloadDir)) {
     }
 }
 
-# O manifest deve refletir os EXEs depois da incorporacao dos icones.
+# O manifest deve refletir os EXEs depois da incorporação dos ícones.
 Write-PayloadManifest -Payload $PayloadDir
 
 New-Item -ItemType Directory -Force -Path (Join-Path $SetupRoot "installer") | Out-Null
@@ -191,25 +223,25 @@ Este pacote corresponde ao NexoFlow $Version.
 Extraia TODO o ZIP antes de executar.
 Depois execute: NexoFlow Setup.exe
 
-O Setup solicita elevacao do Windows automaticamente quando necessario.
-Atualizacoes preservam a instalacao anterior para rollback automatico se houver falha.
+O Setup solicita elevação do Windows automaticamente quando necessário.
+Atualizações preservam a instalação anterior para rollback automático se houver falha.
 
 O launcher NexoFlow Uninstall.exe permanece opcional.
-Se um antivirus corporativo remove-lo antes ou depois da instalacao, o Setup continua funcionando.
-A desinstalacao permanece disponivel por installer\uninstall.ps1 e
+Se um antivírus corporativo removê-lo antes ou depois da instalação, o Setup continua funcionando.
+A desinstalação permanece disponível por installer\uninstall.ps1 e
 desinstalar_nexoflow.cmd.
 
-Nao coloque credenciais dentro deste pacote.
+Não coloque credenciais dentro deste pacote.
 "@
 [IO.File]::WriteAllText((Join-Path $SetupRoot "LEIA-ME INSTALACAO.txt"), $readme, (New-Object Text.UTF8Encoding($false)))
-[IO.File]::WriteAllText((Join-Path $SetupRoot "SETUP VALIDADO.txt"), "NexoFlow $Version - Setup validado automaticamente em Windows para instalacao, atualizacao e ausencia do Uninstall opcional.", (New-Object Text.UTF8Encoding($false)))
+[IO.File]::WriteAllText((Join-Path $SetupRoot "SETUP VALIDADO.txt"), "NexoFlow $Version - Setup validado automaticamente em Windows para instalação, atualização e ausência do Uninstall opcional.", (New-Object Text.UTF8Encoding($false)))
 
 $signing = @'
 param()
-Write-Host "Assinatura Authenticode nao automatizada neste pacote."
-Write-Host "Assine os executaveis somente quando houver certificado corporativo confiavel."
+Write-Host "Assinatura Authenticode não automatizada neste pacote."
+Write-Host "Assine os executáveis somente quando houver certificado corporativo confiável."
 '@
-[IO.File]::WriteAllText((Join-Path $SetupRoot "Assinar Release.ps1"), $signing, (New-Object Text.UTF8Encoding($false)))
+[IO.File]::WriteAllText((Join-Path $SetupRoot "Assinar Release.ps1"), $signing, (New-Object Text.UTF8Encoding($true)))
 
 Write-Host "==> Compilando launcher do Setup"
 Push-Location $RepoRoot
@@ -228,7 +260,10 @@ finally {
     Pop-Location
 }
 
-Write-Host "==> Incorporando icone proprio no NexoFlow Setup.exe"
+Write-Host "==> Incorporando ícone próprio no NexoFlow Setup.exe"
+& (Join-Path $PSScriptRoot "embed_windows_version.ps1") `
+    -ExecutablePath (Join-Path $SetupRoot "NexoFlow Setup.exe") `
+    -Description "NexoFlow — instalação e atualização"
 & (Join-Path $PSScriptRoot "embed_windows_icon.ps1") `
     -ExecutablePath (Join-Path $SetupRoot "NexoFlow Setup.exe") `
     -IconPath (Join-Path (Join-Path $RepoRoot "assets") "installer.ico")
@@ -265,48 +300,49 @@ $shaLines = @(
 $releaseNotes = @"
 # NexoFlow $Version
 
-Distribuicao oficial do **NexoFlow 1.0**.
+Distribuição oficial do **NexoFlow 1.0**.
 
-O arquivo `NexoFlow-Setup-$Version.zip` contem o instalador do NexoFlow 1.0 e foi validado automaticamente em Windows para primeira instalacao e atualizacao de uma instalacao existente.
+O arquivo `NexoFlow-Setup-$Version.zip` contém o instalador do NexoFlow 1.0 e foi validado automaticamente em Windows para primeira instalação e atualização de uma instalação existente.
 
-Melhorias desta distribuicao do NexoFlow 1.0:
-- carga completa Weni 100% ou em partes mantem o CMD aguardando a revisao humana; cancelar ou falhar nao aplica o snapshot e preserva o diagnostico;
-- componente de confirmacao incluido e validado no projeto completo e no Setup;
+Melhorias desta distribuição do NexoFlow 1.0:
+- interface e documentação em português brasileiro, com acentos e cedilha; CMD em UTF-8, PowerShell com BOM e executáveis recompilados com metadados pt-BR;
+- carga completa Weni 100% ou em partes mantém o CMD aguardando a revisão humana; cancelar ou falhar não aplica o snapshot e preserva o diagnóstico;
+- componente de confirmação incluído e validado no projeto completo e no Setup;
 - de-para de pagamento atualizado: 0 Cancelado; 1 Dinheiro; 2 Débito; 3 Crédito; 4 Ticket; 5 Pix por Link de Pagamento; 6 Pix no POS;
-- pagamento 0 cancela o pedido: forma de pagamento Cancelado e status 3 na Weni e no BI, preservando os codigos brutos da API na tabela de pedidos;
-- de-para de status atualizado: EmAberto=-2; PendenteDePagamento=-1; EmProcessamento=0; ProntoParaRota=4; EmTransito=1; Concluido=2; Cancelado=3;
-- estados -2, -1, 0, 4 e 1 permanecem em rechecagem; vendas e ultima_compra consideram pedidos em 4 (Pronto para rota), 1 (Em transito) ou 2 (Concluido), validados pela API e nao cancelados;
-- diagnostico privado local identifica CPFs com falhas 5xx persistentes e captura campos seguros da resposta, fora dos logs publicos e dos pacotes;
-- diagnostico seguro de proxy identifica autenticacao 407, bloqueio de tunel 403, TLS, DNS, timeout e conexao recusada; resposta 400/404 da FarmaLider nao e apresentada como autenticacao confirmada;
-- listas de pedido com leitura CSV preservam virgulas e aspas nos nomes dos produtos, sem desalinhamento artificial na Weni e no Analytics;
-- codigos numericos de pagamento nao documentados sao preservados e exibidos como nao identificados, com o codigo recebido, sem inventar a forma de pagamento;
-- pagamento sem de-para aparece em INFO uma vez por codigo; resumo por codigo e progresso distinguem contatos com pedido validado de alteracoes propostas e gravadas;
-- preparacao e auditoria continuam antes de qualquer gravacao; listas realmente inconsistentes permanecem bloqueadas;
-- cooldown global e recuperacao serial apos falhas 5xx da FarmaLider, com retorno gradual da concorrencia e reducao do intervalo quando a API se recupera;
-- diagnostico de HTTP 500 com referencias opacas por execucao e classificacao da resposta, sem publicar CPF, tokens ou texto livre do servidor;
-- HTTP 404 continua representando cliente nao encontrado; HTTP 500 permanece uma falha da API;
-- consultas por CPF que ja falharam nao sao repetidas na mesma carga; dados previamente confirmados sao preservados quando o CPF continua o mesmo;
+- pagamento 0 cancela o pedido: forma de pagamento Cancelado e status 3 na Weni e no BI, preservando os códigos brutos da API na tabela de pedidos;
+- de-para de status atualizado: EmAberto=-2; PendenteDePagamento=-1; EmProcessamento=0; ProntoParaRota=4; EmTransito=1; Concluído=2; Cancelado=3;
+- estados -2, -1, 0, 4 e 1 permanecem em rechecagem; vendas e ultima_compra consideram pedidos em 4 (Pronto para rota), 1 (Em trânsito) ou 2 (Concluído), validados pela API e não cancelados;
+- diagnóstico privado local identifica CPFs com falhas 5xx persistentes e captura campos seguros da resposta, fora dos logs públicos e dos pacotes;
+- diagnóstico seguro de proxy identifica autenticação 407, bloqueio de túnel 403, TLS, DNS, timeout e conexão recusada; resposta 400/404 da FarmaLíder não é apresentada como autenticação confirmada;
+- listas de pedido com leitura CSV preservam vírgulas e aspas nos nomes dos produtos, sem desalinhamento artificial na Weni e no Analytics;
+- códigos numéricos de pagamento não documentados são preservados e exibidos como não identificados, com o código recebido, sem inventar a forma de pagamento;
+- pagamento sem de-para aparece em INFO uma vez por código; resumo por código e progresso distinguem contatos com pedido validado de alterações propostas e gravadas;
+- preparação e auditoria continuam antes de qualquer gravação; listas realmente inconsistentes permanecem bloqueadas;
+- cooldown global e recuperação serial após falhas 5xx da FarmaLíder, com retorno gradual da concorrência e redução do intervalo quando a API se recupera;
+- diagnóstico de HTTP 500 com referências opacas por execução e classificação da resposta, sem publicar CPF, tokens ou texto livre do servidor;
+- HTTP 404 continua representando cliente não encontrado; HTTP 500 permanece uma falha da API;
+- consultas por CPF que já falharam não são repetidas na mesma carga; dados previamente confirmados são preservados quando o CPF continua o mesmo;
 - cargas incompletas aparecem como parciais e preservam o marco incremental para uma nova tentativa;
-- empacotamento bloqueado quando arquivos privados estao rastreados no Git.
+- empacotamento bloqueado quando arquivos privados estão rastreados no Git.
 
 Principais garantias do Setup:
-- elevacao UAC automatica quando necessaria;
-- rollback automatico se uma atualizacao falhar;
+- elevação UAC automática quando necessária;
+- rollback automático se uma atualização falhar;
 - NexoFlow Uninstall.exe opcional;
-- integridade SHA-256 dos componentes obrigatorios;
-- preservacao de secrets_config.py, credentials e logs em atualizacoes.
+- integridade SHA-256 dos componentes obrigatórios;
+- preservação de secrets_config.py, credentials e logs em atualizações.
 
 Downloads:
 - NexoFlow-Setup-$Version.zip - instalador do NexoFlow 1.0;
 - NexoFlow-$Version.zip - projeto completo do NexoFlow 1.0;
 - SHA256SUMS-$Version.txt - hashes SHA-256.
 
-Recursos incluidos:
+Recursos incluídos:
 - NexoFlow Analytics;
 - NexoFlow Weni;
 - NexoFlow Terminal;
-- integracao Weni, FarmaLider, Google Sheets e Looker Studio;
-- tratamento de pedidos, status, LGPD, canais e atribuicao de anuncios.
+- integração Weni, FarmaLíder, Google Sheets e Looker Studio;
+- tratamento de pedidos, status, LGPD, canais e atribuição de anúncios.
 "@
 [IO.File]::WriteAllText((Join-Path $DistDir "release-notes.md"), $releaseNotes, (New-Object Text.UTF8Encoding($false)))
 

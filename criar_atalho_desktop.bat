@@ -1,24 +1,25 @@
 @echo off
+chcp 65001 >nul
 setlocal
 cd /d "%~dp0"
 
 if not exist "%~dp0NexoFlow Analytics.exe" (
-    echo [ERRO] NexoFlow Analytics.exe nao foi encontrado.
+    echo [ERRO] NexoFlow Analytics.exe não foi encontrado.
     pause
     exit /b 1
 )
 if not exist "%~dp0NexoFlow Weni.exe" (
-    echo [ERRO] NexoFlow Weni.exe nao foi encontrado.
+    echo [ERRO] NexoFlow Weni.exe não foi encontrado.
     pause
     exit /b 1
 )
 if not exist "%~dp0NexoFlow Terminal.exe" (
-    echo [ERRO] NexoFlow Terminal.exe nao foi encontrado.
+    echo [ERRO] NexoFlow Terminal.exe não foi encontrado.
     pause
     exit /b 1
 )
 
-rem -Command nao executa arquivo .ps1 e portanto nao precisa de ExecutionPolicy Bypass.
+rem -Command não executa arquivo .ps1 e portanto não precisa de ExecutionPolicy Bypass.
 powershell.exe -NoLogo -NoProfile -Command ^
   "$desktop=[Environment]::GetFolderPath('Desktop');" ^
   "$ws=New-Object -ComObject WScript.Shell;" ^
@@ -46,7 +47,7 @@ powershell.exe -NoLogo -NoProfile -Command ^
   "Write-Host ('[OK] Atalhos criados: ' + $shortcut + ' | ' + $updateShortcut + ' | ' + $terminalShortcut)"
 
 if errorlevel 1 (
-    echo [ERRO] Nao foi possivel criar os atalhos.
+    echo [ERRO] Não foi possível criar os atalhos.
     pause
     exit /b 1
 )

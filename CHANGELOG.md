@@ -2,6 +2,13 @@
 
 ## NexoFlow 1.0
 
+### Português brasileiro
+
+- acentos e cedilha corrigidos na revisão humana, nos scripts, no instalador e nos launchers;
+- CMD seleciona UTF-8 e PowerShell usa UTF-8 com BOM;
+- HTML declara pt-BR e os pacotes recompilam executáveis com metadados pt-BR;
+- teste no Windows verifica os caracteres recebidos pela janela de confirmação.
+
 ### Revisão humana da carga completa Weni
 
 - confirmação síncrona mantém o CMD aguardando a revisão do relatório, tanto na carga de 100% quanto nas quatro partes;

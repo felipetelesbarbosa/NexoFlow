@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)][string]$ExecutablePath,
     [Parameter(Mandatory = $true)][string]$IconPath
 )
@@ -8,7 +8,7 @@ $ErrorActionPreference = "Stop"
 $exe = (Resolve-Path -LiteralPath $ExecutablePath -ErrorAction Stop).Path
 $ico = (Resolve-Path -LiteralPath $IconPath -ErrorAction Stop).Path
 if ([IO.Path]::GetExtension($exe) -ine ".exe") {
-    throw "O destino precisa ser um executavel .exe: $exe"
+    throw "O destino precisa ser um executável .exe: $exe"
 }
 
 if (-not ('NexoFlowIconResources' -as [type])) {
@@ -68,7 +68,7 @@ try {
     $kind = $reader.ReadUInt16()
     $count = [int]$reader.ReadUInt16()
     if ($reserved -ne 0 -or $kind -ne 1 -or $count -lt 1 -or $count -gt 255) {
-        throw "Cabecalho ICO invalido: $ico"
+        throw "Cabeçalho ICO inválido: $ico"
     }
     if ($iconBytes.Length -lt 6 + (16 * $count)) {
         throw "Tabela de imagens ICO incompleta: $ico"
@@ -89,7 +89,7 @@ try {
             $reservedByte -ne 0 -or $size -le 0 -or $offset -lt 0 -or
             ([long]$offset + [long]$size) -gt $iconBytes.Length
         ) {
-            throw "Imagem ICO invalida na posicao $i ($ico)"
+            throw "Imagem ICO inválida na posição $i ($ico)"
         }
 
         # Alguns ICOs baseados em PNG trazem planes/bits como zero. O shell do
@@ -142,8 +142,8 @@ finally {
 }
 
 # O build anterior gravava apenas en-US (1033). Em Windows pt-BR isso pode
-# resultar em Explorer/atalhos exibindo o icone generico. Gravamos a mesma
-# arvore como neutral (0), pt-BR (1046) e en-US (1033).
+# resultar em Explorer/atalhos exibindo o ícone genérico. Gravamos a mesma
+# árvore como neutral (0), pt-BR (1046) e en-US (1033).
 $languages = @([uint16]0, [uint16]1046, [uint16]1033)
 
 $handle = [NexoFlowIconResources]::BeginUpdateResourceW($exe, $false)
@@ -162,7 +162,7 @@ try {
             )
             if (-not $ok) {
                 $code = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
-                throw "Nao foi possivel embutir RT_ICON $($item.Id), lang=$language em $exe ($code)"
+                throw "Não foi possível embutir RT_ICON $($item.Id), lang=$language em $exe ($code)"
             }
         }
 
@@ -172,7 +172,7 @@ try {
         )
         if (-not $ok) {
             $code = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
-            throw "Nao foi possivel embutir RT_GROUP_ICON, lang=$language em $exe ($code)"
+            throw "Não foi possível embutir RT_GROUP_ICON, lang=$language em $exe ($code)"
         }
     }
 
@@ -188,15 +188,15 @@ finally {
     }
 }
 
-# Validacao real do PE depois da gravacao. A release deve falhar se o recurso
-# neutral/pt-BR nao existir ou se o shell32 nao conseguir extrair o icone.
+# Validação real do PE depois da gravação. A release deve falhar se o recurso
+# neutral/pt-BR não existir ou se o shell32 não conseguir extrair o ícone.
 $LOAD_LIBRARY_AS_DATAFILE = [uint32]2
 $module = [NexoFlowIconResources]::LoadLibraryExW(
     $exe, [IntPtr]::Zero, $LOAD_LIBRARY_AS_DATAFILE
 )
 if ($module -eq [IntPtr]::Zero) {
     $code = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
-    throw "Nao foi possivel reabrir o PE para validar o icone ($code): $exe"
+    throw "Não foi possível reabrir o PE para validar o ícone ($code): $exe"
 }
 try {
     foreach ($language in @([uint16]0, [uint16]1046)) {
@@ -204,7 +204,7 @@ try {
             $module, [IntPtr]14, [IntPtr]1, $language
         )
         if ($resource -eq [IntPtr]::Zero) {
-            throw "RT_GROUP_ICON ausente apos o build (lang=$language): $exe"
+            throw "RT_GROUP_ICON ausente após o build (lang=$language): $exe"
         }
     }
 }
@@ -219,7 +219,7 @@ $extracted = [NexoFlowIconResources]::ExtractIconExW(
 )
 try {
     if ($extracted -lt 1 -or ($large -eq [IntPtr]::Zero -and $small -eq [IntPtr]::Zero)) {
-        throw "shell32 nao conseguiu extrair o icone do executavel: $exe"
+        throw "shell32 não conseguiu extrair o ícone do executável: $exe"
     }
 }
 finally {
@@ -227,4 +227,4 @@ finally {
     if ($small -ne [IntPtr]::Zero) { [void][NexoFlowIconResources]::DestroyIcon($small) }
 }
 
-Write-Host "[OK] Icone PE embutido e validado: $([IO.Path]::GetFileName($exe)) ($count tamanhos; neutral/pt-BR/en-US)"
+Write-Host "[OK] Ícone PE embutido e validado: $([IO.Path]::GetFileName($exe)) ($count tamanhos; neutral/pt-BR/en-US)"

@@ -24,10 +24,10 @@ func main() {
     }
     rc = runChild(powershellPath(), args...)
     if rc != 0 {
-        fmt.Printf("\n[ERRO] O NexoFlow Setup foi encerrado com o codigo %d.\n", rc)
-        fmt.Println("Consulte tambem o log: %TEMP%\\NexoFlow-Setup.log")
+        fmt.Printf("\n[ERRO] O NexoFlow Setup foi encerrado com o código %d.\n", rc)
+        fmt.Println("Consulte também o log: %TEMP%\\NexoFlow-Setup.log")
         if !nonInteractive {
-            fmt.Println("A janela permanecera aberta para que a causa possa ser lida.")
+            fmt.Println("A janela permanecerá aberta para que a causa possa ser lida.")
             waitEnter()
         }
     }

@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 setlocal
 set "NEXO_HOME=%~dp0"
 if exist "%NEXO_HOME%.venv\Scripts\python.exe" (

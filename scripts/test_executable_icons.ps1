@@ -1,4 +1,4 @@
-param([string]$Version = "1.0")
+﻿param([string]$Version = "1.0")
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -45,21 +45,31 @@ function Assert-ExecutableIcon {
     )
 
     if (-not (Test-Path -LiteralPath $Executable -PathType Leaf)) {
-        throw "Executavel ausente: $Executable"
+        throw "Executável ausente: $Executable"
     }
     if (-not (Test-Path -LiteralPath $Icon -PathType Leaf)) {
-        throw "Icone fonte ausente: $Icon"
+        throw "Ícone fonte ausente: $Icon"
+    }
+
+    $metadata = [Diagnostics.FileVersionInfo]::GetVersionInfo($Executable)
+    if ($metadata.ProductName -ne "NexoFlow 1.0" -or $metadata.ProductVersion -ne "1.0.0.0") {
+        throw "Metadados de versão incorretos: $Executable"
+    }
+    # The 0416/04B0 string table is Brazilian Portuguese with Unicode encoding.
+    $metadataBytes = [IO.File]::ReadAllBytes($Executable)
+    if (-not [NexoFlowIconProbe]::ContainsBytes($metadataBytes, [Text.Encoding]::Unicode.GetBytes("041604B0"))) {
+        throw "Metadados pt-BR ausentes no executável: $Executable"
     }
 
     # ExtractIconEx consulta o grupo RT_GROUP_ICON registrado no PE.
-    # Isso detecta executaveis Go sem icone, mesmo que um .ico separado exista.
+    # Isso detecta executáveis Go sem ícone, mesmo que um .ico separado exista.
     $large = [IntPtr]::Zero
     $small = [IntPtr]::Zero
     $number = [NexoFlowIconProbe]::ExtractIconEx(
         $Executable, -1, [ref]$large, [ref]$small, [uint32]0
     )
     if ($number -lt 1) {
-        throw "Executavel sem grupo de icone Windows: $Executable"
+        throw "Executável sem grupo de ícone Windows: $Executable"
     }
 
     $large = [IntPtr]::Zero
@@ -69,7 +79,7 @@ function Assert-ExecutableIcon {
             $Executable, 0, [ref]$large, [ref]$small, [uint32]1
         )
         if ($extracted -lt 1 -or ($large -eq [IntPtr]::Zero -and $small -eq [IntPtr]::Zero)) {
-            throw "Windows nao consegue extrair o icone do .exe: $Executable"
+            throw "Windows não consegue extrair o ícone do .exe: $Executable"
         }
     }
     finally {
@@ -77,31 +87,31 @@ function Assert-ExecutableIcon {
         if ($small -ne [IntPtr]::Zero) { [void][NexoFlowIconProbe]::DestroyIcon($small) }
     }
 
-    # Verifica tambem que TODAS as imagens embutidas correspondem ao .ico
+    # Verifica também que TODAS as imagens embutidas correspondem ao .ico
     # certo (Analytics, Weni, Terminal, Setup ou Uninstall).
     $exeBytes = [IO.File]::ReadAllBytes($Executable)
     $icoBytes = [IO.File]::ReadAllBytes($Icon)
     if ($icoBytes.Length -lt 22 -or [BitConverter]::ToUInt16($icoBytes, 2) -ne 1) {
-        throw "ICO invalido: $Icon"
+        throw "ICO inválido: $Icon"
     }
     $count = [int][BitConverter]::ToUInt16($icoBytes, 4)
     if ($count -lt 1 -or $icoBytes.Length -lt 6 + (16 * $count)) {
-        throw "Tabela ICO invalida: $Icon"
+        throw "Tabela ICO inválida: $Icon"
     }
 
     for ($i = 0; $i -lt $count; $i++) {
         $length = [int][BitConverter]::ToUInt32($icoBytes, 6 + (16 * $i) + 8)
         $offset = [int][BitConverter]::ToUInt32($icoBytes, 6 + (16 * $i) + 12)
         if ($length -lt 1 -or $offset -lt 0 -or ([long]$offset + [long]$length) -gt $icoBytes.Length) {
-            throw "Entrada ICO invalida: $Icon"
+            throw "Entrada ICO inválida: $Icon"
         }
         $image = [byte[]]::new($length)
         [Array]::Copy($icoBytes, $offset, $image, 0, $length)
         if (-not [NexoFlowIconProbe]::ContainsBytes($exeBytes, $image)) {
-            throw "Imagem $($i + 1)/$count nao esta embutida em $Executable"
+            throw "Imagem $($i + 1)/$count não está embutida em $Executable"
         }
     }
-    Write-Host "[OK] Icone Windows extraivel e correto: $([IO.Path]::GetFileName($Executable)) ($count imagens)"
+    Write-Host "[OK] Ícone Windows extraivel e correto: $([IO.Path]::GetFileName($Executable)) ($count imagens)"
 }
 
 $icons = @(
@@ -119,4 +129,4 @@ foreach ($base in @($Project, (Join-Path $Setup "payload"))) {
 
 Assert-ExecutableIcon -Executable (Join-Path $Setup "NexoFlow Setup.exe") -Icon (Join-Path $RepoRoot "assets\installer.ico")
 
-Write-Host "[OK] Os nove executaveis distribuidos possuem seus icones PE corretos."
+Write-Host "[OK] Os nove executáveis distribuídos possuem seus ícones PE corretos."

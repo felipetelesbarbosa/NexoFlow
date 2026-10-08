@@ -1,5 +1,7 @@
 @echo off
+chcp 65001 >nul
 setlocal EnableExtensions
+set "PYTHONIOENCODING=utf-8"
 cd /d "%~dp0"
 title NexoFlow Weni - Carga Completa
 set "NEXOFLOW_LAUNCHER=1"
@@ -17,12 +19,12 @@ echo   [2] Parte 2/4 - segundos 25%%
 echo   [3] Parte 3/4 - terceiros 25%%
 echo   [4] Parte 4/4 - ultimos 25%%
 echo.
-echo As partes 25%% NAO sao incrementais.
+echo As partes 25%% NÃO são incrementais.
 echo Elas usam a mesma base congelada e devem ser executadas em ordem.
-echo Cada parte gera seu proprio dry-run, relatorio e snapshot revisavel.
+echo Cada parte gera seu próprio dry-run, relatório e snapshot revisável.
 echo.
 set "OPCAO="
-set /p "OPCAO=Opcao: " < CON
+set /p "OPÇÃO=Opção: " < CON
 
 set "PART="
 set "PART_ARG="
@@ -35,7 +37,7 @@ if "%OPCAO%"=="2" set "PART=2"
 if "%OPCAO%"=="3" set "PART=3"
 if "%OPCAO%"=="4" set "PART=4"
 if not defined PART (
-    echo [ERRO] Opcao invalida.
+    echo [ERRO] Opção inválida.
     pause < CON
     exit /b 2
 )
@@ -46,7 +48,7 @@ set "REVIEW_TXT=logs\weni_update_review_full_25_parte_%PART%.txt"
 
 :configurado
 if not exist "%~dp0scripts\confirmar_revisao_weni.ps1" (
-    echo [ERRO] Componente de revisao ausente: scripts\confirmar_revisao_weni.ps1
+    echo [ERRO] Componente de revisão ausente: scripts\confirmar_revisao_weni.ps1
     echo Reinstale o Setup atualizado do NexoFlow 1.0 antes de continuar.
     set "RC=3"
     goto :erro
@@ -58,19 +60,19 @@ if defined PART (
     echo [INFO] Carga completa Weni tradicional - 100%%.
 )
 echo.
-echo SEGURANCA NexoFlow 1.0 - ATENDIMENTO 24H:
+echo SEGURANÇA NexoFlow 1.0 - ATENDIMENTO 24H:
 echo   1. check-up
 echo   2. teste de acesso
 echo   3. dry-run + auditoria + snapshot congelado
-echo   4. revisao humana
+echo   4. revisão humana
 echo   5. apply EXATAMENTE do snapshot revisado
-echo   6. validacao individual antes de cada contato
+echo   6. validação individual antes de cada contato
 echo.
 if defined PART (
     echo Na carga 25%%, somente os contatos da Parte %PART%/4 entram no plano.
     echo A proxima parte reutiliza o mesmo manifesto congelado.
 ) else (
-    echo Esta rotina reanalisa 100%% da base disponivel.
+    echo Esta rotina reanalisa 100%% da base disponível.
 )
 echo.
 
@@ -93,38 +95,38 @@ set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto :erro
 
 if not exist "%REVIEW_JSON%" (
-    echo [ERRO] Snapshot de revisao nao foi gerado: %REVIEW_JSON%
+    echo [ERRO] Snapshot de revisão não foi gerado: %REVIEW_JSON%
     set "RC=3"
     goto :erro
 )
 if not exist "%REVIEW_TXT%" (
-    echo [ERRO] Relatorio de revisao nao foi gerado: %REVIEW_TXT%
+    echo [ERRO] Relatório de revisão não foi gerado: %REVIEW_TXT%
     set "RC=3"
     goto :erro
 )
 
 echo.
 echo ==========================================================
-echo REVISAO HUMANA OBRIGATORIA
+echo REVISÃO HUMANA OBRIGATÓRIA
 echo ==========================================================
 if defined PART echo Parte revisada: %PART%/4
-echo O relatorio sera aberto no Bloco de Notas.
+echo O relatório será aberto no Bloco de Notas.
 echo Confira especialmente LGPD, idade/maioridade, grupos, CPF e pedidos.
-echo O plano fica congelado enquanto voce revisa.
-echo O CMD ficara aguardando a confirmacao enquanto voce revisa.
+echo O plano fica congelado enquanto você revisa.
+echo O CMD ficará aguardando a confirmação enquanto você revisa.
 echo Depois de concluir, feche o Bloco de Notas e volte ao CMD.
 echo.
-rem Nao usar START /WAIT: o Bloco de Notas moderno pode usar processo intermediario
-rem e encerrar/alterar a espera do console. A confirmacao abaixo bloqueia no CON.
+rem Não usar START /WAIT: o Bloco de Notas moderno pode usar processo intermediário
+rem e encerrar/alterar a espera do console. A confirmação abaixo bloqueia no CON.
 start "" notepad.exe "%CD%\%REVIEW_TXT%"
 set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto :erro
 
 echo.
-echo [ETAPA 4/6] Confirmacao humana
+echo [ETAPA 4/6] Confirmação humana
 echo ----------------------------------------------------------
-echo [INFO] O CMD permanecera aguardando uma confirmacao em janela separada.
-echo Digite CARGA COMPLETA REVISADA nessa janela somente depois de revisar o relatorio.
+echo [INFO] O CMD permanecerá aguardando uma confirmação em janela separada.
+echo Digite CARGA COMPLETA REVISADA nessa janela somente depois de revisar o relatório.
 set "CONFIRM_PART="
 if defined PART set "CONFIRM_PART=-Part %PART%"
 "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -STA -ExecutionPolicy Bypass -File "%~dp0scripts\confirmar_revisao_weni.ps1" %CONFIRM_PART%
@@ -133,23 +135,23 @@ if "%RC%"=="2" goto :cancelado
 if not "%RC%"=="0" goto :erro
 
 echo.
-echo [ETAPA 5/6] Aplicando snapshot congelado com validacao por contato
+echo [ETAPA 5/6] Aplicando snapshot congelado com validação por contato
 echo ----------------------------------------------------------
 ".venv\Scripts\python.exe" run_update_weni.py --apply --full %PART_ARG% --require-review "%REVIEW_JSON%"
 set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto :erro
 
 echo.
-echo [ETAPA 6/6] Carga concluida
+echo [ETAPA 6/6] Carga concluída
 echo ==========================================================
 if defined PART (
-    echo [OK] Parte %PART%/4 concluida.
+    echo [OK] Parte %PART%/4 concluída.
     if not "%PART%"=="4" echo Execute a proxima parte quando desejar.
     if "%PART%"=="4" echo [OK] As quatro partes Weni foram concluídas nesta campanha.
 ) else (
-    echo [OK] Carga completa 100%% concluida.
+    echo [OK] Carga completa 100%% concluída.
 )
-echo Relatorio: %REVIEW_TXT%
+echo Relatório: %REVIEW_TXT%
 echo Snapshot:  %REVIEW_JSON%
 echo Manifesto 25%%: logs\full_load_25_manifest.json
 echo ==========================================================
@@ -158,16 +160,16 @@ exit /b 0
 
 :cancelado
 echo.
-echo [INFO] Operacao cancelada. Nenhuma alteracao foi aplicada.
-echo O snapshot permanece disponivel para consulta. Execute novamente para gerar uma nova revisao.
+echo [INFO] Operação cancelada. Nenhuma alteração foi aplicada.
+echo O snapshot permanece disponível para consulta. Execute novamente para gerar uma nova revisão.
 pause < CON
 exit /b 2
 
 :erro
 echo.
-echo [ERRO] Codigo de saida: %RC%
-echo [ERRO] Processo interrompido. Nenhuma etapa posterior deve ser presumida como concluida.
-if defined PART echo [INFO] A Parte %PART%/4 NAO deve ser presumida como concluida.
+echo [ERRO] Código de saída: %RC%
+echo [ERRO] Processo interrompido. Nenhuma etapa posterior deve ser presumida como concluída.
+if defined PART echo [INFO] A Parte %PART%/4 NÃO deve ser presumida como concluída.
 echo Consulte logs\nexoflow_update_weni.log.
 pause < CON
 exit /b %RC%

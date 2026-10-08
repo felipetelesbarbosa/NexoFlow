@@ -848,7 +848,7 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn("Get-CimInstance Win32_Process", uninstall)
         self.assertIn("Stop-Process", uninstall)
         self.assertIn("Remove-InstallDirectory", uninstall)
-        self.assertIn("Processos do NexoFlow que estiverem em execucao serao encerrados", uninstall)
+        self.assertIn("Processos do NexoFlow que estiverem em execução serão encerrados", uninstall)
         self.assertNotIn("-WindowStyle Hidden", uninstall)
         self.assertIn("NexoFlow-Uninstall-Stage2.ps1", uninstall)
         self.assertNotIn(r"cmd\.exe|powershell\.exe|pwsh\.exe", uninstall)

@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 setlocal
 cd /d "%~dp0"
 
@@ -8,7 +9,7 @@ echo ==============================================
 echo.
 
 if not exist ".venv\Scripts\python.exe" (
-    echo [ERRO] Ambiente .venv nao encontrado.
+    echo [ERRO] Ambiente .venv não encontrado.
     echo Execute instalar.bat primeiro.
     if not defined NEXOFLOW_LAUNCHER pause
     exit /b 1
@@ -32,12 +33,12 @@ echo [3/3] Auditando consistencia entre arquivos...
 if errorlevel 1 goto :erro
 
 echo.
-echo [OK] Codigo, testes e auditoria passaram.
+echo [OK] Código, testes e auditoria passaram.
 if not defined NEXOFLOW_LAUNCHER pause
 exit /b 0
 
 :erro
 echo.
-echo [ERRO] A verificacao encontrou um problema.
+echo [ERRO] A verificação encontrou um problema.
 if not defined NEXOFLOW_LAUNCHER pause
 exit /b 1

@@ -32,7 +32,7 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Instalar dependencias
+      - name: Instalar dependências
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
@@ -48,7 +48,7 @@ jobs:
         run: |
           python -m unittest discover -s tests -p "test_*.py" -v
 
-      - name: Auditoria de consistencia
+      - name: Auditoria de consistência
         shell: pwsh
         run: |
           python auditar_consistencia.py
@@ -63,7 +63,7 @@ jobs:
         run: |
           ./scripts/build_release.ps1 -Version "1.0"
 
-      - name: Validar icones incorporados nos executaveis
+      - name: Validar ícones incorporados nos executáveis
         shell: pwsh
         run: |
           ./scripts/test_executable_icons.ps1 -Version "1.0"

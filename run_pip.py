@@ -14,9 +14,9 @@ def _configure_proxy() -> None:
     except ModuleNotFoundError as exc:
         if exc.name == "secrets_config":
             print(
-                "[AVISO] secrets_config.py nao foi encontrado.\n"
-                "        O pip tentara usar conexao direta.\n"
-                "        Se estiver na empresa e o proxy exigir autenticacao,\n"
+                "[AVISO] secrets_config.py não foi encontrado.\n"
+                "        O pip tentará usar conexão direta.\n"
+                "        Se estiver na empresa e o proxy exigir autenticação,\n"
                 "        crie/configure secrets_config.py e execute novamente."
             )
             return
@@ -38,7 +38,7 @@ def main() -> int:
         _configure_proxy()
     except Exception as exc:
         print(
-            "[ERRO] Nao foi possivel configurar o proxy para o pip: "
+            "[ERRO] Não foi possível configurar o proxy para o pip: "
             f"{exc}"
         )
         return 1

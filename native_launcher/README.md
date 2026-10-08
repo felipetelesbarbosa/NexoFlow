@@ -35,3 +35,7 @@ O Setup usa `ExecutionPolicy Bypass` somente para iniciar o script PowerShell lo
 
 
 O `NexoFlow Uninstall.exe` é um launcher nativo **opcional** para `installer\uninstall.ps1`. Ele é distribuído por conveniência, mas não é requisito do Setup nem do check-up: se um antivírus/EDR corporativo removê-lo, a instalação e a desinstalação continuam disponíveis por **Aplicativos instalados**, `desinstalar_nexoflow.cmd` e `installer\uninstall.ps1`.
+
+### Português brasileiro
+
+Os pacotes recompilam os cinco launchers a partir destes fontes. A saída do console usa UTF-8 e os recursos de versão usam a tabela pt-BR 0416/04B0, preservando acentos e cedilha. A versão permanece NexoFlow 1.0.

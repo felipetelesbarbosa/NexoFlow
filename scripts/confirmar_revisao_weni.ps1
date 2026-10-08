@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$Part = ""
 )
@@ -16,30 +16,30 @@ function Confirm-WeniReview {
     param([string]$Part = "")
 
     $expected = "CARGA COMPLETA REVISADA"
-    $title = "NexoFlow Weni - Revisao Humana"
+    $title = "NexoFlow Weni - Revisão Humana"
     try {
         $partText = ""
         if ($Part) { $partText = " da Parte $Part/4" }
         $message = @"
-Revise o relatorio aberto no Bloco de Notas$partText.
+Revise o relatório aberto no Bloco de Notas$partText.
 
-Depois de concluir a revisao, digite exatamente:
+Depois de concluir a revisão, digite exatamente:
 
 $expected
 
-Fechar ou cancelar esta janela NAO aplica nenhuma alteracao.
+Fechar ou cancelar esta janela NÃO aplica nenhuma alteração.
 "@
         $response = [string](Show-WeniReviewDialog -Message $message -Title $title)
         if ($response.Trim().Equals($expected, [System.StringComparison]::OrdinalIgnoreCase)) {
-            Write-Host "[OK] Revisao humana confirmada."
+            Write-Host "[OK] Revisão humana confirmada."
             return 0
         }
-        Write-Host "[INFO] Confirmacao humana nao recebida. Nenhuma alteracao sera aplicada."
+        Write-Host "[INFO] Confirmação humana não recebida. Nenhuma alteração será aplicada."
         return 2
     }
     catch {
-        Write-Host "[ERRO] Nao foi possivel abrir a confirmacao humana grafica."
-        Write-Host "[ERRO] Nenhuma alteracao sera aplicada."
+        Write-Host "[ERRO] Não foi possível abrir a confirmação humana gráfica."
+        Write-Host "[ERRO] Nenhuma alteração será aplicada."
         return 3
     }
 }

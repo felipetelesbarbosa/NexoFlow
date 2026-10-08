@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)][string]$SetupZip
 )
 
@@ -61,7 +61,7 @@ function Invoke-Setup {
             Get-Content -LiteralPath $log -Tail 250
             Write-Host "------------------------------"
         }
-        throw "$Label falhou com codigo $($process.ExitCode)."
+        throw "$Label falhou com código $($process.ExitCode)."
     }
 }
 
@@ -80,7 +80,7 @@ function Assert-Installed {
         Assert-True (Test-Path -LiteralPath $path -PathType Leaf) "Arquivo instalado ausente: $relative"
     }
 
-    Assert-True (Test-Path -LiteralPath $UninstallKey) "Registro de desinstalacao nao foi criado."
+    Assert-True (Test-Path -LiteralPath $UninstallKey) "Registro de desinstalação não foi criado."
     $displayVersion = (Get-ItemProperty -LiteralPath $UninstallKey -Name DisplayVersion -ErrorAction Stop).DisplayVersion
     Assert-True ($displayVersion -eq "1.0") "DisplayVersion inesperada: $displayVersion"
 }
@@ -99,10 +99,10 @@ try {
     $env:NEXOFLOW_SETUP_NONINTERACTIVE = "1"
     $env:NEXOFLOW_PYTHON_EXE = $python
 
-    Invoke-Setup "Primeira instalacao"
+    Invoke-Setup "Primeira instalação"
     Assert-Installed
 
-    Write-Host "==> Criando dados privados para testar preservacao"
+    Write-Host "==> Criando dados privados para testar preservação"
     $secretText = @'
 WENI_API_TOKEN = "TOKEN_TESTE_WENI"
 GOOGLE_SPREADSHEET_ID = "PLANILHA_TESTE"
@@ -123,22 +123,22 @@ PROXY_DETECTION_TIMEOUT = 1.0
     [IO.File]::WriteAllText((Join-Path $InstallDir "credentials\google_credentials.json"), '{"smoke_test":true}', (New-Object Text.UTF8Encoding($false)))
     [IO.File]::WriteAllText((Join-Path $InstallDir "logs\setup-smoke-marker.txt"), "preservar", (New-Object Text.UTF8Encoding($false)))
 
-    Invoke-Setup "Atualizacao sobre instalacao existente"
+    Invoke-Setup "Atualização sobre instalação existente"
     Assert-Installed
-    Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir "logs\setup-smoke-marker.txt") -Raw).Trim() -eq "preservar") "Logs nao foram preservados na atualizacao."
-    Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir "credentials\google_credentials.json") -Raw) -match "smoke_test") "Credenciais nao foram preservadas na atualizacao."
-    Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir "secrets_config.py") -Raw) -match "TOKEN_TESTE_WENI") "secrets_config.py nao foi preservado."
+    Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir "logs\setup-smoke-marker.txt") -Raw).Trim() -eq "preservar") "Logs não foram preservados na atualização."
+    Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir "credentials\google_credentials.json") -Raw) -match "smoke_test") "Credenciais não foram preservadas na atualização."
+    Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir "secrets_config.py") -Raw) -match "TOKEN_TESTE_WENI") "secrets_config.py não foi preservado."
 
-    Write-Host "==> Simulando antivirus/EDR removendo o launcher opcional Uninstall"
+    Write-Host "==> Simulando antivírus/EDR removendo o launcher opcional Uninstall"
     $optionalSource = Join-Path $SetupDir "payload\NexoFlow Uninstall.exe"
     Remove-Item -LiteralPath $optionalSource -Force -ErrorAction SilentlyContinue
-    Assert-True (-not (Test-Path -LiteralPath $optionalSource)) "Nao foi possivel simular a remocao do Uninstall opcional."
+    Assert-True (-not (Test-Path -LiteralPath $optionalSource)) "Não foi possível simular a remoção do Uninstall opcional."
 
-    Invoke-Setup "Atualizacao sem NexoFlow Uninstall.exe no pacote extraido"
+    Invoke-Setup "Atualização sem NexoFlow Uninstall.exe no pacote extraido"
     Assert-Installed
     Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir "logs\setup-smoke-marker.txt") -Raw).Trim() -eq "preservar") "Dados privados foram perdidos sem o launcher opcional."
 
-    Write-Host "==> Executando check-up da instalacao real"
+    Write-Host "==> Executando check-up da instalação real"
     $oldLauncher = $env:NEXOFLOW_LAUNCHER
     $env:NEXOFLOW_LAUNCHER = "1"
     try {
@@ -149,7 +149,7 @@ PROXY_DETECTION_TIMEOUT = 1.0
             Get-Content -LiteralPath $checkOutput -Tail 150
             Get-Content -LiteralPath $checkError -Tail 150
         }
-        Assert-True ($check.ExitCode -eq 0) "check-up.bat instalado falhou com codigo $($check.ExitCode)."
+        Assert-True ($check.ExitCode -eq 0) "check-up.bat instalado falhou com código $($check.ExitCode)."
     }
     finally {
         if ($null -eq $oldLauncher) {
@@ -159,7 +159,7 @@ PROXY_DETECTION_TIMEOUT = 1.0
         }
     }
 
-    Write-Host "[OK] Smoke test do NexoFlow Setup 1.0 concluido."
+    Write-Host "[OK] Smoke test do NexoFlow Setup 1.0 concluído."
 }
 finally {
     Remove-Item Env:NEXOFLOW_SETUP_NONINTERACTIVE -ErrorAction SilentlyContinue

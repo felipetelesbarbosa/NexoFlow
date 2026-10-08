@@ -1,10 +1,12 @@
 @echo off
+chcp 65001 >nul
 setlocal EnableExtensions
+set "PYTHONIOENCODING=utf-8"
 cd /d "%~dp0"
 title NexoFlow Analytics - Carga Completa
 
 if not exist ".venv\Scripts\python.exe" (
-    echo Ambiente virtual nao encontrado. Execute instalar.bat primeiro.
+    echo Ambiente virtual não encontrado. Execute instalar.bat primeiro.
     pause
     exit /b 1
 )
@@ -22,10 +24,10 @@ echo   [2] Parte 2/4 - segundos 25%%
 echo   [3] Parte 3/4 - terceiros 25%%
 echo   [4] Parte 4/4 - ultimos 25%%
 echo.
-echo As partes 25%% NAO sao incrementais.
+echo As partes 25%% NÃO são incrementais.
 echo Elas usam uma base congelada e devem ser executadas em ordem.
 echo.
-set /p "OPCAO=Opcao: "
+set /p "OPÇÃO=Opção: "
 
 set "FULL_SYNC_QUARTER="
 if "%OPCAO%"=="0" goto :executar
@@ -34,7 +36,7 @@ if "%OPCAO%"=="2" set "FULL_SYNC_QUARTER=2"
 if "%OPCAO%"=="3" set "FULL_SYNC_QUARTER=3"
 if "%OPCAO%"=="4" set "FULL_SYNC_QUARTER=4"
 if not defined FULL_SYNC_QUARTER (
-    echo [ERRO] Opcao invalida.
+    echo [ERRO] Opção inválida.
     pause
     exit /b 2
 )
@@ -44,7 +46,7 @@ set "FORCE_FULL_SYNC=1"
 if defined FULL_SYNC_QUARTER (
     echo.
     echo [INFO] Executando Analytics - carga completa 25%% Parte %FULL_SYNC_QUARTER%/4.
-    echo [INFO] As outras partes nao serao processadas nesta execucao.
+    echo [INFO] As outras partes não serão processadas nesta execução.
 ) else (
     echo.
     echo [INFO] Executando Analytics - carga completa tradicional 100%%.
@@ -56,11 +58,11 @@ set "FORCE_FULL_SYNC="
 set "FULL_SYNC_QUARTER="
 
 echo.
-echo Codigo de saida: %EXIT_CODE%
+echo Código de saída: %EXIT_CODE%
 if "%EXIT_CODE%"=="3" (
-    echo [AVISO] Sincronizacao parcial. A parte NAO foi marcada como concluida.
+    echo [AVISO] Sincronização parcial. A parte NÃO foi marcada como concluída.
     echo Execute novamente a mesma parte depois de consultar logs\nexoflow.log.
 )
-if "%EXIT_CODE%"=="0" echo [OK] Carga concluida.
+if "%EXIT_CODE%"=="0" echo [OK] Carga concluída.
 pause
 exit /b %EXIT_CODE%

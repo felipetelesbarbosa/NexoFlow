@@ -54,7 +54,7 @@ function Ensure-Administrator {
         $process = Start-Process -FilePath $powershell -ArgumentList $args -Verb RunAs -Wait -PassThru -ErrorAction Stop
         exit $process.ExitCode
     } catch {
-        Show-Message "A desinstalacao precisa de permissao de administrador.`n`n$($_.Exception.Message)" "$AppName - Permissao necessaria" 'Warning'
+        Show-Message "A desinstalação precisa de permissão de administrador.`n`n$($_.Exception.Message)" "$AppName - Permissão necessária" 'Warning'
         exit 1
     }
 }
@@ -103,7 +103,7 @@ function Preserve-PrivateData {
 
     @"
 Dados preservados pelo desinstalador do NexoFlow.
-Uma futura instalacao restaurara automaticamente:
+Uma futura instalação restaurara automaticamente:
 - secrets_config.py
 - credentials\
 - logs\
@@ -257,7 +257,7 @@ if ($Stage2) {
         $details += "`n`nAlguns itens ainda presentes:`n" + ($remainingFiles -join "`n")
     }
 
-    Show-Message "Nao foi possivel remover completamente a pasta:`n$InstallDir$details`n`nFeche terminais ou janelas do Explorer posicionados nessa pasta e tente novamente." "$AppName - Erro" 'Error'
+    Show-Message "Não foi possível remover completamente a pasta:`n$InstallDir$details`n`nFeche terminais ou janelas do Explorer posicionados nessa pasta e tente novamente." "$AppName - Erro" 'Error'
     exit 1
 }
 
@@ -266,7 +266,7 @@ Ensure-Administrator
 try {
     Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
     $result = [System.Windows.Forms.MessageBox]::Show(
-        "Deseja manter configuracoes, credenciais e logs para uma futura reinstalacao?`n`nSIM (recomendado): preserva secrets_config.py, credentials e logs.`nNAO: remove todos os dados locais do sistema.`nCANCELAR: nao desinstala.`n`nProcessos do NexoFlow que estiverem em execucao serao encerrados para permitir a remocao segura.",
+        "Deseja manter configurações, credenciais e logs para uma futura reinstalacao?`n`nSIM (recomendado): preserva secrets_config.py, credentials e logs.`nNÃO: remove todos os dados locais do sistema.`nCANCELAR: não desinstala.`n`nProcessos do NexoFlow que estiverem em execução serão encerrados para permitir a remoção segura.",
         "$AppName - Desinstalar",
         'YesNoCancel',
         'Warning'
@@ -291,6 +291,6 @@ try {
     Start-Process -FilePath (Get-WindowsPowerShellPath) -ArgumentList $argLine -WorkingDirectory $tempWorkingDir
     exit 0
 } catch {
-    Show-Message "A desinstalacao nao foi concluida.`n`n$($_.Exception.Message)" "$AppName - Erro" 'Error'
+    Show-Message "A desinstalação não foi concluída.`n`n$($_.Exception.Message)" "$AppName - Erro" 'Error'
     exit 1
 }

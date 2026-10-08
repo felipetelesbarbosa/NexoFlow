@@ -44,7 +44,7 @@ function Ensure-Administrator {
     if (Test-Admin) { return }
 
     if ($NonInteractive) {
-        throw 'O modo nao interativo precisa ser executado com privilegios de administrador.'
+        throw 'O modo não interativo precisa ser executado com privilégios de administrador.'
     }
 
     $powershellExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
@@ -57,7 +57,7 @@ function Ensure-Administrator {
         $process = Start-Process -FilePath $powershellExe -ArgumentList $argumentLine -Verb RunAs -Wait -PassThru -ErrorAction Stop
         exit $process.ExitCode
     } catch {
-        throw "A instalacao precisa de permissao de administrador. Operacao cancelada ou negada pelo Windows. $($_.Exception.Message)"
+        throw "A instalação precisa de permissão de administrador. Operação cancelada ou negada pelo Windows. $($_.Exception.Message)"
     }
 }
 
@@ -179,9 +179,9 @@ raise SystemExit(0 if sys.version_info >= (3, 11) and bits == 64 else 3)
 
 function Get-CompatiblePython {
     $seen = @{}
-    # Fallback de seguranca: se um python.exe real existir mas o probe do
+    # Fallback de segurança: se um python.exe real existir mas o probe do
     # PowerShell falhar por alguma particularidade do ambiente, o caminho ainda
-    # pode ser entregue ao instalar.bat, que faz uma segunda validacao direta.
+    # pode ser entregue ao instalar.bat, que faz uma segunda validação direta.
     $fallback = [pscustomobject]@{ Path = $null }
 
     function Try-Candidate([string]$Executable, [string[]]$PrefixArguments = @()) {
@@ -192,7 +192,7 @@ function Get-CompatiblePython {
         $seen[$key] = $true
 
         # Guarda o primeiro python.exe real como fallback. Launchers (py.exe) e
-        # aliases de WindowsApps nao entram aqui.
+        # aliases de WindowsApps não entram aqui.
         if (-not $fallback.Path -and $PrefixArguments.Count -eq 0 -and [IO.Path]::IsPathRooted($Executable)) {
             $leaf = [IO.Path]::GetFileName($Executable)
             if (($leaf -match '(?i)^python(?:3(?:\.\d+)*)?\.exe$') -and ($Executable -notlike '*\WindowsApps\python*.exe') -and (Test-Path -LiteralPath $Executable -PathType Leaf)) {
@@ -214,9 +214,9 @@ function Get-CompatiblePython {
         if ($result) { return $result }
     }
 
-    # 1. Atalhos oficiais do Python no Menu Iniciar. O instalador classico
-    #    cria o atalho "Python X.Y.Z"; resolver o TargetPath obtem o python.exe
-    #    real mesmo quando ele nao foi adicionado ao PATH.
+    # 1. Atalhos oficiais do Python no Menu Iniciar. O instalador clássico
+    #    cria o atalho "Python X.Y.Z"; resolver o TargetPath obtém o python.exe
+    #    real mesmo quando ele não foi adicionado ao PATH.
     try {
         $shell = New-Object -ComObject WScript.Shell
         $startMenuRoots = New-Object System.Collections.Generic.List[string]
@@ -259,7 +259,7 @@ function Get-CompatiblePython {
         }
     } catch { }
 
-    # 2. PATH atual. Aliases de WindowsApps sao ignorados porque podem abrir a
+    # 2. PATH atual. Aliases de WindowsApps são ignorados porque podem abrir a
     #    Microsoft Store em vez de representar um runtime instalado.
     foreach ($commandName in @('python.exe','python3.exe','python3.14.exe','python3.13.exe','python3.12.exe','python3.11.exe')) {
         foreach ($command in (Get-Command $commandName -All -ErrorAction SilentlyContinue)) {
@@ -511,8 +511,8 @@ function Install-PythonIfNeeded {
     $python = Get-CompatiblePython
     if ($python) {
         if ($python.Validated -eq $false) {
-            Write-Host ("[OK] Executavel Python localizado: {0}" -f $python.Path) -ForegroundColor Green
-            Write-Host '[INFO] A validacao final de versao e arquitetura sera feita pelo preparar ambiente.' -ForegroundColor DarkYellow
+            Write-Host ("[OK] Executável Python localizado: {0}" -f $python.Path) -ForegroundColor Green
+            Write-Host '[INFO] A validação final de versão e arquitetura será feita pelo preparar ambiente.' -ForegroundColor DarkYellow
         } else {
             Write-Host ("[OK] Python {0} x{1} encontrado: {2}" -f $python.Version, $python.Bits, $python.Path) -ForegroundColor Green
         }
@@ -558,8 +558,8 @@ function Install-PythonIfNeeded {
         $python = Get-CompatiblePython
         if ($python) {
             if ($python.Validated -eq $false) {
-                Write-Host ("[OK] Executavel Python localizado: {0}" -f $python.Path) -ForegroundColor Green
-                Write-Host '[INFO] A validacao final de versao e arquitetura sera feita pelo preparar ambiente.' -ForegroundColor DarkYellow
+                Write-Host ("[OK] Executável Python localizado: {0}" -f $python.Path) -ForegroundColor Green
+                Write-Host '[INFO] A validação final de versão e arquitetura será feita pelo preparar ambiente.' -ForegroundColor DarkYellow
             } else {
                 Write-Host ("[OK] Python {0} x{1} localizado e validado: {2}" -f $python.Version, $python.Bits, $python.Path) -ForegroundColor Green
             }
@@ -595,8 +595,8 @@ function Install-PythonIfNeeded {
     $python = Get-CompatiblePython
     if ($python) {
         if ($python.Validated -eq $false) {
-            Write-Host ("[OK] Executavel Python localizado: {0}" -f $python.Path) -ForegroundColor Green
-            Write-Host '[INFO] A validacao final de versao e arquitetura sera feita pelo preparar ambiente.' -ForegroundColor DarkYellow
+            Write-Host ("[OK] Executável Python localizado: {0}" -f $python.Path) -ForegroundColor Green
+            Write-Host '[INFO] A validação final de versão e arquitetura será feita pelo preparar ambiente.' -ForegroundColor DarkYellow
         } else {
             Write-Host ("[OK] Python {0} x{1} localizado e validado: {2}" -f $python.Version, $python.Bits, $python.Path) -ForegroundColor Green
         }
@@ -623,18 +623,18 @@ function Confirm-Update {
     try {
         Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
         $result = [System.Windows.Forms.MessageBox]::Show(
-            "Uma instalacao do $AppName ja existe.`n`nDeseja atualizar/reinstalar mantendo configuracoes, credenciais e logs?",
-            "$AppName - Atualizacao", 'OKCancel', 'Question')
+            "Uma instalação do $AppName já existe.`n`nDeseja atualizar/reinstalar mantendo configurações, credenciais e logs?",
+            "$AppName - Atualização", 'OKCancel', 'Question')
         return ($result -eq [System.Windows.Forms.DialogResult]::OK)
     } catch {
-        $answer = Read-Host 'Instalacao existente encontrada. Atualizar/reinstalar? (S/N)'
+        $answer = Read-Host 'Instalação existente encontrada. Atualizar/reinstalar? (S/N)'
         return ($answer -match '^[Ss]')
     }
 }
 
 function Validate-Payload {
-    if (-not (Test-Path -LiteralPath $PayloadDir -PathType Container)) { throw "Pasta payload nao encontrada em: $PayloadDir" }
-    if (-not (Test-Path -LiteralPath $ManifestPath -PathType Leaf)) { throw "Manifesto de integridade nao encontrado: $ManifestPath" }
+    if (-not (Test-Path -LiteralPath $PayloadDir -PathType Container)) { throw "Pasta payload não encontrada em: $PayloadDir" }
+    if (-not (Test-Path -LiteralPath $ManifestPath -PathType Leaf)) { throw "Manifesto de integridade não encontrado: $ManifestPath" }
 
     $script:OptionalUninstallerValidated = $true
     $optionalRelative = 'NexoFlow Uninstall.exe'
@@ -649,7 +649,7 @@ function Validate-Payload {
         if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
             if ($relative -eq $optionalRelative) {
                 $script:OptionalUninstallerValidated = $false
-                Write-Warning "$optionalRelative foi removido ou bloqueado antes da instalacao. Como ele e opcional, o Setup continuara normalmente."
+                Write-Warning "$optionalRelative foi removido ou bloqueado antes da instalação. Como ele é opcional, o Setup continuará normalmente."
                 continue
             }
             throw "Arquivo ausente no pacote: $relative"
@@ -660,7 +660,7 @@ function Validate-Payload {
         } catch {
             if ($relative -eq $optionalRelative) {
                 $script:OptionalUninstallerValidated = $false
-                Write-Warning "Nao foi possivel validar $optionalRelative. O componente sera ignorado e o Setup continuara."
+                Write-Warning "Não foi possível validar $optionalRelative. O componente será ignorado e o Setup continuará."
                 continue
             }
             throw
@@ -669,7 +669,7 @@ function Validate-Payload {
         if ($hash -ne ([string]$entry.sha256).ToLowerInvariant()) {
             if ($relative -eq $optionalRelative) {
                 $script:OptionalUninstallerValidated = $false
-                Write-Warning "$optionalRelative divergiu do manifesto. Por seguranca ele nao sera instalado, mas o Setup continuara."
+                Write-Warning "$optionalRelative divergiu do manifesto. Por segurança ele não será instalado, mas o Setup continuará."
                 continue
             }
             throw "Falha de integridade no arquivo: $relative"
@@ -678,7 +678,7 @@ function Validate-Payload {
         $count++
     }
 
-    Write-Host "[OK] Integridade dos componentes obrigatorios validada ($count arquivos)." -ForegroundColor Green
+    Write-Host "[OK] Integridade dos componentes obrigatórios validada ($count arquivos)." -ForegroundColor Green
 }
 
 function Ensure-InstalledPayloadFile([string]$RelativePath) {
@@ -725,7 +725,7 @@ function Install-OptionalUninstaller {
     $relative = 'NexoFlow Uninstall.exe'
 
     if (-not $script:OptionalUninstallerValidated) {
-        Write-Warning "$relative nao sera instalado porque nao passou pela validacao opcional do pacote. A desinstalacao por script permanece funcional."
+        Write-Warning "$relative não será instalado porque não passou pela validação opcional do pacote. A desinstalação por script permanece funcional."
         return
     }
     $source = Join-Path $PayloadDir $relative
@@ -805,7 +805,7 @@ function Stop-InstalledNexoFlowProcesses {
 
     if (-not $targets) { return }
 
-    Write-Host '[INFO] Fechando processos da instalacao anterior antes da atualizacao:' -ForegroundColor DarkYellow
+    Write-Host '[INFO] Fechando processos da instalação anterior antes da atualização:' -ForegroundColor DarkYellow
     $taskkill = Join-Path $env:SystemRoot 'System32\taskkill.exe'
     foreach ($process in ($targets | Sort-Object Id -Unique)) {
         try {
@@ -839,7 +839,7 @@ function Remove-DirectoryWithRetry {
         }
     }
 
-    Write-Warning "Nao foi possivel remover completamente: $Path. Detalhe: $lastError"
+    Write-Warning "Não foi possível remover completamente: $Path. Detalhe: $lastError"
     return $false
 }
 
@@ -852,7 +852,7 @@ function Stage-ExistingInstall {
     for ($attempt = 1; $attempt -le 20; $attempt++) {
         try {
             Move-Item -LiteralPath $InstallDir -Destination $rollback -Force -ErrorAction Stop
-            Write-Host "[OK] Instalacao anterior preservada para rollback seguro." -ForegroundColor Green
+            Write-Host "[OK] Instalação anterior preservada para rollback seguro." -ForegroundColor Green
             return $rollback
         } catch {
             $lastError = $_.Exception.Message
@@ -860,7 +860,7 @@ function Stage-ExistingInstall {
         }
     }
 
-    throw "Nao foi possivel preparar a atualizacao segura de $InstallDir. A instalacao anterior foi mantida intacta. Feche terminais/Explorer nessa pasta e tente novamente. Detalhe: $lastError"
+    throw "Não foi possível preparar a atualização segura de $InstallDir. A instalação anterior foi mantida intacta. Feche terminais/Explorer nessa pasta e tente novamente. Detalhe: $lastError"
 }
 
 function Restore-PreviousInstall {
@@ -880,10 +880,10 @@ function Restore-PreviousInstall {
 
     try {
         Move-Item -LiteralPath $RollbackPath -Destination $InstallDir -Force -ErrorAction Stop
-        Write-Host "[OK] Instalacao anterior restaurada automaticamente." -ForegroundColor Green
+        Write-Host "[OK] Instalação anterior restaurada automaticamente." -ForegroundColor Green
         return $true
     } catch {
-        Write-Warning "Falha ao restaurar automaticamente a instalacao anterior: $($_.Exception.Message)"
+        Write-Warning "Falha ao restaurar automaticamente a instalação anterior: $($_.Exception.Message)"
         return $false
     }
 }
@@ -897,7 +897,7 @@ function Refresh-NexoFlowIconCache([string[]]$Executables) {
                 (Get-Item -LiteralPath $exePath).LastWriteTime = Get-Date
             }
         } catch {
-            Write-Warning "Nao foi possivel atualizar o timestamp de ${exePath}: $($_.Exception.Message)"
+            Write-Warning "Não foi possível atualizar o timestamp de ${exePath}: $($_.Exception.Message)"
         }
     }
 
@@ -916,7 +916,7 @@ public static class NexoFlowShellIconRefresh {
         # SHCNE_ASSOCCHANGED = 0x08000000; SHCNF_IDLIST = 0
         [NexoFlowShellIconRefresh]::SHChangeNotify(0x08000000, 0, [IntPtr]::Zero, [IntPtr]::Zero)
     } catch {
-        Write-Warning "Nao foi possivel notificar o Explorer sobre os novos icones: $($_.Exception.Message)"
+        Write-Warning "Não foi possível notificar o Explorer sobre os novos ícones: $($_.Exception.Message)"
     }
 
     $ie4uinit = Join-Path $env:SystemRoot 'System32\ie4uinit.exe'
@@ -992,15 +992,15 @@ try {
     $pythonScripts = Join-Path $pythonDir 'Scripts'
     $env:Path = "$pythonDir;$pythonScripts;$env:Path"
     if (Test-Path -LiteralPath $InstallDir -PathType Container) {
-        if (-not (Confirm-Update)) { Write-Host '[INFO] Instalacao cancelada pelo usuario.'; try { Stop-Transcript | Out-Null } catch { }; exit 2 }
-        Write-Step 'Fechando processos da instalacao anterior'
+        if (-not (Confirm-Update)) { Write-Host '[INFO] Instalação cancelada pelo usuário.'; try { Stop-Transcript | Out-Null } catch { }; exit 2 }
+        Write-Step 'Fechando processos da instalação anterior'
         Stop-InstalledNexoFlowProcesses
     }
 
     $backupDir = Join-Path $env:TEMP ('NexoFlow Setup ' + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
 
-    Write-Step 'Preservando configuracoes, credenciais e logs existentes'
+    Write-Step 'Preservando configurações, credenciais e logs existentes'
     Backup-PrivateData -Source $LegacyDataDir -Backup (Join-Path $backupDir 'legacy preserved')
     Backup-PrivateData -Source $LegacyInstallDir -Backup (Join-Path $backupDir 'legacy installed')
     Backup-PrivateData -Source $DataDir -Backup (Join-Path $backupDir 'preserved')
@@ -1021,7 +1021,7 @@ try {
     Restore-PrivateData -Backup (Join-Path $backupDir 'preserved') -Target $InstallDir
     Restore-PrivateData -Backup (Join-Path $backupDir 'installed') -Target $InstallDir
 
-    Write-Step 'Preparando ambiente Python e dependencias'
+    Write-Step 'Preparando ambiente Python e dependências'
     $oldInstaller = $env:NEXOFLOW_INSTALLER
     $oldPythonExe = $env:NEXOFLOW_PYTHON_EXE
     $env:NEXOFLOW_INSTALLER = '1'
@@ -1033,7 +1033,7 @@ try {
         if ($null -eq $oldInstaller) { Remove-Item Env:NEXOFLOW_INSTALLER -ErrorAction SilentlyContinue } else { $env:NEXOFLOW_INSTALLER = $oldInstaller }
         if ($null -eq $oldPythonExe) { Remove-Item Env:NEXOFLOW_PYTHON_EXE -ErrorAction SilentlyContinue } else { $env:NEXOFLOW_PYTHON_EXE = $oldPythonExe }
     }
-    if ($installRc -ne 0) { throw "A preparacao do ambiente Python falhou (codigo $installRc). Os arquivos e dados privados foram preservados." }
+    if ($installRc -ne 0) { throw "A preparação do ambiente Python falhou (código $installRc). Os arquivos e dados privados foram preservados." }
 
     Write-Step 'Validando componentes instalados'
     foreach ($requiredFile in @('NexoFlow Analytics.exe','NexoFlow Weni.exe','NexoFlow Terminal.exe','installer\uninstall.ps1','desinstalar_nexoflow.cmd','scripts\confirmar_revisao_weni.ps1')) {
@@ -1076,11 +1076,11 @@ try {
     }
     $startMenu = Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs\NexoFlow'
     if (Test-Path -LiteralPath $startMenu) { Remove-Item -LiteralPath $startMenu -Recurse -Force -ErrorAction SilentlyContinue }
-    Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Analytics.lnk') -TargetPath $appExe -WorkingDirectory $InstallDir -Description 'Valida o ambiente e executa uma sincronizacao incremental do NexoFlow' -IconPath $appIcon
+    Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Analytics.lnk') -TargetPath $appExe -WorkingDirectory $InstallDir -Description 'Valida o ambiente e executa uma sincronização incremental do NexoFlow' -IconPath $appIcon
     Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Weni.lnk') -TargetPath $updateExe -WorkingDirectory $InstallDir -Description 'Audita e atualiza contatos e campos da Weni' -IconPath $updateIcon
     Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Terminal.lnk') -TargetPath $terminalExe -WorkingDirectory $InstallDir -Description 'Terminal NexoFlow com ambiente e proxy preparados para a sessao' -IconPath $terminalIcon
-    Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Analytics.lnk') -TargetPath $appExe -WorkingDirectory $InstallDir -Description 'Sincronizacao manual segura do NexoFlow' -IconPath $appIcon
-    Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Weni.lnk') -TargetPath $updateExe -WorkingDirectory $InstallDir -Description 'Atualizacao segura de contatos e campos da Weni' -IconPath $updateIcon
+    Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Analytics.lnk') -TargetPath $appExe -WorkingDirectory $InstallDir -Description 'Sincronização manual segura do NexoFlow' -IconPath $appIcon
+    Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Weni.lnk') -TargetPath $updateExe -WorkingDirectory $InstallDir -Description 'Atualização segura de contatos e campos da Weni' -IconPath $updateIcon
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Terminal.lnk') -TargetPath $terminalExe -WorkingDirectory $InstallDir -Description 'Terminal NexoFlow com ambiente e proxy preparados para a sessao' -IconPath $terminalIcon
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'Desinstalar NexoFlow.lnk') -TargetPath $uninstallCmd -WorkingDirectory $InstallDir -Description 'Desinstala o NexoFlow' -IconPath (Join-Path $InstallDir 'assets\uninstaller.ico')
     $documentation = Join-Path $InstallDir 'Documentacao NexoFlow.html'
@@ -1089,10 +1089,10 @@ try {
     }
     Write-Host '[OK] Atalhos "NexoFlow Analytics", "NexoFlow Weni" e "NexoFlow Terminal" criados na Area de Trabalho.' -ForegroundColor Green
 
-    Write-Step 'Atualizando cache de icones do Windows'
+    Write-Step 'Atualizando cache de ícones do Windows'
     $uninstallExe = Join-Path $InstallDir 'NexoFlow Uninstall.exe'
     Refresh-NexoFlowIconCache -Executables @($appExe, $updateExe, $terminalExe, $uninstallExe)
-    Write-Host '[OK] Explorer notificado para reler os icones internos dos executaveis do NexoFlow.' -ForegroundColor Green
+    Write-Host '[OK] Explorer notificado para reler os ícones internos dos executáveis do NexoFlow.' -ForegroundColor Green
 
     Write-Step 'Registrando NexoFlow no Windows'
     Register-Uninstaller
@@ -1100,7 +1100,7 @@ try {
 
     if ($script:RollbackInstallDir -and (Test-Path -LiteralPath $script:RollbackInstallDir -PathType Container)) {
         if (-not (Remove-DirectoryWithRetry -Path $script:RollbackInstallDir -Attempts 20)) {
-            Write-Warning "A atualizacao foi concluida, mas a copia de rollback antiga permaneceu em: $script:RollbackInstallDir"
+            Write-Warning "A atualização foi concluída, mas a copia de rollback antiga permaneceu em: $script:RollbackInstallDir"
         } else {
             $script:RollbackInstallDir = $null
         }
@@ -1113,9 +1113,9 @@ try {
     $hasGoogle = Test-Path -LiteralPath (Join-Path $InstallDir 'credentials\google_credentials.json') -PathType Leaf
     Write-Host "`n[OK] $AppName instalado com sucesso." -ForegroundColor Green
     if ($hasSecrets -and $hasGoogle) {
-        Show-Info "NexoFlow foi instalado/atualizado com sucesso.`n`nOs atalhos NexoFlow Analytics, NexoFlow Weni e NexoFlow Terminal foram criados na Area de Trabalho.`n`nNexoFlow Weni executa check-up, teste de conexoes, dry-run/auditoria obrigatoria e somente depois permite aplicar as alteracoes."
+        Show-Info "NexoFlow foi instalado/atualizado com sucesso.`n`nOs atalhos NexoFlow Analytics, NexoFlow Weni e NexoFlow Terminal foram criados na Area de Trabalho.`n`nNexoFlow Weni executa check-up, teste de conexões, dry-run/auditoria obrigatória e somente depois permite aplicar as alterações."
     } else {
-        Show-Info "NexoFlow foi instalado.`n`nOs atalhos NexoFlow Analytics, NexoFlow Weni e NexoFlow Terminal foram criados na Area de Trabalho.`n`nAntes da primeira execucao, configure:`n- secrets_config.py`n- credentials\google_credentials.json"
+        Show-Info "NexoFlow foi instalado.`n`nOs atalhos NexoFlow Analytics, NexoFlow Weni e NexoFlow Terminal foram criados na Area de Trabalho.`n`nAntes da primeira execução, configure:`n- secrets_config.py`n- credentials\google_credentials.json"
     }
     try { Stop-Transcript | Out-Null } catch { }
     exit 0
@@ -1125,7 +1125,7 @@ catch {
     $rollbackRestored = $false
 
     if ($script:RollbackInstallDir) {
-        Write-Host "`n[INFO] A instalacao falhou. Tentando restaurar automaticamente a versao anterior..." -ForegroundColor DarkYellow
+        Write-Host "`n[INFO] A instalação falhou. Tentando restaurar automaticamente a versão anterior..." -ForegroundColor DarkYellow
         $rollbackRestored = Restore-PreviousInstall -RollbackPath $script:RollbackInstallDir
         if ($rollbackRestored) {
             $script:RollbackInstallDir = $null
@@ -1143,16 +1143,16 @@ catch {
 
     Write-Host "`n[ERRO] $errorMessage" -ForegroundColor Red
     if ($rollbackRestored) {
-        Write-Host "[OK] A instalacao anterior foi restaurada; o NexoFlow nao ficou parcialmente atualizado." -ForegroundColor Green
+        Write-Host "[OK] A instalação anterior foi restaurada; o NexoFlow não ficou parcialmente atualizado." -ForegroundColor Green
     }
     Write-Host "[INFO] Log do Setup: $SetupLogPath" -ForegroundColor DarkYellow
 
     $rollbackMessage = if ($rollbackRestored) {
-        "`n`nA instalacao anterior foi restaurada automaticamente."
+        "`n`nA instalação anterior foi restaurada automaticamente."
     } else {
-        "`n`nDados privados existentes foram preservados sempre que possivel."
+        "`n`nDados privados existentes foram preservados sempre que possível."
     }
-    Show-Info "A instalacao nao foi concluida.`n`n$errorMessage`n`nLog: $SetupLogPath$rollbackMessage" "$AppName - Erro"
+    Show-Info "A instalação não foi concluída.`n`n$errorMessage`n`nLog: $SetupLogPath$rollbackMessage" "$AppName - Erro"
     try { Stop-Transcript | Out-Null } catch { }
     exit 1
 }

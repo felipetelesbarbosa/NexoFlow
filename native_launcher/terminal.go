@@ -43,14 +43,14 @@ func main() {
 
     exe, err := os.Executable()
     if err != nil {
-        fmt.Fprintf(os.Stderr, "[ERRO] Nao foi possivel localizar o NexoFlow Terminal: %v\n", err)
+        fmt.Fprintf(os.Stderr, "[ERRO] Não foi possível localizar o NexoFlow Terminal: %v\n", err)
         waitEnter()
         os.Exit(1)
     }
     exe, _ = filepath.Abs(exe)
     installDir := filepath.Dir(exe)
     if err := os.Chdir(installDir); err != nil {
-        fmt.Fprintf(os.Stderr, "[ERRO] Nao foi possivel acessar a pasta do NexoFlow: %v\n", err)
+        fmt.Fprintf(os.Stderr, "[ERRO] Não foi possível acessar a pasta do NexoFlow: %v\n", err)
         waitEnter()
         os.Exit(1)
     }
@@ -61,7 +61,7 @@ func main() {
     }
     python, prefix := findPython(installDir)
     if python == "" {
-        fmt.Println("[ERRO] Python compativel nao foi encontrado.")
+        fmt.Println("[ERRO] Python compatível não foi encontrado.")
         fmt.Println("Execute o NexoFlow Setup para preparar o ambiente.")
         waitEnter()
         os.Exit(2)

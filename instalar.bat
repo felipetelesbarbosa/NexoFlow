@@ -1,9 +1,11 @@
 @echo off
+chcp 65001 >nul
 setlocal EnableExtensions
+set "PYTHONIOENCODING=utf-8"
 cd /d "%~dp0"
 
 echo ==============================================
-echo NexoFlow - Preparacao do ambiente
+echo NexoFlow - Preparação do ambiente
 echo ==============================================
 echo.
 
@@ -67,8 +69,8 @@ if not defined PYTHON_EXE (
 )
 
 if not defined PYTHON_EXE (
-    echo [ERRO] Python 3.11 ou superior, 64 bits, nao foi encontrado.
-    echo Instale um Python compativel ou execute o NexoFlow Setup.
+    echo [ERRO] Python 3.11 ou superior, 64 bits, não foi encontrado.
+    echo Instale um Python compatível ou execute o NexoFlow Setup.
     if not defined NEXOFLOW_INSTALLER pause
     exit /b 1
 )
@@ -77,7 +79,7 @@ if not defined PYTHON_EXE (
 if errorlevel 1 goto :erro
 "%PYTHON_EXE%" %PYTHON_PREFIX% -c "import struct,sys; raise SystemExit(0 if sys.version_info >= (3,11) and struct.calcsize('P')*8 == 64 else 1)"
 if errorlevel 1 (
-    echo [ERRO] O Python encontrado nao atende ao requisito: Python 3.11 ou superior, 64 bits.
+    echo [ERRO] O Python encontrado não atende ao requisito: Python 3.11 ou superior, 64 bits.
     if not defined NEXOFLOW_INSTALLER pause
     exit /b 1
 )
@@ -89,13 +91,13 @@ if not exist ".venv\Scripts\python.exe" (
 )
 
 echo.
-echo Verificando configuracao do proxy...
+echo Verificando configuração do proxy...
 if exist "secrets_config.py" (
     echo secrets_config.py encontrado.
 ) else (
-    echo [AVISO] secrets_config.py nao foi encontrado.
-    echo O pip tentara usar conexao direta.
-    echo Se estiver na rede da empresa e o proxy exigir autenticacao,
+    echo [AVISO] secrets_config.py não foi encontrado.
+    echo O pip tentará usar conexão direta.
+    echo Se estiver na rede da empresa e o proxy exigir autenticação,
     echo configure secrets_config.py e execute novamente.
     echo.
 )
@@ -105,7 +107,7 @@ echo Atualizando pip...
 if errorlevel 1 goto :erro_proxy
 
 echo.
-echo Instalando dependencias...
+echo Instalando dependências...
 ".venv\Scripts\python.exe" run_pip.py install -r requirements.txt
 if errorlevel 1 goto :erro_proxy
 
@@ -115,7 +117,7 @@ echo Ambiente preparado com sucesso.
 echo ==============================================
 echo.
 if not defined NEXOFLOW_INSTALLER (
-    echo Proximos passos:
+    echo Próximos passos:
     echo 1. Verifique secrets_config.py
     echo 2. Verifique credentials\google_credentials.json
     echo 3. Execute check-up.bat
@@ -128,17 +130,17 @@ exit /b 0
 :erro_proxy
 echo.
 echo ==============================================
-echo [ERRO] Falha ao instalar dependencias.
+echo [ERRO] Falha ao instalar dependências.
 echo ==============================================
 echo.
 echo Se apareceu "407 Proxy Authentication Required", verifique
-echo secrets_config.py e as configuracoes PROXY_MODE/PROXY_USER/PROXY_PASSWORD.
+echo secrets_config.py e as configurações PROXY_MODE/PROXY_USER/PROXY_PASSWORD.
 echo.
 if not defined NEXOFLOW_INSTALLER pause
 exit /b 1
 
 :erro
 echo.
-echo [ERRO] Falha durante a preparacao do ambiente.
+echo [ERRO] Falha durante a preparação do ambiente.
 if not defined NEXOFLOW_INSTALLER pause
 exit /b 1
