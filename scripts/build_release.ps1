@@ -207,6 +207,13 @@ foreach ($folder in @($ProjectRoot, $PayloadDir)) {
 }
 
 # O manifest deve refletir os EXEs depois da incorporação dos ícones.
+Write-Host "==> Auditando os executáveis recompilados no projeto completo"
+Push-Location $ProjectRoot
+try {
+    & python auditar_consistencia.py
+    if ($LASTEXITCODE -ne 0) { throw "A auditoria dos arquivos empacotados falhou." }
+}
+finally { Pop-Location }
 Write-PayloadManifest -Payload $PayloadDir
 
 New-Item -ItemType Directory -Force -Path (Join-Path $SetupRoot "installer") | Out-Null

@@ -67,6 +67,17 @@ public static class NexoFlowVersionResource {
         try {
             if (!UpdateResourceW(handle, (IntPtr)16, (IntPtr)1, 1046, data, (uint)data.Length))
                 throw new System.ComponentModel.Win32Exception();
+            // Rebuilding a PE also requires restoring its privilege manifest.
+            const string manifest = @"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
+<assembly xmlns=""urn:schemas-microsoft-com:asm.v1"" manifestVersion=""1.0"">
+<assemblyIdentity name=""NexoFlow"" version=""1.0.0.0"" processorArchitecture=""amd64"" type=""win32""/>
+<trustInfo xmlns=""urn:schemas-microsoft-com:asm.v3""><security><requestedPrivileges>
+<requestedExecutionLevel level=""asInvoker"" uiAccess=""false""/>
+</requestedPrivileges></security></trustInfo>
+</assembly>";
+            var manifestBytes = Encoding.UTF8.GetBytes(manifest);
+            if (!UpdateResourceW(handle, (IntPtr)24, (IntPtr)1, 0, manifestBytes, (uint)manifestBytes.Length))
+                throw new System.ComponentModel.Win32Exception();
             success = true;
         } finally {
             if (!EndUpdateResourceW(handle, !success))
