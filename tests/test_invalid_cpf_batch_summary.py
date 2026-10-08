@@ -53,13 +53,16 @@ class InvalidCpfBatchSummaryTests(unittest.TestCase):
             self.assertIn(label + "=1", text)
 
     def test_identity_failure_remains_blocked_without_warning_per_contact(self):
+        import logging
         for status in ["CPF_IDENTIDADE_DIVERGENTE", "CPF_IDENTIDADE_AMBIGUA",
                        "CPF_IDENTIDADE_INSUFICIENTE"]:
             with self.subTest(status=status):
                 plan = ContactUpdatePlan("synthetic")
                 with patch("weni_update.resolve_contact_order", return_value=(
                     {"status_confirmacao": status}, [],
-                )), patch("weni_update.logging.warning") as warning:
+                )), patch("weni_update.logging.getLogger") as root, \
+                        patch("weni_update.logging.log") as log:
+                    root.return_value.isEnabledFor.return_value = True
                     accepted = _apply_purchase_candidate(
                         plan, {"uuid": "synthetic", "fields": {"cpf": "0"}},
                         farm_client=Mock(), captured_at="2026-10-08T10:00:00Z",
@@ -69,7 +72,8 @@ class InvalidCpfBatchSummaryTests(unittest.TestCase):
                 self.assertFalse(plan.order_found)
                 self.assertEqual(plan.order_resolution_status, status)
                 self.assertEqual(plan.fields, {})
-                warning.assert_not_called()
+                self.assertEqual(log.call_args.args[0], logging.DEBUG)
+                self.assertNotIn("synthetic", str(log.call_args))
 
     def test_order_found_is_not_lost_when_existing_order_date_is_newer(self):
         plan = ContactUpdatePlan("synthetic")
@@ -98,12 +102,28 @@ class InvalidCpfBatchSummaryTests(unittest.TestCase):
         plan = ContactUpdatePlan("synthetic")
         with patch("weni_update.resolve_contact_order", return_value=(
             {"status_confirmacao": "CPF_IDENTIDADE_AMBIGUA"}, [],
-        )), patch("weni_update.logging.log") as log:
+        )), patch("weni_update.logging.getLogger") as root, \
+                patch("weni_update.logging.log") as log:
+            root.return_value.isEnabledFor.return_value = True
             _apply_purchase_candidate(
                 plan, {"uuid": "synthetic", "fields": {"cpf": "52998224725"}},
                 farm_client=Mock(), captured_at="2026-10-08T10:00:00Z",
             )
         self.assertEqual(log.call_args.args[0], logging.WARNING)
+        self.assertFalse(plan.order_validated)
+
+    def test_quiet_checkup_does_not_force_identity_warning(self):
+        plan = ContactUpdatePlan("synthetic")
+        with patch("weni_update.resolve_contact_order", return_value=(
+            {"status_confirmacao": "CPF_IDENTIDADE_AMBIGUA"}, [],
+        )), patch("weni_update.logging.getLogger") as root, \
+                patch("weni_update.logging.log") as log:
+            root.return_value.isEnabledFor.return_value = False
+            _apply_purchase_candidate(
+                plan, {"uuid": "synthetic", "fields": {"cpf": "52998224725"}},
+                farm_client=Mock(), captured_at="2026-10-08T10:00:00Z",
+            )
+        log.assert_not_called()
         self.assertFalse(plan.order_validated)
 
     def test_diagnostic_metadata_does_not_change_frozen_plan_digest(self):
