@@ -240,6 +240,10 @@ O NexoFlow usa interpretação conservadora:
 
 ## Pedidos e FarmaLíder API
 
+A preparação Weni resume a checagem de CPFs inválidos em lotes de até **500 contatos**, incluindo o último lote parcial e um total final. O resumo mostra pedidos encontrados e validados, divergências, identidade ambígua, dados insuficientes, cliente não encontrado e outros impedimentos. O total também aparece no relatório da revisão humana e no resumo do terminal. Os avisos individuais de identidade ficam no nível DEBUG.
+
+Esses lotes organizam o acompanhamento: o endpoint continua recebendo uma consulta por CPF. As contagens são por contato Weni, incluem pedidos cancelados e contatos sem alterações e não representam vendas, pedidos únicos ou gravações. A validação por nome e e-mail ou telefone continua obrigatória para CPFs inválidos.
+
 A **FarmaLíder API é a fonte de verdade dos pedidos**. Os campos de pedido da Weni funcionam como destino/cache operacional e são atualizados pela rotina auditada.
 
 Fluxo principal:

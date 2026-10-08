@@ -177,8 +177,18 @@ class CpfQueryPriorityTests(unittest.TestCase):
              patch("weni_update._open_farmalider", return_value=farm), \
              patch("weni_update._load_state", return_value={}), \
              patch("weni_update.resolve_window", return_value=window), \
-             patch("weni_update._append_audit"), patch("weni_update._save_state"):
-            weni_update.run_update(apply=False, full=True)
+             patch("weni_update._append_audit"), patch("weni_update._save_state"), \
+             tempfile.TemporaryDirectory() as tmp:
+            review = Path(tmp) / "review.json"
+            result = weni_update.run_update(apply=False, full=True, review_out=review)
+            self.assertEqual(result.invalid_cpf_checked, 2)
+            self.assertEqual(result.invalid_cpf_orders_found, 0)
+            self.assertEqual(result.invalid_cpf_outcomes, {"CPF_NAO_ENCONTRADO": 2})
+            payload = json.loads(review.read_text(encoding="utf-8"))
+            self.assertEqual(payload["summary"]["invalid_cpf_checked"], 2)
+            resumed = weni_update.run_update(apply=True, full=True, require_review=review)
+            self.assertEqual(resumed.invalid_cpf_checked, 2)
+            self.assertEqual(resumed.invalid_cpf_outcomes, result.invalid_cpf_outcomes)
         self.assertEqual(calls, [VALID, "0", "123"])
         client.update_contact_fields.assert_not_called()
         client.contact_group_action.assert_not_called()

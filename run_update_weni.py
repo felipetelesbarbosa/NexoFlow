@@ -52,7 +52,7 @@ def main() -> int:
 
     from config import WENI_UPDATE_LOG_FILE
     from logging_config import configure_logging
-    from weni_update import check_update_connections, run_update
+    from weni_update import _invalid_cpf_summary, check_update_connections, run_update
 
     configure_logging(WENI_UPDATE_LOG_FILE)
     logging.info("NexoFlow Weni iniciado.")
@@ -130,6 +130,9 @@ def main() -> int:
         print(f"Contatos com pedido validado (inclusive sem alteração): {stats.orders_validated}")
         print(f"Contatos com pedido cancelado por pagamento 0: {stats.orders_cancelled_payment_zero}")
         print(f"Contatos com pedido pendente de pagamento: {stats.orders_pending_payment}")
+        if stats.invalid_cpf_checked:
+            print("CPFs inválidos: " + _invalid_cpf_summary(stats))
+            print("Contagens por contato, incluindo cancelados; não são vendas nem pedidos únicos.")
         if stats.payment_unmapped_codes:
             print(
                 "Pagamento não identificado por código: "

@@ -2,6 +2,14 @@
 
 ## NexoFlow 1.0
 
+### Resumo da checagem de CPFs inválidos
+
+- resultados exibidos por lotes de até 500 contatos, com o último lote parcial e total da preparação;
+- contagens separam pedido encontrado, pedido validado, divergência, identidade ambígua, dados insuficientes e outros impedimentos;
+- avisos individuais de identidade ficam em DEBUG; totais permanecem no console, no log e no relatório de revisão;
+- contagens incluem contatos sem alterações e pedidos cancelados; não representam vendas, pedidos únicos ou gravações realizadas;
+- o resumo do dry-run é preservado ao aplicar o snapshot revisado, sem repetir consultas.
+
 ### Identidade de clientes com CPF inválido
 
 - nome completo e e-mail, ou nome completo e telefone, são obrigatórios para confirmar o cliente;

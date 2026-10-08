@@ -27,6 +27,7 @@ from ad_attribution import (
     extract_google_ads_attribution,
 )
 from config import (
+    FARMALIDER_BATCH_SIZE,
     WENI_UPDATE_AUDIT_FILE,
     WENI_UPDATE_CONTEXT_LOOKBACK_HOURS,
     WENI_UPDATE_INITIAL_LOOKBACK_DAYS,
@@ -161,6 +162,8 @@ class ContactUpdatePlan:
     order_validated: bool = False
     # Diagnostic metadata from this GET; never written to Weni or plan digest.
     order_payment_code: str = ""
+    order_resolution_status: str = ""
+    order_found: bool = False
     purchase_confirmed: bool = False
     purchase_confirmation: str = ""
 
@@ -187,6 +190,73 @@ class UpdateStats:
     payment_unmapped_codes: dict[str, int] = field(default_factory=dict)
     orders_cancelled_payment_zero: int = 0
     orders_pending_payment: int = 0
+    invalid_cpf_checked: int = 0
+    invalid_cpf_orders_found: int = 0
+    invalid_cpf_orders_validated: int = 0
+    invalid_cpf_outcomes: dict[str, int] = field(default_factory=dict)
+
+
+def _record_invalid_cpf_result(stats: UpdateStats, plan: ContactUpdatePlan) -> None:
+    """Count completed contact checks, including unchanged and blocked plans."""
+    stats.invalid_cpf_checked += 1
+    stats.invalid_cpf_orders_found += int(plan.order_found or plan.order_validated)
+    stats.invalid_cpf_orders_validated += int(plan.order_validated)
+    outcome = (
+        "PEDIDO_VALIDADO" if plan.order_validated
+        else "PEDIDO_CONFIRMADO_NAO_PROPOSTO" if plan.order_found
+        else plan.order_resolution_status or "SEM_PEDIDO_VALIDADO"
+    )
+    stats.invalid_cpf_outcomes[outcome] = stats.invalid_cpf_outcomes.get(outcome, 0) + 1
+
+
+def _invalid_cpf_summary(stats: UpdateStats) -> str:
+    counts = stats.invalid_cpf_outcomes
+    divergent = {
+        "CPF_IDENTIDADE_DIVERGENTE", "CPF_DIVERGENTE_API",
+        "CLIENTE_ID_DIVERGENTE_API", "PEDIDO_CLIENTE_DIVERGENTE_API",
+    }
+    known = divergent | {
+        "PEDIDO_VALIDADO", "PEDIDO_CONFIRMADO_NAO_PROPOSTO",
+        "CPF_IDENTIDADE_AMBIGUA", "CPF_IDENTIDADE_INSUFICIENTE",
+        "CPF_NAO_ENCONTRADO", "SEM_PEDIDO_VALIDADO", "ERRO_API",
+    }
+    return (
+        f"contatos avaliados={stats.invalid_cpf_checked}; "
+        f"pedidos encontrados={stats.invalid_cpf_orders_found}; "
+        f"pedidos validados={stats.invalid_cpf_orders_validated}; "
+        f"divergência={sum(counts.get(key, 0) for key in divergent)}; "
+        f"identidade ambígua={counts.get('CPF_IDENTIDADE_AMBIGUA', 0)}; "
+        f"dados insuficientes={counts.get('CPF_IDENTIDADE_INSUFICIENTE', 0)}; "
+        f"cliente não encontrado={counts.get('CPF_NAO_ENCONTRADO', 0)}; "
+        f"sem pedido validado={counts.get('SEM_PEDIDO_VALIDADO', 0)}; "
+        f"falha API={counts.get('ERRO_API', 0)}; "
+        f"outros impedimentos={sum(v for k, v in counts.items() if k not in known)}"
+    )
+
+
+@dataclass
+class _InvalidCpfBatch:
+    size: int = FARMALIDER_BATCH_SIZE
+    number: int = 1
+    stats: UpdateStats = field(default_factory=UpdateStats)
+
+    def record(self, plan: ContactUpdatePlan) -> None:
+        _record_invalid_cpf_result(self.stats, plan)
+        if self.stats.invalid_cpf_checked >= self.size:
+            self.flush()
+
+    def flush(self, *, interrupted: bool = False) -> None:
+        if not self.stats.invalid_cpf_checked:
+            return
+        logging.info(
+            "Weni CPFs inválidos | lote %s%s | %s. "
+            "Contagens por contato, incluindo pedidos cancelados; "
+            "nenhuma gravação foi iniciada.",
+            self.number, " interrompido (contatos concluídos)" if interrupted else "",
+            _invalid_cpf_summary(self.stats),
+        )
+        self.number += 1
+        self.stats = UpdateStats()
 
 
 def _record_validated_order(stats: UpdateStats, plan: ContactUpdatePlan) -> None:
@@ -765,13 +835,20 @@ def _apply_purchase_candidate(
     except (FarmaliderAuthError, FarmaliderUnavailableError):
         raise
     except FarmaliderError:
+        plan.order_resolution_status = "ERRO_API"
         logging.warning("Falha ao consultar ou confirmar pedido na FarmaLíder API.")
         return False
 
+    plan.order_resolution_status = (
+        str(order.get("status_confirmacao") or "SEM_PEDIDO_VALIDADO")
+        if order is not None else "SEM_PEDIDO_VALIDADO" if farm_client is not None
+        else "API_DESABILITADA"
+    )
     if order is not None and str(order.get("status_confirmacao") or "").startswith("CPF_IDENTIDADE_"):
-        reference = farm_client.weni_contact_diagnostic_ref(str(contact.get("uuid") or "")) if isinstance(farm_client, FarmaliderClient) else "-"
-        logging.warning("Weni [contato_ref=%s]: pedido bloqueado: %s; nome e e-mail ou telefone não identificaram um cliente único.",
-                        reference, order["status_confirmacao"])
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            reference = farm_client.weni_contact_diagnostic_ref(str(contact.get("uuid") or "")) if isinstance(farm_client, FarmaliderClient) else "-"
+            logging.debug("Weni [contato_ref=%s]: pedido bloqueado: %s; nome e e-mail ou telefone não identificaram um cliente único.",
+                          reference, order["status_confirmacao"])
     if order is None or not items:
         return False
 
@@ -786,6 +863,10 @@ def _apply_purchase_candidate(
     order_value = _safe_number(order.get("valor_total_compra"))
     if not pedido_id or proposed_dt is None or order_value is None or order_value < 0:
         return False
+
+    # A confirmed order may remain unchanged or be older than Weni's snapshot.
+    # Diagnostic counts must not confuse those cases with a missing order.
+    plan.order_found = True
 
     names = [(item.get("produto_nome") or "").strip() for item in items]
     quantities = [_weni_number_text(item.get("quantidade")) for item in items]
@@ -1322,6 +1403,10 @@ def _review_summary(plans: list[ContactUpdatePlan], stats: UpdateStats) -> dict[
         "payment_unmapped_codes": dict(sorted(stats.payment_unmapped_codes.items())),
         "orders_cancelled_payment_zero": stats.orders_cancelled_payment_zero,
         "orders_pending_payment": stats.orders_pending_payment,
+        "invalid_cpf_checked": stats.invalid_cpf_checked,
+        "invalid_cpf_orders_found": stats.invalid_cpf_orders_found,
+        "invalid_cpf_orders_validated": stats.invalid_cpf_orders_validated,
+        "invalid_cpf_outcomes": dict(sorted(stats.invalid_cpf_outcomes.items())),
         "field_counts": dict(sorted(field_counts.items())),
         "lgpd_contacts": lgpd_contacts,
         "cpf_contacts": cpf_contacts,
@@ -1442,6 +1527,8 @@ def write_review_snapshot(
         f"Pagamento não identificado por código: {summary['payment_unmapped_codes']}",
         f"Contatos com pedido cancelado por pagamento 0: {summary['orders_cancelled_payment_zero']}",
         f"Contatos com pedido pendente de pagamento: {summary['orders_pending_payment']}",
+        "CPFs inválidos (contagens por contato; não são pedidos únicos nem gravações):",
+        _invalid_cpf_summary(stats),
         "",
         "ALTERAÇÕES POR CAMPO",
         "----------------------------------------------------------",
@@ -2008,6 +2095,10 @@ def run_update(
             ))
             stats.orders_cancelled_payment_zero = int(summary.get("orders_cancelled_payment_zero") or 0)
             stats.orders_pending_payment = int(summary.get("orders_pending_payment") or 0)
+            stats.invalid_cpf_checked = int(summary.get("invalid_cpf_checked") or 0)
+            stats.invalid_cpf_orders_found = int(summary.get("invalid_cpf_orders_found") or 0)
+            stats.invalid_cpf_orders_validated = int(summary.get("invalid_cpf_orders_validated") or 0)
+            stats.invalid_cpf_outcomes = dict(summary.get("invalid_cpf_outcomes") or {})
             unmapped = summary.get("payment_unmapped_codes")
             if isinstance(unmapped, dict):
                 stats.payment_unmapped_codes = {
@@ -2412,25 +2503,34 @@ def run_update(
                              preparation_index, len(all_contact_uuids))
 
         previous_phase = None
+        invalid_batch = _InvalidCpfBatch()
         for index, (priority, contact_uuid, contact, context, candidate_ids) in enumerate(
             sorted(prepared_contacts, key=lambda entry: (entry[0], entry[1])), start=1
         ):
             if priority != previous_phase:
+                invalid_batch.flush()
                 logging.info("Weni: etapa de consulta FarmaLíder: %s.",
                              ("CPFs válidos", "CPFs inválidos", "contatos sem CPF")[priority])
                 previous_phase = priority
-            plan = _build_contact_plan(
-                contact,
-                context_messages=context,
-                candidate_message_ids=candidate_ids,
-                farm_client=farm,
-                opt_out_group_name=WENI_UPDATE_OPT_OUT_GROUP,
-                opt_out_group_uuid=opt_out_uuid,
-                captured_at=captured_at,
-                opt_in_group_name=WENI_UPDATE_OPT_IN_GROUP,
-                opt_in_group_uuid=opt_in_uuid,
-                available_weni_fields=available_weni_fields,
-            )
+            try:
+                plan = _build_contact_plan(
+                    contact,
+                    context_messages=context,
+                    candidate_message_ids=candidate_ids,
+                    farm_client=farm,
+                    opt_out_group_name=WENI_UPDATE_OPT_OUT_GROUP,
+                    opt_out_group_uuid=opt_out_uuid,
+                    captured_at=captured_at,
+                    opt_in_group_name=WENI_UPDATE_OPT_IN_GROUP,
+                    opt_in_group_uuid=opt_in_uuid,
+                    available_weni_fields=available_weni_fields,
+                )
+            except BaseException:
+                invalid_batch.flush(interrupted=True)
+                raise
+            if priority == 1:
+                _record_invalid_cpf_result(stats, plan)
+                invalid_batch.record(plan)
             stats.contacts_considered += 1
             _record_validated_order(stats, plan)
             _track_open_order(
@@ -2448,6 +2548,11 @@ def run_update(
             stats.plans_with_changes = len(plans)
             _log_planning_progress(stats, processed=index, total=len(all_contact_uuids))
 
+        invalid_batch.flush()
+        if stats.invalid_cpf_checked:
+            logging.info("Weni CPFs inválidos | total da preparação | %s. "
+                         "Contagens por contato; nenhuma gravação foi iniciada.",
+                         _invalid_cpf_summary(stats))
         stats.plans_with_changes = len(plans)
         stats.field_changes = sum(len(plan.fields) for plan in plans)
         stats.group_actions = sum(len(plan.group_actions) for plan in plans)
