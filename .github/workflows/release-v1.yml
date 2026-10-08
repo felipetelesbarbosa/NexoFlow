@@ -20,6 +20,9 @@ concurrency:
 jobs:
   validar-e-publicar:
     runs-on: windows-latest
+    env:
+      PYTHONIOENCODING: utf-8
+      PYTHONUTF8: "1"
 
     steps:
       - name: Checkout

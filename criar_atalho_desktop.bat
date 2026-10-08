@@ -1,6 +1,7 @@
 @echo off
 chcp 65001 >nul
 setlocal
+set "PYTHONIOENCODING=utf-8"
 cd /d "%~dp0"
 
 if not exist "%~dp0NexoFlow Analytics.exe" (

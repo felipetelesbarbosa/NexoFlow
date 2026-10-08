@@ -17,7 +17,7 @@ echo   [0] 100%% - carga completa tradicional
 echo   [1] Parte 1/4 - primeiros 25%%
 echo   [2] Parte 2/4 - segundos 25%%
 echo   [3] Parte 3/4 - terceiros 25%%
-echo   [4] Parte 4/4 - ultimos 25%%
+echo   [4] Parte 4/4 - últimos 25%%
 echo.
 echo As partes 25%% NÃO são incrementais.
 echo Elas usam a mesma base congelada e devem ser executadas em ordem.
@@ -70,7 +70,7 @@ echo   6. validação individual antes de cada contato
 echo.
 if defined PART (
     echo Na carga 25%%, somente os contatos da Parte %PART%/4 entram no plano.
-    echo A proxima parte reutiliza o mesmo manifesto congelado.
+    echo A próxima parte reutiliza o mesmo manifesto congelado.
 ) else (
     echo Esta rotina reanalisa 100%% da base disponível.
 )
@@ -146,7 +146,7 @@ echo [ETAPA 6/6] Carga concluída
 echo ==========================================================
 if defined PART (
     echo [OK] Parte %PART%/4 concluída.
-    if not "%PART%"=="4" echo Execute a proxima parte quando desejar.
+    if not "%PART%"=="4" echo Execute a próxima parte quando desejar.
     if "%PART%"=="4" echo [OK] As quatro partes Weni foram concluídas nesta campanha.
 ) else (
     echo [OK] Carga completa 100%% concluída.

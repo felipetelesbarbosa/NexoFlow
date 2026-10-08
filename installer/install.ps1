@@ -1043,7 +1043,7 @@ try {
     Write-Step 'Verificando launcher opcional de desinstalação'
     Install-OptionalUninstaller
 
-    Write-Step 'Criando atalhos do NexoFlow na Area de Trabalho'
+    Write-Step 'Criando atalhos do NexoFlow na Área de Trabalho'
     $appExe = Join-Path $InstallDir 'NexoFlow Analytics.exe'
     $updateExe = Join-Path $InstallDir 'NexoFlow Weni.exe'
     $appIcon = Join-Path $InstallDir 'assets\NexoFlow.ico'
@@ -1087,7 +1087,7 @@ try {
     if (Test-Path -LiteralPath $documentation -PathType Leaf) {
         Create-Shortcut -ShortcutPath (Join-Path $startMenu 'Documentacao NexoFlow.lnk') -TargetPath $documentation -WorkingDirectory $InstallDir -Description 'Abre a documentação operacional do NexoFlow' -IconPath $appIcon
     }
-    Write-Host '[OK] Atalhos "NexoFlow Analytics", "NexoFlow Weni" e "NexoFlow Terminal" criados na Area de Trabalho.' -ForegroundColor Green
+    Write-Host '[OK] Atalhos "NexoFlow Analytics", "NexoFlow Weni" e "NexoFlow Terminal" criados na Área de Trabalho.' -ForegroundColor Green
 
     Write-Step 'Atualizando cache de ícones do Windows'
     $uninstallExe = Join-Path $InstallDir 'NexoFlow Uninstall.exe'
@@ -1113,9 +1113,9 @@ try {
     $hasGoogle = Test-Path -LiteralPath (Join-Path $InstallDir 'credentials\google_credentials.json') -PathType Leaf
     Write-Host "`n[OK] $AppName instalado com sucesso." -ForegroundColor Green
     if ($hasSecrets -and $hasGoogle) {
-        Show-Info "NexoFlow foi instalado/atualizado com sucesso.`n`nOs atalhos NexoFlow Analytics, NexoFlow Weni e NexoFlow Terminal foram criados na Area de Trabalho.`n`nNexoFlow Weni executa check-up, teste de conexões, dry-run/auditoria obrigatória e somente depois permite aplicar as alterações."
+        Show-Info "NexoFlow foi instalado/atualizado com sucesso.`n`nOs atalhos NexoFlow Analytics, NexoFlow Weni e NexoFlow Terminal foram criados na Área de Trabalho.`n`nNexoFlow Weni executa check-up, teste de conexões, dry-run/auditoria obrigatória e somente depois permite aplicar as alterações."
     } else {
-        Show-Info "NexoFlow foi instalado.`n`nOs atalhos NexoFlow Analytics, NexoFlow Weni e NexoFlow Terminal foram criados na Area de Trabalho.`n`nAntes da primeira execução, configure:`n- secrets_config.py`n- credentials\google_credentials.json"
+        Show-Info "NexoFlow foi instalado.`n`nOs atalhos NexoFlow Analytics, NexoFlow Weni e NexoFlow Terminal foram criados na Área de Trabalho.`n`nAntes da primeira execução, configure:`n- secrets_config.py`n- credentials\google_credentials.json"
     }
     try { Stop-Transcript | Out-Null } catch { }
     exit 0

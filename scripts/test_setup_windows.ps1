@@ -52,7 +52,16 @@ function Invoke-Setup {
     param([string]$Label)
 
     Write-Host "==> $Label"
-    $process = Start-Process -FilePath (Join-Path $SetupDir "NexoFlow Setup.exe") -WorkingDirectory $SetupDir -PassThru -Wait
+    $outputLog = Join-Path $TempRoot "setup-stdout.txt"
+    $errorLog = Join-Path $TempRoot "setup-stderr.txt"
+    $process = Start-Process -FilePath (Join-Path $SetupDir "NexoFlow Setup.exe") -WorkingDirectory $SetupDir -RedirectStandardOutput $outputLog -RedirectStandardError $errorLog -PassThru
+    if (-not $process.WaitForExit(240000)) {
+        & taskkill.exe /PID $process.Id /T /F | Out-Null
+        foreach ($path in @($outputLog, $errorLog, (Join-Path $env:TEMP "NexoFlow-Setup.log"))) {
+            if (Test-Path -LiteralPath $path) { Get-Content -LiteralPath $path -Encoding UTF8 -Tail 100 }
+        }
+        throw "O teste de instalação excedeu quatro minutos: $Label"
+    }
 
     if ($process.ExitCode -ne 0) {
         $log = Join-Path $env:TEMP "NexoFlow-Setup.log"
@@ -144,10 +153,16 @@ PROXY_DETECTION_TIMEOUT = 1.0
     try {
         $checkOutput = Join-Path $TempRoot "checkup-stdout.txt"
         $checkError = Join-Path $TempRoot "checkup-stderr.txt"
-        $check = Start-Process -FilePath (Join-Path $env:SystemRoot "System32\cmd.exe") -ArgumentList '/d','/c','check-up.bat' -WorkingDirectory $InstallDir -RedirectStandardOutput $checkOutput -RedirectStandardError $checkError -PassThru -Wait
+        $check = Start-Process -FilePath (Join-Path $env:SystemRoot "System32\cmd.exe") -ArgumentList '/d','/c','check-up.bat' -WorkingDirectory $InstallDir -RedirectStandardOutput $checkOutput -RedirectStandardError $checkError -PassThru
+        if (-not $check.WaitForExit(120000)) {
+            & taskkill.exe /PID $check.Id /T /F | Out-Null
+            Get-Content -LiteralPath $checkOutput -Encoding UTF8 -Tail 150
+            Get-Content -LiteralPath $checkError -Encoding UTF8 -Tail 150
+            throw "O check-up instalado excedeu dois minutos."
+        }
         if ($check.ExitCode -ne 0) {
-            Get-Content -LiteralPath $checkOutput -Tail 150
-            Get-Content -LiteralPath $checkError -Tail 150
+            Get-Content -LiteralPath $checkOutput -Encoding UTF8 -Tail 150
+            Get-Content -LiteralPath $checkError -Encoding UTF8 -Tail 150
         }
         Assert-True ($check.ExitCode -eq 0) "check-up.bat instalado falhou com código $($check.ExitCode)."
     }

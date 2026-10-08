@@ -22,7 +22,7 @@ echo   [0] 100%% - carga completa tradicional
 echo   [1] Parte 1/4 - primeiros 25%%
 echo   [2] Parte 2/4 - segundos 25%%
 echo   [3] Parte 3/4 - terceiros 25%%
-echo   [4] Parte 4/4 - ultimos 25%%
+echo   [4] Parte 4/4 - últimos 25%%
 echo.
 echo As partes 25%% NÃO são incrementais.
 echo Elas usam uma base congelada e devem ser executadas em ordem.

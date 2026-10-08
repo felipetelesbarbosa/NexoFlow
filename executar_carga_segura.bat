@@ -11,7 +11,7 @@ echo ==========================================================
 echo NexoFlow - Sincronização Manual Segura
 echo ==========================================================
 echo.
-echo Esta rotina executara, em ordem:
+echo Esta rotina executará, em ordem:
 echo   1. Check-up do projeto
 echo   2. Teste de conexões
 echo   3. Sincronização incremental manual
@@ -53,7 +53,7 @@ exit /b 0
 :parcial
 echo.
 echo ==========================================================
-echo [AVISO] Sincronização parcial: algumas consultas a FarmaLider falharam.
+echo [AVISO] Sincronização parcial: algumas consultas à FarmaLíder falharam.
 echo Os dados processados foram salvos; o marco incremental anterior foi
 echo mantido para nova tentativa. Consulte logs\nexoflow.log.
 echo Código de saída: %RC%

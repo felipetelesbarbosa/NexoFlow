@@ -43,7 +43,7 @@ echo ==========================================================
 echo DRY-RUN APROVADO. Nenhum dado foi alterado até aqui.
 echo ==========================================================
 echo.
-set /p "CONFIRMA=Digite ATUALIZAR para gravar as mudancas na Weni: "
+set /p "CONFIRMA=Digite ATUALIZAR para gravar as mudanças na Weni: "
 if /I not "%CONFIRMA%"=="ATUALIZAR" (
     echo.
     echo [INFO] Operação cancelada. Nenhuma alteração foi aplicada.

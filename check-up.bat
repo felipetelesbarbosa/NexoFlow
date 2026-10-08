@@ -1,6 +1,7 @@
 @echo off
 chcp 65001 >nul
 setlocal
+set "PYTHONIOENCODING=utf-8"
 cd /d "%~dp0"
 
 echo ==============================================
@@ -28,7 +29,7 @@ if errorlevel 1 goto :erro
 echo.
 echo [OK] Testes.
 echo.
-echo [3/3] Auditando consistencia entre arquivos...
+echo [3/3] Auditando consistência entre arquivos...
 ".venv\Scripts\python.exe" auditar_consistencia.py
 if errorlevel 1 goto :erro
 

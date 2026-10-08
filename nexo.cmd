@@ -1,6 +1,7 @@
 @echo off
 chcp 65001 >nul
 setlocal
+set "PYTHONIOENCODING=utf-8"
 set "NEXO_HOME=%~dp0"
 if exist "%NEXO_HOME%.venv\Scripts\python.exe" (
   "%NEXO_HOME%.venv\Scripts\python.exe" "%NEXO_HOME%nexo_cli.py" %*

@@ -54,7 +54,7 @@ function Assert-PublicTrackedFiles {
     }
     if ($unsafe.Count -gt 0) {
         throw ("Build bloqueado: arquivos privados estão rastreados no Git. " +
-            "Remova-os do indice antes de publicar: " + ($unsafe -join ", "))
+            "Remova-os do índice antes de publicar: " + ($unsafe -join ", "))
     }
 }
 
