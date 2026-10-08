@@ -142,7 +142,13 @@ PROXY_DETECTION_TIMEOUT = 1.0
     $oldLauncher = $env:NEXOFLOW_LAUNCHER
     $env:NEXOFLOW_LAUNCHER = "1"
     try {
-        $check = Start-Process -FilePath (Join-Path $env:SystemRoot "System32\cmd.exe") -ArgumentList '/d','/c','check-up.bat' -WorkingDirectory $InstallDir -PassThru -Wait
+        $checkOutput = Join-Path $TempRoot "checkup-stdout.txt"
+        $checkError = Join-Path $TempRoot "checkup-stderr.txt"
+        $check = Start-Process -FilePath (Join-Path $env:SystemRoot "System32\cmd.exe") -ArgumentList '/d','/c','check-up.bat' -WorkingDirectory $InstallDir -RedirectStandardOutput $checkOutput -RedirectStandardError $checkError -PassThru -Wait
+        if ($check.ExitCode -ne 0) {
+            Get-Content -LiteralPath $checkOutput -Tail 150
+            Get-Content -LiteralPath $checkError -Tail 150
+        }
         Assert-True ($check.ExitCode -eq 0) "check-up.bat instalado falhou com codigo $($check.ExitCode)."
     }
     finally {
