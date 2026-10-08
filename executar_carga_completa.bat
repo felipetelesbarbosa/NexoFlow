@@ -27,7 +27,7 @@ echo.
 echo As partes 25%% NÃO são incrementais.
 echo Elas usam uma base congelada e devem ser executadas em ordem.
 echo.
-set /p "OPÇÃO=Opção: "
+set /p "OPCAO=Opção: "
 
 set "FULL_SYNC_QUARTER="
 if "%OPCAO%"=="0" goto :executar

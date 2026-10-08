@@ -24,7 +24,7 @@ echo Elas usam a mesma base congelada e devem ser executadas em ordem.
 echo Cada parte gera seu próprio dry-run, relatório e snapshot revisável.
 echo.
 set "OPCAO="
-set /p "OPÇÃO=Opção: " < CON
+set /p "OPCAO=Opção: " < CON
 
 set "PART="
 set "PART_ARG="

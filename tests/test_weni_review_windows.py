@@ -31,7 +31,7 @@ class WeniReviewBatchWindowsTests(unittest.TestCase):
                     f"{output_path.read_text(encoding='utf-8', errors='replace')}"
                 )
             time.sleep(0.05)
-        self.fail(f"Timed out waiting for {description}")
+        self.fail(f"Timed out waiting for {description}\n{output_path.read_text(encoding='utf-8', errors='replace')}")
 
     def _close_process(self, process) -> None:
         if process.poll() is None:

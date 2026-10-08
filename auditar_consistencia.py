@@ -1275,6 +1275,9 @@ def check_portuguese_encoding() -> None:
         if path.exists() and 'lang="pt-BR"' not in path.read_text(encoding="utf-8"):
             fail(f"Documentação HTML sem idioma português brasileiro: {name}")
             return
+        if path.exists() and "\ufffd" in path.read_text(encoding="utf-8"):
+            fail(f"Documentação HTML contém caracteres de substituição: {name}")
+            return
     ok("Interface Windows e documentação usam UTF-8 e português brasileiro (pt-BR).")
 
 
