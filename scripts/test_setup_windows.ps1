@@ -89,6 +89,8 @@ function Assert-Installed {
         Assert-True (Test-Path -LiteralPath $path -PathType Leaf) "Arquivo instalado ausente: $relative"
     }
 
+    Assert-True (Test-Path -LiteralPath (Join-Path $InstallDir "importacoes") -PathType Container) "A pasta importacoes não foi instalada."
+
     Assert-True (Test-Path -LiteralPath $UninstallKey) "Registro de desinstalação não foi criado."
     $displayVersion = (Get-ItemProperty -LiteralPath $UninstallKey -Name DisplayVersion -ErrorAction Stop).DisplayVersion
     Assert-True ($displayVersion -eq "1.0") "DisplayVersion inesperada: $displayVersion"
@@ -103,6 +105,17 @@ try {
 
     Assert-True (Test-Path -LiteralPath (Join-Path $SetupDir "NexoFlow Setup.exe") -PathType Leaf) "NexoFlow Setup.exe ausente no ZIP."
     Assert-True (Test-Path -LiteralPath (Join-Path $SetupDir "payload\payload manifest.json") -PathType Leaf) "Manifesto do payload ausente."
+    $importsPayload = Join-Path $SetupDir 'payload\importacoes'
+    Assert-True (Test-Path -LiteralPath $importsPayload -PathType Container) 'Pasta importacoes ausente no ZIP do Setup.'
+    Assert-True (@(Get-ChildItem -LiteralPath $importsPayload -Force -Recurse).Count -eq 0) 'O pacote deve conter importacoes vazia, sem exports.'
+    $projectZip = Join-Path (Split-Path -Parent $resolvedZip) 'NexoFlow-1.0.zip'
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $projectArchive = [IO.Compression.ZipFile]::OpenRead($projectZip)
+    try {
+        Assert-True ($null -ne $projectArchive.GetEntry('NexoFlow/importacoes/')) 'Pasta importacoes ausente no projeto completo.'
+        Assert-True (@($projectArchive.Entries | Where-Object { $_.FullName.StartsWith('NexoFlow/importacoes/') -and -not $_.FullName.EndsWith('/') }).Count -eq 0) 'O projeto completo não deve incluir arquivos privados em importacoes.'
+    } finally { $projectArchive.Dispose() }
+
 
     $python = (Get-Command python.exe -ErrorAction Stop).Source
     $env:NEXOFLOW_SETUP_NONINTERACTIVE = "1"
@@ -131,12 +144,14 @@ PROXY_DETECTION_TIMEOUT = 1.0
     New-Item -ItemType Directory -Force -Path (Join-Path $InstallDir "logs") | Out-Null
     [IO.File]::WriteAllText((Join-Path $InstallDir "credentials\google_credentials.json"), '{"smoke_test":true}', (New-Object Text.UTF8Encoding($false)))
     [IO.File]::WriteAllText((Join-Path $InstallDir "logs\setup-smoke-marker.txt"), "preservar", (New-Object Text.UTF8Encoding($false)))
+    [IO.File]::WriteAllText((Join-Path $InstallDir 'importacoes\planilha-teste.txt'), 'export privado sintético', (New-Object Text.UTF8Encoding($false)))
 
     Invoke-Setup "Atualização sobre instalação existente"
     Assert-Installed
     Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir "logs\setup-smoke-marker.txt") -Raw).Trim() -eq "preservar") "Logs não foram preservados na atualização."
     Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir "credentials\google_credentials.json") -Raw) -match "smoke_test") "Credenciais não foram preservadas na atualização."
     Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir "secrets_config.py") -Raw) -match "TOKEN_TESTE_WENI") "secrets_config.py não foi preservado."
+    Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir 'importacoes\planilha-teste.txt') -Raw) -eq 'export privado sintético') 'Importações não foram preservadas na atualização.'
 
     Write-Host "==> Simulando antivírus/EDR removendo o launcher opcional Uninstall"
     $optionalSource = Join-Path $SetupDir "payload\NexoFlow Uninstall.exe"

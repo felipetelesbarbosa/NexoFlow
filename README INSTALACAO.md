@@ -5,6 +5,8 @@
 
 Este documento corresponde ao **NexoFlow 1.0**.
 
+Os dois pacotes incluem a pasta `importacoes` vazia; os exports XLSX permanecem privados. O Setup instala essa pasta em `C:\NexoFlow\importacoes`. Ao desinstalar, os arquivos são sempre preservados em `C:\NexoFlow Data\importacoes`, mesmo escolhendo remover configurações, credenciais e logs. A reinstalação os restaura. Arquivos anteriores com o mesmo nome e conteúdo diferente ficam em `historico_preservado`.
+
 Baixe a distribuição estável na [release v1.0](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.0): [NexoFlow-Setup-1.0.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.0/NexoFlow-Setup-1.0.zip). Os hashes estão em [SHA256SUMS-1.0.txt](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.0/SHA256SUMS-1.0.txt).
 
 

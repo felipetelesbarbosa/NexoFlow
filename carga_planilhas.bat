@@ -34,14 +34,14 @@ echo.
 echo [2/3] Revise o relatório no Bloco de Notas.
 echo Confira identidade, pedidos, datas, exclusões e destino da carga.
 start "" notepad.exe "%CD%\%REVIEW_TXT%"
-echo O CMD permanecerá aguardando sua confirmação.
-set "CONFIRMA="
-set /p "CONFIRMA=Após revisar, digite PLANILHAS REVISADAS para aplicar: "
-if /I not "%CONFIRMA%"=="PLANILHAS REVISADAS" (
-    echo [INFO] Operação cancelada. Nenhuma alteração foi aplicada.
-    set "RC=2"
-    goto :fim
-)
+set "RC=%ERRORLEVEL%"
+if not "%RC%"=="0" goto :erro_confirmacao
+echo O CMD permanecerá aguardando uma confirmação em janela separada.
+echo Digite PLANILHAS REVISADAS nessa janela somente depois de revisar o relatório.
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -STA -ExecutionPolicy Bypass -File "%~dp0scripts\confirmar_revisao_weni.ps1" -Expected "PLANILHAS REVISADAS" -Title "NexoFlow %DESTINO% - Revisão das Planilhas"
+set "RC=%ERRORLEVEL%"
+if "%RC%"=="2" goto :cancelado
+if not "%RC%"=="0" goto :erro_confirmacao
 echo.
 echo [3/3] Revalidando os contatos e aplicando o snapshot revisado...
 ".venv\Scripts\python.exe" run_delivery_tickets.py --apply --target "%DESTINO%" --require-review "%REVIEW_JSON%"
@@ -52,6 +52,14 @@ if not "%RC%"=="0" (
     goto :fim
 )
 echo [OK] Carga por planilhas concluída.
+goto :fim
+
+:cancelado
+echo [INFO] Operação cancelada. Nenhuma alteração foi aplicada.
+goto :fim
+
+:erro_confirmacao
+echo [ERRO] Não foi possível confirmar a revisão. Nenhuma alteração foi aplicada.
 goto :fim
 
 :erro_consulta

@@ -3,7 +3,9 @@
 Scripts de instalação e desinstalação do NexoFlow 1.0.
 
 - `install.ps1`: instala/atualiza o NexoFlow em `C:\NexoFlow`, prepara a `.venv`, valida o payload e cria os atalhos.
-- `uninstall.ps1`: remove os componentes do NexoFlow e pode preservar dados privados em `C:\NexoFlow Data`.
+- `uninstall.ps1`: remove os componentes do NexoFlow e sempre preserva `importacoes` e seus arquivos em `C:\NexoFlow Data\importacoes`. A preservação de configurações, credenciais e logs continua opcional.
+
+Setup e projeto completo incluem `importacoes` vazia, sem XLSX exportados. O instalador cria a pasta em `C:\NexoFlow\importacoes` e restaura seus arquivos na reinstalação. Backups conflitantes são mantidos em `historico_preservado`; falha na cópia ou na validação SHA-256 das importações impede a remoção da instalação.
 
 O Setup valida integridade por SHA-256 e não incorpora credenciais.
 

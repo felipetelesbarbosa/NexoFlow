@@ -83,31 +83,95 @@ function Remove-Shortcuts {
     Remove-Item -LiteralPath $startMenu -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-function Preserve-PrivateData {
-    if (Test-Path -LiteralPath $DataDir) {
-        Remove-Item -LiteralPath $DataDir -Recurse -Force
+function Remove-OptionalPrivateData {
+    # importacoes nunca faz parte da limpeza opcional.
+    foreach ($name in @('secrets_config.py', 'credentials', 'logs', 'DADOS PRESERVADOS.txt')) {
+        $path = Join-Path $DataDir $name
+        if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction Stop }
     }
+}
+
+function Copy-ImportDirectory([string]$Source, [string]$Target, [string]$Relative = '', [string]$ArchiveRoot = '') {
+    if (-not $ArchiveRoot) { $ArchiveRoot = Join-Path $Target 'historico_preservado' }
+    $sourceItem = Get-Item -LiteralPath $Source -Force
+    if ($sourceItem.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+        throw 'A pasta importacoes contém um link/junção. A desinstalação foi interrompida para preservar os dados.'
+    }
+    New-Item -ItemType Directory -Force -Path $Target | Out-Null
+    foreach ($item in (Get-ChildItem -LiteralPath $Source -Force)) {
+        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            throw 'A pasta importacoes contém um link/junção. A desinstalação foi interrompida para preservar os dados.'
+        }
+        $destination = Join-Path $Target $item.Name
+        $relativePath = if ($Relative) { Join-Path $Relative $item.Name } else { $item.Name }
+        if ($item.PSIsContainer) {
+            Copy-ImportDirectory -Source $item.FullName -Target $destination -Relative $relativePath -ArchiveRoot $ArchiveRoot
+            continue
+        }
+        $sourceHash = (Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash
+        if (Test-Path -LiteralPath $destination) {
+            $existingHash = (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash
+            if ($existingHash -eq $sourceHash) { continue }
+            # Um backup anterior com o mesmo nome é mantido antes da cópia
+            # atual. A chave por conteúdo evita perder versões ou duplicá-las.
+            $archive = Join-Path (Join-Path $ArchiveRoot $existingHash) $relativePath
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $archive) | Out-Null
+            if (Test-Path -LiteralPath $archive) {
+                if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $existingHash) {
+                    throw 'O histórico preservado está inconsistente. Nenhum arquivo instalado será removido.'
+                }
+            } else {
+                Copy-Item -LiteralPath $destination -Destination $archive -Force -ErrorAction Stop
+                if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $existingHash) {
+                    throw "Não foi possível verificar a cópia anterior de importacoes."
+                }
+            }
+        }
+        Copy-Item -LiteralPath $item.FullName -Destination $destination -Force -ErrorAction Stop
+        if ((Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash -ne $sourceHash) {
+            throw 'A cópia das importações não passou pela validação SHA-256. A desinstalação foi interrompida.'
+        }
+    }
+}
+
+function Preserve-Imports {
+    $installed = [IO.Path]::GetFullPath($InstallDir).TrimEnd('\')
+    $preserved = [IO.Path]::GetFullPath($DataDir).TrimEnd('\')
+    if ($preserved.Equals($installed, [StringComparison]::OrdinalIgnoreCase) -or
+        $preserved.StartsWith($installed + '\', [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'A pasta de preservação deve ficar fora da instalação do NexoFlow.'
+    }
+    $source = Join-Path $InstallDir 'importacoes'
+    $target = Join-Path $DataDir 'importacoes'
+    New-Item -ItemType Directory -Force -Path $target | Out-Null
+    if (Test-Path -LiteralPath $source -PathType Container) {
+        Copy-ImportDirectory -Source $source -Target $target
+    }
+}
+
+function Preserve-PrivateData {
+    Preserve-Imports
+    Remove-OptionalPrivateData
     New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
 
     $secret = Join-Path $InstallDir 'secrets_config.py'
     if (Test-Path -LiteralPath $secret -PathType Leaf) {
         Copy-Item -LiteralPath $secret -Destination (Join-Path $DataDir 'secrets_config.py') -Force
     }
-
-    foreach ($name in @('credentials', 'logs', 'importacoes')) {
+    foreach ($name in @('credentials', 'logs')) {
         $source = Join-Path $InstallDir $name
         if (Test-Path -LiteralPath $source -PathType Container) {
             Copy-Item -LiteralPath $source -Destination (Join-Path $DataDir $name) -Recurse -Force
         }
     }
-
     @"
 Dados preservados pelo desinstalador do NexoFlow.
-Uma futura instalação restaurara automaticamente:
+Uma futura instalação restaurará automaticamente:
 - secrets_config.py
 - credentials\
 - logs\
 - importacoes\
+As importações são sempre preservadas, independentemente da escolha para os demais dados.
 "@ | Set-Content -LiteralPath (Join-Path $DataDir 'DADOS PRESERVADOS.txt') -Encoding UTF8
 }
 
@@ -221,6 +285,13 @@ if ($Stage2) {
     }
 
     $KeepData = ($KeepDataFlag -eq 1)
+    try {
+        Stop-NexoFlowProcesses | Out-Null
+        Preserve-Imports
+    } catch {
+        Show-Message "Não foi possível preservar importacoes. A instalação não será removida.`n`n$($_.Exception.Message)" "$AppName - Erro" 'Error'
+        exit 1
+    }
     $removed = Remove-InstallDirectory
 
     if ($removed) {
@@ -228,16 +299,14 @@ if ($Stage2) {
         Remove-Item -LiteralPath $UninstallKey -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -LiteralPath $AppKey -Recurse -Force -ErrorAction SilentlyContinue
 
-        if (-not $KeepData -and (Test-Path -LiteralPath $DataDir)) {
-            Remove-Item -LiteralPath $DataDir -Recurse -Force -ErrorAction SilentlyContinue
-        }
+        if (-not $KeepData) { Remove-OptionalPrivateData }
 
         try { Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue } catch { }
 
         if ($KeepData) {
-            Show-Message "$AppName foi desinstalado.`n`nConfiguracoes, credenciais e logs foram preservados em:`n$DataDir"
+            Show-Message "$AppName foi desinstalado.`n`nConfigurações, credenciais, logs e importacoes foram preservados em:`n$DataDir"
         } else {
-            Show-Message "$AppName e seus dados locais foram removidos."
+            Show-Message "$AppName foi desinstalado. Configurações, credenciais e logs foram removidos.`n`nA pasta importacoes e seus arquivos foram preservados em:`n$(Join-Path $DataDir 'importacoes')"
         }
         exit 0
     }
@@ -267,7 +336,7 @@ Ensure-Administrator
 try {
     Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
     $result = [System.Windows.Forms.MessageBox]::Show(
-        "Deseja manter configurações, credenciais e logs para uma futura reinstalacao?`n`nSIM (recomendado): preserva secrets_config.py, credentials e logs.`nNÃO: remove todos os dados locais do sistema.`nCANCELAR: não desinstala.`n`nProcessos do NexoFlow que estiverem em execução serão encerrados para permitir a remoção segura.",
+        "Deseja manter configurações, credenciais e logs para uma futura reinstalação?`n`nSIM (recomendado): preserva secrets_config.py, credentials e logs.`nNÃO: remove configurações, credenciais e logs.`nCANCELAR: não desinstala.`n`nA pasta importacoes e seus arquivos SEMPRE serão preservados em $DataDir\importacoes.`n`nProcessos do NexoFlow que estiverem em execução serão encerrados para permitir a remoção segura.",
         "$AppName - Desinstalar",
         'YesNoCancel',
         'Warning'
@@ -275,6 +344,7 @@ try {
     if ($result -eq [System.Windows.Forms.DialogResult]::Cancel) { exit 2 }
     $keep = ($result -eq [System.Windows.Forms.DialogResult]::Yes)
 
+    Preserve-Imports
     if ($keep) { Preserve-PrivateData }
 
     # O Stage2 precisa executar fora de C:\NexoFlow para que o Windows possa

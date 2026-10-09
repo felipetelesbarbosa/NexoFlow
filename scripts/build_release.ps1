@@ -185,6 +185,7 @@ Write-Host "==> Montando payload do Setup"
 Copy-TrackedFiles -Destination $PayloadDir
 
 foreach ($folder in @($ProjectRoot, $PayloadDir)) {
+    New-Item -ItemType Directory -Force -Path (Join-Path $folder 'importacoes') | Out-Null
     foreach ($target in $launcherTargets) {
         Copy-Item -LiteralPath (Join-Path $LauncherDir $target.Name) -Destination (Join-Path $folder $target.Name) -Force
     }
@@ -289,6 +290,20 @@ Compress-Archive -Path $SetupRoot -DestinationPath $SetupZip -CompressionLevel O
 Write-Host "==> Compactando projeto completo"
 Compress-Archive -Path $ProjectRoot -DestinationPath $ProjectZip -CompressionLevel Optimal -Force
 
+# Garantir a entrada vazia mesmo em ferramentas que omitam diretórios sem arquivos.
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+foreach ($item in @(
+    @{ Path = $SetupZip; Entry = 'NexoFlow Setup/payload/importacoes/' },
+    @{ Path = $ProjectZip; Entry = 'NexoFlow/importacoes/' }
+)) {
+    $archive = [IO.Compression.ZipFile]::Open($item.Path, [IO.Compression.ZipArchiveMode]::Update)
+    try {
+        if (-not $archive.GetEntry($item.Entry)) { $archive.CreateEntry($item.Entry) | Out-Null }
+    } finally { $archive.Dispose() }
+    Assert-ZipEntry -ZipPath $item.Path -EntryName $item.Entry
+}
+
+
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/NexoFlow Setup.exe"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/payload manifest.json"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/weni_update.py"
@@ -334,7 +349,10 @@ Melhorias desta distribuição do NexoFlow 1.0:
 - empacotamento bloqueado quando arquivos privados estão rastreados no Git.
 
 - carga por planilhas de conversas e contatos com comandos nexo weni planilhas e nexo analytics planilhas, validação de identidade e revisão humana por destino;
-- arquivos privados em importacoes preservados pelo instalador e excluídos dos pacotes.
+- cargas por planilha Weni e Analytics aguardam confirmação gráfica explícita, mesmo sem entrada de console; fechar o Bloco de Notas não encerra a espera;
+- pasta importacoes vazia incluída no Setup e no projeto completo, sem exports XLSX;
+- importacoes e seus arquivos sempre preservados na desinstalação, inclusive ao remover configurações, credenciais e logs;
+- backups anteriores com conteúdo diferente mantidos em historico_preservado, com validação SHA-256 antes de remover a instalação.
 
 Principais garantias do Setup:
 - elevação UAC automática quando necessária;

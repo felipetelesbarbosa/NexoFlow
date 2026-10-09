@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @unittest.skipUnless(os.name == 'nt', 'Requer CMD do Windows')
 class SpreadsheetReviewWindowsTests(unittest.TestCase):
-    def run_case(self, target, decision, dry_failure=False):
+    def run_case(self, target, decision, dry_failure=False, closed_stdin=False):
         with tempfile.TemporaryDirectory(prefix='nexo planilhas ') as temp:
             root = Path(temp)
             (root/'run_delivery_tickets.py').write_text('''import json,sys
@@ -37,24 +37,38 @@ else:
             gui_python=Path(sys.executable).with_name('pythonw.exe')
             self.assertTrue(gui_python.is_file())
             batch=batch.replace('start "" notepad.exe', f'start "" "{gui_python}" "{root / "notepad_stub.py"}"')
+            scripts=root/'scripts';scripts.mkdir()
+            real_script=scripts/'real_review.ps1'
+            real_script.write_bytes((ROOT/'scripts'/'confirmar_revisao_weni.ps1').read_bytes())
+            (scripts/'confirmar_revisao_weni.ps1').write_text(
+                "param([string]$Expected,[string]$Title)\n"
+                ". \"$PSScriptRoot/real_review.ps1\" -Expected $Expected -Title $Title\n"
+                "function Show-WeniReviewDialog { param([string]$Message,[string]$Title)\n"
+                " Set-Content -LiteralPath \"$PSScriptRoot/../dialog_open\" -Value $Message -Encoding UTF8\n"
+                " while (-not (Test-Path -LiteralPath \"$PSScriptRoot/../decision\")) { Start-Sleep -Milliseconds 50 }\n"
+                " return (Get-Content -LiteralPath \"$PSScriptRoot/../decision\" -Raw)\n}\n"
+                "exit (Confirm-WeniReview -Expected $Expected -Title $Title)\n",
+                encoding='utf-8-sig')
             (root/'carga_planilhas.bat').write_text(batch,encoding='utf-8')
             env={**os.environ,'NEXOFLOW_LAUNCHER':'1'}
             output=root/'console.log'
             with output.open('wb') as handle:
-                process=subprocess.Popen([os.environ.get('COMSPEC','cmd.exe'),'/d','/c','carga_planilhas.bat',target],cwd=root,env=env,stdin=subprocess.PIPE,stdout=handle,stderr=subprocess.STDOUT)
+                process=subprocess.Popen([os.environ.get('COMSPEC','cmd.exe'),'/d','/c','carga_planilhas.bat',target],cwd=root,env=env,stdin=subprocess.DEVNULL if closed_stdin else subprocess.PIPE,stdout=handle,stderr=subprocess.STDOUT)
                 try:
                     if dry_failure:
                         self.assertEqual(process.wait(timeout=15),9)
                     else:
                         deadline=time.monotonic()+45
-                        while not (root/'note_closed').exists() and time.monotonic()<deadline:
+                        while not ((root/'note_closed').exists() and (root/'dialog_open').exists()) and time.monotonic()<deadline:
                             if process.poll() is not None:
                                 self.fail('CMD fechou antes da revisão: '+output.read_text(encoding='utf-8',errors='replace'))
                             time.sleep(.05)
                         self.assertTrue((root/'note_closed').exists(), output.read_text(encoding='utf-8',errors='replace'))
+                        self.assertTrue((root/'dialog_open').exists())
+                        self.assertIn('PLANILHAS REVISADAS',(root/'dialog_open').read_text(encoding='utf-8-sig'))
                         self.assertIsNone(process.poll(), 'Fechar o Bloco de Notas não pode fechar o CMD')
                         self.assertFalse((root/'applied.json').exists())
-                        process.stdin.write((decision+'\r\n').encode('ascii'));process.stdin.flush()
+                        (root/'decision').write_text(decision,encoding='ascii')
                         self.assertEqual(process.wait(timeout=15),0 if decision=='PLANILHAS REVISADAS' else 2)
                     if not dry_failure and decision=='PLANILHAS REVISADAS':
                         applied=json.loads((root/'applied.json').read_text())
@@ -68,11 +82,15 @@ else:
                     if process.poll() is None:
                         subprocess.run(['taskkill','/PID',str(process.pid),'/T','/F'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10,check=False)
                         process.wait(timeout=10)
-                    process.stdin.close()
+                    if process.stdin: process.stdin.close()
 
     def test_both_targets_apply_only_after_review_and_notepad_exit_keeps_cmd_open(self):
         for target in ['weni','analytics']:
             with self.subTest(target=target):self.run_case(target,'PLANILHAS REVISADAS')
+
+    def test_closed_stdin_still_waits_for_explicit_dialog_confirmation(self):
+        for target in ['weni','analytics']:
+            with self.subTest(target=target):self.run_case(target,'PLANILHAS REVISADAS',closed_stdin=True)
 
     def test_cancellation_does_not_apply(self):
         self.run_case('weni','CANCELAR')

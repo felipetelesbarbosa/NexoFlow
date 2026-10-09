@@ -764,6 +764,50 @@ function Install-OptionalUninstaller {
     Write-Host "[OK] $relative disponível no destino (componente opcional)." -ForegroundColor Green
 }
 
+function Copy-ImportDirectory([string]$Source, [string]$Target, [string]$Relative = '', [string]$ArchiveRoot = '') {
+    if (-not $ArchiveRoot) { $ArchiveRoot = Join-Path $Target 'historico_preservado' }
+    $sourceItem = Get-Item -LiteralPath $Source -Force
+    if ($sourceItem.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+        throw 'A pasta importacoes contém um link/junção. A desinstalação foi interrompida para preservar os dados.'
+    }
+    New-Item -ItemType Directory -Force -Path $Target | Out-Null
+    foreach ($item in (Get-ChildItem -LiteralPath $Source -Force)) {
+        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            throw 'A pasta importacoes contém um link/junção. A desinstalação foi interrompida para preservar os dados.'
+        }
+        $destination = Join-Path $Target $item.Name
+        $relativePath = if ($Relative) { Join-Path $Relative $item.Name } else { $item.Name }
+        if ($item.PSIsContainer) {
+            Copy-ImportDirectory -Source $item.FullName -Target $destination -Relative $relativePath -ArchiveRoot $ArchiveRoot
+            continue
+        }
+        $sourceHash = (Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash
+        if (Test-Path -LiteralPath $destination) {
+            $existingHash = (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash
+            if ($existingHash -eq $sourceHash) { continue }
+            # Um backup anterior com o mesmo nome é mantido antes da cópia
+            # atual. A chave por conteúdo evita perder versões ou duplicá-las.
+            $archive = Join-Path (Join-Path $ArchiveRoot $existingHash) $relativePath
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $archive) | Out-Null
+            if (Test-Path -LiteralPath $archive) {
+                if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $existingHash) {
+                    throw 'O histórico preservado está inconsistente. Nenhum arquivo instalado será removido.'
+                }
+            } else {
+                Copy-Item -LiteralPath $destination -Destination $archive -Force -ErrorAction Stop
+                if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $existingHash) {
+                    throw "Não foi possível verificar a cópia anterior de importacoes."
+                }
+            }
+        }
+        Copy-Item -LiteralPath $item.FullName -Destination $destination -Force -ErrorAction Stop
+        if ((Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash -ne $sourceHash) {
+            throw 'A cópia das importações não passou pela validação SHA-256. A desinstalação foi interrompida.'
+        }
+    }
+}
+
+
 function Backup-PrivateData([string]$Source, [string]$Backup) {
     if (-not (Test-Path -LiteralPath $Source -PathType Container)) { return }
     New-Item -ItemType Directory -Force -Path $Backup | Out-Null
@@ -783,6 +827,10 @@ function Restore-PrivateData([string]$Backup, [string]$Target) {
         $srcDir = Join-Path $Backup $dirName
         if (Test-Path -LiteralPath $srcDir -PathType Container) {
             $dstDir = Join-Path $Target $dirName
+            if ($dirName -eq 'importacoes') {
+                Copy-ImportDirectory -Source $srcDir -Target $dstDir
+                continue
+            }
             if (Test-Path -LiteralPath $dstDir) { Remove-Item -LiteralPath $dstDir -Recurse -Force }
             Copy-Item -LiteralPath $srcDir -Destination $dstDir -Recurse -Force
         }
@@ -1020,6 +1068,7 @@ try {
     Restore-PrivateData -Backup (Join-Path $backupDir 'legacy installed') -Target $InstallDir
     Restore-PrivateData -Backup (Join-Path $backupDir 'preserved') -Target $InstallDir
     Restore-PrivateData -Backup (Join-Path $backupDir 'installed') -Target $InstallDir
+    New-Item -ItemType Directory -Force -Path (Join-Path $InstallDir 'importacoes') | Out-Null
 
     Write-Step 'Preparando ambiente Python e dependências'
     $oldInstaller = $env:NEXOFLOW_INSTALLER

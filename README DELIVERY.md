@@ -13,7 +13,7 @@ Coloque os dois exports originais na pasta `C:\NexoFlow\importacoes`, com estes 
 | `Conversas_Delivery.xlsx` | Conversas encerradas, aba `rooms`, com as tags Pedido ou Pedido Finalizado. |
 | `Contatos_Delivery.xlsx` | Contatos da mesma organização, abas `Contact` ou `Contact 1`, `Contact 2` etc., com UUID, nome, CPF, e-mail e URNs nativas. |
 
-Renomeie apenas os arquivos. Preserve abas, cabeçalhos e dados originais. Os exports ficam fora do Git e dos pacotes. A pasta `importacoes` é preservada na atualização/reinstalação e no backup de dados da desinstalação.
+Renomeie apenas os arquivos. Preserve abas, cabeçalhos e dados originais. Os exports ficam fora do Git e dos pacotes; o Setup e o projeto completo incluem a pasta `importacoes` vazia. Na desinstalação, a pasta e seus arquivos são sempre preservados em `C:\NexoFlow Data\importacoes`, inclusive se você optar por remover configurações, credenciais e logs. O Setup restaura as importações na reinstalação. Cópias anteriores com o mesmo nome e conteúdo diferente ficam em `historico_preservado`; uma cópia vazia não apaga os arquivos preservados.
 
 No NexoFlow Terminal:
 
@@ -116,3 +116,5 @@ Para indicadores de atendimento, use `encerrado_em` na fonte de tickets. Não us
 O comando atualiza as fontes do Google Sheets. A conexão e configuração dos gráficos no Looker são feitas no editor do relatório; ele não altera permissões de compartilhamento.
 
 Referência de schema e autenticação: [Weni Chats Engine, API externa v2](https://github.com/weni-ai/chats-engine/tree/main/chats/apps/api/v2/external/rooms).
+
+A revisão das cargas Weni e Analytics por planilha aguarda uma janela separada de confirmação. Após conferir o relatório, digite `PLANILHAS REVISADAS` nessa janela. Fechar o Bloco de Notas não confirma nem cancela a carga. Cancelar a janela não aplica dados; uma falha ao abrir a confirmação também bloqueia a aplicação.

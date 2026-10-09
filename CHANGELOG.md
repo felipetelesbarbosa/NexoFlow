@@ -2,6 +2,14 @@
 
 ## NexoFlow 1.0
 
+- Cargas por planilha Weni e Analytics aguardam confirmação gráfica explícita, inclusive quando o terminal não fornece entrada padrão. Fechar o Bloco de Notas não encerra a espera. Cancelamento ou falha da janela impede a aplicação.
+
+### Pasta de importações nos pacotes e na desinstalação
+
+- `importacoes` vazia incluída no Setup e no projeto completo, sem exports privados;
+- preservação obrigatória da pasta e seus arquivos em `C:\NexoFlow Data\importacoes`, independente da opção de manter configurações, credenciais e logs;
+- validação SHA-256 antes de remover a instalação, versões conflitantes arquivadas em `historico_preservado` e restauração sem perda de arquivos por backups vazios.
+
 ### Carga por exports de conversas e contatos
 
 - arquivos padronizados `importacoes/Conversas_Delivery.xlsx` e `importacoes/Contatos_Delivery.xlsx`, sem exigir token do Chats;

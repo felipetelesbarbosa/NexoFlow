@@ -1,6 +1,8 @@
 ﻿[CmdletBinding()]
 param(
-    [string]$Part = ""
+    [string]$Part = "",
+    [string]$Expected = "CARGA COMPLETA REVISADA",
+    [string]$Title = "NexoFlow Weni - Revisão Humana"
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,10 +15,8 @@ function Show-WeniReviewDialog {
 }
 
 function Confirm-WeniReview {
-    param([string]$Part = "")
+    param([string]$Part = "", [string]$Expected = "CARGA COMPLETA REVISADA", [string]$Title = "NexoFlow Weni - Revisão Humana")
 
-    $expected = "CARGA COMPLETA REVISADA"
-    $title = "NexoFlow Weni - Revisão Humana"
     try {
         $partText = ""
         if ($Part) { $partText = " da Parte $Part/4" }
@@ -45,5 +45,5 @@ Fechar ou cancelar esta janela NÃO aplica nenhuma alteração.
 }
 
 if ($MyInvocation.InvocationName -ne '.') {
-    exit (Confirm-WeniReview -Part $Part)
+    exit (Confirm-WeniReview -Part $Part -Expected $Expected -Title $Title)
 }
