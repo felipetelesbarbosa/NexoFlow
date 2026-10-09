@@ -18,9 +18,21 @@ function Confirm-WeniReview {
     param([string]$Part = "", [string]$Expected = "CARGA COMPLETA REVISADA", [string]$Title = "NexoFlow Weni - Revisão Humana")
 
     try {
-        $partText = ""
-        if ($Part) { $partText = " da Parte $Part/4" }
-        $message = @"
+        if ($Expected.Equals("ATUALIZAR", [System.StringComparison]::OrdinalIgnoreCase)) {
+            $message = @"
+O dry-run incremental foi concluído e auditado.
+
+Para autorizar a gravação das mudanças na Weni, digite exatamente:
+
+$expected
+
+Fechar ou cancelar esta janela NÃO aplica nenhuma alteração.
+"@
+        }
+        else {
+            $partText = ""
+            if ($Part) { $partText = " da Parte $Part/4" }
+            $message = @"
 Revise o relatório aberto no Bloco de Notas$partText.
 
 Depois de concluir a revisão, digite exatamente:
@@ -29,6 +41,7 @@ $expected
 
 Fechar ou cancelar esta janela NÃO aplica nenhuma alteração.
 "@
+        }
         $response = [string](Show-WeniReviewDialog -Message $message -Title $title)
         if ($response.Trim().Equals($expected, [System.StringComparison]::OrdinalIgnoreCase)) {
             Write-Host "[OK] Revisão humana confirmada."

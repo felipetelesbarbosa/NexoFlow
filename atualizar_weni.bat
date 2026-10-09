@@ -6,6 +6,13 @@ cd /d "%~dp0"
 title NexoFlow Weni
 set "NEXOFLOW_LAUNCHER=1"
 
+if not exist "%~dp0scripts\confirmar_revisao_weni.ps1" (
+    echo [ERRO] Componente de confirmação ausente: scripts\confirmar_revisao_weni.ps1
+    echo Reinstale o Setup atualizado do NexoFlow 1.0 antes de continuar.
+    pause < CON
+    exit /b 1
+)
+
 cls
 echo ==========================================================
 echo NexoFlow Weni
@@ -43,11 +50,14 @@ echo ==========================================================
 echo DRY-RUN APROVADO. Nenhum dado foi alterado até aqui.
 echo ==========================================================
 echo.
-set /p "CONFIRMA=Digite ATUALIZAR para gravar as mudanças na Weni: "
-if /I not "%CONFIRMA%"=="ATUALIZAR" (
+echo [INFO] A confirmação será solicitada em uma janela separada.
+echo [INFO] Digite ATUALIZAR apenas depois de revisar o resumo do dry-run.
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -STA -ExecutionPolicy Bypass -File "%~dp0scripts\confirmar_revisao_weni.ps1" -Expected "ATUALIZAR" -Title "NexoFlow Weni - Confirmacao Incremental"
+set "RC=%ERRORLEVEL%"
+if not "%RC%"=="0" (
     echo.
     echo [INFO] Operação cancelada. Nenhuma alteração foi aplicada.
-    pause
+    pause < CON
     exit /b 2
 )
 
@@ -64,25 +74,25 @@ echo [OK] NexoFlow Weni concluído com sucesso.
 echo Auditoria: OK ^| Gravação: OK
 echo ==========================================================
 echo.
-pause
+pause < CON
 exit /b 0
 
 :erro_checkup
 echo.
 echo [ERRO] Check-up falhou. Nenhuma alteração foi feita na Weni.
-pause
+pause < CON
 exit /b %RC%
 
 :erro_conexoes
 echo.
 echo [ERRO] Teste de conexões falhou. Nenhuma alteração foi feita na Weni.
-pause
+pause < CON
 exit /b %RC%
 
 :erro_dryrun
 echo.
 echo [ERRO] Dry-run/auditoria falhou. Nenhuma alteração foi feita na Weni.
-pause
+pause < CON
 exit /b %RC%
 
 :erro_apply
@@ -90,5 +100,5 @@ echo.
 echo [ERRO] A aplicação foi interrompida.
 echo O checkpoint NÃO foi avançado. Execute novamente após corrigir o problema.
 echo Consulte logs\nexoflow_update_weni.log e logs\weni_update_audit.jsonl.
-pause
+pause < CON
 exit /b %RC%
