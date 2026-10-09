@@ -32,7 +32,11 @@ else:
             if dry_failure: (root/'fail_dry').touch()
             batch=(ROOT/'carga_planilhas.bat').read_text(encoding='utf-8')
             batch=batch.replace('".venv\\Scripts\\python.exe"', f'"{sys.executable}"')
-            batch=batch.replace('start "" notepad.exe', f'start "" /b "{sys.executable}" "{root / "notepad_stub.py"}"')
+            # A GUI editor does not share CMD's blocked stdin. A /b console
+            # Python child can block during startup while SET /P reads the pipe.
+            gui_python=Path(sys.executable).with_name('pythonw.exe')
+            self.assertTrue(gui_python.is_file())
+            batch=batch.replace('start "" notepad.exe', f'start "" "{gui_python}" "{root / "notepad_stub.py"}"')
             (root/'carga_planilhas.bat').write_text(batch,encoding='utf-8')
             env={**os.environ,'NEXOFLOW_LAUNCHER':'1'}
             output=root/'console.log'
