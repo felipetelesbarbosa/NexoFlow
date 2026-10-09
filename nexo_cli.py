@@ -214,7 +214,8 @@ def _run_windows_target(filename: str) -> int:
         raise RuntimeError(f"Arquivo não encontrado: {path}")
     if os.name == "nt":
         if path.suffix.lower() in {".bat", ".cmd"}:
-            completed = subprocess.run(["cmd.exe", "/d", "/c", str(path)], cwd=BASE_DIR, check=False)
+            completed = subprocess.run(["cmd.exe", "/d", "/c", str(path)], cwd=BASE_DIR, check=False,
+                                       env={**os.environ, "NEXOFLOW_LAUNCHER": "1"})
         else:
             completed = subprocess.run([str(path)], cwd=BASE_DIR, check=False)
         return int(completed.returncode)

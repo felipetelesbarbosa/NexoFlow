@@ -370,3 +370,15 @@ python run_delivery_tickets.py --apply --target weni --require-review logs/deliv
 ```
 
 A retomada relê os contatos, preserva o pedido histórico congelado e não regrava valores já aplicados. Não gere outro dry-run para retomar uma aplicação parcial sem antes conferir o snapshot. A carga por planilha usa `pedido_data`; escritas legadas de `ultima_compra` são omitidas, com aviso, mantendo intacto o arquivo e seu hash. Outros campos ausentes bloqueiam antes de qualquer POST. Erros Weni informam releitura ou gravação e diagnóstico HTTP seguro, sem CPF, token ou corpo bruto da resposta.
+
+### Janela da carga completa
+
+Ao abrir `atualizar_weni_carga_completa.bat` por duplo clique, a sessão CMD permanece aberta após o término, inclusive diante de erro. Depois de conferir o resultado, digite `exit` para fechar. A revisão humana continua obrigatória e a aplicação aguarda o Python terminar. Uma janela de resultado só aparece depois da conclusão, cancelamento ou erro; fechar essa janela não autoriza outra aplicação.
+
+`logs/weni_full_launcher.log` registra `APPLY_INICIADO`, `APPLY_RETORNOU` com o código do Python e o resultado final. Um início sem retorno significa ausência de confirmação do término; consulte também `logs/nexoflow_update_weni.log` antes de retomar. Preserve o snapshot revisado, principalmente em caso de aplicação parcial. No NexoFlow Terminal, use o snapshot 100% já revisado:
+
+```text
+python run_update_weni.py --apply --full --require-review logs/weni_update_review_full.json
+```
+
+Para uma parte, use `--quarter N` e o arquivo `logs/weni_update_review_full_25_parte_N.json` correspondente. Não gere um novo dry-run para retomar uma aplicação parcial sem antes conferir o snapshot e os logs.

@@ -72,7 +72,7 @@ function Copy-TrackedFiles {
             if (-not $relative) { continue }
             if ($relative -like "releases/*") { continue }
             if ($relative -like ".github/*") { continue }
-            if ($relative -like "scripts/*" -and $relative -ne "scripts/confirmar_revisao_weni.ps1") { continue }
+            if ($relative -like "scripts/*" -and $relative -notin @("scripts/confirmar_revisao_weni.ps1", "scripts/resultado_carga_weni.ps1")) { continue }
 
             $source = Join-Path $RepoRoot $relative
             if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { continue }
@@ -312,6 +312,8 @@ Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/weni_updat
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/analytics.py"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/confirmar_revisao_weni.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/confirmar_revisao_weni.ps1"
+Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/resultado_carga_weni.ps1"
+Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/resultado_carga_weni.ps1"
 
 $setupHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $SetupZip).Hash.ToLowerInvariant()
 $projectHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $ProjectZip).Hash.ToLowerInvariant()

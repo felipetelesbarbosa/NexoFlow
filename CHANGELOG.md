@@ -2,6 +2,8 @@
 
 ## NexoFlow 1.0
 
+- Carga completa por duplo clique mantém a sessão CMD aberta após o resultado; confirmação final independente de stdin e registro de início/retorno da aplicação em logs/weni_full_launcher.log.
+
 - Carga Delivery/planilhas usa pedido_data e elimina escrita legada de ultima_compra, inclusive na retomada do snapshot sem alterar seu arquivo; preflight de campos antes de POST e diagnóstico seguro por etapa/HTTP.
 
 - Cargas por planilha consolidam UUIDs repetidos idênticos na paginação Weni; versões divergentes exigem releitura individual, mantendo os bloqueios por identidade/URN ambígua.

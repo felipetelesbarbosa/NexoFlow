@@ -70,6 +70,7 @@ elif '--apply' in args:
     snapshot = Path(args[args.index('--require-review') + 1])
     payload = json.loads(snapshot.read_text(encoding='utf-8'))
     Path('apply.json').write_text(json.dumps({'args': args, 'snapshot': payload}), encoding='utf-8')
+    if Path('apply_error').exists(): raise SystemExit(int(Path('apply_error').read_text()))
 else:
     raise SystemExit('Unexpected fixture command')
 """,
@@ -100,6 +101,14 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
             encoding="utf-8",
         )
 
+        (directory / "scripts" / "resultado_carga_weni.ps1").write_text("fixture", encoding="ascii")
+        (directory / "result_stub.py").write_text(
+            "import sys,time,json\nfrom pathlib import Path\n"
+            "args=sys.argv[1:]\n"
+            "if '-RecordOnly' in args: raise SystemExit(0)\n"
+            "Path('result_waiting.json').write_text(json.dumps(args))\n"
+            "while not Path('result_ack').exists(): time.sleep(.05)\n",
+            encoding="utf-8")
         batch = (REPOSITORY / "atualizar_weni_carga_completa.bat").read_text(encoding="utf-8")
         # Production continues using CON. Only the isolated fixture accepts a pipe.
         batch = batch.replace(" < CON", "")
@@ -115,31 +124,39 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
         )
         self.assertEqual(note_count, 1, "Notepad fixture must replace exactly one external call")
         batch, gate_count = re.subn(
-            r'(?m)^"%SystemRoot%\\System32\\WindowsPowerShell\\v1\.0\\powershell\.exe"[^\n]*$',
+            r'(?m)^"%SystemRoot%\\System32\\WindowsPowerShell\\v1\.0\\powershell\.exe"[^\n]*confirmar_revisao_weni\.ps1[^\n]*$',
             lambda match: (
                 f'"{sys.executable}" "{directory / "review_gate_stub.py"}" %CONFIRM_PART%'
             ),
             batch,
         )
         self.assertEqual(gate_count, 1, "Review fixture must replace exactly one external call")
+        batch = re.sub(
+            r'(?m)^"%SystemRoot%\\System32\\WindowsPowerShell\\v1\.0\\powershell\.exe"[^\n]*resultado_carga_weni\.ps1"(.*)$',
+            lambda match: f'"{sys.executable}" "{directory / "result_stub.py"}"'+match.group(1), batch)
         (directory / "atualizar_weni_carga_completa.bat").write_text(batch, encoding="utf-8")
 
-    def _run_batch_case(self, *, part: int, decision: int) -> None:
+    def _run_batch_case(self, *, part: int, decision: int, closed_stdin=False, direct=False, apply_code=0) -> None:
         with tempfile.TemporaryDirectory(prefix="nexoflow review ") as temporary:
             directory = Path(temporary)
             self._fixture(directory)
+            if apply_code: (directory/"apply_error").write_text(str(apply_code))
             output_path = directory / "console.log"
+            env={**os.environ, "NEXOFLOW_LAUNCHER":"1"}
+            if direct: env.pop("NEXOFLOW_LAUNCHER",None)
             with output_path.open("wb") as output:
                 process = subprocess.Popen(
                     [os.environ.get("COMSPEC", "cmd.exe"), "/d", "/c", "atualizar_weni_carga_completa.bat"],
                     cwd=directory,
                     stdin=subprocess.PIPE,
+                    env=env,
                     stdout=output,
                     stderr=subprocess.STDOUT,
                 )
                 try:
                     process.stdin.write(f"{part}\r\n".encode("ascii"))
                     process.stdin.flush()
+                    if closed_stdin: process.stdin.close()
                     self._wait_until(
                         lambda: (directory / "review_waiting.json").exists()
                         and (directory / "notepad_closed.json").exists(),
@@ -169,12 +186,15 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
                     else:
                         self.assertNotIn("--quarter", dry_args)
 
-                    (directory / "review_decision.txt").write_text(str(decision), encoding="ascii")
+                    pending=directory/"review_decision.pending"
+                    pending.write_text(str(decision),encoding="ascii")
+                    os.replace(pending,directory/"review_decision.txt")
                     expected_output = {
                         0: "[ETAPA 6/6]",
                         2: "Operação cancelada",
                         3: "Processo interrompido",
                     }[decision]
+                    if decision == 0 and apply_code: expected_output=f"Código de saída: {apply_code}"
                     self._wait_until(
                         lambda: expected_output in output_path.read_text(encoding="utf-8", errors="replace"),
                         process,
@@ -197,9 +217,12 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
                             self.assertNotIn("--quarter", applied["args"])
                     else:
                         self.assertFalse((directory / "apply.json").exists(), "Cancellation or UI failure must not apply")
-                    process.stdin.write(b"\r\n")
-                    process.stdin.flush()
-                    self.assertEqual(process.wait(timeout=10), decision)
+                    (directory/"result_ack").touch()
+                    if direct:
+                        time.sleep(.3)
+                        self.assertIsNone(process.poll(), "Duplo clique deve preservar a sessão após a carga")
+                        process.stdin.write(b"exit\r\n");process.stdin.flush()
+                    self.assertEqual(process.wait(timeout=10), apply_code if decision == 0 else decision)
                 finally:
                     self._close_process(process)
 
@@ -214,6 +237,7 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
                     [os.environ.get("COMSPEC", "cmd.exe"), "/d", "/c", "atualizar_weni_carga_completa.bat"],
                     cwd=directory,
                     stdin=subprocess.PIPE,
+                    env={**os.environ, "NEXOFLOW_LAUNCHER":"1"},
                     stdout=output,
                     stderr=subprocess.STDOUT,
                 )
@@ -230,11 +254,42 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
                     self.assertIsNone(process.poll(), "The missing-helper diagnostic must remain visible")
                     for marker in ("dry_run.json", "notepad_closed.json", "review_waiting.json", "apply.json"):
                         self.assertFalse((directory / marker).exists(), f"Missing helper must prevent {marker}")
-                    process.stdin.write(b"\r\n")
-                    process.stdin.flush()
+                    (directory/"result_ack").touch()
                     self.assertEqual(process.wait(timeout=10), 3)
                 finally:
                     self._close_process(process)
+
+    def test_closed_stdin_still_waits_for_final_result_acknowledgment(self):
+        self._run_batch_case(part=0,decision=0,closed_stdin=True)
+
+    def test_apply_failure_after_confirmation_waits_with_closed_stdin(self):
+        self._run_batch_case(part=0,decision=0,closed_stdin=True,apply_code=9)
+
+    def test_result_script_records_failure_and_waits_without_stdin(self):
+        with tempfile.TemporaryDirectory(prefix="nexo result ") as temp:
+            root=Path(temp);(root/'scripts').mkdir()
+            (root/'scripts'/'resultado_carga_weni.ps1').write_bytes((REPOSITORY/'scripts'/'resultado_carga_weni.ps1').read_bytes())
+            harness=root/'result.ps1'
+            harness.write_text(
+                '. "$PSScriptRoot/scripts/resultado_carga_weni.ps1" -ResultCode 9 -Stage ERRO -Snapshot "logs/test.json"\n'
+                'function Show-WeniResult { param([string]$Message)\n'
+                ' Set-Content -LiteralPath "$PSScriptRoot/ready" -Value $Message -Encoding UTF8\n'
+                ' while (-not (Test-Path -LiteralPath "$PSScriptRoot/ack")) { Start-Sleep -Milliseconds 50 }\n}\n'
+                'exit (Complete-WeniResult)\n',encoding='utf-8-sig')
+            out=root/'out.log'
+            with out.open('wb') as output:
+                ps=Path(os.environ['SystemRoot'])/'System32/WindowsPowerShell/v1.0/powershell.exe'
+                process=subprocess.Popen([str(ps),'-NoLogo','-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',str(harness)],cwd=root,stdin=subprocess.DEVNULL,stdout=output,stderr=subprocess.STDOUT)
+                try:
+                    self._wait_until(lambda:(root/'ready').exists(),process,out,'final result acknowledgment')
+                    self.assertIsNone(process.poll())
+                    log=(root/'logs'/'weni_full_launcher.log').read_text(encoding='utf-8-sig')
+                    self.assertIn('etapa=ERRO',log);self.assertIn('código=9',log);self.assertIn('-03:00',log)
+                    (root/'ack').touch();self.assertEqual(process.wait(timeout=15),0)
+                finally:self._close_process(process)
+
+    def test_direct_batch_session_stays_open_after_result(self):
+        self._run_batch_case(part=0,decision=0,direct=True)
 
     def test_full_load_waits_for_approval_and_applies_the_frozen_snapshot(self) -> None:
         self._run_batch_case(part=0, decision=0)
