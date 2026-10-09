@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import logging
 import re
 from collections import Counter, defaultdict
 from datetime import datetime
@@ -163,23 +164,41 @@ def read_delivery_spreadsheets(directory, *, cutoff):
     return tickets, [contacts[uid] for uid in sorted(selected_ids)], {"summary": dict(summary), "rejections": rejected, "sources": sources}
 
 
-def validate_current_contacts(tickets, current_contacts):
+def validate_current_contacts(tickets, current_contacts, *, refresh_contact=None):
     """Require the exported UUID/URN/name link to still identify one live contact."""
     by_uuid, index = {}, defaultdict(set)
+    duplicates, conflicts = 0, set()
     for contact in current_contacts:
         uid = str(contact.get("uuid") or "")
+        if not uid:
+            raise DeliverySpreadsheetError("Contato sem UUID na API; atualização interrompida.")
         if uid in by_uuid:
-            raise DeliverySpreadsheetError("A API devolveu UUIDs de contatos duplicados; atualização interrompida.")
-        by_uuid[uid] = contact
+            duplicates += 1
+            if contact != by_uuid[uid]: conflicts.add(uid)
+        else:
+            by_uuid[uid] = contact
         for urn in native_contact_urns(contact):
             index[urn].add(uid)
+    for uid in sorted(conflicts):
+        if refresh_contact is None:
+            raise DeliverySpreadsheetError("UUID repetido com dados diferentes; releitura individual necessária antes da atualização.")
+        fresh = refresh_contact(uid)
+        if fresh is None:
+            by_uuid.pop(uid, None)
+            continue
+        if str(fresh.get("uuid") or "") != uid:
+            raise DeliverySpreadsheetError("Releitura devolveu outro UUID; atualização interrompida.")
+        by_uuid[uid] = fresh
+        for urn in native_contact_urns(fresh): index[urn].add(uid)
+    if duplicates:
+        logging.warning("Weni paginação: repetições=%s; UUIDs únicos=%s; releituras por divergência=%s. Ambiguidades de identidade permanecem bloqueadas.", duplicates, len(by_uuid), len(conflicts))
     accepted, rejected = [], Counter()
     for ticket in tickets:
         uid, urn = ticket["contact_uuid"], ticket.get("export_urn")
         current = by_uuid.get(uid)
         if current is None:
             rejected["UUID_NAO_LOCALIZADO_NA_WENI_ATUAL"] += 1
-        elif urn and index.get(urn, set()) != {uid}:
+        elif urn and (urn not in native_contact_urns(current) or index.get(urn, set()) != {uid}):
             rejected["URN_ALTERADA_OU_AMBIGUA_NA_WENI_ATUAL"] += 1
         elif _identity_name(ticket.get("export_contact_name")) not in _names(current):
             rejected["NOME_ALTERADO_NA_WENI_ATUAL"] += 1

@@ -116,6 +116,29 @@ class DeliverySpreadsheetsTests(unittest.TestCase):
         self.assertEqual(len(tickets),1)
         self.assertEqual(report['summary']['contatos_export'],2)
 
+    def test_identical_api_pages_are_deduplicated(self):
+        tickets, _, _ = self.read()
+        current=contact(urns=[URN]);refresh=Mock()
+        accepted, contacts, _=validate_current_contacts(tickets,[current,dict(current)],refresh_contact=refresh)
+        self.assertEqual(len(accepted),1);self.assertEqual(len(contacts),1)
+        refresh.assert_not_called()
+
+    def test_changed_duplicate_is_refetched_and_old_urn_is_rejected(self):
+        tickets, _, _ = self.read()
+        current=contact(urns=[URN]);changed=contact(urns=['whatsapp:5591222222222'])
+        refresh=Mock(return_value=changed)
+        accepted, _, rejected=validate_current_contacts(tickets,[current,changed],refresh_contact=refresh)
+        refresh.assert_called_once_with(current['uuid'])
+        self.assertFalse(accepted)
+        self.assertEqual(rejected['URN_ALTERADA_OU_AMBIGUA_NA_WENI_ATUAL'],1)
+
+    def test_conflicting_pages_without_refetch_block(self):
+        tickets, _, _ = self.read()
+        current=contact(urns=[URN]);changed={**current,'name':'Outro Cliente'}
+        with self.assertRaises(DeliverySpreadsheetError):validate_current_contacts(tickets,[current,changed])
+        with self.assertRaises(DeliverySpreadsheetError):
+            validate_current_contacts(tickets,[current,changed],refresh_contact=Mock(return_value={**current,'uuid':OTHER}))
+
     def test_current_contact_uuid_native_urn_and_name_must_still_match(self):
         tickets, _, _ = self.read()
         current=contact(urns=[URN])

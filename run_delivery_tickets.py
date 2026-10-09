@@ -63,7 +63,9 @@ def main():
             from delivery_spreadsheets import validate_current_contacts
             tickets, _, import_report = imported
             contacts = weni.list_contacts() if tickets else []
-            tickets, contacts, rejected = validate_current_contacts(tickets, contacts)
+            tickets, contacts, rejected = validate_current_contacts(
+                tickets, contacts, refresh_contact=lambda uid: weni.get_contact(uuid=uid),
+            )
             import_report["current_contact_rejections"] = rejected
             logging.info("Delivery planilhas: %s; exclusões atuais=%s.", import_report["summary"], rejected)
         else:
