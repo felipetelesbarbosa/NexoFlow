@@ -1081,6 +1081,9 @@ def main() -> int:
         )
         sheets.replace_bi_orders(bi_orders)
         logging.info("Google Sheets: BI 6/7 - BI_Pedidos atualizado.")
+        # Keep optional Delivery metrics current when existing orders change status/value.
+        # The ordinary Analytics load does not create these tabs or infer new ticket tags.
+        sheets.refresh_delivery_bi(all_order_records, create=False)
 
         # O status é gravado por último para refletir a própria execução do BI.
         completion_status, completion_controls = _completion_controls(

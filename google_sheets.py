@@ -206,6 +206,7 @@ class GoogleSheetsStore:
             self.book.worksheets,
         )
         sheets_by_title = {ws.title: ws for ws in worksheets}
+        self._known_sheets = sheets_by_title
         expected = self.schema_fingerprint()
         stored = ""
 
@@ -1235,6 +1236,26 @@ class GoogleSheetsStore:
         self._replace_table(
             self.bi_status, BI_STATUS_COLUMNS, [row], value_input_option="USER_ENTERED"
         )
+
+    def upsert_delivery_tickets(self, records: list[dict[str, Any]]) -> UpsertResult:
+        # Optional source: existing installations do not create these tabs until the Delivery command runs.
+        from delivery_tickets import TICKET_COLUMNS
+        ws = self._get_or_create_sheet("Tickets_Delivery_Weni", TICKET_COLUMNS)
+        return self._upsert_records_detailed(ws, records, "ticket_uuid",
+            ignore_compare_fields={"atualizado_em"}, value_input_option="RAW")
+
+    def refresh_delivery_bi(self, orders: list[dict[str, str]] | None = None, *, create: bool = True) -> None:
+        from delivery_tickets import TICKET_COLUMNS, DELIVERY_ORDER_COLUMNS, build_delivery_order_records
+        known = getattr(self, "_known_sheets", {})
+        if not create and not all(title in known for title in ("Tickets_Delivery_Weni", "BI_Delivery_Pedidos")):
+            return
+        tickets_ws = self._get_or_create_sheet("Tickets_Delivery_Weni", TICKET_COLUMNS, existing_sheets=known)
+        tickets = self._values_to_records(self._read_with_retry("ler tickets Delivery", tickets_ws.get_all_values))
+        records = build_delivery_order_records(tickets, self.load_order_records() if orders is None else orders, updated_at=self.now_iso())
+        ws = self._get_or_create_sheet("BI_Delivery_Pedidos", DELIVERY_ORDER_COLUMNS, existing_sheets=known)
+        # A numeric sale flag and order value become numeric cells; ISO dates remain stable for Looker parsing.
+        rows = [[record.get(column, "") for column in DELIVERY_ORDER_COLUMNS] for record in records]
+        self._replace_table(ws, DELIVERY_ORDER_COLUMNS, rows, value_input_option="USER_ENTERED")
 
     def get_control(self, key: str) -> str:
         values = self._control_values_cache

@@ -818,6 +818,7 @@ def _apply_purchase_candidate(
     farm_client: FarmaliderClient | None,
     captured_at: str,
     available_weni_fields: set[str] | None = None,
+    resolved_order: tuple[dict[str, str] | None, list[dict[str, str]]] | None = None,
 ) -> bool:
     """Resolve the latest official FarmaLíder order and flatten it into Weni."""
     current_fields = get_fields(contact)
@@ -827,10 +828,8 @@ def _apply_purchase_candidate(
         candidate["fields"]["cpf"] = plan.fields["cpf"]
 
     try:
-        order, items = resolve_contact_order(
-            candidate,
-            farm_client=farm_client,
-            captured_at=captured_at,
+        order, items = resolved_order if resolved_order is not None else resolve_contact_order(
+            candidate, farm_client=farm_client, captured_at=captured_at,
         )
     except (FarmaliderAuthError, FarmaliderUnavailableError):
         raise

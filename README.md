@@ -679,6 +679,7 @@ Após atualizar ou reinstalar, essa sequência gera um novo dry-run com o de-par
 ## Documentação
 
 - [NexoFlow Weni](README%20WENI.md)
+- [Reconciliação dos atendimentos Delivery com tags de pedido](README%20DELIVERY.md)
 - [NexoFlow Terminal](README%20TERMINAL.md) — arquivo `README TERMINAL.md`
 - [Instalação](README%20INSTALACAO.md)
 - [Pedidos](docs/PEDIDOS.md)

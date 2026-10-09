@@ -2,6 +2,15 @@
 
 ## NexoFlow 1.0
 
+### Atendimentos Delivery com tags de pedido
+
+- leitura paginada da API externa v2 do Weni Chats, com autenticação própria do projeto e seleção de atendimentos humanos encerrados com Pedido ou Pedido finalizado;
+- consulta por cliente, com prioridade para CPFs válidos e validação de identidade preservada nos inválidos;
+- revisão congelada antes da atualização dos campos de pedido na Weni e publicação das informações oficiais no Google Sheets;
+- fontes opcionais `Tickets_Delivery_Weni` e `BI_Delivery_Pedidos`, sem duplicar valores por conversa e com emissão real da API;
+- existência de pedido do cliente e vínculo comprovado com o atendimento apresentados separadamente; último pedido não substitui histórico de pedidos;
+- token de Chats ausente bloqueia a consulta dessas tags; nenhum pedido é atribuído a atendimentos por suposição.
+
 ### Resumo da checagem de CPFs inválidos
 
 - resultados exibidos por lotes de até 500 contatos, com o último lote parcial e total da preparação;
