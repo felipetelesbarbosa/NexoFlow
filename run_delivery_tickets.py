@@ -90,7 +90,9 @@ def main():
         # SDK errors can contain private/authenticated URLs; never print the original exception text.
         from weni_chats_client import WeniChatsError
         from delivery_spreadsheets import DeliverySpreadsheetError
-        if isinstance(exc, (WeniChatsError, DeliverySpreadsheetError)):
+        from weni_client import WeniError
+        from weni_update import PlanAuditError
+        if isinstance(exc, (WeniChatsError, DeliverySpreadsheetError, WeniError, PlanAuditError)):
             logging.error("%s", exc)
         else:
             logging.error("Reconciliação Delivery interrompida (%s). Confira as configurações e o relatório privado; uma aplicação parcial deve ser retomada com o mesmo snapshot.", type(exc).__name__)

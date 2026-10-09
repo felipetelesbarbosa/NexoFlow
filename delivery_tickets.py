@@ -15,8 +15,9 @@ from analytics import _sales_order_is_valid, cpf_query_priority, get_fields, nor
 from farmalider_client import FarmaliderAuthError, FarmaliderError, FarmaliderUnavailableError
 from farmalider_integration import apply_pedido_api_confirmation, resolve_contact_order, weni_identity_guard
 from pedido_utils import business_order_datetime, effective_order_status_code
+from weni_client import WeniError
 from weni_update import (
-    ContactUpdatePlan, UpdateStats, _apply_purchase_candidate, _ensure_order_fields,
+    ContactUpdatePlan, UpdateStats, PlanAuditError, _apply_purchase_candidate, _ensure_order_fields,
     _prepare_frozen_plan_for_apply, audit_plans, load_review_snapshot, write_review_snapshot,
 )
 
@@ -114,6 +115,9 @@ def _order_plan(contact, resolved, farm, captured_at, available_fields):
     plan = ContactUpdatePlan(contact_uuid=contact["uuid"], contact_name=str(contact.get("name") or ""))
     _apply_purchase_candidate(plan, contact, farm_client=farm, captured_at=captured_at,
                               available_weni_fields=available_fields, resolved_order=resolved)
+    plan.fields.pop("ultima_compra", None)
+    plan.previous.pop("ultima_compra", None)
+    plan.evidence.pop("ultima_compra", None)
     # Always guard the identity, including orders kept only in Sheets because Weni has a newer snapshot.
     plan.guards["__invalid_cpf_identity"] = weni_identity_guard(contact)
     for name in ("cpf", "ultimo_pedido", "pedido_id", "pedido_data", "pedido_status",
@@ -257,10 +261,28 @@ def apply_delivery_review(path, weni, *, store_factory=None, target=None):
     if target in {"analytics", "both"} and store_factory is None:
         raise ValueError("Google Sheets deve estar configurado para o destino revisado.")
     audit_plans(plans, opt_out_group_available=True, opt_in_group_available=True)
-    _ensure_order_fields({item.get("key") for item in weni.list_fields()})
-    accepted, conflicts, current_contacts = set(), set(), []
+    available = {item.get("key") for item in weni.list_fields()}
+    _ensure_order_fields(available)
+    # A orientação vigente usa pedido_data; não editar o arquivo revisado.
+    # A projeção abaixo somente elimina a escrita legada de ultima_compra.
+    legacy = sum("ultima_compra" in p.fields for p in plans)
     for plan in plans:
-        current = weni.get_contact(uuid=plan.contact_uuid)
+        for data in (plan.fields, plan.previous, plan.guards, plan.evidence):
+            data.pop("ultima_compra", None)
+    if legacy:
+        logging.warning("Delivery: escrita legada de ultima_compra desconsiderada em %s plano(s); pedido_data permanece como referência. Snapshot original preservado.", legacy)
+    unknown = sorted({key for plan in plans for key in plan.fields if key not in available})
+    if unknown:
+        raise PlanAuditError("Campos do snapshot ausentes na Weni: " + ", ".join(unknown) + ". Aplicação bloqueada antes de gravar; confira os campos e a revisão.")
+    accepted, conflicts, current_contacts = set(), set(), []
+    for position, plan in enumerate(plans, 1):
+        reference = hashlib.sha256(plan.contact_uuid.encode()).hexdigest()[:12]
+        if position == 1 or position % 100 == 0:
+            logging.info("Delivery aplicação: contato=%s/%s; aceitos=%s; conflitos=%s.", position, len(plans), len(accepted), len(conflicts))
+        try:
+            current = weni.get_contact(uuid=plan.contact_uuid)
+        except WeniError as exc:
+            raise WeniError(f"Delivery etapa=RELER_CONTATO contato_ref={reference}: {exc}") from None
         if current is None:
             conflicts.add(plan.contact_uuid)
             continue
@@ -271,7 +293,10 @@ def apply_delivery_review(path, weni, *, store_factory=None, target=None):
             continue
         audit_plans([prepared], opt_out_group_available=True, opt_in_group_available=True)
         if prepared.fields and target in {"weni", "both"}:
-            weni.update_contact_fields(plan.contact_uuid, prepared.fields)
+            try:
+                weni.update_contact_fields(plan.contact_uuid, prepared.fields)
+            except WeniError as exc:
+                raise WeniError(f"Delivery etapa=GRAVAR_CAMPOS contato_ref={reference}: {exc}") from None
         accepted.add(plan.contact_uuid)
         merged = deepcopy(current)
         merged["fields"] = {**get_fields(current), **prepared.fields}

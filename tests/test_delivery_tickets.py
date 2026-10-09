@@ -159,6 +159,50 @@ class DeliveryTicketsTests(unittest.TestCase):
             self.assertEqual(store.upsert_orders_detailed.call_args.args[0], [])
             self.assertEqual(store.upsert_delivery_tickets.call_args.args[0], [])
 
+    def test_legacy_ultima_compra_is_omitted_and_same_snapshot_resumes(self):
+        plans, delivery = self.reconcile()
+        self.assertNotIn('ultima_compra',plans[0].fields)
+        delivery['target']='weni'
+        plans[0].fields['ultima_compra']=delivery['orders'][0]['data_hora']
+        plans[0].previous['ultima_compra']=None
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/'review.json';write_delivery_review(plans,delivery,path)
+            original=path.read_bytes();live=contact();weni=Mock()
+            weni.list_fields.return_value=[{'key':key} for key in REQUIRED_ORDER_FIELDS]
+            weni.get_contact.side_effect=lambda **kwargs:deepcopy(live)
+            def update(uid,fields):
+                self.assertNotIn('ultima_compra',fields)
+                live['fields'].update(fields)
+            weni.update_contact_fields.side_effect=update
+            result=apply_delivery_review(path,weni,target='weni')
+            self.assertEqual(result['conflicts'],0)
+            count=weni.update_contact_fields.call_count
+            apply_delivery_review(path,weni,target='weni')
+            self.assertEqual(weni.update_contact_fields.call_count,count)
+            self.assertEqual(path.read_bytes(),original)
+
+    def test_unknown_snapshot_field_blocks_before_any_contact_write(self):
+        from weni_update import PlanAuditError
+        plans,delivery=self.reconcile();delivery['target']='weni'
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/'review.json';write_delivery_review(plans,delivery,path)
+            weni=Mock();weni.list_fields.return_value=[{'key':key} for key in REQUIRED_ORDER_FIELDS if key!='pedido_valor']
+            with self.assertRaises(PlanAuditError):apply_delivery_review(path,weni,target='weni')
+            weni.get_contact.assert_not_called();weni.update_contact_fields.assert_not_called()
+
+    def test_weni_failure_identifies_stage_without_contact_uuid(self):
+        from weni_client import WeniError
+        plans,delivery=self.reconcile();delivery['target']='weni'
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/'review.json';write_delivery_review(plans,delivery,path)
+            weni=Mock();weni.list_fields.return_value=[{'key':key} for key in REQUIRED_ORDER_FIELDS]
+            weni.get_contact.return_value=contact()
+            weni.update_contact_fields.side_effect=WeniError('HTTP=400; requisição rejeitada')
+            with self.assertRaises(WeniError) as caught:apply_delivery_review(path,weni,target='weni')
+            self.assertIn('GRAVAR_CAMPOS',str(caught.exception))
+            self.assertIn('HTTP=400',str(caught.exception))
+            self.assertNotIn(plans[0].contact_uuid,str(caught.exception))
+
     def test_snapshot_delivery_data_tampering_blocks_before_external_calls(self):
         plans, delivery = self.reconcile()
         with tempfile.TemporaryDirectory() as temp:

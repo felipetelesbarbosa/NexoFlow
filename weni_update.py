@@ -926,7 +926,7 @@ def _apply_purchase_candidate(
             plan, current_fields, field_name, value, reason=reason
         )
 
-    if plan.purchase_confirmed:
+    if plan.purchase_confirmed and (available_weni_fields is None or "ultima_compra" in available_weni_fields):
         current_last_purchase = business_order_datetime(
             normalize_value(current_fields.get("ultima_compra"))
         )

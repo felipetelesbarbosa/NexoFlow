@@ -277,7 +277,7 @@ Regras:
 - `pedido_id` é o primeiro localizador de fallback quando o GET por CPF não puder ser usado;
 - `ultimo_pedido` é o **último localizador**: ele pode vir de outra integração e serve somente para recuperar um ID de pedido que depois será confirmado em `GET pedido/{id}`;
 - `ultimo_pedido` nunca substitui a API como fonte de produtos, valores, status, data ou pagamento; se a FarmaLíder estiver indisponível, os campos `pedido_*` existentes são preservados e não são reconstruídos a partir do snapshot legado;
-- `ultima_compra` avança somente para pedido confirmado pela FarmaLíder com status efetivo 4, 1 ou 2, sem cancelamento explícito e sem pagamento 0; somente esses pedidos entram nas métricas de venda.
+- `ultima_compra`, quando o campo existe, avança nas rotinas convencionais somente para pedido confirmado pela FarmaLíder com status efetivo 4, 1 ou 2, sem cancelamento explícito e sem pagamento 0; somente esses pedidos entram nas métricas de venda.
 
 Os campos `pedido_id`, `pedido_data`, `pedido_status`, `pedido_produtos`, `pedido_quantidade_itens`, `pedido_valor_produtos`, `pedido_valor` e `pedido_forma_pagamento` são obrigatórios na Weni. Se qualquer um estiver ausente, o preflight bloqueia a execução antes de qualquer atualização de pedido.
 
@@ -360,3 +360,13 @@ Grupo sincronizado com a última compra confirmada entre 0 e 25 dias, remoção 
 O Setup instala **NexoFlow Planilha.exe** com ícone próprio e atalho na Área de Trabalho. O menu permite executar as cargas por planilha para Weni ou Analytics/Google Sheets e abrir `importacoes`. Use `Conversas_Delivery.xlsx` e `Contatos_Delivery.xlsx`; cada carga mantém a revisão humana antes de aplicar.
 
 Na carga por planilha, UUIDs idênticos repetidos pela paginação são consolidados. Versões diferentes exigem GET individual por UUID; telefone/URN e nome continuam validados, e falha da releitura não autoriza gravação. O log mostra contagens agregadas, sem CPF.
+
+### Retomar uma aplicação por planilha
+
+Se a aplicação falhar, preserve `logs/delivery_weni_review.json` e o relatório já revisado. No NexoFlow Terminal, após atualizar o Setup, retome com:
+
+```text
+python run_delivery_tickets.py --apply --target weni --require-review logs/delivery_weni_review.json
+```
+
+A retomada relê os contatos, preserva o pedido histórico congelado e não regrava valores já aplicados. Não gere outro dry-run para retomar uma aplicação parcial sem antes conferir o snapshot. A carga por planilha usa `pedido_data`; escritas legadas de `ultima_compra` são omitidas, com aviso, mantendo intacto o arquivo e seu hash. Outros campos ausentes bloqueiam antes de qualquer POST. Erros Weni informam releitura ou gravação e diagnóstico HTTP seguro, sem CPF, token ou corpo bruto da resposta.
