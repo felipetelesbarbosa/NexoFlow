@@ -68,8 +68,13 @@ else:
                         self.assertIn('PLANILHAS REVISADAS',(root/'dialog_open').read_text(encoding='utf-8-sig'))
                         self.assertIsNone(process.poll(), 'Fechar o Bloco de Notas não pode fechar o CMD')
                         self.assertFalse((root/'applied.json').exists())
-                        (root/'decision').write_text(decision,encoding='ascii')
-                        self.assertEqual(process.wait(timeout=15),0 if decision=='PLANILHAS REVISADAS' else 2)
+                        # Publicar a resposta completa: o PowerShell pode ler
+                        # entre a criação do arquivo e a escrita de seu conteúdo.
+                        pending=root/'decision.pending'
+                        pending.write_text(decision,encoding='ascii')
+                        os.replace(pending,root/'decision')
+                        self.assertEqual(process.wait(timeout=15),0 if decision=='PLANILHAS REVISADAS' else 2,
+                                         output.read_text(encoding='utf-8',errors='replace'))
                     if not dry_failure and decision=='PLANILHAS REVISADAS':
                         applied=json.loads((root/'applied.json').read_text())
                         args=applied['args'];dry=applied['snapshot']['args']
