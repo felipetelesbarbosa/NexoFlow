@@ -15,6 +15,9 @@ def main():
     mode.add_argument("--apply", action="store_true", help="aplica o snapshot revisado na Weni e no Google Sheets")
     parser.add_argument("--review-out", type=Path, default=Path("logs/delivery_review.json"))
     parser.add_argument("--require-review", type=Path, help="snapshot Delivery previamente revisado")
+    parser.add_argument("--planilhas", action="store_true", help="usa Conversas_Delivery.xlsx e Contatos_Delivery.xlsx, sem token do Chats")
+    parser.add_argument("--import-dir", type=Path, default=Path("importacoes"), help="pasta dos dois exports XLSX")
+    parser.add_argument("--target", choices=["weni", "analytics", "both"], help="destino da carga; fica congelado no relatório de revisão")
     args = parser.parse_args()
     if args.apply and args.require_review is None:
         parser.error("--apply exige --require-review com o snapshot revisado.")
@@ -33,31 +36,48 @@ def main():
     try:
         if not getattr(secrets, "WENI_API_TOKEN", ""):
             raise RuntimeError("Token da Weni não configurado.")
-        if args.dry_run:
+        imported = None
+        cutoff = datetime.now(timezone.utc)
+        if args.dry_run and args.planilhas:
+            from delivery_spreadsheets import read_delivery_spreadsheets
+            imported = read_delivery_spreadsheets(args.import_dir, cutoff=cutoff)
+        elif args.dry_run:
             # Validate Chats configuration before listing the entire Weni base or querying FarmaLíder.
             chats = WeniChatsClient(str(getattr(secrets, "WENI_CHATS_API_BASE_URL", "")),
                                     str(getattr(secrets, "WENI_CHATS_API_TOKEN", "")))
         weni = WeniClient(secrets.WENI_API_TOKEN)
         if args.apply:
             spreadsheet_id = str(getattr(secrets, "GOOGLE_SPREADSHEET_ID", ""))
-            if not spreadsheet_id:
-                raise RuntimeError("ID da planilha Google não configurado.")
+            def store_factory():
+                if not spreadsheet_id:
+                    raise RuntimeError("ID da planilha Google não configurado.")
+                return GoogleSheetsStore(spreadsheet_id)
             result = apply_delivery_review(args.require_review, weni,
-                store_factory=lambda: GoogleSheetsStore(spreadsheet_id))
+                store_factory=store_factory, target=args.target)
             print("[OK] Reconciliação aplicada:", result)
             return 3 if result["conflicts"] else 0
         farm = _open_farmalider()
         if farm is None:
             raise RuntimeError("FarmaLíder deve estar configurada para confirmar os pedidos.")
-        cutoff = datetime.now(timezone.utc)
-        rooms = chats.list_closed_rooms(cutoff=cutoff)
-        tickets, rejected = select_tickets(rooms, cutoff=cutoff)
+        if imported is not None:
+            from delivery_spreadsheets import validate_current_contacts
+            tickets, _, import_report = imported
+            contacts = weni.list_contacts() if tickets else []
+            tickets, contacts, rejected = validate_current_contacts(tickets, contacts)
+            import_report["current_contact_rejections"] = rejected
+            logging.info("Delivery planilhas: %s; exclusões atuais=%s.", import_report["summary"], rejected)
+        else:
+            rooms = chats.list_closed_rooms(cutoff=cutoff)
+            tickets, rejected = select_tickets(rooms, cutoff=cutoff)
+            contacts = weni.list_contacts() if tickets else []
         logging.info("Delivery: tickets selecionados=%s; exclusões por motivo=%s.", len(tickets), rejected)
-        contacts = weni.list_contacts() if tickets else []
         available = {item.get("key") for item in weni.list_fields()}
         plans, delivery = reconcile_tickets(tickets, contacts, farm, captured_at=cutoff.isoformat(),
-            available_fields=available, order_id_field=str(getattr(secrets, "WENI_CHATS_ORDER_ID_FIELD", "pedido_id")))
+            available_fields=available, order_id_field="" if imported is not None else str(getattr(secrets, "WENI_CHATS_ORDER_ID_FIELD", "")))
         delivery["selection_rejections"] = rejected
+        delivery["target"] = args.target or "both"
+        if imported is not None:
+            delivery["spreadsheet_import"] = import_report
         write_delivery_review(plans, delivery, args.review_out)
         print(f"[OK] Revisão gerada em {args.review_out.with_suffix('.txt')}.")
         print(f"Tickets: {len(tickets)} | clientes: {len(plans)} | pedidos únicos: {len(delivery['orders'])}.")
@@ -67,7 +87,8 @@ def main():
     except Exception as exc:
         # SDK errors can contain private/authenticated URLs; never print the original exception text.
         from weni_chats_client import WeniChatsError
-        if isinstance(exc, WeniChatsError):
+        from delivery_spreadsheets import DeliverySpreadsheetError
+        if isinstance(exc, (WeniChatsError, DeliverySpreadsheetError)):
             logging.error("%s", exc)
         else:
             logging.error("Reconciliação Delivery interrompida (%s). Confira as configurações e o relatório privado; uma aplicação parcial deve ser retomada com o mesmo snapshot.", type(exc).__name__)

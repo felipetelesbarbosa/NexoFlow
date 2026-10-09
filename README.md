@@ -1,5 +1,7 @@
 # NexoFlow 1.0
 
+**Carga por exports do Delivery:** coloque `Conversas_Delivery.xlsx` e `Contatos_Delivery.xlsx` em `C:\NexoFlow\importacoes` e execute `nexo weni planilhas` ou `nexo analytics planilhas`. Os destinos são separados e exigem revisão antes da aplicação. Consulte [Delivery e carga por planilhas](README%20DELIVERY.md).
+
 ## Consulta de CPFs válidos e inválidos
 
 Nas cargas Weni e Analytics, o NexoFlow consulta primeiro os CPFs matematicamente válidos e aguarda essa etapa terminar antes de consultar os inválidos preenchidos. A classificação usa 11 dígitos, rejeição de sequências repetidas e os dois dígitos verificadores. CPFs curtos, dígitos incorretos e valores como `0` ou `00000000000` também são consultados, na segunda etapa. Valores sem dígitos não geram GET. O CPF original permanece no cadastro; a consulta remove a formatação, sem completar, corrigir ou inventar dígitos.

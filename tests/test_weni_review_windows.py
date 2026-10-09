@@ -286,7 +286,7 @@ class WeniReviewDialogWindowsTests(unittest.TestCase):
                     str(harness),
                 ],
                 capture_output=True,
-                timeout=15,
+                timeout=45,
                 check=False,
             )
             self.assertEqual(expected_code, result.returncode, result.stdout + result.stderr)

@@ -54,9 +54,9 @@ def selection(rooms=None):
 
 
 class DeliveryTicketsTests(unittest.TestCase):
-    def reconcile(self, tickets=None, contacts=None, client=None):
+    def reconcile(self, tickets=None, contacts=None, client=None, order_id_field=""):
         return reconcile_tickets(tickets or selection(), contacts or [contact()], client or farm(),
-                                 captured_at=NOW, available_fields=REQUIRED_ORDER_FIELDS)
+                                 captured_at=NOW, available_fields=REQUIRED_ORDER_FIELDS, order_id_field=order_id_field)
 
     def test_exact_tags_closed_human_and_flows_external_id(self):
         rooms = [room(), room(), room(uuid="20000000-0000-0000-0000-000000000002",
@@ -130,9 +130,10 @@ class DeliveryTicketsTests(unittest.TestCase):
         order = data["orders"][0]
         ticket = selection()[0]
         ticket["custom_fields"] = {"pedido_id": "201"}
-        self.assertEqual(ticket_order_link(ticket, order), "CONFIRMADO_POR_ID")
+        self.assertEqual(ticket_order_link(ticket, order), "FORA_DO_PERIODO_DO_ATENDIMENTO")
+        self.assertEqual(ticket_order_link(ticket, order, order_id_field="pedido_id"), "CONFIRMADO_POR_ID")
         ticket["custom_fields"] = {"pedido_id": "202"}
-        self.assertEqual(ticket_order_link(ticket, order), "OUTRO_PEDIDO_NO_TICKET")
+        self.assertEqual(ticket_order_link(ticket, order, order_id_field="pedido_id"), "OUTRO_PEDIDO_NO_TICKET")
         ticket["custom_fields"] = {}
         ticket["aberto_em"] = "2026-06-01T12:00:00Z"
         ticket["encerrado_em"] = "2026-06-01T14:00:00Z"
@@ -180,13 +181,13 @@ class DeliveryTicketsTests(unittest.TestCase):
         historical["capa"]["emissao"] = "2026-05-01T10:00:00"
         historical["itens"][0]["codPedido"] = 199
         client.get_pedido.side_effect = lambda pid: historical if str(pid) == "199" else latest
-        plans, data = self.reconcile(tickets=tickets, client=client)
+        plans, data = self.reconcile(tickets=tickets, client=client, order_id_field="pedido_id")
         self.assertEqual(data["orders"][0]["pedido_id"], "199")
         self.assertEqual(data["orders"][0]["data"], "2026-05-01")
         self.assertEqual(data["tickets"][0]["vinculo_atendimento"], "CONFIRMADO_POR_ID")
         self.assertEqual(plans[0].fields["pedido_id"], "201")
         historical["capa"]["codCliente"] = 999
-        _, data = self.reconcile(tickets=tickets, client=client)
+        _, data = self.reconcile(tickets=tickets, client=client, order_id_field="pedido_id")
         self.assertEqual(data["orders"], [])
         self.assertEqual(data["tickets"][0]["resultado_validacao"], "PEDIDO_CLIENTE_DIVERGENTE_API")
 

@@ -15,6 +15,11 @@ diagnosticos_privados/
 farmalider_falhas_*.jsonl
 logs/*.log
 logs/*.log.*
+logs/delivery*review.json
+logs/delivery*review.txt
+
+# Exports privados de conversas e contatos
+importacoes/
 
 # VS Code
 .vscode/

@@ -32,7 +32,8 @@ function Assert-PublicTrackedFiles {
     $privatePatterns = @(
         '(^|/)(\.git|\.venv|venv|__pycache__)(/|$)',
         '(^|/)(credentials|secrets|logs)(/|$)',
-        '(^|/)diagnosticos_privados(/|$)',
+        '(^|/)(diagnosticos_privados|importacoes)(/|$)',
+        '(^|/)(Conversas_Delivery|Contatos_Delivery)\.xlsx$',
         '(^|/)farmalider_falhas_[^/]*\.jsonl$',
         '(^|/)secrets_config\.py($|\.)',
         '(^|/)\.env($|\.)',
@@ -331,6 +332,9 @@ Melhorias desta distribuição do NexoFlow 1.0:
 - consultas por CPF que já falharam não são repetidas na mesma carga; dados previamente confirmados são preservados quando o CPF continua o mesmo;
 - cargas incompletas aparecem como parciais e preservam o marco incremental para uma nova tentativa;
 - empacotamento bloqueado quando arquivos privados estão rastreados no Git.
+
+- carga por planilhas de conversas e contatos com comandos nexo weni planilhas e nexo analytics planilhas, validação de identidade e revisão humana por destino;
+- arquivos privados em importacoes preservados pelo instalador e excluídos dos pacotes.
 
 Principais garantias do Setup:
 - elevação UAC automática quando necessária;

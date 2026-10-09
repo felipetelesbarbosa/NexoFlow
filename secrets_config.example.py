@@ -11,7 +11,7 @@ WENI_API_TOKEN = "COLE_SEU_TOKEN_WENI_AQUI"
 WENI_CHATS_API_BASE_URL = ""
 WENI_CHATS_API_TOKEN = ""
 # Campo estruturado do ticket que contém o ID oficial do pedido, quando disponível.
-WENI_CHATS_ORDER_ID_FIELD = "pedido_id"
+WENI_CHATS_ORDER_ID_FIELD = ""  # Somente um campo comprovadamente específico do ticket.
 
 GOOGLE_SPREADSHEET_ID = "COLE_O_ID_DA_PLANILHA_GOOGLE_AQUI"
 

@@ -2,6 +2,16 @@
 
 ## NexoFlow 1.0
 
+### Carga por exports de conversas e contatos
+
+- arquivos padronizados `importacoes/Conversas_Delivery.xlsx` e `importacoes/Contatos_Delivery.xlsx`, sem exigir token do Chats;
+- comandos `nexo weni planilhas` e `nexo analytics planilhas`, com destinos separados, revisão congelada e aplicação idempotente;
+- UUIDs de Chats/Flows cruzados por URN nativa única e nome, revalidados na Weni atual antes da consulta oficial;
+- CPFs válidos primeiro; inválidos exigem nome + e-mail ou nome + telefone, preservando bloqueios de identidade;
+- relatórios por grupo de CPF e motivo, emissão real dos pedidos e chave estável de atendimento compartilhada entre XLSX e API;
+- campos de pedido herdados do contato não são considerados prova automática de atribuição ao atendimento;
+- exports privados ignorados no Git, bloqueados no empacotamento e preservados pelo instalador.
+
 ### Atendimentos Delivery com tags de pedido
 
 - leitura paginada da API externa v2 do Weni Chats, com autenticação própria do projeto e seleção de atendimentos humanos encerrados com Pedido ou Pedido finalizado;

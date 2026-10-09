@@ -769,7 +769,7 @@ function Backup-PrivateData([string]$Source, [string]$Backup) {
     New-Item -ItemType Directory -Force -Path $Backup | Out-Null
     $secret = Join-Path $Source 'secrets_config.py'
     if (Test-Path -LiteralPath $secret -PathType Leaf) { Copy-Item -LiteralPath $secret -Destination (Join-Path $Backup 'secrets_config.py') -Force }
-    foreach ($dirName in @('credentials','logs')) {
+    foreach ($dirName in @('credentials','logs','importacoes')) {
         $srcDir = Join-Path $Source $dirName
         if (Test-Path -LiteralPath $srcDir -PathType Container) { Copy-Item -LiteralPath $srcDir -Destination (Join-Path $Backup $dirName) -Recurse -Force }
     }
@@ -779,7 +779,7 @@ function Restore-PrivateData([string]$Backup, [string]$Target) {
     if (-not (Test-Path -LiteralPath $Backup -PathType Container)) { return }
     $secret = Join-Path $Backup 'secrets_config.py'
     if (Test-Path -LiteralPath $secret -PathType Leaf) { Copy-Item -LiteralPath $secret -Destination (Join-Path $Target 'secrets_config.py') -Force }
-    foreach ($dirName in @('credentials','logs')) {
+    foreach ($dirName in @('credentials','logs','importacoes')) {
         $srcDir = Join-Path $Backup $dirName
         if (Test-Path -LiteralPath $srcDir -PathType Container) {
             $dstDir = Join-Path $Target $dirName

@@ -94,7 +94,7 @@ function Preserve-PrivateData {
         Copy-Item -LiteralPath $secret -Destination (Join-Path $DataDir 'secrets_config.py') -Force
     }
 
-    foreach ($name in @('credentials', 'logs')) {
+    foreach ($name in @('credentials', 'logs', 'importacoes')) {
         $source = Join-Path $InstallDir $name
         if (Test-Path -LiteralPath $source -PathType Container) {
             Copy-Item -LiteralPath $source -Destination (Join-Path $DataDir $name) -Recurse -Force
@@ -107,6 +107,7 @@ Uma futura instalação restaurara automaticamente:
 - secrets_config.py
 - credentials\
 - logs\
+- importacoes\
 "@ | Set-Content -LiteralPath (Join-Path $DataDir 'DADOS PRESERVADOS.txt') -Encoding UTF8
 }
 

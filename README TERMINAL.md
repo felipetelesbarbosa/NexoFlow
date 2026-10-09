@@ -35,6 +35,17 @@ nexo help
 
 ## Comandos gerais
 
+### Cargas por planilhas
+
+Coloque `Conversas_Delivery.xlsx` e `Contatos_Delivery.xlsx` em `C:\NexoFlow\importacoes`, preservando as abas e os cabeçalhos originais dos exports.
+
+```text
+nexo weni planilhas
+nexo analytics planilhas
+```
+
+Weni atualiza somente os campos de pedido dos clientes identificados. Analytics atualiza o Google Sheets com os pedidos confirmados e sua data real, sem gravar na Weni. Os comandos consultam primeiro CPFs válidos e depois inválidos, com nome + e-mail ou nome + telefone exigidos para estes últimos. Cada comando gera uma revisão privada e aguarda `PLANILHAS REVISADAS` antes de aplicar. Não exigem o token de integração do Chats. Veja [Carga por planilhas](README%20DELIVERY.md) para a seleção de tags, validações, configuração e limitações de atribuição.
+
 ### Status
 
 ```text

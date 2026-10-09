@@ -4,14 +4,55 @@
 
 O comando `run_delivery_tickets.py` reconcilia os clientes dos atendimentos humanos encerrados com essas tags. As tags são lidas na **API externa v2 do Weni Chats**, não nos tópicos/setores ou nas etiquetas de mensagens da API de Flows.
 
+### Carga por planilhas — Weni e Analytics
+
+Coloque os dois exports originais na pasta `C:\NexoFlow\importacoes`, com estes nomes:
+
+| Arquivo | Export e estrutura original |
+| --- | --- |
+| `Conversas_Delivery.xlsx` | Conversas encerradas, aba `rooms`, com as tags Pedido ou Pedido Finalizado. |
+| `Contatos_Delivery.xlsx` | Contatos da mesma organização, abas `Contact` ou `Contact 1`, `Contact 2` etc., com UUID, nome, CPF, e-mail e URNs nativas. |
+
+Renomeie apenas os arquivos. Preserve abas, cabeçalhos e dados originais. Os exports ficam fora do Git e dos pacotes. A pasta `importacoes` é preservada na atualização/reinstalação e no backup de dados da desinstalação.
+
+No NexoFlow Terminal:
+
+```text
+nexo weni planilhas
+nexo analytics planilhas
+```
+
+O primeiro comando consulta a FarmaLíder e aplica somente os campos de pedido na Weni. O segundo consulta novamente a FarmaLíder e publica os contatos/pedidos/itens e indicadores no Google Sheets, sem gravar na Weni. Recomenda-se executar Weni primeiro e Analytics depois. Cada execução prepara um snapshot próprio e abre o relatório no Bloco de Notas; digite `PLANILHAS REVISADAS` no CMD somente depois de conferir os resultados. Cancelar, fechar a janela ou falhar na consulta/auditoria impede a aplicação. Fechar o Bloco de Notas não confirma a carga.
+
+Essa modalidade não precisa do token `project_auth` do Chats. Continua exigindo token de contatos da Weni, token FarmaLíder e, para Analytics, credencial/ID da planilha Google. O importador cruza o UUID interno do Chats com o UUID de contatos/Flows por URN nativa única e nome correspondente; não usa nome ou CPF sozinho para unir contatos. URNs duplicadas, nomes divergentes, datas inválidas, conversas abertas, ausência de atendente e setores diferentes são excluídos com motivo.
+
+Antes da consulta de pedidos, o vínculo UUID/URN/nome é revalidado na base atual da Weni. CPF, nome, e-mail e telefone usados na FarmaLíder vêm desse contato atual, evitando atualizar a partir de dados pessoais desatualizados no export. Consultas priorizam CPFs válidos, depois inválidos preenchidos, incluindo zero; CPF inválido exige nome completo + e-mail ou nome completo + telefone do mesmo cliente da API, sem ambiguidade. Sem CPF, somente os localizadores oficiais já existentes no contato podem ser revalidados; não há endpoint documentado de busca por nome/e-mail/telefone.
+
+Logs e revisão apresentam totais por grupo de CPF, pedidos validados e impedimentos, sem exibir dados pessoais no console. Os relatórios privados são `logs/delivery_weni_review.txt` e `logs/delivery_analytics_review.txt`. Falha de API não significa cliente sem pedido. A carga mantém a revisão congelada e não avança o checkpoint da carga geral.
+
+As datas sem fuso do export de conversas são interpretadas em `America/Belem`, pois o export do Chats retira o fuso após converter para o horário do projeto. As vendas continuam usando a emissão real da API. O campo `custom_fields.pedido_id` do export pode ser um snapshot antigo do contato e **não comprova vínculo com a conversa**. Por isso, a modalidade por planilhas não o usa como prova de atribuição.
+
+Um identificador local estável de atendimento é gerado a partir do UUID interno do contato do Chats e das datas de abertura/encerramento. Reimportar o mesmo atendimento não duplica sua linha; quando esses dados também estão presentes na API do Chats, as duas origens usam a mesma chave. `chats_room_uuid` guarda o UUID real da sala quando disponível; fica vazio no export sem essa coluna.
+
+Para execução técnica sem o assistente do Terminal:
+
+```powershell
+python run_delivery_tickets.py --dry-run --planilhas --target weni --review-out logs/delivery_weni_review.json
+python run_delivery_tickets.py --apply --target weni --require-review logs/delivery_weni_review.json
+python run_delivery_tickets.py --dry-run --planilhas --target analytics --review-out logs/delivery_analytics_review.json
+python run_delivery_tickets.py --apply --target analytics --require-review logs/delivery_analytics_review.json
+```
+
+O destino fica congelado na revisão. Não é permitido usar uma revisão de Weni para gravar no Analytics ou vice-versa. `--import-dir` permite selecionar outra pasta mantendo os mesmos nomes de arquivos. Uma exportação contendo somente Pedido Finalizado não recupera atendimentos marcados apenas com Pedido.
+
 ### Configuração local
 
 Preencha em `secrets_config.py`, que permanece fora do Git e dos pacotes:
 
 ```python
-WENI_CHATS_API_BASE_URL = "https://ORIGEM_DA_API_DO_SEU_CHATS"
+WENI_CHATS_API_BASE_URL = "https://chats-engine.weni.ai"
 WENI_CHATS_API_TOKEN = "TOKEN_DE_INTEGRACAO_DO_PROJETO"
-WENI_CHATS_ORDER_ID_FIELD = "pedido_id"
+WENI_CHATS_ORDER_ID_FIELD = ""
 ```
 
 O token de integração do Chats é um Bearer UUID do projeto **Delivery FarmaLíder**. Ele é diferente do `WENI_API_TOKEN` usado para contatos e mensagens. A origem deve ser a API, não a página do navegador, sem caminhos, parâmetros ou credenciais. O token restringe as consultas ao projeto: confirme essa organização antes de configurar. O comando lê `GET /v2/external/rooms_metrics/`, todas as páginas de atendimentos encerrados até o corte da execução, sem janela inicial de 90 dias. Redirecionamentos e paginação para outro destino são bloqueados.
@@ -24,7 +65,7 @@ Referências oficiais: [configuração `project_auth` da integração com Flows]
 
 A API externa também documenta o filtro `tag_name`, por exemplo `GET /v2/external/rooms_metrics/?is_active=false&tag_name=Pedido`. Para a segunda tag, o valor é `Pedido%20finalizado`, respeitando o nome cadastrado. O NexoFlow lê todas as páginas encerradas e compara as duas tags localmente, para lidar com capitalização, tickets com ambas as tags e diferenças de espaços sem duplicação.
 
-O campo opcional `WENI_CHATS_ORDER_ID_FIELD` identifica o campo estruturado do ticket que contém o ID oficial do pedido. O NexoFlow não inventa esse campo: se não existir, o vínculo do pedido com aquele atendimento continua pendente.
+O campo opcional `WENI_CHATS_ORDER_ID_FIELD` identifica um campo comprovadamente específico do ticket que contém o ID oficial do pedido. Deixe vazio até documentar esse vínculo. Não use automaticamente `pedido_id` herdado do contato: ele pode representar uma compra anterior. Sem evidência específica, o vínculo do pedido com o atendimento continua pendente.
 
 ### Preparação e revisão
 

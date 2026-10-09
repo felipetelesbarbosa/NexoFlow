@@ -7,6 +7,14 @@ import nexo_cli
 
 
 class NexoCliTests(unittest.TestCase):
+    def test_spreadsheet_load_commands_route_to_separate_targets(self):
+        for args, expected in [(["weni", "planilhas"], "atualizar_weni_planilhas.bat"),
+                               (["analytics", "planilhas"], "executar_analytics_planilhas.bat"),
+                               (["analytics"], "NexoFlow Analytics.exe")]:
+            with self.subTest(args=args), patch("nexo_cli._run_windows_target", return_value=0) as runner:
+                self.assertEqual(nexo_cli.run(args), 0)
+                runner.assert_called_once_with(expected)
+
     def test_help_lists_friendly_commands(self) -> None:
         out = io.StringIO()
         with redirect_stdout(out):

@@ -274,9 +274,11 @@ def _print_commands() -> None:
     print("  nexo weni dry-run            Simula alterações sem gravar")
     print("  nexo weni atualizar          Atualização incremental segura")
     print("  nexo weni carga-completa     Carga completa com revisão humana")
+    print("  nexo weni planilhas          Atualiza a Weni a partir dos exports XLSX")
     print()
     print("ANALYTICS")
     print("  nexo analytics               Executa o NexoFlow Analytics")
+    print("  nexo analytics planilhas     Consulta os exports e atualiza o Google Sheets")
     print()
     print("CONSULTAS WENI - SOMENTE LEITURA")
     print("  nexo api weni status")
@@ -542,7 +544,8 @@ def build_parser() -> argparse.ArgumentParser:
     status.add_argument("--local", action="store_true", help="não consulta APIs")
 
     sub.add_parser("diagnostico", aliases=["doctor", "check"], help="check-up e conexões")
-    sub.add_parser("analytics", help="executa o NexoFlow Analytics")
+    analytics = sub.add_parser("analytics", help="executa o NexoFlow Analytics")
+    analytics.add_argument("analytics_op", nargs="?", choices=["planilhas"], help="carga pelos exports de conversas e contatos")
 
     weni = sub.add_parser("weni", help="rotinas seguras de atualização da Weni")
     weni_sub = weni.add_subparsers(dest="weni_op")
@@ -550,6 +553,7 @@ def build_parser() -> argparse.ArgumentParser:
     weni_sub.add_parser("dry-run", aliases=["simular"], help="simula alterações sem gravar")
     weni_sub.add_parser("atualizar", aliases=["update"], help="atualização incremental segura")
     weni_sub.add_parser("carga-completa", aliases=["full"], help="carga completa com revisão humana")
+    weni_sub.add_parser("planilhas", help="carga de pedidos a partir dos exports XLSX, com revisão humana")
 
     logs = sub.add_parser("logs", help="consulta logs do NexoFlow")
     logs.add_argument("tipo", nargs="?", default="weni", choices=["weni", "analytics"])
@@ -615,7 +619,7 @@ def run(argv: list[str] | None = None) -> int:
         if args.command in {"diagnostico", "doctor", "check"}:
             return _doctor()
         if args.command == "analytics":
-            return _run_windows_target("NexoFlow Analytics.exe")
+            return _run_windows_target("executar_analytics_planilhas.bat" if args.analytics_op == "planilhas" else "NexoFlow Analytics.exe")
         if args.command == "weni":
             mapping = {
                 "testar": "testar_update_weni.bat",
@@ -627,6 +631,7 @@ def run(argv: list[str] | None = None) -> int:
                 "update": "atualizar_weni.bat",
                 "carga-completa": "atualizar_weni_carga_completa.bat",
                 "full": "atualizar_weni_carga_completa.bat",
+                "planilhas": "atualizar_weni_planilhas.bat",
             }
             if args.weni_op not in mapping:
                 parser.parse_args(["weni", "-h"])

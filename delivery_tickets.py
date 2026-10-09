@@ -7,9 +7,9 @@ import logging
 import os
 from collections import Counter
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
-from uuid import UUID
+from uuid import UUID, NAMESPACE_URL, uuid5
 
 from analytics import _sales_order_is_valid, cpf_query_priority, get_fields, normalize_contact
 from farmalider_client import FarmaliderAuthError, FarmaliderError, FarmaliderUnavailableError
@@ -24,6 +24,7 @@ TICKET_COLUMNS = [
     "ticket_uuid", "protocolo", "contact_uuid", "tags", "aberto_em", "encerrado_em",
     "resultado_validacao", "pedido_chave", "pedido_id", "pedido_data", "pedido_status", "pedido_valor",
     "vinculo_atendimento", "atualizado_em",
+    "chats_room_uuid", "chat_contact_uuid", "origem_registro",
 ]
 DELIVERY_ORDER_COLUMNS = [
     "pedido_chave", "pedido_id", "cliente_id", "pedido_data", "data", "pedido_status",
@@ -39,6 +40,19 @@ def _datetime(value):
         return result if result.tzinfo is not None else None
     except (TypeError, ValueError):
         return None
+
+
+def delivery_ticket_key(chat_contact_uuid, opened, ended, *, fallback=""):
+    """Stable local key shared by XLSX and API, independent of mutable tags."""
+    try:
+        contact_id = str(UUID(str(chat_contact_uuid)))
+    except ValueError:
+        return fallback
+    dates = [_datetime(opened), _datetime(ended)]
+    if not all(dates):
+        return fallback
+    natural = [contact_id, *(date.astimezone(timezone.utc).isoformat() for date in dates)]
+    return str(uuid5(NAMESPACE_URL, "nexoflow:delivery:" + json.dumps(natural)))
 
 
 def select_tickets(rooms, *, cutoff):
@@ -69,7 +83,10 @@ def select_tickets(rooms, *, cutoff):
         except ValueError:
             rejected["VINCULO_WENI_AUSENTE_OU_INVALIDO"] += 1
             continue
-        selected.append({"ticket_uuid": uid, "protocolo": str(room.get("protocol") or ""),
+        chat_uid = str(contact.get("uuid") or "")
+        selected.append({"ticket_uuid": delivery_ticket_key(chat_uid, room.get("created_on"), room.get("ended_at"), fallback=uid),
+                         "chats_room_uuid": uid, "chat_contact_uuid": chat_uid, "origem_registro": "API_CHATS",
+                         "protocolo": str(room.get("protocol") or ""),
                          "contact_uuid": external_id, "tags": ", ".join(names),
                          "aberto_em": str(room.get("created_on") or ""),
                          "encerrado_em": str(room.get("ended_at") or ""),
@@ -77,7 +94,7 @@ def select_tickets(rooms, *, cutoff):
     return selected, dict(rejected)
 
 
-def ticket_order_link(ticket, order, *, order_id_field="pedido_id"):
+def ticket_order_link(ticket, order, *, order_id_field=""):
     """A tag e a proximidade de datas não comprovam qual pedido gerou o ticket."""
     fields = ticket.get("custom_fields")
     raw_id = fields.get(order_id_field) if isinstance(fields, dict) else None
@@ -106,13 +123,14 @@ def _order_plan(contact, resolved, farm, captured_at, available_fields):
     return plan
 
 
-def reconcile_tickets(tickets, contacts, farm, *, captured_at, available_fields, order_id_field="pedido_id"):
+def reconcile_tickets(tickets, contacts, farm, *, captured_at, available_fields, order_id_field=""):
     _ensure_order_fields(available_fields)
     by_uuid = {str(contact.get("uuid") or ""): contact for contact in contacts}
     selected_ids = {ticket["contact_uuid"] for ticket in tickets}
     selected_contacts = [by_uuid[uid] for uid in selected_ids if uid in by_uuid]
     selected_contacts.sort(key=lambda contact: (cpf_query_priority(get_fields(contact).get("cpf")), contact["uuid"]))
     resolved_by_uuid, plans, summary = {}, [], Counter()
+    groups = {}
     for index, contact in enumerate(selected_contacts, 1):
         try:
             resolved = resolve_contact_order(contact, farm_client=farm, captured_at=captured_at)
@@ -126,8 +144,10 @@ def reconcile_tickets(tickets, contacts, farm, *, captured_at, available_fields,
         plans.append(plan)
         outcome = plan.order_resolution_status or "SEM_PEDIDO_VALIDADO"
         summary[outcome] += 1
-        if index % 500 == 0 or index == len(selected_contacts):
-            logging.info("Delivery: clientes verificados=%s/%s; resultados=%s.", index, len(selected_contacts), dict(summary))
+        priority = cpf_query_priority(get_fields(contact).get("cpf"))
+        groups.setdefault(str(priority), Counter())[outcome] += 1
+        if index % 100 == 0 or index == len(selected_contacts):
+            logging.info("Delivery: clientes verificados=%s/%s; resultados=%s; grupos CPF=%s.", index, len(selected_contacts), dict(summary), {key: dict(value) for key, value in groups.items()})
     audit_plans(plans, opt_out_group_available=True, opt_in_group_available=True)
     orders, items, rows, ticket_orders = {}, {}, [], {}
     for ticket in tickets:
@@ -167,7 +187,7 @@ def reconcile_tickets(tickets, contacts, farm, *, captured_at, available_fields,
                 items[item["item_chave"]] = item
         rows.append(row)
     return plans, {"tickets": rows, "orders": list(orders.values()), "items": list(items.values()),
-                   "summary": dict(summary), "cutoff": captured_at}
+                   "summary": dict(summary), "cpf_groups": {key: dict(value) for key, value in groups.items()}, "cutoff": captured_at}
 
 
 def build_delivery_order_records(tickets, orders, *, updated_at):
@@ -210,6 +230,10 @@ def write_delivery_review(plans, delivery, path):
         report.write("A tag seleciona clientes. Apenas CONFIRMADO_POR_ID comprova o vínculo de um pedido com o ticket.\n")
         report.write("O endpoint por CPF informa somente o último pedido; o histórico de pedidos de cada ticket pode ficar pendente.\n")
         report.write("Resultados por cliente: " + json.dumps(delivery["summary"], ensure_ascii=False) + "\n")
+        report.write("Destino revisado: " + delivery.get("target", "both") + "\n")
+        report.write("Grupos CPF (0 válido, 1 inválido preenchido, 2 ausente): " + json.dumps(delivery.get("cpf_groups", {}), ensure_ascii=False) + "\n")
+        if delivery.get("spreadsheet_import"):
+            report.write("Importação de planilhas: " + json.dumps(delivery["spreadsheet_import"], ensure_ascii=False) + "\n")
         for ticket in delivery["tickets"]:
             report.write(f"Ticket {ticket['ticket_uuid']} | contato {ticket['contact_uuid']} | tags {ticket['tags']} | "
                          f"checagem {ticket['resultado_validacao']} | pedido {ticket['pedido_id'] or '<não validado>'} | "
@@ -221,11 +245,17 @@ def _digest(value):
     return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
-def apply_delivery_review(path, weni, *, store_factory):
+def apply_delivery_review(path, weni, *, store_factory=None, target=None):
     plans, payload, _ = load_review_snapshot(full=True, json_path=path)
     delivery = payload.get("delivery")
     if not isinstance(delivery, dict) or _digest(delivery) != payload.get("delivery_sha256"):
         raise ValueError("Snapshot Delivery ausente ou alterado; execute a reconciliação novamente.")
+    frozen_target = delivery.get("target", "both")
+    target = frozen_target if target is None else target
+    if target not in {"weni", "analytics", "both"} or target != frozen_target:
+        raise ValueError("Destino diferente do snapshot revisado; execute um novo dry-run.")
+    if target in {"analytics", "both"} and store_factory is None:
+        raise ValueError("Google Sheets deve estar configurado para o destino revisado.")
     audit_plans(plans, opt_out_group_available=True, opt_in_group_available=True)
     _ensure_order_fields({item.get("key") for item in weni.list_fields()})
     accepted, conflicts, current_contacts = set(), set(), []
@@ -240,7 +270,7 @@ def apply_delivery_review(path, weni, *, store_factory):
             conflicts.add(plan.contact_uuid)
             continue
         audit_plans([prepared], opt_out_group_available=True, opt_in_group_available=True)
-        if prepared.fields:
+        if prepared.fields and target in {"weni", "both"}:
             weni.update_contact_fields(plan.contact_uuid, prepared.fields)
         accepted.add(plan.contact_uuid)
         merged = deepcopy(current)
@@ -264,6 +294,8 @@ def apply_delivery_review(path, weni, *, store_factory):
     orders = [order for order in delivery["orders"] if order["contact_uuid"] in accepted]
     keys = {order["pedido_chave"] for order in orders}
     items = [item for item in delivery["items"] if item["pedido_chave"] in keys]
+    if target == "weni":
+        return {"contacts_accepted": len(accepted), "conflicts": len(conflicts), "tickets": len(tickets), "orders": len(keys), "target": target}
     store = store_factory()
     base = store.upsert_contacts_detailed(current_contacts)
     all_orders = store.upsert_orders_detailed(orders).final_records
