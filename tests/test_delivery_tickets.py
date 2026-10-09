@@ -89,7 +89,7 @@ class DeliveryTicketsTests(unittest.TestCase):
         rows = build_delivery_order_records(data["tickets"], data["orders"], updated_at=NOW)
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["quantidade_atendimentos"], 2)
-        self.assertEqual(rows[0]["pedido_valor"], "20.00")
+        self.assertEqual(rows[0]["pedido_valor"], 20.0)
         self.assertEqual(rows[0]["vinculo_atendimento"], "SEM_VINCULO_COMPROVADO")
 
     def test_invalid_cpf_different_customer_cannot_confirm_order(self):

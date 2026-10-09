@@ -8,6 +8,7 @@ import os
 from collections import Counter
 from copy import deepcopy
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
 from analytics import _sales_order_is_valid, cpf_query_priority, get_fields, normalize_contact
@@ -185,7 +186,7 @@ def build_delivery_order_records(tickets, orders, *, updated_at):
         records.append(dict(zip(DELIVERY_ORDER_COLUMNS, [
             key, order["pedido_id"], order.get("farmalider_cliente_id", ""),
             order["data_hora"], order["data"], effective_order_status_code(order),
-            order.get("farmalider_status_pedido_nome", ""), order.get("valor_total_compra", ""),
+            order.get("farmalider_status_pedido_nome", ""), float(Decimal(order["valor_total_compra"])),
             int(_sales_order_is_valid(order)),
             "CONFIRMADO_POR_ID" if "CONFIRMADO_POR_ID" in links else "SEM_VINCULO_COMPROVADO",
             len(unique), updated_at,
