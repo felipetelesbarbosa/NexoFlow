@@ -67,6 +67,8 @@ function Remove-Shortcuts {
         (Join-Path $userDesktop 'NexoFlow Analytics.lnk'),
         (Join-Path $desktop 'NexoFlow Weni.lnk'),
         (Join-Path $userDesktop 'NexoFlow Weni.lnk'),
+        (Join-Path $desktop 'NexoFlow Planilha.lnk'),
+        (Join-Path $userDesktop 'NexoFlow Planilha.lnk'),
         (Join-Path $desktop 'NexoFlow Terminal.lnk'),
         (Join-Path $userDesktop 'NexoFlow Terminal.lnk'),
         (Join-Path $desktop 'NexoFlow - Update Weni.lnk'),

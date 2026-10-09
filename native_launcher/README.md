@@ -39,3 +39,7 @@ O `NexoFlow Uninstall.exe` é um launcher nativo **opcional** para `installer\un
 ### Português brasileiro
 
 Os pacotes recompilam os cinco launchers a partir destes fontes. A saída do console usa UTF-8 e os recursos de versão usam a tabela pt-BR 0416/04B0, preservando acentos e cedilha. A versão permanece NexoFlow 1.0.
+
+## NexoFlow Planilha
+
+O Setup instala **NexoFlow Planilha.exe** com ícone próprio e atalho na Área de Trabalho. O menu permite executar as cargas por planilha para Weni ou Analytics/Google Sheets e abrir `importacoes`. Use `Conversas_Delivery.xlsx` e `Contatos_Delivery.xlsx`; cada carga mantém a revisão humana antes de aplicar.

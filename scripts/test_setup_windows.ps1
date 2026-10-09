@@ -41,6 +41,7 @@ function Remove-TestArtifacts {
     foreach ($shortcut in @(
         (Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) "NexoFlow Analytics.lnk"),
         (Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) "NexoFlow Weni.lnk"),
+        (Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) "NexoFlow Planilha.lnk"),
         (Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) "NexoFlow Terminal.lnk"),
         (Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\NexoFlow")
     )) {
@@ -79,6 +80,9 @@ function Assert-Installed {
         "NexoFlow Analytics.exe",
         "NexoFlow Weni.exe",
         "NexoFlow Terminal.exe",
+        "NexoFlow Planilha.exe",
+        "executar_planilha.bat",
+        "assets\NexoFlow_Planilha.ico",
         "installer\install.ps1",
         "installer\uninstall.ps1",
         "scripts\confirmar_revisao_weni.ps1",
@@ -90,6 +94,12 @@ function Assert-Installed {
     }
 
     Assert-True (Test-Path -LiteralPath (Join-Path $InstallDir "importacoes") -PathType Container) "A pasta importacoes não foi instalada."
+
+    $shortcutPath = Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) "NexoFlow Planilha.lnk"
+    Assert-True (Test-Path -LiteralPath $shortcutPath) "Atalho NexoFlow Planilha ausente."
+    $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($shortcutPath)
+    Assert-True ($shortcut.TargetPath -eq (Join-Path $InstallDir "NexoFlow Planilha.exe")) "Destino do atalho de planilha incorreto."
+    Assert-True ($shortcut.IconLocation.StartsWith((Join-Path $InstallDir "assets\NexoFlow_Planilha.ico"))) "Ícone do atalho de planilha incorreto."
 
     Assert-True (Test-Path -LiteralPath $UninstallKey) "Registro de desinstalação não foi criado."
     $displayVersion = (Get-ItemProperty -LiteralPath $UninstallKey -Name DisplayVersion -ErrorAction Stop).DisplayVersion

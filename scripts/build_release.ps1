@@ -158,6 +158,7 @@ New-Item -ItemType Directory -Force -Path $LauncherDir | Out-Null
 $launcherTargets = @(
     @{ Name = "NexoFlow Analytics.exe"; Tag = "analytics"; Description = "NexoFlow Analytics — análise de dados" },
     @{ Name = "NexoFlow Weni.exe"; Tag = "updateweni"; Description = "NexoFlow Weni — atualização de contatos" },
+    @{ Name = "NexoFlow Planilha.exe"; Tag = "planilha"; Description = "NexoFlow Planilha — cargas por planilhas" },
     @{ Name = "NexoFlow Terminal.exe"; Tag = "terminal"; Description = "NexoFlow Terminal — consultas e diagnóstico" },
     @{ Name = "NexoFlow Uninstall.exe"; Tag = "uninstall"; Description = "NexoFlow — desinstalação" }
 )
@@ -196,6 +197,7 @@ foreach ($folder in @($ProjectRoot, $PayloadDir)) {
 $launcherIcons = @(
     @{ Executable = "NexoFlow Analytics.exe"; Icon = "NexoFlow.ico" },
     @{ Executable = "NexoFlow Weni.exe"; Icon = "NexoFlow_Weni.ico" },
+    @{ Executable = "NexoFlow Planilha.exe"; Icon = "NexoFlow_Planilha.ico" },
     @{ Executable = "NexoFlow Terminal.exe"; Icon = "NexoFlow_Terminal.ico" },
     @{ Executable = "NexoFlow Uninstall.exe"; Icon = "uninstaller.ico" }
 )
@@ -372,6 +374,7 @@ Recursos incluídos:
 - NexoFlow Analytics;
 - NexoFlow Weni;
 - NexoFlow Terminal;
+- NexoFlow Planilha, com menu para Weni e Analytics, ícone próprio e atalhos;
 - integração Weni, FarmaLíder, Google Sheets e Looker Studio;
 - tratamento de pedidos, status, LGPD, canais e atribuição de anúncios.
 "@

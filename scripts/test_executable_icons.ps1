@@ -117,6 +117,7 @@ function Assert-ExecutableIcon {
 $icons = @(
     @{ Executable = "NexoFlow Analytics.exe"; Icon = "NexoFlow.ico" },
     @{ Executable = "NexoFlow Weni.exe"; Icon = "NexoFlow_Weni.ico" },
+    @{ Executable = "NexoFlow Planilha.exe"; Icon = "NexoFlow_Planilha.ico" },
     @{ Executable = "NexoFlow Terminal.exe"; Icon = "NexoFlow_Terminal.ico" },
     @{ Executable = "NexoFlow Uninstall.exe"; Icon = "uninstaller.ico" }
 )
@@ -129,4 +130,4 @@ foreach ($base in @($Project, (Join-Path $Setup "payload"))) {
 
 Assert-ExecutableIcon -Executable (Join-Path $Setup "NexoFlow Setup.exe") -Icon (Join-Path $RepoRoot "assets\installer.ico")
 
-Write-Host "[OK] Os nove executáveis distribuídos possuem seus ícones PE corretos."
+Write-Host "[OK] Os onze executáveis distribuídos possuem seus ícones PE corretos."

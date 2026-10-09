@@ -2,6 +2,8 @@
 
 ## NexoFlow 1.0
 
+- NexoFlow Planilha: executável nativo com ícone próprio, menu Weni/Analytics e atalhos instalados; reutiliza as cargas por planilhas e a revisão humana.
+
 - Recompra FarmaLíder: referência exclusiva em `pedido_data`, sem dependência ou escrita de `ultima_compra`; grupo de 0 a 25 dias, envio D+25 pela Weni, recusas prioritárias, revisão obrigatória, nova validação por GET e ledger persistente por contato/pedido.
 - Remoção preventiva do agendamento anterior antes de atualizar campos de pedido; integração opcional aos launchers e comandos próprios de auditoria, dry-run e aplicação.
 - Diagnóstico da campanha/fluxo/fuso e bloqueio por campos obrigatórios ausentes, conflito, estado corrompido e inclusão indeterminada.
