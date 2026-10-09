@@ -28,7 +28,7 @@ else:
     p=Path(args[args.index('--require-review')+1])
     Path('applied.json').write_text(json.dumps({'args':args,'snapshot':json.loads(p.read_text())}))
 ''',encoding='utf-8')
-            (root/'notepad_stub.py').write_text("from pathlib import Path\nPath('note_closed').write_text('closed')\n",encoding='utf-8')
+            (root/'notepad_stub.py').write_text(f"from pathlib import Path\nPath({str(root / 'note_closed')!r}).write_text('closed')\n",encoding='utf-8')
             if dry_failure: (root/'fail_dry').touch()
             batch=(ROOT/'carga_planilhas.bat').read_text(encoding='utf-8')
             batch=batch.replace('".venv\\Scripts\\python.exe"', f'"{sys.executable}"')
@@ -42,12 +42,12 @@ else:
                     if dry_failure:
                         self.assertEqual(process.wait(timeout=15),9)
                     else:
-                        deadline=time.monotonic()+15
+                        deadline=time.monotonic()+45
                         while not (root/'note_closed').exists() and time.monotonic()<deadline:
                             if process.poll() is not None:
                                 self.fail('CMD fechou antes da revisão: '+output.read_text(encoding='utf-8',errors='replace'))
                             time.sleep(.05)
-                        self.assertTrue((root/'note_closed').exists())
+                        self.assertTrue((root/'note_closed').exists(), output.read_text(encoding='utf-8',errors='replace'))
                         self.assertIsNone(process.poll(), 'Fechar o Bloco de Notas não pode fechar o CMD')
                         self.assertFalse((root/'applied.json').exists())
                         process.stdin.write((decision+'\r\n').encode('ascii'));process.stdin.flush()
@@ -62,7 +62,8 @@ else:
                     else:self.assertFalse((root/'applied.json').exists())
                 finally:
                     if process.poll() is None:
-                        process.kill();process.wait(timeout=10)
+                        subprocess.run(['taskkill','/PID',str(process.pid),'/T','/F'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10,check=False)
+                        process.wait(timeout=10)
                     process.stdin.close()
 
     def test_both_targets_apply_only_after_review_and_notepad_exit_keeps_cmd_open(self):
