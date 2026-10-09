@@ -1228,8 +1228,18 @@ class GoogleSheetsStore:
         )
 
     def replace_bi_orders(self, rows: list[list[Any]]) -> None:
+        # USER_ENTERED interpreta datas e números, mas CEP e localização são
+        # texto: o apóstrofo preserva zeros iniciais e bloqueia fórmulas.
+        text_indexes = [BI_ORDERS_COLUMNS.index(column) for column in ("cidade", "estado", "cep", "bairro")]
+        safe_rows = []
+        for row in rows:
+            safe = list(row)
+            for index in text_indexes:
+                if index < len(safe) and safe[index] != "":
+                    safe[index] = "'" + str(safe[index])
+            safe_rows.append(safe)
         self._replace_table(
-            self.bi_orders, BI_ORDERS_COLUMNS, rows, value_input_option="USER_ENTERED"
+            self.bi_orders, BI_ORDERS_COLUMNS, safe_rows, value_input_option="USER_ENTERED"
         )
 
     def replace_bi_status(self, row: list[Any]) -> None:

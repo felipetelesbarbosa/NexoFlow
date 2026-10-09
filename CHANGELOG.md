@@ -2,6 +2,8 @@
 
 ## NexoFlow 1.0
 
+- Analytics exporta cidade, estado, CEP, bairro e idade do perfil Weni para a base e BI_Pedidos, preservando CEP como texto, ausência de informação e a data original do pedido.
+
 - Cargas por planilha Weni e Analytics aguardam confirmação gráfica explícita, inclusive quando o terminal não fornece entrada padrão. Fechar o Bloco de Notas não encerra a espera. Cancelamento ou falha da janela impede a aplicação.
 
 ### Pasta de importações nos pacotes e na desinstalação

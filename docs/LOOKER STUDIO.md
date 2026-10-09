@@ -193,3 +193,21 @@ cd C:\NexoFlow
 ```
 
 Isso cria/migra as sete abas BI, incluindo `BI_Pedidos`, completa a Base_Contatos com os contatos historicamente excluídos e inicializa o dashboard. Depois, volte ao fluxo incremental normal com `executar_manual.bat` ou `nexo analytics`.
+
+## Localização e idade dos clientes
+
+O Analytics envia `cidade`, `estado`, `cep`, `bairro` e `idade` dos campos personalizados da Weni para `Base_Contatos` e para a camada `BI_Pedidos`. O histórico de alterações também preserva a localização. Os pedidos recebem o perfil do contato vinculado pelo `contact_uuid`, sem criar novas linhas por produto nem multiplicar os valores da venda.
+
+| Campo | Campo Weni | Tipo no Looker Studio |
+|---|---|---|
+| `cidade` | `@fields.cidade` | Texto; cidade para mapas quando a localização puder ser identificada |
+| `estado` | `@fields.estado` | Texto; UF para contextualizar a cidade brasileira |
+| `cep` | `@fields.cep` | Texto, preservando zeros iniciais e a formatação recebida |
+| `bairro` | `@fields.bairro` | Texto |
+| `idade` | `@fields.idade` | Número; dimensão, sem somar idades |
+
+A localização e a idade correspondem ao **cadastro atual na Weni**, inclusive para pedidos antigos. Não representam necessariamente endereço de entrega ou idade na data da compra. Valores ausentes continuam vazios; idade inválida na camada BI também fica vazia, sem virar zero. A idade zero informada é preservada. A data real do pedido continua em `pedido_data` e `data`, separada de `atualizado_em`.
+
+Depois de instalar a distribuição atualizada, execute uma **carga completa do Analytics** para preencher esses campos nos contatos já existentes. A carga Analytics por planilhas também exporta os campos dos contatos selecionados e relidos na Weni, após revisão humana. As colunas novas são acrescentadas sem deslocar os cabeçalhos existentes.
+
+No Looker Studio, atualize os campos das fontes `Base_Contatos` e `BI_Pedidos` uma vez após a migração. Use cidade, bairro, CEP e faixa etária como dimensões e filtros; para pedidos e faturamento por região, use `BI_Pedidos`, filtre vendas nos status 4, 1 e 2 e utilize `data` como dimensão de período. Não some snapshots da base ou idades. Para contagem de clientes, use pessoas únicas no contexto da fonte, não a quantidade de linhas de pedidos. O relatório não recebe automaticamente componentes novos apenas porque as colunas foram adicionadas.

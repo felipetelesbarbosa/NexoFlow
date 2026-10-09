@@ -312,9 +312,13 @@ BASE_COLUMNS = [
     "weni_created_on",
     "weni_modified_on",
     "sincronizado_em",
+    "cidade",
+    "estado",
+    "cep",
+    "bairro",
 ]
 
-HISTORY_COLUMNS = ["acao", "sincronizado_em", *BASE_COLUMNS[:-1]]
+HISTORY_COLUMNS = ["acao", "sincronizado_em", *[column for column in BASE_COLUMNS if column != "sincronizado_em"]]
 
 METRIC_COLUMNS = [
     "data",
@@ -558,6 +562,11 @@ BI_ORDERS_COLUMNS = [
     "primeiro_anuncio_origem",
     "ultimo_anuncio_origem",
     "atualizado_em",
+    "cidade",
+    "estado",
+    "cep",
+    "bairro",
+    "idade",
 ]
 
 
@@ -709,6 +718,10 @@ def normalize_contact(
         returned_other_ad = "Não informado"
 
     row = {
+        "cidade": normalize_value(fields.get("cidade")).strip(),
+        "estado": normalize_value(fields.get("estado")).strip(),
+        "cep": normalize_value(fields.get("cep")).strip(),
+        "bairro": normalize_value(fields.get("bairro")).strip(),
         "contact_uuid": normalize_value(contact.get("uuid")),
         "telefone": phone,
         "weni_name": normalize_value(contact.get("name")),
@@ -1698,6 +1711,19 @@ def _bi_display_number(value: Any) -> str:
     return format(number.normalize(), "f")
 
 
+def _bi_customer_age(value: Any) -> int | str:
+    text = normalize_value(value).strip()
+    if not text:
+        return ""
+    try:
+        age = Decimal(text.replace(",", "."))
+        if age.is_finite() and age >= 0 and age == age.to_integral_value():
+            return int(age)
+    except InvalidOperation:
+        pass
+    return ""
+
+
 def build_bi_order_rows(
     base_records: list[dict[str, str]],
     order_records: list[dict[str, str]],
@@ -1764,6 +1790,11 @@ def build_bi_order_rows(
             (order.get("primeiro_anuncio_origem") or "").strip(),
             (order.get("ultimo_anuncio_origem") or "").strip(),
             updated_at,
+            (base.get("cidade") or "").strip(),
+            (base.get("estado") or "").strip(),
+            (base.get("cep") or "").strip(),
+            (base.get("bairro") or "").strip(),
+            _bi_customer_age(base.get("idade")),
         ])
     return rows
 
