@@ -274,6 +274,7 @@ def _print_commands() -> None:
     print("  nexo weni dry-run            Simula alterações sem gravar")
     print("  nexo weni atualizar          Atualização incremental segura")
     print("  nexo weni carga-completa     Carga completa com revisão humana")
+    print("  nexo weni recompra auditoria|dry-run|aplicar  Recompra D+25 com revisão")
     print("  nexo weni planilhas          Atualiza a Weni a partir dos exports XLSX")
     print()
     print("ANALYTICS")
@@ -553,6 +554,11 @@ def build_parser() -> argparse.ArgumentParser:
     weni_sub.add_parser("dry-run", aliases=["simular"], help="simula alterações sem gravar")
     weni_sub.add_parser("atualizar", aliases=["update"], help="atualização incremental segura")
     weni_sub.add_parser("carga-completa", aliases=["full"], help="carga completa com revisão humana")
+    recompra = weni_sub.add_parser("recompra", help="auditoria, simulação e aplicação revisada da recompra D+25")
+    recompra.add_argument("recompra_op", choices=["auditoria", "dry-run", "aplicar", "atualizar"])
+    recompra.add_argument("--revisao", default="logs/recompra_review.json")
+    recompra.add_argument("--contato", help="UUID de um contato para a simulação")
+    recompra.add_argument("--full", action="store_true")
     weni_sub.add_parser("planilhas", help="carga de pedidos a partir dos exports XLSX, com revisão humana")
 
     logs = sub.add_parser("logs", help="consulta logs do NexoFlow")
@@ -621,6 +627,15 @@ def run(argv: list[str] | None = None) -> int:
         if args.command == "analytics":
             return _run_windows_target("executar_analytics_planilhas.bat" if args.analytics_op == "planilhas" else "NexoFlow Analytics.exe")
         if args.command == "weni":
+            if args.weni_op == "recompra":
+                if args.recompra_op == "atualizar":
+                    return _run_windows_target("atualizar_recompra.bat")
+                from run_recompra import main as recompra_main
+                arguments = [{"auditoria": "--check-only", "dry-run": "--dry-run", "aplicar": "--apply"}[args.recompra_op]]
+                arguments += ["--require-review" if args.recompra_op == "aplicar" else "--review-out", args.revisao]
+                if args.contato: arguments += ["--contact", args.contato]
+                if args.full: arguments.append("--full")
+                return recompra_main(arguments)
             mapping = {
                 "testar": "testar_update_weni.bat",
                 "teste": "testar_update_weni.bat",

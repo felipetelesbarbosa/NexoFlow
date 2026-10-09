@@ -41,6 +41,7 @@ def build_parser() -> argparse.ArgumentParser:
             "faz controle de conflito por contato"
         ),
     )
+    parser.add_argument("--recompra", action="store_true", help="executa a rotina de recompra, com revisão própria e sem mudar os demais processos")
     return parser
 
 
@@ -48,6 +49,15 @@ def main() -> int:
     args = build_parser().parse_args()
     if args.quarter is not None and not args.full:
         raise SystemExit("--quarter exige --full.")
+    if args.recompra:
+        if args.quarter is not None:
+            raise SystemExit("Recompra não usa partes: membros expirados precisam ser verificados em cada execução.")
+        from run_recompra import main as recompra_main
+        arguments = ["--check-only" if args.check_only else "--dry-run" if args.dry_run else "--apply"]
+        if args.full: arguments.append("--full")
+        if args.review_out: arguments += ["--review-out", args.review_out]
+        if args.require_review: arguments += ["--require-review", args.require_review]
+        return recompra_main(arguments)
     status = configure_proxy()
 
     from config import WENI_UPDATE_LOG_FILE

@@ -51,3 +51,7 @@ PROXY_BYPASS = "localhost,127.0.0.1"
 
 # Tempo máximo, em segundos, para detectar se o proxy existe.
 PROXY_DETECTION_TIMEOUT = 1.5
+
+# Recompra integrada aos launchers Weni, após a carga normal e revisão própria.
+# Habilite somente após corrigir as pendências de campos/campanha e auditar.
+RECOMPRA_ENABLED = False

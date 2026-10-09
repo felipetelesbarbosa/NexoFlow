@@ -1070,7 +1070,30 @@ def _build_contact_plan(
             "pedido_valor_produtos", "pedido_valor", "pedido_forma_pagamento",
         ):
             plan.guards[key] = fields.get(key)
+    from recompra import refused, member, GROUP, OPT_OUT, TZ
+    campaign_groups = [g for g in contact.get("groups", []) or [] if isinstance(g, dict) and g.get("name") == GROUP and g.get("uuid")]
+    if campaign_groups:
+        reference = business_order_datetime(plan.fields.get("pedido_data", fields.get("pedido_data")))
+        local_now = business_order_datetime(captured_at)
+        expired = reference is None or (local_now and (local_now.astimezone(TZ).date() - reference.date()).days > 25)
+        if "pedido_data" in plan.fields or (plan.order_validated and not plan.purchase_confirmed) or expired or refused(contact) or member(contact, "", OPT_OUT):
+            plan.group_actions.append(GroupAction("remove", campaign_groups[0]["uuid"], "referência de recompra mudou, expirou ou cliente inelegível; reavaliar na rotina de recompra", GROUP))
+            plan.guards["marketing_opt_in"] = fields.get("marketing_opt_in")
+
     return plan
+
+def _execute_contact_plan(weni, plan):
+    # Uma referência nova não pode deixar o evento antigo ativo enquanto os
+    # campos são atualizados. A remoção já faz parte do plano revisado.
+    removals = [a for a in plan.group_actions if a.action == "remove" and a.group_name == "Recompra FarmaLíder"]
+    for action in removals:
+        weni.contact_group_action(plan.contact_uuid, action="remove", group=action.group)
+    if plan.fields:
+        weni.update_contact_fields(plan.contact_uuid, plan.fields)
+    for action in plan.group_actions:
+        if action not in removals:
+            weni.contact_group_action(plan.contact_uuid, action=action.action, group=action.group)
+
 
 def audit_plans(
     plans: list[ContactUpdatePlan],
@@ -2205,14 +2228,7 @@ def run_update(
                     continue
 
                 try:
-                    if prepared.fields:
-                        weni.update_contact_fields(prepared.contact_uuid, prepared.fields)
-                    for action in prepared.group_actions:
-                        weni.contact_group_action(
-                            prepared.contact_uuid,
-                            action=action.action,
-                            group=action.group,
-                        )
+                    _execute_contact_plan(weni, prepared)
                     _track_open_order(
                         open_order_uuids,
                         prepared.contact_uuid,
@@ -2640,7 +2656,7 @@ def run_update(
         conflicted_uuids: list[str] = []
         for plan in plans:
             try:
-                if plan.order_validated:
+                if plan.order_validated or any(action.group_name == "Recompra FarmaLíder" for action in plan.group_actions):
                     current_contact = weni.get_contact(uuid=plan.contact_uuid)
                     prepared = None
                     conflict = "contato não localizado no momento do apply"
@@ -2664,14 +2680,7 @@ def run_update(
                         continue
                     audit_plans([prepared], opt_out_group_available=opt_out_available, opt_in_group_available=opt_in_available)
                     plan = prepared
-                if plan.fields:
-                    weni.update_contact_fields(plan.contact_uuid, plan.fields)
-                for action in plan.group_actions:
-                    weni.contact_group_action(
-                        plan.contact_uuid,
-                        action=action.action,
-                        group=action.group,
-                    )
+                _execute_contact_plan(weni, plan)
                 stats.contacts_updated += 1
                 _append_audit(_audit_plan_event(plan, mode=mode, status="applied"))
             except Exception as exc:

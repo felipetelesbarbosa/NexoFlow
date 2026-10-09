@@ -362,3 +362,7 @@ Toda mudança relevante deve executar:
 
 Consulte também `README.md`, `README INSTALACAO.md`, `README WENI.md` e `CHANGELOG.md`.
 <!-- NexoFlow 1.0 -->
+
+## Recompra FarmaLíder D+25
+
+Grupo sincronizado com a última compra confirmada entre 0 e 25 dias, remoção depois de 25 dias e por recusa. O envio continua somente no D+25 pela campanha Weni. Execute `nexo weni recompra auditoria`, `dry-run` e `aplicar` com revisão, ou `nexo weni recompra atualizar`. Confira [implementação, configuração e limites da recompra](../README%20RECOMPRA.md). A rotina não altera marketing_opt_in, não dispara WhatsApp e não modifica a campanha.

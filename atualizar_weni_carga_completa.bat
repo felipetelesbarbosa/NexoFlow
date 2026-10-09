@@ -142,6 +142,13 @@ set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto :erro
 
 echo.
+if defined PART if not "%PART%"=="4" goto :recompra_fim
+rem Recompra é uma etapa independente, com auditoria e revisão próprias.
+".venv\Scripts\python.exe" -c "import sys,secrets_config as s; sys.exit(0 if getattr(s,'RECOMPRA_ENABLED',False) else 10)"
+if not "%ERRORLEVEL%"=="0" goto :recompra_fim
+call "%~dp0atualizar_recompra.bat"
+if errorlevel 1 echo [AVISO] Carga Weni concluída; recompra pendente. Consulte logs\nexoflow_recompra.log.
+:recompra_fim
 echo [ETAPA 6/6] Carga concluída
 echo ==========================================================
 if defined PART (

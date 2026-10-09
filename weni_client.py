@@ -338,6 +338,23 @@ class WeniClient:
             item_label="grupos",
         )
 
+    def list_campaigns(self) -> list[dict[str, Any]]:
+        return self._list_paginated(
+            "https://flows.weni.ai/api/v2/campaigns.json", {}, item_label="campanhas"
+        )
+
+    def list_campaign_events(self, campaign_uuid: str) -> list[dict[str, Any]]:
+        return self._list_paginated(
+            "https://flows.weni.ai/api/v2/campaign_events.json",
+            {"campaign": campaign_uuid}, item_label="eventos de campanha",
+        )
+
+    def get_org(self) -> dict[str, Any]:
+        return self._get_json("https://flows.weni.ai/api/v2/org.json")
+
+    def get_flow_definition(self, flow_uuid: str) -> dict[str, Any]:
+        return self._get_json("https://flows.weni.ai/api/v2/definitions.json", params={"flow": flow_uuid})
+
     def test_connection(self) -> dict[str, Any]:
         payload = self._get_json(
             WENI_CONTACTS_API_URL,

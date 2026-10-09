@@ -1130,9 +1130,11 @@ def check_weni_update_safety() -> None:
         return
     ok("Update Weni sincroniza os grupos Opt-In/Opt-Out conforme opt_in_lgpd.")
 
-    write_pos = update_text.find("weni.update_contact_fields")
-    audit_pos = update_text.rfind("audit_plans(", 0, write_pos)
-    state_pos = update_text.rfind("_save_state(")
+    # Verifica o fluxo de execução, não a definição do helper de escrita.
+    execution = update_text[update_text.index("def run_update("):]
+    write_pos = execution.find("_execute_contact_plan(")
+    audit_pos = execution.rfind("audit_plans(", 0, write_pos)
+    state_pos = execution.rfind("_save_state(")
     if audit_pos < 0 or write_pos < 0 or audit_pos > write_pos:
         fail("Auditoria do Update Weni precisa ocorrer antes de qualquer escrita.")
         return

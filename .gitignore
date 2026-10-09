@@ -27,3 +27,6 @@ importacoes/
 # Sistema operacional
 Thumbs.db
 .DS_Store
+
+# Estado, auditoria e revisão privados da recompra
+logs/recompra*

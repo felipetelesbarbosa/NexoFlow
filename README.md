@@ -714,3 +714,7 @@ A localização e a idade correspondem ao **cadastro atual na Weni**, inclusive 
 Depois de instalar a distribuição atualizada, execute uma **carga completa do Analytics** para preencher esses campos nos contatos já existentes. A carga Analytics por planilhas também exporta os campos dos contatos selecionados e relidos na Weni, após revisão humana. As colunas novas são acrescentadas sem deslocar os cabeçalhos existentes.
 
 No Looker Studio, atualize os campos das fontes `Base_Contatos` e `BI_Pedidos` uma vez após a migração. Use cidade, bairro, CEP e faixa etária como dimensões e filtros; para pedidos e faturamento por região, use `BI_Pedidos`, filtre vendas nos status 4, 1 e 2 e utilize `data` como dimensão de período. Não some snapshots da base ou idades. Para contagem de clientes, use pessoas únicas no contexto da fonte, não a quantidade de linhas de pedidos. O relatório não recebe automaticamente componentes novos apenas porque as colunas foram adicionadas.
+
+## Recompra FarmaLíder D+25
+
+Grupo sincronizado com a última compra confirmada entre 0 e 25 dias, remoção depois de 25 dias e por recusa. O envio continua somente no D+25 pela campanha Weni. Execute `nexo weni recompra auditoria`, `dry-run` e `aplicar` com revisão, ou `nexo weni recompra atualizar`. Confira [implementação, configuração e limites da recompra](README%20RECOMPRA.md). A rotina não altera marketing_opt_in, não dispara WhatsApp e não modifica a campanha.

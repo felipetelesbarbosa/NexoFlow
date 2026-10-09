@@ -328,6 +328,7 @@ Distribuição oficial do **NexoFlow 1.0**.
 O arquivo `NexoFlow-Setup-$Version.zip` contém o instalador do NexoFlow 1.0 e foi validado automaticamente em Windows para primeira instalação e atualização de uma instalação existente.
 
 Melhorias desta distribuição do NexoFlow 1.0:
+- recompra com grupo de 0 a 25 dias, revisão, controle persistente e proteção de referências; envio D+25 permanece na campanha Weni; confira README RECOMPRA.md antes de habilitar;
 - cidade, estado, CEP, bairro e idade dos clientes da Weni na base e BI_Pedidos; CEP preservado como texto e datas de pedido mantidas;
 - interface e documentação em português brasileiro, com acentos e cedilha; CMD em UTF-8, PowerShell com BOM e executáveis recompilados com metadados pt-BR;
 - carga completa Weni 100% ou em partes mantém o CMD aguardando a revisão humana; cancelar ou falhar não aplica o snapshot e preserva o diagnóstico;
