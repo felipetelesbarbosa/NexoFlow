@@ -91,6 +91,21 @@ function Remove-OptionalPrivateData {
     }
 }
 
+function Get-Sha256File([string]$Path) {
+    $stream = $null
+    $sha = $null
+    try {
+        $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+        $sha = [Security.Cryptography.SHA256]::Create()
+        $bytes = $sha.ComputeHash($stream)
+        return ([BitConverter]::ToString($bytes)).Replace('-', '').ToLowerInvariant()
+    } finally {
+        if ($sha) { $sha.Dispose() }
+        if ($stream) { $stream.Dispose() }
+    }
+}
+
+
 function Copy-ImportDirectory([string]$Source, [string]$Target, [string]$Relative = '', [string]$ArchiveRoot = '') {
     if (-not $ArchiveRoot) { $ArchiveRoot = Join-Path $Target 'historico_preservado' }
     $sourceItem = Get-Item -LiteralPath $Source -Force
@@ -108,27 +123,27 @@ function Copy-ImportDirectory([string]$Source, [string]$Target, [string]$Relativ
             Copy-ImportDirectory -Source $item.FullName -Target $destination -Relative $relativePath -ArchiveRoot $ArchiveRoot
             continue
         }
-        $sourceHash = (Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash
+        $sourceHash = (Get-Sha256File -Path $item.FullName)
         if (Test-Path -LiteralPath $destination) {
-            $existingHash = (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash
+            $existingHash = (Get-Sha256File -Path $destination)
             if ($existingHash -eq $sourceHash) { continue }
             # Um backup anterior com o mesmo nome é mantido antes da cópia
             # atual. A chave por conteúdo evita perder versões ou duplicá-las.
             $archive = Join-Path (Join-Path $ArchiveRoot $existingHash) $relativePath
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent $archive) | Out-Null
             if (Test-Path -LiteralPath $archive) {
-                if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $existingHash) {
+                if ((Get-Sha256File -Path $archive) -ne $existingHash) {
                     throw 'O histórico preservado está inconsistente. Nenhum arquivo instalado será removido.'
                 }
             } else {
                 Copy-Item -LiteralPath $destination -Destination $archive -Force -ErrorAction Stop
-                if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $existingHash) {
+                if ((Get-Sha256File -Path $archive) -ne $existingHash) {
                     throw "Não foi possível verificar a cópia anterior de importacoes."
                 }
             }
         }
         Copy-Item -LiteralPath $item.FullName -Destination $destination -Force -ErrorAction Stop
-        if ((Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash -ne $sourceHash) {
+        if ((Get-Sha256File -Path $destination) -ne $sourceHash) {
             throw 'A cópia das importações não passou pela validação SHA-256. A desinstalação foi interrompida.'
         }
     }
