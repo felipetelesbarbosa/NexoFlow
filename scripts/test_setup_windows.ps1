@@ -79,6 +79,7 @@ function Assert-Installed {
     foreach ($relative in @(
         "NexoFlow Analytics.exe",
         "NexoFlow Weni.exe",
+        "NexoFlow Recompra.exe",
         "NexoFlow Terminal.exe",
         "NexoFlow Planilha.exe",
         "executar_planilha.bat",
