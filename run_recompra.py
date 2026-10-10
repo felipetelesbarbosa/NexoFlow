@@ -11,6 +11,7 @@ def build_parser():
     mode.add_argument('--check-only', action='store_true', help='audita campos, grupos, campanha e fluxo; somente GET')
     mode.add_argument('--dry-run', action='store_true', help='consulta clientes e propõe alterações sem gravar na Weni')
     mode.add_argument('--apply', action='store_true', help='revalida e aplica o snapshot revisado')
+    mode.add_argument('--check-review', action='store_true', help='confere integridade e dia da revisão local, sem acessar APIs')
     parser.add_argument('--full', action='store_true', help='auditoria de toda a base; mesmas regras do incremental, sem retroativos')
     parser.add_argument('--contact', help='UUID Weni para auditoria de um contato')
     parser.add_argument('--workers', type=int, choices=range(1, FARMALIDER_MAX_WORKERS + 1), default=FARMALIDER_MAX_WORKERS,
@@ -22,7 +23,23 @@ def build_parser():
 
 def main(argv=None):
     parser = build_parser(); args = parser.parse_args(argv)
-    if args.apply and not args.require_review: parser.error('--apply exige --require-review após revisão humana.')
+    if (args.apply or args.check_review) and not args.require_review:
+        parser.error('--apply e --check-review exigem --require-review.')
+    from recompra import ensure_review_current, now_local, read_review, ReviewExpiredError, REVIEW_EXPIRED_EXIT_CODE
+    review = None
+    if args.apply or args.check_review:
+        try:
+            review = read_review(args.require_review)
+            ensure_review_current(review, now_local())
+        except ReviewExpiredError as exc:
+            print('[REVISÃO EXPIRADA] ' + str(exc))
+            return REVIEW_EXPIRED_EXIT_CODE
+        except Exception as exc:
+            print('[ERRO] ' + (str(exc) if isinstance(exc, RuntimeError) else 'Não foi possível validar a revisão. Gere um novo dry-run.'))
+            return 1
+        if args.check_review:
+            print('[OK] Integridade e dia da revisão conferidos: ' + review['day'] + '.')
+            return 0
     from proxy_config import configure_proxy
     configure_proxy()
     from logging_config import configure_logging
@@ -34,7 +51,9 @@ def main(argv=None):
     weni = None; farm = None
     try:
         if not getattr(secrets, 'WENI_API_TOKEN', ''): raise RuntimeError('Token Weni não configurado.')
-        weni = WeniClient(secrets.WENI_API_TOKEN)
+        # Uma resposta perdida de POST não autoriza repetir inclusão nem
+        # atravessar a virada do dia em uma tentativa interna do cliente.
+        weni = WeniClient(secrets.WENI_API_TOKEN, retry_mutations=False)
         structure = inspect_structure(weni)
         for error in structure['errors']: print('[PENDÊNCIA] ' + error)
         print('[INFO] Diagnóstico somente leitura: grupo, evento +25 dias, campos, fluxo e fuso.')
@@ -42,7 +61,7 @@ def main(argv=None):
         farm = _open_farmalider()
         if farm is None: raise RuntimeError('FarmaLíder precisa estar disponível para confirmar a compra.')
         if args.apply:
-            result = apply_review(read_review(args.require_review), weni, farm)
+            result = apply_review(review, weni, farm)
             print('[OK] Recompra: ' + str(result)); return 3 if result.get('conflitos') else 0
         state = load_state(STATE)
         now = now_local()
@@ -57,10 +76,18 @@ def main(argv=None):
             contacts = weni.iter_contacts()
         plans = build_plans(contacts, farm, structure, state, now=now, workers=args.workers)
         review = make_review(plans, structure, now=now, state=state)
+        # Os planos usam o relógio capturado antes da varredura. Não publicar
+        # esses planos sob a data nova se a geração atravessou a meia-noite.
+        ensure_review_current(review, now_local())
         write_review(review, args.review_out)
+        ensure_review_current(review, now_local())
         print('[OK] Dry-run concluído; nenhuma gravação na Weni. Revise ' + str(args.review_out.with_suffix('.txt')))
         print('[INFO] Grupo: 0 a 25 dias. Envio: exclusivamente pela campanha Weni no D+25.')
         return 1 if structure['errors'] else 0
+    except ReviewExpiredError as exc:
+        logging.warning('Recompra: %s', exc)
+        print('[REVISÃO EXPIRADA] ' + str(exc))
+        return REVIEW_EXPIRED_EXIT_CODE if exc.allow_refresh else 1
     except Exception as exc:
         logging.error('Recompra falhou: %s.', type(exc).__name__)
         print('[ERRO] ' + (str(exc) if isinstance(exc, (RuntimeError, ValueError)) else 'Falha de API. Consulte o diagnóstico seguro.'))

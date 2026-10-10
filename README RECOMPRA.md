@@ -34,6 +34,7 @@ Conforme a orientação posterior do responsável, bloqueiam **Opt-Out Marketing
 - Até quatro consultas à FarmaLíder ocorrem simultaneamente. Todas usam a mesma instância do cliente, suas sessões por thread e seus limites globais de ritmo, cooldown, recuperação e circuito de falhas. A fila de trabalho contém no máximo oito contatos com a configuração padrão.
 - O cache de leitura tem limite de 4.096 respostas brutas e reúne consultas simultâneas à mesma chave. Falhas transitórias não ficam cacheadas; respostas 404 e rejeições 400 podem ser reutilizadas nesta execução. O cache é descartado ao fim de cada dry-run ou apply, evitando usar a confirmação do dry-run na aplicação.
 - Na aplicação, campos iguais continuam sem POST, planos sem trabalho dispensam consultas e gravações locais idênticas são evitadas. Inclusões mantêm a persistência de intenção antes do POST e de confirmação depois dele. As escritas e verificações de grupo continuam sequenciais.
+- O cliente usado pela recompra faz uma única tentativa de cada POST. Timeout, resposta inválida ou erro HTTP interrompem a aplicação com o estado preservado; a inclusão não é repetida dentro da mesma chamada. As leituras GET continuam usando os controles de retry existentes.
 - Os logs mostram contatos processados, tempo, velocidade no dry-run, consultas e reutilizações do cache. O ganho real depende da latência, dos limites das APIs e da quantidade de planos com alterações.
 
 Para usar apenas uma consulta por vez no dry-run, execute `nexo weni recompra dry-run --workers 1`. O padrão de quatro consultas já vale para os launchers existentes. `--full` mantém a auditoria completa; não usa dados antigos para dispensar a confirmação oficial.
@@ -51,7 +52,19 @@ nexo weni recompra aplicar --revisao logs/recompra_review.json
 nexo weni recompra atualizar
 ```
 
-`atualizar` executa diagnóstico, dry-run, abre o relatório e solicita **RECOMPRA REVISADA** em uma janela separada. Fechar o Bloco de Notas não confirma nem encerra a espera. Cancelar ou falhar não aplica a recompra.
+`atualizar` executa diagnóstico, dry-run, confere a validade do snapshot, abre o relatório e solicita **RECOMPRA REVISADA** em uma janela separada. Fechar o Bloco de Notas não confirma nem encerra a espera. Cancelar a confirmação ou falhar nas etapas anteriores à aplicação não inicia gravações.
+
+Se o dia mudar antes de qualquer gravação, o launcher renova o dry-run uma vez, abre um novo arquivo de relatório e pede outra confirmação. A confirmação anterior não autoriza o relatório renovado. Se o próprio dry-run atravessar a meia-noite, seus planos não são publicados sob a data nova: o cálculo é refeito com o dia atual.
+
+A aplicação verifica a data também entre contatos, depois das consultas e antes dos POSTs. Uma virada de dia após o início das gravações interrompe o processo sem renovação automática. Admissões confirmadas continuam registradas; resultados incertos continuam pendentes. Confira `logs/recompra_audit.jsonl` e gere outra revisão antes de retomar, preservando `logs/recompra_state.json`.
+
+Para conferir apenas a integridade e o dia de um snapshot, sem inicializar as APIs:
+
+```text
+python run_recompra.py --check-review --require-review logs/recompra_review.json
+```
+
+O retorno `4` identifica revisão expirada sem aplicação iniciada. Erros de revisão inválida, conflito, falha ou aplicação já iniciada não acionam a renovação automática. Se a revisão renovada também expirar, a rotina encerra e informa que precisa ser executada novamente.
 
 Também pode usar a entrada existente, inclusive no Linux para testes/desenvolvimento:
 
@@ -100,3 +113,5 @@ Não há confirmação de entrega do WhatsApp nesta rotina. A proteção local i
 Fixtures sintéticas cobrem 0, 24, 25, 26 e 365 dias, futuro, fuso local, campos vazios, produtos com vírgula, recusas e Opt-Out, estados de pedido, proteção contra regressão de compra, referência nova, reprocessamento/reinicialização, resposta incerta, estado corrompido, revisão adulterada/expirada, recusa concorrente, cancelamento antes de atualizar a data e rotas do fluxo que tentariam contornar as guardas.
 
 Os testes de otimização verificam paginação sob demanda, concorrência limitada, prioridade global dos CPFs, cache de payloads sem compartilhamento de identidade, descarte de falhas transitórias, limpeza de temporários e aplicação sem consultas para planos sem trabalho.
+
+Os testes de virada do dia verificam expiração antes das gravações, interrupção após alterações parciais, preservação de uma inclusão confirmada que atravessou a meia-noite, renovação de todo o dry-run e ausência de repetição interna de POST.

@@ -501,7 +501,7 @@ class RecompraRunnerOptimizationTests(unittest.TestCase):
                 weni.iter_contacts.return_value = contacts
                 state = {"schema": 1, "contacts": {}}
                 plan = {"synthetic": "plan"}
-                review = {"synthetic": "review"}
+                review = {"synthetic": "review", "day": NOW.date().isoformat()}
                 stack.enter_context(patch("proxy_config.configure_proxy"))
                 stack.enter_context(patch("logging_config.configure_logging"))
                 stack.enter_context(patch("secrets_config.WENI_API_TOKEN", "synthetic-token", create=True))

@@ -2,6 +2,9 @@
 
 ## NexoFlow 1.0
 
+- Recompra identifica revisão expirada antes das gravações, renova o dry-run uma vez no launcher e exige confirmação do novo relatório. A data é conferida também durante a aplicação; operações já iniciadas preservam o estado e interrompem sem renovação automática.
+- POSTs da recompra usam tentativa única, preservando intenção pendente após resultado incerto; GETs mantêm as retentativas existentes. Relatório gerado durante a virada do dia exige novo cálculo.
+
 - Recompra processa contatos durante a paginação, consulta FarmaLíder com até quatro workers e cache limitado de payloads brutos por execução. CPFs válidos concluem antes dos inválidos; seleção de identidade permanece por contato.
 - Aplicação da recompra pula planos sem trabalho antes de consultar as APIs, evita gravações locais redundantes e mantém revalidação, revisão e persistência de intenção/confirmação nas inclusões. Logs mostram velocidade e reutilizações de consultas.
 

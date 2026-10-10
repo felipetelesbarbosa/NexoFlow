@@ -35,6 +35,25 @@ GUARD_FIELDS = FIELDS | {"pedido_id", "cpf", "nome", "email", "marketing_opt_in"
 STATE = Path("logs/recompra_state.json")
 REVIEW = Path("logs/recompra_review.json")
 AUDIT = Path("logs/recompra_audit.jsonl")
+REVIEW_EXPIRED_EXIT_CODE = 4
+
+
+class ReviewExpiredError(RuntimeError):
+    """A renovação automática só é permitida antes de gravar estado ou contatos."""
+
+    def __init__(self, review_day, current_day, *, allow_refresh=True):
+        self.allow_refresh = allow_refresh
+        message = (f"Revisão de {review_day}; dia operacional atual: {current_day} (America/Belem). "
+                   "Gere um novo dry-run e confirme o novo relatório.")
+        if not allow_refresh:
+            message += " A aplicação já iniciou; estado e resultados confirmados foram preservados. Confira a auditoria antes de retomar."
+        super().__init__(message)
+
+
+def ensure_review_current(review, now, *, allow_refresh=True):
+    current_day = now.astimezone(TZ).date().isoformat()
+    if review["day"] != current_day:
+        raise ReviewExpiredError(review["day"], current_day, allow_refresh=allow_refresh)
 
 
 class RecompraReadCache:
@@ -500,17 +519,25 @@ def append_audit(event, path=AUDIT):
 def apply_review(review, weni, farm, *, state_path=STATE, now_fn=now_local, audit_path=AUDIT):
     """Somente snapshots revisados; conflito ou confirmação incerta bloqueia inclusão."""
     now = now_fn()
-    if review["day"] != now.astimezone(TZ).date().isoformat(): raise RuntimeError("Revisão de outro dia. Gere um novo dry-run, sem recuperação retroativa.")
+    ensure_review_current(review, now)
     structure = inspect_structure(weni)
+    ensure_review_current(review, now_fn())
     if structure["errors"]: raise RuntimeError("Aplicação bloqueada: " + "; ".join(structure["errors"]))
     if structure != review["structure"]: raise RuntimeError("Campanha ou campos mudaram depois da revisão.")
     summary = Counter()
     started = monotonic()
+    writes_started = False
+
+    def check_day():
+        ensure_review_current(review, now_fn(), allow_refresh=not writes_started)
+
     with state_lock(state_path):
         state = load_state(state_path)
+        check_day()
         if digest(state) != review["state_sha256"]: raise RuntimeError("Estado mudou após a revisão. Gere um novo dry-run.")
         reads = RecompraReadCache(farm)
         for index, reviewed in enumerate(review["plans"], 1):
+            check_day()
             if index > 1 and (index - 1) % 100 == 0:
                 logging.info("Recompra aplicação: contatos=%s/%s; resultados=%s; cache=%s.",
                              index - 1, len(review["plans"]), dict(summary), reads.metrics())
@@ -523,10 +550,13 @@ def apply_review(review, weni, farm, *, state_path=STATE, now_fn=now_local, audi
                 summary["sem_mudanca"] += 1
                 continue
             current = weni.get_contact(uuid=uid)
+            check_day()
             if not current or guard(current) != reviewed["guard"]:
                 summary["conflitos"] += 1; append_audit({"contact_uuid": uid, "status": "CONFLITO_CONTATO"}, audit_path); continue
             order, items = resolve_latest(current, reads, now_fn().isoformat(), saved=saved)
+            check_day()
             fresh = propose(current, order, items, structure, saved, now=now_fn())
+            check_day()
             if any(fresh[key] != reviewed[key] for key in ("fields", "action", "order_id", "reason", "purchase", "event_at", "due_today", "within_window")):
                 summary["conflitos"] += 1; append_audit({"contact_uuid": uid, "status": "CONFLITO_PEDIDO_OU_DIA"}, audit_path); continue
             action = fresh["action"]
@@ -543,15 +573,22 @@ def apply_review(review, weni, farm, *, state_path=STATE, now_fn=now_local, audi
             if action in {"add", "replace"}:
                 entry.update({"pending": True, "day": review["day"], "event_uuid": structure["event_uuid"]})
             if contact_state != previous_state:
+                check_day()
+                writes_started = True
                 atomic_json(state_path, state)
             persisted_state = deepcopy(contact_state)
             try:
                 if action in {"remove", "replace"}:
+                    check_day()
+                    writes_started = True
                     weni.contact_group_action(uid, action="remove", group=structure["group_uuid"])
                     removed_contact = weni.get_contact(uuid=uid)
                     if not removed_contact or member(removed_contact, structure["group_uuid"], GROUP):
                         raise RuntimeError("Remoção do agendamento anterior não foi confirmada.")
-                if fresh["fields"]: weni.update_contact_fields(uid, fresh["fields"])
+                if fresh["fields"]:
+                    check_day()
+                    writes_started = True
+                    weni.update_contact_fields(uid, fresh["fields"])
                 if action in {"add", "replace"}:
                     # Releitura imediatamente antes de admitir: recusa concorrente
                     # e mudanças externas não podem ser ignoradas.
@@ -564,20 +601,32 @@ def apply_review(review, weni, farm, *, state_path=STATE, now_fn=now_local, audi
                     if actual != expected or refused(latest) or member(latest, structure["opt_out_uuid"], OPT_OUT):
                         raise RuntimeError("Identidade, campos ou recusa mudaram antes da inclusão.")
                     if not 0 <= (now_fn().astimezone(TZ).date() - business_order_datetime(fresh["purchase"]["data_hora"]).date()).days <= 25:
+                        check_day()
                         raise RuntimeError("Janela de 0 a 25 dias terminou durante a aplicação.")
+                    check_day()
+                    writes_started = True
                     weni.contact_group_action(uid, action="add", group=structure["group_uuid"])
                     entry.update({"pending": False, "admitted": True, "admitted_at": now_fn().isoformat()})
                 if fresh["in_group"] and fresh["order_id"] and action == "":
                     entry.update({"admitted": True, "pending": False})
                 if contact_state != persisted_state:
+                    writes_started = True
                     atomic_json(state_path, state)
                 summary["aplicados"] += 1
                 append_audit({"contact_uuid": uid, "pedido_id": fresh["order_id"], "status": "APLICADO", "action": action, "at": now_fn().isoformat()}, audit_path)
+            except ReviewExpiredError:
+                if contact_state != persisted_state:
+                    atomic_json(state_path, state)
+                append_audit({"contact_uuid": uid, "pedido_id": fresh["order_id"], "status": "REVISAO_EXPIRADA_DURANTE_APLICACAO", "at": now_fn().isoformat()}, audit_path)
+                raise
             except Exception:
                 if contact_state != persisted_state:
                     atomic_json(state_path, state)
                 append_audit({"contact_uuid": uid, "pedido_id": fresh["order_id"], "status": "FALHA_OU_RESULTADO_INDETERMINADO", "at": now_fn().isoformat()}, audit_path)
                 raise RuntimeError("Recompra interrompida. Estado preservado; inclusão incerta não será repetida automaticamente.") from None
+            # Se uma chamada concluída atravessou a meia-noite, seus resultados
+            # conhecidos já estão persistidos antes de interromper a execução.
+            check_day()
     logging.info("Recompra aplicação: contatos=%s; duração=%.1fs; resultados=%s; cache=%s.",
                  len(review["plans"]), monotonic() - started, dict(summary), reads.metrics())
     return dict(summary)

@@ -28,7 +28,8 @@ class WeniError(RuntimeError):
 
 
 class WeniClient:
-    def __init__(self, token: str) -> None:
+    def __init__(self, token: str, *, retry_mutations: bool = True) -> None:
+        self.retry_mutations = retry_mutations
         self.session = requests.Session()
         self.session.headers.update(
             {
@@ -58,8 +59,9 @@ class WeniClient:
         json_body: dict[str, Any] | None = None,
     ) -> Any:
         last_error = "erro desconhecido"
+        max_attempts = MAX_RETRIES if method.upper() == "GET" or self.retry_mutations else 1
 
-        for attempt in range(1, MAX_RETRIES + 1):
+        for attempt in range(1, max_attempts + 1):
             try:
                 response = self.session.request(
                     method,
@@ -79,7 +81,7 @@ class WeniClient:
                     )
 
                 if response.status_code == 429 or response.status_code >= 500:
-                    if attempt >= MAX_RETRIES:
+                    if attempt >= max_attempts:
                         response.raise_for_status()
                     wait = float(2 ** (attempt - 1))
                     logging.warning(
@@ -87,7 +89,7 @@ class WeniClient:
                         "Tentativa %s/%s. Repetindo em %.1fs.",
                         response.status_code,
                         attempt,
-                        MAX_RETRIES,
+                        max_attempts,
                         wait,
                     )
                     time.sleep(wait)
@@ -106,13 +108,13 @@ class WeniClient:
                     last_error = failure.summary
                     if not failure.retryable:
                         break
-                    if attempt < MAX_RETRIES:
+                    if attempt < max_attempts:
                         refresh_network_route(
                             reason="falha recuperável ao acessar Weni"
                         )
                 else:
                     last_error = "[RESPOSTA_INVALIDA] A resposta da Weni não contém JSON válido."
-                if attempt >= MAX_RETRIES:
+                if attempt >= max_attempts:
                     break
                 wait = float(2 ** (attempt - 1))
                 logging.warning(
@@ -120,7 +122,7 @@ class WeniClient:
                     "Repetindo em %.1fs.",
                     last_error,
                     attempt,
-                    MAX_RETRIES,
+                    max_attempts,
                     wait,
                 )
                 time.sleep(wait)
