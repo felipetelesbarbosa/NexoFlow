@@ -72,7 +72,7 @@ function Copy-TrackedFiles {
             if (-not $relative) { continue }
             if ($relative -like "releases/*") { continue }
             if ($relative -like ".github/*") { continue }
-            if ($relative -like "scripts/*" -and $relative -notin @("scripts/confirmar_revisao_weni.ps1", "scripts/resultado_carga_weni.ps1")) { continue }
+            if ($relative -like "scripts/*" -and $relative -notin @("scripts/confirmar_revisao_weni.ps1", "scripts/resultado_carga_weni.ps1", "scripts/check_release_secrets.py")) { continue }
 
             $source = Join-Path $RepoRoot $relative
             if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { continue }
@@ -336,6 +336,10 @@ Distribuição oficial do **NexoFlow 1.0**.
 O arquivo `NexoFlow-Setup-$Version.zip` contém o instalador do NexoFlow 1.0 e foi validado automaticamente em Windows para primeira instalação e atualização de uma instalação existente.
 
 Melhorias desta distribuição do NexoFlow 1.0:
+- Requests exige versão 2.33.0 ou superior na série 2, excluindo versões antigas com vulnerabilidades conhecidas;
+- publicação verifica segredos em todo o histórico Git e nos ZIPs extraídos, confere os hashes dos pacotes e bloqueia o release se alguma etapa falhar;
+- testes e empacotamento usam permissão de leitura no GitHub; somente a etapa final de publicação pode atualizar a tag e o release, com Actions fixadas por commit;
+- política de segurança e orientações para acesso público em SECURITY.md; credenciais e diagnósticos privados continuam fora do Git e dos pacotes;
 - identificação e documentação padronizadas como NexoFlow 1.0, com os componentes Planilha e Recompra nos índices e instruções de assinatura e desinstalação alinhadas ao Setup;
 - recompra processa contatos durante a paginação, consulta a FarmaLíder com até quatro workers e cache limitado por execução, reduzindo leituras e gravações redundantes sem alterar a validação de identidade;
 - revisão de recompra expirada na virada do dia gera um novo dry-run uma vez no launcher e exige nova confirmação; se a aplicação já iniciou, interrompe e preserva o estado;

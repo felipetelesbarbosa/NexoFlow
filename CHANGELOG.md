@@ -2,6 +2,10 @@
 
 ## NexoFlow 1.0
 
+- Versão mínima do Requests elevada para 2.33.0, excluindo versões com vulnerabilidades conhecidas sem alterar o limite de compatibilidade da série 2.
+- Publicação protegida por varredura Gitleaks do histórico e dos ZIPs extraídos, com validação dos checksums e exceção exata para o trecho público `3200/farmalider`. Achados ou falhas bloqueiam o release; relatórios não entram nos pacotes.
+- Permissões do CI separadas: testes e build usam leitura, e somente o job de publicação recebe escrita. Actions fixadas por SHA e política de segurança com configuração local, relato privado de vulnerabilidades e orientações administrativas para tornar o projeto público.
+
 - Identificação e documentação padronizadas como NexoFlow 1.0, com listas dos executáveis Planilha e Recompra, índices de operação e instruções de assinatura e desinstalação alinhadas à distribuição atual. Atualizações seguem na main, com commits NexoFlow 1.0 e release v1.0 de nomes estáveis.
 - Publicação automática bloqueada fora da main ou quando a mensagem do commit não corresponde exatamente a NexoFlow 1.0.
 

@@ -40,6 +40,8 @@ O **NexoFlow Analytics** organiza os dados operacionais, pedidos, atribuição d
 
 Os pacotes são atualizados no [release NexoFlow 1.0](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.0) após testes, auditoria e validação do Setup no Windows. A versão permanece **1.0**.
 
+Consulte a [política de segurança e as configurações para publicação pública](SECURITY.md). Credenciais e dados reais de clientes devem permanecer locais, fora do Git e dos pacotes.
+
 ## Idioma e codificação
 
 A interface e a documentação do NexoFlow usam português brasileiro, com acentos e cedilha. Os scripts de CMD selecionam UTF-8; os scripts PowerShell usam UTF-8 com BOM para compatibilidade com Windows PowerShell 5.1. Os executáveis são recompilados com metadados pt-BR na geração dos pacotes. Nomes técnicos de arquivos, comandos, campos e endpoints preservam o contrato de integração. Botões e mensagens do Windows ou do instalador Python seguem o idioma desses componentes.

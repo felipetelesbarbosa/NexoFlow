@@ -1,0 +1,10 @@
+# NexoFlow 1.0 — análise de segredos com todas as regras padrão.
+[extend]
+useDefault = true
+
+# A regra generic-api-key interpreta a porta/caminho desta URL pública como chave.
+# A exceção não ignora arquivos, regras nem outras URLs.
+[allowlist]
+description = "URL pública da API FarmaLíder (porta e caminho), sem credencial"
+regexTarget = "secret"
+regexes = ['''^3200/farmalider$''']
