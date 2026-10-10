@@ -13,6 +13,7 @@ import logging
 import os
 from pathlib import Path
 import tempfile
+import traceback
 from threading import Lock
 from time import monotonic
 import unicodedata
@@ -29,13 +30,18 @@ FLOW = "Recompra FarmaLíder D+25"
 TZ = ZoneInfo("America/Belem")
 DAY_EXPRESSION = '@(if(default(datetime_diff(format_date(fields.pedido_data, "YYYY-MM-DD"), today(), "D"), -1) = 25, "D25_OK", "D25_FORA"))'
 REFUSAL_EXPRESSION = '@(if(or(lower(trim(fields.marketing_opt_in)) = "recusado", lower(trim(fields.marketing_opt_in)) = "não", lower(trim(fields.marketing_opt_in)) = "nao", lower(trim(fields.marketing_opt_in)) = "negado"), "MKT_RECUSADO", "MKT_SEM_RECUSA"))'
-FIELDS = {"pedido_data", "pedido_produtos", "ultimo_pedido"}
-FIELDS |= {"pedido_id", "pedido_quantidade_itens", "pedido_valor_produtos", "pedido_valor", "pedido_status", "pedido_forma_pagamento"}
-GUARD_FIELDS = FIELDS | {"pedido_id", "cpf", "nome", "email", "marketing_opt_in", "pedido_status", "pedido_forma_pagamento"}
+# Somente os campos essenciais ao agendamento e ao texto da campanha.
+# ultimo_pedido pertence às demais integrações, nunca à recompra.
+FIELDS = {"pedido_data", "pedido_produtos"}
+GUARD_FIELDS = FIELDS | {"cpf", "nome", "email", "marketing_opt_in"}
 STATE = Path("logs/recompra_state.json")
 REVIEW = Path("logs/recompra_review.json")
 AUDIT = Path("logs/recompra_audit.jsonl")
 REVIEW_EXPIRED_EXIT_CODE = 4
+
+
+class PreAdmissionConflict(RuntimeError):
+    """A inclusão ainda não foi tentada; o contato precisa de nova revisão."""
 
 
 class ReviewExpiredError(RuntimeError):
@@ -325,7 +331,7 @@ def inspect_structure(weni):
     for key in sorted(FIELDS):
         if key not in fields: errors.append(f"Campo obrigatório ausente: {key}")
     if fields.get("pedido_data") != "datetime": errors.append("pedido_data precisa ser DateTime.")
-    if fields.get("pedido_produtos") != "text" or fields.get("ultimo_pedido") != "text": errors.append("Produtos e JSON precisam ser campos Texto.")
+    if fields.get("pedido_produtos") != "text": errors.append("pedido_produtos precisa ser campo Texto para o conteúdo da campanha.")
     org = weni.get_org()
     if org.get("timezone") != "America/Belem": errors.append("Organização Weni precisa usar America/Belem; nenhuma configuração será alterada.")
     campaigns = [c for c in weni.list_campaigns() if c.get("name") == GROUP]
@@ -355,6 +361,8 @@ def inspect_structure(weni):
 def resolve_latest(contact, farm, captured_at, lookup_cache=None, saved=None):
     """Reutiliza seleção de identidade e resolução oficiais, sem novos endpoints."""
     fields = get_fields(contact)
+    # Esta rotina não deve nem usar ultimo_pedido como localizador implícito.
+    safe_contact = {**contact, "fields": {k: v for k, v in fields.items() if k != "ultimo_pedido"}}
     from analytics import normalize_cpf
     cpf = normalize_cpf(fields.get("cpf"))
     if not cpf: return None, []
@@ -371,24 +379,18 @@ def resolve_latest(contact, farm, captured_at, lookup_cache=None, saved=None):
     if result[0] not in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO"}: return {"status_confirmacao": result[0]}, []
     # Sem ultimoPedido, não reconstruir a compra a partir de campos soltos.
     if not selected or not isinstance(selected.get("ultimoPedido"), dict): return None, []
-    latest = resolve_contact_order(contact, farm_client=farm, captured_at=captured_at,
+    latest = resolve_contact_order(safe_contact, farm_client=farm, captured_at=captured_at,
                                    linked_cliente_id=result[1], cliente_response=payload)
     if latest[0] and _sales_order_is_valid(latest[0]) and latest[0].get("status_validacao") == "OK":
         return latest
-    # A API retorna apenas ultimoPedido. Uma compra confirmada anterior só
-    # pode ser recuperada de um ID conhecido, revalidado pelo GET e mesmo ID
-    # de cliente. Não inventamos histórico nem interpretamos JSON Weni como prova.
+    # Recuperação somente por ID de compra previamente validado em estado
+    # local. Nunca usar o campo Weni ultimo_pedido como localizador.
     candidates = {text(((saved or {}).get("purchase") or {}).get("pedido_id"))}
-    try:
-        old_snapshot = json.loads(text(fields.get("ultimo_pedido")) or "{}")
-        if isinstance(old_snapshot, dict): candidates.add(text(old_snapshot.get("pedido_id")))
-    except ValueError:
-        pass
     recovered = []
     for candidate in candidates - {"", text((latest[0] or {}).get("pedido_id"))}:
         if not candidate.isascii() or not candidate.isdigit(): continue
         reference_payload = {"cliente": selected["cliente"], "ultimoPedido": {"id": candidate, "codCliente": result[1]}, "itens": []}
-        previous = resolve_contact_order(contact, farm_client=farm, captured_at=captured_at,
+        previous = resolve_contact_order(safe_contact, farm_client=farm, captured_at=captured_at,
                                         linked_cliente_id=result[1], cliente_response=reference_payload)
         if previous[0] and _sales_order_is_valid(previous[0]) and previous[0].get("status_validacao") == "OK" and previous[1]:
             recovered.append(previous)
@@ -403,7 +405,8 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
     uid = text(contact.get("uuid"))
     plan = {"contact_uuid": uid, "guard": guard(contact), "fields": {}, "action": "",
             "reason": "SEM_PEDIDO_CONFIRMADO", "order_id": "", "purchase": None,
-            "in_group": in_group, "event_at": "", "due_today": False, "within_window": False, "scheduled_future": False}
+            "in_group": in_group, "event_at": "", "due_today": False, "within_window": False, "scheduled_future": False,
+            "warnings": []}
     diagnostic = text((order or {}).get("status_confirmacao"))
     if diagnostic.startswith("CPF_") or diagnostic.startswith("ERRO_"): plan["reason"] = diagnostic
     dt = business_order_datetime((order or {}).get("data_hora"))
@@ -412,24 +415,22 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
                  and dt and dt <= now and items and all(names))
     if valid:
         order_id = text(order.get("pedido_id"))
-        from pedido_utils import normalize_farmalider_order_status_code, normalize_farmalider_payment_code
-        current_order = business_order_datetime(fields.get("pedido_data")) if (
-            normalize_farmalider_order_status_code(text(fields.get("pedido_status"))) in {"4", "1", "2"}
-            and normalize_farmalider_payment_code(text(fields.get("pedido_forma_pagamento"))) != "0"
-            and norm(fields.get("pedido_forma_pagamento")) != "cancelado"
-        ) else None
+        # Para a cronologia do agendamento, somente pedido_data é consultado.
+        # Uma data posterior não pode ser substituída por pedido mais antigo.
+        current_order = business_order_datetime(fields.get("pedido_data"))
         saved_dt = business_order_datetime((saved.get("purchase") or {}).get("data_hora"))
         if any(other and other > dt for other in (current_order, saved_dt)):
             valid = False; plan["reason"] = "PEDIDO_ANTIGO_BLOQUEADO"
         else:
-            # Reutilizar o plano de pedido evita combinar a compra nova com
-            # ID, valores ou quantidades da compra anterior no Analytics.
+            # Usar a validação oficial dos itens, mas não gerar atualizações
+            # de campos de Analytics, JSON ou histórico de pedidos na Weni.
             from weni_update import ContactUpdatePlan, _apply_purchase_candidate
-            candidate = {**contact, "fields": dict(fields)}
+            candidate = {**contact, "fields": {k: v for k, v in fields.items() if k != "ultimo_pedido"}}
             if current_order is None: candidate["fields"]["pedido_data"] = ""
             purchase_plan = ContactUpdatePlan(uid)
             _apply_purchase_candidate(purchase_plan, candidate, farm_client=None,
-                                      captured_at=now.isoformat(), resolved_order=(order, items))
+                                      captured_at=now.isoformat(), resolved_order=(order, items),
+                                      available_weni_fields=FIELDS)
             if not purchase_plan.order_validated:
                 plan["reason"] = "PEDIDO_INCOMPLETO"
                 if in_group: plan["action"] = "remove"
@@ -437,8 +438,11 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
             plan["order_id"] = order_id
             plan["purchase"] = {"pedido_id": order_id, "data_hora": dt.isoformat(),
                                 "snapshot": serialize_pedido_products(order, items)}
-            proposal = {**{k: v for k, v in purchase_plan.fields.items() if k in FIELDS}, "pedido_data": dt.isoformat(),
-                        "pedido_produtos": serialize_weni_order_list(names), "ultimo_pedido": serialize_pedido_products(order, items)}
+            # Referência temporal: pedido_data. A lista de produtos é mantida
+            # apenas porque o fluxo existente a exige para exibir a oferta.
+            # O JSON completo permanece SOMENTE em state.purchase.snapshot.
+            proposal = {"pedido_data": dt.isoformat(),
+                        "pedido_produtos": serialize_weni_order_list(names)}
             for key, value in proposal.items():
                 same = business_order_datetime(fields.get(key)) == dt if key == "pedido_data" else field_guard(key, fields.get(key)) == field_guard(key, value)
                 if not same: plan["fields"][key] = value
@@ -496,7 +500,7 @@ def write_review(review, path=REVIEW):
              "Sem disparos, sem alterações de campanha. Horário já passado não cria envio retroativo.",
              "Pendências: " + "; ".join(review["structure"]["errors"]), f"Resultados: {dict(counts)}"]
     for plan in review["plans"]:
-        lines.append(f"Contato {plan['contact_uuid']} | pedido {plan['order_id']} | {plan['reason']} | grupo={plan['action'] or 'sem mudança'} | evento={plan['event_at']} | horário futuro={plan['scheduled_future']}")
+        lines.append(f"Contato {plan['contact_uuid']} | pedido {plan['order_id']} | {plan['reason']} | grupo={plan['action'] or 'sem mudança'} | evento={plan['event_at']} | horário futuro={plan['scheduled_future']} | avisos={plan.get('warnings', [])}")
         lines.extend(f"  {key}: {text(plan['guard']['fields'].get(key))} -> {value}" for key, value in plan["fields"].items())
     path.with_suffix(".txt").write_text("\n".join(lines)+"\n", encoding="utf-8-sig")
 
@@ -514,6 +518,55 @@ def append_audit(event, path=AUDIT):
     path = Path(path); path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True)+"\n"); handle.flush(); os.fsync(handle.fileno())
+
+
+def safe_error_frames(exc):
+    """Somente arquivo, linha e função, sem payloads, URLs, tokens ou dados pessoais."""
+    return [f"{Path(frame.filename).name}:{frame.lineno}:{frame.name}"
+            for frame in traceback.extract_tb(exc.__traceback__)[-8:]]
+
+
+def diagnose_state(state_path=STATE, audit_path=AUDIT):
+    """Conciliação preliminar somente leitura, sem GET/POST nas APIs."""
+    state = load_state(state_path)
+    contacts = state["contacts"]
+    counts = Counter()
+    pending_uuids = []
+    for uid, contact in contacts.items():
+        if not isinstance(contact, dict) or not isinstance(contact.get("orders", {}), dict):
+            raise RuntimeError("Estado de recompra malformado; não altere nem reinicie a carga.")
+        for order in contact.get("orders", {}).values():
+            if not isinstance(order, dict):
+                raise RuntimeError("Registro de pedido malformado no estado de recompra.")
+            if order.get("admitted"):
+                counts["admissoes_confirmadas_localmente"] += 1
+            if order.get("pending"):
+                counts["inclusoes_pendentes_ou_indeterminadas"] += 1
+                if len(pending_uuids) < 20:
+                    pending_uuids.append(uid)
+    audit_counts = Counter()
+    last_failures = []
+    audit_file = Path(audit_path)
+    if audit_file.exists():
+        with audit_file.open(encoding="utf-8") as handle:
+            for number, line in enumerate(handle, 1):
+                if not line.strip():
+                    continue
+                try:
+                    event = json.loads(line)
+                except (ValueError, TypeError) as exc:
+                    raise RuntimeError(f"Auditoria malformada na linha {number}; preserve o arquivo para investigação.") from exc
+                if not isinstance(event, dict):
+                    raise RuntimeError(f"Auditoria malformada na linha {number}; preserve o arquivo.")
+                status = event.get("status") or "SEM_STATUS"
+                audit_counts[status] += 1
+                if status in {"FALHA_OU_RESULTADO_INDETERMINADO", "CONFLITO_PRE_INCLUSAO", "REVISAO_EXPIRADA_DURANTE_APLICACAO"}:
+                    last_failures.append({key: event.get(key) for key in ("contact_uuid", "pedido_id", "status", "stage", "error_type", "reason", "at") if event.get(key)})
+                    last_failures = last_failures[-10:]
+    return {"somente_leitura": True, "contatos_com_estado": len(contacts), **dict(counts),
+            "uuids_pendentes_amostra_20": pending_uuids,
+            "eventos_auditoria": dict(audit_counts), "ultimas_pendencias_auditoria": last_failures,
+            "aviso": "Pending não comprova envio. Reconciliar Weni e auditoria antes de qualquer novo apply."}
 
 
 def apply_review(review, weni, farm, *, state_path=STATE, now_fn=now_local, audit_path=AUDIT):
@@ -557,7 +610,7 @@ def apply_review(review, weni, farm, *, state_path=STATE, now_fn=now_local, audi
             check_day()
             fresh = propose(current, order, items, structure, saved, now=now_fn())
             check_day()
-            if any(fresh[key] != reviewed[key] for key in ("fields", "action", "order_id", "reason", "purchase", "event_at", "due_today", "within_window")):
+            if any(fresh[key] != reviewed[key] for key in ("fields", "action", "order_id", "reason", "purchase", "event_at", "due_today", "within_window")) or fresh.get("warnings", []) != reviewed.get("warnings", []):
                 summary["conflitos"] += 1; append_audit({"contact_uuid": uid, "status": "CONFLITO_PEDIDO_OU_DIA"}, audit_path); continue
             action = fresh["action"]
             if not plan_needs_apply(fresh, saved):
@@ -577,53 +630,88 @@ def apply_review(review, weni, farm, *, state_path=STATE, now_fn=now_local, audi
                 writes_started = True
                 atomic_json(state_path, state)
             persisted_state = deepcopy(contact_state)
+            stage = "preparacao"
             try:
                 if action in {"remove", "replace"}:
+                    stage = "remover_grupo"
                     check_day()
                     writes_started = True
                     weni.contact_group_action(uid, action="remove", group=structure["group_uuid"])
+                    stage = "confirmar_remocao"
                     removed_contact = weni.get_contact(uuid=uid)
                     if not removed_contact or member(removed_contact, structure["group_uuid"], GROUP):
                         raise RuntimeError("Remoção do agendamento anterior não foi confirmada.")
                 if fresh["fields"]:
+                    stage = "atualizar_campos"
                     check_day()
                     writes_started = True
                     weni.update_contact_fields(uid, fresh["fields"])
                 if action in {"add", "replace"}:
+                    stage = "reler_antes_inclusao"
                     # Releitura imediatamente antes de admitir: recusa concorrente
                     # e mudanças externas não podem ser ignoradas.
                     latest = weni.get_contact(uuid=uid)
-                    if not latest: raise RuntimeError("Contato ausente antes da inclusão.")
+                    if not latest: raise PreAdmissionConflict("Contato ausente antes da inclusão.")
                     expected = dict(fresh["guard"]); expected["fields"] = {**expected["fields"], **{k: field_guard(k, v) for k,v in fresh["fields"].items()}}
                     actual = guard(latest)
                     actual["groups"] = [g for g in actual["groups"] if g not in {structure["group_uuid"], GROUP}]
                     expected["groups"] = [g for g in expected["groups"] if g not in {structure["group_uuid"], GROUP}]
                     if actual != expected or refused(latest) or member(latest, structure["opt_out_uuid"], OPT_OUT):
-                        raise RuntimeError("Identidade, campos ou recusa mudaram antes da inclusão.")
+                        # Diagnóstico por NOMES de campos: nunca expor conteúdo, CPF, URNs ou token.
+                        field_diffs = sorted(k for k in expected["fields"]
+                                             if actual["fields"].get(k) != expected["fields"].get(k))
+                        other_diffs = [k for k in ("name", "urns", "groups") if actual[k] != expected[k]]
+                        if refused(latest) or member(latest, structure["opt_out_uuid"], OPT_OUT):
+                            other_diffs.append("opt_out_marketing")
+                        raise PreAdmissionConflict("Guarda divergiu antes da inclusão: campos=" +
+                                                   ",".join(field_diffs) + "; demais=" + ",".join(other_diffs))
                     if not 0 <= (now_fn().astimezone(TZ).date() - business_order_datetime(fresh["purchase"]["data_hora"]).date()).days <= 25:
                         check_day()
                         raise RuntimeError("Janela de 0 a 25 dias terminou durante a aplicação.")
                     check_day()
                     writes_started = True
+                    stage = "adicionar_grupo"
                     weni.contact_group_action(uid, action="add", group=structure["group_uuid"])
                     entry.update({"pending": False, "admitted": True, "admitted_at": now_fn().isoformat()})
                 if fresh["in_group"] and fresh["order_id"] and action == "":
                     entry.update({"admitted": True, "pending": False})
                 if contact_state != persisted_state:
+                    stage = "persistir_confirmacao"
                     writes_started = True
                     atomic_json(state_path, state)
                 summary["aplicados"] += 1
+                stage = "registrar_auditoria"
                 append_audit({"contact_uuid": uid, "pedido_id": fresh["order_id"], "status": "APLICADO", "action": action, "at": now_fn().isoformat()}, audit_path)
+            except PreAdmissionConflict as exc:
+                # O POST de admissão NÃO foi tentado. O pending criado nesta
+                # passagem não pode impedir uma nova revisão do mesmo pedido.
+                if action in {"add", "replace"}:
+                    entry["pending"] = False
+                    atomic_json(state_path, state)
+                summary["conflitos"] += 1
+                logging.warning("Recompra: conflito antes da inclusão; etapa=%s; contato=%s; motivo=%s.", stage, uid, str(exc))
+                append_audit({"contact_uuid": uid, "pedido_id": fresh["order_id"],
+                              "status": "CONFLITO_PRE_INCLUSAO", "stage": stage, "reason": str(exc),
+                              "at": now_fn().isoformat()}, audit_path)
+                continue
             except ReviewExpiredError:
                 if contact_state != persisted_state:
                     atomic_json(state_path, state)
                 append_audit({"contact_uuid": uid, "pedido_id": fresh["order_id"], "status": "REVISAO_EXPIRADA_DURANTE_APLICACAO", "at": now_fn().isoformat()}, audit_path)
                 raise
-            except Exception:
+            except Exception as exc:
+                frames = safe_error_frames(exc)
+                logging.error("Recompra falhou: contato=%s; pedido=%s; etapa=%s; tipo=%s; origem=%s.",
+                              uid, fresh["order_id"], stage, type(exc).__name__, " > ".join(frames))
                 if contact_state != persisted_state:
                     atomic_json(state_path, state)
-                append_audit({"contact_uuid": uid, "pedido_id": fresh["order_id"], "status": "FALHA_OU_RESULTADO_INDETERMINADO", "at": now_fn().isoformat()}, audit_path)
-                raise RuntimeError("Recompra interrompida. Estado preservado; inclusão incerta não será repetida automaticamente.") from None
+                append_audit({"contact_uuid": uid, "pedido_id": fresh["order_id"],
+                              "status": "FALHA_OU_RESULTADO_INDETERMINADO", "stage": stage,
+                              "error_type": type(exc).__name__, "origin": frames,
+                              "at": now_fn().isoformat()}, audit_path)
+                raise RuntimeError(f"Recompra interrompida na etapa {stage} ({type(exc).__name__}). "
+                                   "Estado preservado; inclusão incerta não será repetida automaticamente. "
+                                   "Confira logs/nexoflow_recompra.log e logs/recompra_audit.jsonl.") from None
             # Se uma chamada concluída atravessou a meia-noite, seus resultados
             # conhecidos já estão persistidos antes de interromper a execução.
             check_day()

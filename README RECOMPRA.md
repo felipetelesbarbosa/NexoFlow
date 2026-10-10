@@ -14,11 +14,11 @@ Conforme a orientação posterior do responsável, bloqueiam **Opt-Out Marketing
 
 - Reutiliza `WeniClient`, `FarmaliderClient`, a seleção por identidade e `resolve_contact_order`; não introduz um endpoint de histórico inexistente.
 - Consulta CPFs válidos primeiro e conclui essa fase antes dos inválidos preenchidos, incluindo zeros; ausentes ficam por último. Compartilha payloads brutos de GET por CPF e pedido na execução, mas valida cada contato por identidade; CPF inválido continua exigindo nome + e-mail ou nome + telefone, sem ambiguidade.
-- Atualiza `pedido_data` com ISO 8601 com offset `-03:00`, `pedido_produtos` com CSV compatível com as listas atuais, `ultimo_pedido` com o serializador oficial. A recompra usa exclusivamente `pedido_data`; não exige, consulta ou altera `ultima_compra`.
-- Atualiza também ID, quantidades, valores unitários, total, status e pagamento usando o plano de pedido existente; não mistura campos de duas compras no Analytics. Itens incompletos bloqueiam a admissão.
+- A campanha usa exclusivamente `pedido_data` (DateTime, fuso America/Belem) para calcular a janela e disparar o evento D+25. A rotina altera apenas `pedido_data` e, quando necessário, `pedido_produtos` (lista CSV usada pelo conteúdo e pela guarda de produtos do fluxo); não altera outros campos de pedidos da Weni. O snapshot completo do pedido continua privado em `logs/recompra_state.json` para deduplicação e auditoria.
+- Não lê, usa como localizador, compara, valida existência nem grava `ultimo_pedido`. O campo é responsabilidade das demais integrações do NexoFlow. O validador oficial FarmaLíder verifica status, pagamento e itens antes da inclusão; itens incompletos bloqueiam a admissão.
 - Produtos com vírgulas mantêm aspas de CSV; não são artificialmente divididos. Produtos não são substituídos por códigos.
 - Não substitui uma compra confirmada mais recente por um pedido antigo. Um pedido recente cancelado ou pendente não apaga a compra confirmada anterior.
-- Quando o último pedido da API não é uma venda, tenta revalidar um ID de compra anterior conhecido pelo estado ou JSON Weni. Só aceita GET oficial com o mesmo cliente. Sem um ID conhecido, não inventa nem afirma ter percorrido todo o histórico de compras da FarmaLíder.
+- Quando o último pedido da API não é uma venda, tenta revalidar um ID de compra anterior **somente do estado privado de recompra**. Nunca consulta o campo Weni `ultimo_pedido`. Só aceita GET oficial com o mesmo cliente. Sem ID conhecido, não inventa histórico de compras.
 - Retira o grupo antes de alterar uma referência que já estava agendada; verifica a remoção, atualiza campos e relê o contato antes da admissão. Nova compra recalcula a janela usando sua data.
 - A atualização Weni convencional também inclui no seu plano auditado uma remoção preventiva quando a referência muda, o pedido deixa de ser venda, há recusa ou o prazo expira. Executa essa remoção antes dos campos; a admissão fica na rotina de recompra revisada.
 - `logs/recompra_state.json` registra por UUID e ID do pedido a compra de referência, intenção pendente e admissão reconhecida. Não registra admissão como mensagem enviada.
@@ -107,6 +107,24 @@ O código upstream explica o mecanismo, mas não prova a versão exata implantad
 Com `delivery_hour=-1`, o horário é o da compra +25 dias. Se entrar no grupo no D+25 depois desse horário, a entrada **não garante envio naquele dia** e o NexoFlow não altera a data para provocar envio atrasado. Se uma fila retomar em D+26, a guarda D25 do fluxo inspecionado termina sem enviar. Remover do grupo cancela eventos não disparados; não garante interromper um fluxo que já começou.
 
 Não há confirmação de entrega do WhatsApp nesta rotina. A proteção local impede reentrada iniciada pelo NexoFlow, mas não impede edições manuais externas do grupo/campo nem duplicações causadas por outros sistemas. Se uma compra nova ocorrer na FarmaLíder enquanto o NexoFlow estiver parado e a Weni ainda guardar a compra antiga, o fluxo atual não faz GET à FarmaLíder antes de enviar. Garantir essa situação exige webhook de compra ou confirmação no fluxo antes do envio; nenhuma dessas alterações de produção foi ativada automaticamente.
+
+## Falhas e diagnóstico seguro (10/10/2026)
+
+Após interrupção do apply, **não repita o snapshot** nem apague `logs/recompra_state.json`, `logs/recompra_audit.jsonl` ou `logs/recompra_state.lock` sem investigar. O log anterior, com apenas `RuntimeError`, não prova se o problema foi Weni, checagem local ou rede FarmaLíder; a resposta HTTP 200 da FarmaLíder não confirma POSTs à Weni.
+
+Para inspecionar **somente os arquivos locais**, sem rede ou gravação:
+
+```text
+.venv\Scripts\python.exe run_recompra.py --diagnose-state
+```
+
+O resultado exibe totais de admissão local, `pending`, eventos da auditoria e as últimas pendências. `pending` significa **intenção de inscrição cujo resultado remoto não pode ser presumido**, não mensagem enviada. A amostra de UUIDs permite conferência manual na Weni; os arquivos privados não devem ser publicados no GitHub. Auditorias anteriores à correção podem não ter `stage` ou `error_type`.
+
+Na falha de 10/10/2026, o primeiro plano de inclusão também tentava alterar `ultimo_pedido` com um JSON de 1.002 caracteres, desnecessário ao agendamento. A causa exata do `RuntimeError` não aparece no log legado; a alteração indevida do JSON é uma hipótese e foi eliminada deste fluxo. Não existe mais compactação nem escrita desse campo. A nova aplicação exige novo dry-run/revisão; o snapshot antigo é incompatível e não deve ser reutilizado.
+
+Em novas falhas, `logs/nexoflow_recompra.log` registra etapa, tipo e origem (arquivo/linha/função) sem corpo da API, CPF ou token; a auditoria anota etapa e tipo. Divergência de guarda ou desaparecimento de contato **antes de tentar o POST de inclusão** agora vira conflito auditado, desfaz o `pending` criado na execução e continua nos demais contatos, exigindo uma nova revisão para aquele contato. Falha ao adicionar no grupo continua bloqueando o reenvio automático: reconcilie a intenção com o estado real da Weni antes de considerar qualquer ação manual.
+
+Somente após reconciliar as pendências, gere um **novo dry-run e nova revisão humana do dia**. O NexoFlow não faz reenvio retroativo nem altera a campanha por conta própria.
 
 ## Testes
 
