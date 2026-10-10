@@ -110,6 +110,8 @@ O Analytics e o NexoFlow Weni possuem responsabilidades separadas. O NexoFlow We
 ```text
 NexoFlow Analytics.exe
 NexoFlow Weni.exe
+NexoFlow Recompra.exe
+NexoFlow Planilha.exe
 NexoFlow Uninstall.exe (opcional)
 desinstalar_nexoflow.cmd / installer\uninstall.ps1
 NexoFlow Terminal.exe
@@ -298,7 +300,7 @@ O JSON é um snapshot verificável e congelado (schema 6). O SHA-256 protege a i
 
 ## Instalação
 
-`NexoFlow Setup.exe` instala em `C:\NexoFlow`, valida o payload por SHA-256, aceita Python 3.11+ x64, oferece o Python 3.14.8 x64 incluído quando necessário, cria `.venv`, preserva dados privados de uma instalação anterior e cria os atalhos **NexoFlow Analytics**, **NexoFlow Weni** e **NexoFlow Terminal**.
+`NexoFlow Setup.exe` instala em `C:\NexoFlow`, valida o payload por SHA-256, aceita Python 3.11+ x64, oferece o Python 3.14.8 x64 incluído quando necessário, cria `.venv`, preserva dados privados de uma instalação anterior e cria os atalhos **NexoFlow Analytics**, **NexoFlow Weni**, **NexoFlow Recompra**, **NexoFlow Planilha** e **NexoFlow Terminal** na Área de Trabalho e no Menu Iniciar.
 
 Consulte `README INSTALACAO.md` para o procedimento detalhado.
 
@@ -364,3 +366,11 @@ Toda mudança relevante deve executar:
 ```
 
 Consulte também `README.md`, `README INSTALACAO.md`, `README WENI.md` e `CHANGELOG.md`.
+
+## Recompra FarmaLíder D+25
+
+`NexoFlow Recompra.exe` inicia `atualizar_recompra.bat`, com diagnóstico, dry-run, revisão humana e aplicação. Grupo sincronizado com a última compra confirmada entre 0 e 25 dias, remoção depois de 25 dias e por recusa. O envio continua somente no D+25 pela campanha Weni. Execute `nexo weni recompra auditoria`, `dry-run` e `aplicar` com revisão, ou `nexo weni recompra atualizar`. Confira [implementação, configuração e limites da recompra](README%20RECOMPRA.md). A rotina não altera marketing_opt_in, não dispara WhatsApp e não modifica a campanha.
+
+## NexoFlow Planilha
+
+`NexoFlow Planilha.exe` abre o menu das cargas por planilha para Weni e Analytics e da pasta `importacoes`. Use `Conversas_Delivery.xlsx` e `Contatos_Delivery.xlsx`; cada destino exige revisão humana antes da aplicação. Consulte [Delivery e carga por planilhas](README%20DELIVERY.md).

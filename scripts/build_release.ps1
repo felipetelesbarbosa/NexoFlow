@@ -336,6 +336,7 @@ Distribuição oficial do **NexoFlow 1.0**.
 O arquivo `NexoFlow-Setup-$Version.zip` contém o instalador do NexoFlow 1.0 e foi validado automaticamente em Windows para primeira instalação e atualização de uma instalação existente.
 
 Melhorias desta distribuição do NexoFlow 1.0:
+- identificação e documentação padronizadas como NexoFlow 1.0, com os componentes Planilha e Recompra nos índices e instruções de assinatura e desinstalação alinhadas ao Setup;
 - recompra processa contatos durante a paginação, consulta a FarmaLíder com até quatro workers e cache limitado por execução, reduzindo leituras e gravações redundantes sem alterar a validação de identidade;
 - revisão de recompra expirada na virada do dia gera um novo dry-run uma vez no launcher e exige nova confirmação; se a aplicação já iniciou, interrompe e preserva o estado;
 - POSTs da recompra usam tentativa única para evitar repetição de inclusões com resposta incerta; GETs mantêm retentativas e o controle persistente continua protegendo os contatos;

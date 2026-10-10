@@ -681,6 +681,8 @@ Após atualizar ou reinstalar, essa sequência gera um novo dry-run com o de-par
 ## Documentação
 
 - [NexoFlow Weni](README%20WENI.md)
+- [NexoFlow Recompra](README%20RECOMPRA.md)
+- [NexoFlow Planilha](README%20DELIVERY.md)
 - [Reconciliação dos atendimentos Delivery com tags de pedido](README%20DELIVERY.md)
 - [NexoFlow Terminal](README%20TERMINAL.md) — arquivo `README TERMINAL.md`
 - [Instalação](README%20INSTALACAO.md)
@@ -692,6 +694,8 @@ Após atualizar ou reinstalar, essa sequência gera um novo dry-run com o de-par
 - [Proxy e rede](README%20PROXY.md)
 - [VS Code](README%20VSCODE.md)
 - [Antivírus e confiança](docs/ANTIVIRUS%20E%20CONFIANCA.md)
+- [Histórico de mudanças](CHANGELOG.md)
+- [Processo de mudanças](PROCESSO%20DE%20MUDANCAS.md)
 
 ## NexoFlow 1.0
 

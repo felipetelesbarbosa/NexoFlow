@@ -19,23 +19,27 @@ Arquivos que devem ser assinados:
 NexoFlow Setup.exe
 NexoFlow Analytics.exe
 NexoFlow Weni.exe
+NexoFlow Planilha.exe
+NexoFlow Recompra.exe
 NexoFlow Terminal.exe
+NexoFlow Uninstall.exe (quando distribuído)
 installer/install.ps1
 installer/uninstall.ps1
 ```
 
 Os executáveis e scripts PowerShell podem receber assinatura Authenticode. Use SHA-256 e timestamp confiável para manter a assinatura verificável após o vencimento do certificado.
 
-## Script preparado
+## Procedimento de assinatura
 
-O pacote do NexoFlow 1.0 contém `Assinar Release.ps1`. O script:
+O pacote do NexoFlow 1.0 contém `Assinar Release.ps1`, que apenas informa que a assinatura Authenticode não é automatizada. Ele não procura certificados, assina arquivos nem recalcula hashes. A distribuição atual não recebe assinatura automaticamente.
 
-1. localiza o certificado pelo thumbprint;
-2. assina os executáveis do payload;
-3. assina os scripts PowerShell;
-4. recalcula o manifesto SHA-256 do payload;
-5. assina `NexoFlow Setup.exe` por último;
-6. valida o status Authenticode dos arquivos assinados.
+Quando houver certificado corporativo confiável, a equipe responsável deve:
+
+1. assinar os executáveis e scripts PowerShell do payload e do projeto completo;
+2. validar o status Authenticode dos arquivos assinados;
+3. recalcular `payload manifest.json` depois de assinar os arquivos do payload;
+4. assinar `NexoFlow Setup.exe` e os scripts externos do Setup;
+5. recalcular `checksums SHA256.txt`, gerar os dois ZIPs e atualizar `SHA256SUMS-1.0.txt`.
 
 Nenhuma chave privada ou certificado é incluído no projeto.
 

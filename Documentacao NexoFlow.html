@@ -462,6 +462,8 @@ modo enxuto, suprimindo somente ruído esperado dos testes.</li>
 <h2 id="executáveis-windows">Executáveis Windows</h2>
 <pre class="text"><code>NexoFlow Analytics.exe
 NexoFlow Weni.exe
+NexoFlow Recompra.exe
+NexoFlow Planilha.exe
 NexoFlow Uninstall.exe (opcional)
 desinstalar_nexoflow.cmd / installer\uninstall.ps1
 NexoFlow Terminal.exe</code></pre>
@@ -711,8 +713,9 @@ mudanças posteriores sejam elegíveis para a próxima incremental.</p>
 valida o payload por SHA-256, aceita Python 3.11+ x64, oferece o Python
 3.14.8 x64 incluído quando necessário, cria <code>.venv</code>, preserva
 dados privados de uma instalação anterior e cria os atalhos
-<strong>NexoFlow Analytics</strong>, <strong>NexoFlow Weni</strong> e
-<strong>NexoFlow Terminal</strong>.</p>
+<strong>NexoFlow Analytics</strong>, <strong>NexoFlow Weni</strong>,
+<strong>NexoFlow Recompra</strong>, <strong>NexoFlow Planilha</strong> e
+<strong>NexoFlow Terminal</strong> na Área de Trabalho e no Menu Iniciar.</p>
 <p>Consulte <code>README INSTALACAO.md</code> para o procedimento
 detalhado.</p>
 <h2 id="desinstalação-resiliente">Desinstalação resiliente</h2>
@@ -777,5 +780,23 @@ senhas do proxy</code></pre>
 <p>Consulte também <code>README.md</code>,
 <code>README INSTALACAO.md</code>, <code>README WENI.md</code> e
 <code>CHANGELOG.md</code>.</p>
+<h2 id="recompra-farmalíder-d25">Recompra FarmaLíder D+25</h2>
+<p><code>NexoFlow Recompra.exe</code> inicia
+<code>atualizar_recompra.bat</code>, com diagnóstico, dry-run, revisão
+humana e aplicação. Grupo sincronizado com a última compra confirmada
+entre 0 e 25 dias, remoção depois de 25 dias e por recusa. O envio
+continua somente no D+25 pela campanha Weni. Execute
+<code>nexo weni recompra auditoria</code>, <code>dry-run</code> e
+<code>aplicar</code> com revisão, ou
+<code>nexo weni recompra atualizar</code>. Confira
+<a href="README%20RECOMPRA.md">implementação, configuração e limites
+da recompra</a>. A rotina não altera marketing_opt_in, não dispara
+WhatsApp e não modifica a campanha.</p>
+<h2 id="nexoflow-planilha">NexoFlow Planilha</h2>
+<p><code>NexoFlow Planilha.exe</code> abre o menu das cargas por planilha
+para Weni e Analytics e da pasta <code>importacoes</code>. Use
+<code>Conversas_Delivery.xlsx</code> e <code>Contatos_Delivery.xlsx</code>;
+cada destino exige revisão humana antes da aplicação. Consulte
+<a href="README%20DELIVERY.md">Delivery e carga por planilhas</a>.</p>
 </body>
 </html>

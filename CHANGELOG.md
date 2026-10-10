@@ -2,6 +2,9 @@
 
 ## NexoFlow 1.0
 
+- Identificação e documentação padronizadas como NexoFlow 1.0, com listas dos executáveis Planilha e Recompra, índices de operação e instruções de assinatura e desinstalação alinhadas à distribuição atual. Atualizações seguem na main, com commits NexoFlow 1.0 e release v1.0 de nomes estáveis.
+- Publicação automática bloqueada fora da main ou quando a mensagem do commit não corresponde exatamente a NexoFlow 1.0.
+
 - Recompra identifica revisão expirada antes das gravações, renova o dry-run uma vez no launcher e exige confirmação do novo relatório. A data é conferida também durante a aplicação; operações já iniciadas preservam o estado e interrompem sem renovação automática.
 - POSTs da recompra usam tentativa única, preservando intenção pendente após resultado incerto; GETs mantêm as retentativas existentes. Relatório gerado durante a virada do dia exige novo cálculo.
 

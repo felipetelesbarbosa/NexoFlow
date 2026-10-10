@@ -30,6 +30,19 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Conferir padrão da publicação
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF -cne "refs/heads/main") {
+            throw "A publicação do NexoFlow 1.0 deve partir da main."
+          }
+          $commitMessage = (& git log -1 --format=%B | Out-String).TrimEnd([char[]]"`r`n")
+          if ($LASTEXITCODE -ne 0) { throw "Não foi possível conferir a mensagem do commit." }
+          if ($commitMessage -cne "NexoFlow 1.0") {
+            throw "Use exatamente NexoFlow 1.0 como mensagem de commit antes de publicar."
+          }
+
       - name: Python para testes
         uses: actions/setup-python@v5
         with:

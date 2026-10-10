@@ -1,4 +1,4 @@
-# NexoFlow
+# NexoFlow 1.0 — Documentação
 
 ## Consulta de CPFs válidos e inválidos
 
@@ -110,6 +110,9 @@ O Analytics e o NexoFlow Weni possuem responsabilidades separadas. O NexoFlow We
 ```text
 NexoFlow Analytics.exe
 NexoFlow Weni.exe
+NexoFlow Recompra.exe
+NexoFlow Planilha.exe
+NexoFlow Uninstall.exe (opcional)
 desinstalar_nexoflow.cmd / installer\uninstall.ps1
 NexoFlow Terminal.exe
 ```
@@ -250,7 +253,7 @@ O `NexoFlow Setup.exe` não encerra mais silenciosamente quando a etapa PowerShe
 A interface Windows usa os nomes **NexoFlow Weni** e **NexoFlow Terminal**. O Terminal é distribuído como `NexoFlow Terminal.exe`, inicia diretamente `run_terminal.py` com o Python da `.venv` quando disponível e incorpora `assets\NexoFlow_Terminal.ico`. Os atalhos de Área de Trabalho e Menu Iniciar usam o mesmo ícone. Durante atualização, o Setup remove atalhos com os nomes anteriores e solicita ao Explorer a releitura dos ícones.
 
 ### Hardening de distribuição e NexoFlow Terminal
-Os launchers Windows deixam de usar `system()` e iniciam processos filhos por API nativa do Windows através de `CreateProcessW`. Os PE também passam a conter informações de versão/produto. O registro de desinstalação chama diretamente o EXE, o Stage2 não é ocultado e o desinstalador restringe o encerramento de processos externos a Python/PythonW que referenciem explicitamente arquivos do NexoFlow.
+Os launchers Windows deixam de usar `system()` e iniciam processos filhos por API nativa do Windows através de `CreateProcessW`. Os PE também passam a conter informações de versão/produto. O `NexoFlow Uninstall.exe` é distribuído como launcher nativo opcional, enquanto o registro de desinstalação do Windows continua apontando diretamente para `installer\uninstall.ps1`. Assim, a remoção segue funcional mesmo se um antivírus/EDR bloquear o EXE opcional. O Stage2 não é ocultado e o desinstalador restringe o encerramento de processos externos a Python/PythonW que referenciem explicitamente arquivos do NexoFlow.
 
 `NexoFlow Terminal.exe` abre uma PowerShell em `C:\NexoFlow` com a `.venv` priorizada. A mesma lógica de `proxy_config.py` é executada antes do terminal e a configuração de proxy é herdada apenas por aquela sessão. A senha não é exibida. Tokens Weni/FarmaLíder e credenciais Google continuam nos arquivos locais e não são exportados para o ambiente.
 
@@ -297,12 +300,14 @@ O JSON é um snapshot verificável e congelado (schema 6). O SHA-256 protege a i
 
 ## Instalação
 
-`NexoFlow Setup.exe` instala em `C:\NexoFlow`, valida o payload por SHA-256, aceita Python 3.11+ x64, oferece o Python 3.14.8 x64 incluído quando necessário, cria `.venv`, preserva dados privados de uma instalação anterior e cria os atalhos **NexoFlow Analytics**, **NexoFlow Weni** e **NexoFlow Terminal**.
+`NexoFlow Setup.exe` instala em `C:\NexoFlow`, valida o payload por SHA-256, aceita Python 3.11+ x64, oferece o Python 3.14.8 x64 incluído quando necessário, cria `.venv`, preserva dados privados de uma instalação anterior e cria os atalhos **NexoFlow Analytics**, **NexoFlow Weni**, **NexoFlow Recompra**, **NexoFlow Planilha** e **NexoFlow Terminal** na Área de Trabalho e no Menu Iniciar.
 
 Consulte `README INSTALACAO.md` para o procedimento detalhado.
 
 ## Desinstalação resiliente
-O `desinstalar_nexoflow.cmd / installer\uninstall.ps1` remove Analytics, NexoFlow Weni, NexoFlow Terminal, BATs, módulos, atalhos, registro do aplicativo e os demais componentes instalados.
+O `NexoFlow Uninstall.exe`, quando disponível, apenas inicia o mesmo fluxo de `installer\uninstall.ps1`. O `desinstalar_nexoflow.cmd / installer\uninstall.ps1` permanece o mecanismo independente de remoção de Analytics, NexoFlow Weni, NexoFlow Terminal, BATs, módulos, atalhos, registro do aplicativo e demais componentes instalados.
+
+A presença do `NexoFlow Uninstall.exe` **não é requisito do Setup nem do check-up**. O Setup tenta copiá-lo e apenas avisa quando um antivírus/EDR corporativo bloqueia ou remove o arquivo.
 
 Para impedir que o próprio desinstalador mantenha `C:\NexoFlow` bloqueado, a remoção final funciona em duas etapas:
 
@@ -365,4 +370,8 @@ Consulte também `README.md`, `README INSTALACAO.md`, `README WENI.md` e `CHANGE
 
 ## Recompra FarmaLíder D+25
 
-Grupo sincronizado com a última compra confirmada entre 0 e 25 dias, remoção depois de 25 dias e por recusa. O envio continua somente no D+25 pela campanha Weni. Execute `nexo weni recompra auditoria`, `dry-run` e `aplicar` com revisão, ou `nexo weni recompra atualizar`. Confira [implementação, configuração e limites da recompra](../README%20RECOMPRA.md). A rotina não altera marketing_opt_in, não dispara WhatsApp e não modifica a campanha.
+`NexoFlow Recompra.exe` inicia `atualizar_recompra.bat`, com diagnóstico, dry-run, revisão humana e aplicação. Grupo sincronizado com a última compra confirmada entre 0 e 25 dias, remoção depois de 25 dias e por recusa. O envio continua somente no D+25 pela campanha Weni. Execute `nexo weni recompra auditoria`, `dry-run` e `aplicar` com revisão, ou `nexo weni recompra atualizar`. Confira [implementação, configuração e limites da recompra](../README%20RECOMPRA.md). A rotina não altera marketing_opt_in, não dispara WhatsApp e não modifica a campanha.
+
+## NexoFlow Planilha
+
+`NexoFlow Planilha.exe` abre o menu das cargas por planilha para Weni e Analytics e da pasta `importacoes`. Use `Conversas_Delivery.xlsx` e `Contatos_Delivery.xlsx`; cada destino exige revisão humana antes da aplicação. Consulte [Delivery e carga por planilhas](../README%20DELIVERY.md).
