@@ -5,7 +5,7 @@ from collections import Counter, OrderedDict
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import contextmanager
 from copy import deepcopy
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from itertools import groupby, islice
 import json
@@ -36,6 +36,9 @@ GUARD_FIELDS = FIELDS | {"pedido_id", "cpf", "nome", "email", "marketing_opt_in"
 STATE = Path("logs/recompra_state.json")
 REVIEW = Path("logs/recompra_review.json")
 AUDIT = Path("logs/recompra_audit.jsonl")
+# Limite conservador usado por implantações RapidPro para campos de texto.
+# Confirmar o valor efetivo com a Weni; nunca gravar JSON incompleto.
+WENI_SAFE_TEXT_LIMIT = 640
 REVIEW_EXPIRED_EXIT_CODE = 4
 
 
@@ -229,6 +232,29 @@ def field_guard(key, value):
     return text(value)
 
 
+def compact_weni_order_snapshot(snapshot):
+    """Resumo JSON coerente para o campo Weni; original permanece no estado local.
+
+    Não corta nomes/produtos nem faz substring de JSON. Quando o pedido não
+    couber no limite seguro, retorna None para preservar o campo existente.
+    """
+    try:
+        payload = json.loads(snapshot)
+        dt = business_order_datetime(payload.get("data_hora"))
+        products = payload.get("produtos")
+        if not isinstance(payload, dict) or not dt or not isinstance(products, list) or not products:
+            return None
+        reduced = {"pedido_id": str(payload["pedido_id"]),
+                   "data_hora": dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+                   "valor_total_compra": payload["valor_total_compra"],
+                   "produtos": [{key: item[key] for key in ("nome", "quantidade", "valor_unitario", "valor_total")}
+                                for item in products]}
+        encoded = json.dumps(reduced, ensure_ascii=False, separators=(",", ":"))
+        return encoded if len(encoded) <= WENI_SAFE_TEXT_LIMIT else None
+    except (ValueError, TypeError, KeyError, AttributeError):
+        return None
+
+
 def guard(contact):
     fields = get_fields(contact)
     return {"fields": {key: field_guard(key, fields.get(key)) for key in sorted(GUARD_FIELDS)},
@@ -408,7 +434,8 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
     uid = text(contact.get("uuid"))
     plan = {"contact_uuid": uid, "guard": guard(contact), "fields": {}, "action": "",
             "reason": "SEM_PEDIDO_CONFIRMADO", "order_id": "", "purchase": None,
-            "in_group": in_group, "event_at": "", "due_today": False, "within_window": False, "scheduled_future": False}
+            "in_group": in_group, "event_at": "", "due_today": False, "within_window": False, "scheduled_future": False,
+            "warnings": []}
     diagnostic = text((order or {}).get("status_confirmacao"))
     if diagnostic.startswith("CPF_") or diagnostic.startswith("ERRO_"): plan["reason"] = diagnostic
     dt = business_order_datetime((order or {}).get("data_hora"))
@@ -442,8 +469,17 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
             plan["order_id"] = order_id
             plan["purchase"] = {"pedido_id": order_id, "data_hora": dt.isoformat(),
                                 "snapshot": serialize_pedido_products(order, items)}
+            complete_order_json = serialize_pedido_products(order, items)
+            reduced_order_json = compact_weni_order_snapshot(complete_order_json)
             proposal = {**{k: v for k, v in purchase_plan.fields.items() if k in FIELDS}, "pedido_data": dt.isoformat(),
-                        "pedido_produtos": serialize_weni_order_list(names), "ultimo_pedido": serialize_pedido_products(order, items)}
+                        "pedido_produtos": serialize_weni_order_list(names)}
+            if reduced_order_json is not None:
+                proposal["ultimo_pedido"] = reduced_order_json
+            else:
+                # O JSON completo continua disponível em state.purchase.snapshot.
+                # Não corromper o campo Weni com dados cortados na API.
+                proposal.pop("ultimo_pedido", None)
+                plan["warnings"].append("ULTIMO_PEDIDO_JSON_NAO_CABE_EM_CAMPO_WENI")
             for key, value in proposal.items():
                 same = business_order_datetime(fields.get(key)) == dt if key == "pedido_data" else field_guard(key, fields.get(key)) == field_guard(key, value)
                 if not same: plan["fields"][key] = value
@@ -500,8 +536,10 @@ def write_review(review, path=REVIEW):
              "Política: grupo entre 0 e 25 dias; envio somente D+25, bloqueando recusas; marketing_opt_in não será alterado.",
              "Sem disparos, sem alterações de campanha. Horário já passado não cria envio retroativo.",
              "Pendências: " + "; ".join(review["structure"]["errors"]), f"Resultados: {dict(counts)}"]
+    skipped_json = sum("ULTIMO_PEDIDO_JSON_NAO_CABE_EM_CAMPO_WENI" in p.get("warnings", []) for p in review["plans"])
+    lines.append(f"JSON completo de ultimo_pedido preservado apenas no estado local quando excede o campo Weni: {skipped_json} contato(s).")
     for plan in review["plans"]:
-        lines.append(f"Contato {plan['contact_uuid']} | pedido {plan['order_id']} | {plan['reason']} | grupo={plan['action'] or 'sem mudança'} | evento={plan['event_at']} | horário futuro={plan['scheduled_future']}")
+        lines.append(f"Contato {plan['contact_uuid']} | pedido {plan['order_id']} | {plan['reason']} | grupo={plan['action'] or 'sem mudança'} | evento={plan['event_at']} | horário futuro={plan['scheduled_future']} | avisos={plan.get('warnings', [])}")
         lines.extend(f"  {key}: {text(plan['guard']['fields'].get(key))} -> {value}" for key, value in plan["fields"].items())
     path.with_suffix(".txt").write_text("\n".join(lines)+"\n", encoding="utf-8-sig")
 
@@ -611,7 +649,7 @@ def apply_review(review, weni, farm, *, state_path=STATE, now_fn=now_local, audi
             check_day()
             fresh = propose(current, order, items, structure, saved, now=now_fn())
             check_day()
-            if any(fresh[key] != reviewed[key] for key in ("fields", "action", "order_id", "reason", "purchase", "event_at", "due_today", "within_window")):
+            if any(fresh[key] != reviewed[key] for key in ("fields", "action", "order_id", "reason", "purchase", "event_at", "due_today", "within_window")) or fresh.get("warnings", []) != reviewed.get("warnings", []):
                 summary["conflitos"] += 1; append_audit({"contact_uuid": uid, "status": "CONFLITO_PEDIDO_OU_DIA"}, audit_path); continue
             action = fresh["action"]
             if not plan_needs_apply(fresh, saved):
