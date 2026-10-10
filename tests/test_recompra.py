@@ -368,3 +368,48 @@ class RecompraRuntimeDiagnosticsTests(unittest.TestCase):
         self.assertEqual(result["ultimas_pendencias_auditoria"][0]["contact_uuid"], "u1")
         self.assertEqual(self.state_path.read_bytes(), before_state)
         self.assertEqual(self.audit_path.read_bytes(), before_audit)
+
+
+    def test_compact_order_json_stays_under_safe_field_limit(self):
+        from recompra import WENI_SAFE_TEXT_LIMIT
+        contact, order, items = fixture(24)
+        items *= 3
+        plan = propose(contact, order, items, STRUCTURE, now=NOW)
+        serialized = plan["fields"]["ultimo_pedido"]
+        self.assertLessEqual(len(serialized), WENI_SAFE_TEXT_LIMIT)
+        compact = json.loads(serialized)
+        complete = json.loads(plan["purchase"]["snapshot"])
+        self.assertEqual(compact["pedido_id"], complete["pedido_id"])
+        self.assertEqual(compact["valor_total_compra"], complete["valor_total_compra"])
+        self.assertEqual(len(compact["produtos"]), len(complete["produtos"]))
+        self.assertEqual(set(compact["produtos"][0]), {"nome", "quantidade", "valor_unitario", "valor_total"})
+        self.assertTrue(compact["data_hora"].endswith("Z"))
+
+    def test_oversize_order_keeps_full_state_and_allows_group_add_without_truncation(self):
+        from recompra import WENI_SAFE_TEXT_LIMIT
+        contact, order, items = fixture(24)
+        items = [{**items[0], "produto_nome": f"Produto longo sintético {number} " + "Y"*60} for number in range(15)]
+        state = load_state(self.state_path)
+        plan = propose(contact, order, items, STRUCTURE, now=NOW)
+        self.assertEqual(plan["action"], "add")
+        self.assertNotIn("ultimo_pedido", plan["fields"])
+        self.assertIn("ULTIMO_PEDIDO_JSON_NAO_CABE_EM_CAMPO_WENI", plan["warnings"])
+        self.assertGreater(len(plan["purchase"]["snapshot"]), WENI_SAFE_TEXT_LIMIT)
+        self.assertEqual(len(json.loads(plan["purchase"]["snapshot"])["produtos"]), 15)
+        review = make_review([plan], STRUCTURE, now=NOW, state=state)
+        current = deepcopy(contact)
+        client = Mock()
+        client.get_contact.side_effect = lambda **kwargs: deepcopy(current)
+        client.update_contact_fields.side_effect = lambda uid, fields: current["fields"].update(fields)
+        client.contact_group_action.side_effect = lambda uid, *, action, group: current["groups"].append({"uuid": group, "name": GROUP})
+        with patch("recompra.inspect_structure", return_value=STRUCTURE), patch(
+            "recompra.resolve_latest", return_value=(order, items)
+        ):
+            outcome = apply_review(
+                review, client, Mock(), state_path=self.state_path,
+                audit_path=self.audit_path, now_fn=lambda: NOW
+            )
+        self.assertEqual(outcome["aplicados"], 1)
+        self.assertEqual(client.contact_group_action.call_count, 1)
+        self.assertNotIn("ultimo_pedido", client.update_contact_fields.call_args.args[1])
+        self.assertTrue(load_state(self.state_path)["contacts"]["u1"]["orders"]["100"]["admitted"])
