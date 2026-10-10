@@ -115,7 +115,7 @@ Após interrupção do apply, **não repita o snapshot** nem apague `logs/recomp
 Para inspecionar **somente os arquivos locais**, sem rede ou gravação:
 
 ```text
-.venv\\Scripts\\python.exe run_recompra.py --diagnose-state
+.venv\Scripts\python.exe run_recompra.py --diagnose-state
 ```
 
 O resultado exibe totais de admissão local, `pending`, eventos da auditoria e as últimas pendências. `pending` significa **intenção de inscrição cujo resultado remoto não pode ser presumido**, não mensagem enviada. A amostra de UUIDs permite conferência manual na Weni; os arquivos privados não devem ser publicados no GitHub. Auditorias anteriores à correção podem não ter `stage` ou `error_type`.
