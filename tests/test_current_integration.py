@@ -799,6 +799,7 @@ class CurrentIntegrationTests(unittest.TestCase):
         for name in (
             "NexoFlow Analytics.exe",
             "NexoFlow Weni.exe",
+            "NexoFlow Recompra.exe",
             "NexoFlow Terminal.exe",
             "installer\\uninstall.ps1",
             "desinstalar_nexoflow.cmd",
@@ -807,7 +808,7 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn("function Install-OptionalUninstaller", install)
         self.assertIn("NexoFlow Uninstall.exe", install)
         self.assertIn("A instalação continuará normalmente", install)
-        required_line = "foreach ($requiredFile in @('NexoFlow Analytics.exe','NexoFlow Weni.exe','NexoFlow Terminal.exe','NexoFlow Planilha.exe','executar_planilha.bat','assets\\NexoFlow_Planilha.ico','installer\\uninstall.ps1','desinstalar_nexoflow.cmd','scripts\\confirmar_revisao_weni.ps1','scripts\\resultado_carga_weni.ps1'))"
+        required_line = "foreach ($requiredFile in @('NexoFlow Analytics.exe','NexoFlow Weni.exe','NexoFlow Recompra.exe','NexoFlow Terminal.exe','NexoFlow Planilha.exe','executar_planilha.bat','assets\\NexoFlow_Planilha.ico','installer\\uninstall.ps1','desinstalar_nexoflow.cmd','scripts\\confirmar_revisao_weni.ps1','scripts\\resultado_carga_weni.ps1'))"
         self.assertIn(required_line, install)
         self.assertNotIn("'NexoFlow Uninstall.exe')) {\n        Ensure-InstalledPayloadFile", install)
         self.assertIn("Verifique antivírus/EDR e tente novamente", install)
@@ -963,7 +964,7 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn("SHChangeNotify", install)
         self.assertIn("-ClearIconCache", install)
         self.assertIn("-show", install)
-        self.assertIn("Refresh-NexoFlowIconCache -Executables @($appExe, $updateExe, $terminalExe, $planilhaExe, $uninstallExe)", install)
+        self.assertIn("Refresh-NexoFlowIconCache -Executables @($appExe, $updateExe, $recompraExe, $terminalExe, $planilhaExe, $uninstallExe)", install)
 
     def test_update_weni_safe_batch_has_mandatory_audit_before_apply(self) -> None:
         root = Path(__file__).resolve().parents[1]

@@ -158,6 +158,7 @@ New-Item -ItemType Directory -Force -Path $LauncherDir | Out-Null
 $launcherTargets = @(
     @{ Name = "NexoFlow Analytics.exe"; Tag = "analytics"; Description = "NexoFlow Analytics — análise de dados" },
     @{ Name = "NexoFlow Weni.exe"; Tag = "updateweni"; Description = "NexoFlow Weni — atualização de contatos" },
+    @{ Name = "NexoFlow Recompra.exe"; Tag = "recompra"; Description = "NexoFlow Recompra — grupo FarmaLíder D+25" },
     @{ Name = "NexoFlow Planilha.exe"; Tag = "planilha"; Description = "NexoFlow Planilha — cargas por planilhas" },
     @{ Name = "NexoFlow Terminal.exe"; Tag = "terminal"; Description = "NexoFlow Terminal — consultas e diagnóstico" },
     @{ Name = "NexoFlow Uninstall.exe"; Tag = "uninstall"; Description = "NexoFlow — desinstalação" }
@@ -197,6 +198,7 @@ foreach ($folder in @($ProjectRoot, $PayloadDir)) {
 $launcherIcons = @(
     @{ Executable = "NexoFlow Analytics.exe"; Icon = "NexoFlow.ico" },
     @{ Executable = "NexoFlow Weni.exe"; Icon = "NexoFlow_Weni.ico" },
+    @{ Executable = "NexoFlow Recompra.exe"; Icon = "NexoFlow_Weni.ico" },
     @{ Executable = "NexoFlow Planilha.exe"; Icon = "NexoFlow_Planilha.ico" },
     @{ Executable = "NexoFlow Terminal.exe"; Icon = "NexoFlow_Terminal.ico" },
     @{ Executable = "NexoFlow Uninstall.exe"; Icon = "uninstaller.ico" }
@@ -308,6 +310,8 @@ foreach ($item in @(
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/NexoFlow Setup.exe"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/payload manifest.json"
+Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/NexoFlow Recompra.exe"
+Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/NexoFlow Recompra.exe"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/weni_update.py"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/analytics.py"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/confirmar_revisao_weni.ps1"
