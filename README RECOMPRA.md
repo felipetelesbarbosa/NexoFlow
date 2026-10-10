@@ -59,6 +59,20 @@ Para usar apenas uma consulta por vez no dry-run, execute `nexo weni recompra dr
 
 A instalação precisa conter o executável novo; baixar o Setup atualizado da versão que inclua esta correção. A validação automatizada cobre a lógica de inclusão com transporte Weni sintético, o executável Windows compilado chamando o BAT e o código de retorno. **Não comprova inclusão em produção** sem teste controlado de um contato real, previamente revisado e autorizado.
 
+## Teste controlado com um contato autorizado na Weni de produção
+
+A validação automatizada **não altera produção**. Depois de instalar o release aprovado e reconciliar a pendência anterior, escolha **um contato de teste autorizado**, com compra realmente confirmada há 0–24 dias, `marketing_opt_in` não recusado e sem grupo Opt-Out. Não use um contato real de cliente sem autorização. A execução abaixo faz GETs reais e pode produzir POST; o grupo Weni tem evento de campanha, portanto teste fora do D+25 e com supervisão da equipe.
+
+```powershell
+cd C:\\NexoFlow
+.\\.venv\\Scripts\\python.exe run_recompra.py --dry-run --contact UUID_DO_CONTATO_DE_TESTE --review-out logs/recompra_canario.json
+.\\.venv\\Scripts\\python.exe run_recompra.py --check-review --require-review logs/recompra_canario.json
+# Somente depois de revisar o relatório e aprovar conscientemente a inclusão:
+.\\.venv\\Scripts\\python.exe run_recompra.py --apply --require-review logs/recompra_canario.json
+```
+
+Confirme que o resultado mostra `aplicados: 1`, o registro de auditoria desse contato possui `group_confirmed: true` e o contato aparece no grupo **Recompra FarmaLíder** na interface da Weni. Se faltar qualquer confirmação, **não repetir o POST** e verificar o `pending`. Este teste unitário/supervisionado não remove nem reseta entradas históricas sem investigação.
+
 ## Comandos
 
 No NexoFlow Terminal:
