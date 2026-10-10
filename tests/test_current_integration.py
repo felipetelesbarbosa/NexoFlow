@@ -964,7 +964,7 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn("SHChangeNotify", install)
         self.assertIn("-ClearIconCache", install)
         self.assertIn("-show", install)
-        self.assertIn("Refresh-NexoFlowIconCache -Executables @($appExe, $updateExe, $terminalExe, $planilhaExe, $uninstallExe)", install)
+        self.assertIn("Refresh-NexoFlowIconCache -Executables @($appExe, $updateExe, $recompraExe, $terminalExe, $planilhaExe, $uninstallExe)", install)
 
     def test_update_weni_safe_batch_has_mandatory_audit_before_apply(self) -> None:
         root = Path(__file__).resolve().parents[1]
