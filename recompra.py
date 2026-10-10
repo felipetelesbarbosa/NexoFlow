@@ -15,14 +15,16 @@ from pathlib import Path
 import tempfile
 import traceback
 from threading import Lock
-from time import monotonic
+from time import monotonic, sleep
 import unicodedata
 from zoneinfo import ZoneInfo
 
 from analytics import get_fields, normalize_value, cpf_query_priority, _sales_order_is_valid
 from config import FARMALIDER_MAX_WORKERS
 from farmalider_integration import resolve_contact_order, select_cliente_response, weni_customer_identity
-from pedido_utils import business_order_datetime, serialize_pedido_products, serialize_weni_order_list
+from pedido_utils import (business_order_datetime, serialize_pedido_products,
+                          serialize_weni_order_list, normalize_farmalider_order_status_code,
+                          normalize_farmalider_payment_code, is_order_cancelled)
 
 GROUP = "Recompra FarmaLíder"
 OPT_OUT = "Opt-Out Marketing"
@@ -212,6 +214,29 @@ def refused(contact):
         "recusado", "nao", "negado", "inativo", "recusa", "opt-out", "opt out",
         "false", "0", "cancelado", "nao autorizado", "nao quero receber",
     }
+
+
+def cancelled_order_reason(order, contact=None):
+    """Regra negativa de recompra: nunca admitir pedido cancelado.
+
+    Aplica-se ao pedido oficial e aos campos Weni do contato. Não interpreta
+    campos ausentes como status autorizado: a validação positiva ocorre depois.
+    """
+    if isinstance(order, dict):
+        if normalize_farmalider_order_status_code(order.get("farmalider_status_pedido", order.get("pedido_status"))) == "3":
+            return "PEDIDO_STATUS_3_CANCELADO"
+        if normalize_farmalider_payment_code(order.get("farmalider_forma_pagamento", order.get("pedido_forma_pagamento"))) == "0":
+            return "PAGAMENTO_0_CANCELADO"
+        if is_order_cancelled(order):
+            return "PEDIDO_CANCELADO"
+    if contact is not None:
+        fields = get_fields(contact)
+        if normalize_farmalider_order_status_code(fields.get("pedido_status")) == "3":
+            return "PEDIDO_STATUS_3_CANCELADO_WENI"
+        payment = fields.get("pedido_forma_pagamento")
+        if normalize_farmalider_payment_code(payment) == "0" or norm(payment) == "cancelado":
+            return "PAGAMENTO_0_CANCELADO_WENI"
+    return ""
 
 
 def member(contact, group_uuid, group_name):
@@ -409,6 +434,14 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
             "warnings": []}
     diagnostic = text((order or {}).get("status_confirmacao"))
     if diagnostic.startswith("CPF_") or diagnostic.startswith("ERRO_"): plan["reason"] = diagnostic
+    # A recusa e o cancelamento prevalecem até sobre pedidos que a API
+    # rotulou como confirmados. Não atualizamos campos desse contato.
+    blocked = "RECUSA_MARKETING" if (refused(contact) or member(contact, structure["opt_out_uuid"], OPT_OUT)) else cancelled_order_reason(order, contact)
+    if blocked:
+        plan["reason"] = blocked
+        if in_group:
+            plan["action"] = "remove"
+        return plan
     dt = business_order_datetime((order or {}).get("data_hora"))
     names = [text(item.get("produto_nome")) for item in items]
     valid = bool(order and _sales_order_is_valid(order) and order.get("status_validacao") == "OK"
@@ -455,9 +488,7 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
             plan["within_window"] = 0 <= age_days <= 25
             plan["scheduled_future"] = event_at > now
             plan["reason"] = "JANELA_0_A_25" if plan["within_window"] else "MAIS_DE_25_DIAS"
-    opted_out = refused(contact) or member(contact, structure["opt_out_uuid"], OPT_OUT)
-    if opted_out: plan["reason"] = "RECUSA_MARKETING"
-    eligible = valid and plan["within_window"] and not opted_out
+    eligible = valid and plan["within_window"]
     entry = (saved.get("orders") or {}).get(plan["order_id"], {})
     same_reference = not plan["fields"].get("pedido_data")
     if in_group:
@@ -656,13 +687,15 @@ def apply_review(review, weni, farm, *, state_path=STATE, now_fn=now_local, audi
                     actual = guard(latest)
                     actual["groups"] = [g for g in actual["groups"] if g not in {structure["group_uuid"], GROUP}]
                     expected["groups"] = [g for g in expected["groups"] if g not in {structure["group_uuid"], GROUP}]
-                    if actual != expected or refused(latest) or member(latest, structure["opt_out_uuid"], OPT_OUT):
+                    if actual != expected or refused(latest) or member(latest, structure["opt_out_uuid"], OPT_OUT) or cancelled_order_reason(order, latest):
                         # Diagnóstico por NOMES de campos: nunca expor conteúdo, CPF, URNs ou token.
                         field_diffs = sorted(k for k in expected["fields"]
                                              if actual["fields"].get(k) != expected["fields"].get(k))
                         other_diffs = [k for k in ("name", "urns", "groups") if actual[k] != expected[k]]
                         if refused(latest) or member(latest, structure["opt_out_uuid"], OPT_OUT):
                             other_diffs.append("opt_out_marketing")
+                        if cancelled_order_reason(order, latest):
+                            other_diffs.append("pedido_ou_pagamento_cancelado")
                         raise PreAdmissionConflict("Guarda divergiu antes da inclusão: campos=" +
                                                    ",".join(field_diffs) + "; demais=" + ",".join(other_diffs))
                     if not 0 <= (now_fn().astimezone(TZ).date() - business_order_datetime(fresh["purchase"]["data_hora"]).date()).days <= 25:
@@ -672,6 +705,21 @@ def apply_review(review, weni, farm, *, state_path=STATE, now_fn=now_local, audi
                     writes_started = True
                     stage = "adicionar_grupo"
                     weni.contact_group_action(uid, action="add", group=structure["group_uuid"])
+                    # Resposta HTTP/POST não comprova adesão. Somente a
+                    # releitura da Weni confirma a inclusão; nunca repetir POST.
+                    stage = "confirmar_inclusao_no_grupo"
+                    verified = None
+                    for attempt in range(3):
+                        check_day()
+                        verified = weni.get_contact(uuid=uid)
+                        if verified and member(verified, structure["group_uuid"], GROUP):
+                            break
+                        if attempt < 2:
+                            sleep(0.3)
+                    if not verified or not member(verified, structure["group_uuid"], GROUP):
+                        raise RuntimeError("POST de inclusão sem confirmação de associação na Weni.")
+                    if refused(verified) or member(verified, structure["opt_out_uuid"], OPT_OUT) or cancelled_order_reason(order, verified):
+                        raise RuntimeError("Contato tornou-se inelegível após o POST; inclusão precisa de reconciliação.")
                     entry.update({"pending": False, "admitted": True, "admitted_at": now_fn().isoformat()})
                 if fresh["in_group"] and fresh["order_id"] and action == "":
                     entry.update({"admitted": True, "pending": False})
@@ -681,7 +729,9 @@ def apply_review(review, weni, farm, *, state_path=STATE, now_fn=now_local, audi
                     atomic_json(state_path, state)
                 summary["aplicados"] += 1
                 stage = "registrar_auditoria"
-                append_audit({"contact_uuid": uid, "pedido_id": fresh["order_id"], "status": "APLICADO", "action": action, "at": now_fn().isoformat()}, audit_path)
+                append_audit({"contact_uuid": uid, "pedido_id": fresh["order_id"], "status": "APLICADO",
+                              "action": action, "group_confirmed": action in {"add", "replace"},
+                              "at": now_fn().isoformat()}, audit_path)
             except PreAdmissionConflict as exc:
                 # O POST de admissão NÃO foi tentado. O pending criado nesta
                 # passagem não pode impedir uma nova revisão do mesmo pedido.
