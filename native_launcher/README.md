@@ -26,6 +26,7 @@ Os ícones dos cinco programas são incorporados ao próprio PE como recursos `R
 | `NexoFlow Setup.exe` | `assets/installer.ico` |
 | `NexoFlow Analytics.exe` | `assets/NexoFlow.ico` |
 | `NexoFlow Weni.exe` | `assets/NexoFlow_Weni.ico` |
+| `NexoFlow Recompra.exe` | `assets/NexoFlow_Weni.ico` |
 | `NexoFlow Terminal.exe` | `assets/NexoFlow_Terminal.ico` |
 | `NexoFlow Uninstall.exe` | `assets/uninstaller.ico` |
 
@@ -43,3 +44,7 @@ Os pacotes recompilam os cinco launchers a partir destes fontes. A saída do con
 ## NexoFlow Planilha
 
 O Setup instala **NexoFlow Planilha.exe** com ícone próprio e atalho na Área de Trabalho. O menu permite executar as cargas por planilha para Weni ou Analytics/Google Sheets e abrir `importacoes`. Use `Conversas_Delivery.xlsx` e `Contatos_Delivery.xlsx`; cada carga mantém a revisão humana antes de aplicar.
+
+## Executável Recompra
+
+`NexoFlow Recompra.exe` foi adicionado como lançador dedicado para `atualizar_recompra.bat`. Não altera nem ignora os passos do BAT: check-only, dry-run, revisão humana e confirmação antes do apply. O workflow Windows executa o EXE compilado em uma pasta temporária com BAT sintético e verifica retorno 0 e propagação de falha; a validação de POST/GET para grupo Weni usa API simulada nos testes Python, sem atualizar contatos reais.
