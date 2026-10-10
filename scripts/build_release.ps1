@@ -72,7 +72,7 @@ function Copy-TrackedFiles {
             if (-not $relative) { continue }
             if ($relative -like "releases/*") { continue }
             if ($relative -like ".github/*") { continue }
-            if ($relative -like "scripts/*" -and $relative -ne "scripts/confirmar_revisao_weni.ps1") { continue }
+            if ($relative -like "scripts/*" -and $relative -notin @("scripts/confirmar_revisao_weni.ps1", "scripts/resultado_carga_weni.ps1")) { continue }
 
             $source = Join-Path $RepoRoot $relative
             if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { continue }
@@ -312,6 +312,8 @@ Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/weni_updat
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/analytics.py"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/confirmar_revisao_weni.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/confirmar_revisao_weni.ps1"
+Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/resultado_carga_weni.ps1"
+Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/resultado_carga_weni.ps1"
 
 $setupHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $SetupZip).Hash.ToLowerInvariant()
 $projectHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $ProjectZip).Hash.ToLowerInvariant()
@@ -330,6 +332,9 @@ Distribuição oficial do **NexoFlow 1.0**.
 O arquivo `NexoFlow-Setup-$Version.zip` contém o instalador do NexoFlow 1.0 e foi validado automaticamente em Windows para primeira instalação e atualização de uma instalação existente.
 
 Melhorias desta distribuição do NexoFlow 1.0:
+- recompra processa contatos durante a paginação, consulta a FarmaLíder com até quatro workers e cache limitado por execução, reduzindo leituras e gravações redundantes sem alterar a validação de identidade;
+- revisão de recompra expirada na virada do dia gera um novo dry-run uma vez no launcher e exige nova confirmação; se a aplicação já iniciou, interrompe e preserva o estado;
+- POSTs da recompra usam tentativa única para evitar repetição de inclusões com resposta incerta; GETs mantêm retentativas e o controle persistente continua protegendo os contatos;
 - recompra com grupo de 0 a 25 dias, revisão, controle persistente e proteção de referências; envio D+25 permanece na campanha Weni; confira README RECOMPRA.md antes de habilitar;
 - cidade, estado, CEP, bairro e idade dos clientes da Weni na base e BI_Pedidos; CEP preservado como texto e datas de pedido mantidas;
 - interface e documentação em português brasileiro, com acentos e cedilha; CMD em UTF-8, PowerShell com BOM e executáveis recompilados com metadados pt-BR;

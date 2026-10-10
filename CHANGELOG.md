@@ -8,6 +8,10 @@
 - Recompra processa contatos durante a paginação, consulta FarmaLíder com até quatro workers e cache limitado de payloads brutos por execução. CPFs válidos concluem antes dos inválidos; seleção de identidade permanece por contato.
 - Aplicação da recompra pula planos sem trabalho antes de consultar as APIs, evita gravações locais redundantes e mantém revalidação, revisão e persistência de intenção/confirmação nas inclusões. Logs mostram velocidade e reutilizações de consultas.
 
+- Carga completa por duplo clique mantém a sessão CMD aberta após o resultado; confirmação final independente de stdin e registro de início/retorno da aplicação em logs/weni_full_launcher.log.
+
+- Carga Delivery/planilhas usa pedido_data e elimina escrita legada de ultima_compra, inclusive na retomada do snapshot sem alterar seu arquivo; preflight de campos antes de POST e diagnóstico seguro por etapa/HTTP.
+
 - Cargas por planilha consolidam UUIDs repetidos idênticos na paginação Weni; versões divergentes exigem releitura individual, mantendo os bloqueios por identidade/URN ambígua.
 
 - NexoFlow Planilha: executável nativo com ícone próprio, menu Weni/Analytics e atalhos instalados; reutiliza as cargas por planilhas e a revisão humana.

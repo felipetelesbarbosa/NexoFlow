@@ -86,6 +86,7 @@ function Assert-Installed {
         "installer\install.ps1",
         "installer\uninstall.ps1",
         "scripts\confirmar_revisao_weni.ps1",
+        "scripts\resultado_carga_weni.ps1",
         "desinstalar_nexoflow.cmd",
         ".venv\Scripts\python.exe"
     )) {

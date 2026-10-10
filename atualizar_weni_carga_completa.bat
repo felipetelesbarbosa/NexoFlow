@@ -1,6 +1,13 @@
 @echo off
 chcp 65001 >nul
-setlocal EnableExtensions
+rem Duplo clique mantém uma sessão visível mesmo diante de erro do BAT.
+if not defined NEXOFLOW_LAUNCHER (
+    set "NEXOFLOW_LAUNCHER=1"
+    echo Depois de conferir o resultado, digite EXIT para fechar esta sessão.
+    "%SystemRoot%\System32\cmd.exe" /d /k call "%~f0"
+    exit /b
+)
+setlocal EnableExtensions DisableDelayedExpansion
 set "PYTHONIOENCODING=utf-8"
 cd /d "%~dp0"
 title NexoFlow Weni - Carga Completa
@@ -50,6 +57,11 @@ set "REVIEW_TXT=logs\weni_update_review_full_25_parte_%PART%.txt"
 if not exist "%~dp0scripts\confirmar_revisao_weni.ps1" (
     echo [ERRO] Componente de revisão ausente: scripts\confirmar_revisao_weni.ps1
     echo Reinstale o Setup atualizado do NexoFlow 1.0 antes de continuar.
+    set "RC=3"
+    goto :erro
+)
+if not exist "%~dp0scripts\resultado_carga_weni.ps1" (
+    echo [ERRO] Componente de resultado ausente. Reinstale o Setup atualizado.
     set "RC=3"
     goto :erro
 )
@@ -135,10 +147,14 @@ if "%RC%"=="2" goto :cancelado
 if not "%RC%"=="0" goto :erro
 
 echo.
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -STA -ExecutionPolicy Bypass -File "%~dp0scripts\resultado_carga_weni.ps1" -RecordOnly -Stage "APPLY_INICIADO" -Snapshot "%REVIEW_JSON%"
+set "RC=%ERRORLEVEL%"
+if not "%RC%"=="0" goto :erro
 echo [ETAPA 5/6] Aplicando snapshot congelado com validação por contato
 echo ----------------------------------------------------------
 ".venv\Scripts\python.exe" run_update_weni.py --apply --full %PART_ARG% --require-review "%REVIEW_JSON%"
 set "RC=%ERRORLEVEL%"
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -STA -ExecutionPolicy Bypass -File "%~dp0scripts\resultado_carga_weni.ps1" -RecordOnly -Stage "APPLY_RETORNOU" -ResultCode %RC% -Snapshot "%REVIEW_JSON%"
 if not "%RC%"=="0" goto :erro
 
 echo.
@@ -162,14 +178,18 @@ echo Relatório: %REVIEW_TXT%
 echo Snapshot:  %REVIEW_JSON%
 echo Manifesto 25%%: logs\full_load_25_manifest.json
 echo ==========================================================
-pause < CON
+set "RC=0"
+set "RESULT_STAGE=CONCLUIDO"
+call :resultado
 exit /b 0
 
 :cancelado
 echo.
 echo [INFO] Operação cancelada. Nenhuma alteração foi aplicada.
 echo O snapshot permanece disponível para consulta. Execute novamente para gerar uma nova revisão.
-pause < CON
+set "RC=2"
+set "RESULT_STAGE=CANCELADO"
+call :resultado
 exit /b 2
 
 :erro
@@ -178,5 +198,15 @@ echo [ERRO] Código de saída: %RC%
 echo [ERRO] Processo interrompido. Nenhuma etapa posterior deve ser presumida como concluída.
 if defined PART echo [INFO] A Parte %PART%/4 NÃO deve ser presumida como concluída.
 echo Consulte logs\nexoflow_update_weni.log.
-pause < CON
+set "RESULT_STAGE=ERRO"
+call :resultado
 exit /b %RC%
+
+:resultado
+if not exist "%~dp0scripts\resultado_carga_weni.ps1" (
+    pause < CON
+    exit /b
+)
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -STA -ExecutionPolicy Bypass -File "%~dp0scripts\resultado_carga_weni.ps1" -ResultCode %RC% -Stage "%RESULT_STAGE%" -Snapshot "%REVIEW_JSON%"
+if errorlevel 1 pause < CON
+exit /b 0
