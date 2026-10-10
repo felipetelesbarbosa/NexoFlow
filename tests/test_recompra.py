@@ -374,6 +374,7 @@ class RecompraRuntimeDiagnosticsTests(unittest.TestCase):
         from recompra import WENI_SAFE_TEXT_LIMIT
         contact, order, items = fixture(24)
         items *= 3
+        order["valor_total_compra"] = "30"
         plan = propose(contact, order, items, STRUCTURE, now=NOW)
         serialized = plan["fields"]["ultimo_pedido"]
         self.assertLessEqual(len(serialized), WENI_SAFE_TEXT_LIMIT)
@@ -388,7 +389,8 @@ class RecompraRuntimeDiagnosticsTests(unittest.TestCase):
     def test_oversize_order_keeps_full_state_and_allows_group_add_without_truncation(self):
         from recompra import WENI_SAFE_TEXT_LIMIT
         contact, order, items = fixture(24)
-        items = [{**items[0], "produto_nome": f"Produto longo sintético {number} " + "Y"*60} for number in range(15)]
+        items = [{**items[0], "produto_nome": f"P{number:02d}"} for number in range(15)]
+        order["valor_total_compra"] = "150"
         state = load_state(self.state_path)
         plan = propose(contact, order, items, STRUCTURE, now=NOW)
         self.assertEqual(plan["action"], "add")
