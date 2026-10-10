@@ -406,7 +406,11 @@ def resolve_latest(contact, farm, captured_at, lookup_cache=None, saved=None):
     if not selected or not isinstance(selected.get("ultimoPedido"), dict): return None, []
     latest = resolve_contact_order(safe_contact, farm_client=farm, captured_at=captured_at,
                                    linked_cliente_id=result[1], cliente_response=payload)
-    if latest[0] and _sales_order_is_valid(latest[0]) and latest[0].get("status_validacao") == "OK":
+    if latest[0] and (cancelled_order_reason(latest[0]) or (
+        _sales_order_is_valid(latest[0]) and latest[0].get("status_validacao") == "OK"
+    )):
+        # Um último pedido cancelado não deve ativar um pedido antigo do
+        # histórico local, ainda que este tenha sido válido anteriormente.
         return latest
     # Recuperação somente por ID de compra previamente validado em estado
     # local. Nunca usar o campo Weni ultimo_pedido como localizador.
