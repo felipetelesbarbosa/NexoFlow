@@ -13,7 +13,7 @@ Conforme a orientação posterior do responsável, bloqueiam **Opt-Out Marketing
 ## Arquitetura e salvaguardas
 
 - Reutiliza `WeniClient`, `FarmaliderClient`, a seleção por identidade e `resolve_contact_order`; não introduz um endpoint de histórico inexistente.
-- Consulta CPFs válidos primeiro e inválidos depois. Compartilha GET por CPF na execução, mas valida cada contato por identidade; CPF inválido continua exigindo nome + e-mail ou nome + telefone, sem ambiguidade.
+- Consulta CPFs válidos primeiro e conclui essa fase antes dos inválidos preenchidos, incluindo zeros; ausentes ficam por último. Compartilha payloads brutos de GET por CPF e pedido na execução, mas valida cada contato por identidade; CPF inválido continua exigindo nome + e-mail ou nome + telefone, sem ambiguidade.
 - Atualiza `pedido_data` com ISO 8601 com offset `-03:00`, `pedido_produtos` com CSV compatível com as listas atuais, `ultimo_pedido` com o serializador oficial. A recompra usa exclusivamente `pedido_data`; não exige, consulta ou altera `ultima_compra`.
 - Atualiza também ID, quantidades, valores unitários, total, status e pagamento usando o plano de pedido existente; não mistura campos de duas compras no Analytics. Itens incompletos bloqueiam a admissão.
 - Produtos com vírgulas mantêm aspas de CSV; não são artificialmente divididos. Produtos não são substituídos por códigos.
@@ -24,9 +24,19 @@ Conforme a orientação posterior do responsável, bloqueiam **Opt-Out Marketing
 - `logs/recompra_state.json` registra por UUID e ID do pedido a compra de referência, intenção pendente e admissão reconhecida. Não registra admissão como mensagem enviada.
 - Intenção persistida antes do POST, gravação atômica e lock impedem execução simultânea e reentrada após timeout/resposta perdida. Estado corrompido bloqueia aplicação, em vez de zerar a proteção.
 - O mesmo pedido não reentra depois de o fluxo removê-lo, inclusive após reiniciar o NexoFlow. Uma intenção indeterminada exige investigação; não há reset automático para tentar disparar novamente.
-- Cada apply exige snapshot revisado do mesmo dia, estrutura da campanha inalterada, releitura do contato, nova confirmação na FarmaLíder e comparação do plano. Recusa ou compra que mudou após a revisão gera conflito, sem POST daquele contato.
-- A rotina de recompra varre os contatos também no incremental: o relógio e novas compras na FarmaLíder não alteram necessariamente `modified_on` na Weni. Sem GET de compras modificadas ou webhook, limitar apenas a contatos modificados perderia essas mudanças. A API de CPF é deduplicada; os controles de retry/throttle existentes continuam ativos.
+- Cada apply exige snapshot revisado do mesmo dia e estrutura da campanha inalterada. Planos que alteram campos, grupo ou estado local exigem releitura do contato, nova confirmação na FarmaLíder e comparação do plano. Recusa ou compra que mudou após a revisão gera conflito, sem POST daquele contato. Planos sem trabalho são contabilizados e pulados antes dos GETs; mudanças posteriores serão propostas no próximo dry-run.
+- A rotina de recompra varre os contatos também no incremental: o relógio e novas compras na FarmaLíder não alteram necessariamente `modified_on` na Weni. Sem GET de compras modificadas ou webhook, limitar apenas a contatos modificados perderia essas mudanças.
 - Revisão e auditoria são privadas e ignoradas no Git/pacotes. As demais rotinas de Analytics, pedidos, CPF, LGPD e planilhas continuam com seus próprios controles.
+
+## Otimizações de processamento
+
+- O dry-run começa a resolver CPFs válidos durante a leitura das páginas Weni. Contatos inválidos ou sem CPF são adiados em arquivos temporários privados, removidos ao terminar ou falhar. Não carrega a lista completa de contatos antes de começar; o snapshot final ainda contém todos os planos para revisão.
+- Até quatro consultas à FarmaLíder ocorrem simultaneamente. Todas usam a mesma instância do cliente, suas sessões por thread e seus limites globais de ritmo, cooldown, recuperação e circuito de falhas. A fila de trabalho contém no máximo oito contatos com a configuração padrão.
+- O cache de leitura tem limite de 4.096 respostas brutas e reúne consultas simultâneas à mesma chave. Falhas transitórias não ficam cacheadas; respostas 404 e rejeições 400 podem ser reutilizadas nesta execução. O cache é descartado ao fim de cada dry-run ou apply, evitando usar a confirmação do dry-run na aplicação.
+- Na aplicação, campos iguais continuam sem POST, planos sem trabalho dispensam consultas e gravações locais idênticas são evitadas. Inclusões mantêm a persistência de intenção antes do POST e de confirmação depois dele. As escritas e verificações de grupo continuam sequenciais.
+- Os logs mostram contatos processados, tempo, velocidade no dry-run, consultas e reutilizações do cache. O ganho real depende da latência, dos limites das APIs e da quantidade de planos com alterações.
+
+Para usar apenas uma consulta por vez no dry-run, execute `nexo weni recompra dry-run --workers 1`. O padrão de quatro consultas já vale para os launchers existentes. `--full` mantém a auditoria completa; não usa dados antigos para dispensar a confirmação oficial.
 
 ## Comandos
 
@@ -35,6 +45,7 @@ No NexoFlow Terminal:
 ```text
 nexo weni recompra auditoria
 nexo weni recompra dry-run
+nexo weni recompra dry-run --workers 4
 nexo weni recompra dry-run --contato UUID_WENI
 nexo weni recompra aplicar --revisao logs/recompra_review.json
 nexo weni recompra atualizar
@@ -87,3 +98,5 @@ Não há confirmação de entrega do WhatsApp nesta rotina. A proteção local i
 ## Testes
 
 Fixtures sintéticas cobrem 0, 24, 25, 26 e 365 dias, futuro, fuso local, campos vazios, produtos com vírgula, recusas e Opt-Out, estados de pedido, proteção contra regressão de compra, referência nova, reprocessamento/reinicialização, resposta incerta, estado corrompido, revisão adulterada/expirada, recusa concorrente, cancelamento antes de atualizar a data e rotas do fluxo que tentariam contornar as guardas.
+
+Os testes de otimização verificam paginação sob demanda, concorrência limitada, prioridade global dos CPFs, cache de payloads sem compartilhamento de identidade, descarte de falhas transitórias, limpeza de temporários e aplicação sem consultas para planos sem trabalho.

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Iterator
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urljoin
@@ -172,15 +173,19 @@ class WeniClient:
             "A API da Weni retornou um formato paginado não reconhecido."
         )
 
-    def _list_paginated(
+    def _iter_paginated(
         self,
         base_url: str,
         params: dict[str, Any] | None = None,
         *,
         item_label: str,
         max_results: int | None = None,
-    ) -> list[dict[str, Any]]:
-        results: list[dict[str, Any]] = []
+    ) -> Iterator[dict[str, Any]]:
+        """Read the next page only when its records are requested."""
+        if max_results is not None and max_results <= 0:
+            return
+
+        result_count = 0
         url: str | None = base_url
         first_request = True
         page = 1
@@ -192,26 +197,43 @@ class WeniClient:
             )
             first_request = False
             page_results, next_url = self.extract_results(payload)
-            results.extend(page_results)
-            if max_results is not None and len(results) >= max_results:
-                results = results[:max_results]
-                next_url = None
             logging.info(
                 "Weni %s página %s: %s registro(s).",
                 item_label,
                 page,
                 len(page_results),
             )
+            for result in page_results:
+                result_count += 1
+                yield result
+                if max_results is not None and result_count >= max_results:
+                    return
             page += 1
             url = urljoin(base_url, next_url) if next_url else None
 
-        return results
+    def _list_paginated(
+        self,
+        base_url: str,
+        params: dict[str, Any] | None = None,
+        *,
+        item_label: str,
+        max_results: int | None = None,
+    ) -> list[dict[str, Any]]:
+        return list(
+            self._iter_paginated(
+                base_url,
+                params,
+                item_label=item_label,
+                max_results=max_results,
+            )
+        )
 
-    def list_contacts(
+    def iter_contacts(
         self,
         after: datetime | None = None,
         limit: int = PAGE_LIMIT,
-    ) -> list[dict[str, Any]]:
+    ) -> Iterator[dict[str, Any]]:
+        """Stream contacts page by page without loading the entire contact base."""
         params: dict[str, Any] = {
             "deleted": "false",
             "order_by": "modified_on",
@@ -219,11 +241,18 @@ class WeniClient:
         }
         if after is not None:
             params["after"] = self.format_datetime(after)
-        return self._list_paginated(
+        return self._iter_paginated(
             WENI_CONTACTS_API_URL,
             params,
             item_label="contatos",
         )
+
+    def list_contacts(
+        self,
+        after: datetime | None = None,
+        limit: int = PAGE_LIMIT,
+    ) -> list[dict[str, Any]]:
+        return list(self.iter_contacts(after=after, limit=limit))
 
     def get_contact(
         self,

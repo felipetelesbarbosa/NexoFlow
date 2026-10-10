@@ -1,19 +1,25 @@
 """Recompra D+25: planos revisados, sem envio nem edição da campanha."""
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, OrderedDict
+from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import contextmanager
+from copy import deepcopy
 from datetime import datetime, timedelta
 from hashlib import sha256
+from itertools import groupby, islice
 import json
 import logging
 import os
 from pathlib import Path
 import tempfile
+from threading import Lock
+from time import monotonic
 import unicodedata
 from zoneinfo import ZoneInfo
 
 from analytics import get_fields, normalize_value, cpf_query_priority, _sales_order_is_valid
+from config import FARMALIDER_MAX_WORKERS
 from farmalider_integration import resolve_contact_order, select_cliente_response, weni_customer_identity
 from pedido_utils import business_order_datetime, serialize_pedido_products, serialize_weni_order_list
 
@@ -29,6 +35,139 @@ GUARD_FIELDS = FIELDS | {"pedido_id", "cpf", "nome", "email", "marketing_opt_in"
 STATE = Path("logs/recompra_state.json")
 REVIEW = Path("logs/recompra_review.json")
 AUDIT = Path("logs/recompra_audit.jsonl")
+
+
+class RecompraReadCache:
+    """Payloads brutos por execução; uma consulta por chave em andamento.
+
+    A seleção de identidade continua ocorrendo separadamente para cada contato.
+    Nada deste cache serve como confirmação para uma execução posterior.
+    """
+
+    def __init__(self, farm, max_entries=4096):
+        if max_entries < 1:
+            raise ValueError("O cache precisa ter ao menos uma entrada.")
+        self.farm = farm
+        self.max_entries = max_entries
+        self._lock = Lock()
+        self._responses = OrderedDict()
+        self._hits = 0
+        self._misses = 0
+
+    def _read(self, kind, key, fetch):
+        cache_key = (kind, str(key))
+        with self._lock:
+            future = self._responses.get(cache_key)
+            owner = future is None
+            if owner:
+                future = Future()
+                self._responses[cache_key] = future
+                self._misses += 1
+            else:
+                self._responses.move_to_end(cache_key)
+                self._hits += 1
+        if owner:
+            try:
+                future.set_result(fetch())
+            except BaseException as exc:
+                future.set_exception(exc)
+                from farmalider_client import FarmaliderBadRequestError
+                # HTTP 400 é definitivo para esta consulta; falhas transitórias
+                # não impedem outra tentativa nesta mesma execução.
+                if not isinstance(exc, FarmaliderBadRequestError):
+                    with self._lock:
+                        if self._responses.get(cache_key) is future:
+                            del self._responses[cache_key]
+            finally:
+                with self._lock:
+                    # Não expulsar consultas em andamento: seus consumidores
+                    # precisam continuar compartilhando a mesma requisição.
+                    while len(self._responses) > self.max_entries:
+                        candidate = next((key for key, response in self._responses.items() if response.done()), None)
+                        if candidate is None:
+                            break
+                        del self._responses[candidate]
+        return deepcopy(future.result())
+
+    def get_cliente_by_cpf(self, cpf):
+        return self._read("cpf", cpf, lambda: self.farm.get_cliente_by_cpf(cpf))
+
+    def get_pedido(self, order_id):
+        return self._read("pedido", order_id, lambda: self.farm.get_pedido(order_id))
+
+    def metrics(self):
+        with self._lock:
+            return {"consultas": self._misses, "reusos": self._hits, "entradas": len(self._responses)}
+
+
+def iter_prioritized_contacts(contacts):
+    """Processa válidos durante a paginação; adia os demais em disco.
+
+    Mantém a prioridade global de CPF sem guardar toda a base em memória.
+    O diretório temporário é privado e removido também em caso de falha.
+    """
+    with tempfile.TemporaryDirectory(prefix="nexoflow-recompra-") as directory:
+        paths = {priority: Path(directory) / f"cpf-{priority}.jsonl" for priority in (1, 2)}
+        with paths[1].open("w", encoding="utf-8") as invalid, paths[2].open("w", encoding="utf-8") as empty:
+            outputs = {1: invalid, 2: empty}
+            for contact in contacts:
+                priority = cpf_query_priority(get_fields(contact).get("cpf"))
+                if priority == 0:
+                    yield contact
+                else:
+                    outputs[priority].write(json.dumps(contact, ensure_ascii=False) + "\n")
+        for priority in (1, 2):
+            with paths[priority].open(encoding="utf-8") as handle:
+                for line in handle:
+                    yield json.loads(line)
+
+
+def build_plans(contacts, farm, structure, state, *, now=None, workers=FARMALIDER_MAX_WORKERS):
+    """GETs concorrentes e limitados; Weni e estado permanecem na thread principal."""
+    if not 1 <= workers <= FARMALIDER_MAX_WORKERS:
+        raise ValueError(f"Use de 1 a {FARMALIDER_MAX_WORKERS} consultas simultâneas.")
+    now = now or now_local()
+    reads = RecompraReadCache(farm)
+    plans = []
+    results = Counter()
+    started = monotonic()
+
+    def plan_contact(contact):
+        saved = state["contacts"].get(contact["uuid"])
+        order, items = resolve_latest(contact, reads, now.isoformat(), saved=saved)
+        return propose(contact, order, items, structure, saved, now=now)
+
+    prioritized = iter_prioritized_contacts(contacts)
+    try:
+        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="recompra") as pool:
+            # Cada fase termina antes da seguinte, inclusive as requisições que
+            # estiverem em andamento. A fila tem no máximo workers * 2 contatos.
+            for _, phase in groupby(prioritized, key=lambda c: cpf_query_priority(get_fields(c).get("cpf"))):
+                while batch := list(islice(phase, workers * 2)):
+                    for plan in pool.map(plan_contact, batch):
+                        plans.append(plan)
+                        results[plan["reason"]] += 1
+                        if len(plans) % 100 == 0:
+                            elapsed = max(monotonic() - started, 0.001)
+                            logging.info("Recompra: contatos=%s; velocidade=%.1f/s; resultados=%s; cache=%s.",
+                                         len(plans), len(plans) / elapsed, dict(results), reads.metrics())
+    finally:
+        prioritized.close()
+    elapsed = max(monotonic() - started, 0.001)
+    logging.info("Recompra: contatos=%s; duração=%.1fs; resultados=%s; cache=%s.",
+                 len(plans), elapsed, dict(results), reads.metrics())
+    return plans
+
+
+def plan_needs_apply(plan, saved=None):
+    """Inclui persistência local necessária mesmo quando não há POST."""
+    saved = saved or {}
+    if plan["action"] or plan["fields"] or (plan["purchase"] and plan["purchase"] != saved.get("purchase")):
+        return True
+    if plan["in_group"] and plan["order_id"]:
+        entry = (saved.get("orders") or {}).get(plan["order_id"], {})
+        return not entry.get("admitted") or bool(entry.get("pending"))
+    return False
 
 
 def now_local():
@@ -366,34 +505,46 @@ def apply_review(review, weni, farm, *, state_path=STATE, now_fn=now_local, audi
     if structure["errors"]: raise RuntimeError("Aplicação bloqueada: " + "; ".join(structure["errors"]))
     if structure != review["structure"]: raise RuntimeError("Campanha ou campos mudaram depois da revisão.")
     summary = Counter()
+    started = monotonic()
     with state_lock(state_path):
         state = load_state(state_path)
         if digest(state) != review["state_sha256"]: raise RuntimeError("Estado mudou após a revisão. Gere um novo dry-run.")
-        cache = {}
-        for reviewed in review["plans"]:
+        reads = RecompraReadCache(farm)
+        for index, reviewed in enumerate(review["plans"], 1):
+            if index > 1 and (index - 1) % 100 == 0:
+                logging.info("Recompra aplicação: contatos=%s/%s; resultados=%s; cache=%s.",
+                             index - 1, len(review["plans"]), dict(summary), reads.metrics())
             audit_plan(reviewed)
             uid = reviewed["contact_uuid"]
             saved = state["contacts"].get(uid, {})
+            # Um plano sem trabalho não autoriza novas alterações descobertas
+            # depois da revisão; elas serão propostas no próximo dry-run.
+            if not plan_needs_apply(reviewed, saved):
+                summary["sem_mudanca"] += 1
+                continue
             current = weni.get_contact(uuid=uid)
             if not current or guard(current) != reviewed["guard"]:
                 summary["conflitos"] += 1; append_audit({"contact_uuid": uid, "status": "CONFLITO_CONTATO"}, audit_path); continue
-            order, items = resolve_latest(current, farm, now_fn().isoformat(), cache, saved)
+            order, items = resolve_latest(current, reads, now_fn().isoformat(), saved=saved)
             fresh = propose(current, order, items, structure, saved, now=now_fn())
             if any(fresh[key] != reviewed[key] for key in ("fields", "action", "order_id", "reason", "purchase", "event_at", "due_today", "within_window")):
                 summary["conflitos"] += 1; append_audit({"contact_uuid": uid, "status": "CONFLITO_PEDIDO_OU_DIA"}, audit_path); continue
             action = fresh["action"]
-            if not action and not fresh["fields"] and fresh["purchase"] == saved.get("purchase"):
+            if not plan_needs_apply(fresh, saved):
                 summary["sem_mudanca"] += 1
                 continue
             # Persistir intenção antes de qualquer inclusão: uma resposta perdida
             # não autoriza reentrar no grupo na próxima execução.
+            previous_state = deepcopy(saved)
             contact_state = state["contacts"].setdefault(uid, {"orders": {}})
             contact_state.setdefault("orders", {})
             if fresh["purchase"]: contact_state["purchase"] = fresh["purchase"]
             entry = contact_state["orders"].setdefault(fresh["order_id"], {}) if fresh["order_id"] else {}
             if action in {"add", "replace"}:
                 entry.update({"pending": True, "day": review["day"], "event_uuid": structure["event_uuid"]})
-            atomic_json(state_path, state)
+            if contact_state != previous_state:
+                atomic_json(state_path, state)
+            persisted_state = deepcopy(contact_state)
             try:
                 if action in {"remove", "replace"}:
                     weni.contact_group_action(uid, action="remove", group=structure["group_uuid"])
@@ -418,11 +569,15 @@ def apply_review(review, weni, farm, *, state_path=STATE, now_fn=now_local, audi
                     entry.update({"pending": False, "admitted": True, "admitted_at": now_fn().isoformat()})
                 if fresh["in_group"] and fresh["order_id"] and action == "":
                     entry.update({"admitted": True, "pending": False})
-                atomic_json(state_path, state)
+                if contact_state != persisted_state:
+                    atomic_json(state_path, state)
                 summary["aplicados"] += 1
                 append_audit({"contact_uuid": uid, "pedido_id": fresh["order_id"], "status": "APLICADO", "action": action, "at": now_fn().isoformat()}, audit_path)
             except Exception:
-                atomic_json(state_path, state)
+                if contact_state != persisted_state:
+                    atomic_json(state_path, state)
                 append_audit({"contact_uuid": uid, "pedido_id": fresh["order_id"], "status": "FALHA_OU_RESULTADO_INDETERMINADO", "at": now_fn().isoformat()}, audit_path)
                 raise RuntimeError("Recompra interrompida. Estado preservado; inclusão incerta não será repetida automaticamente.") from None
+    logging.info("Recompra aplicação: contatos=%s; duração=%.1fs; resultados=%s; cache=%s.",
+                 len(review["plans"]), monotonic() - started, dict(summary), reads.metrics())
     return dict(summary)

@@ -2,6 +2,9 @@
 
 ## NexoFlow 1.0
 
+- Recompra processa contatos durante a paginação, consulta FarmaLíder com até quatro workers e cache limitado de payloads brutos por execução. CPFs válidos concluem antes dos inválidos; seleção de identidade permanece por contato.
+- Aplicação da recompra pula planos sem trabalho antes de consultar as APIs, evita gravações locais redundantes e mantém revalidação, revisão e persistência de intenção/confirmação nas inclusões. Logs mostram velocidade e reutilizações de consultas.
+
 - Cargas por planilha consolidam UUIDs repetidos idênticos na paginação Weni; versões divergentes exigem releitura individual, mantendo os bloqueios por identidade/URN ambígua.
 
 - NexoFlow Planilha: executável nativo com ícone próprio, menu Weni/Analytics e atalhos instalados; reutiliza as cargas por planilhas e a revisão humana.

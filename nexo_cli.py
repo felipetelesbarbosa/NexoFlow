@@ -530,6 +530,7 @@ def _add_output_flags(parser: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    from config import FARMALIDER_MAX_WORKERS
     parser = argparse.ArgumentParser(
         prog="nexo",
         add_help=True,
@@ -559,6 +560,8 @@ def build_parser() -> argparse.ArgumentParser:
     recompra.add_argument("--revisao", default="logs/recompra_review.json")
     recompra.add_argument("--contato", help="UUID de um contato para a simulação")
     recompra.add_argument("--full", action="store_true")
+    recompra.add_argument("--workers", type=int, choices=range(1, FARMALIDER_MAX_WORKERS + 1),
+                          help=f"consultas FarmaLíder simultâneas no dry-run (padrão: {FARMALIDER_MAX_WORKERS})")
     weni_sub.add_parser("planilhas", help="carga de pedidos a partir dos exports XLSX, com revisão humana")
 
     logs = sub.add_parser("logs", help="consulta logs do NexoFlow")
@@ -635,6 +638,7 @@ def run(argv: list[str] | None = None) -> int:
                 arguments += ["--require-review" if args.recompra_op == "aplicar" else "--review-out", args.revisao]
                 if args.contato: arguments += ["--contact", args.contato]
                 if args.full: arguments.append("--full")
+                if args.workers is not None: arguments += ["--workers", str(args.workers)]
                 return recompra_main(arguments)
             mapping = {
                 "testar": "testar_update_weni.bat",
