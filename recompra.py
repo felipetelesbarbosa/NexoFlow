@@ -223,9 +223,12 @@ def cancelled_order_reason(order, contact=None):
     campos ausentes como status autorizado: a validação positiva ocorre depois.
     """
     if isinstance(order, dict):
-        if normalize_farmalider_order_status_code(order.get("farmalider_status_pedido", order.get("pedido_status"))) == "3":
+        if any(normalize_farmalider_order_status_code(order.get(key)) == "3"
+               for key in ("farmalider_status_pedido", "pedido_status")):
             return "PEDIDO_STATUS_3_CANCELADO"
-        if normalize_farmalider_payment_code(order.get("farmalider_forma_pagamento", order.get("pedido_forma_pagamento"))) == "0":
+        if any(normalize_farmalider_payment_code(order.get(key)) == "0"
+               or norm(order.get(key)) == "cancelado"
+               for key in ("farmalider_forma_pagamento", "pedido_forma_pagamento")):
             return "PAGAMENTO_0_CANCELADO"
         if is_order_cancelled(order):
             return "PEDIDO_CANCELADO"
