@@ -5,7 +5,7 @@ from collections import Counter, OrderedDict
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import contextmanager
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from hashlib import sha256
 from itertools import groupby, islice
 import json
@@ -30,15 +30,13 @@ FLOW = "Recompra FarmaLíder D+25"
 TZ = ZoneInfo("America/Belem")
 DAY_EXPRESSION = '@(if(default(datetime_diff(format_date(fields.pedido_data, "YYYY-MM-DD"), today(), "D"), -1) = 25, "D25_OK", "D25_FORA"))'
 REFUSAL_EXPRESSION = '@(if(or(lower(trim(fields.marketing_opt_in)) = "recusado", lower(trim(fields.marketing_opt_in)) = "não", lower(trim(fields.marketing_opt_in)) = "nao", lower(trim(fields.marketing_opt_in)) = "negado"), "MKT_RECUSADO", "MKT_SEM_RECUSA"))'
-FIELDS = {"pedido_data", "pedido_produtos", "ultimo_pedido"}
-FIELDS |= {"pedido_id", "pedido_quantidade_itens", "pedido_valor_produtos", "pedido_valor", "pedido_status", "pedido_forma_pagamento"}
-GUARD_FIELDS = FIELDS | {"pedido_id", "cpf", "nome", "email", "marketing_opt_in", "pedido_status", "pedido_forma_pagamento"}
+# Somente os campos essenciais ao agendamento e ao texto da campanha.
+# ultimo_pedido pertence às demais integrações, nunca à recompra.
+FIELDS = {"pedido_data", "pedido_produtos"}
+GUARD_FIELDS = FIELDS | {"cpf", "nome", "email", "marketing_opt_in"}
 STATE = Path("logs/recompra_state.json")
 REVIEW = Path("logs/recompra_review.json")
 AUDIT = Path("logs/recompra_audit.jsonl")
-# Limite conservador usado por implantações RapidPro para campos de texto.
-# Confirmar o valor efetivo com a Weni; nunca gravar JSON incompleto.
-WENI_SAFE_TEXT_LIMIT = 640
 REVIEW_EXPIRED_EXIT_CODE = 4
 
 
@@ -232,29 +230,6 @@ def field_guard(key, value):
     return text(value)
 
 
-def compact_weni_order_snapshot(snapshot):
-    """Resumo JSON coerente para o campo Weni; original permanece no estado local.
-
-    Não corta nomes/produtos nem faz substring de JSON. Quando o pedido não
-    couber no limite seguro, retorna None para preservar o campo existente.
-    """
-    try:
-        payload = json.loads(snapshot)
-        dt = business_order_datetime(payload.get("data_hora"))
-        products = payload.get("produtos")
-        if not isinstance(payload, dict) or not dt or not isinstance(products, list) or not products:
-            return None
-        reduced = {"pedido_id": str(payload["pedido_id"]),
-                   "data_hora": dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
-                   "valor_total_compra": payload["valor_total_compra"],
-                   "produtos": [{key: item[key] for key in ("nome", "quantidade", "valor_unitario", "valor_total")}
-                                for item in products]}
-        encoded = json.dumps(reduced, ensure_ascii=False, separators=(",", ":"))
-        return encoded if len(encoded) <= WENI_SAFE_TEXT_LIMIT else None
-    except (ValueError, TypeError, KeyError, AttributeError):
-        return None
-
-
 def guard(contact):
     fields = get_fields(contact)
     return {"fields": {key: field_guard(key, fields.get(key)) for key in sorted(GUARD_FIELDS)},
@@ -356,7 +331,7 @@ def inspect_structure(weni):
     for key in sorted(FIELDS):
         if key not in fields: errors.append(f"Campo obrigatório ausente: {key}")
     if fields.get("pedido_data") != "datetime": errors.append("pedido_data precisa ser DateTime.")
-    if fields.get("pedido_produtos") != "text" or fields.get("ultimo_pedido") != "text": errors.append("Produtos e JSON precisam ser campos Texto.")
+    if fields.get("pedido_produtos") != "text": errors.append("pedido_produtos precisa ser campo Texto para o conteúdo da campanha.")
     org = weni.get_org()
     if org.get("timezone") != "America/Belem": errors.append("Organização Weni precisa usar America/Belem; nenhuma configuração será alterada.")
     campaigns = [c for c in weni.list_campaigns() if c.get("name") == GROUP]
@@ -386,6 +361,8 @@ def inspect_structure(weni):
 def resolve_latest(contact, farm, captured_at, lookup_cache=None, saved=None):
     """Reutiliza seleção de identidade e resolução oficiais, sem novos endpoints."""
     fields = get_fields(contact)
+    # Esta rotina não deve nem usar ultimo_pedido como localizador implícito.
+    safe_contact = {**contact, "fields": {k: v for k, v in fields.items() if k != "ultimo_pedido"}}
     from analytics import normalize_cpf
     cpf = normalize_cpf(fields.get("cpf"))
     if not cpf: return None, []
@@ -402,24 +379,18 @@ def resolve_latest(contact, farm, captured_at, lookup_cache=None, saved=None):
     if result[0] not in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO"}: return {"status_confirmacao": result[0]}, []
     # Sem ultimoPedido, não reconstruir a compra a partir de campos soltos.
     if not selected or not isinstance(selected.get("ultimoPedido"), dict): return None, []
-    latest = resolve_contact_order(contact, farm_client=farm, captured_at=captured_at,
+    latest = resolve_contact_order(safe_contact, farm_client=farm, captured_at=captured_at,
                                    linked_cliente_id=result[1], cliente_response=payload)
     if latest[0] and _sales_order_is_valid(latest[0]) and latest[0].get("status_validacao") == "OK":
         return latest
-    # A API retorna apenas ultimoPedido. Uma compra confirmada anterior só
-    # pode ser recuperada de um ID conhecido, revalidado pelo GET e mesmo ID
-    # de cliente. Não inventamos histórico nem interpretamos JSON Weni como prova.
+    # Recuperação somente por ID de compra previamente validado em estado
+    # local. Nunca usar o campo Weni ultimo_pedido como localizador.
     candidates = {text(((saved or {}).get("purchase") or {}).get("pedido_id"))}
-    try:
-        old_snapshot = json.loads(text(fields.get("ultimo_pedido")) or "{}")
-        if isinstance(old_snapshot, dict): candidates.add(text(old_snapshot.get("pedido_id")))
-    except ValueError:
-        pass
     recovered = []
     for candidate in candidates - {"", text((latest[0] or {}).get("pedido_id"))}:
         if not candidate.isascii() or not candidate.isdigit(): continue
         reference_payload = {"cliente": selected["cliente"], "ultimoPedido": {"id": candidate, "codCliente": result[1]}, "itens": []}
-        previous = resolve_contact_order(contact, farm_client=farm, captured_at=captured_at,
+        previous = resolve_contact_order(safe_contact, farm_client=farm, captured_at=captured_at,
                                         linked_cliente_id=result[1], cliente_response=reference_payload)
         if previous[0] and _sales_order_is_valid(previous[0]) and previous[0].get("status_validacao") == "OK" and previous[1]:
             recovered.append(previous)
@@ -444,24 +415,22 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
                  and dt and dt <= now and items and all(names))
     if valid:
         order_id = text(order.get("pedido_id"))
-        from pedido_utils import normalize_farmalider_order_status_code, normalize_farmalider_payment_code
-        current_order = business_order_datetime(fields.get("pedido_data")) if (
-            normalize_farmalider_order_status_code(text(fields.get("pedido_status"))) in {"4", "1", "2"}
-            and normalize_farmalider_payment_code(text(fields.get("pedido_forma_pagamento"))) != "0"
-            and norm(fields.get("pedido_forma_pagamento")) != "cancelado"
-        ) else None
+        # Para a cronologia do agendamento, somente pedido_data é consultado.
+        # Uma data posterior não pode ser substituída por pedido mais antigo.
+        current_order = business_order_datetime(fields.get("pedido_data"))
         saved_dt = business_order_datetime((saved.get("purchase") or {}).get("data_hora"))
         if any(other and other > dt for other in (current_order, saved_dt)):
             valid = False; plan["reason"] = "PEDIDO_ANTIGO_BLOQUEADO"
         else:
-            # Reutilizar o plano de pedido evita combinar a compra nova com
-            # ID, valores ou quantidades da compra anterior no Analytics.
+            # Usar a validação oficial dos itens, mas não gerar atualizações
+            # de campos de Analytics, JSON ou histórico de pedidos na Weni.
             from weni_update import ContactUpdatePlan, _apply_purchase_candidate
-            candidate = {**contact, "fields": dict(fields)}
+            candidate = {**contact, "fields": {k: v for k, v in fields.items() if k != "ultimo_pedido"}}
             if current_order is None: candidate["fields"]["pedido_data"] = ""
             purchase_plan = ContactUpdatePlan(uid)
             _apply_purchase_candidate(purchase_plan, candidate, farm_client=None,
-                                      captured_at=now.isoformat(), resolved_order=(order, items))
+                                      captured_at=now.isoformat(), resolved_order=(order, items),
+                                      available_weni_fields=FIELDS)
             if not purchase_plan.order_validated:
                 plan["reason"] = "PEDIDO_INCOMPLETO"
                 if in_group: plan["action"] = "remove"
@@ -469,17 +438,11 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
             plan["order_id"] = order_id
             plan["purchase"] = {"pedido_id": order_id, "data_hora": dt.isoformat(),
                                 "snapshot": serialize_pedido_products(order, items)}
-            complete_order_json = serialize_pedido_products(order, items)
-            reduced_order_json = compact_weni_order_snapshot(complete_order_json)
-            proposal = {**{k: v for k, v in purchase_plan.fields.items() if k in FIELDS}, "pedido_data": dt.isoformat(),
+            # Referência temporal: pedido_data. A lista de produtos é mantida
+            # apenas porque o fluxo existente a exige para exibir a oferta.
+            # O JSON completo permanece SOMENTE em state.purchase.snapshot.
+            proposal = {"pedido_data": dt.isoformat(),
                         "pedido_produtos": serialize_weni_order_list(names)}
-            if reduced_order_json is not None:
-                proposal["ultimo_pedido"] = reduced_order_json
-            else:
-                # O JSON completo continua disponível em state.purchase.snapshot.
-                # Não corromper o campo Weni com dados cortados na API.
-                proposal.pop("ultimo_pedido", None)
-                plan["warnings"].append("ULTIMO_PEDIDO_JSON_NAO_CABE_EM_CAMPO_WENI")
             for key, value in proposal.items():
                 same = business_order_datetime(fields.get(key)) == dt if key == "pedido_data" else field_guard(key, fields.get(key)) == field_guard(key, value)
                 if not same: plan["fields"][key] = value
@@ -536,8 +499,6 @@ def write_review(review, path=REVIEW):
              "Política: grupo entre 0 e 25 dias; envio somente D+25, bloqueando recusas; marketing_opt_in não será alterado.",
              "Sem disparos, sem alterações de campanha. Horário já passado não cria envio retroativo.",
              "Pendências: " + "; ".join(review["structure"]["errors"]), f"Resultados: {dict(counts)}"]
-    skipped_json = sum("ULTIMO_PEDIDO_JSON_NAO_CABE_EM_CAMPO_WENI" in p.get("warnings", []) for p in review["plans"])
-    lines.append(f"JSON completo de ultimo_pedido preservado apenas no estado local quando excede o campo Weni: {skipped_json} contato(s).")
     for plan in review["plans"]:
         lines.append(f"Contato {plan['contact_uuid']} | pedido {plan['order_id']} | {plan['reason']} | grupo={plan['action'] or 'sem mudança'} | evento={plan['event_at']} | horário futuro={plan['scheduled_future']} | avisos={plan.get('warnings', [])}")
         lines.extend(f"  {key}: {text(plan['guard']['fields'].get(key))} -> {value}" for key, value in plan["fields"].items())
