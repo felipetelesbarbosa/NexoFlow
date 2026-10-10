@@ -1,5 +1,6 @@
 """Rotina incremental de recompra, sempre com revisão antes dos POSTs."""
 import argparse
+import json
 from pathlib import Path
 import logging
 
@@ -12,6 +13,7 @@ def build_parser():
     mode.add_argument('--dry-run', action='store_true', help='consulta clientes e propõe alterações sem gravar na Weni')
     mode.add_argument('--apply', action='store_true', help='revalida e aplica o snapshot revisado')
     mode.add_argument('--check-review', action='store_true', help='confere integridade e dia da revisão local, sem acessar APIs')
+    mode.add_argument('--diagnose-state', action='store_true', help='resume estado, pendências e auditoria sem acessar APIs nem gravar arquivos')
     parser.add_argument('--full', action='store_true', help='auditoria de toda a base; mesmas regras do incremental, sem retroativos')
     parser.add_argument('--contact', help='UUID Weni para auditoria de um contato')
     parser.add_argument('--workers', type=int, choices=range(1, FARMALIDER_MAX_WORKERS + 1), default=FARMALIDER_MAX_WORKERS,
@@ -25,7 +27,15 @@ def main(argv=None):
     parser = build_parser(); args = parser.parse_args(argv)
     if (args.apply or args.check_review) and not args.require_review:
         parser.error('--apply e --check-review exigem --require-review.')
-    from recompra import ensure_review_current, now_local, read_review, ReviewExpiredError, REVIEW_EXPIRED_EXIT_CODE
+    from recompra import (ensure_review_current, now_local, read_review, ReviewExpiredError,
+                          REVIEW_EXPIRED_EXIT_CODE, diagnose_state, safe_error_frames)
+    if args.diagnose_state:
+        try:
+            print(json.dumps(diagnose_state(), ensure_ascii=False, indent=2))
+            return 0
+        except (RuntimeError, OSError, ValueError) as exc:
+            print('[ERRO] ' + str(exc))
+            return 1
     review = None
     if args.apply or args.check_review:
         try:
@@ -89,7 +99,8 @@ def main(argv=None):
         print('[REVISÃO EXPIRADA] ' + str(exc))
         return REVIEW_EXPIRED_EXIT_CODE if exc.allow_refresh else 1
     except Exception as exc:
-        logging.error('Recompra falhou: %s.', type(exc).__name__)
+        logging.error('Recompra falhou: tipo=%s; origem=%s.',
+                      type(exc).__name__, ' > '.join(safe_error_frames(exc)))
         print('[ERRO] ' + (str(exc) if isinstance(exc, (RuntimeError, ValueError)) else 'Falha de API. Consulte o diagnóstico seguro.'))
         return 1
     finally:
