@@ -714,7 +714,9 @@ def apply_review(review, weni, farm, *, state_path=STATE, now_fn=now_local, audi
                     stage = "confirmar_inclusao_no_grupo"
                     verified = None
                     for attempt in range(3):
-                        check_day()
+                        # Depois do POST, ainda que passe da meia-noite,
+                        # confirmar o resultado conhecido via GET e persistir.
+                        # Não há nenhum novo POST de inclusão nesta etapa.
                         verified = weni.get_contact(uuid=uid)
                         if verified and member(verified, structure["group_uuid"], GROUP):
                             break
