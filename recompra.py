@@ -696,7 +696,14 @@ def apply_review(review, weni, farm, *, state_path=STATE, now_fn=now_local, audi
                     actual["groups"] = [g for g in actual["groups"] if g not in {structure["group_uuid"], GROUP}]
                     expected["groups"] = [g for g in expected["groups"] if g not in {structure["group_uuid"], GROUP}]
                     if actual != expected or refused(latest) or member(latest, structure["opt_out_uuid"], OPT_OUT):
-                        raise PreAdmissionConflict("Identidade, campos ou recusa mudaram antes da inclusão.")
+                        # Diagnóstico por NOMES de campos: nunca expor conteúdo, CPF, URNs ou token.
+                        field_diffs = sorted(k for k in expected["fields"]
+                                             if actual["fields"].get(k) != expected["fields"].get(k))
+                        other_diffs = [k for k in ("name", "urns", "groups") if actual[k] != expected[k]]
+                        if refused(latest) or member(latest, structure["opt_out_uuid"], OPT_OUT):
+                            other_diffs.append("opt_out_marketing")
+                        raise PreAdmissionConflict("Guarda divergiu antes da inclusão: campos=" +
+                                                   ",".join(field_diffs) + "; demais=" + ",".join(other_diffs))
                     if not 0 <= (now_fn().astimezone(TZ).date() - business_order_datetime(fresh["purchase"]["data_hora"]).date()).days <= 25:
                         check_day()
                         raise RuntimeError("Janela de 0 a 25 dias terminou durante a aplicação.")
