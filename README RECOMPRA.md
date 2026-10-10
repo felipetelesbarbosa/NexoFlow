@@ -10,6 +10,18 @@ A regra de confirmação é a mesma do NexoFlow: status 4, 1 ou 2, validação o
 
 Conforme a orientação posterior do responsável, bloqueiam **Opt-Out Marketing** e valores de recusa em `marketing_opt_in`, inclusive `recusado`, `Não`, `nao` e `negado`. Campo vazio não bloqueia nesta política, denominada `JANELA_0_A_25_SEM_RECUSA`. Isso não é registrado como consentimento: o NexoFlow não preenche `marketing_opt_in` nem adiciona a Opt-In Marketing. Essa política substitui o critério anterior de exigir autorização positiva em outra origem.
 
+## Critérios obrigatórios de inclusão
+
+O NexoFlow **não adiciona** ao grupo Recompra FarmaLíder contatos que apresentem qualquer um destes impedimentos, inclusive quando o dado está registrado nos campos Weni ou é confirmado na API FarmaLíder:
+
+- `marketing_opt_in=recusado` ou grupo Opt-Out Marketing (e demais recusas já reconhecidas);
+- `pedido_status=3` (pedido cancelado);
+- `pedido_forma_pagamento=0` ou `Cancelado` (pagamento cancelado).
+
+A compra deve ser confirmada pela API FarmaLíder, respeitar 0 a 25 dias no fuso de Belém e preservar `pedido_data` como **única referência temporal**. `pedido_produtos` continua necessário somente ao conteúdo e à guarda do fluxo vigente; `ultimo_pedido` é ignorado nesta rotina.
+
+**Confirmação de inclusão obrigatória:** após o POST `contact_group_action(add)`, o NexoFlow faz GET do contato na Weni e exige que o grupo esteja presente (até 3 leituras, sem repetir o POST). Se não puder confirmar, **não marca `admitted`**, mantém `pending`, encerra o apply e exige reconciliação. `pending` não significa mensagem enviada. As revisões humanas diárias e a proteção contra envios duplicados continuam obrigatórias.
+
 ## Arquitetura e salvaguardas
 
 - Reutiliza `WeniClient`, `FarmaliderClient`, a seleção por identidade e `resolve_contact_order`; não introduz um endpoint de histórico inexistente.
@@ -38,6 +50,14 @@ Conforme a orientação posterior do responsável, bloqueiam **Opt-Out Marketing
 - Os logs mostram contatos processados, tempo, velocidade no dry-run, consultas e reutilizações do cache. O ganho real depende da latência, dos limites das APIs e da quantidade de planos com alterações.
 
 Para usar apenas uma consulta por vez no dry-run, execute `nexo weni recompra dry-run --workers 1`. O padrão de quatro consultas já vale para os launchers existentes. `--full` mantém a auditoria completa; não usa dados antigos para dispensar a confirmação oficial.
+
+## Iniciar pelo BAT ou executável
+
+- **`atualizar_recompra.bat`**: diagnóstico, dry-run, nova revisão humana e apply da recompra.
+- **`NexoFlow Recompra.exe`**: novo atalho executável dedicado, que inicia exatamente esse BAT (independente de `RECOMPRA_ENABLED`), sem pular confirmações.
+- **`NexoFlow Weni.exe`**: chama `atualizar_weni.bat` e executa a recompra somente se `RECOMPRA_ENABLED=True`; agora propaga erro da recompra em vez de exibir sucesso geral indevido.
+
+A instalação precisa conter o executável novo; baixar o Setup atualizado da versão que inclua esta correção. A validação automatizada cobre a lógica de inclusão com transporte Weni sintético, o executável Windows compilado chamando o BAT e o código de retorno. **Não comprova inclusão em produção** sem teste controlado de um contato real, previamente revisado e autorizado.
 
 ## Comandos
 
