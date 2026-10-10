@@ -108,6 +108,22 @@ Com `delivery_hour=-1`, o horário é o da compra +25 dias. Se entrar no grupo n
 
 Não há confirmação de entrega do WhatsApp nesta rotina. A proteção local impede reentrada iniciada pelo NexoFlow, mas não impede edições manuais externas do grupo/campo nem duplicações causadas por outros sistemas. Se uma compra nova ocorrer na FarmaLíder enquanto o NexoFlow estiver parado e a Weni ainda guardar a compra antiga, o fluxo atual não faz GET à FarmaLíder antes de enviar. Garantir essa situação exige webhook de compra ou confirmação no fluxo antes do envio; nenhuma dessas alterações de produção foi ativada automaticamente.
 
+## Falhas e diagnóstico seguro (10/10/2026)
+
+Após interrupção do apply, **não repita o snapshot** nem apague `logs/recompra_state.json`, `logs/recompra_audit.jsonl` ou `logs/recompra_state.lock` sem investigar. O log anterior, com apenas `RuntimeError`, não prova se o problema foi Weni, checagem local ou rede FarmaLíder; a resposta HTTP 200 da FarmaLíder não confirma POSTs à Weni.
+
+Para inspecionar **somente os arquivos locais**, sem rede ou gravação:
+
+```text
+.venv\\Scripts\\python.exe run_recompra.py --diagnose-state
+```
+
+O resultado exibe totais de admissão local, `pending`, eventos da auditoria e as últimas pendências. `pending` significa **intenção de inscrição cujo resultado remoto não pode ser presumido**, não mensagem enviada. A amostra de UUIDs permite conferência manual na Weni; os arquivos privados não devem ser publicados no GitHub. Auditorias anteriores à correção podem não ter `stage` ou `error_type`.
+
+Em novas falhas, `logs/nexoflow_recompra.log` registra etapa, tipo e origem (arquivo/linha/função) sem corpo da API, CPF ou token; a auditoria anota etapa e tipo. Divergência de guarda ou desaparecimento de contato **antes de tentar o POST de inclusão** agora vira conflito auditado, desfaz o `pending` criado na execução e continua nos demais contatos, exigindo uma nova revisão para aquele contato. Falha ao adicionar no grupo continua bloqueando o reenvio automático: reconcilie a intenção com o estado real da Weni antes de considerar qualquer ação manual.
+
+Somente após reconciliar as pendências, gere um **novo dry-run e nova revisão humana do dia**. O NexoFlow não faz reenvio retroativo nem altera a campanha por conta própria.
+
 ## Testes
 
 Fixtures sintéticas cobrem 0, 24, 25, 26 e 365 dias, futuro, fuso local, campos vazios, produtos com vírgula, recusas e Opt-Out, estados de pedido, proteção contra regressão de compra, referência nova, reprocessamento/reinicialização, resposta incerta, estado corrompido, revisão adulterada/expirada, recusa concorrente, cancelamento antes de atualizar a data e rotas do fluxo que tentariam contornar as guardas.
