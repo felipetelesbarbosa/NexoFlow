@@ -14,7 +14,7 @@ Conforme a orientação posterior do responsável, bloqueiam **Opt-Out Marketing
 
 - Reutiliza `WeniClient`, `FarmaliderClient`, a seleção por identidade e `resolve_contact_order`; não introduz um endpoint de histórico inexistente.
 - Consulta CPFs válidos primeiro e conclui essa fase antes dos inválidos preenchidos, incluindo zeros; ausentes ficam por último. Compartilha payloads brutos de GET por CPF e pedido na execução, mas valida cada contato por identidade; CPF inválido continua exigindo nome + e-mail ou nome + telefone, sem ambiguidade.
-- Atualiza `pedido_data` com ISO 8601 com offset `-03:00`, `pedido_produtos` com CSV compatível com as listas atuais, `ultimo_pedido` com o serializador oficial. A recompra usa exclusivamente `pedido_data`; não exige, consulta ou altera `ultima_compra`.
+- Atualiza `pedido_data` com ISO 8601 com offset `-03:00`, `pedido_produtos` com CSV compatível com as listas atuais. O JSON completo do pedido é preservado em `logs/recompra_state.json`, enquanto `ultimo_pedido` na Weni recebe um JSON compacto válido (pedido_id, data_hora UTC, valor_total_compra, produtos com nome/quantidade/preços), **somente se couber no limite conservador de 640 caracteres**. Se não couber, não corta o JSON e sinaliza a omissão no relatório de revisão. A recompra usa exclusivamente `pedido_data`; não exige, consulta ou altera `ultima_compra`.
 - Atualiza também ID, quantidades, valores unitários, total, status e pagamento usando o plano de pedido existente; não mistura campos de duas compras no Analytics. Itens incompletos bloqueiam a admissão.
 - Produtos com vírgulas mantêm aspas de CSV; não são artificialmente divididos. Produtos não são substituídos por códigos.
 - Não substitui uma compra confirmada mais recente por um pedido antigo. Um pedido recente cancelado ou pendente não apaga a compra confirmada anterior.
@@ -119,6 +119,8 @@ Para inspecionar **somente os arquivos locais**, sem rede ou gravação:
 ```
 
 O resultado exibe totais de admissão local, `pending`, eventos da auditoria e as últimas pendências. `pending` significa **intenção de inscrição cujo resultado remoto não pode ser presumido**, não mensagem enviada. A amostra de UUIDs permite conferência manual na Weni; os arquivos privados não devem ser publicados no GitHub. Auditorias anteriores à correção podem não ter `stage` ou `error_type`.
+
+Na falha de 10/10/2026, o primeiro pedido elegível tinha `ultimo_pedido` de 1.002 caracteres; **todos os 106 planos de inclusão revisados tinham JSON acima de 640 caracteres**, tornando plausível uma divergência na releitura do campo após POST. O limite de 640 vem de documentação RapidPro de uma implantação independente e ainda precisa ser confirmado na instância Weni do projeto. O resumo compacto desse primeiro pedido tem 419 caracteres. A nova aplicação exige outro dry-run/revisão; o snapshot antigo não deve ser reutilizado.
 
 Em novas falhas, `logs/nexoflow_recompra.log` registra etapa, tipo e origem (arquivo/linha/função) sem corpo da API, CPF ou token; a auditoria anota etapa e tipo. Divergência de guarda ou desaparecimento de contato **antes de tentar o POST de inclusão** agora vira conflito auditado, desfaz o `pending` criado na execução e continua nos demais contatos, exigindo uma nova revisão para aquele contato. Falha ao adicionar no grupo continua bloqueando o reenvio automático: reconcilie a intenção com o estado real da Weni antes de considerar qualquer ação manual.
 
