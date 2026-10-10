@@ -1095,6 +1095,7 @@ try {
     Write-Step 'Criando atalhos do NexoFlow na Área de Trabalho'
     $appExe = Join-Path $InstallDir 'NexoFlow Analytics.exe'
     $updateExe = Join-Path $InstallDir 'NexoFlow Weni.exe'
+    $recompraExe = Join-Path $InstallDir 'NexoFlow Recompra.exe'
     $appIcon = Join-Path $InstallDir 'assets\NexoFlow.ico'
     $updateIcon = Join-Path $InstallDir 'assets\NexoFlow_Weni.ico'
     $terminalIcon = Join-Path $InstallDir 'assets\NexoFlow_Terminal.ico'
@@ -1110,6 +1111,8 @@ try {
         (Join-Path $userDesktop 'NexoFlow Analytics.lnk'),
         (Join-Path $desktop 'NexoFlow Weni.lnk'),
         (Join-Path $userDesktop 'NexoFlow Weni.lnk'),
+        (Join-Path $desktop 'NexoFlow Recompra.lnk'),
+        (Join-Path $userDesktop 'NexoFlow Recompra.lnk'),
         (Join-Path $desktop 'NexoFlow Planilha.lnk'),
         (Join-Path $userDesktop 'NexoFlow Planilha.lnk'),
         (Join-Path $desktop 'NexoFlow Terminal.lnk'),
@@ -1131,10 +1134,12 @@ try {
     if (Test-Path -LiteralPath $startMenu) { Remove-Item -LiteralPath $startMenu -Recurse -Force -ErrorAction SilentlyContinue }
     Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Analytics.lnk') -TargetPath $appExe -WorkingDirectory $InstallDir -Description 'Valida o ambiente e executa uma sincronização incremental do NexoFlow' -IconPath $appIcon
     Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Weni.lnk') -TargetPath $updateExe -WorkingDirectory $InstallDir -Description 'Audita e atualiza contatos e campos da Weni' -IconPath $updateIcon
+    Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Recompra.lnk') -TargetPath $recompraExe -WorkingDirectory $InstallDir -Description 'Recompra FarmaLider D+25 com revisao antes de incluir na Weni' -IconPath $updateIcon
     Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Planilha.lnk') -TargetPath $planilhaExe -WorkingDirectory $InstallDir -Description 'Cargas por planilhas para Weni e Analytics, com revisão humana' -IconPath $planilhaIcon
     Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Terminal.lnk') -TargetPath $terminalExe -WorkingDirectory $InstallDir -Description 'Terminal NexoFlow com ambiente e proxy preparados para a sessao' -IconPath $terminalIcon
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Analytics.lnk') -TargetPath $appExe -WorkingDirectory $InstallDir -Description 'Sincronização manual segura do NexoFlow' -IconPath $appIcon
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Weni.lnk') -TargetPath $updateExe -WorkingDirectory $InstallDir -Description 'Atualização segura de contatos e campos da Weni' -IconPath $updateIcon
+    Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Recompra.lnk') -TargetPath $recompraExe -WorkingDirectory $InstallDir -Description 'Recompra FarmaLider D+25 com revisao obrigatoria' -IconPath $updateIcon
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Planilha.lnk') -TargetPath $planilhaExe -WorkingDirectory $InstallDir -Description 'Cargas por planilhas para Weni e Analytics, com revisão humana' -IconPath $planilhaIcon
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Terminal.lnk') -TargetPath $terminalExe -WorkingDirectory $InstallDir -Description 'Terminal NexoFlow com ambiente e proxy preparados para a sessao' -IconPath $terminalIcon
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'Desinstalar NexoFlow.lnk') -TargetPath $uninstallCmd -WorkingDirectory $InstallDir -Description 'Desinstala o NexoFlow' -IconPath (Join-Path $InstallDir 'assets\uninstaller.ico')
@@ -1146,7 +1151,7 @@ try {
 
     Write-Step 'Atualizando cache de ícones do Windows'
     $uninstallExe = Join-Path $InstallDir 'NexoFlow Uninstall.exe'
-    Refresh-NexoFlowIconCache -Executables @($appExe, $updateExe, $terminalExe, $planilhaExe, $uninstallExe)
+    Refresh-NexoFlowIconCache -Executables @($appExe, $updateExe, $recompraExe, $terminalExe, $planilhaExe, $uninstallExe)
     Write-Host '[OK] Explorer notificado para reler os ícones internos dos executáveis do NexoFlow.' -ForegroundColor Green
 
     Write-Step 'Registrando NexoFlow no Windows'
