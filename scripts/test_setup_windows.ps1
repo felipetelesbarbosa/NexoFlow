@@ -41,6 +41,7 @@ function Remove-TestArtifacts {
     foreach ($shortcut in @(
         (Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) "NexoFlow Analytics.lnk"),
         (Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) "NexoFlow Weni.lnk"),
+        (Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) "NexoFlow Recompra.lnk"),
         (Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) "NexoFlow Planilha.lnk"),
         (Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) "NexoFlow Terminal.lnk"),
         (Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\NexoFlow")
@@ -97,6 +98,10 @@ function Assert-Installed {
 
     Assert-True (Test-Path -LiteralPath (Join-Path $InstallDir "importacoes") -PathType Container) "A pasta importacoes não foi instalada."
 
+    $recompraLink = Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) "NexoFlow Recompra.lnk"
+    Assert-True (Test-Path -LiteralPath $recompraLink) "Atalho Recompra ausente."
+    $recompraShortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($recompraLink)
+    Assert-True ($recompraShortcut.TargetPath -eq (Join-Path $InstallDir "NexoFlow Recompra.exe")) "Destino do atalho Recompra incorreto."
     $shortcutPath = Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) "NexoFlow Planilha.lnk"
     Assert-True (Test-Path -LiteralPath $shortcutPath) "Atalho NexoFlow Planilha ausente."
     $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($shortcutPath)
