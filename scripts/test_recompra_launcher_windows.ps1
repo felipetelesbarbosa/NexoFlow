@@ -1,4 +1,4 @@
-param([string]$PackageDir = "dist/NexoFlow")
+﻿param([string]$PackageDir = "dist/NexoFlow")
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $package = Join-Path $root $PackageDir
