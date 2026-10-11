@@ -1,12 +1,68 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nexoflow"
+version = "1.0"
+description = "Integração Weni, FarmaLíder, Google Sheets e analytics."
+requires-python = ">=3.11"
+dynamic = ["dependencies", "optional-dependencies"]
+
+[tool.setuptools]
+# Módulos públicos explícitos: configuração privada e pastas de dados ficam fora.
+py-modules = [
+  "ad_attribution",
+  "analytics",
+  "auditar_consistencia",
+  "auditar_mudanca",
+  "config",
+  "contact_enrichment",
+  "delivery_spreadsheets",
+  "delivery_tickets",
+  "diagnostico",
+  "farmalider_client",
+  "farmalider_integration",
+  "google_sheets",
+  "logging_config",
+  "main",
+  "network_diagnostics",
+  "nexo_cli",
+  "pedido_utils",
+  "private_diagnostics",
+  "proxy_config",
+  "recompra",
+  "run_checkup_tests",
+  "run_delivery_tickets",
+  "run_diagnostico",
+  "run_main",
+  "run_pip",
+  "run_recompra",
+  "run_terminal",
+  "run_update_weni",
+  "run_webhook",
+  "run_webhook_pedidos",
+  "task_progress",
+  "urn_utils",
+  "webhook_eventos",
+  "webhook_pedidos",
+  "webhook_runtime",
+  "weni_chats_client",
+  "weni_client",
+  "weni_update",
+]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.dynamic.optional-dependencies]
+webhook = {file = ["requirements-webhook.txt"]}
+
 [tool.ruff]
 target-version = "py311"
 line-length = 88
 extend-exclude = [
   ".venv",
-  "webhook_eventos.py",
-  "webhook_pedidos.py",
-  "run_webhook.py",
-  "run_webhook_pedidos.py",
 ]
 
 [tool.ruff.lint]
