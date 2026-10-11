@@ -1,4 +1,5 @@
 """Otimizações de recompra com fixtures sintéticas, sem chamadas externas."""
+
 import tempfile
 import unittest
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -45,7 +46,9 @@ class RecompraReadCacheTests(unittest.TestCase):
         entry_barrier = Barrier(consumers)
         waiter_lock = Lock()
         waiter_count = 0
-        payload = {"clientes": [{"cliente": {"nome": "Cliente Sintético"}, "itens": [1]}]}
+        payload = {
+            "clientes": [{"cliente": {"nome": "Cliente Sintético"}, "itens": [1]}]
+        }
 
         class ObservedFuture(Future):
             def result(self, timeout=None):
@@ -70,7 +73,10 @@ class RecompraReadCacheTests(unittest.TestCase):
             entry_barrier.wait(TIMEOUT)
             return cache.get_cliente_by_cpf("52998224725")
 
-        with patch("recompra.Future", ObservedFuture), ThreadPoolExecutor(max_workers=consumers) as pool:
+        with (
+            patch("recompra.Future", ObservedFuture),
+            ThreadPoolExecutor(max_workers=consumers) as pool,
+        ):
             futures = [pool.submit(consume) for _ in range(consumers)]
             try:
                 self.assertTrue(started.wait(TIMEOUT))
@@ -94,7 +100,9 @@ class RecompraReadCacheTests(unittest.TestCase):
         first = cache.get_pedido(7)
         first["itens"][0]["descricao"] = "Modificado"
         self.assertEqual(cache.get_pedido("7"), farm.get_pedido.return_value)
-        self.assertEqual(cache.get_cliente_by_cpf("7"), farm.get_cliente_by_cpf.return_value)
+        self.assertEqual(
+            cache.get_cliente_by_cpf("7"), farm.get_cliente_by_cpf.return_value
+        )
         farm.get_pedido.assert_called_once_with(7)
         farm.get_cliente_by_cpf.assert_called_once_with("7")
 
@@ -112,12 +120,17 @@ class RecompraReadCacheTests(unittest.TestCase):
 
     def test_transient_error_does_not_persist_and_next_read_retries(self):
         farm = Mock()
-        farm.get_cliente_by_cpf.side_effect = [RuntimeError("falha transitória"), {"cliente": {"id": 1}}]
+        farm.get_cliente_by_cpf.side_effect = [
+            RuntimeError("falha transitória"),
+            {"cliente": {"id": 1}},
+        ]
         cache = RecompraReadCache(farm)
         with self.assertRaisesRegex(RuntimeError, "transitória"):
             cache.get_cliente_by_cpf("52998224725")
         self.assertEqual(cache.metrics()["entradas"], 0)
-        self.assertEqual(cache.get_cliente_by_cpf("52998224725"), {"cliente": {"id": 1}})
+        self.assertEqual(
+            cache.get_cliente_by_cpf("52998224725"), {"cliente": {"id": 1}}
+        )
         self.assertEqual(farm.get_cliente_by_cpf.call_count, 2)
 
     def test_bad_request_remains_cached_for_this_run_only(self):
@@ -162,6 +175,7 @@ class RecompraReadCacheTests(unittest.TestCase):
 
         farm.get_cliente_by_cpf.side_effect = fetch
         with ThreadPoolExecutor(max_workers=2) as pool:
+
             class RacingFuture(Future):
                 def set_exception(self, exception):
                     super().set_exception(exception)
@@ -192,17 +206,25 @@ class RecompraReadCacheTests(unittest.TestCase):
     def test_invalid_cpf_cache_never_shares_selected_identity_or_order(self):
         contacts = []
         payload = {"clientes": []}
-        for index, name in enumerate(("Ana Cliente Sintética", "Bia Cliente Sintética"), start=1):
+        for index, name in enumerate(
+            ("Ana Cliente Sintética", "Bia Cliente Sintética"), start=1
+        ):
             contact = synthetic_contact(index, "0")
             contact["name"] = name
             contact["urns"] = []
             contact["fields"]["email"] = f"cliente{index}@example.test"
             contacts.append(contact)
-            payload["clientes"].append({
-                "cliente": {"id": index, "cpf": "0", "nome": name,
-                            "email": f"cliente{index}@example.test"},
-                "ultimoPedido": {"id": str(index * 100), "codCliente": index},
-            })
+            payload["clientes"].append(
+                {
+                    "cliente": {
+                        "id": index,
+                        "cpf": "0",
+                        "nome": name,
+                        "email": f"cliente{index}@example.test",
+                    },
+                    "ultimoPedido": {"id": str(index * 100), "codCliente": index},
+                }
+            )
         farm = Mock()
         farm.get_cliente_by_cpf.return_value = payload
         cache = RecompraReadCache(farm)
@@ -233,12 +255,11 @@ class RecompraPlanBuildTests(unittest.TestCase):
             patch("recompra.resolve_latest", return_value=(None, [])),
             patch("recompra.logging.info") as info,
         ):
-            plans = build_plans(
-                contacts, Mock(), STRUCTURE, {"contacts": {}}, now=NOW
-            )
+            plans = build_plans(contacts, Mock(), STRUCTURE, {"contacts": {}}, now=NOW)
         self.assertEqual(len(plans), 2050)
         progress_counts = [
-            call.args[1] for call in info.call_args_list
+            call.args[1]
+            for call in info.call_args_list
             if "velocidade=" in call.args[0]
         ]
         self.assertEqual(progress_counts, [1000, 2000])
@@ -269,8 +290,19 @@ class RecompraPlanBuildTests(unittest.TestCase):
                     active -= 1
 
         contacts = [synthetic_contact(index) for index in range(16)]
-        with patch("recompra.resolve_latest", side_effect=resolve), ThreadPoolExecutor(max_workers=1) as coordinator:
-            future = coordinator.submit(build_plans, contacts, Mock(), STRUCTURE, load_state(Path("absent-state-synthetic.json")), now=NOW, workers=4)
+        with (
+            patch("recompra.resolve_latest", side_effect=resolve),
+            ThreadPoolExecutor(max_workers=1) as coordinator,
+        ):
+            future = coordinator.submit(
+                build_plans,
+                contacts,
+                Mock(),
+                STRUCTURE,
+                load_state(Path("absent-state-synthetic.json")),
+                now=NOW,
+                workers=4,
+            )
             try:
                 barrier.wait(TIMEOUT)
                 with lock:
@@ -280,15 +312,30 @@ class RecompraPlanBuildTests(unittest.TestCase):
             plans = future.result(TIMEOUT)
         self.assertEqual(maximum, 4)
         self.assertEqual(len(plans), 16)
-        self.assertEqual({plan["contact_uuid"] for plan in plans}, {contact["uuid"] for contact in contacts})
+        self.assertEqual(
+            {plan["contact_uuid"] for plan in plans},
+            {contact["uuid"] for contact in contacts},
+        )
 
     def test_all_valid_cpfs_complete_before_invalid_including_zero(self):
-        cpfs = ["0", "", "123", "52998224725", "11111111111", "52998224725", "52998224725"]
+        cpfs = [
+            "0",
+            "",
+            "123",
+            "52998224725",
+            "11111111111",
+            "52998224725",
+            "52998224725",
+        ]
         contacts = [synthetic_contact(index, cpf) for index, cpf in enumerate(cpfs)]
         lock = Lock()
         completed_valid = set()
         invalid_seen = []
-        expected_valid = {contact["uuid"] for contact in contacts if cpf_query_priority(contact["fields"]["cpf"]) == 0}
+        expected_valid = {
+            contact["uuid"]
+            for contact in contacts
+            if cpf_query_priority(contact["fields"]["cpf"]) == 0
+        }
 
         def resolve(contact, *args, **kwargs):
             priority = cpf_query_priority(contact["fields"]["cpf"])
@@ -301,10 +348,15 @@ class RecompraPlanBuildTests(unittest.TestCase):
             return None, []
 
         with patch("recompra.resolve_latest", side_effect=resolve):
-            plans = build_plans(contacts, Mock(), STRUCTURE, {"contacts": {}}, now=NOW, workers=4)
+            plans = build_plans(
+                contacts, Mock(), STRUCTURE, {"contacts": {}}, now=NOW, workers=4
+            )
         self.assertEqual(len(plans), len(contacts))
         self.assertIn("0", invalid_seen)
-        self.assertEqual([cpf_query_priority(plan["guard"]["fields"]["cpf"]) for plan in plans], [0, 0, 0, 1, 1, 1, 2])
+        self.assertEqual(
+            [cpf_query_priority(plan["guard"]["fields"]["cpf"]) for plan in plans],
+            [0, 0, 0, 1, 1, 1, 2],
+        )
 
     def test_processing_starts_before_source_iterator_finishes(self):
         processing = Event()
@@ -313,7 +365,10 @@ class RecompraPlanBuildTests(unittest.TestCase):
         def source():
             for index in range(8):
                 yield synthetic_contact(index)
-            self.assertTrue(processing.wait(TIMEOUT), "A fonte foi consumida inteira antes de iniciar consultas.")
+            self.assertTrue(
+                processing.wait(TIMEOUT),
+                "A fonte foi consumida inteira antes de iniciar consultas.",
+            )
             yield synthetic_contact(8)
             source_finished.set()
 
@@ -324,7 +379,9 @@ class RecompraPlanBuildTests(unittest.TestCase):
             return None, []
 
         with patch("recompra.resolve_latest", side_effect=resolve):
-            plans = build_plans(source(), Mock(), STRUCTURE, {"contacts": {}}, now=NOW, workers=4)
+            plans = build_plans(
+                source(), Mock(), STRUCTURE, {"contacts": {}}, now=NOW, workers=4
+            )
         self.assertTrue(source_finished.is_set())
         self.assertEqual(len(plans), 9)
 
@@ -337,10 +394,20 @@ class RecompraPlanBuildTests(unittest.TestCase):
             created.append(Path(result.name))
             return result
 
-        contacts = [synthetic_contact("invalid", "0")] + [synthetic_contact(index) for index in range(8)]
-        with patch("recompra.tempfile.TemporaryDirectory", side_effect=directory), patch("recompra.resolve_latest", side_effect=RuntimeError("worker sintético falhou")):
+        contacts = [synthetic_contact("invalid", "0")] + [
+            synthetic_contact(index) for index in range(8)
+        ]
+        with (
+            patch("recompra.tempfile.TemporaryDirectory", side_effect=directory),
+            patch(
+                "recompra.resolve_latest",
+                side_effect=RuntimeError("worker sintético falhou"),
+            ),
+        ):
             with self.assertRaisesRegex(RuntimeError, "worker sintético"):
-                build_plans(contacts, Mock(), STRUCTURE, {"contacts": {}}, now=NOW, workers=4)
+                build_plans(
+                    contacts, Mock(), STRUCTURE, {"contacts": {}}, now=NOW, workers=4
+                )
         self.assertEqual(len(created), 1)
         self.assertFalse(created[0].exists())
 
@@ -348,7 +415,14 @@ class RecompraPlanBuildTests(unittest.TestCase):
         contacts = Mock()
         for workers in (0, 5):
             with self.subTest(workers=workers), self.assertRaises(ValueError):
-                build_plans(contacts, Mock(), STRUCTURE, {"contacts": {}}, now=NOW, workers=workers)
+                build_plans(
+                    contacts,
+                    Mock(),
+                    STRUCTURE,
+                    {"contacts": {}},
+                    now=NOW,
+                    workers=workers,
+                )
         self.assertEqual(contacts.mock_calls, [])
 
 
@@ -363,7 +437,10 @@ class RecompraApplyOptimizationTests(unittest.TestCase):
         contact, order, items = fixture(24, grouped=grouped)
         initial = propose(contact, order, items, STRUCTURE, now=NOW)
         contact["fields"].update(initial["fields"])
-        saved = {"purchase": initial["purchase"], "orders": {"100": record} if record is not None else {}}
+        saved = {
+            "purchase": initial["purchase"],
+            "orders": {"100": record} if record is not None else {},
+        }
         state = {"schema": 1, "contacts": {"u1": saved}}
         atomic_json(self.state_path, state)
         plan = propose(contact, order, items, STRUCTURE, saved, now=NOW)
@@ -372,14 +449,24 @@ class RecompraApplyOptimizationTests(unittest.TestCase):
 
     def apply(self, review, weni, farm):
         with patch("recompra.inspect_structure", return_value=STRUCTURE):
-            return apply_review(review, weni, farm, state_path=self.state_path, audit_path=self.audit_path, now_fn=lambda: NOW)
+            return apply_review(
+                review,
+                weni,
+                farm,
+                state_path=self.state_path,
+                audit_path=self.audit_path,
+                now_fn=lambda: NOW,
+            )
 
     def test_no_work_skips_contact_and_order_reads_posts_and_state_writes(self):
         _, _, _, saved, state, plan = self.existing_plan(record={"admitted": True})
         self.assertFalse(plan_needs_apply(plan, saved))
         review = make_review([plan], STRUCTURE, now=NOW, state=state)
         weni, farm = Mock(), Mock()
-        with patch("recompra.atomic_json") as writer, patch("recompra.resolve_latest") as resolver:
+        with (
+            patch("recompra.atomic_json") as writer,
+            patch("recompra.resolve_latest") as resolver,
+        ):
             self.assertEqual(self.apply(review, weni, farm), {"sem_mudanca": 1})
         self.assertEqual(weni.mock_calls, [])
         self.assertEqual(farm.mock_calls, [])
@@ -401,7 +488,8 @@ class RecompraApplyOptimizationTests(unittest.TestCase):
             result = self.apply(review, Mock(), Mock())
         self.assertEqual(result, {"sem_mudanca": 2050})
         progress_counts = [
-            call.args[1] for call in info.call_args_list
+            call.args[1]
+            for call in info.call_args_list
             if "contatos=%s/%s" in call.args[0]
         ]
         self.assertEqual(progress_counts, [1000, 2000])
@@ -421,10 +509,15 @@ class RecompraApplyOptimizationTests(unittest.TestCase):
         self.assertFalse(plan_needs_apply(plan, saved))
         review = make_review([plan], STRUCTURE, now=NOW, state=state)
         weni, farm = Mock(), Mock()
-        with patch("recompra.atomic_json") as writer, patch("recompra.resolve_latest") as resolver:
+        with (
+            patch("recompra.atomic_json") as writer,
+            patch("recompra.resolve_latest") as resolver,
+        ):
             self.assertEqual(self.apply(review, weni, farm), {"sem_mudanca": 1})
         self.assertEqual(self.state_path.read_bytes(), before)
-        self.assertEqual(load_state(self.state_path)["contacts"]["u1"]["purchase"], saved_purchase)
+        self.assertEqual(
+            load_state(self.state_path)["contacts"]["u1"]["purchase"], saved_purchase
+        )
         self.assertEqual(weni.mock_calls, [])
         self.assertEqual(farm.mock_calls, [])
         resolver.assert_not_called()
@@ -433,15 +526,21 @@ class RecompraApplyOptimizationTests(unittest.TestCase):
     def test_group_admission_needs_local_persistence_even_without_field_changes(self):
         for record in (None, {"admitted": False}, {"admitted": True, "pending": True}):
             with self.subTest(record=record):
-                contact, order, items, saved, state, plan = self.existing_plan(grouped=True, record=record)
+                contact, order, items, saved, state, plan = self.existing_plan(
+                    grouped=True, record=record
+                )
                 self.assertEqual(plan["action"], "")
                 self.assertTrue(plan_needs_apply(plan, saved))
                 review = make_review([plan], STRUCTURE, now=NOW, state=state)
                 weni, farm = Mock(), Mock()
                 weni.get_contact.return_value = contact
-                with patch("recompra.resolve_latest", return_value=(order, items)) as resolver:
+                with patch(
+                    "recompra.resolve_latest", return_value=(order, items)
+                ) as resolver:
                     self.assertEqual(self.apply(review, weni, farm), {"aplicados": 1})
-                persisted = load_state(self.state_path)["contacts"]["u1"]["orders"]["100"]
+                persisted = load_state(self.state_path)["contacts"]["u1"]["orders"][
+                    "100"
+                ]
                 self.assertTrue(persisted["admitted"])
                 self.assertFalse(persisted["pending"])
                 weni.get_contact.assert_called_once_with(uuid="u1")
@@ -483,13 +582,18 @@ class RecompraApplyOptimizationTests(unittest.TestCase):
         contact["fields"].update(initial["fields"])
         state = {"schema": 1, "contacts": {"u1": {"orders": {}}}}
         atomic_json(self.state_path, state)
-        plan = propose(contact, order, items, STRUCTURE, state["contacts"]["u1"], now=NOW)
+        plan = propose(
+            contact, order, items, STRUCTURE, state["contacts"]["u1"], now=NOW
+        )
         self.assertEqual(plan["fields"], {})
         self.assertEqual(plan["action"], "")
         weni, farm = Mock(), Mock()
         weni.get_contact.return_value = contact
         review = make_review([plan], STRUCTURE, now=NOW, state=state)
-        with patch("recompra.resolve_latest", return_value=(order, items)), patch("recompra.atomic_json", wraps=atomic_json) as writer:
+        with (
+            patch("recompra.resolve_latest", return_value=(order, items)),
+            patch("recompra.atomic_json", wraps=atomic_json) as writer,
+        ):
             self.assertEqual(self.apply(review, weni, farm), {"aplicados": 1})
             writer.assert_called_once()
         persisted = load_state(self.state_path)
@@ -510,11 +614,15 @@ class RecompraApplyOptimizationTests(unittest.TestCase):
         live = deepcopy(contact)
         weni, farm = Mock(), Mock()
         weni.get_contact.side_effect = lambda **kwargs: deepcopy(live)
-        weni.update_contact_fields.side_effect = lambda uid, fields: live["fields"].update(fields)
+        weni.update_contact_fields.side_effect = lambda uid, fields: live[
+            "fields"
+        ].update(fields)
 
         def uncertain(uid, *, action, group):
             self.assertEqual(action, "add")
-            self.assertTrue(load_state(self.state_path)["contacts"][uid]["orders"]["100"]["pending"])
+            self.assertTrue(
+                load_state(self.state_path)["contacts"][uid]["orders"]["100"]["pending"]
+            )
             raise RuntimeError("Resposta sintética perdida")
 
         weni.contact_group_action.side_effect = uncertain
@@ -532,15 +640,24 @@ class RecompraApplyOptimizationTests(unittest.TestCase):
 class RecompraRunnerOptimizationTests(unittest.TestCase):
     def test_worker_parser_defaults_and_rejects_values_outside_global_limit(self):
         parser = build_parser()
-        self.assertEqual(parser.parse_args(["--dry-run"]).workers, FARMALIDER_MAX_WORKERS)
+        self.assertEqual(
+            parser.parse_args(["--dry-run"]).workers, FARMALIDER_MAX_WORKERS
+        )
         self.assertEqual(parser.parse_args(["--dry-run", "--workers", "1"]).workers, 1)
         for workers in ("0", str(FARMALIDER_MAX_WORKERS + 1)):
-            with self.subTest(workers=workers), patch("sys.stderr"), self.assertRaises(SystemExit) as raised:
+            with (
+                self.subTest(workers=workers),
+                patch("sys.stderr"),
+                self.assertRaises(SystemExit) as raised,
+            ):
                 parser.parse_args(["--dry-run", "--workers", workers])
             self.assertEqual(raised.exception.code, 2)
 
     def test_dry_run_forwards_workers_and_streams_contacts_then_closes_clients(self):
-        for extra_args, workers in (([], FARMALIDER_MAX_WORKERS), (["--workers", "1"], 1)):
+        for extra_args, workers in (
+            ([], FARMALIDER_MAX_WORKERS),
+            (["--workers", "1"], 1),
+        ):
             with self.subTest(workers=workers), ExitStack() as stack:
                 contact, _, _ = fixture()
                 contacts = iter([contact])
@@ -551,20 +668,41 @@ class RecompraRunnerOptimizationTests(unittest.TestCase):
                 review = {"synthetic": "review", "day": NOW.date().isoformat()}
                 stack.enter_context(patch("proxy_config.configure_proxy"))
                 stack.enter_context(patch("logging_config.configure_logging"))
-                stack.enter_context(patch("secrets_config.WENI_API_TOKEN", "synthetic-token", create=True))
+                stack.enter_context(
+                    patch(
+                        "secrets_config.WENI_API_TOKEN", "synthetic-token", create=True
+                    )
+                )
                 stack.enter_context(patch("weni_client.WeniClient", return_value=weni))
-                stack.enter_context(patch("weni_update._open_farmalider", return_value=farm))
-                stack.enter_context(patch("recompra.inspect_structure", return_value=STRUCTURE))
+                stack.enter_context(
+                    patch("weni_update._open_farmalider", return_value=farm)
+                )
+                stack.enter_context(
+                    patch("recompra.inspect_structure", return_value=STRUCTURE)
+                )
                 stack.enter_context(patch("recompra.now_local", return_value=NOW))
                 stack.enter_context(patch("recompra.load_state", return_value=state))
-                planner = stack.enter_context(patch("recompra.build_plans", return_value=[plan]))
-                reviewer = stack.enter_context(patch("recompra.make_review", return_value=review))
+                planner = stack.enter_context(
+                    patch("recompra.build_plans", return_value=[plan])
+                )
+                reviewer = stack.enter_context(
+                    patch("recompra.make_review", return_value=review)
+                )
                 writer = stack.enter_context(patch("recompra.write_review"))
                 stack.enter_context(patch("builtins.print"))
                 review_out = Path("synthetic/review.json")
-                self.assertEqual(run_recompra(["--dry-run", "--review-out", str(review_out), *extra_args]), 0)
-                planner.assert_called_once_with(contacts, farm, STRUCTURE, state, now=NOW, workers=workers)
-                reviewer.assert_called_once_with([plan], STRUCTURE, now=NOW, state=state)
+                self.assertEqual(
+                    run_recompra(
+                        ["--dry-run", "--review-out", str(review_out), *extra_args]
+                    ),
+                    0,
+                )
+                planner.assert_called_once_with(
+                    contacts, farm, STRUCTURE, state, now=NOW, workers=workers
+                )
+                reviewer.assert_called_once_with(
+                    [plan], STRUCTURE, now=NOW, state=state
+                )
                 writer.assert_called_once_with(review, review_out)
                 weni.iter_contacts.assert_called_once_with()
                 weni.list_contacts.assert_not_called()

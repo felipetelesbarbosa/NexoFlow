@@ -17,7 +17,10 @@ def main() -> int:
 
     # Synthetic HTTP500 fixtures must never appear as real customer failures.
     with tempfile.TemporaryDirectory(prefix="nexoflow_checkup_") as directory:
-        with patch("private_diagnostics.private_diagnostic_directory", return_value=Path(directory)):
+        with patch(
+            "private_diagnostics.private_diagnostic_directory",
+            return_value=Path(directory),
+        ):
             suite = unittest.defaultTestLoader.discover(
                 "tests", pattern="test_*.py", top_level_dir="."
             )

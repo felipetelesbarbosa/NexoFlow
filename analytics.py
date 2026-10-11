@@ -56,11 +56,13 @@ def _full_load_25_uuid(contact: dict[str, Any]) -> str:
 
 
 def _full_load_25_uuids(contacts: list[dict[str, Any]]) -> list[str]:
-    return sorted({
-        _full_load_25_uuid(contact)
-        for contact in contacts
-        if _full_load_25_uuid(contact)
-    })
+    return sorted(
+        {
+            _full_load_25_uuid(contact)
+            for contact in contacts
+            if _full_load_25_uuid(contact)
+        }
+    )
 
 
 def _full_load_25_digest(uuids: list[str]) -> str:
@@ -107,7 +109,8 @@ def _full_load_25_load() -> dict[str, Any]:
 
 
 def _full_load_25_completed(
-    payload: dict[str, Any], component: str,
+    payload: dict[str, Any],
+    component: str,
 ) -> set[int]:
     completed = payload.get("completed")
     if not isinstance(completed, dict):
@@ -131,14 +134,10 @@ def _full_load_25_new_manifest(
             "A Weni não retornou contatos para criar a carga completa 25%."
         )
     captured = (
-        datetime.now(UTC)
-        .isoformat(timespec="microseconds")
-        .replace("+00:00", "Z")
+        datetime.now(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
     )
     digest = _full_load_25_digest(uuids)
-    campaign_id = hashlib.sha256(
-        f"{captured}|{digest}".encode()
-    ).hexdigest()[:16]
+    campaign_id = hashlib.sha256(f"{captured}|{digest}".encode()).hexdigest()[:16]
     return {
         "schema_version": 1,
         "campaign_id": campaign_id,
@@ -214,9 +213,7 @@ def prepare_full_load_quarter(
     current_set = set(current_map)
     manifest_set = set(manifest_uuids)
     selected_contacts = [
-        current_map[uuid]
-        for uuid in selected_manifest
-        if uuid in current_map
+        current_map[uuid] for uuid in selected_manifest if uuid in current_map
     ]
     return {
         "part": part,
@@ -241,27 +238,20 @@ def mark_full_load_quarter_complete(
 ) -> tuple[bool, bool]:
     payload = _full_load_25_load()
     if str(payload.get("campaign_id") or "") != str(campaign_id or ""):
-        raise RuntimeError(
-            "A campanha completa 25% mudou durante a execução."
-        )
+        raise RuntimeError("A campanha completa 25% mudou durante a execução.")
     completed = _full_load_25_completed(payload, component)
     if not set(range(1, part)).issubset(completed):
         raise RuntimeError("Não é possível concluir uma parte 25% fora de ordem.")
     completed.add(part)
     payload.setdefault("completed", {})[component] = sorted(completed)
-    payload.setdefault("completed_at_utc", {})[
-        f"{component}_{part}"
-    ] = (
-        datetime.now(UTC)
-        .isoformat(timespec="seconds")
-        .replace("+00:00", "Z")
+    payload.setdefault("completed_at_utc", {})[f"{component}_{part}"] = (
+        datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
     )
     _full_load_25_write(payload)
 
     component_complete = completed == set(range(1, FULL_LOAD_25_PARTS + 1))
     campaign_complete = all(
-        _full_load_25_completed(payload, name)
-        == set(range(1, FULL_LOAD_25_PARTS + 1))
+        _full_load_25_completed(payload, name) == set(range(1, FULL_LOAD_25_PARTS + 1))
         for name in _FULL_LOAD_25_COMPONENTS
     )
     return component_complete, campaign_complete
@@ -316,7 +306,11 @@ BASE_COLUMNS = [
     "bairro",
 ]
 
-HISTORY_COLUMNS = ["acao", "sincronizado_em", *[column for column in BASE_COLUMNS if column != "sincronizado_em"]]
+HISTORY_COLUMNS = [
+    "acao",
+    "sincronizado_em",
+    *[column for column in BASE_COLUMNS if column != "sincronizado_em"],
+]
 
 METRIC_COLUMNS = [
     "data",
@@ -635,8 +629,11 @@ def normalize_order_source(value: Any) -> str:
     """Normalize absent Weni order fields without treating invalid content as empty."""
     while isinstance(value, dict) and "value" in value:
         value = value["value"]
-    raw = (json.dumps(value, ensure_ascii=False, sort_keys=True)
-           if isinstance(value, (dict, list)) else normalize_value(value)).strip()
+    raw = (
+        json.dumps(value, ensure_ascii=False, sort_keys=True)
+        if isinstance(value, (dict, list))
+        else normalize_value(value)
+    ).strip()
     return "" if raw.casefold() == "null" else raw
 
 
@@ -688,9 +685,14 @@ def is_meta_ads_contact(contact: dict[str, Any]) -> bool:
 
 def has_ultimo_pedido(contact: dict[str, Any]) -> bool:
     fields = get_fields(contact)
-    return any(normalize_value(fields.get(key)).strip() for key in (
-        "ultimo_pedido", "pedido_id", "pedido_produtos",
-    ))
+    return any(
+        normalize_value(fields.get(key)).strip()
+        for key in (
+            "ultimo_pedido",
+            "pedido_id",
+            "pedido_produtos",
+        )
+    )
 
 
 def is_relevant_contact(contact: dict[str, Any]) -> bool:
@@ -731,10 +733,16 @@ def normalize_contact(
         "maior_de_18_anos": normalize_value(fields.get("maior_de_18_anos")),
         "opt_in_lgpd": normalize_value(fields.get("opt_in_lgpd")),
         "contact_urn": urn,
-        "contact_urn_whatsapp": resolved_urns.channel_urns.get("whatsapp", "") or normalize_value(fields.get("contact_urn_whatsapp")),
-        "contact_urn_instagram": normalize_value(fields.get("contact_urn_instagram")) or resolved_urns.channel_urns.get("instagram", ""),
-        "contact_urn_facebook": normalize_value(fields.get("contact_urn_facebook")) or resolved_urns.channel_urns.get("facebook", ""),
-        "contact_canal_principal": normalize_value(fields.get("contact_canal_principal")) or resolved_urns.principal_channel,
+        "contact_urn_whatsapp": resolved_urns.channel_urns.get("whatsapp", "")
+        or normalize_value(fields.get("contact_urn_whatsapp")),
+        "contact_urn_instagram": normalize_value(fields.get("contact_urn_instagram"))
+        or resolved_urns.channel_urns.get("instagram", ""),
+        "contact_urn_facebook": normalize_value(fields.get("contact_urn_facebook"))
+        or resolved_urns.channel_urns.get("facebook", ""),
+        "contact_canal_principal": normalize_value(
+            fields.get("contact_canal_principal")
+        )
+        or resolved_urns.principal_channel,
         "farmalider_cliente_id": "",
         "farmalider_cliente_nome": "",
         "farmalider_cliente_status": "",
@@ -750,13 +758,21 @@ def normalize_contact(
         row[key] = normalize_value(fields.get(key))
 
     for key in (
-        "pedido_id", "pedido_data", "pedido_status", "pedido_forma_pagamento",
-        "pedido_produtos", "pedido_quantidade_itens", "pedido_valor_produtos",
+        "pedido_id",
+        "pedido_data",
+        "pedido_status",
+        "pedido_forma_pagamento",
+        "pedido_produtos",
+        "pedido_quantidade_itens",
+        "pedido_valor_produtos",
         "pedido_valor",
     ):
         row[key] = normalize_value(fields.get(key))
     payment_code = normalize_farmalider_payment_code(row["pedido_forma_pagamento"])
-    if payment_code == "0" or row["pedido_forma_pagamento"].strip().casefold() == "cancelado":
+    if (
+        payment_code == "0"
+        or row["pedido_forma_pagamento"].strip().casefold() == "cancelado"
+    ):
         row["pedido_forma_pagamento"] = "Cancelado"
     elif payment_code:
         row["pedido_forma_pagamento"] = payment_code
@@ -883,11 +899,7 @@ def _canonical_order_key(
     if pedido_id:
         return f"FARMALIDER:{pedido_id}"
 
-    basis = (
-        f"{contact_uuid}|{data_hora}"
-        if data_hora
-        else f"{contact_uuid}|{raw}"
-    )
+    basis = f"{contact_uuid}|{data_hora}" if data_hora else f"{contact_uuid}|{raw}"
     return hashlib.sha256(basis.encode("utf-8")).hexdigest()[:32]
 
 
@@ -916,16 +928,14 @@ def _parse_order_items(
 
     for position, product in enumerate(produtos, start=1):
         if not isinstance(product, dict):
-            raise ValueError(
-                f"produto na posição {position} não é um objeto."
-            )
+            raise ValueError(f"produto na posição {position} não é um objeto.")
 
         nome = normalize_value(product.get("nome")).strip()
-        codigo = normalize_value(product.get("codigo") or product.get("codProduto")).strip()
+        codigo = normalize_value(
+            product.get("codigo") or product.get("codProduto")
+        ).strip()
         if not nome and not codigo:
-            raise ValueError(
-                f"produto na posição {position} sem nome ou código."
-            )
+            raise ValueError(f"produto na posição {position} sem nome ou código.")
 
         quantidade = _quantity(product.get("quantidade"))
         valor_unitario = _to_decimal(
@@ -981,15 +991,13 @@ def _parse_order_totals(
             raise ValueError("farmalider_frete não pode ser negativo.")
         comparison_total += freight
     difference = total_compra - comparison_total
-    status = (
-        "OK"
-        if abs(difference) <= Decimal("0.01")
-        else "ATENÇÃO_TOTAL_DIVERGENTE"
-    )
+    status = "OK" if abs(difference) <= Decimal("0.01") else "ATENÇÃO_TOTAL_DIVERGENTE"
     if "quantidade_itens" in payload:
         reported_qty = _quantity(payload["quantidade_itens"])
         if reported_qty != total_unidades:
-            raise ValueError("quantidade_itens diverge da soma das quantidades dos produtos.")
+            raise ValueError(
+                "quantidade_itens diverge da soma das quantidades dos produtos."
+            )
 
     return comparison_total, difference, status
 
@@ -1052,9 +1060,7 @@ def parse_ultimo_pedido_raw(
         if not isinstance(produtos, list):
             raise ValueError("produtos precisa ser uma lista.")
 
-        pedido_chave = _canonical_order_key(
-            contact_uuid, data_hora, raw, pedido_id
-        )
+        pedido_chave = _canonical_order_key(contact_uuid, data_hora, raw, pedido_id)
 
         item_rows, total_itens, total_unidades = _parse_order_items(
             produtos,
@@ -1136,31 +1142,52 @@ def parse_ultimo_pedido_raw(
             "capturado_em": captured_at,
         }
         for key in (
-            "origem_pedido", "status_confirmacao", "farmalider_cancelamento",
-            "farmalider_status_pedido", "farmalider_frete", "valor_origem", "total_api",
-            "valor_total_api_itens", "quantidade_itens_api", "farmalider_cod_cliente",
-            "farmalider_cliente_id", "farmalider_emissao", "farmalider_confirmado_em",
-            "valor_total_weni", "diferenca_total_weni_api",
+            "origem_pedido",
+            "status_confirmacao",
+            "farmalider_cancelamento",
+            "farmalider_status_pedido",
+            "farmalider_frete",
+            "valor_origem",
+            "total_api",
+            "valor_total_api_itens",
+            "quantidade_itens_api",
+            "farmalider_cod_cliente",
+            "farmalider_cliente_id",
+            "farmalider_emissao",
+            "farmalider_confirmado_em",
+            "valor_total_weni",
+            "diferenca_total_weni_api",
             "farmalider_erro",
             "farmalider_status_pedido_nome",
-            "farmalider_forma_pagamento", "farmalider_forma_pagamento_nome",
+            "farmalider_forma_pagamento",
+            "farmalider_forma_pagamento_nome",
         ):
             if key in payload:
                 order_row[key] = normalize_value(payload[key])
-        official_status_name = farmalider_order_status_name(effective_order_status_code(order_row))
+        official_status_name = farmalider_order_status_name(
+            effective_order_status_code(order_row)
+        )
         if official_status_name:
             order_row["farmalider_status_pedido_nome"] = official_status_name
-        order_row["farmalider_forma_pagamento_nome"] = farmalider_payment_method_display(
-            order_row["farmalider_forma_pagamento"]
+        order_row["farmalider_forma_pagamento_nome"] = (
+            farmalider_payment_method_display(order_row["farmalider_forma_pagamento"])
         )
         upstream_validation = normalize_value(payload.get("status_validacao")).strip()
         if upstream_validation and upstream_validation not in {"OK", "VALIDADO_WENI"}:
             order_row["status_validacao"] = upstream_validation
             if upstream_validation.startswith("ERRO"):
-                order_row["erro_parse"] = "Snapshot de pedido marcado com erro de validação na origem."
+                order_row["erro_parse"] = (
+                    "Snapshot de pedido marcado com erro de validação na origem."
+                )
         return order_row, item_rows
 
-    except (json.JSONDecodeError, ValueError, TypeError, InvalidOperation, OverflowError) as exc:
+    except (
+        json.JSONDecodeError,
+        ValueError,
+        TypeError,
+        InvalidOperation,
+        OverflowError,
+    ) as exc:
         error_row = {
             "pedido_chave": fallback_key,
             "pedido_id": "",
@@ -1232,8 +1259,12 @@ def _split_weni_order_list(value: Any) -> list[str]:
 def _derived_order_payload(fields: dict[str, Any]) -> dict[str, Any] | None:
     """Build a legacy-compatible order object from the flat Weni order fields."""
     names = (
-        "pedido_id", "pedido_data", "pedido_produtos",
-        "pedido_quantidade_itens", "pedido_valor_produtos", "pedido_valor",
+        "pedido_id",
+        "pedido_data",
+        "pedido_produtos",
+        "pedido_quantidade_itens",
+        "pedido_valor_produtos",
+        "pedido_valor",
     )
     if not any(normalize_value(fields.get(key)).strip() for key in names):
         return None
@@ -1279,18 +1310,26 @@ def _derived_order_payload(fields: dict[str, Any]) -> dict[str, Any] | None:
         product_names, quantities, unit_values = [], [], []
 
     product_rows: list[dict[str, Any]] | None = None
-    if product_names and all(product_names) and len(product_names) == len(quantities) == len(unit_values):
+    if (
+        product_names
+        and all(product_names)
+        and len(product_names) == len(quantities) == len(unit_values)
+    ):
         rows: list[dict[str, Any]] = []
         try:
-            for name, qty_raw, unit_raw in zip(product_names, quantities, unit_values, strict=False):
+            for name, qty_raw, unit_raw in zip(
+                product_names, quantities, unit_values, strict=False
+            ):
                 qty = _to_decimal(qty_raw, "quantidade")
                 unit = _to_decimal(unit_raw, "valor_unitario")
-                rows.append({
-                    "nome": name,
-                    "quantidade": _quantity_text(qty),
-                    "valor_unitario": _money(unit),
-                    "valor_total": _money(qty * unit),
-                })
+                rows.append(
+                    {
+                        "nome": name,
+                        "quantidade": _quantity_text(qty),
+                        "valor_unitario": _money(unit),
+                        "valor_total": _money(qty * unit),
+                    }
+                )
         except ValueError:
             rows = []
         if rows:
@@ -1299,10 +1338,20 @@ def _derived_order_payload(fields: dict[str, Any]) -> dict[str, Any] | None:
     raw_status = normalize_value(fields.get("pedido_status")).strip()
     raw_payment = normalize_value(fields.get("pedido_forma_pagamento")).strip()
     payment_code = normalize_farmalider_payment_code(raw_payment)
-    payment_value = "Cancelado" if payment_code == "0" or raw_payment.casefold() == "cancelado" else payment_code or raw_payment
-    status_code = effective_order_status_code({
-        "pedido_status": raw_status, "pedido_forma_pagamento": payment_value,
-    }) or raw_status
+    payment_value = (
+        "Cancelado"
+        if payment_code == "0" or raw_payment.casefold() == "cancelado"
+        else payment_code or raw_payment
+    )
+    status_code = (
+        effective_order_status_code(
+            {
+                "pedido_status": raw_status,
+                "pedido_forma_pagamento": payment_value,
+            }
+        )
+        or raw_status
+    )
     return {
         "pedido_id": pedido_id,
         "data_hora": pedido_data,
@@ -1311,6 +1360,7 @@ def _derived_order_payload(fields: dict[str, Any]) -> dict[str, Any] | None:
         "farmalider_status_pedido": status_code,
         "farmalider_forma_pagamento": payment_value,
     }
+
 
 def parse_ultimo_pedido(
     contact: dict[str, Any],
@@ -1336,10 +1386,9 @@ def parse_ultimo_pedido(
     )
 
     original_order, original_items = parse_ultimo_pedido_raw(raw, **context)
-    original_valid = (
-        original_order is not None
-        and not str(original_order.get("status_validacao") or "").startswith("ERRO")
-    )
+    original_valid = original_order is not None and not str(
+        original_order.get("status_validacao") or ""
+    ).startswith("ERRO")
     if raw and not original_valid:
         return original_order, original_items
 
@@ -1348,16 +1397,17 @@ def parse_ultimo_pedido(
         return original_order, original_items
 
     derived_order, derived_items = parse_ultimo_pedido_raw(
-        json.dumps(derived_payload, ensure_ascii=False), **context,
+        json.dumps(derived_payload, ensure_ascii=False),
+        **context,
     )
     assert derived_order is not None
     derived_order["ultimo_pedido_raw"] = raw
     if derived_order["origem_pedido"] == "WENI_ULTIMO_PEDIDO":
         derived_order["origem_pedido"] = "WENI_PEDIDO_FIELDS"
 
-    derived_valid = not str(
-        derived_order.get("status_validacao") or ""
-    ).startswith("ERRO")
+    derived_valid = not str(derived_order.get("status_validacao") or "").startswith(
+        "ERRO"
+    )
     if not original_valid:
         return (
             (derived_order, derived_items)
@@ -1370,8 +1420,7 @@ def parse_ultimo_pedido(
     if derived_valid:
         confirmation = derived_order.get("status_confirmacao", "")
         verified = (
-            confirmation.startswith("CONFIRMADO_API")
-            or confirmation == "CANCELADO_API"
+            confirmation.startswith("CONFIRMADO_API") or confirmation == "CANCELADO_API"
         )
         derived_dt = business_order_datetime(derived_order.get("data_hora", ""))
         original_dt = business_order_datetime(original_order.get("data_hora", ""))
@@ -1394,6 +1443,7 @@ def parse_ultimo_pedido(
         ):
             return derived_order, derived_items
     return original_order, original_items
+
 
 def _order_revenue_parts(record: dict[str, str]) -> tuple[Decimal, Decimal, Decimal]:
     """Return products, freight and billed total for a validated order."""
@@ -1510,13 +1560,19 @@ def _bi_float(value: Decimal) -> float:
 
 def _order_customer_identity_verified(record: dict[str, str]) -> bool:
     cpf = normalize_cpf(record.get("cpf_normalizado") or record.get("cpf"))
-    return not cpf or is_valid_cpf(cpf) or str(record.get("origem_pedido") or "").endswith("_IDENTIDADE_VALIDADA")
+    return (
+        not cpf
+        or is_valid_cpf(cpf)
+        or str(record.get("origem_pedido") or "").endswith("_IDENTIDADE_VALIDADA")
+    )
 
 
 def _sales_order_is_valid(record: dict[str, str]) -> bool:
     """API-confirmed ready-for-route, in-transit and completed orders enter sales KPIs."""
     confirmation = str(record.get("status_confirmacao") or "")
-    if not confirmation.startswith("CONFIRMADO_API") or not _order_customer_identity_verified(record):
+    if not confirmation.startswith(
+        "CONFIRMADO_API"
+    ) or not _order_customer_identity_verified(record):
         return False
     return (
         record.get("status_validacao") in ("OK", "ATENÇÃO_TOTAL_DIVERGENTE")
@@ -1526,11 +1582,7 @@ def _sales_order_is_valid(record: dict[str, str]) -> bool:
 
 
 def _bi_valid_orders(order_records: list[dict[str, str]]) -> list[dict[str, str]]:
-    return [
-        record
-        for record in order_records
-        if _sales_order_is_valid(record)
-    ]
+    return [record for record in order_records if _sales_order_is_valid(record)]
 
 
 def build_bi_sales_rows(
@@ -1545,8 +1597,14 @@ def build_bi_sales_rows(
     dates_seen: set[str] = set()
     for row in base:
         (
-            date, pedidos, confirmados, compradores, unidades,
-            faturamento_produtos, faturamento_frete, faturamento_total,
+            date,
+            pedidos,
+            confirmados,
+            compradores,
+            unidades,
+            faturamento_produtos,
+            faturamento_frete,
+            faturamento_total,
             fat_confirmado,
         ) = row
         pedidos_i = int(pedidos or 0)
@@ -1554,30 +1612,46 @@ def build_bi_sales_rows(
         faturamento_d = _bi_decimal(faturamento_total)
         ticket = (faturamento_d / pedidos_i) if pedidos_i else Decimal("0")
         taxa = (Decimal(confirmados_i) * 100 / pedidos_i) if pedidos_i else Decimal("0")
-        rows.append([
-            date,
-            pedidos_i,
-            confirmados_i,
-            int(compradores or 0),
-            float(_bi_decimal(unidades)),
-            _bi_float(_bi_decimal(faturamento_produtos)),
-            _bi_float(_bi_decimal(faturamento_frete)),
-            _bi_float(faturamento_d),
-            _bi_float(faturamento_d),
-            _bi_float(_bi_decimal(fat_confirmado)),
-            _bi_float(ticket),
-            _bi_float(taxa),
-            updated_at,
-        ])
+        rows.append(
+            [
+                date,
+                pedidos_i,
+                confirmados_i,
+                int(compradores or 0),
+                float(_bi_decimal(unidades)),
+                _bi_float(_bi_decimal(faturamento_produtos)),
+                _bi_float(_bi_decimal(faturamento_frete)),
+                _bi_float(faturamento_d),
+                _bi_float(faturamento_d),
+                _bi_float(_bi_decimal(fat_confirmado)),
+                _bi_float(ticket),
+                _bi_float(taxa),
+                updated_at,
+            ]
+        )
         dates_seen.add(str(date))
 
     if snapshot_date not in dates_seen:
-        rows.append([
-            snapshot_date, 0, 0, 0, 0,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, updated_at,
-        ])
+        rows.append(
+            [
+                snapshot_date,
+                0,
+                0,
+                0,
+                0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                updated_at,
+            ]
+        )
     rows.sort(key=lambda row: str(row[0]))
     return rows
+
 
 def _bi_channel(record: dict[str, str]) -> str:
     value = (record.get("contact_canal_principal") or "").strip().casefold()
@@ -1609,7 +1683,11 @@ def build_bi_summary_record(
     updated_at: str,
 ) -> dict[str, Any]:
     valid_orders = _bi_valid_orders(order_records)
-    all_buyers = {r.get("contact_uuid", "").strip() for r in valid_orders if r.get("contact_uuid", "").strip()}
+    all_buyers = {
+        r.get("contact_uuid", "").strip()
+        for r in valid_orders
+        if r.get("contact_uuid", "").strip()
+    }
     all_order_keys = {r.get("pedido_chave", "").strip() for r in valid_orders}
     all_products = sum((_order_revenue_parts(r)[0] for r in valid_orders), Decimal("0"))
     all_freight = sum((_order_revenue_parts(r)[1] for r in valid_orders), Decimal("0"))
@@ -1701,17 +1779,32 @@ def build_bi_channel_records(
     result: list[dict[str, Any]] = []
     for channel in channels:
         rows = [r for r in base_records if _bi_channel(r) == channel]
-        result.append({
-            "chave": f"{snapshot_date}|{channel}",
-            "data": snapshot_date,
-            "canal": channel,
-            "contatos": len(rows),
-            "contatos_com_cpf": sum(1 for r in rows if normalize_cpf(r.get("cpf_normalizado") or r.get("cpf"))),
-            "clientes_farmalider": sum(1 for r in rows if (r.get("farmalider_cliente_status") or "").strip() in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO"}),
-            "contatos_ads": sum(1 for r in rows if _bi_is_ad_contact(r)),
-            "opt_in_lgpd": sum(1 for r in rows if (r.get("opt_in_lgpd") or "").strip().casefold() == "ativo"),
-            "atualizado_em": updated_at,
-        })
+        result.append(
+            {
+                "chave": f"{snapshot_date}|{channel}",
+                "data": snapshot_date,
+                "canal": channel,
+                "contatos": len(rows),
+                "contatos_com_cpf": sum(
+                    1
+                    for r in rows
+                    if normalize_cpf(r.get("cpf_normalizado") or r.get("cpf"))
+                ),
+                "clientes_farmalider": sum(
+                    1
+                    for r in rows
+                    if (r.get("farmalider_cliente_status") or "").strip()
+                    in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO"}
+                ),
+                "contatos_ads": sum(1 for r in rows if _bi_is_ad_contact(r)),
+                "opt_in_lgpd": sum(
+                    1
+                    for r in rows
+                    if (r.get("opt_in_lgpd") or "").strip().casefold() == "ativo"
+                ),
+                "atualizado_em": updated_at,
+            }
+        )
     return result
 
 
@@ -1723,11 +1816,32 @@ def build_bi_conversion_records(
     updated_at: str,
 ) -> list[dict[str, Any]]:
     valid_orders = _bi_valid_orders(order_records)
-    buyers = {r.get("contact_uuid", "").strip() for r in valid_orders if r.get("contact_uuid", "").strip()}
+    buyers = {
+        r.get("contact_uuid", "").strip()
+        for r in valid_orders
+        if r.get("contact_uuid", "").strip()
+    }
     stages = [
         (1, "Contatos", len(base_records)),
-        (2, "CPF válido", sum(1 for r in base_records if is_valid_cpf(normalize_cpf(r.get("cpf_normalizado") or r.get("cpf"))))),
-        (3, "Cliente FarmaLíder", sum(1 for r in base_records if (r.get("farmalider_cliente_status") or "").strip() in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO"})),
+        (
+            2,
+            "CPF válido",
+            sum(
+                1
+                for r in base_records
+                if is_valid_cpf(normalize_cpf(r.get("cpf_normalizado") or r.get("cpf")))
+            ),
+        ),
+        (
+            3,
+            "Cliente FarmaLíder",
+            sum(
+                1
+                for r in base_records
+                if (r.get("farmalider_cliente_status") or "").strip()
+                in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO"}
+            ),
+        ),
         (4, "Cliente comprador", len(buyers)),
     ]
     base = stages[0][2] or 0
@@ -1735,17 +1849,21 @@ def build_bi_conversion_records(
     result: list[dict[str, Any]] = []
     for order, label, qty in stages:
         base_rate = (qty * 100 / base) if base else 0.0
-        prev_rate = 100.0 if order == 1 else ((qty * 100 / previous) if previous else 0.0)
-        result.append({
-            "chave": f"{snapshot_date}|{order}",
-            "data": snapshot_date,
-            "etapa_ordem": order,
-            "etapa": label,
-            "quantidade": qty,
-            "taxa_base_pct": round(base_rate, 2),
-            "taxa_etapa_anterior_pct": round(prev_rate, 2),
-            "atualizado_em": updated_at,
-        })
+        prev_rate = (
+            100.0 if order == 1 else ((qty * 100 / previous) if previous else 0.0)
+        )
+        result.append(
+            {
+                "chave": f"{snapshot_date}|{order}",
+                "data": snapshot_date,
+                "etapa_ordem": order,
+                "etapa": label,
+                "quantidade": qty,
+                "taxa_base_pct": round(base_rate, 2),
+                "taxa_etapa_anterior_pct": round(prev_rate, 2),
+                "atualizado_em": updated_at,
+            }
+        )
         previous = qty
     return result
 
@@ -1815,34 +1933,53 @@ def build_bi_order_rows(
         status_code = effective_order_status_code(order)
         payment_code = (order.get("farmalider_forma_pagamento") or "").strip()
 
-        rows.append([
-            key,
-            pedido_id,
-            weni_order_datetime_text(dt) if dt is not None else "",
-            dt.date().isoformat() if dt is not None else "",
-            dt.strftime("%H:%M:%S") if dt is not None else "",
-            (order.get("cliente") or base.get("nome") or base.get("weni_name") or "").strip(),
-            (order.get("cpf_normalizado") or order.get("cpf") or base.get("cpf_normalizado") or base.get("cpf") or "").strip(),
-            ", ".join((item.get("produto_nome") or "").strip() for item in items if (item.get("produto_nome") or "").strip()),
-            ", ".join(_bi_display_number(item.get("quantidade")) for item in items),
-            ", ".join(_bi_display_number(item.get("valor_unitario")) for item in items),
-            _bi_float(_bi_decimal(order.get("valor_total_compra"))),
-            _bi_float(_order_revenue_parts(order)[1]),
-            _bi_float(_order_revenue_parts(order)[2]),
-            status_code,
-            farmalider_order_status_name(status_code),
-            payment_code,
-            farmalider_payment_method_display(payment_code),
-            (base.get("contact_canal_principal") or "outro").strip().casefold(),
-            (order.get("primeiro_anuncio_origem") or "").strip(),
-            (order.get("ultimo_anuncio_origem") or "").strip(),
-            updated_at,
-            (base.get("cidade") or "").strip(),
-            (base.get("estado") or "").strip(),
-            (base.get("cep") or "").strip(),
-            (base.get("bairro") or "").strip(),
-            _bi_customer_age(base.get("idade")),
-        ])
+        rows.append(
+            [
+                key,
+                pedido_id,
+                weni_order_datetime_text(dt) if dt is not None else "",
+                dt.date().isoformat() if dt is not None else "",
+                dt.strftime("%H:%M:%S") if dt is not None else "",
+                (
+                    order.get("cliente")
+                    or base.get("nome")
+                    or base.get("weni_name")
+                    or ""
+                ).strip(),
+                (
+                    order.get("cpf_normalizado")
+                    or order.get("cpf")
+                    or base.get("cpf_normalizado")
+                    or base.get("cpf")
+                    or ""
+                ).strip(),
+                ", ".join(
+                    (item.get("produto_nome") or "").strip()
+                    for item in items
+                    if (item.get("produto_nome") or "").strip()
+                ),
+                ", ".join(_bi_display_number(item.get("quantidade")) for item in items),
+                ", ".join(
+                    _bi_display_number(item.get("valor_unitario")) for item in items
+                ),
+                _bi_float(_bi_decimal(order.get("valor_total_compra"))),
+                _bi_float(_order_revenue_parts(order)[1]),
+                _bi_float(_order_revenue_parts(order)[2]),
+                status_code,
+                farmalider_order_status_name(status_code),
+                payment_code,
+                farmalider_payment_method_display(payment_code),
+                (base.get("contact_canal_principal") or "outro").strip().casefold(),
+                (order.get("primeiro_anuncio_origem") or "").strip(),
+                (order.get("ultimo_anuncio_origem") or "").strip(),
+                updated_at,
+                (base.get("cidade") or "").strip(),
+                (base.get("estado") or "").strip(),
+                (base.get("cep") or "").strip(),
+                (base.get("bairro") or "").strip(),
+                _bi_customer_age(base.get("idade")),
+            ]
+        )
     return rows
 
 
@@ -1869,9 +2006,21 @@ def build_bi_ads_rows(
             if not any((ad_id, title, origin)):
                 continue
             key = (label, origin, campaign, destination, ad_id, title)
-            bucket = contact_groups.setdefault(key, {"contatos": 0, "clientes": 0, "buyers": set(), "orders": set(), "revenue": Decimal("0")})
+            bucket = contact_groups.setdefault(
+                key,
+                {
+                    "contatos": 0,
+                    "clientes": 0,
+                    "buyers": set(),
+                    "orders": set(),
+                    "revenue": Decimal("0"),
+                },
+            )
             bucket["contatos"] += 1
-            if (record.get("farmalider_cliente_status") or "").strip() in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO"}:
+            if (record.get("farmalider_cliente_status") or "").strip() in {
+                "CPF_CONFIRMADO",
+                "CPF_INVALIDO_ENCONTRADO",
+            }:
                 bucket["clientes"] += 1
 
     for label, prefix in dimensions:
@@ -1884,7 +2033,16 @@ def build_bi_ads_rows(
             if not any((ad_id, title, origin)):
                 continue
             key = (label, origin, campaign, destination, ad_id, title)
-            bucket = contact_groups.setdefault(key, {"contatos": 0, "clientes": 0, "buyers": set(), "orders": set(), "revenue": Decimal("0")})
+            bucket = contact_groups.setdefault(
+                key,
+                {
+                    "contatos": 0,
+                    "clientes": 0,
+                    "buyers": set(),
+                    "orders": set(),
+                    "revenue": Decimal("0"),
+                },
+            )
             uuid = (record.get("contact_uuid") or "").strip()
             order_key = (record.get("pedido_chave") or "").strip()
             if uuid:
@@ -1897,14 +2055,43 @@ def build_bi_ads_rows(
     for key in sorted(contact_groups):
         label, origin, campaign, destination, ad_id, title = key
         bucket = contact_groups[key]
-        rows.append([
-            snapshot_date, label, origin, campaign, destination, ad_id, title,
-            int(bucket["contatos"]), int(bucket["clientes"]),
-            len(bucket["buyers"]), len(bucket["orders"]),
-            _bi_float(bucket["revenue"]), updated_at,
-        ])
+        rows.append(
+            [
+                snapshot_date,
+                label,
+                origin,
+                campaign,
+                destination,
+                ad_id,
+                title,
+                int(bucket["contatos"]),
+                int(bucket["clientes"]),
+                len(bucket["buyers"]),
+                len(bucket["orders"]),
+                _bi_float(bucket["revenue"]),
+                updated_at,
+            ]
+        )
 
     if not rows:
-        rows.append([snapshot_date, "Sem dados", "", "", "", "", "Sem conversas atribuídas a anúncios", 0, 0, 0, 0, 0.0, updated_at])
+        rows.append(
+            [
+                snapshot_date,
+                "Sem dados",
+                "",
+                "",
+                "",
+                "",
+                "Sem conversas atribuídas a anúncios",
+                0,
+                0,
+                0,
+                0,
+                0.0,
+                updated_at,
+            ]
+        )
     return rows
+
+
 # NexoFlow 1.0

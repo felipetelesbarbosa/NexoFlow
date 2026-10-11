@@ -44,16 +44,16 @@ def main() -> int:
     errors = 0
     farm_auth_unconfirmed = False
     print("=== Diagnóstico NexoFlow ===\n")
-    print("[INFO] Proxy TCP acessível não comprova autenticação nem acesso a cada serviço HTTPS.")
-    print("[INFO] TLS permanece validado; o diagnóstico não muda automaticamente a rota de rede.\n")
+    print(
+        "[INFO] Proxy TCP acessível não comprova autenticação nem acesso a cada serviço HTTPS."
+    )
+    print(
+        "[INFO] TLS permanece validado; o diagnóstico não muda automaticamente a rota de rede.\n"
+    )
 
     weni_token = str(getattr(secrets, "WENI_API_TOKEN", "")).strip()
-    spreadsheet_id = str(
-        getattr(secrets, "GOOGLE_SPREADSHEET_ID", "")
-    ).strip()
-    farm_token = str(
-        getattr(secrets, "FARMALIDER_API_TOKEN", "")
-    ).strip()
+    spreadsheet_id = str(getattr(secrets, "GOOGLE_SPREADSHEET_ID", "")).strip()
+    farm_token = str(getattr(secrets, "FARMALIDER_API_TOKEN", "")).strip()
     farm_enabled = bool(getattr(secrets, "FARMALIDER_API_ENABLED", True))
     farm_hml = bool(getattr(secrets, "FARMALIDER_USE_HML", False))
 
@@ -107,7 +107,9 @@ def main() -> int:
     print("\nTestando Weni...")
     proxies = requests.utils.get_environ_proxies(WENI_CONTACTS_API_URL)
     route = "proxy" if proxies.get("https") or proxies.get("all") else "direta"
-    print(f"[INFO] Destino: {urlsplit(WENI_CONTACTS_API_URL).hostname} | conexão: {route}")
+    print(
+        f"[INFO] Destino: {urlsplit(WENI_CONTACTS_API_URL).hostname} | conexão: {route}"
+    )
     client = WeniClient(weni_token)
     try:
         result = client.test_connection()
@@ -134,7 +136,9 @@ def main() -> int:
                     "Rede acessível; autenticação não confirmada por este teste."
                 )
             else:
-                ok(f"FarmaLíder respondeu ao teste ({result['environment']}, HTTP {result['status_code']}).")
+                ok(
+                    f"FarmaLíder respondeu ao teste ({result['environment']}, HTTP {result['status_code']})."
+                )
             ok(f"URL selecionada FarmaLíder: {result['base_url']}")
         except Exception as exc:
             fail(f"Falha na FarmaLíder API: {safe_failure(exc)}")
@@ -156,7 +160,9 @@ def main() -> int:
         return 1
 
     if farm_auth_unconfirmed:
-        warn("Conexões testadas; autenticação FarmaLíder ainda precisa ser confirmada em uma consulta real.")
+        warn(
+            "Conexões testadas; autenticação FarmaLíder ainda precisa ser confirmada em uma consulta real."
+        )
     else:
         print("Tudo certo. O projeto está pronto para sincronizar.")
     return 0

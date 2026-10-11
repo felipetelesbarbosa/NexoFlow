@@ -36,10 +36,7 @@ def main() -> int:
     try:
         _configure_proxy()
     except (ImportError, SyntaxError, OSError, ValueError) as exc:
-        print(
-            "[ERRO] Não foi possível configurar o proxy para o pip: "
-            f"{exc}"
-        )
+        print(f"[ERRO] Não foi possível configurar o proxy para o pip: {exc}")
         return 1
 
     command = [sys.executable, "-m", "pip", *sys.argv[1:]]

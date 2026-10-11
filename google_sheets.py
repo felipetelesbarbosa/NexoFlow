@@ -102,9 +102,7 @@ class GoogleSheetsStore:
                 f"Credencial Google não encontrada: {GOOGLE_CREDENTIALS_FILE}"
             )
 
-        self.client = gspread.service_account(
-            filename=str(GOOGLE_CREDENTIALS_FILE)
-        )
+        self.client = gspread.service_account(filename=str(GOOGLE_CREDENTIALS_FILE))
         self.client.set_timeout(
             (
                 float(GOOGLE_SHEETS_CONNECT_TIMEOUT_SECONDS),
@@ -220,7 +218,9 @@ class GoogleSheetsStore:
                 control_values,
                 self.SCHEMA_CONTROL_KEY,
             )
-            saved_layout = self._control_value_from_values(control_values, self.SCHEMA_HEADERS_CONTROL_KEY)
+            saved_layout = self._control_value_from_values(
+                control_values, self.SCHEMA_HEADERS_CONTROL_KEY
+            )
             try:
                 layout = json.loads(saved_layout) if saved_layout else {}
                 schema = self._schema_map()
@@ -239,7 +239,9 @@ class GoogleSheetsStore:
                 # sem reler cabeçalhos redundantes da API.
                 # Migrações acrescentam colunas no fim da aba existente. A
                 # ordem física validada pode diferir da declaração local.
-                self._headers_cache = {title: list(layout[title]) for title in self._schema_map()}
+                self._headers_cache = {
+                    title: list(layout[title]) for title in self._schema_map()
+                }
                 logging.info(
                     "Google Sheets: estrutura compatível pelo fingerprint; "
                     "checagem completa de cabeçalhos ignorada."
@@ -247,12 +249,24 @@ class GoogleSheetsStore:
                 return
 
         self.ensure_structure(existing_sheets=sheets_by_title)
-        serialized_layout = json.dumps(self._headers_cache, ensure_ascii=False, sort_keys=True)
-        if stored != expected or self._control_value_from_values(self._control_values_cache or [], self.SCHEMA_HEADERS_CONTROL_KEY) != serialized_layout:
-            self.set_controls({self.SCHEMA_CONTROL_KEY: expected, self.SCHEMA_HEADERS_CONTROL_KEY: serialized_layout})
+        serialized_layout = json.dumps(
+            self._headers_cache, ensure_ascii=False, sort_keys=True
+        )
+        if (
+            stored != expected
+            or self._control_value_from_values(
+                self._control_values_cache or [], self.SCHEMA_HEADERS_CONTROL_KEY
+            )
+            != serialized_layout
+        ):
+            self.set_controls(
+                {
+                    self.SCHEMA_CONTROL_KEY: expected,
+                    self.SCHEMA_HEADERS_CONTROL_KEY: serialized_layout,
+                }
+            )
         logging.info(
-            "Google Sheets: estrutura completa validada "
-            "(fingerprint=%s).",
+            "Google Sheets: estrutura completa validada (fingerprint=%s).",
             expected,
         )
 
@@ -295,9 +309,7 @@ class GoogleSheetsStore:
 
     @staticmethod
     def _retryable_status(status: int | None) -> bool:
-        return status == 429 or (
-            status is not None and 500 <= status < 600
-        )
+        return status == 429 or (status is not None and 500 <= status < 600)
 
     def _read_with_retry(self, description: str, func):
         """Executa leitura com timeout/retry para rede, 429 e erros 5xx."""
@@ -329,9 +341,13 @@ class GoogleSheetsStore:
                 if status == 429:
                     wait = retry_after if retry_after is not None else 5.0
                 else:
-                    wait = retry_after if retry_after is not None else min(
-                        2 ** attempt,
-                        30,
+                    wait = (
+                        retry_after
+                        if retry_after is not None
+                        else min(
+                            2**attempt,
+                            30,
+                        )
                     )
 
                 logging.warning(
@@ -354,7 +370,7 @@ class GoogleSheetsStore:
                 refresh_network_route(
                     reason=f"falha recuperável no Google Sheets ({description})"
                 )
-                wait = min(2 ** attempt, 30)
+                wait = min(2**attempt, 30)
                 logging.warning(
                     "Google Sheets teve falha de rede/timeout após %.1fs durante %s: %s. "
                     "Tentativa %s/%s. Aguardando %.1f s.",
@@ -412,8 +428,7 @@ class GoogleSheetsStore:
         for item in items:
             item_bytes = cls._payload_size_bytes(item) + 1
             if current and (
-                len(current) >= item_limit
-                or current_bytes + item_bytes > byte_limit
+                len(current) >= item_limit or current_bytes + item_bytes > byte_limit
             ):
                 batches.append(current)
                 current = []
@@ -452,9 +467,13 @@ class GoogleSheetsStore:
                 if status == 429:
                     wait = retry_after if retry_after is not None else 65.0
                 else:
-                    wait = retry_after if retry_after is not None else min(
-                        2 ** attempt,
-                        30,
+                    wait = (
+                        retry_after
+                        if retry_after is not None
+                        else min(
+                            2**attempt,
+                            30,
+                        )
                     )
 
                 logging.warning(
@@ -475,7 +494,7 @@ class GoogleSheetsStore:
                 refresh_network_route(
                     reason=f"falha recuperável na escrita Google Sheets ({description})"
                 )
-                wait = min(2 ** attempt, 30)
+                wait = min(2**attempt, 30)
                 logging.warning(
                     "Google Sheets teve falha de rede/timeout durante escrita %s: %s. "
                     "Tentativa %s/%s. Aguardando %.1f s.",
@@ -654,7 +673,10 @@ class GoogleSheetsStore:
             SHEET_BI_PEDIDOS, BI_ORDERS_COLUMNS, existing_sheets=existing_sheets
         )
         self.bi_status = self._get_or_create_sheet(
-            SHEET_BI_STATUS, BI_STATUS_COLUMNS, rows=100, existing_sheets=existing_sheets
+            SHEET_BI_STATUS,
+            BI_STATUS_COLUMNS,
+            rows=100,
+            existing_sheets=existing_sheets,
         )
         self.control = self._get_or_create_sheet(
             SHEET_CONTROLE,
@@ -708,9 +730,7 @@ class GoogleSheetsStore:
             BASE_COLUMNS,
         )
         if "contact_uuid" not in headers:
-            raise RuntimeError(
-                "A aba Base_Contatos não possui a coluna contact_uuid."
-            )
+            raise RuntimeError("A aba Base_Contatos não possui a coluna contact_uuid.")
         column = headers.index("contact_uuid") + 1
         values = self._read_with_retry(
             "ler UUIDs da Base_Contatos",
@@ -776,7 +796,12 @@ class GoogleSheetsStore:
             if key:
                 unique_records[key] = {**unique_records.get(key, {}), **record}
         if len(unique_records) < len(records):
-            logging.info("Google Sheets: %s - entradas consolidadas por chave (%s → %s).", ws.title, len(records), len(unique_records))
+            logging.info(
+                "Google Sheets: %s - entradas consolidadas por chave (%s → %s).",
+                ws.title,
+                len(records),
+                len(unique_records),
+            )
         records = list(unique_records.values())
         if existing_values is None:
             logging.info(
@@ -809,9 +834,7 @@ class GoogleSheetsStore:
         else:
             headers = list(values[0])
         if key_name not in headers:
-            raise RuntimeError(
-                f"A aba {ws.title} não possui a chave {key_name!r}."
-            )
+            raise RuntimeError(f"A aba {ws.title} não possui a chave {key_name!r}.")
 
         stage_started = time.monotonic()
         key_col = headers.index(key_name)
@@ -819,8 +842,10 @@ class GoogleSheetsStore:
         final_rows: list[list[str]] = []
 
         for row_number, row in enumerate(values[1:], start=2):
-            padded = [str(value) if value is not None else "" for value in row] + [""] * (len(headers) - len(row))
-            padded = padded[:len(headers)]
+            padded = [str(value) if value is not None else "" for value in row] + [
+                ""
+            ] * (len(headers) - len(row))
+            padded = padded[: len(headers)]
             final_rows.append(padded)
             key = padded[key_col].strip()
             if key:
@@ -865,7 +890,9 @@ class GoogleSheetsStore:
                 updated += 1
             else:
                 appended = [
-                    "" if record.get(header, "") is None else str(record.get(header, ""))
+                    ""
+                    if record.get(header, "") is None
+                    else str(record.get(header, ""))
                     for header in headers
                 ]
                 appends.append(appended)
@@ -1022,26 +1049,36 @@ class GoogleSheetsStore:
             ignore_compare_fields={"capturado_em"},
         )
         stale_indexes = [
-            index for index, record in enumerate(result.final_records)
+            index
+            for index, record in enumerate(result.final_records)
             if record.get("pedido_chave") in active_keys
             and record.get("item_chave") not in active_keys[record["pedido_chave"]]
         ]
         if stale_indexes:
-            headers = getattr(self, "_headers_cache", {}).get(self.order_items.title, ORDER_ITEM_COLUMNS)
+            headers = getattr(self, "_headers_cache", {}).get(
+                self.order_items.title, ORDER_ITEM_COLUMNS
+            )
             last_col = column_letter(len(headers))
             ranges = [f"A{index + 2}:{last_col}{index + 2}" for index in stale_indexes]
             # Limpar valores de linhas específicas é idempotente e não desloca
             # os demais pedidos, inclusive quando há retry da requisição.
             for start in range(0, len(ranges), 100):
-                batch = ranges[start:start + 100]
+                batch = ranges[start : start + 100]
                 self._write_with_retry(
                     "reconciliar itens removidos dos pedidos atualizados",
                     lambda batch=batch: self.order_items.batch_clear(batch),
                 )
             stale = set(stale_indexes)
-            result.final_records = [record for index, record in enumerate(result.final_records) if index not in stale]
+            result.final_records = [
+                record
+                for index, record in enumerate(result.final_records)
+                if index not in stale
+            ]
             result.removed = len(stale_indexes)
-            logging.info("Google Sheets: %s item(ns) antigos removidos dos pedidos atualizados.", result.removed)
+            logging.info(
+                "Google Sheets: %s item(ns) antigos removidos dos pedidos atualizados.",
+                result.removed,
+            )
         return result
 
     def upsert_order_items(
@@ -1073,27 +1110,19 @@ class GoogleSheetsStore:
             "(%s colunas); leitura redundante de cabeçalho dispensada.",
             len(headers),
         )
-        logging.info(
-            "Google Sheets: Historico_Alteracoes - montando linhas..."
-        )
+        logging.info("Google Sheets: Historico_Alteracoes - montando linhas...")
         sync_time = self.now_iso()
         rows = []
 
         for contact in contacts:
             uuid = contact.get("contact_uuid", "")
-            action = (
-                "Atualizado"
-                if uuid in existing_uuids_before_sync
-                else "Inserido"
-            )
+            action = "Atualizado" if uuid in existing_uuids_before_sync else "Inserido"
             record = {
                 "acao": action,
                 "sincronizado_em": sync_time,
             }
             record.update(contact)
-            rows.append(
-                [record.get(header, "") for header in headers]
-            )
+            rows.append([record.get(header, "") for header in headers])
 
         batches = self._adaptive_batches(
             rows,
@@ -1186,9 +1215,7 @@ class GoogleSheetsStore:
         self._replace_table(self.metrics, METRIC_COLUMNS, rows)
 
     def replace_sales_metrics(self, rows: list[list[Any]]) -> None:
-        self._replace_table(
-            self.sales_metrics, SALES_METRIC_COLUMNS, rows
-        )
+        self._replace_table(self.sales_metrics, SALES_METRIC_COLUMNS, rows)
 
     def upsert_bi_summary(self, record: dict[str, Any]) -> UpsertResult:
         return self._upsert_records_detailed(
@@ -1230,7 +1257,10 @@ class GoogleSheetsStore:
     def replace_bi_orders(self, rows: list[list[Any]]) -> None:
         # USER_ENTERED interpreta datas e números, mas CEP e localização são
         # texto: o apóstrofo preserva zeros iniciais e bloqueia fórmulas.
-        text_indexes = [BI_ORDERS_COLUMNS.index(column) for column in ("cidade", "estado", "cep", "bairro")]
+        text_indexes = [
+            BI_ORDERS_COLUMNS.index(column)
+            for column in ("cidade", "estado", "cep", "bairro")
+        ]
         safe_rows = []
         for row in rows:
             safe = list(row)
@@ -1239,7 +1269,10 @@ class GoogleSheetsStore:
                     safe[index] = "'" + str(safe[index])
             safe_rows.append(safe)
         self._replace_table(
-            self.bi_orders, BI_ORDERS_COLUMNS, safe_rows, value_input_option="USER_ENTERED"
+            self.bi_orders,
+            BI_ORDERS_COLUMNS,
+            safe_rows,
+            value_input_option="USER_ENTERED",
         )
 
     def replace_bi_status(self, row: list[Any]) -> None:
@@ -1250,26 +1283,52 @@ class GoogleSheetsStore:
     def upsert_delivery_tickets(self, records: list[dict[str, Any]]) -> UpsertResult:
         # Optional source: existing installations do not create these tabs until the Delivery command runs.
         from delivery_tickets import TICKET_COLUMNS
-        ws = self._get_or_create_sheet("Tickets_Delivery_Weni", TICKET_COLUMNS)
-        return self._upsert_records_detailed(ws, records, "ticket_uuid",
-            ignore_compare_fields={"atualizado_em"}, value_input_option="RAW")
 
-    def refresh_delivery_bi(self, orders: list[dict[str, str]] | None = None, *, create: bool = True) -> None:
+        ws = self._get_or_create_sheet("Tickets_Delivery_Weni", TICKET_COLUMNS)
+        return self._upsert_records_detailed(
+            ws,
+            records,
+            "ticket_uuid",
+            ignore_compare_fields={"atualizado_em"},
+            value_input_option="RAW",
+        )
+
+    def refresh_delivery_bi(
+        self, orders: list[dict[str, str]] | None = None, *, create: bool = True
+    ) -> None:
         from delivery_tickets import (
             DELIVERY_ORDER_COLUMNS,
             TICKET_COLUMNS,
             build_delivery_order_records,
         )
+
         known = getattr(self, "_known_sheets", {})
-        if not create and not all(title in known for title in ("Tickets_Delivery_Weni", "BI_Delivery_Pedidos")):
+        if not create and not all(
+            title in known for title in ("Tickets_Delivery_Weni", "BI_Delivery_Pedidos")
+        ):
             return
-        tickets_ws = self._get_or_create_sheet("Tickets_Delivery_Weni", TICKET_COLUMNS, existing_sheets=known)
-        tickets = self._values_to_records(self._read_with_retry("ler tickets Delivery", tickets_ws.get_all_values))
-        records = build_delivery_order_records(tickets, self.load_order_records() if orders is None else orders, updated_at=self.now_iso())
-        ws = self._get_or_create_sheet("BI_Delivery_Pedidos", DELIVERY_ORDER_COLUMNS, existing_sheets=known)
+        tickets_ws = self._get_or_create_sheet(
+            "Tickets_Delivery_Weni", TICKET_COLUMNS, existing_sheets=known
+        )
+        tickets = self._values_to_records(
+            self._read_with_retry("ler tickets Delivery", tickets_ws.get_all_values)
+        )
+        records = build_delivery_order_records(
+            tickets,
+            self.load_order_records() if orders is None else orders,
+            updated_at=self.now_iso(),
+        )
+        ws = self._get_or_create_sheet(
+            "BI_Delivery_Pedidos", DELIVERY_ORDER_COLUMNS, existing_sheets=known
+        )
         # A numeric sale flag and order value become numeric cells; ISO dates remain stable for Looker parsing.
-        rows = [[record.get(column, "") for column in DELIVERY_ORDER_COLUMNS] for record in records]
-        self._replace_table(ws, DELIVERY_ORDER_COLUMNS, rows, value_input_option="USER_ENTERED")
+        rows = [
+            [record.get(column, "") for column in DELIVERY_ORDER_COLUMNS]
+            for record in records
+        ]
+        self._replace_table(
+            ws, DELIVERY_ORDER_COLUMNS, rows, value_input_option="USER_ENTERED"
+        )
 
     def get_control(self, key: str) -> str:
         values = self._control_values_cache
@@ -1335,10 +1394,7 @@ class GoogleSheetsStore:
 
         # Atualiza o cache local sem nova leitura da API.
         cached = [list(row) for row in values]
-        cached_index = {
-            row[0]: idx for idx, row in enumerate(cached)
-            if row
-        }
+        cached_index = {row[0]: idx for idx, row in enumerate(cached) if row}
         for key, value in mapping.items():
             row = [key, value, now]
             if key in cached_index:
@@ -1362,4 +1418,6 @@ class GoogleSheetsStore:
             lambda: self.events.col_values(1),
         )
         return set(values[1:]) if len(values) > 1 else set()
+
+
 # NexoFlow 1.0

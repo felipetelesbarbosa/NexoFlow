@@ -12,12 +12,17 @@ class TaskProgressTests(unittest.TestCase):
         self.now = 0.0
         self.bytes = 0
         self.logs = []
-        self.logger = patch("task_progress.logging.info", side_effect=lambda fmt, *args: self.logs.append(fmt % args))
+        self.logger = patch(
+            "task_progress.logging.info",
+            side_effect=lambda fmt, *args: self.logs.append(fmt % args),
+        )
         self.logger.start()
         self.addCleanup(self.logger.stop)
 
     def progress(self, total, **kwargs):
-        return TaskProgress("Teste", total, clock=lambda: self.now, interval=3600, **kwargs)
+        return TaskProgress(
+            "Teste", total, clock=lambda: self.now, interval=3600, **kwargs
+        )
 
     def test_actual_counts_bytes_and_eta(self):
         self.bytes = 500  # Conteúdo de uma execução anterior não entra na medição.
@@ -93,8 +98,12 @@ class TaskProgressTests(unittest.TestCase):
             before = weni_update._AUDIT_BYTES_WRITTEN
             try:
                 weni_update._append_audit({"nome": "João", "status": "planned"}, path)
-                weni_update._append_audit({"nome": "Conceição", "status": "applied"}, path)
-                self.assertEqual(weni_update._AUDIT_BYTES_WRITTEN - before, path.stat().st_size)
+                weni_update._append_audit(
+                    {"nome": "Conceição", "status": "applied"}, path
+                )
+                self.assertEqual(
+                    weni_update._AUDIT_BYTES_WRITTEN - before, path.stat().st_size
+                )
                 self.assertEqual(len(path.read_text(encoding="utf-8").splitlines()), 2)
             finally:
                 weni_update._close_audit_handles()

@@ -48,7 +48,9 @@ class PeripheralExceptionHandlingTests(unittest.TestCase):
         ):
             with self.subTest(error=type(error).__name__):
                 with (
-                    patch.object(run_terminal, "_prepare_environment", side_effect=error),
+                    patch.object(
+                        run_terminal, "_prepare_environment", side_effect=error
+                    ),
                     patch.object(run_terminal.subprocess, "run") as runner,
                     redirect_stderr(io.StringIO()) as output,
                 ):
@@ -93,7 +95,10 @@ class PeripheralExceptionHandlingTests(unittest.TestCase):
     def test_proxy_configuration_failures_stop_diagnostic_before_api_import(self):
         import run_diagnostico
 
-        for error in (ValueError("Configuração fictícia inválida"), OSError("Falha fictícia")):
+        for error in (
+            ValueError("Configuração fictícia inválida"),
+            OSError("Falha fictícia"),
+        ):
             with self.subTest(error=type(error).__name__):
                 with (
                     patch.object(run_diagnostico, "configure_proxy", side_effect=error),

@@ -38,16 +38,20 @@ class WebhookPreparationTests(unittest.TestCase):
         self.assertEqual(len(items), 2)
 
     def test_same_raw_parser_generates_stable_key(self):
-        raw = json.dumps({
-            "data_hora": "2026-09-30T16:07:00Z",
-            "valor_total_compra": 10,
-            "produtos": [{
-                "nome": "Produto",
-                "quantidade": 1,
-                "valor_unitario": 10,
-                "valor_total": 10,
-            }],
-        })
+        raw = json.dumps(
+            {
+                "data_hora": "2026-09-30T16:07:00Z",
+                "valor_total_compra": 10,
+                "produtos": [
+                    {
+                        "nome": "Produto",
+                        "quantidade": 1,
+                        "valor_unitario": 10,
+                        "valor_total": 10,
+                    }
+                ],
+            }
+        )
 
         first, _ = parse_ultimo_pedido_raw(
             raw,

@@ -1,4 +1,5 @@
 """Synthetic tests for FarmaLíder-first order resolution."""
+
 import json
 import unittest
 from unittest.mock import Mock
@@ -81,17 +82,21 @@ def pedido_payload():
 
 
 def legacy_raw():
-    return json.dumps({
-        "pedido_id": "777",
-        "data_hora": "2026-10-01T10:00:00-03:00",
-        "valor_total_compra": "10.00",
-        "produtos": [{
-            "nome": "Pedido legado",
-            "quantidade": 1,
-            "valor_unitario": "10.00",
-            "valor_total": "10.00",
-        }],
-    })
+    return json.dumps(
+        {
+            "pedido_id": "777",
+            "data_hora": "2026-10-01T10:00:00-03:00",
+            "valor_total_compra": "10.00",
+            "produtos": [
+                {
+                    "nome": "Pedido legado",
+                    "quantidade": 1,
+                    "valor_unitario": "10.00",
+                    "valor_total": "10.00",
+                }
+            ],
+        }
+    )
 
 
 def contact(*, cpf=SYNTHETIC_CPF, raw=None, pedido_id=None):
@@ -110,9 +115,7 @@ def client(*, cliente=None, pedido=None):
     api.get_cliente_by_cpf.return_value = (
         cliente_payload() if cliente is None else cliente
     )
-    api.get_pedido.return_value = (
-        pedido_payload() if pedido is None else pedido
-    )
+    api.get_pedido.return_value = pedido_payload() if pedido is None else pedido
     return api
 
 
@@ -220,9 +223,7 @@ class PedidoResolutionTests(unittest.TestCase):
         self.assertEqual(items[0]["produto_nome"], "Descrição atual")
         self.assertEqual(order["farmalider_status_pedido"], "2")
         self.assertEqual(order["farmalider_forma_pagamento"], "3")
-        self.assertEqual(
-            order["farmalider_forma_pagamento_nome"], "Crédito"
-        )
+        self.assertEqual(order["farmalider_forma_pagamento_nome"], "Crédito")
 
     def test_descricao_is_required_for_product_name(self):
         pedido = pedido_payload()
@@ -253,7 +254,13 @@ class PedidoResolutionTests(unittest.TestCase):
         pedido = pedido_payload()
         pedido["capa"]["frete"] = "20.00"
         pedido["itens"].append(
-            item(code="9002", description="Produto B", value="10.00", total="20.00", quantity=2)
+            item(
+                code="9002",
+                description="Produto B",
+                value="10.00",
+                total="20.00",
+                quantity=2,
+            )
         )
         order, items = resolve_contact_order(
             contact(),
@@ -281,9 +288,7 @@ class PedidoResolutionTests(unittest.TestCase):
 
     def test_fractional_quantities_remain_exact(self):
         pedido = pedido_payload()
-        pedido["itens"][0].update(
-            quantidade="1.5", valor="0.20", total="0.30"
-        )
+        pedido["itens"][0].update(quantidade="1.5", valor="0.20", total="0.30")
         order, items = resolve_contact_order(
             contact(),
             farm_client=client(pedido=pedido),
@@ -322,13 +327,17 @@ class PedidoResolutionTests(unittest.TestCase):
                 pedido = pedido_payload()
                 pedido["capa"]["status"] = name
                 order, items = resolve_contact_order(
-                    contact(), farm_client=client(pedido=pedido), captured_at=CAPTURED_AT
+                    contact(),
+                    farm_client=client(pedido=pedido),
+                    captured_at=CAPTURED_AT,
                 )
                 self.assertEqual(order["status_validacao"], "OK")
                 self.assertEqual(order["farmalider_status_pedido"], name)
                 self.assertEqual(effective_order_status_code(order), str(code))
                 self.assertEqual(order["farmalider_status_pedido_nome"], label)
-                self.assertEqual(bool(build_sales_metrics([order], items)), code in (4, 1, 2))
+                self.assertEqual(
+                    bool(build_sales_metrics([order], items)), code in (4, 1, 2)
+                )
 
     def test_payment_mapping_is_official(self):
         expected = {
@@ -373,9 +382,23 @@ class PedidoResolutionTests(unittest.TestCase):
 
     def test_payment_display_rejects_missing_and_invalid_codes(self):
         invalid = (
-            None, "", " ", True, False, "Pix", "1.5", 1.5, 2.0,
-            -1, "-1", 2147483648, "2147483648", "9" * 100,
-            "６", [], {},
+            None,
+            "",
+            " ",
+            True,
+            False,
+            "Pix",
+            "1.5",
+            1.5,
+            2.0,
+            -1,
+            "-1",
+            2147483648,
+            "2147483648",
+            "9" * 100,
+            "６",
+            [],
+            {},
         )
         for value in invalid:
             with self.subTest(value=value):
@@ -441,7 +464,9 @@ class PedidoResolutionTests(unittest.TestCase):
                 self.assertEqual(is_order_made(order), status in (0, 1, 2, 4))
                 self.assertEqual(is_order_completed(order), status == 2)
                 self.assertFalse(is_order_cancelled(order))
-                self.assertEqual(len(build_sales_metrics([order], items)), int(status in (4, 1, 2)))
+                self.assertEqual(
+                    len(build_sales_metrics([order], items)), int(status in (4, 1, 2))
+                )
 
     def test_payment_zero_or_cancelled_literal_cancels_any_api_status(self):
         for status in (-2, -1, 0, 1, 2, 4):
@@ -450,11 +475,15 @@ class PedidoResolutionTests(unittest.TestCase):
                     pedido = pedido_payload()
                     pedido["capa"].update(status=status, formaPagamento=payment)
                     order, items = resolve_contact_order(
-                        contact(), farm_client=client(pedido=pedido), captured_at=CAPTURED_AT
+                        contact(),
+                        farm_client=client(pedido=pedido),
+                        captured_at=CAPTURED_AT,
                     )
                     self.assertEqual(order["farmalider_status_pedido"], str(status))
                     self.assertEqual(order["farmalider_forma_pagamento"], str(payment))
-                    self.assertEqual(order["farmalider_status_pedido_nome"], "Cancelado")
+                    self.assertEqual(
+                        order["farmalider_status_pedido_nome"], "Cancelado"
+                    )
                     self.assertEqual(order["status_confirmacao"], "CANCELADO_API")
                     self.assertEqual(effective_order_status_code(order), "3")
                     self.assertTrue(is_order_cancelled(order))
@@ -467,10 +496,12 @@ class PedidoResolutionTests(unittest.TestCase):
             for value in (status, str(status)):
                 with self.subTest(value=value):
                     self.assertEqual(
-                        effective_order_status_code({
-                            "farmalider_status_pedido": value,
-                            "farmalider_forma_pagamento": 6,
-                        }),
+                        effective_order_status_code(
+                            {
+                                "farmalider_status_pedido": value,
+                                "farmalider_forma_pagamento": 6,
+                            }
+                        ),
                         str(status),
                     )
 
@@ -485,14 +516,24 @@ class PedidoResolutionTests(unittest.TestCase):
 
     def test_api_enum_aliases_preserve_raw_values_and_effective_status(self):
         for payment, status_code, status_name, confirmation, payment_name in (
-            ("PIX no POS", "-1", "Pendente de pagamento", "CONFIRMADO_API", "Pix no POS"),
+            (
+                "PIX no POS",
+                "-1",
+                "Pendente de pagamento",
+                "CONFIRMADO_API",
+                "Pix no POS",
+            ),
             ("_", "3", "Cancelado", "CANCELADO_API", "Cancelado"),
         ):
             with self.subTest(payment=payment):
                 pedido = pedido_payload()
-                pedido["capa"].update(status="PendentePagamento", formaPagamento=payment)
+                pedido["capa"].update(
+                    status="PendentePagamento", formaPagamento=payment
+                )
                 order, items = resolve_contact_order(
-                    contact(), farm_client=client(pedido=pedido), captured_at=CAPTURED_AT
+                    contact(),
+                    farm_client=client(pedido=pedido),
+                    captured_at=CAPTURED_AT,
                 )
                 self.assertEqual(order["status_validacao"], "OK")
                 self.assertEqual(order["farmalider_status_pedido"], "PendentePagamento")
@@ -532,19 +573,13 @@ class PedidoResolutionTests(unittest.TestCase):
                 self.assertTrue(is_order_completed(order))
 
     def test_completed_code_is_completed(self):
-        self.assertTrue(
-            is_order_completed({"farmalider_status_pedido": 2})
-        )
-        self.assertFalse(
-            is_order_completed({"farmalider_status_pedido": 1})
-        )
+        self.assertTrue(is_order_completed({"farmalider_status_pedido": 2}))
+        self.assertFalse(is_order_completed({"farmalider_status_pedido": 1}))
 
     def test_business_datetime_formats_for_weni(self):
         value = business_order_datetime("2026-06-05T15:45:27.497")
         self.assertEqual(value.isoformat(), "2026-06-05T15:45:27.497000-03:00")
-        self.assertEqual(
-            weni_order_datetime_text(value), "05/06/26 15:45:27"
-        )
+        self.assertEqual(weni_order_datetime_text(value), "05/06/26 15:45:27")
         self.assertEqual(
             business_order_datetime("05/06/26 15:45:27").isoformat(),
             "2026-06-05T15:45:27-03:00",
@@ -608,9 +643,7 @@ class PedidoResolutionTests(unittest.TestCase):
         api = client()
         api.get_cliente_by_cpf.side_effect = FarmaliderAuthError("synthetic")
         with self.assertRaises(FarmaliderAuthError):
-            resolve_contact_order(
-                contact(), farm_client=api, captured_at=CAPTURED_AT
-            )
+            resolve_contact_order(contact(), farm_client=api, captured_at=CAPTURED_AT)
 
     def test_no_api_preserves_existing_fields_without_using_ultimo_pedido_as_data(self):
         order, items = resolve_contact_order(
@@ -642,7 +675,9 @@ class PedidoResolutionTests(unittest.TestCase):
         previous_pedido = pedido_payload()
         previous_pedido["capa"].update(status=2, formaPagamento=0)
         previous_order, previous_items = resolve_contact_order(
-            contact(), farm_client=client(pedido=previous_pedido), captured_at=CAPTURED_AT
+            contact(),
+            farm_client=client(pedido=previous_pedido),
+            captured_at=CAPTURED_AT,
         )
         self.assertEqual(previous_order["status_confirmacao"], "CANCELADO_API")
         self.assertEqual(build_sales_metrics([previous_order], previous_items), [])

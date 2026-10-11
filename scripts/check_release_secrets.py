@@ -3,6 +3,7 @@
 O scanner é instalado externamente. Sua saída e seus relatórios nunca são
 reproduzidos no console, mesmo quando ele termina com erro.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -44,10 +45,14 @@ def verify_package_hashes(assets_dir: Path) -> tuple[Path, ...]:
             continue
         match = re.fullmatch(r"([0-9a-fA-F]{64})[ \t]+\*?(.+)", line)
         if not match or match[2] not in PACKAGE_NAMES or match[2] in expected:
-            raise ScanError("Arquivo externo de hashes inválido para os dois pacotes oficiais.")
+            raise ScanError(
+                "Arquivo externo de hashes inválido para os dois pacotes oficiais."
+            )
         expected[match[2]] = match[1].lower()
     if set(expected) != set(PACKAGE_NAMES):
-        raise ScanError("O arquivo externo de hashes deve identificar os dois pacotes oficiais.")
+        raise ScanError(
+            "O arquivo externo de hashes deve identificar os dois pacotes oficiais."
+        )
     packages = tuple(assets_dir / name for name in PACKAGE_NAMES)
     for package in packages:
         if package.is_symlink() or not package.is_file():
@@ -68,7 +73,12 @@ def member_path(info: zipfile.ZipInfo) -> tuple[PurePosixPath, bool]:
     """Valida também nomes que seriam perigosos após extração no Windows."""
     original = info.orig_filename
     name = original.replace("\\", "/")
-    if "\x00" in original or not name or name.startswith("/") or ntpath.splitdrive(name)[0]:
+    if (
+        "\x00" in original
+        or not name
+        or name.startswith("/")
+        or ntpath.splitdrive(name)[0]
+    ):
         raise ScanError("O ZIP contém caminho absoluto ou inválido.")
     is_directory = name.endswith("/")
     parts = name[:-1].split("/") if is_directory else name.split("/")
@@ -80,7 +90,9 @@ def member_path(info: zipfile.ZipInfo) -> tuple[PurePosixPath, bool]:
             or part.endswith((".", " "))
             or part.split(".", 1)[0].upper() in WINDOWS_RESERVED
         ):
-            raise ScanError("O ZIP contém caminho não portátil ou tentativa de sair do diretório.")
+            raise ScanError(
+                "O ZIP contém caminho não portátil ou tentativa de sair do diretório."
+            )
     file_type = stat.S_IFMT(info.external_attr >> 16)
     if file_type not in {0, stat.S_IFREG, stat.S_IFDIR}:
         raise ScanError("O ZIP contém link simbólico ou arquivo especial.")
@@ -93,9 +105,14 @@ def member_path(info: zipfile.ZipInfo) -> tuple[PurePosixPath, bool]:
     return PurePosixPath(*parts), is_directory
 
 
-def validated_members(archive: zipfile.ZipFile) -> list[tuple[zipfile.ZipInfo, PurePosixPath, bool]]:
+def validated_members(
+    archive: zipfile.ZipFile,
+) -> list[tuple[zipfile.ZipInfo, PurePosixPath, bool]]:
     infos = archive.infolist()
-    if len(infos) > MAX_PACKAGE_ENTRIES or sum(info.file_size for info in infos) > MAX_PACKAGE_BYTES:
+    if (
+        len(infos) > MAX_PACKAGE_ENTRIES
+        or sum(info.file_size for info in infos) > MAX_PACKAGE_BYTES
+    ):
         raise ScanError("O ZIP excede o limite de extração da verificação.")
     entries = []
     seen: set[str] = set()
@@ -110,8 +127,14 @@ def validated_members(archive: zipfile.ZipFile) -> list[tuple[zipfile.ZipInfo, P
             files.add(key)
         entries.append((info, path, is_directory))
     for _, path, _ in entries:
-        if any(parent.as_posix().casefold() in files for parent in path.parents if parent != PurePosixPath(".")):
-            raise ScanError("O ZIP contém caminhos de arquivo e diretório conflitantes.")
+        if any(
+            parent.as_posix().casefold() in files
+            for parent in path.parents
+            if parent != PurePosixPath(".")
+        ):
+            raise ScanError(
+                "O ZIP contém caminhos de arquivo e diretório conflitantes."
+            )
     return entries
 
 
@@ -120,7 +143,9 @@ def extract_packages(assets_dir: Path, destination: Path) -> None:
     packages = verify_package_hashes(assets_dir)
     try:
         with ExitStack() as stack:
-            archives = [stack.enter_context(zipfile.ZipFile(package)) for package in packages]
+            archives = [
+                stack.enter_context(zipfile.ZipFile(package)) for package in packages
+            ]
             plans = [validated_members(archive) for archive in archives]
             for package, archive, plan in zip(packages, archives, plans, strict=False):
                 root = destination / package.stem
@@ -136,10 +161,14 @@ def extract_packages(assets_dir: Path, destination: Path) -> None:
     except ScanError:
         raise
     except Exception as exc:
-        raise ScanError("Pacote ZIP corrompido ou impossível de verificar integralmente.") from exc
+        raise ScanError(
+            "Pacote ZIP corrompido ou impossível de verificar integralmente."
+        ) from exc
 
 
-def run_scanner(scanner: str, mode: str, target: Path, config: Path, private_dir: Path) -> int:
+def run_scanner(
+    scanner: str, mode: str, target: Path, config: Path, private_dir: Path
+) -> int:
     ignore_file = private_dir / "empty.gitleaksignore"
     report_file = private_dir / "gitleaks-report.json"
     for path in (ignore_file, report_file):
@@ -147,29 +176,54 @@ def run_scanner(scanner: str, mode: str, target: Path, config: Path, private_dir
     command = [scanner, "git" if mode == "history" else "dir", str(target)]
     if mode == "history":
         command.append("--log-opts=--all")
-    command.extend([
-        "--config", str(config), "--redact=100", "--ignore-gitleaks-allow",
-        "--gitleaks-ignore-path", str(ignore_file), "--report-format=json",
-        "--report-path", str(report_file), "--no-banner", "--exit-code=1",
-    ])
+    command.extend(
+        [
+            "--config",
+            str(config),
+            "--redact=100",
+            "--ignore-gitleaks-allow",
+            "--gitleaks-ignore-path",
+            str(ignore_file),
+            "--report-format=json",
+            "--report-path",
+            str(report_file),
+            "--no-banner",
+            "--exit-code=1",
+        ]
+    )
     try:
         result = subprocess.run(
-            command, capture_output=True, text=True, encoding="utf-8",
-            errors="replace", check=False, timeout=900,
+            command,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+            timeout=900,
         )
     except (OSError, subprocess.SubprocessError) as exc:
-        raise ScanError("Não foi possível concluir a execução do scanner de segredos.") from exc
+        raise ScanError(
+            "Não foi possível concluir a execução do scanner de segredos."
+        ) from exc
     try:
         report_file.chmod(0o600)
         findings = json.loads(report_file.read_text(encoding="utf-8-sig"))
     except (OSError, UnicodeError, ValueError) as exc:
-        raise ScanError("O scanner não produziu um relatório válido; publicação bloqueada.") from exc
-    if not isinstance(findings, list) or any(not isinstance(item, dict) for item in findings):
-        raise ScanError("O scanner produziu um relatório inesperado; publicação bloqueada.")
+        raise ScanError(
+            "O scanner não produziu um relatório válido; publicação bloqueada."
+        ) from exc
+    if not isinstance(findings, list) or any(
+        not isinstance(item, dict) for item in findings
+    ):
+        raise ScanError(
+            "O scanner produziu um relatório inesperado; publicação bloqueada."
+        )
     if result.returncode not in (0, 1):
         raise ScanError("O scanner terminou com erro; publicação bloqueada.")
     if result.returncode == 1 or findings:
-        print(f"Segurança: publicação bloqueada; scanner sinalizou {len(findings)} ocorrência(s).")
+        print(
+            f"Segurança: publicação bloqueada; scanner sinalizou {len(findings)} ocorrência(s)."
+        )
         return 1
     print("Segurança: varredura aprovada, sem ocorrências.")
     return 0
@@ -180,12 +234,26 @@ def is_within(path: Path, directory: Path) -> bool:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="NexoFlow 1.0 — verificação de segredos antes da publicação.")
-    parser.add_argument("--scanner", default="gitleaks", help="Executável Gitleaks instalado externamente.")
+    parser = argparse.ArgumentParser(
+        description="NexoFlow 1.0 — verificação de segredos antes da publicação."
+    )
+    parser.add_argument(
+        "--scanner",
+        default="gitleaks",
+        help="Executável Gitleaks instalado externamente.",
+    )
     parser.add_argument("--mode", choices=("history", "packages"), required=True)
-    parser.add_argument("--repo", required=True, type=Path, help="Raiz com .gitleaks.toml.")
-    parser.add_argument("--assets-dir", type=Path, help="Diretório dos dois ZIPs e SHA256SUMS-1.0.txt.")
-    parser.add_argument("--report-dir", type=Path, help="Diretório privado, fora do repositório, para reter relatório redigido.")
+    parser.add_argument(
+        "--repo", required=True, type=Path, help="Raiz com .gitleaks.toml."
+    )
+    parser.add_argument(
+        "--assets-dir", type=Path, help="Diretório dos dois ZIPs e SHA256SUMS-1.0.txt."
+    )
+    parser.add_argument(
+        "--report-dir",
+        type=Path,
+        help="Diretório privado, fora do repositório, para reter relatório redigido.",
+    )
     args = parser.parse_args(argv)
     try:
         repo = args.repo.resolve()
@@ -195,20 +263,36 @@ def main(argv: list[str] | None = None) -> int:
         assets = args.assets_dir.resolve() if args.assets_dir is not None else None
         if args.mode == "packages" and (assets is None or not assets.is_dir()):
             raise ScanError("Informe um diretório válido de pacotes com --assets-dir.")
-        report_parent = args.report_dir.resolve() if args.report_dir is not None else None
+        report_parent = (
+            args.report_dir.resolve() if args.report_dir is not None else None
+        )
         if report_parent is not None:
-            if is_within(report_parent, repo) or (assets is not None and is_within(report_parent, assets)):
-                raise ScanError("Relatórios devem ficar fora do repositório e dos pacotes públicos.")
+            if is_within(report_parent, repo) or (
+                assets is not None and is_within(report_parent, assets)
+            ):
+                raise ScanError(
+                    "Relatórios devem ficar fora do repositório e dos pacotes públicos."
+                )
             report_parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         # O diretório temporário padrão é removido. Quando solicitado, somente
         # ignore vazio e relatório redigido são retidos em subdiretório privado.
         with ExitStack() as stack:
             if report_parent is None:
-                private_dir = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix="nexoflow-secrets-")))
+                private_dir = Path(
+                    stack.enter_context(
+                        tempfile.TemporaryDirectory(prefix="nexoflow-secrets-")
+                    )
+                )
             else:
-                private_dir = Path(tempfile.mkdtemp(prefix="nexoflow-secrets-", dir=report_parent))
+                private_dir = Path(
+                    tempfile.mkdtemp(prefix="nexoflow-secrets-", dir=report_parent)
+                )
             if args.mode == "packages":
-                extraction_dir = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix="nexoflow-packages-")))
+                extraction_dir = Path(
+                    stack.enter_context(
+                        tempfile.TemporaryDirectory(prefix="nexoflow-packages-")
+                    )
+                )
                 extract_packages(assets, extraction_dir)
                 target = extraction_dir
             else:
@@ -218,7 +302,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Segurança: {exc}")
         return 1
     except OSError:
-        print("Segurança: falha de acesso aos arquivos de verificação; publicação bloqueada.")
+        print(
+            "Segurança: falha de acesso aos arquivos de verificação; publicação bloqueada."
+        )
         return 1
 
 

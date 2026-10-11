@@ -127,7 +127,13 @@ REQUIRED_ORDER_FIELDS = {
 # Alias mantido para compatibilidade com testes/documentação anteriores.
 RECOMMENDED_ORDER_FIELDS = REQUIRED_ORDER_FIELDS
 
-OPEN_ORDER_STATUSES = {"Em aberto", "Pendente de pagamento", "Em processamento", "Pronto para rota", "Em trânsito"}
+OPEN_ORDER_STATUSES = {
+    "Em aberto",
+    "Pendente de pagamento",
+    "Em processamento",
+    "Pronto para rota",
+    "Em trânsito",
+}
 TERMINAL_ORDER_STATUSES = {"Concluído", "Cancelado"}
 
 
@@ -205,8 +211,10 @@ def _record_invalid_cpf_result(stats: UpdateStats, plan: ContactUpdatePlan) -> N
     stats.invalid_cpf_orders_found += int(plan.order_found or plan.order_validated)
     stats.invalid_cpf_orders_validated += int(plan.order_validated)
     outcome = (
-        "PEDIDO_VALIDADO" if plan.order_validated
-        else "PEDIDO_CONFIRMADO_NAO_PROPOSTO" if plan.order_found
+        "PEDIDO_VALIDADO"
+        if plan.order_validated
+        else "PEDIDO_CONFIRMADO_NAO_PROPOSTO"
+        if plan.order_found
         else plan.order_resolution_status or "SEM_PEDIDO_VALIDADO"
     )
     stats.invalid_cpf_outcomes[outcome] = stats.invalid_cpf_outcomes.get(outcome, 0) + 1
@@ -215,13 +223,19 @@ def _record_invalid_cpf_result(stats: UpdateStats, plan: ContactUpdatePlan) -> N
 def _invalid_cpf_summary(stats: UpdateStats) -> str:
     counts = stats.invalid_cpf_outcomes
     divergent = {
-        "CPF_IDENTIDADE_DIVERGENTE", "CPF_DIVERGENTE_API",
-        "CLIENTE_ID_DIVERGENTE_API", "PEDIDO_CLIENTE_DIVERGENTE_API",
+        "CPF_IDENTIDADE_DIVERGENTE",
+        "CPF_DIVERGENTE_API",
+        "CLIENTE_ID_DIVERGENTE_API",
+        "PEDIDO_CLIENTE_DIVERGENTE_API",
     }
     known = divergent | {
-        "PEDIDO_VALIDADO", "PEDIDO_CONFIRMADO_NAO_PROPOSTO",
-        "CPF_IDENTIDADE_AMBIGUA", "CPF_IDENTIDADE_INSUFICIENTE",
-        "CPF_NAO_ENCONTRADO", "SEM_PEDIDO_VALIDADO", "ERRO_API",
+        "PEDIDO_VALIDADO",
+        "PEDIDO_CONFIRMADO_NAO_PROPOSTO",
+        "CPF_IDENTIDADE_AMBIGUA",
+        "CPF_IDENTIDADE_INSUFICIENTE",
+        "CPF_NAO_ENCONTRADO",
+        "SEM_PEDIDO_VALIDADO",
+        "ERRO_API",
     }
     return (
         f"contatos avaliados={stats.invalid_cpf_checked}; "
@@ -255,7 +269,8 @@ class _InvalidCpfBatch:
             "Weni CPFs inválidos | lote %s%s | %s. "
             "Contagens por contato, incluindo pedidos cancelados; "
             "nenhuma gravação foi iniciada.",
-            self.number, " interrompido (contatos concluídos)" if interrupted else "",
+            self.number,
+            " interrompido (contatos concluídos)" if interrupted else "",
             _invalid_cpf_summary(self.stats),
         )
         self.number += 1
@@ -267,9 +282,12 @@ def _record_validated_order(stats: UpdateStats, plan: ContactUpdatePlan) -> None
     if not plan.order_validated:
         return
     stats.orders_validated += 1
-    status = normalize_value(plan.fields.get(
-        "pedido_status", plan.guards.get("pedido_status"),
-    )).strip()
+    status = normalize_value(
+        plan.fields.get(
+            "pedido_status",
+            plan.guards.get("pedido_status"),
+        )
+    ).strip()
     if status == "-1":
         stats.orders_pending_payment += 1
     code = normalize_farmalider_payment_code(plan.order_payment_code)
@@ -313,9 +331,7 @@ def utc_now() -> datetime:
 
 
 def iso_utc(value: datetime) -> str:
-    return value.astimezone(UTC).isoformat(timespec="seconds").replace(
-        "+00:00", "Z"
-    )
+    return value.astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def _parse_datetime(value: Any) -> datetime | None:
@@ -393,7 +409,9 @@ def _same_value(field_name: str, current: Any, proposed: Any) -> bool:
             return current_dt == proposed_dt
     if field_name == "pedido_produtos":
         try:
-            return json.loads(normalize_value(current)) == json.loads(normalize_value(proposed))
+            return json.loads(normalize_value(current)) == json.loads(
+                normalize_value(proposed)
+            )
         except (ValueError, TypeError):
             pass
     return _semantic_text(current).casefold() == _semantic_text(proposed).casefold()
@@ -521,8 +539,12 @@ def _set_ad_field(
     _set_field_if_changed(plan, current_fields, field_name, value, evidence=evidence)
 
 
-def _same_ad_event(current_fields: dict[str, Any], prefix: str, attribution: Any) -> bool:
-    origin = str(current_fields.get(f"{prefix}_anuncio_origem") or "").strip().casefold()
+def _same_ad_event(
+    current_fields: dict[str, Any], prefix: str, attribution: Any
+) -> bool:
+    origin = (
+        str(current_fields.get(f"{prefix}_anuncio_origem") or "").strip().casefold()
+    )
     if origin not in {"google ads", "googleads", "google adwords", "adwords"}:
         return False
     current_click = str(current_fields.get(f"{prefix}_anuncio_clique_id") or "").strip()
@@ -534,7 +556,11 @@ def _same_ad_event(current_fields: dict[str, Any], prefix: str, attribution: Any
         return current_id == candidate_id
     current_date = _parse_datetime(current_fields.get(f"{prefix}_anuncio_data"))
     candidate_date = _parse_datetime(attribution.occurred_at)
-    return current_date is not None and candidate_date is not None and current_date == candidate_date
+    return (
+        current_date is not None
+        and candidate_date is not None
+        and current_date == candidate_date
+    )
 
 
 def _sync_google_ads_attribution(
@@ -566,7 +592,9 @@ def _sync_google_ads_attribution(
         if attribution is None:
             continue
         if not attribution.destination_channel and single_contact_channel:
-            attribution = replace(attribution, destination_channel=single_contact_channel)
+            attribution = replace(
+                attribution, destination_channel=single_contact_channel
+            )
         occurred = _parse_datetime(attribution.occurred_at)
         if occurred is None:
             # Sem data confiável não há como decidir primeiro/último anúncio.
@@ -648,7 +676,9 @@ def _sync_google_ads_attribution(
             )
 
 
-def _contact_in_group(contact: dict[str, Any], *, group_name: str, group_uuid: str) -> bool:
+def _contact_in_group(
+    contact: dict[str, Any], *, group_name: str, group_uuid: str
+) -> bool:
     groups = contact.get("groups")
     if not isinstance(groups, list):
         return False
@@ -690,7 +720,9 @@ def _load_state(path: Path = WENI_UPDATE_STATE_FILE) -> dict[str, Any]:
 
 def _save_state(payload: dict[str, Any], path: Path = WENI_UPDATE_STATE_FILE) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temp_name = tempfile.mkstemp(prefix="weni-update-", suffix=".json", dir=path.parent)
+    fd, temp_name = tempfile.mkstemp(
+        prefix="weni-update-", suffix=".json", dir=path.parent
+    )
     os.close(fd)
     temp_path = Path(temp_name)
     try:
@@ -724,7 +756,9 @@ def _append_audit(event: dict[str, Any], path: Path = WENI_UPDATE_AUDIT_FILE) ->
     line = json.dumps(event, ensure_ascii=False, default=str) + "\n"
     handle.write(line)
     # TextIO converte LF para CRLF no Windows; contar bytes realmente escritos.
-    _AUDIT_BYTES_WRITTEN += len(line.encode("utf-8")) + (1 if os.linesep == "\r\n" else 0)
+    _AUDIT_BYTES_WRITTEN += len(line.encode("utf-8")) + (
+        1 if os.linesep == "\r\n" else 0
+    )
 
 
 def _close_audit_handles() -> None:
@@ -826,8 +860,14 @@ def _apply_purchase_candidate(
         candidate["fields"]["cpf"] = plan.fields["cpf"]
 
     try:
-        order, items = resolved_order if resolved_order is not None else resolve_contact_order(
-            candidate, farm_client=farm_client, captured_at=captured_at,
+        order, items = (
+            resolved_order
+            if resolved_order is not None
+            else resolve_contact_order(
+                candidate,
+                farm_client=farm_client,
+                captured_at=captured_at,
+            )
         )
     except (FarmaliderAuthError, FarmaliderUnavailableError):
         raise
@@ -838,18 +878,31 @@ def _apply_purchase_candidate(
 
     plan.order_resolution_status = (
         str(order.get("status_confirmacao") or "SEM_PEDIDO_VALIDADO")
-        if order is not None else "SEM_PEDIDO_VALIDADO" if farm_client is not None
+        if order is not None
+        else "SEM_PEDIDO_VALIDADO"
+        if farm_client is not None
         else "API_DESABILITADA"
     )
-    if order is not None and str(order.get("status_confirmacao") or "").startswith("CPF_IDENTIDADE_"):
+    if order is not None and str(order.get("status_confirmacao") or "").startswith(
+        "CPF_IDENTIDADE_"
+    ):
         identity_level = (
-            logging.DEBUG if cpf_query_priority(candidate["fields"].get("cpf")) == 1
+            logging.DEBUG
+            if cpf_query_priority(candidate["fields"].get("cpf")) == 1
             else logging.WARNING
         )
         if logging.getLogger().isEnabledFor(identity_level):
-            reference = farm_client.weni_contact_diagnostic_ref(str(contact.get("uuid") or "")) if isinstance(farm_client, FarmaliderClient) else "-"
-            logging.log(identity_level, "Weni [contato_ref=%s]: pedido bloqueado: %s; nome e e-mail ou telefone não identificaram um cliente único.",
-                        reference, order["status_confirmacao"])
+            reference = (
+                farm_client.weni_contact_diagnostic_ref(str(contact.get("uuid") or ""))
+                if isinstance(farm_client, FarmaliderClient)
+                else "-"
+            )
+            logging.log(
+                identity_level,
+                "Weni [contato_ref=%s]: pedido bloqueado: %s; nome e e-mail ou telefone não identificaram um cliente único.",
+                reference,
+                order["status_confirmacao"],
+            )
     if order is None or not items:
         return False
 
@@ -920,11 +973,11 @@ def _apply_purchase_candidate(
             and field_name not in available_weni_fields
         ):
             continue
-        _set_field_if_changed(
-            plan, current_fields, field_name, value, reason=reason
-        )
+        _set_field_if_changed(plan, current_fields, field_name, value, reason=reason)
 
-    if plan.purchase_confirmed and (available_weni_fields is None or "ultima_compra" in available_weni_fields):
+    if plan.purchase_confirmed and (
+        available_weni_fields is None or "ultima_compra" in available_weni_fields
+    ):
         current_last_purchase = business_order_datetime(
             normalize_value(current_fields.get("ultima_compra"))
         )
@@ -937,6 +990,7 @@ def _apply_purchase_candidate(
                 reason="pedido não cancelado confirmado pela API FarmaLíder",
             )
     return True
+
 
 def _build_contact_plan(
     contact: dict[str, Any],
@@ -985,9 +1039,11 @@ def _build_contact_plan(
     # O valor efetivo de opt_in_lgpd é a fonte de verdade para os grupos.
     # A rotina corrige os dois lados, inclusive quando o contato já chega com
     # associação inconsistente: ativo <-> Opt-In, recusado <-> Opt-Out.
-    desired_lgpd = str(
-        plan.fields.get("opt_in_lgpd", fields.get("opt_in_lgpd") or "")
-    ).strip().casefold()
+    desired_lgpd = (
+        str(plan.fields.get("opt_in_lgpd", fields.get("opt_in_lgpd") or ""))
+        .strip()
+        .casefold()
+    )
     is_opt_in = _contact_in_group(
         contact,
         group_name=opt_in_group_name,
@@ -1063,34 +1119,72 @@ def _build_contact_plan(
             plan.guards["__native_urns"] = sorted(native_contact_urns(contact))
         # A revisão depende da identidade e das duas possíveis fontes.
         for key in (
-            "cpf", "ultimo_pedido", "pedido_id", "pedido_data", "pedido_status",
-            "pedido_produtos", "pedido_quantidade_itens",
-            "pedido_valor_produtos", "pedido_valor", "pedido_forma_pagamento",
+            "cpf",
+            "ultimo_pedido",
+            "pedido_id",
+            "pedido_data",
+            "pedido_status",
+            "pedido_produtos",
+            "pedido_quantidade_itens",
+            "pedido_valor_produtos",
+            "pedido_valor",
+            "pedido_forma_pagamento",
         ):
             plan.guards[key] = fields.get(key)
     from recompra import GROUP, OPT_OUT, TZ, member, refused
-    campaign_groups = [g for g in contact.get("groups", []) or [] if isinstance(g, dict) and g.get("name") == GROUP and g.get("uuid")]
+
+    campaign_groups = [
+        g
+        for g in contact.get("groups", []) or []
+        if isinstance(g, dict) and g.get("name") == GROUP and g.get("uuid")
+    ]
     if campaign_groups:
-        reference = business_order_datetime(plan.fields.get("pedido_data", fields.get("pedido_data")))
+        reference = business_order_datetime(
+            plan.fields.get("pedido_data", fields.get("pedido_data"))
+        )
         local_now = business_order_datetime(captured_at)
-        expired = reference is None or (local_now and (local_now.astimezone(TZ).date() - reference.date()).days > 25)
-        if "pedido_data" in plan.fields or (plan.order_validated and not plan.purchase_confirmed) or expired or refused(contact) or member(contact, "", OPT_OUT):
-            plan.group_actions.append(GroupAction("remove", campaign_groups[0]["uuid"], "referência de recompra mudou, expirou ou cliente inelegível; reavaliar na rotina de recompra", GROUP))
+        expired = reference is None or (
+            local_now and (local_now.astimezone(TZ).date() - reference.date()).days > 25
+        )
+        if (
+            "pedido_data" in plan.fields
+            or (plan.order_validated and not plan.purchase_confirmed)
+            or expired
+            or refused(contact)
+            or member(contact, "", OPT_OUT)
+        ):
+            plan.group_actions.append(
+                GroupAction(
+                    "remove",
+                    campaign_groups[0]["uuid"],
+                    "referência de recompra mudou, expirou ou cliente inelegível; reavaliar na rotina de recompra",
+                    GROUP,
+                )
+            )
             plan.guards["marketing_opt_in"] = fields.get("marketing_opt_in")
 
     return plan
 
+
 def _execute_contact_plan(weni, plan):
     # Uma referência nova não pode deixar o evento antigo ativo enquanto os
     # campos são atualizados. A remoção já faz parte do plano revisado.
-    removals = [a for a in plan.group_actions if a.action == "remove" and a.group_name == "Recompra FarmaLíder"]
+    removals = [
+        a
+        for a in plan.group_actions
+        if a.action == "remove" and a.group_name == "Recompra FarmaLíder"
+    ]
     for action in removals:
-        weni.contact_group_action(plan.contact_uuid, action="remove", group=action.group)
+        weni.contact_group_action(
+            plan.contact_uuid, action="remove", group=action.group
+        )
     if plan.fields:
         weni.update_contact_fields(plan.contact_uuid, plan.fields)
     for action in plan.group_actions:
         if action not in removals:
-            weni.contact_group_action(plan.contact_uuid, action=action.action, group=action.group)
+            weni.contact_group_action(
+                plan.contact_uuid, action=action.action, group=action.group
+            )
 
 
 def audit_plans(
@@ -1118,32 +1212,44 @@ def audit_plans(
 
         for field_name, value in plan.fields.items():
             if value is None or str(value).strip() == "":
-                errors.append(f"{plan.contact_uuid}: tentativa de gravar vazio em {field_name}")
+                errors.append(
+                    f"{plan.contact_uuid}: tentativa de gravar vazio em {field_name}"
+                )
 
         if "cpf" in plan.fields:
             cpf = normalize_cpf(plan.fields["cpf"])
             if not is_valid_cpf(cpf):
                 errors.append(f"{plan.contact_uuid}: CPF inválido")
             elif str(plan.fields["cpf"]).strip() != cpf:
-                errors.append(f"{plan.contact_uuid}: CPF deve ser gravado com 11 dígitos sem pontuação")
+                errors.append(
+                    f"{plan.contact_uuid}: CPF deve ser gravado com 11 dígitos sem pontuação"
+                )
 
         if "idade" in plan.fields:
             age = _safe_number(plan.fields["idade"])
             if not isinstance(age, int) or not 1 <= age <= 120:
                 errors.append(f"{plan.contact_uuid}: idade fora da faixa segura")
             expected = "sim" if isinstance(age, int) and age >= 18 else "não"
-            majority = str(
-                plan.fields.get("maior_de_18_anos", expected)
-            ).strip().casefold()
+            majority = (
+                str(plan.fields.get("maior_de_18_anos", expected)).strip().casefold()
+            )
             if age is not None and majority != expected:
                 errors.append(f"{plan.contact_uuid}: idade e maioridade inconsistentes")
 
         if "maior_de_18_anos" in plan.fields:
-            if str(plan.fields["maior_de_18_anos"]).strip().casefold() not in {"sim", "não"}:
-                errors.append(f"{plan.contact_uuid}: valor inválido em maior_de_18_anos")
+            if str(plan.fields["maior_de_18_anos"]).strip().casefold() not in {
+                "sim",
+                "não",
+            }:
+                errors.append(
+                    f"{plan.contact_uuid}: valor inválido em maior_de_18_anos"
+                )
 
         if "opt_in_lgpd" in plan.fields:
-            if str(plan.fields["opt_in_lgpd"]).strip().casefold() not in {"ativo", "recusado"}:
+            if str(plan.fields["opt_in_lgpd"]).strip().casefold() not in {
+                "ativo",
+                "recusado",
+            }:
                 errors.append(f"{plan.contact_uuid}: valor inválido em opt_in_lgpd")
 
         if "pedido_status" in plan.fields:
@@ -1154,7 +1260,9 @@ def audit_plans(
             payment = str(plan.fields["pedido_forma_pagamento"]).strip()
             normalized_payment = normalize_farmalider_payment_code(payment)
             if payment.casefold() != "cancelado" and (
-                not normalized_payment or normalized_payment != payment or normalized_payment == "0"
+                not normalized_payment
+                or normalized_payment != payment
+                or normalized_payment == "0"
             ):
                 errors.append(
                     f"{plan.contact_uuid}: código inválido em pedido_forma_pagamento"
@@ -1162,16 +1270,31 @@ def audit_plans(
 
         if plan.order_validated and set(plan.fields) & PURCHASE_FIELDS:
             cpf = normalize_cpf(plan.fields.get("cpf", plan.guards.get("cpf")))
-            if cpf and not is_valid_cpf(cpf) and not plan.guards.get("__invalid_cpf_identity"):
-                errors.append(f"{plan.contact_uuid}: CPF inválido exige nova validação de nome e e-mail ou telefone; gere outro dry-run")
-            payment = normalize_value(plan.fields.get(
-                "pedido_forma_pagamento", plan.guards.get(
-                    "pedido_forma_pagamento", plan.previous.get("pedido_forma_pagamento"),
-                ),
-            )).strip()
-            status = normalize_value(plan.fields.get(
-                "pedido_status", plan.guards.get("pedido_status", plan.previous.get("pedido_status")),
-            )).strip()
+            if (
+                cpf
+                and not is_valid_cpf(cpf)
+                and not plan.guards.get("__invalid_cpf_identity")
+            ):
+                errors.append(
+                    f"{plan.contact_uuid}: CPF inválido exige nova validação de nome e e-mail ou telefone; gere outro dry-run"
+                )
+            payment = normalize_value(
+                plan.fields.get(
+                    "pedido_forma_pagamento",
+                    plan.guards.get(
+                        "pedido_forma_pagamento",
+                        plan.previous.get("pedido_forma_pagamento"),
+                    ),
+                )
+            ).strip()
+            status = normalize_value(
+                plan.fields.get(
+                    "pedido_status",
+                    plan.guards.get(
+                        "pedido_status", plan.previous.get("pedido_status")
+                    ),
+                )
+            ).strip()
             if normalize_farmalider_payment_code(payment) == "0":
                 errors.append(
                     f"{plan.contact_uuid}: pagamento 0 exige novo plano com Cancelado e pedido_status=3"
@@ -1180,7 +1303,9 @@ def audit_plans(
                 errors.append(
                     f"{plan.contact_uuid}: pagamento Cancelado exige pedido_status=3"
                 )
-            if "ultima_compra" in plan.fields and (status not in {"4", "1", "2"} or payment.casefold() == "cancelado"):
+            if "ultima_compra" in plan.fields and (
+                status not in {"4", "1", "2"} or payment.casefold() == "cancelado"
+            ):
                 errors.append(
                     f"{plan.contact_uuid}: ultima_compra exige venda realizada (pedido_status=4, 1 ou 2) e não cancelada"
                 )
@@ -1204,22 +1329,39 @@ def audit_plans(
                     f"{plan.contact_uuid}: {field_name} não contém URN de {expected_channel}"
                 )
 
-        for field_name in ("primeiro_anuncio_canal_destino", "ultimo_anuncio_canal_destino"):
+        for field_name in (
+            "primeiro_anuncio_canal_destino",
+            "ultimo_anuncio_canal_destino",
+        ):
             if field_name in plan.fields:
                 channel = str(plan.fields[field_name]).strip().casefold()
                 if channel not in {"whatsapp", "instagram", "facebook", "outro"}:
-                    errors.append(f"{plan.contact_uuid}: canal de destino de anúncio inválido em {field_name}")
+                    errors.append(
+                        f"{plan.contact_uuid}: canal de destino de anúncio inválido em {field_name}"
+                    )
 
         for field_name in ("primeiro_anuncio_origem", "ultimo_anuncio_origem"):
-            if field_name in plan.fields and str(plan.fields[field_name]).strip() != GOOGLE_ADS_ORIGIN:
-                errors.append(f"{plan.contact_uuid}: origem de anúncio não autorizada pelo detector Google Ads")
+            if (
+                field_name in plan.fields
+                and str(plan.fields[field_name]).strip() != GOOGLE_ADS_ORIGIN
+            ):
+                errors.append(
+                    f"{plan.contact_uuid}: origem de anúncio não autorizada pelo detector Google Ads"
+                )
 
-        if set(plan.fields) & (PURCHASE_FIELDS - {"ultima_compra"}) and not (plan.order_validated or plan.purchase_confirmed):
+        if set(plan.fields) & (PURCHASE_FIELDS - {"ultima_compra"}) and not (
+            plan.order_validated or plan.purchase_confirmed
+        ):
             errors.append(f"{plan.contact_uuid}: campos de pedido sem validação")
         if "ultima_compra" in plan.fields and not plan.purchase_confirmed:
-            errors.append(f"{plan.contact_uuid}: ultima_compra sem compra não cancelada confirmada")
+            errors.append(
+                f"{plan.contact_uuid}: ultima_compra sem compra não cancelada confirmada"
+            )
         for date_field in ("pedido_data", "ultima_compra"):
-            if date_field in plan.fields and business_order_datetime(plan.fields[date_field]) is None:
+            if (
+                date_field in plan.fields
+                and business_order_datetime(plan.fields[date_field]) is None
+            ):
                 errors.append(f"{plan.contact_uuid}: data inválida em {date_field}")
         if "pedido_valor" in plan.fields:
             number = _safe_number(plan.fields["pedido_valor"])
@@ -1227,13 +1369,18 @@ def audit_plans(
                 errors.append(f"{plan.contact_uuid}: número inválido em pedido_valor")
 
         aligned_fields = (
-            "pedido_produtos", "pedido_quantidade_itens", "pedido_valor_produtos",
+            "pedido_produtos",
+            "pedido_quantidade_itens",
+            "pedido_valor_produtos",
         )
         effective_fields = {**plan.guards, **plan.fields}
         parsed_lists: dict[str, list[str]] = {}
         if set(plan.fields) & set(aligned_fields):
             for list_field in aligned_fields:
-                if list_field not in effective_fields or effective_fields[list_field] is None:
+                if (
+                    list_field not in effective_fields
+                    or effective_fields[list_field] is None
+                ):
                     continue
                 try:
                     parsed_lists[list_field] = parse_weni_order_list(
@@ -1256,8 +1403,10 @@ def audit_plans(
                 continue
             for value in values:
                 number = _safe_number(value)
-                if number is None or number < 0 or (
-                    list_field == "pedido_quantidade_itens" and number <= 0
+                if (
+                    number is None
+                    or number < 0
+                    or (list_field == "pedido_quantidade_itens" and number <= 0)
                 ):
                     errors.append(
                         f"{plan.contact_uuid}: valor inválido em {list_field}"
@@ -1350,7 +1499,10 @@ def _canonical_plan(plan: ContactUpdatePlan) -> dict[str, Any]:
 
 
 def _plan_digest(plans: list[ContactUpdatePlan]) -> str:
-    canonical = [_canonical_plan(plan) for plan in sorted(plans, key=lambda item: item.contact_uuid)]
+    canonical = [
+        _canonical_plan(plan)
+        for plan in sorted(plans, key=lambda item: item.contact_uuid)
+    ]
     payload = json.dumps(
         canonical,
         ensure_ascii=False,
@@ -1369,7 +1521,9 @@ def _display_value(value: Any) -> str:
     return str(value)
 
 
-def _review_summary(plans: list[ContactUpdatePlan], stats: UpdateStats) -> dict[str, Any]:
+def _review_summary(
+    plans: list[ContactUpdatePlan], stats: UpdateStats
+) -> dict[str, Any]:
     field_counts: dict[str, int] = {}
     opt_in_add = 0
     opt_in_remove = 0
@@ -1394,7 +1548,13 @@ def _review_summary(plans: list[ContactUpdatePlan], stats: UpdateStats) -> dict[
             age_contacts += 1
         if PURCHASE_FIELDS & set(plan.fields):
             purchase_contacts += 1
-        if {"contact_urn", "contact_urn_whatsapp", "contact_urn_instagram", "contact_urn_facebook", "contact_canal_principal"} & set(plan.fields):
+        if {
+            "contact_urn",
+            "contact_urn_whatsapp",
+            "contact_urn_instagram",
+            "contact_urn_facebook",
+            "contact_canal_principal",
+        } & set(plan.fields):
             channel_contacts += 1
         if any(
             str(plan.fields.get(field_name) or "").strip().casefold() == "google ads"
@@ -1402,7 +1562,9 @@ def _review_summary(plans: list[ContactUpdatePlan], stats: UpdateStats) -> dict[
         ):
             google_ads_contacts += 1
         if plan.contact_channel:
-            principal_channels[plan.contact_channel] = principal_channels.get(plan.contact_channel, 0) + 1
+            principal_channels[plan.contact_channel] = (
+                principal_channels.get(plan.contact_channel, 0) + 1
+            )
         for action in plan.group_actions:
             group_name = (action.group_name or action.group).strip().casefold()
             if group_name == WENI_UPDATE_OPT_IN_GROUP.casefold():
@@ -1563,19 +1725,29 @@ def write_review_snapshot(
     else:
         lines.append("Nenhuma alteração de campo proposta.")
 
-    lines.extend(["", "DETALHES POR CONTATO", "=========================================================="])
+    lines.extend(
+        [
+            "",
+            "DETALHES POR CONTATO",
+            "==========================================================",
+        ]
+    )
     if not plans:
         lines.append("Nenhuma alteração proposta.")
 
-    for index, plan in enumerate(sorted(plans, key=lambda item: item.contact_uuid), start=1):
+    for index, plan in enumerate(
+        sorted(plans, key=lambda item: item.contact_uuid), start=1
+    ):
         label = plan.contact_name or "Contato sem nome"
-        lines.extend([
-            "",
-            f"[{index}] {label}",
-            f"UUID: {plan.contact_uuid}",
-            f"URN principal: {plan.contact_urn or '<não disponível>'}",
-            f"Canal principal: {plan.contact_channel or '<não identificado>'}",
-        ])
+        lines.extend(
+            [
+                "",
+                f"[{index}] {label}",
+                f"UUID: {plan.contact_uuid}",
+                f"URN principal: {plan.contact_urn or '<não disponível>'}",
+                f"Canal principal: {plan.contact_channel or '<não identificado>'}",
+            ]
+        )
         if plan.fields:
             lines.append("Campos:")
             for field_name in sorted(plan.fields):
@@ -1604,7 +1776,11 @@ def write_review_snapshot(
         if plan.purchase_confirmed:
             lines.append(
                 "Pedido FarmaLíder: CONFIRMADO"
-                + (f" | {plan.purchase_confirmation}" if plan.purchase_confirmation else "")
+                + (
+                    f" | {plan.purchase_confirmation}"
+                    if plan.purchase_confirmation
+                    else ""
+                )
             )
 
     txt_path.write_text("\n".join(lines) + "\n", encoding="utf-8-sig")
@@ -1637,10 +1813,14 @@ def verify_review_snapshot(
     partition = payload.get("partition")
     if quarter is None:
         if isinstance(partition, dict) and partition.get("kind") == "full_25":
-            raise PlanAuditError("O snapshot revisado pertence a uma carga completa 25%.")
+            raise PlanAuditError(
+                "O snapshot revisado pertence a uma carga completa 25%."
+            )
     else:
         if not isinstance(partition, dict) or partition.get("kind") != "full_25":
-            raise PlanAuditError("O snapshot revisado não pertence à carga completa 25%.")
+            raise PlanAuditError(
+                "O snapshot revisado não pertence à carga completa 25%."
+            )
         if int(partition.get("part") or 0) != quarter:
             raise PlanAuditError(
                 f"O snapshot revisado pertence à Parte {partition.get('part')}, não à Parte {quarter}."
@@ -1684,10 +1864,14 @@ def load_review_snapshot(
     partition = payload.get("partition")
     if quarter is None:
         if isinstance(partition, dict) and partition.get("kind") == "full_25":
-            raise PlanAuditError("O snapshot revisado pertence a uma carga completa 25%.")
+            raise PlanAuditError(
+                "O snapshot revisado pertence a uma carga completa 25%."
+            )
     else:
         if not isinstance(partition, dict) or partition.get("kind") != "full_25":
-            raise PlanAuditError("O snapshot revisado não pertence à carga completa 25%.")
+            raise PlanAuditError(
+                "O snapshot revisado não pertence à carga completa 25%."
+            )
         if int(partition.get("part") or 0) != quarter:
             raise PlanAuditError(
                 f"O snapshot revisado pertence à Parte {partition.get('part')}, não à Parte {quarter}."
@@ -1708,7 +1892,9 @@ def load_review_snapshot(
         actions: list[GroupAction] = []
         for item in raw_actions:
             if not isinstance(item, dict):
-                raise PlanAuditError("Snapshot de revisão contém ação de grupo inválida.")
+                raise PlanAuditError(
+                    "Snapshot de revisão contém ação de grupo inválida."
+                )
             actions.append(
                 GroupAction(
                     action=str(item.get("action") or ""),
@@ -1755,8 +1941,20 @@ def load_review_snapshot(
 def _same_guard_value(current: Any, expected: Any) -> bool:
     if isinstance(current, (dict, list)) or isinstance(expected, (dict, list)):
         try:
-            left = json.dumps(current, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
-            right = json.dumps(expected, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+            left = json.dumps(
+                current,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                default=str,
+            )
+            right = json.dumps(
+                expected,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                default=str,
+            )
             return left == right
         except TypeError:
             pass
@@ -1799,11 +1997,15 @@ def _prepare_frozen_plan_for_apply(
     for guard_name, expected in plan.guards.items():
         if guard_name == "__invalid_cpf_identity":
             if weni_identity_guard(current_contact) != expected:
-                conflicts.append("nome, e-mail ou telefone usados para identificar o cliente mudaram após a revisão")
+                conflicts.append(
+                    "nome, e-mail ou telefone usados para identificar o cliente mudaram após a revisão"
+                )
             continue
         if guard_name == "__native_urns":
             current_native = sorted(native_contact_urns(current_contact))
-            expected_native = sorted(str(item) for item in (expected or []) if str(item).strip())
+            expected_native = sorted(
+                str(item) for item in (expected or []) if str(item).strip()
+            )
             if current_native != expected_native:
                 conflicts.append("URNs nativas da Weni mudaram após a revisão")
             continue
@@ -1894,7 +2096,9 @@ def _build_context_for_contact(
 
     timestamps = [
         dt
-        for dt in (_parse_datetime(message_created_on(item)) for item in candidate_messages)
+        for dt in (
+            _parse_datetime(message_created_on(item)) for item in candidate_messages
+        )
         if dt is not None
     ]
     earliest = min(timestamps) if timestamps else started_at
@@ -1914,6 +2118,7 @@ def _resolve_group(client: WeniClient, group_name: str) -> tuple[bool, str]:
             return True, str(group.get("uuid") or "").strip()
     return False, ""
 
+
 def _resolve_required_groups(
     client: WeniClient,
     group_names: tuple[str, ...],
@@ -1921,7 +2126,9 @@ def _resolve_required_groups(
     """Resolve vários grupos com uma única listagem da API."""
     groups = client.list_groups()
     by_name = {
-        str(group.get("name") or "").strip().casefold(): str(group.get("uuid") or "").strip()
+        str(group.get("name") or "").strip().casefold(): str(
+            group.get("uuid") or ""
+        ).strip()
         for group in groups
         if isinstance(group, dict) and str(group.get("name") or "").strip()
     }
@@ -1940,8 +2147,12 @@ def _available_weni_fields(client: WeniClient) -> set[str]:
     }
 
 
-def _missing_multichannel_fields(client: WeniClient, available: set[str] | None = None) -> list[str]:
-    available_fields = available if available is not None else _available_weni_fields(client)
+def _missing_multichannel_fields(
+    client: WeniClient, available: set[str] | None = None
+) -> list[str]:
+    available_fields = (
+        available if available is not None else _available_weni_fields(client)
+    )
     return sorted(REQUIRED_MULTICHANNEL_FIELDS - available_fields)
 
 
@@ -1965,7 +2176,9 @@ def _ensure_order_fields(available: set[str]) -> None:
     )
 
 
-def _ensure_multichannel_fields(client: WeniClient, available: set[str] | None = None) -> None:
+def _ensure_multichannel_fields(
+    client: WeniClient, available: set[str] | None = None
+) -> None:
     missing = _missing_multichannel_fields(client, available)
     if not missing:
         return
@@ -2016,10 +2229,16 @@ def check_update_connections() -> dict[str, Any]:
         opt_in_available, _ = _resolve_opt_in_group(weni)
         available_fields = _available_weni_fields(weni)
         result["weni"]["opt_in_group_found"] = opt_in_available
-        result["weni"]["missing_multichannel_fields"] = _missing_multichannel_fields(weni, available_fields)
-        result["weni"]["pedido_status_field_found"] = "pedido_status" in available_fields
+        result["weni"]["missing_multichannel_fields"] = _missing_multichannel_fields(
+            weni, available_fields
+        )
+        result["weni"]["pedido_status_field_found"] = (
+            "pedido_status" in available_fields
+        )
         result["weni"]["missing_order_fields"] = _missing_order_fields(available_fields)
-        result["weni"]["missing_google_ads_fields"] = _missing_google_ads_fields(available_fields)
+        result["weni"]["missing_google_ads_fields"] = _missing_google_ads_fields(
+            available_fields
+        )
         farm = _open_farmalider()
         if farm is not None:
             result["farmalider"] = farm.test_connection()
@@ -2107,29 +2326,49 @@ def run_update(
                 opt_in_group_available=opt_in_available,
             )
 
-            summary = review_payload.get("summary") if isinstance(review_payload.get("summary"), dict) else {}
+            summary = (
+                review_payload.get("summary")
+                if isinstance(review_payload.get("summary"), dict)
+                else {}
+            )
             stats.messages_incoming = int(summary.get("messages_incoming") or 0)
-            stats.contacts_considered = int(summary.get("contacts_considered") or len(plans))
+            stats.contacts_considered = int(
+                summary.get("contacts_considered") or len(plans)
+            )
             stats.plans_with_changes = len(plans)
             stats.field_changes = sum(len(plan.fields) for plan in plans)
             stats.group_actions = sum(len(plan.group_actions) for plan in plans)
-            stats.purchase_confirmed = sum(1 for plan in plans if plan.purchase_confirmed)
-            stats.orders_validated = int(summary.get("orders_validated") or sum(
-                1 for plan in plans if plan.order_validated
-            ))
-            stats.orders_cancelled_payment_zero = int(summary.get("orders_cancelled_payment_zero") or 0)
-            stats.orders_pending_payment = int(summary.get("orders_pending_payment") or 0)
+            stats.purchase_confirmed = sum(
+                1 for plan in plans if plan.purchase_confirmed
+            )
+            stats.orders_validated = int(
+                summary.get("orders_validated")
+                or sum(1 for plan in plans if plan.order_validated)
+            )
+            stats.orders_cancelled_payment_zero = int(
+                summary.get("orders_cancelled_payment_zero") or 0
+            )
+            stats.orders_pending_payment = int(
+                summary.get("orders_pending_payment") or 0
+            )
             stats.invalid_cpf_checked = int(summary.get("invalid_cpf_checked") or 0)
-            stats.invalid_cpf_orders_found = int(summary.get("invalid_cpf_orders_found") or 0)
-            stats.invalid_cpf_orders_validated = int(summary.get("invalid_cpf_orders_validated") or 0)
+            stats.invalid_cpf_orders_found = int(
+                summary.get("invalid_cpf_orders_found") or 0
+            )
+            stats.invalid_cpf_orders_validated = int(
+                summary.get("invalid_cpf_orders_validated") or 0
+            )
             stats.invalid_cpf_outcomes = dict(summary.get("invalid_cpf_outcomes") or {})
             unmapped = summary.get("payment_unmapped_codes")
             if isinstance(unmapped, dict):
                 stats.payment_unmapped_codes = {
-                    code: count for code, count in unmapped.items()
+                    code: count
+                    for code, count in unmapped.items()
                     if normalize_farmalider_payment_code(code) == code
                     and not farmalider_payment_method_name(code)
-                    and isinstance(count, int) and not isinstance(count, bool) and count > 0
+                    and isinstance(count, int)
+                    and not isinstance(count, bool)
+                    and count > 0
                 }
             captured_at = str(review_payload.get("captured_at_utc") or "").strip()
             reviewed_partition = (
@@ -2152,7 +2391,13 @@ def run_update(
             )
 
             conflicted_uuids: list[str] = []
-            with TaskProgress("Aplicação do snapshot", len(plans), detail=lambda: f"aplicados={stats.contacts_updated}; conflitos={stats.contacts_conflicted}; já corretos={stats.contacts_already_satisfied}; falhas={stats.contacts_failed}") as progress:
+            with TaskProgress(
+                "Aplicação do snapshot",
+                len(plans),
+                detail=lambda: (
+                    f"aplicados={stats.contacts_updated}; conflitos={stats.contacts_conflicted}; já corretos={stats.contacts_already_satisfied}; falhas={stats.contacts_failed}"
+                ),
+            ) as progress:
                 for index, plan in progress.track(enumerate(plans, start=1)):
                     # Em atendimento 24h, relê somente este contato imediatamente
                     # antes da escrita. Mudanças em outros contatos não cancelam a carga.
@@ -2259,7 +2504,6 @@ def run_update(
                             "O checkpoint não foi avançado."
                         ) from exc
 
-
             if quarter is None:
                 state_payload = {
                     "last_success_utc": captured_at,
@@ -2280,9 +2524,9 @@ def run_update(
                     for item in (state.get("pending_conflict_uuids") or [])
                     if str(item).strip()
                 }
-                pending_after = (
-                    previous_pending - reviewed_uuids
-                ) | set(conflicted_uuids)
+                pending_after = (previous_pending - reviewed_uuids) | set(
+                    conflicted_uuids
+                )
                 component_complete, campaign_complete = mark_full_load_quarter_complete(
                     component="weni",
                     part=quarter,
@@ -2402,7 +2646,9 @@ def run_update(
         # a mudança no modified_on do contato (por exemplo, só associação a grupo).
         pending_conflicts = state.get("pending_conflict_uuids") or []
         if isinstance(pending_conflicts, list) and pending_conflicts:
-            unique_pending = sorted({str(item).strip() for item in pending_conflicts if str(item).strip()})
+            unique_pending = sorted(
+                {str(item).strip() for item in pending_conflicts if str(item).strip()}
+            )
             logging.info(
                 "Reprocessando %s conflito(s) pendente(s) da carga completa.",
                 len(unique_pending),
@@ -2473,13 +2719,19 @@ def run_update(
         )
 
         prepared_contacts = []
-        with TaskProgress("Preparação da fila Weni", len(all_contact_uuids)) as progress:
-            for _preparation_index, contact_uuid in progress.track(enumerate(sorted(all_contact_uuids), start=1)):
+        with TaskProgress(
+            "Preparação da fila Weni", len(all_contact_uuids)
+        ) as progress:
+            for _preparation_index, contact_uuid in progress.track(
+                enumerate(sorted(all_contact_uuids), start=1)
+            ):
                 contact = contacts_by_uuid.get(contact_uuid)
                 if contact is None:
                     contact = weni.get_contact(uuid=contact_uuid)
                 if contact is None:
-                    logging.warning("Contato %s não foi localizado; ignorando.", contact_uuid)
+                    logging.warning(
+                        "Contato %s não foi localizado; ignorando.", contact_uuid
+                    )
                     continue
 
                 candidate_messages = incoming_by_contact.get(contact_uuid, [])
@@ -2487,7 +2739,9 @@ def run_update(
                     message_id(item) for item in candidate_messages if message_id(item)
                 }
                 if window.full:
-                    context = full_context_by_contact.get(contact_uuid, candidate_messages)
+                    context = full_context_by_contact.get(
+                        contact_uuid, candidate_messages
+                    )
                 else:
                     context = _build_context_for_contact(
                         weni,
@@ -2501,24 +2755,53 @@ def run_update(
 
                 # Determine priority from the effective CPF, including a valid CPF
                 # inferred from messages. Preparation performs no FarmaLíder GET.
-                evidences = infer_contact_fields(context, candidate_message_ids=candidate_ids)
+                evidences = infer_contact_fields(
+                    context, candidate_message_ids=candidate_ids
+                )
                 effective_cpf = (
-                    evidences["cpf"].value if "cpf" in evidences
+                    evidences["cpf"].value
+                    if "cpf" in evidences
                     else get_fields(contact).get("cpf")
                 )
-                prepared_contacts.append((cpf_query_priority(effective_cpf), contact_uuid,
-                                          contact, context, candidate_ids))
+                prepared_contacts.append(
+                    (
+                        cpf_query_priority(effective_cpf),
+                        contact_uuid,
+                        contact,
+                        context,
+                        candidate_ids,
+                    )
+                )
 
         previous_phase = None
         invalid_batch = _InvalidCpfBatch()
-        with TaskProgress("Preparação Weni", len(prepared_contacts), detail=lambda: f"pedidos validados={stats.orders_validated}; alterações propostas={stats.plans_with_changes}; nenhuma gravação na Weni") as progress:
-            for _index, (priority, contact_uuid, contact, context, candidate_ids) in progress.track(enumerate(
-                sorted(prepared_contacts, key=lambda entry: (entry[0], entry[1])), start=1
-            )):
+        with TaskProgress(
+            "Preparação Weni",
+            len(prepared_contacts),
+            detail=lambda: (
+                f"pedidos validados={stats.orders_validated}; alterações propostas={stats.plans_with_changes}; nenhuma gravação na Weni"
+            ),
+        ) as progress:
+            for _index, (
+                priority,
+                contact_uuid,
+                contact,
+                context,
+                candidate_ids,
+            ) in progress.track(
+                enumerate(
+                    sorted(prepared_contacts, key=lambda entry: (entry[0], entry[1])),
+                    start=1,
+                )
+            ):
                 if priority != previous_phase:
                     invalid_batch.flush()
-                    logging.info("Weni: etapa de consulta FarmaLíder: %s.",
-                                 ("CPFs válidos", "CPFs inválidos", "contatos sem CPF")[priority])
+                    logging.info(
+                        "Weni: etapa de consulta FarmaLíder: %s.",
+                        ("CPFs válidos", "CPFs inválidos", "contatos sem CPF")[
+                            priority
+                        ],
+                    )
                     previous_phase = priority
                 try:
                     plan = _build_contact_plan(
@@ -2544,7 +2827,9 @@ def run_update(
                 _track_open_order(
                     open_order_uuids,
                     contact_uuid,
-                    plan.fields.get("pedido_status", get_fields(contact).get("pedido_status")),
+                    plan.fields.get(
+                        "pedido_status", get_fields(contact).get("pedido_status")
+                    ),
                 )
                 if plan.purchase_confirmed:
                     stats.purchase_confirmed += 1
@@ -2557,9 +2842,11 @@ def run_update(
 
         invalid_batch.flush()
         if stats.invalid_cpf_checked:
-            logging.info("Weni CPFs inválidos | total da preparação | %s. "
-                         "Contagens por contato; nenhuma gravação foi iniciada.",
-                         _invalid_cpf_summary(stats))
+            logging.info(
+                "Weni CPFs inválidos | total da preparação | %s. "
+                "Contagens por contato; nenhuma gravação foi iniciada.",
+                _invalid_cpf_summary(stats),
+            )
         stats.plans_with_changes = len(plans)
         stats.field_changes = sum(len(plan.fields) for plan in plans)
         stats.group_actions = sum(len(plan.group_actions) for plan in plans)
@@ -2574,7 +2861,9 @@ def run_update(
             "Pedidos no plano por contato: cancelados por pagamento 0=%s; "
             "pendentes de pagamento=%s; concluídos confirmados=%s. "
             "Os valores não representam pedidos únicos nem gravações realizadas.",
-            stats.orders_cancelled_payment_zero, stats.orders_pending_payment, stats.purchase_confirmed,
+            stats.orders_cancelled_payment_zero,
+            stats.orders_pending_payment,
+            stats.purchase_confirmed,
         )
 
         # ETAPA OBRIGATÓRIA: nenhum POST é feito antes desta auditoria completa.
@@ -2636,17 +2925,31 @@ def run_update(
 
         mode = "apply" if apply else "dry-run"
         if not apply:
-            with TaskProgress("Gravação da auditoria JSONL (dry-run)", len(plans), unit="registros", byte_count=lambda: _AUDIT_BYTES_WRITTEN) as progress:
+            with TaskProgress(
+                "Gravação da auditoria JSONL (dry-run)",
+                len(plans),
+                unit="registros",
+                byte_count=lambda: _AUDIT_BYTES_WRITTEN,
+            ) as progress:
                 for plan in progress.track(plans):
                     _append_audit(_audit_plan_event(plan, mode=mode, status="planned"))
             logging.info("DRY-RUN concluído. Nenhum contato foi alterado na Weni.")
             return stats
 
         conflicted_uuids: list[str] = []
-        with TaskProgress("Aplicação Weni", len(plans), detail=lambda: f"aplicados={stats.contacts_updated}; conflitos={stats.contacts_conflicted}; já corretos={stats.contacts_already_satisfied}; falhas={stats.contacts_failed}") as progress:
+        with TaskProgress(
+            "Aplicação Weni",
+            len(plans),
+            detail=lambda: (
+                f"aplicados={stats.contacts_updated}; conflitos={stats.contacts_conflicted}; já corretos={stats.contacts_already_satisfied}; falhas={stats.contacts_failed}"
+            ),
+        ) as progress:
             for plan in progress.track(plans):
                 try:
-                    if plan.order_validated or any(action.group_name == "Recompra FarmaLíder" for action in plan.group_actions):
+                    if plan.order_validated or any(
+                        action.group_name == "Recompra FarmaLíder"
+                        for action in plan.group_actions
+                    ):
                         current_contact = weni.get_contact(uuid=plan.contact_uuid)
                         prepared = None
                         conflict = "contato não localizado no momento do apply"
@@ -2662,13 +2965,28 @@ def run_update(
                         if prepared is None:
                             stats.contacts_conflicted += 1
                             conflicted_uuids.append(plan.contact_uuid)
-                            _append_audit(_audit_plan_event(plan, mode=mode, status="conflict_skipped", error=conflict))
+                            _append_audit(
+                                _audit_plan_event(
+                                    plan,
+                                    mode=mode,
+                                    status="conflict_skipped",
+                                    error=conflict,
+                                )
+                            )
                             continue
                         if not prepared.has_changes:
                             stats.contacts_already_satisfied += 1
-                            _append_audit(_audit_plan_event(plan, mode=mode, status="already_satisfied"))
+                            _append_audit(
+                                _audit_plan_event(
+                                    plan, mode=mode, status="already_satisfied"
+                                )
+                            )
                             continue
-                        audit_plans([prepared], opt_out_group_available=opt_out_available, opt_in_group_available=opt_in_available)
+                        audit_plans(
+                            [prepared],
+                            opt_out_group_available=opt_out_available,
+                            opt_in_group_available=opt_in_available,
+                        )
                         plan = prepared
                     _execute_contact_plan(weni, plan)
                     stats.contacts_updated += 1
@@ -2707,4 +3025,6 @@ def run_update(
         weni.close()
         if farm is not None:
             farm.close()
+
+
 # NexoFlow 1.0

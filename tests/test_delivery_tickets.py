@@ -23,32 +23,67 @@ NOW = "2026-10-08T16:00:00+00:00"
 
 
 def room(**updates):
-    result = {"uuid": TICKET, "contact": {"uuid": "internal-id", "external_id": CONTACT},
-              "tags": [{"name": "Pedido"}, {"name": "Pedido finalizado"}],
-              "user": {"name": "Atendente sintético"}, "is_active": False,
-              "created_on": "2026-10-08T12:00:00Z", "ended_at": "2026-10-08T15:00:00Z"}
+    result = {
+        "uuid": TICKET,
+        "contact": {"uuid": "internal-id", "external_id": CONTACT},
+        "tags": [{"name": "Pedido"}, {"name": "Pedido finalizado"}],
+        "user": {"name": "Atendente sintético"},
+        "is_active": False,
+        "created_on": "2026-10-08T12:00:00Z",
+        "ended_at": "2026-10-08T15:00:00Z",
+    }
     result.update(updates)
     return result
 
 
 def contact(**updates):
-    result = {"uuid": CONTACT, "name": "Cliente Árvore", "fields": {
-        "cpf": "0", "nome": "Cliente Árvore", "email": "arvore@example.test"},
-        "urns": ["tel:+5591987654321"]}
+    result = {
+        "uuid": CONTACT,
+        "name": "Cliente Árvore",
+        "fields": {
+            "cpf": "0",
+            "nome": "Cliente Árvore",
+            "email": "arvore@example.test",
+        },
+        "urns": ["tel:+5591987654321"],
+    }
     result.update(updates)
     return result
 
 
 def farm(payload=None):
-    payload = payload or {"cliente": {"id": 101, "cpf": 0, "nome": "Cliente Árvore",
-        "email": "arvore@example.test", "telefone": "91987654321"},
-        "ultimoPedido": {"id": 201, "codCliente": 101, "emissao": "2026-06-01T10:00:00",
-                         "status": 2, "formaPagamento": 1, "frete": 0},
-        "itens": [{"codPedido": 201, "descricao": "Produto sintético", "quantidade": 2,
-                   "valor": 10, "total": 20}]}
+    payload = payload or {
+        "cliente": {
+            "id": 101,
+            "cpf": 0,
+            "nome": "Cliente Árvore",
+            "email": "arvore@example.test",
+            "telefone": "91987654321",
+        },
+        "ultimoPedido": {
+            "id": 201,
+            "codCliente": 101,
+            "emissao": "2026-06-01T10:00:00",
+            "status": 2,
+            "formaPagamento": 1,
+            "frete": 0,
+        },
+        "itens": [
+            {
+                "codPedido": 201,
+                "descricao": "Produto sintético",
+                "quantidade": 2,
+                "valor": 10,
+                "total": 20,
+            }
+        ],
+    }
     client = Mock()
     client.get_cliente_by_cpf.return_value = payload
-    client.get_pedido.return_value = {"capa": payload["ultimoPedido"], "itens": payload["itens"]}
+    client.get_pedido.return_value = {
+        "capa": payload["ultimoPedido"],
+        "itens": payload["itens"],
+    }
     return client
 
 
@@ -58,16 +93,32 @@ def selection(rooms=None):
 
 class DeliveryTicketsTests(unittest.TestCase):
     def reconcile(self, tickets=None, contacts=None, client=None, order_id_field=""):
-        return reconcile_tickets(tickets or selection(), contacts or [contact()], client or farm(),
-                                 captured_at=NOW, available_fields=REQUIRED_ORDER_FIELDS, order_id_field=order_id_field)
+        return reconcile_tickets(
+            tickets or selection(),
+            contacts or [contact()],
+            client or farm(),
+            captured_at=NOW,
+            available_fields=REQUIRED_ORDER_FIELDS,
+            order_id_field=order_id_field,
+        )
 
     def test_exact_tags_closed_human_and_flows_external_id(self):
-        rooms = [room(), room(), room(uuid="20000000-0000-0000-0000-000000000002",
-                                      tags=[{"name": " PEDIDO   FINALIZADO "}]),
-                 room(uuid="20000000-0000-0000-0000-000000000003", tags=[{"name": "Pedidos"}]),
-                 room(uuid="20000000-0000-0000-0000-000000000004", ended_at=None),
-                 room(uuid="20000000-0000-0000-0000-000000000005", user=None),
-                 room(uuid="20000000-0000-0000-0000-000000000006", contact={"uuid": CONTACT})]
+        rooms = [
+            room(),
+            room(),
+            room(
+                uuid="20000000-0000-0000-0000-000000000002",
+                tags=[{"name": " PEDIDO   FINALIZADO "}],
+            ),
+            room(
+                uuid="20000000-0000-0000-0000-000000000003", tags=[{"name": "Pedidos"}]
+            ),
+            room(uuid="20000000-0000-0000-0000-000000000004", ended_at=None),
+            room(uuid="20000000-0000-0000-0000-000000000005", user=None),
+            room(
+                uuid="20000000-0000-0000-0000-000000000006", contact={"uuid": CONTACT}
+            ),
+        ]
         selected, rejected = select_tickets(rooms, cutoff=datetime.fromisoformat(NOW))
         self.assertEqual(len(selected), 2)
         self.assertTrue(all(ticket["contact_uuid"] == CONTACT for ticket in selected))
@@ -88,27 +139,54 @@ class DeliveryTicketsTests(unittest.TestCase):
         self.assertEqual(len(data["tickets"]), 2)
         self.assertEqual(data["orders"][0]["data"], "2026-06-01")
         self.assertEqual(plans[0].fields["pedido_data"], "01/06/26 10:00:00")
-        self.assertTrue(all(row["vinculo_atendimento"] == "FORA_DO_PERIODO_DO_ATENDIMENTO" for row in data["tickets"]))
-        rows = build_delivery_order_records(data["tickets"], data["orders"], updated_at=NOW)
+        self.assertTrue(
+            all(
+                row["vinculo_atendimento"] == "FORA_DO_PERIODO_DO_ATENDIMENTO"
+                for row in data["tickets"]
+            )
+        )
+        rows = build_delivery_order_records(
+            data["tickets"], data["orders"], updated_at=NOW
+        )
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["quantidade_atendimentos"], 2)
         self.assertEqual(rows[0]["pedido_valor"], 20.0)
         self.assertEqual(rows[0]["vinculo_atendimento"], "SEM_VINCULO_COMPROVADO")
 
     def test_invalid_cpf_different_customer_cannot_confirm_order(self):
-        bad = contact(name="Outra Pessoa", fields={"cpf": "0", "email": "other@example.test"}, urns=[])
+        bad = contact(
+            name="Outra Pessoa",
+            fields={"cpf": "0", "email": "other@example.test"},
+            urns=[],
+        )
         plans, data = self.reconcile(contacts=[bad])
         self.assertFalse(plans[0].has_changes)
         self.assertEqual(data["orders"], [])
-        self.assertEqual(data["tickets"][0]["resultado_validacao"], "CPF_IDENTIDADE_DIVERGENTE")
+        self.assertEqual(
+            data["tickets"][0]["resultado_validacao"], "CPF_IDENTIDADE_DIVERGENTE"
+        )
 
     def test_valid_cpfs_before_invalid_and_no_identity_shared_by_cpf_zero(self):
-        valid = contact(uuid="10000000-0000-0000-0000-000000000002", fields={"cpf": "52998224725"})
-        tickets = selection([room(), room(uuid="20000000-0000-0000-0000-000000000002",
-            contact={"external_id": valid["uuid"]})])
-        with patch("delivery_tickets.resolve_contact_order", return_value=(None, [])) as resolver:
+        valid = contact(
+            uuid="10000000-0000-0000-0000-000000000002", fields={"cpf": "52998224725"}
+        )
+        tickets = selection(
+            [
+                room(),
+                room(
+                    uuid="20000000-0000-0000-0000-000000000002",
+                    contact={"external_id": valid["uuid"]},
+                ),
+            ]
+        )
+        with patch(
+            "delivery_tickets.resolve_contact_order", return_value=(None, [])
+        ) as resolver:
             self.reconcile(tickets=tickets, contacts=[contact(), valid])
-        self.assertEqual([call.args[0]["fields"]["cpf"] for call in resolver.call_args_list], ["52998224725", "0"])
+        self.assertEqual(
+            [call.args[0]["fields"]["cpf"] for call in resolver.call_args_list],
+            ["52998224725", "0"],
+        )
 
     def test_no_overwrite_of_newer_weni_order_but_history_export_kept(self):
         newer = contact()
@@ -119,10 +197,23 @@ class DeliveryTicketsTests(unittest.TestCase):
 
     def test_delivery_sale_flag_respects_current_status_and_identity_provenance(self):
         _, data = self.reconcile()
-        for status, payment, expected in [(4, 1, 1), (1, 1, 1), (2, 1, 1), (-1, 1, 0), (3, 1, 0), (2, 0, 0)]:
+        for status, payment, expected in [
+            (4, 1, 1),
+            (1, 1, 1),
+            (2, 1, 1),
+            (-1, 1, 0),
+            (3, 1, 0),
+            (2, 0, 0),
+        ]:
             with self.subTest(status=status, payment=payment):
-                order = dict(data["orders"][0], farmalider_status_pedido=str(status), farmalider_forma_pagamento=str(payment))
-                rows = build_delivery_order_records(data["tickets"], [order], updated_at=NOW)
+                order = dict(
+                    data["orders"][0],
+                    farmalider_status_pedido=str(status),
+                    farmalider_forma_pagamento=str(payment),
+                )
+                rows = build_delivery_order_records(
+                    data["tickets"], [order], updated_at=NOW
+                )
                 self.assertEqual(rows[0]["venda_realizada"], expected)
         order = dict(data["orders"][0], origem_pedido="FARMALIDER_PEDIDO_API")
         rows = build_delivery_order_records(data["tickets"], [order], updated_at=NOW)
@@ -133,14 +224,24 @@ class DeliveryTicketsTests(unittest.TestCase):
         order = data["orders"][0]
         ticket = selection()[0]
         ticket["custom_fields"] = {"pedido_id": "201"}
-        self.assertEqual(ticket_order_link(ticket, order), "FORA_DO_PERIODO_DO_ATENDIMENTO")
-        self.assertEqual(ticket_order_link(ticket, order, order_id_field="pedido_id"), "CONFIRMADO_POR_ID")
+        self.assertEqual(
+            ticket_order_link(ticket, order), "FORA_DO_PERIODO_DO_ATENDIMENTO"
+        )
+        self.assertEqual(
+            ticket_order_link(ticket, order, order_id_field="pedido_id"),
+            "CONFIRMADO_POR_ID",
+        )
         ticket["custom_fields"] = {"pedido_id": "202"}
-        self.assertEqual(ticket_order_link(ticket, order, order_id_field="pedido_id"), "OUTRO_PEDIDO_NO_TICKET")
+        self.assertEqual(
+            ticket_order_link(ticket, order, order_id_field="pedido_id"),
+            "OUTRO_PEDIDO_NO_TICKET",
+        )
         ticket["custom_fields"] = {}
         ticket["aberto_em"] = "2026-06-01T12:00:00Z"
         ticket["encerrado_em"] = "2026-06-01T14:00:00Z"
-        self.assertEqual(ticket_order_link(ticket, order), "COMPATIVEL_COM_PERIODO_SEM_ID")
+        self.assertEqual(
+            ticket_order_link(ticket, order), "COMPATIVEL_COM_PERIODO_SEM_ID"
+        )
 
     def test_snapshot_conflicting_identity_never_writes_weni_or_exports_success(self):
         plans, delivery = self.reconcile()
@@ -151,9 +252,15 @@ class DeliveryTicketsTests(unittest.TestCase):
             changed["fields"]["email"] = "changed@example.test"
             weni = Mock()
             weni.get_contact.return_value = changed
-            weni.list_fields.return_value = [{"key": key} for key in REQUIRED_ORDER_FIELDS]
+            weni.list_fields.return_value = [
+                {"key": key} for key in REQUIRED_ORDER_FIELDS
+            ]
             store = Mock()
-            for method in (store.upsert_contacts_detailed, store.upsert_orders_detailed, store.upsert_order_items_detailed):
+            for method in (
+                store.upsert_contacts_detailed,
+                store.upsert_orders_detailed,
+                store.upsert_order_items_detailed,
+            ):
                 method.return_value.final_records = []
             result = apply_delivery_review(path, weni, store_factory=lambda: store)
             self.assertEqual(result["conflicts"], 1)
@@ -164,47 +271,71 @@ class DeliveryTicketsTests(unittest.TestCase):
 
     def test_legacy_ultima_compra_is_omitted_and_same_snapshot_resumes(self):
         plans, delivery = self.reconcile()
-        self.assertNotIn('ultima_compra',plans[0].fields)
-        delivery['target']='weni'
-        plans[0].fields['ultima_compra']=delivery['orders'][0]['data_hora']
-        plans[0].previous['ultima_compra']=None
+        self.assertNotIn("ultima_compra", plans[0].fields)
+        delivery["target"] = "weni"
+        plans[0].fields["ultima_compra"] = delivery["orders"][0]["data_hora"]
+        plans[0].previous["ultima_compra"] = None
         with tempfile.TemporaryDirectory() as temp:
-            path=Path(temp)/'review.json';write_delivery_review(plans,delivery,path)
-            original=path.read_bytes();live=contact();weni=Mock()
-            weni.list_fields.return_value=[{'key':key} for key in REQUIRED_ORDER_FIELDS]
-            weni.get_contact.side_effect=lambda **kwargs:deepcopy(live)
-            def update(uid,fields):
-                self.assertNotIn('ultima_compra',fields)
-                live['fields'].update(fields)
-            weni.update_contact_fields.side_effect=update
-            result=apply_delivery_review(path,weni,target='weni')
-            self.assertEqual(result['conflicts'],0)
-            count=weni.update_contact_fields.call_count
-            apply_delivery_review(path,weni,target='weni')
-            self.assertEqual(weni.update_contact_fields.call_count,count)
-            self.assertEqual(path.read_bytes(),original)
+            path = Path(temp) / "review.json"
+            write_delivery_review(plans, delivery, path)
+            original = path.read_bytes()
+            live = contact()
+            weni = Mock()
+            weni.list_fields.return_value = [
+                {"key": key} for key in REQUIRED_ORDER_FIELDS
+            ]
+            weni.get_contact.side_effect = lambda **kwargs: deepcopy(live)
+
+            def update(uid, fields):
+                self.assertNotIn("ultima_compra", fields)
+                live["fields"].update(fields)
+
+            weni.update_contact_fields.side_effect = update
+            result = apply_delivery_review(path, weni, target="weni")
+            self.assertEqual(result["conflicts"], 0)
+            count = weni.update_contact_fields.call_count
+            apply_delivery_review(path, weni, target="weni")
+            self.assertEqual(weni.update_contact_fields.call_count, count)
+            self.assertEqual(path.read_bytes(), original)
 
     def test_unknown_snapshot_field_blocks_before_any_contact_write(self):
         from weni_update import PlanAuditError
-        plans,delivery=self.reconcile();delivery['target']='weni'
+
+        plans, delivery = self.reconcile()
+        delivery["target"] = "weni"
         with tempfile.TemporaryDirectory() as temp:
-            path=Path(temp)/'review.json';write_delivery_review(plans,delivery,path)
-            weni=Mock();weni.list_fields.return_value=[{'key':key} for key in REQUIRED_ORDER_FIELDS if key!='pedido_valor']
-            with self.assertRaises(PlanAuditError):apply_delivery_review(path,weni,target='weni')
-            weni.get_contact.assert_not_called();weni.update_contact_fields.assert_not_called()
+            path = Path(temp) / "review.json"
+            write_delivery_review(plans, delivery, path)
+            weni = Mock()
+            weni.list_fields.return_value = [
+                {"key": key} for key in REQUIRED_ORDER_FIELDS if key != "pedido_valor"
+            ]
+            with self.assertRaises(PlanAuditError):
+                apply_delivery_review(path, weni, target="weni")
+            weni.get_contact.assert_not_called()
+            weni.update_contact_fields.assert_not_called()
 
     def test_weni_failure_identifies_stage_without_contact_uuid(self):
         from weni_client import WeniError
-        plans,delivery=self.reconcile();delivery['target']='weni'
+
+        plans, delivery = self.reconcile()
+        delivery["target"] = "weni"
         with tempfile.TemporaryDirectory() as temp:
-            path=Path(temp)/'review.json';write_delivery_review(plans,delivery,path)
-            weni=Mock();weni.list_fields.return_value=[{'key':key} for key in REQUIRED_ORDER_FIELDS]
-            weni.get_contact.return_value=contact()
-            weni.update_contact_fields.side_effect=WeniError('HTTP=400; requisição rejeitada')
-            with self.assertRaises(WeniError) as caught:apply_delivery_review(path,weni,target='weni')
-            self.assertIn('GRAVAR_CAMPOS',str(caught.exception))
-            self.assertIn('HTTP=400',str(caught.exception))
-            self.assertNotIn(plans[0].contact_uuid,str(caught.exception))
+            path = Path(temp) / "review.json"
+            write_delivery_review(plans, delivery, path)
+            weni = Mock()
+            weni.list_fields.return_value = [
+                {"key": key} for key in REQUIRED_ORDER_FIELDS
+            ]
+            weni.get_contact.return_value = contact()
+            weni.update_contact_fields.side_effect = WeniError(
+                "HTTP=400; requisição rejeitada"
+            )
+            with self.assertRaises(WeniError) as caught:
+                apply_delivery_review(path, weni, target="weni")
+            self.assertIn("GRAVAR_CAMPOS", str(caught.exception))
+            self.assertIn("HTTP=400", str(caught.exception))
+            self.assertNotIn(plans[0].contact_uuid, str(caught.exception))
 
     def test_snapshot_delivery_data_tampering_blocks_before_external_calls(self):
         plans, delivery = self.reconcile()
@@ -227,27 +358,40 @@ class DeliveryTicketsTests(unittest.TestCase):
         historical["capa"]["id"] = 199
         historical["capa"]["emissao"] = "2026-05-01T10:00:00"
         historical["itens"][0]["codPedido"] = 199
-        client.get_pedido.side_effect = lambda pid: historical if str(pid) == "199" else latest
-        plans, data = self.reconcile(tickets=tickets, client=client, order_id_field="pedido_id")
+        client.get_pedido.side_effect = lambda pid: (
+            historical if str(pid) == "199" else latest
+        )
+        plans, data = self.reconcile(
+            tickets=tickets, client=client, order_id_field="pedido_id"
+        )
         self.assertEqual(data["orders"][0]["pedido_id"], "199")
         self.assertEqual(data["orders"][0]["data"], "2026-05-01")
         self.assertEqual(data["tickets"][0]["vinculo_atendimento"], "CONFIRMADO_POR_ID")
         self.assertEqual(plans[0].fields["pedido_id"], "201")
         historical["capa"]["codCliente"] = 999
-        _, data = self.reconcile(tickets=tickets, client=client, order_id_field="pedido_id")
+        _, data = self.reconcile(
+            tickets=tickets, client=client, order_id_field="pedido_id"
+        )
         self.assertEqual(data["orders"], [])
-        self.assertEqual(data["tickets"][0]["resultado_validacao"], "PEDIDO_CLIENTE_DIVERGENTE_API")
+        self.assertEqual(
+            data["tickets"][0]["resultado_validacao"], "PEDIDO_CLIENTE_DIVERGENTE_API"
+        )
 
 
 class WeniChatsClientTests(unittest.TestCase):
     def client(self):
-        return WeniChatsClient("https://chats.example.test", "30000000-0000-0000-0000-000000000001")
+        return WeniChatsClient(
+            "https://chats.example.test", "30000000-0000-0000-0000-000000000001"
+        )
 
     def test_rejects_flows_token_and_authenticated_base_url(self):
         with self.assertRaises(WeniChatsError):
             WeniChatsClient("https://chats.example.test", "flows-token")
         with self.assertRaises(WeniChatsError):
-            WeniChatsClient("https://user:secret@chats.example.test", "30000000-0000-0000-0000-000000000001")
+            WeniChatsClient(
+                "https://user:secret@chats.example.test",
+                "30000000-0000-0000-0000-000000000001",
+            )
 
     def test_pagination_collects_all_pages_and_deduplicates_rooms(self):
         client = self.client()
@@ -258,12 +402,17 @@ class WeniChatsClientTests(unittest.TestCase):
         result = client.list_closed_rooms(cutoff=datetime.fromisoformat(NOW))
         self.assertEqual(len(result), 1)
         self.assertEqual(client.session.get.call_count, 2)
-        self.assertEqual(client.session.get.call_args_list[0].kwargs["params"]["is_active"], "false")
+        self.assertEqual(
+            client.session.get.call_args_list[0].kwargs["params"]["is_active"], "false"
+        )
 
     def test_cross_origin_pagination_blocked_before_token_sent(self):
         client = self.client()
         first = Mock(status_code=200)
-        first.json.return_value = {"results": [room()], "next": "https://other.example.test/v2/external/rooms_metrics/"}
+        first.json.return_value = {
+            "results": [room()],
+            "next": "https://other.example.test/v2/external/rooms_metrics/",
+        }
         client.session.get = Mock(return_value=first)
         with self.assertRaises(WeniChatsError):
             client.list_closed_rooms(cutoff=datetime.fromisoformat(NOW))
@@ -271,7 +420,9 @@ class WeniChatsClientTests(unittest.TestCase):
 
     def test_http_401_does_not_retry_or_print_response_body(self):
         client = self.client()
-        client.session.get = Mock(return_value=Mock(status_code=401, text="secret private body"))
+        client.session.get = Mock(
+            return_value=Mock(status_code=401, text="secret private body")
+        )
         with self.assertRaises(WeniChatsError) as error:
             client.list_closed_rooms(cutoff=datetime.fromisoformat(NOW))
         self.assertNotIn("secret", str(error.exception))

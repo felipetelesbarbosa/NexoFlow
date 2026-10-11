@@ -1,4 +1,5 @@
 """Shared order semantics, independent of API clients and analytics schemas."""
+
 from __future__ import annotations
 
 import csv
@@ -54,17 +55,23 @@ FARMALIDER_PAYMENT_METHOD_ALIASES = {
 
 
 def _enum_key(value: str) -> str:
-    return "".join(
-        character for character in unicodedata.normalize("NFKD", value)
-        if not unicodedata.combining(character)
-    ).casefold().replace(" ", "")
+    return (
+        "".join(
+            character
+            for character in unicodedata.normalize("NFKD", value)
+            if not unicodedata.combining(character)
+        )
+        .casefold()
+        .replace(" ", "")
+    )
 
 
 def serialize_weni_order_list(values: list[str]) -> str:
     """Keep comma-separated fields reversible, including punctuation in names."""
     return ", ".join(
         '"' + value.replace('"', '""') + '"'
-        if any(char in value for char in ',"\r\n') else value
+        if any(char in value for char in ',"\r\n')
+        else value
         for value in values
     )
 
@@ -74,9 +81,13 @@ def parse_weni_order_list(value: str) -> list[str]:
     if not value.strip():
         return []
     try:
-        records = list(csv.reader(
-            io.StringIO(value, newline=""), skipinitialspace=True, strict=True,
-        ))
+        records = list(
+            csv.reader(
+                io.StringIO(value, newline=""),
+                skipinitialspace=True,
+                strict=True,
+            )
+        )
     except csv.Error as exc:
         raise ValueError("Lista de pedido com CSV inválido.") from exc
     if len(records) != 1:
@@ -171,7 +182,9 @@ def weni_order_datetime_text(value: Any) -> str:
 
 
 def is_order_cancelled(order: dict[str, Any]) -> bool:
-    payment = order.get("farmalider_forma_pagamento", order.get("pedido_forma_pagamento"))
+    payment = order.get(
+        "farmalider_forma_pagamento", order.get("pedido_forma_pagamento")
+    )
     if normalize_farmalider_payment_code(payment) == "0" or (
         isinstance(payment, str) and payment.strip().casefold() == "cancelado"
     ):
@@ -204,7 +217,8 @@ def is_order_completed(order: dict[str, Any]) -> bool:
         return True
     if isinstance(status, str):
         text = "".join(
-            character for character in unicodedata.normalize("NFKD", status.strip())
+            character
+            for character in unicodedata.normalize("NFKD", status.strip())
             if not unicodedata.combining(character)
         ).casefold()
         return text == "concluido"
@@ -213,7 +227,11 @@ def is_order_completed(order: dict[str, Any]) -> bool:
 
 def is_order_sale(order: dict[str, Any]) -> bool:
     """Business sales include ready-for-route, in-transit and completed orders."""
-    return not is_order_cancelled(order) and effective_order_status_code(order) in {"4", "1", "2"}
+    return not is_order_cancelled(order) and effective_order_status_code(order) in {
+        "4",
+        "1",
+        "2",
+    }
 
 
 def is_order_made(order: dict[str, Any]) -> bool:
@@ -225,10 +243,15 @@ def is_order_made(order: dict[str, Any]) -> bool:
     if label in {"Em processamento", "Pronto para rota", "Em trânsito", "Concluído"}:
         return True
     if isinstance(status, str):
-        text = "".join(
-            character for character in unicodedata.normalize("NFKD", status.strip())
-            if not unicodedata.combining(character)
-        ).casefold().replace(" ", "")
+        text = (
+            "".join(
+                character
+                for character in unicodedata.normalize("NFKD", status.strip())
+                if not unicodedata.combining(character)
+            )
+            .casefold()
+            .replace(" ", "")
+        )
         return text in {"emprocessamento", "prontopararota", "emtransito", "concluido"}
     return False
 
@@ -248,7 +271,8 @@ def _number_text(value: Any, *, money: bool = False) -> str:
 
 
 def serialize_pedido_products(
-    order: dict[str, Any], items: list[dict[str, Any]],
+    order: dict[str, Any],
+    items: list[dict[str, Any]],
 ) -> str:
     """Serialize an auditable snapshot without PII or volatile capture times."""
     products = [
@@ -262,16 +286,37 @@ def serialize_pedido_products(
         for item in items
     ]
     metadata_fields = (
-        "pedido_id", "data_hora", "status_confirmacao", "status_validacao",
-        "origem_pedido", "farmalider_cancelamento", "farmalider_status_pedido", "farmalider_status_pedido_nome",
-        "farmalider_forma_pagamento", "farmalider_forma_pagamento_nome",
-        "valor_origem", "valor_total_weni", "diferenca_total_weni_api",
+        "pedido_id",
+        "data_hora",
+        "status_confirmacao",
+        "status_validacao",
+        "origem_pedido",
+        "farmalider_cancelamento",
+        "farmalider_status_pedido",
+        "farmalider_status_pedido_nome",
+        "farmalider_forma_pagamento",
+        "farmalider_forma_pagamento_nome",
+        "valor_origem",
+        "valor_total_weni",
+        "diferenca_total_weni_api",
     )
-    payload: dict[str, Any] = {key: "" if order.get(key) is None else str(order.get(key)) for key in metadata_fields}
-    for key in ("valor_total_compra", "valor_total_api_itens", "farmalider_frete", "total_api"):
+    payload: dict[str, Any] = {
+        key: "" if order.get(key) is None else str(order.get(key))
+        for key in metadata_fields
+    }
+    for key in (
+        "valor_total_compra",
+        "valor_total_api_itens",
+        "farmalider_frete",
+        "total_api",
+    ):
         payload[key] = _number_text(order.get(key), money=True)
     for key in ("quantidade_itens", "quantidade_itens_api", "quantidade_produtos"):
         payload[key] = _number_text(order.get(key))
     payload["produtos"] = products
-    return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
+
+
 # NexoFlow 1.0

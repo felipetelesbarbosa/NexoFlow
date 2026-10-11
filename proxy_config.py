@@ -36,9 +36,7 @@ class ProxyStatus:
     @property
     def safe_summary(self) -> str:
         endpoint = (
-            f"{self.host}:{self.port}"
-            if self.host and self.port
-            else "não configurado"
+            f"{self.host}:{self.port}" if self.host and self.port else "não configurado"
         )
         auth = "sim" if self.has_credentials else "não"
         active = "sim" if self.active else "não"
@@ -81,8 +79,7 @@ def _read_settings() -> tuple[str, str, int, str, str, str, float]:
 
     if bool(user) != bool(password):
         raise ValueError(
-            "Preencha PROXY_USER e PROXY_PASSWORD juntos, "
-            "ou deixe os dois vazios."
+            "Preencha PROXY_USER e PROXY_PASSWORD juntos, ou deixe os dois vazios."
         )
 
     return mode, host, port, user, password, bypass, timeout
@@ -107,9 +104,7 @@ def _direct_internet_available(timeout: float) -> bool:
     no Windows mesmo quando o nosso código decidiu não ativá-lo.
     """
     try:
-        opener = urllib.request.build_opener(
-            urllib.request.ProxyHandler({})
-        )
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         request = urllib.request.Request(
             DIRECT_TEST_URL,
             method="HEAD",
@@ -243,8 +238,7 @@ def configure_proxy(*, detection_attempts: int | None = None) -> ProxyStatus:
     if not configured:
         if mode == "on":
             raise ValueError(
-                "PROXY_MODE='on', mas PROXY_HOST/PROXY_PORT "
-                "não foram configurados."
+                "PROXY_MODE='on', mas PROXY_HOST/PROXY_PORT não foram configurados."
             )
 
         _force_direct_mode()
@@ -380,8 +374,10 @@ class NetworkRouteRefresh:
     @property
     def transition(self) -> str:
         before = (
-            "proxy" if self.previous_active is True
-            else "direta" if self.previous_active is False
+            "proxy"
+            if self.previous_active is True
+            else "direta"
+            if self.previous_active is False
             else "desconhecida"
         )
         after = "proxy" if self.current_active else "direta"
@@ -408,10 +404,7 @@ def refresh_network_route(*, reason: str = "falha de rede") -> NetworkRouteRefre
         previous_active = _proxy_active_from_env()
         status = configure_proxy(detection_attempts=1)
         current_active = bool(status.active)
-        changed = (
-            previous_active is not None
-            and previous_active != current_active
-        )
+        changed = previous_active is not None and previous_active != current_active
 
         if changed:
             logging.warning(

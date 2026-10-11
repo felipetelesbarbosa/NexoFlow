@@ -34,9 +34,9 @@ def _ico_images(path: Path) -> list[bytes]:
     images: list[bytes] = []
     for index in range(count):
         entry = 6 + (16 * index)
-        size = int.from_bytes(data[entry + 8:entry + 12], "little")
-        offset = int.from_bytes(data[entry + 12:entry + 16], "little")
-        images.append(data[offset:offset + size])
+        size = int.from_bytes(data[entry + 8 : entry + 12], "little")
+        offset = int.from_bytes(data[entry + 12 : entry + 16], "little")
+        images.append(data[offset : offset + size])
     return images
 
 
@@ -66,7 +66,9 @@ class CurrentIntegrationTests(unittest.TestCase):
                     )
 
         self.assertEqual([len(values) for values in selected], [2, 3, 2, 3])
-        self.assertEqual(set().union(*selected), {f"u{index:02d}" for index in range(10)})
+        self.assertEqual(
+            set().union(*selected), {f"u{index:02d}" for index in range(10)}
+        )
         for left in range(4):
             for right in range(left + 1, 4):
                 self.assertTrue(selected[left].isdisjoint(selected[right]))
@@ -97,7 +99,9 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertNotIn("u99", second["selected_uuids"])
         self.assertEqual(second["total_contacts"], 8)
 
-    def test_full_load_25_does_not_rollover_until_weni_and_analytics_finish(self) -> None:
+    def test_full_load_25_does_not_rollover_until_weni_and_analytics_finish(
+        self,
+    ) -> None:
         contacts = [{"uuid": f"u{index:02d}"} for index in range(8)]
         with tempfile.TemporaryDirectory() as tmp:
             manifest = Path(tmp) / "full_load_25_manifest.json"
@@ -266,7 +270,9 @@ class CurrentIntegrationTests(unittest.TestCase):
             patch.object(store, "_wait_before_write", return_value=None),
         ):
             self.assertEqual(store._read_with_retry("teste leitura", read), "read-ok")
-            self.assertEqual(store._write_with_retry("teste escrita", write), "write-ok")
+            self.assertEqual(
+                store._write_with_retry("teste escrita", write), "write-ok"
+            )
         self.assertEqual(read.call_count, 2)
         self.assertEqual(write.call_count, 2)
         self.assertEqual(refresh.call_count, 2)
@@ -289,7 +295,9 @@ class CurrentIntegrationTests(unittest.TestCase):
                     "get",
                     side_effect=[ReadTimeout("switching network"), response_404],
                 ) as get,
-                patch.object(client, "_refresh_network_route", side_effect=switch_route),
+                patch.object(
+                    client, "_refresh_network_route", side_effect=switch_route
+                ),
                 patch.object(client, "_protect_after_failure", return_value=None),
                 patch.object(client, "_sleep_before_retry", return_value=None),
             ):
@@ -479,7 +487,9 @@ class CurrentIntegrationTests(unittest.TestCase):
         store.base.row_values.assert_not_called()
         store.base.col_values.assert_called_once_with(1)
 
-    def test_google_sheets_append_history_uses_validated_schema_without_header_read(self) -> None:
+    def test_google_sheets_append_history_uses_validated_schema_without_header_read(
+        self,
+    ) -> None:
         store = GoogleSheetsStore.__new__(GoogleSheetsStore)
         store.history = Mock()
         store._headers_cache = {
@@ -551,22 +561,34 @@ class CurrentIntegrationTests(unittest.TestCase):
         store.base = Mock()
         store.base.title = "Base_Contatos"
         store._headers_cache = {
-            "Base_Contatos": ["contact_uuid", "nome", "sincronizado_em", "farmalider_cliente_consultado_em"]
+            "Base_Contatos": [
+                "contact_uuid",
+                "nome",
+                "sincronizado_em",
+                "farmalider_cliente_consultado_em",
+            ]
         }
         store._last_write_started_at = 0.0
         store._read_requests = 0
         store._write_requests = 0
         values = [
-            ["contact_uuid", "nome", "sincronizado_em", "farmalider_cliente_consultado_em"],
+            [
+                "contact_uuid",
+                "nome",
+                "sincronizado_em",
+                "farmalider_cliente_consultado_em",
+            ],
             ["u1", "Maria", "old", "old"],
         ]
         result = store.upsert_contacts_detailed(
-            [{
-                "contact_uuid": "u1",
-                "nome": "Maria",
-                "sincronizado_em": "new",
-                "farmalider_cliente_consultado_em": "new",
-            }],
+            [
+                {
+                    "contact_uuid": "u1",
+                    "nome": "Maria",
+                    "sincronizado_em": "new",
+                    "farmalider_cliente_consultado_em": "new",
+                }
+            ],
             existing_values=values,
         )
         self.assertEqual(result.updated, 0)
@@ -601,7 +623,9 @@ class CurrentIntegrationTests(unittest.TestCase):
         ws.clear.assert_not_called()
         ws.update.assert_not_called()
 
-    def test_validate_contacts_reuses_recent_farmalider_cache_incrementally(self) -> None:
+    def test_validate_contacts_reuses_recent_farmalider_cache_incrementally(
+        self,
+    ) -> None:
         farm = Mock()
         settings = FarmaliderSettings(enabled=True, token="x", use_hml=False)
         now = datetime.now(UTC).isoformat(timespec="seconds")
@@ -714,14 +738,13 @@ class CurrentIntegrationTests(unittest.TestCase):
             all(row["farmalider_cliente_status"] == "CPF_CONFIRMADO" for row in rows)
         )
 
-
     def test_safe_launcher_batch_gates_each_stage(self) -> None:
         root = Path(__file__).resolve().parents[1]
         text = (root / "executar_carga_segura.bat").read_text(encoding="utf-8")
-        self.assertIn("call \"%~dp0check-up.bat\"", text)
-        self.assertIn("call \"%~dp0testar_conexoes.bat\"", text)
-        self.assertIn("call \"%~dp0executar_manual.bat\"", text)
-        self.assertGreaterEqual(text.count("if not \"%RC%\"==\"0\""), 3)
+        self.assertIn('call "%~dp0check-up.bat"', text)
+        self.assertIn('call "%~dp0testar_conexoes.bat"', text)
+        self.assertIn('call "%~dp0executar_manual.bat"', text)
+        self.assertGreaterEqual(text.count('if not "%RC%"=="0"'), 3)
 
     def test_individual_batches_support_launcher_mode_and_exit_codes(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -750,7 +773,6 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertNotIn(b"powershell.exe", data)
         self.assertNotIn(b"-ExecutionPolicy", data)
         self.assertIn("Grupo Líder".encode("utf-16le"), data)
-
 
     def test_setup_failure_keeps_diagnostics_visible(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -810,7 +832,9 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn("A instalação continuará normalmente", install)
         required_line = "foreach ($requiredFile in @('NexoFlow Analytics.exe','NexoFlow Weni.exe','NexoFlow Recompra.exe','NexoFlow Terminal.exe','NexoFlow Planilha.exe','executar_planilha.bat','assets\\NexoFlow_Planilha.ico','installer\\uninstall.ps1','desinstalar_nexoflow.cmd','scripts\\confirmar_revisao_weni.ps1','scripts\\resultado_carga_weni.ps1'))"
         self.assertIn(required_line, install)
-        self.assertNotIn("'NexoFlow Uninstall.exe')) {\n        Ensure-InstalledPayloadFile", install)
+        self.assertNotIn(
+            "'NexoFlow Uninstall.exe')) {\n        Ensure-InstalledPayloadFile", install
+        )
         self.assertIn("Verifique antivírus/EDR e tente novamente", install)
 
     def test_installer_lifecycle_preserves_private_data(self) -> None:
@@ -849,7 +873,10 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn("Get-CimInstance Win32_Process", uninstall)
         self.assertIn("Stop-Process", uninstall)
         self.assertIn("Remove-InstallDirectory", uninstall)
-        self.assertIn("Processos do NexoFlow que estiverem em execução serão encerrados", uninstall)
+        self.assertIn(
+            "Processos do NexoFlow que estiverem em execução serão encerrados",
+            uninstall,
+        )
         self.assertNotIn("-WindowStyle Hidden", uninstall)
         self.assertIn("NexoFlow-Uninstall-Stage2.ps1", uninstall)
         self.assertNotIn(r"cmd\.exe|powershell\.exe|pwsh\.exe", uninstall)
@@ -863,9 +890,8 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn("$uninstallCommand = '\"' + $powershellExe", install)
         self.assertIn("installer\\uninstall.ps1", install)
         self.assertIn("-Verb RunAs", uninstall)
-        self.assertNotIn("start \"\" /wait /D", install)
-        self.assertNotIn("cd /d \"\"{0}\"\" &&", install)
-
+        self.assertNotIn('start "" /wait /D', install)
+        self.assertNotIn('cd /d ""{0}"" &&', install)
 
     def test_powershell_installer_scripts_are_utf8_bom(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -875,7 +901,13 @@ class CurrentIntegrationTests(unittest.TestCase):
 
     def test_windows_icon_assets_exist(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        for name in ("NexoFlow.ico", "NexoFlow_Weni.ico", "NexoFlow_Terminal.ico", "installer.ico", "uninstaller.ico"):
+        for name in (
+            "NexoFlow.ico",
+            "NexoFlow_Weni.ico",
+            "NexoFlow_Terminal.ico",
+            "installer.ico",
+            "uninstaller.ico",
+        ):
             icon = root / "assets" / name
             self.assertTrue(icon.exists(), name)
             self.assertGreater(icon.stat().st_size, 1024)
@@ -905,7 +937,6 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn("sys.version_info >= (3,11)", text)
         self.assertIn("struct.calcsize('P')*8 == 64", text)
 
-
     def test_update_weni_launcher_and_batches_exist(self) -> None:
         root = Path(__file__).resolve().parents[1]
         launcher = root / "NexoFlow Weni.exe"
@@ -928,7 +959,6 @@ class CurrentIntegrationTests(unittest.TestCase):
         ):
             self.assertTrue((root / name).exists(), name)
 
-
     def test_update_weni_executable_embeds_dedicated_icon(self) -> None:
         root = Path(__file__).resolve().parents[1]
         launcher = (root / "NexoFlow Weni.exe").read_bytes()
@@ -939,7 +969,6 @@ class CurrentIntegrationTests(unittest.TestCase):
             self.assertIn(image, launcher)
         for image in analytics_images:
             self.assertNotIn(image, launcher)
-
 
     def test_terminal_executable_embeds_dedicated_icon(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -964,7 +993,10 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn("SHChangeNotify", install)
         self.assertIn("-ClearIconCache", install)
         self.assertIn("-show", install)
-        self.assertIn("Refresh-NexoFlowIconCache -Executables @($appExe, $updateExe, $recompraExe, $terminalExe, $planilhaExe, $uninstallExe)", install)
+        self.assertIn(
+            "Refresh-NexoFlowIconCache -Executables @($appExe, $updateExe, $recompraExe, $terminalExe, $planilhaExe, $uninstallExe)",
+            install,
+        )
 
     def test_update_weni_safe_batch_has_mandatory_audit_before_apply(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -989,7 +1021,9 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn("--require-review", text)
         self.assertLess(text.index("--review-out"), text.index("--require-review"))
 
-    def test_nexoflow_terminal_uses_project_proxy_without_exporting_api_tokens(self) -> None:
+    def test_nexoflow_terminal_uses_project_proxy_without_exporting_api_tokens(
+        self,
+    ) -> None:
         root = Path(__file__).resolve().parents[1]
         terminal = (root / "NexoFlow Terminal.exe").read_bytes()
         runner = (root / "run_terminal.py").read_text(encoding="utf-8")
@@ -1015,7 +1049,11 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertNotIn("-WindowStyle Hidden", uninstall)
         self.assertIn("NexoFlow-Uninstall-Stage2.ps1", uninstall)
         self.assertNotIn("cmd.exe /d /s /c start", install)
-        for name in ("NexoFlow Analytics.exe", "NexoFlow Weni.exe", "NexoFlow Terminal.exe"):
+        for name in (
+            "NexoFlow Analytics.exe",
+            "NexoFlow Weni.exe",
+            "NexoFlow Terminal.exe",
+        ):
             data = (root / name).read_bytes()
             self.assertIn(b"NexoFlowNativeLauncher=1.0", data)
             self.assertIn(b"CreateProcessW", data)
@@ -1046,15 +1084,16 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn("${exePath}: $($_.Exception.Message)", install)
         self.assertNotIn("$exePath: $($_.Exception.Message)", install)
 
-
     def test_weni_update_tests_do_not_read_operational_state(self) -> None:
         root = Path(__file__).resolve().parents[1]
         tests = (root / "tests" / "test_weni_update.py").read_text(encoding="utf-8")
-        self.assertIn('patch(', tests)
+        self.assertIn("patch(", tests)
         self.assertIn('"weni_update._load_state"', tests)
-        self.assertIn('side_effect=lambda *args, **kwargs: {}', tests)
+        self.assertIn("side_effect=lambda *args, **kwargs: {}", tests)
 
-    def test_checkup_suppresses_expected_test_noise_without_hiding_failures(self) -> None:
+    def test_checkup_suppresses_expected_test_noise_without_hiding_failures(
+        self,
+    ) -> None:
         root = Path(__file__).resolve().parents[1]
         batch = (root / "check-up.bat").read_text(encoding="utf-8")
         runner = (root / "run_checkup_tests.py").read_text(encoding="utf-8")
@@ -1064,13 +1103,16 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn("TextTestRunner(verbosity=0)", runner)
         self.assertIn("result.wasSuccessful()", runner)
 
-
     def test_batch_files_are_cmd_compatible_without_utf8_bom(self) -> None:
         root = Path(__file__).resolve().parents[1]
         batch_files = sorted(root.glob("*.bat"))
         self.assertTrue(batch_files)
-        offenders = [p.name for p in batch_files if p.read_bytes().startswith(b"\xef\xbb\xbf")]
-        self.assertEqual([], offenders, f"BATs com UTF-8 BOM quebram @echo/cmd.exe: {offenders}")
+        offenders = [
+            p.name for p in batch_files if p.read_bytes().startswith(b"\xef\xbb\xbf")
+        ]
+        self.assertEqual(
+            [], offenders, f"BATs com UTF-8 BOM quebram @echo/cmd.exe: {offenders}"
+        )
 
     def test_nexo_cmd_is_cmd_compatible_without_utf8_bom(self) -> None:
         root = Path(__file__).resolve().parents[1]

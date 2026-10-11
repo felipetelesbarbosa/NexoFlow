@@ -21,8 +21,6 @@ def read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
-
-
 def ico_images(path: Path) -> list[bytes]:
     data = path.read_bytes()
     if data[:4] != b"\x00\x00\x01\x00":
@@ -31,10 +29,11 @@ def ico_images(path: Path) -> list[bytes]:
     images: list[bytes] = []
     for index in range(count):
         entry = 6 + (16 * index)
-        size = int.from_bytes(data[entry + 8:entry + 12], "little")
-        offset = int.from_bytes(data[entry + 12:entry + 16], "little")
-        images.append(data[offset:offset + size])
+        size = int.from_bytes(data[entry + 8 : entry + 12], "little")
+        offset = int.from_bytes(data[entry + 12 : entry + 16], "little")
+        images.append(data[offset : offset + size])
     return images
+
 
 def numeric_config(config_text: str, name: str) -> float | None:
     match = re.search(
@@ -74,10 +73,7 @@ def check_farmalider_runtime() -> None:
     elif delay < 0:
         fail("FARMALIDER_REQUEST_DELAY_SECONDS não pode ser negativo.")
     else:
-        ok(
-            "Delay global FarmaLíder centralizado em config.py "
-            f"({delay * 1000:g} ms)."
-        )
+        ok(f"Delay global FarmaLíder centralizado em config.py ({delay * 1000:g} ms).")
 
     if workers is None:
         fail("FARMALIDER_MAX_WORKERS não foi encontrado em config.py.")
@@ -93,10 +89,7 @@ def check_farmalider_runtime() -> None:
     elif batch_size is not None and parallel_min > batch_size:
         fail("O limiar de paralelismo não pode ser maior que o lote.")
     else:
-        ok(
-            "Paralelismo FarmaLíder só é ativado a partir de "
-            f"{int(parallel_min)} CPFs."
-        )
+        ok(f"Paralelismo FarmaLíder só é ativado a partir de {int(parallel_min)} CPFs.")
 
     if batch_size is None:
         fail("FARMALIDER_BATCH_SIZE não foi encontrado em config.py.")
@@ -117,10 +110,7 @@ def check_farmalider_runtime() -> None:
     elif delay is not None and max_adaptive_delay < delay:
         fail("O delay adaptativo máximo não pode ser menor que o delay base.")
     else:
-        ok(
-            "Throttle adaptativo de 429 limitado a "
-            f"{max_adaptive_delay * 1000:g} ms."
-        )
+        ok(f"Throttle adaptativo de 429 limitado a {max_adaptive_delay * 1000:g} ms.")
 
     if slow_request is None or slow_request <= 0:
         fail("FARMALIDER_SLOW_REQUEST_SECONDS deve ser maior que zero.")
@@ -130,23 +120,41 @@ def check_farmalider_runtime() -> None:
             f"({slow_request:g}s)."
         )
 
-    recovery_delay = numeric_config(config_text, "FARMALIDER_RECOVERY_MAX_DELAY_SECONDS")
+    recovery_delay = numeric_config(
+        config_text, "FARMALIDER_RECOVERY_MAX_DELAY_SECONDS"
+    )
     server_cooldown = numeric_config(config_text, "FARMALIDER_5XX_COOLDOWN_SECONDS")
-    serial_successes = numeric_config(config_text, "FARMALIDER_RECOVERY_SERIAL_SUCCESSES")
-    parallel_successes = numeric_config(config_text, "FARMALIDER_RECOVERY_PARALLEL_SUCCESSES")
+    serial_successes = numeric_config(
+        config_text, "FARMALIDER_RECOVERY_SERIAL_SUCCESSES"
+    )
+    parallel_successes = numeric_config(
+        config_text, "FARMALIDER_RECOVERY_PARALLEL_SUCCESSES"
+    )
     circuit_errors = numeric_config(config_text, "FARMALIDER_CIRCUIT_MIN_5XX")
-    circuit_queries = numeric_config(config_text, "FARMALIDER_CIRCUIT_MIN_DISTINCT_QUERIES")
+    circuit_queries = numeric_config(
+        config_text, "FARMALIDER_CIRCUIT_MIN_DISTINCT_QUERIES"
+    )
     if (
-        recovery_delay is None or not (delay or 0) <= recovery_delay <= 1
-        or server_cooldown is None or server_cooldown < 5
-        or serial_successes is None or serial_successes < 6
-        or parallel_successes is None or parallel_successes < serial_successes
-        or circuit_errors is None or circuit_errors < 12
-        or circuit_queries is None or circuit_queries < 3
+        recovery_delay is None
+        or not (delay or 0) <= recovery_delay <= 1
+        or server_cooldown is None
+        or server_cooldown < 5
+        or serial_successes is None
+        or serial_successes < 6
+        or parallel_successes is None
+        or parallel_successes < serial_successes
+        or circuit_errors is None
+        or circuit_errors < 12
+        or circuit_queries is None
+        or circuit_queries < 3
     ):
-        fail("Recuperação FarmaLíder deve manter cooldown, retorno gradual e circuito por várias consultas.")
+        fail(
+            "Recuperação FarmaLíder deve manter cooldown, retorno gradual e circuito por várias consultas."
+        )
     else:
-        ok("Recuperação serial gradual, cooldown 5xx e circuito antecipado configurados.")
+        ok(
+            "Recuperação serial gradual, cooldown 5xx e circuito antecipado configurados."
+        )
 
     required_client_parts = [
         "threading.local",
@@ -162,9 +170,7 @@ def check_farmalider_runtime() -> None:
         "slow_requests",
         "_endpoint_label",
     ]
-    missing_client = [
-        item for item in required_client_parts if item not in client_text
-    ]
+    missing_client = [item for item in required_client_parts if item not in client_text]
     if missing_client:
         fail(
             "Proteções de concorrência no cliente FarmaLíder incompletas: "
@@ -181,7 +187,7 @@ def check_farmalider_runtime() -> None:
         "if not failure.retryable",
         "_protect_after_failure",
         "_sleep_before_retry",
-        "\"attempts\": attempt",
+        '"attempts": attempt',
     ]
     missing_preflight = [
         item for item in required_preflight_parts if item not in preflight_text
@@ -226,8 +232,7 @@ def check_farmalider_runtime() -> None:
                 missing_route_parts.append(f"{file_name}:{marker}")
     if missing_route_parts:
         fail(
-            "Troca dinâmica direta/proxy incompleta: "
-            + ", ".join(missing_route_parts)
+            "Troca dinâmica direta/proxy incompleta: " + ", ".join(missing_route_parts)
         )
     else:
         ok(
@@ -283,10 +288,7 @@ def check_farmalider_runtime() -> None:
             if marker not in source:
                 missing_quarter_parts.append(f"{file_name}:{marker}")
     if missing_quarter_parts:
-        fail(
-            "Carga completa 25% incompleta: "
-            + ", ".join(missing_quarter_parts)
-        )
+        fail("Carga completa 25% incompleta: " + ", ".join(missing_quarter_parts))
     else:
         ok(
             "Carga completa 25% usa quatro partes determinísticas, manifesto "
@@ -326,7 +328,7 @@ def check_farmalider_runtime() -> None:
     weni_tests = read("tests/test_weni_update.py")
     required_isolation = [
         '"weni_update._load_state"',
-        'side_effect=lambda *args, **kwargs: {}',
+        "side_effect=lambda *args, **kwargs: {}",
     ]
     missing_isolation = [item for item in required_isolation if item not in weni_tests]
     if missing_isolation:
@@ -438,8 +440,7 @@ def check_google_sheets_retry_if_configured() -> None:
     missing_config = [item for item in required_config if item not in config_text]
     if missing_config:
         fail(
-            "Proteção Google Sheets ausente em config.py: "
-            + ", ".join(missing_config)
+            "Proteção Google Sheets ausente em config.py: " + ", ".join(missing_config)
         )
         return
 
@@ -465,10 +466,7 @@ def check_google_sheets_retry_if_configured() -> None:
     ]
     missing = [item for item in required if item not in sheets_text]
     if missing:
-        fail(
-            "Proteção de escrita do Google Sheets incompleta: "
-            + ", ".join(missing)
-        )
+        fail("Proteção de escrita do Google Sheets incompleta: " + ", ".join(missing))
     else:
         ok(
             "Google Sheets protegido com timeout/retry de leitura, "
@@ -489,8 +487,7 @@ def check_google_sheets_retry_if_configured() -> None:
     ]
     observability_source = config_text + "\n" + sheets_text + "\n" + main_text
     missing_observability = [
-        item for item in required_observability
-        if item not in observability_source
+        item for item in required_observability if item not in observability_source
     ]
     if missing_observability:
         fail(
@@ -509,40 +506,48 @@ def check_google_sheets_retry_if_configured() -> None:
             "durante a carga."
         )
     else:
-        ok(
-            "Histórico reutiliza schema validado e não relê cabeçalho redundante."
-        )
+        ok("Histórico reutiliza schema validado e não relê cabeçalho redundante.")
 
     bi_required = [
-        'SHEET_BI_RESUMO_DIARIO',
-        'SHEET_BI_CANAIS',
-        'SHEET_BI_CONVERSAO',
-        'SHEET_BI_VENDAS',
-        'SHEET_BI_ADS',
-        'SHEET_BI_PEDIDOS',
-        'SHEET_BI_STATUS',
-        'BI_SUMMARY_COLUMNS',
-        'BI_CHANNEL_COLUMNS',
-        'BI_CONVERSION_COLUMNS',
-        'BI_SALES_COLUMNS',
-        'BI_ADS_COLUMNS',
-        'BI_ORDERS_COLUMNS',
-        'BI_STATUS_COLUMNS',
-        'build_bi_summary_record',
-        'build_bi_channel_records',
-        'build_bi_conversion_records',
-        'build_bi_sales_rows',
-        'build_bi_ads_rows',
-        'build_bi_order_rows',
-        'opt_in_lgpd',
-        'maior_de_18_anos',
+        "SHEET_BI_RESUMO_DIARIO",
+        "SHEET_BI_CANAIS",
+        "SHEET_BI_CONVERSAO",
+        "SHEET_BI_VENDAS",
+        "SHEET_BI_ADS",
+        "SHEET_BI_PEDIDOS",
+        "SHEET_BI_STATUS",
+        "BI_SUMMARY_COLUMNS",
+        "BI_CHANNEL_COLUMNS",
+        "BI_CONVERSION_COLUMNS",
+        "BI_SALES_COLUMNS",
+        "BI_ADS_COLUMNS",
+        "BI_ORDERS_COLUMNS",
+        "BI_STATUS_COLUMNS",
+        "build_bi_summary_record",
+        "build_bi_channel_records",
+        "build_bi_conversion_records",
+        "build_bi_sales_rows",
+        "build_bi_ads_rows",
+        "build_bi_order_rows",
+        "opt_in_lgpd",
+        "maior_de_18_anos",
     ]
-    bi_source = config_text + "\n" + sheets_text + "\n" + main_text + "\n" + read("analytics.py")
+    bi_source = (
+        config_text
+        + "\n"
+        + sheets_text
+        + "\n"
+        + main_text
+        + "\n"
+        + read("analytics.py")
+    )
     missing_bi = [item for item in bi_required if item not in bi_source]
     if missing_bi:
         fail("Camada BI/Looker Studio 1.0 incompleta: " + ", ".join(missing_bi))
     else:
-        ok("Camada BI/Looker Studio contém as sete tabelas, incluindo BI_Pedidos, métricas e campos LGPD/maioridade.")
+        ok(
+            "Camada BI/Looker Studio contém as sete tabelas, incluindo BI_Pedidos, métricas e campos LGPD/maioridade."
+        )
 
     diagnostico_text = read("diagnostico.py")
     if "validate_structure=True" not in diagnostico_text:
@@ -552,7 +557,6 @@ def check_google_sheets_retry_if_configured() -> None:
         )
     else:
         ok("Diagnóstico força validação completa da estrutura do Sheets.")
-
 
 
 def check_windows_lifecycle() -> None:
@@ -610,9 +614,16 @@ def check_windows_lifecycle() -> None:
     ok("BATs individuais preservam uso manual e suportam o launcher.")
 
     batch_files = sorted(ROOT.glob("*.bat"))
-    batch_bom = [path.name for path in batch_files if path.read_bytes().startswith(b"\xef\xbb\xbf")]
+    batch_bom = [
+        path.name
+        for path in batch_files
+        if path.read_bytes().startswith(b"\xef\xbb\xbf")
+    ]
     if batch_bom:
-        fail("Arquivos BAT não podem usar UTF-8 BOM no CMD do Windows: " + ", ".join(batch_bom))
+        fail(
+            "Arquivos BAT não podem usar UTF-8 BOM no CMD do Windows: "
+            + ", ".join(batch_bom)
+        )
         return
     ok("Arquivos BAT usam codificação compatível com cmd.exe, sem UTF-8 BOM inicial.")
 
@@ -632,20 +643,42 @@ def check_windows_lifecycle() -> None:
         fail("Executáveis operacionais não compartilham a trava de instância esperada.")
     elif b"atualizar_weni.bat" not in update_launcher_bytes:
         fail("NexoFlow Weni.exe não aponta para atualizar_weni.bat.")
-    elif any(b"NexoFlowNativeLauncher=1.0" not in data for data in (launcher_bytes, update_launcher_bytes, terminal_bytes)):
-        fail("Launchers Windows não possuem a revisão nativa de segurança do NexoFlow 1.0.")
-    elif any(b"CreateProcessW" not in data for data in (launcher_bytes, update_launcher_bytes, terminal_bytes)):
-        fail("Launchers Windows precisam iniciar processos pela API nativa/CreateProcessW.")
-    elif any(b"\x00system\x00" in data for data in (launcher_bytes, update_launcher_bytes, terminal_bytes)):
+    elif any(
+        b"NexoFlowNativeLauncher=1.0" not in data
+        for data in (launcher_bytes, update_launcher_bytes, terminal_bytes)
+    ):
+        fail(
+            "Launchers Windows não possuem a revisão nativa de segurança do NexoFlow 1.0."
+        )
+    elif any(
+        b"CreateProcessW" not in data
+        for data in (launcher_bytes, update_launcher_bytes, terminal_bytes)
+    ):
+        fail(
+            "Launchers Windows precisam iniciar processos pela API nativa/CreateProcessW."
+        )
+    elif any(
+        b"\x00system\x00" in data
+        for data in (launcher_bytes, update_launcher_bytes, terminal_bytes)
+    ):
         fail("Launchers Windows não podem importar system().")
     elif b"run_terminal.py" not in terminal_bytes:
         fail("NexoFlow Terminal.exe não aponta diretamente para run_terminal.py.")
     elif b"powershell.exe" in launcher_bytes or b"-ExecutionPolicy" in launcher_bytes:
-        fail("Analytics não deve conter lógica de PowerShell/ExecutionPolicy que pertence ao Setup/Uninstall.")
-    elif b"powershell.exe" in update_launcher_bytes or b"-ExecutionPolicy" in update_launcher_bytes:
-        fail("Update Weni não deve conter lógica de PowerShell/ExecutionPolicy que pertence ao Setup/Uninstall.")
+        fail(
+            "Analytics não deve conter lógica de PowerShell/ExecutionPolicy que pertence ao Setup/Uninstall."
+        )
+    elif (
+        b"powershell.exe" in update_launcher_bytes
+        or b"-ExecutionPolicy" in update_launcher_bytes
+    ):
+        fail(
+            "Update Weni não deve conter lógica de PowerShell/ExecutionPolicy que pertence ao Setup/Uninstall."
+        )
     else:
-        ok("Analytics, NexoFlow Weni e Terminal usam launchers nativos sem system(); a desinstalação usa script PowerShell auditável com autoelevação.")
+        ok(
+            "Analytics, NexoFlow Weni e Terminal usam launchers nativos sem system(); a desinstalação usa script PowerShell auditável com autoelevação."
+        )
 
     if b'requestedExecutionLevel level="asInvoker"' not in launcher_bytes:
         fail("Launcher manual deve usar manifest asInvoker.")
@@ -653,10 +686,15 @@ def check_windows_lifecycle() -> None:
         fail("Launcher Update Weni deve usar manifest asInvoker.")
     elif b'requestedExecutionLevel level="asInvoker"' not in terminal_bytes:
         fail("NexoFlow Terminal deve usar manifest asInvoker.")
-    elif any(b".rsrc" not in data for data in (launcher_bytes, update_launcher_bytes, terminal_bytes)):
+    elif any(
+        b".rsrc" not in data
+        for data in (launcher_bytes, update_launcher_bytes, terminal_bytes)
+    ):
         fail("Executáveis devem conter recursos/ícones embutidos.")
     else:
-        ok("Manifests de privilégio e recursos dos três executáveis operacionais estão presentes.")
+        ok(
+            "Manifests de privilégio e recursos dos três executáveis operacionais estão presentes."
+        )
 
     version_markers = [
         "Grupo Líder".encode("utf-16le"),
@@ -668,12 +706,18 @@ def check_windows_lifecycle() -> None:
         fail("Executável Analytics não contém VERSIONINFO completo do NexoFlow 1.0.")
         return
     if any(marker not in update_launcher_bytes for marker in version_markers):
-        fail("Executável NexoFlow Weni não contém VERSIONINFO completo do NexoFlow 1.0.")
+        fail(
+            "Executável NexoFlow Weni não contém VERSIONINFO completo do NexoFlow 1.0."
+        )
         return
     if any(marker not in terminal_bytes for marker in version_markers):
-        fail("Executável NexoFlow Terminal não contém VERSIONINFO completo do NexoFlow 1.0.")
+        fail(
+            "Executável NexoFlow Terminal não contém VERSIONINFO completo do NexoFlow 1.0."
+        )
         return
-    ok("Executáveis Windows operacionais possuem VERSIONINFO de produto/empresa/versão.")
+    ok(
+        "Executáveis Windows operacionais possuem VERSIONINFO de produto/empresa/versão."
+    )
 
     optional_uninstaller = ROOT / "NexoFlow Uninstall.exe"
     if optional_uninstaller.exists():
@@ -682,14 +726,20 @@ def check_windows_lifecycle() -> None:
             fail("NexoFlow Uninstall.exe opcional não possui cabeçalho PE/MZ.")
             return
         if b"NexoFlowNativeLauncher=1.0" not in optional_bytes:
-            fail("NexoFlow Uninstall.exe opcional não está identificado como NexoFlow 1.0.")
+            fail(
+                "NexoFlow Uninstall.exe opcional não está identificado como NexoFlow 1.0."
+            )
             return
         if "1.0.0.0".encode("utf-16le") not in optional_bytes:
             fail("NexoFlow Uninstall.exe opcional não contém VERSIONINFO 1.0.0.0.")
             return
-        ok("NexoFlow Uninstall.exe opcional está presente e identificado como release 1.0.")
+        ok(
+            "NexoFlow Uninstall.exe opcional está presente e identificado como release 1.0."
+        )
     else:
-        ok("NexoFlow Uninstall.exe opcional não está presente; isso não reprova o check-up.")
+        ok(
+            "NexoFlow Uninstall.exe opcional não está presente; isso não reprova o check-up."
+        )
 
     install = read("installer/install.ps1")
     uninstall = read("installer/uninstall.ps1")
@@ -734,14 +784,22 @@ def check_windows_lifecycle() -> None:
         "Documentacao NexoFlow.html",
     ]:
         if required_text not in install:
-            fail(f"Instalador não contém o fluxo obrigatório de requisito Python/documentação: {required_text}")
+            fail(
+                f"Instalador não contém o fluxo obrigatório de requisito Python/documentação: {required_text}"
+            )
             return
     install_bytes = (ROOT / "installer" / "install.ps1").read_bytes()
     uninstall_script_bytes = (ROOT / "installer" / "uninstall.ps1").read_bytes()
-    if not install_bytes.startswith(b"\xef\xbb\xbf") or not uninstall_script_bytes.startswith(b"\xef\xbb\xbf"):
-        fail("Scripts PowerShell do instalador/desinstalador devem usar UTF-8 com BOM para preservar acentuação no Windows PowerShell.")
+    if not install_bytes.startswith(
+        b"\xef\xbb\xbf"
+    ) or not uninstall_script_bytes.startswith(b"\xef\xbb\xbf"):
+        fail(
+            "Scripts PowerShell do instalador/desinstalador devem usar UTF-8 com BOM para preservar acentuação no Windows PowerShell."
+        )
         return
-    ok("Instalador reconhece Python 3.11+ (incluindo 3.14) e usa scripts PowerShell com UTF-8 BOM.")
+    ok(
+        "Instalador reconhece Python 3.11+ (incluindo 3.14) e usa scripts PowerShell com UTF-8 BOM."
+    )
     for required_text in [
         "Start-Transcript",
         "NexoFlow-Setup.log",
@@ -755,13 +813,23 @@ def check_windows_lifecycle() -> None:
         "-Verb RunAs",
     ]:
         if required_text not in install:
-            fail(f"Setup 1.0 não contém a proteção/diagnóstico obrigatório: {required_text}")
+            fail(
+                f"Setup 1.0 não contém a proteção/diagnóstico obrigatório: {required_text}"
+            )
             return
     setup_source = read("native_launcher/setup.go")
-    if "if rc != 0" not in setup_source or "waitEnter()" not in setup_source or "NexoFlow-Setup.log" not in setup_source:
-        fail("Launcher do Setup deve manter a janela aberta em falha e indicar o log persistente.")
+    if (
+        "if rc != 0" not in setup_source
+        or "waitEnter()" not in setup_source
+        or "NexoFlow-Setup.log" not in setup_source
+    ):
+        fail(
+            "Launcher do Setup deve manter a janela aberta em falha e indicar o log persistente."
+        )
         return
-    ok("Setup mantém diagnóstico visível, gera log persistente e trata arquivos em uso na atualização.")
+    ok(
+        "Setup mantém diagnóstico visível, gera log persistente e trata arquivos em uso na atualização."
+    )
     for required_text in [
         "function Ensure-InstalledPayloadFile",
         "Write-Step 'Validando componentes instalados'",
@@ -772,9 +840,13 @@ def check_windows_lifecycle() -> None:
         "Verifique antivírus/EDR e tente novamente",
     ]:
         if required_text not in install:
-            fail(f"Setup não valida/repara executáveis obrigatórios no destino: {required_text}")
+            fail(
+                f"Setup não valida/repara executáveis obrigatórios no destino: {required_text}"
+            )
             return
-    ok("Setup valida e repara launchers operacionais e o desinstalador baseado em script após a instalação.")
+    ok(
+        "Setup valida e repara launchers operacionais e o desinstalador baseado em script após a instalação."
+    )
     for required_text in [
         "function Install-OptionalUninstaller",
         "NexoFlow Uninstall.exe",
@@ -783,13 +855,21 @@ def check_windows_lifecycle() -> None:
         "Where-Object { $_.Name -notin @('payload manifest.json','NexoFlow Uninstall.exe') }",
     ]:
         if required_text not in install:
-            fail(f"Setup não trata o launcher opcional de desinstalação de forma tolerante: {required_text}")
+            fail(
+                f"Setup não trata o launcher opcional de desinstalação de forma tolerante: {required_text}"
+            )
             return
     if "'NexoFlow Uninstall.exe')) {\n        Ensure-InstalledPayloadFile" in install:
-        fail("NexoFlow Uninstall.exe não pode fazer parte da validação obrigatória no destino.")
+        fail(
+            "NexoFlow Uninstall.exe não pode fazer parte da validação obrigatória no destino."
+        )
         return
-    ok("NexoFlow Uninstall.exe é distribuído opcionalmente e não reprova Setup/check-up quando bloqueado por antivírus/EDR.")
-    ok("Instalador valida integridade, trata o requisito Python, preserva dados privados e registra o ciclo Windows.")
+    ok(
+        "NexoFlow Uninstall.exe é distribuído opcionalmente e não reprova Setup/check-up quando bloqueado por antivírus/EDR."
+    )
+    ok(
+        "Instalador valida integridade, trata o requisito Python, preserva dados privados e registra o ciclo Windows."
+    )
 
     for required_text in [
         "YesNoCancel",
@@ -812,23 +892,35 @@ def check_windows_lifecycle() -> None:
         if required_text not in uninstall:
             fail(f"Desinstalador não contém controle obrigatório: {required_text}")
             return
-    if 'cmd.exe /d /s /c start' in install or 'cd /d ""{0}"" &&' in install:
+    if "cmd.exe /d /s /c start" in install or 'cd /d ""{0}"" &&' in install:
         fail("Registro de desinstalação não deve depender de CMD intermediário.")
         return
-    if "$uninstallCommand =" not in install or "$powershellExe" not in install or "installer\\uninstall.ps1" not in install:
-        fail("Registro de desinstalação deve apontar para installer\\uninstall.ps1 via Windows PowerShell.")
+    if (
+        "$uninstallCommand =" not in install
+        or "$powershellExe" not in install
+        or "installer\\uninstall.ps1" not in install
+    ):
+        fail(
+            "Registro de desinstalação deve apontar para installer\\uninstall.ps1 via Windows PowerShell."
+        )
         return
-    if "function Ensure-Administrator" not in uninstall or "-Verb RunAs" not in uninstall:
+    if (
+        "function Ensure-Administrator" not in uninstall
+        or "-Verb RunAs" not in uninstall
+    ):
         fail("Desinstalador em script deve solicitar elevação administrativa via UAC.")
         return
     if "-WindowStyle Hidden" in uninstall:
         fail("Stage2 do desinstalador não deve ser executado oculto.")
         return
     if r"cmd\.exe|powershell\.exe|pwsh\.exe" in uninstall:
-        fail("Desinstalador não deve usar a antiga expressão que encerrava terminais CMD/PowerShell genéricos.")
+        fail(
+            "Desinstalador não deve usar a antiga expressão que encerrava terminais CMD/PowerShell genéricos."
+        )
         return
-    ok("Desinstalador em script preserva dados opcionalmente, autoeleva via UAC, usa Stage2 visível/determinístico e restringe processos bloqueadores.")
-
+    ok(
+        "Desinstalador em script preserva dados opcionalmente, autoeleva via UAC, usa Stage2 visível/determinístico e restringe processos bloqueadores."
+    )
 
     install_bat = read("instalar.bat")
     if (
@@ -839,11 +931,19 @@ def check_windows_lifecycle() -> None:
         or "sys.version_info >= (3,11)" not in install_bat
         or "struct.calcsize('P')*8 == 64" not in install_bat
     ):
-        fail("instalar.bat não está preparado para Python 3.11+ x64 e execução não interativa pelo instalador.")
+        fail(
+            "instalar.bat não está preparado para Python 3.11+ x64 e execução não interativa pelo instalador."
+        )
     else:
         ok("Preparação do ambiente suporta Python 3.11+ x64, instalador e uso manual.")
 
-    for icon in ["NexoFlow.ico", "NexoFlow_Weni.ico", "NexoFlow_Terminal.ico", "installer.ico", "uninstaller.ico"]:
+    for icon in [
+        "NexoFlow.ico",
+        "NexoFlow_Weni.ico",
+        "NexoFlow_Terminal.ico",
+        "installer.ico",
+        "uninstaller.ico",
+    ]:
         data = (ROOT / "assets" / icon).read_bytes()
         if len(data) < 1024 or not data.startswith(b"\x00\x00\x01\x00"):
             fail(f"Ícone Windows inválido ou incompleto: {icon}")
@@ -863,38 +963,67 @@ def check_windows_lifecycle() -> None:
     if "assets\\NexoFlow_Terminal.ico" not in desktop_shortcuts:
         fail("Atalho desktop do NexoFlow Terminal deve usar o ícone dedicado.")
         return
-    if "$terminalIcon = Join-Path $InstallDir 'assets\\NexoFlow_Terminal.ico'" not in install or "-IconPath $terminalIcon" not in install:
-        fail("Instalador deve aplicar o ícone dedicado aos atalhos do NexoFlow Terminal.")
+    if (
+        "$terminalIcon = Join-Path $InstallDir 'assets\\NexoFlow_Terminal.ico'"
+        not in install
+        or "-IconPath $terminalIcon" not in install
+    ):
+        fail(
+            "Instalador deve aplicar o ícone dedicado aos atalhos do NexoFlow Terminal."
+        )
         return
-    ok("Ícones dedicados do NexoFlow Weni e NexoFlow Terminal estão presentes e aplicados aos atalhos.")
+    ok(
+        "Ícones dedicados do NexoFlow Weni e NexoFlow Terminal estão presentes e aplicados aos atalhos."
+    )
 
     if "-ExecutionPolicy Bypass -Command" in desktop_shortcuts:
-        fail("Criação manual de atalhos não deve usar ExecutionPolicy Bypass para comando inline.")
+        fail(
+            "Criação manual de atalhos não deve usar ExecutionPolicy Bypass para comando inline."
+        )
         return
     terminal_runner = read("run_terminal.py")
-    if b"run_terminal.py" not in terminal_bytes or "configure_proxy()" not in terminal_runner:
-        fail("NexoFlow Terminal precisa iniciar run_terminal.py e carregar o proxy do projeto antes de abrir PowerShell.")
+    if (
+        b"run_terminal.py" not in terminal_bytes
+        or "configure_proxy()" not in terminal_runner
+    ):
+        fail(
+            "NexoFlow Terminal precisa iniciar run_terminal.py e carregar o proxy do projeto antes de abrir PowerShell."
+        )
         return
-    if "NEXOFLOW_HOME" not in terminal_runner or "NEXOFLOW_TERMINAL" not in terminal_runner or "VIRTUAL_ENV" not in terminal_runner:
+    if (
+        "NEXOFLOW_HOME" not in terminal_runner
+        or "NEXOFLOW_TERMINAL" not in terminal_runner
+        or "VIRTUAL_ENV" not in terminal_runner
+    ):
         fail("NexoFlow Terminal precisa preparar diretório/ambiente Python do projeto.")
         return
     ok("NexoFlow Terminal prepara proxy e ambiente local sem expor tokens de API.")
 
     update_launcher = (ROOT / "NexoFlow Weni.exe").read_bytes()
     if b"NexoFlowWeniIconRevision=1.0" not in update_launcher:
-        fail("Executável NexoFlow Weni não contém a revisão binária de ícone do NexoFlow 1.0.")
+        fail(
+            "Executável NexoFlow Weni não contém a revisão binária de ícone do NexoFlow 1.0."
+        )
         return
     if b"NexoFlowTerminalIconRevision=1.0" not in terminal_bytes:
-        fail("Executável NexoFlow Terminal não contém a revisão binária de ícone do NexoFlow 1.0.")
+        fail(
+            "Executável NexoFlow Terminal não contém a revisão binária de ícone do NexoFlow 1.0."
+        )
         return
     update_icon_images = ico_images(ROOT / "assets" / "NexoFlow_Weni.ico")
     terminal_icon_images = ico_images(ROOT / "assets" / "NexoFlow_Terminal.ico")
     analytics_icon_images = ico_images(ROOT / "assets" / "NexoFlow.ico")
-    if not update_icon_images or not all(image in update_launcher for image in update_icon_images):
+    if not update_icon_images or not all(
+        image in update_launcher for image in update_icon_images
+    ):
         fail("Executável NexoFlow Weni não incorpora o ícone dedicado nos recursos PE.")
         return
-    if not terminal_icon_images or not all(image in terminal_bytes for image in terminal_icon_images):
-        fail("Executável NexoFlow Terminal não incorpora o ícone dedicado nos recursos PE.")
+    if not terminal_icon_images or not all(
+        image in terminal_bytes for image in terminal_icon_images
+    ):
+        fail(
+            "Executável NexoFlow Terminal não incorpora o ícone dedicado nos recursos PE."
+        )
         return
     if any(image in update_launcher for image in analytics_icon_images):
         fail("Executável NexoFlow Weni ainda incorpora o ícone do Analytics.")
@@ -902,18 +1031,25 @@ def check_windows_lifecycle() -> None:
     if any(image in terminal_bytes for image in analytics_icon_images):
         fail("Executável NexoFlow Terminal ainda incorpora o ícone do Analytics.")
         return
-    ok("Executáveis NexoFlow Weni e NexoFlow Terminal incorporam somente seus ícones dedicados.")
+    ok(
+        "Executáveis NexoFlow Weni e NexoFlow Terminal incorporam somente seus ícones dedicados."
+    )
 
     if (
         "function Refresh-NexoFlowIconCache" not in install
         or "SHChangeNotify" not in install
         or "-ClearIconCache" not in install
         or "-show" not in install
-        or "Refresh-NexoFlowIconCache -Executables @($appExe, $updateExe, $recompraExe, $terminalExe, $planilhaExe, $uninstallExe)" not in install
+        or "Refresh-NexoFlowIconCache -Executables @($appExe, $updateExe, $recompraExe, $terminalExe, $planilhaExe, $uninstallExe)"
+        not in install
     ):
-        fail("Instalador precisa invalidar/recarregar os ícones do Windows após instalar Analytics, Weni, Terminal, Planilha e Uninstall.")
+        fail(
+            "Instalador precisa invalidar/recarregar os ícones do Windows após instalar Analytics, Weni, Terminal, Planilha e Uninstall."
+        )
         return
-    ok("Instalador força o Explorer a reler os ícones internos de todos os executáveis do NexoFlow.")
+    ok(
+        "Instalador força o Explorer a reler os ícones internos de todos os executáveis do NexoFlow."
+    )
 
     active_docs = [
         read("README.md"),
@@ -930,7 +1066,6 @@ def check_windows_lifecycle() -> None:
         ok("Documentação operacional ativa está alinhada à marca NexoFlow.")
 
 
-
 def check_weni_update_safety() -> None:
     client_text = read("weni_client.py")
     update_text = read("weni_update.py")
@@ -944,7 +1079,9 @@ def check_weni_update_safety() -> None:
         "list_messages",
     ]:
         if required not in client_text:
-            fail(f"Cliente Weni não contém recurso obrigatório do Update Weni: {required}")
+            fail(
+                f"Cliente Weni não contém recurso obrigatório do Update Weni: {required}"
+            )
             return
     ok("Cliente Weni possui leitura de mensagens, escrita de fields e ações de grupo.")
     for optimized in [
@@ -956,7 +1093,9 @@ def check_weni_update_safety() -> None:
         if optimized not in update_text:
             fail(f"Otimização segura do Update Weni ausente: {optimized}")
             return
-    ok("Update Weni reduz leituras auxiliares e I/O de auditoria sem relaxar proteções de escrita.")
+    ok(
+        "Update Weni reduz leituras auxiliares e I/O de auditoria sem relaxar proteções de escrita."
+    )
 
     for required in [
         "ALLOWED_WRITE_FIELDS",
@@ -984,7 +1123,7 @@ def check_weni_update_safety() -> None:
         if required not in enrichment_text:
             fail(f"Detecção segura de CPF em mensagens está incompleta: {required}")
             return
-    if '"cpf",' not in update_text or 'CPF inválido' not in update_text:
+    if '"cpf",' not in update_text or "CPF inválido" not in update_text:
         fail("Update Weni precisa autorizar e auditar CPF antes da escrita.")
         return
     ok("Update Weni detecta CPF válido em mensagens e audita a escrita do campo cpf.")
@@ -992,11 +1131,11 @@ def check_weni_update_safety() -> None:
     urn_utils_text = read("urn_utils.py")
     for required in [
         'CHANNEL_PRIORITY = ("whatsapp", "instagram", "facebook")',
-        'contact_urn_whatsapp',
-        'contact_urn_instagram',
-        'contact_urn_facebook',
-        'resolve_contact_urns',
-        'messenger',
+        "contact_urn_whatsapp",
+        "contact_urn_instagram",
+        "contact_urn_facebook",
+        "resolve_contact_urns",
+        "messenger",
     ]:
         if required not in urn_utils_text:
             fail(f"Resolução multicanal de URNs está incompleta: {required}")
@@ -1006,11 +1145,13 @@ def check_weni_update_safety() -> None:
         '"contact_urn_instagram"',
         '"contact_urn_facebook"',
         '"contact_canal_principal"',
-        '_sync_contact_channel_fields',
-        'REVIEW_SCHEMA_VERSION = 6',
+        "_sync_contact_channel_fields",
+        "REVIEW_SCHEMA_VERSION = 6",
     ]:
         if required not in update_text:
-            fail(f"Update Weni não contém a identificação multicanal obrigatória: {required}")
+            fail(
+                f"Update Weni não contém a identificação multicanal obrigatória: {required}"
+            )
             return
     analytics_text = read("analytics.py")
     for required in [
@@ -1018,59 +1159,78 @@ def check_weni_update_safety() -> None:
         '"contact_urn_instagram"',
         '"contact_urn_facebook"',
         '"contact_canal_principal"',
-        'resolve_contact_urns',
+        "resolve_contact_urns",
     ]:
         if required not in analytics_text:
-            fail(f"Analytics não expõe a identificação multicanal obrigatória: {required}")
+            fail(
+                f"Analytics não expõe a identificação multicanal obrigatória: {required}"
+            )
             return
-    ok("URNs multicanal usam a Weni como fonte, com principal determinístico e campos separados por canal.")
+    ok(
+        "URNs multicanal usam a Weni como fonte, com principal determinístico e campos separados por canal."
+    )
     ad_text = read("ad_attribution.py")
     for required in [
         'GOOGLE_ADS_ORIGIN = "Google Ads"',
-        'gclid',
-        'gbraid',
-        'wbraid',
-        'Performance Max',
-        'Display/Banner',
-        'YouTube',
-        'extract_google_ads_attribution',
+        "gclid",
+        "gbraid",
+        "wbraid",
+        "Performance Max",
+        "Display/Banner",
+        "YouTube",
+        "extract_google_ads_attribution",
     ]:
         if required not in ad_text:
             fail(f"Atribuição Google Ads está incompleta: {required}")
             return
     for required in [
-        '_sync_google_ads_attribution',
-        'GOOGLE_ADS_WRITE_FIELDS',
-        '_missing_google_ads_fields',
+        "_sync_google_ads_attribution",
+        "GOOGLE_ADS_WRITE_FIELDS",
+        "_missing_google_ads_fields",
     ]:
         if required not in update_text:
-            fail(f"NexoFlow Weni não contém integração Google Ads obrigatória: {required}")
+            fail(
+                f"NexoFlow Weni não contém integração Google Ads obrigatória: {required}"
+            )
             return
     for required in [
-        'primeiro_anuncio_tipo_campanha',
-        'primeiro_anuncio_canal_destino',
-        'ultimo_anuncio_tipo_campanha',
-        'ultimo_anuncio_canal_destino',
+        "primeiro_anuncio_tipo_campanha",
+        "primeiro_anuncio_canal_destino",
+        "ultimo_anuncio_tipo_campanha",
+        "ultimo_anuncio_canal_destino",
     ]:
         if required not in ad_text:
             fail(f"Mapeamento Google Ads não contém campo obrigatório: {required}")
             return
     for required in [
-        'primeiro_anuncio_tipo_campanha',
-        'primeiro_anuncio_canal_destino',
-        'ultimo_anuncio_tipo_campanha',
-        'ultimo_anuncio_canal_destino',
-        'is_ads_contact',
+        "primeiro_anuncio_tipo_campanha",
+        "primeiro_anuncio_canal_destino",
+        "ultimo_anuncio_tipo_campanha",
+        "ultimo_anuncio_canal_destino",
+        "is_ads_contact",
     ]:
         if required not in analytics_text:
-            fail(f"Analytics não expõe metadados Google Ads/canal de destino: {required}")
+            fail(
+                f"Analytics não expõe metadados Google Ads/canal de destino: {required}"
+            )
             return
     google_docs = read("docs/GOOGLE ADS.md")
-    for required in ['Google Ads', 'gclid', 'gbraid', 'wbraid', 'Performance Max', 'Search', 'Display/Banner', 'YouTube']:
+    for required in [
+        "Google Ads",
+        "gclid",
+        "gbraid",
+        "wbraid",
+        "Performance Max",
+        "Search",
+        "Display/Banner",
+        "YouTube",
+    ]:
         if required not in google_docs:
             fail(f"Documentação Google Ads incompleta: {required}")
             return
-    ok("Atribuição Google Ads usa evidência explícita e mantém origem do anúncio separada do canal/URN.")
+    ok(
+        "Atribuição Google Ads usa evidência explícita e mantém origem do anúncio separada do canal/URN."
+    )
     client_text = read("weni_client.py")
     config_text = read("config.py")
     run_update_text = read("run_update_weni.py")
@@ -1093,7 +1253,9 @@ def check_weni_update_safety() -> None:
     if "Campos multicanal ausentes na Weni" not in run_update_text:
         fail("CLI do NexoFlow Weni não informa campos multicanal ausentes.")
         return
-    ok("Preflight valida os campos multicanal na Weni antes de processar/aplicar o plano.")
+    ok(
+        "Preflight valida os campos multicanal na Weni antes de processar/aplicar o plano."
+    )
 
     for required in [
         "REQUIRED_ORDER_FIELDS",
@@ -1121,9 +1283,13 @@ def check_weni_update_safety() -> None:
     ]:
         source = integration_text + "\n" + analytics_text
         if required not in source:
-            fail(f"Arquitetura de recuperação/frete dos pedidos está incompleta: {required}")
+            fail(
+                f"Arquitetura de recuperação/frete dos pedidos está incompleta: {required}"
+            )
             return
-    ok("Pedidos usam pedido_id/ultimo_pedido como localizadores e separam produtos, frete e faturamento total.")
+    ok(
+        "Pedidos usam pedido_id/ultimo_pedido como localizadores e separam produtos, frete e faturamento total."
+    )
 
     if "Opt-In LGPD" not in update_text or "Opt-Out LGPD" not in update_text:
         fail("Update Weni precisa sincronizar os grupos Opt-In LGPD e Opt-Out LGPD.")
@@ -1131,7 +1297,7 @@ def check_weni_update_safety() -> None:
     ok("Update Weni sincroniza os grupos Opt-In/Opt-Out conforme opt_in_lgpd.")
 
     # Verifica o fluxo de execução, não a definição do helper de escrita.
-    execution = update_text[update_text.index("def run_update("):]
+    execution = update_text[update_text.index("def run_update(") :]
     write_pos = execution.find("_execute_contact_plan(")
     audit_pos = execution.rfind("audit_plans(", 0, write_pos)
     state_pos = execution.rfind("_save_state(")
@@ -1141,7 +1307,9 @@ def check_weni_update_safety() -> None:
     if state_pos < write_pos:
         fail("Checkpoint do Update Weni não pode avançar antes das escritas.")
         return
-    ok("Update Weni audita todo o plano antes de escrever e só avança checkpoint após sucesso.")
+    ok(
+        "Update Weni audita todo o plano antes de escrever e só avança checkpoint após sucesso."
+    )
 
     if (
         "--dry-run" not in runner_text
@@ -1159,9 +1327,13 @@ def check_weni_update_safety() -> None:
         or dry_pos > apply_pos
         or "Digite ATUALIZAR" not in batch_text
     ):
-        fail("atualizar_weni.bat precisa executar dry-run antes de apply e exigir confirmação manual.")
+        fail(
+            "atualizar_weni.bat precisa executar dry-run antes de apply e exigir confirmação manual."
+        )
         return
-    ok("Launcher Update Weni exige check-up, dry-run/auditoria e confirmação antes do apply.")
+    ok(
+        "Launcher Update Weni exige check-up, dry-run/auditoria e confirmação antes do apply."
+    )
 
     full_batch_text = read("atualizar_weni_carga_completa.bat")
     for required in [
@@ -1183,7 +1355,9 @@ def check_weni_update_safety() -> None:
         or 'if "%RC%"=="2" goto :cancelado' not in full_batch_text
         or 'if not "%RC%"=="0" goto :erro' not in full_batch_text
     ):
-        fail("Revisão Weni deve aguardar confirmação, preservar erros e incluir o componente nos pacotes.")
+        fail(
+            "Revisão Weni deve aguardar confirmação, preservar erros e incluir o componente nos pacotes."
+        )
         return
     # O build é validado no repositório; a instalação contém apenas scripts de uso.
     if (ROOT / "scripts/build_release.ps1").is_file():
@@ -1192,7 +1366,9 @@ def check_weni_update_safety() -> None:
             '"scripts/confirmar_revisao_weni.ps1"' not in release_text
             or "payload/scripts/confirmar_revisao_weni.ps1" not in release_text
         ):
-            fail("Build deve incluir e validar o componente de revisão Weni nos pacotes.")
+            fail(
+                "Build deve incluir e validar o componente de revisão Weni nos pacotes."
+            )
             return
     for required in [
         "write_review_snapshot",
@@ -1213,9 +1389,13 @@ def check_weni_update_safety() -> None:
         "apply SOMENTE se o plano for identico ao revisado",
     ]:
         if forbidden in full_batch_text:
-            fail(f"Carga completa ainda contém fluxo antigo incompatível com atendimento 24h: {forbidden}")
+            fail(
+                f"Carga completa ainda contém fluxo antigo incompatível com atendimento 24h: {forbidden}"
+            )
             return
-    ok("Carga completa usa snapshot congelado revisado, valida conflito por contato e não recalcula o histórico no apply.")
+    ok(
+        "Carga completa usa snapshot congelado revisado, valida conflito por contato e não recalcula o histórico no apply."
+    )
 
 
 def check_terminal_cli() -> None:
@@ -1223,7 +1403,9 @@ def check_terminal_cli() -> None:
     cmd_path = ROOT / "nexo.cmd"
     terminal_doc = ROOT / "README TERMINAL.md"
     if not cli_path.exists() or not cmd_path.exists() or not terminal_doc.exists():
-        fail("CLI amigável do NexoFlow Terminal está incompleta (nexo_cli.py/nexo.cmd/documentação).")
+        fail(
+            "CLI amigável do NexoFlow Terminal está incompleta (nexo_cli.py/nexo.cmd/documentação)."
+        )
         return
     if cmd_path.read_bytes().startswith(b"\xef\xbb\xbf"):
         fail("nexo.cmd não pode usar UTF-8 BOM porque é executado pelo cmd.exe.")
@@ -1231,39 +1413,58 @@ def check_terminal_cli() -> None:
     cli = read("nexo_cli.py")
     cmd = read("nexo.cmd")
     runner = read("run_terminal.py")
-    docs = read("README TERMINAL.md") + "\n" + read("README.md") + "\n" + read("Documentacao NexoFlow.md")
+    docs = (
+        read("README TERMINAL.md")
+        + "\n"
+        + read("README.md")
+        + "\n"
+        + read("Documentacao NexoFlow.md")
+    )
     for required in [
         'VERSION = "1.0"',
-        'nexo api weni contato',
-        'nexo api farmalider pedido',
-        'nexo logs weni --seguir',
-        'def _api_weni',
-        'def _api_farmalider',
-        'def _menu',
+        "nexo api weni contato",
+        "nexo api farmalider pedido",
+        "nexo logs weni --seguir",
+        "def _api_weni",
+        "def _api_farmalider",
+        "def _menu",
     ]:
         source = cli + "\n" + docs
         if required not in source:
-            fail(f"CLI/documentação do Terminal está sem recurso obrigatório: {required}")
+            fail(
+                f"CLI/documentação do Terminal está sem recurso obrigatório: {required}"
+            )
             return
     if "nexo_cli.py" not in cmd or "%NEXO_HOME%.venv\\Scripts\\python.exe" not in cmd:
         fail("nexo.cmd não prioriza a .venv nem chama nexo_cli.py.")
         return
-    if 'path_parts = [str(BASE_DIR)]' not in runner or 'nexo ajuda' not in runner:
-        fail("run_terminal.py precisa colocar C:\\NexoFlow no PATH e orientar sobre nexo ajuda.")
+    if "path_parts = [str(BASE_DIR)]" not in runner or "nexo ajuda" not in runner:
+        fail(
+            "run_terminal.py precisa colocar C:\\NexoFlow no PATH e orientar sobre nexo ajuda."
+        )
         return
     forbidden = ["update_contact_fields(", "contact_group_action(", "_post_json("]
-    api_region = cli[cli.find("def _api_weni"):cli.find("def _menu")]
+    api_region = cli[cli.find("def _api_weni") : cli.find("def _menu")]
     if any(item in api_region for item in forbidden):
-        fail("Família nexo api deve permanecer somente leitura, sem métodos de escrita da Weni.")
+        fail(
+            "Família nexo api deve permanecer somente leitura, sem métodos de escrita da Weni."
+        )
         return
-    if "README TERMINAL.md" not in read("README.md") or "README TERMINAL.md" not in read("Documentacao NexoFlow.md"):
+    if "README TERMINAL.md" not in read(
+        "README.md"
+    ) or "README TERMINAL.md" not in read("Documentacao NexoFlow.md"):
         fail("README/documentação geral precisam apontar para README TERMINAL.md.")
         return
-    ok("NexoFlow Terminal oferece CLI amigável, ajuda integrada e consultas API somente leitura.")
+    ok(
+        "NexoFlow Terminal oferece CLI amigável, ajuda integrada e consultas API somente leitura."
+    )
+
 
 def check_portuguese_encoding() -> None:
     # PowerShell 5.1 defaults to ANSI without a BOM; CMD needs an explicit page.
-    paths = list((ROOT / "installer").glob("*.ps1")) + list((ROOT / "scripts").glob("*.ps1"))
+    paths = list((ROOT / "installer").glob("*.ps1")) + list(
+        (ROOT / "scripts").glob("*.ps1")
+    )
     for path in paths:
         if not path.read_bytes().startswith(b"\xef\xbb\xbf"):
             fail(f"PowerShell sem UTF-8 com BOM: {path.relative_to(ROOT)}")

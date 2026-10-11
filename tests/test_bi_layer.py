@@ -76,7 +76,9 @@ class BILayerTests(unittest.TestCase):
             },
         ]
         summary = build_bi_summary_record(
-            base, [], [],
+            base,
+            [],
+            [],
             snapshot_date="2026-10-05",
             updated_at="2026-10-05T14:00:00+00:00",
         )
@@ -98,7 +100,8 @@ class BILayerTests(unittest.TestCase):
 
     def test_bi_sales_emits_today_zero_row_before_first_sale(self) -> None:
         rows = build_bi_sales_rows(
-            [], [],
+            [],
+            [],
             snapshot_date="2026-10-05",
             updated_at="2026-10-05T14:00:00+00:00",
         )
@@ -109,7 +112,8 @@ class BILayerTests(unittest.TestCase):
 
     def test_bi_ads_emits_placeholder_before_first_attribution(self) -> None:
         rows = build_bi_ads_rows(
-            [], [],
+            [],
+            [],
             snapshot_date="2026-10-05",
             updated_at="2026-10-05T14:00:00+00:00",
         )
@@ -118,9 +122,16 @@ class BILayerTests(unittest.TestCase):
         self.assertEqual(rows[0][7], 0)
 
     def test_bi_conversion_has_four_contact_funnel_stages(self) -> None:
-        base = [{"contact_uuid": "u1", "cpf": "52998224725", "farmalider_cliente_status": "CPF_CONFIRMADO"}]
+        base = [
+            {
+                "contact_uuid": "u1",
+                "cpf": "52998224725",
+                "farmalider_cliente_status": "CPF_CONFIRMADO",
+            }
+        ]
         rows = build_bi_conversion_records(
-            base, [],
+            base,
+            [],
             snapshot_date="2026-10-05",
             updated_at="2026-10-05T14:00:00+00:00",
         )
@@ -140,39 +151,50 @@ class BILayerTests(unittest.TestCase):
         self.assertEqual(schema[SHEET_BI_STATUS], BI_STATUS_COLUMNS)
 
     def test_bi_orders_exposes_friendly_order_contract(self) -> None:
-        base = [{
-            "contact_uuid": "u1",
-            "nome": "Cliente",
-            "cpf_normalizado": "52998224725",
-            "contact_canal_principal": "whatsapp",
-        }]
-        orders = [{
-            "pedido_chave": "FARMALIDER:340793",
-            "pedido_id": "340793",
-            "data_hora": "2026-06-05T15:45:27-03:00",
-            "contact_uuid": "u1",
-            "cliente": "Cliente",
-            "cpf_normalizado": "52998224725",
-            "valor_total_compra": "112.80",
-            "farmalider_frete": "9.90",
-            "valor_total_faturamento": "122.70",
-            "farmalider_status_pedido": "3",
-            "farmalider_forma_pagamento": "2",
-        }]
+        base = [
+            {
+                "contact_uuid": "u1",
+                "nome": "Cliente",
+                "cpf_normalizado": "52998224725",
+                "contact_canal_principal": "whatsapp",
+            }
+        ]
+        orders = [
+            {
+                "pedido_chave": "FARMALIDER:340793",
+                "pedido_id": "340793",
+                "data_hora": "2026-06-05T15:45:27-03:00",
+                "contact_uuid": "u1",
+                "cliente": "Cliente",
+                "cpf_normalizado": "52998224725",
+                "valor_total_compra": "112.80",
+                "farmalider_frete": "9.90",
+                "valor_total_faturamento": "122.70",
+                "farmalider_status_pedido": "3",
+                "farmalider_forma_pagamento": "2",
+            }
+        ]
         items = [
             {
-                "pedido_chave": "FARMALIDER:340793", "produto_ordem": "1",
+                "pedido_chave": "FARMALIDER:340793",
+                "produto_ordem": "1",
                 "produto_nome": "PROLOPA BD 100+25MG C/30CAP",
-                "quantidade": "1", "valor_unitario": "53.90",
+                "quantidade": "1",
+                "valor_unitario": "53.90",
             },
             {
-                "pedido_chave": "FARMALIDER:340793", "produto_ordem": "2",
+                "pedido_chave": "FARMALIDER:340793",
+                "produto_ordem": "2",
                 "produto_nome": "TP PRAMIPEXOL PRATI 1MG C/30 CPR (G)",
-                "quantidade": "1", "valor_unitario": "58.90",
+                "quantidade": "1",
+                "valor_unitario": "58.90",
             },
         ]
         rows = build_bi_order_rows(
-            base, orders, items, updated_at="2026-10-06T21:00:00-03:00",
+            base,
+            orders,
+            items,
+            updated_at="2026-10-06T21:00:00-03:00",
         )
         self.assertEqual(len(rows), 1)
         record = dict(zip(BI_ORDERS_COLUMNS, rows[0], strict=False))
@@ -191,23 +213,45 @@ class BILayerTests(unittest.TestCase):
         self.assertEqual(record["pedido_forma_pagamento"], "2")
         self.assertEqual(record["pedido_forma_pagamento_nome"], "Débito")
 
-
-    def order_fixture(self, *, confirmation="CONFIRMADO_API", cancellation="", status=2):
-        raw = json.dumps({
-            "pedido_id": "500", "data_hora": "2026-10-05T10:00:00-03:00",
-            "valor_total_compra": "19.50", "produtos": [
-                {"nome": "Produto sintético", "codigo": "900", "quantidade": 2,
-                 "valor_unitario": "10.00", "valor_total": "19.50"}],
-            "status_confirmacao": confirmation, "farmalider_cancelamento": cancellation,
-            "farmalider_status_pedido": status,
-        })
-        order, items = parse_ultimo_pedido({"uuid": "u1", "fields": {"ultimo_pedido": raw}}, "2026-10-05T14:00:00Z")
+    def order_fixture(
+        self, *, confirmation="CONFIRMADO_API", cancellation="", status=2
+    ):
+        raw = json.dumps(
+            {
+                "pedido_id": "500",
+                "data_hora": "2026-10-05T10:00:00-03:00",
+                "valor_total_compra": "19.50",
+                "produtos": [
+                    {
+                        "nome": "Produto sintético",
+                        "codigo": "900",
+                        "quantidade": 2,
+                        "valor_unitario": "10.00",
+                        "valor_total": "19.50",
+                    }
+                ],
+                "status_confirmacao": confirmation,
+                "farmalider_cancelamento": cancellation,
+                "farmalider_status_pedido": status,
+            }
+        )
+        order, items = parse_ultimo_pedido(
+            {"uuid": "u1", "fields": {"ultimo_pedido": raw}}, "2026-10-05T14:00:00Z"
+        )
         order["primeiro_anuncio_id"] = "test-ad"
         order["primeiro_anuncio_titulo"] = "Anúncio sintético"
-        base = [{"contact_uuid": "u1", "primeiro_anuncio_id": "test-ad", "primeiro_anuncio_titulo": "Anúncio sintético"}]
+        base = [
+            {
+                "contact_uuid": "u1",
+                "primeiro_anuncio_id": "test-ad",
+                "primeiro_anuncio_titulo": "Anúncio sintético",
+            }
+        ]
         return base, order, items
 
-    def test_cancelled_and_mismatched_orders_remain_auditable_but_leave_all_sales_kpis(self):
+    def test_cancelled_and_mismatched_orders_remain_auditable_but_leave_all_sales_kpis(
+        self,
+    ):
         cases = (
             {"cancellation": "2026-10-05T11:00:00-03:00"},
             {"status": "CANCELADO", "cancellation": "false"},
@@ -224,53 +268,121 @@ class BILayerTests(unittest.TestCase):
                 self.assertEqual(order["pedido_chave"], "FARMALIDER:500")
                 self.assertEqual(len(items), 1)
                 self.assertEqual(build_sales_metrics([order], items), [])
-                summary = build_bi_summary_record(base, [order], items,
-                    snapshot_date="2026-10-05", updated_at="2026-10-05T14:00:00Z")
-                for key in ("pedidos_total", "faturamento_total", "clientes_compradores_total",
-                            "pedidos_dia", "faturamento_dia", "unidades_vendidas_dia"):
+                summary = build_bi_summary_record(
+                    base,
+                    [order],
+                    items,
+                    snapshot_date="2026-10-05",
+                    updated_at="2026-10-05T14:00:00Z",
+                )
+                for key in (
+                    "pedidos_total",
+                    "faturamento_total",
+                    "clientes_compradores_total",
+                    "pedidos_dia",
+                    "faturamento_dia",
+                    "unidades_vendidas_dia",
+                ):
                     self.assertEqual(summary[key], 0)
-                conversion = build_bi_conversion_records(base, [order],
-                    snapshot_date="2026-10-05", updated_at="2026-10-05T14:00:00Z")
+                conversion = build_bi_conversion_records(
+                    base,
+                    [order],
+                    snapshot_date="2026-10-05",
+                    updated_at="2026-10-05T14:00:00Z",
+                )
                 self.assertEqual(conversion[-1]["quantidade"], 0)
-                ads = build_bi_ads_rows(base, [order],
-                    snapshot_date="2026-10-05", updated_at="2026-10-05T14:00:00Z")
+                ads = build_bi_ads_rows(
+                    base,
+                    [order],
+                    snapshot_date="2026-10-05",
+                    updated_at="2026-10-05T14:00:00Z",
+                )
                 self.assertEqual(ads[0][7], 1)
                 self.assertEqual(ads[0][9:12], [0, 0, 0.0])
 
     def test_false_cancellation_and_completed_status_do_not_remove_valid_sales(self):
         for cancellation in (False, "False", "false", 0, "0", "null", None):
             with self.subTest(cancellation=cancellation):
-                _, order, items = self.order_fixture(cancellation=cancellation, status=2)
-                self.assertEqual(build_sales_metrics([order], items),
-                    [["2026-10-05", 1, 1, 1, "2", "19.50", "0.00", "19.50", "19.50"]])
+                _, order, items = self.order_fixture(
+                    cancellation=cancellation, status=2
+                )
+                self.assertEqual(
+                    build_sales_metrics([order], items),
+                    [["2026-10-05", 1, 1, 1, "2", "19.50", "0.00", "19.50", "19.50"]],
+                )
 
     def test_new_contacts_use_business_day_at_utc_midnight(self):
         base = [{"contact_uuid": "u1", "weni_created_on": "2026-10-06T01:30:00Z"}]
-        summary = build_bi_summary_record(base, [], [], snapshot_date="2026-10-05",
-                                         updated_at="2026-10-06T01:30:00Z")
+        summary = build_bi_summary_record(
+            base, [], [], snapshot_date="2026-10-05", updated_at="2026-10-06T01:30:00Z"
+        )
         self.assertEqual(summary["novos_contatos"], 1)
 
     def test_configured_states_enter_sales_and_bi(self):
-        for status in (-2, -1, 0, 1, 2, 3, 4, "-2", "-1", "0", "1", "2", "3", "4", "99", "", None):
+        for status in (
+            -2,
+            -1,
+            0,
+            1,
+            2,
+            3,
+            4,
+            "-2",
+            "-1",
+            "0",
+            "1",
+            "2",
+            "3",
+            "4",
+            "99",
+            "",
+            None,
+        ):
             with self.subTest(status=status):
                 base, order, items = self.order_fixture(status=status)
                 made = str(status) in {"4", "1", "2"}
                 self.assertEqual(len(items), 1)  # Every state remains auditable.
                 self.assertEqual(order["pedido_chave"], "FARMALIDER:500")
-                expected_sales = [["2026-10-05", 1, 1, 1, "2", "19.50", "0.00", "19.50", "19.50"]] if made else []
+                expected_sales = (
+                    [["2026-10-05", 1, 1, 1, "2", "19.50", "0.00", "19.50", "19.50"]]
+                    if made
+                    else []
+                )
                 self.assertEqual(build_sales_metrics([order], items), expected_sales)
-                summary = build_bi_summary_record(base, [order], items,
-                    snapshot_date="2026-10-05", updated_at="2026-10-05T14:00:00Z")
-                for key in ("pedidos_total", "clientes_compradores_total", "pedidos_dia", "clientes_compradores_dia"):
+                summary = build_bi_summary_record(
+                    base,
+                    [order],
+                    items,
+                    snapshot_date="2026-10-05",
+                    updated_at="2026-10-05T14:00:00Z",
+                )
+                for key in (
+                    "pedidos_total",
+                    "clientes_compradores_total",
+                    "pedidos_dia",
+                    "clientes_compradores_dia",
+                ):
                     self.assertEqual(summary[key], 1 if made else 0)
-                for key in ("faturamento_total", "faturamento_dia", "faturamento_confirmado_api_dia"):
+                for key in (
+                    "faturamento_total",
+                    "faturamento_dia",
+                    "faturamento_confirmado_api_dia",
+                ):
                     self.assertEqual(summary[key], 19.50 if made else 0)
                 self.assertEqual(summary["unidades_vendidas_dia"], 2 if made else 0)
-                conversion = build_bi_conversion_records(base, [order],
-                    snapshot_date="2026-10-05", updated_at="2026-10-05T14:00:00Z")
+                conversion = build_bi_conversion_records(
+                    base,
+                    [order],
+                    snapshot_date="2026-10-05",
+                    updated_at="2026-10-05T14:00:00Z",
+                )
                 self.assertEqual(conversion[-1]["quantidade"], 1 if made else 0)
-                ads = build_bi_ads_rows(base, [order],
-                    snapshot_date="2026-10-05", updated_at="2026-10-05T14:00:00Z")
+                ads = build_bi_ads_rows(
+                    base,
+                    [order],
+                    snapshot_date="2026-10-05",
+                    updated_at="2026-10-05T14:00:00Z",
+                )
                 self.assertEqual(ads[0][9:12], [1, 1, 19.5] if made else [0, 0, 0.0])
 
 

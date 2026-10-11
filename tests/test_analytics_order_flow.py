@@ -1,4 +1,5 @@
 """Synthetic integration tests for the FarmaLíder-first order architecture."""
+
 import json
 import re
 import unittest
@@ -41,14 +42,16 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
     def fixture(self, *, status=2, cancelled=False, freight="9.99", payment=2):
         contact = {"uuid": "synthetic-u1", "fields": {"cpf": "52998224725"}}
         client = Mock()
-        cliente_items = [{
-            "codPedido": 500,
-            "codProduto": 9001,
-            "descricao": "Produto sintético",
-            "quantidade": 2,
-            "valor": "10.00",
-            "total": "19.50",
-        }]
+        cliente_items = [
+            {
+                "codPedido": 500,
+                "codProduto": 9001,
+                "descricao": "Produto sintético",
+                "quantidade": 2,
+                "valor": "10.00",
+                "total": "19.50",
+            }
+        ]
         client.get_cliente_by_cpf.return_value = {
             "cliente": {
                 "id": 99,
@@ -62,9 +65,7 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
                 "status": status,
                 "formaPagamento": payment,
                 "frete": freight,
-                "cancelamento": (
-                    "2026-10-05T11:00:00" if cancelled else None
-                ),
+                "cancelamento": ("2026-10-05T11:00:00" if cancelled else None),
             },
             "itens": cliente_items,
         }
@@ -76,9 +77,7 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
                 "status": status,
                 "formaPagamento": payment,
                 "frete": freight,
-                "cancelamento": (
-                    "2026-10-05T11:00:00" if cancelled else None
-                ),
+                "cancelamento": ("2026-10-05T11:00:00" if cancelled else None),
             },
             "itens": [dict(cliente_items[0])],
         }
@@ -171,7 +170,8 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
                     "2026-10-05T14:00:00Z",
                 )
                 self.assertEqual(
-                    row["pedido_forma_pagamento"], "Cancelado" if code == 0 else str(code)
+                    row["pedido_forma_pagamento"],
+                    "Cancelado" if code == 0 else str(code),
                 )
                 self.assertEqual(row["pedido_forma_pagamento_nome"], label)
                 if code == 0:
@@ -207,9 +207,7 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
                 contact, client = self.fixture(payment=code)
                 row, orders, items = self.resolve_and_persist(contact, client)
                 self.assertEqual(orders[0]["farmalider_forma_pagamento"], str(code))
-                self.assertEqual(
-                    orders[0]["farmalider_forma_pagamento_nome"], label
-                )
+                self.assertEqual(orders[0]["farmalider_forma_pagamento_nome"], label)
                 bi_rows = build_bi_order_rows(
                     [row], orders, items, updated_at="2026-10-05T14:00:00Z"
                 )
@@ -220,7 +218,9 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
                 self.assertEqual(orders[0]["farmalider_status_pedido"], "2")
                 if code == 0:
                     self.assertEqual(orders[0]["status_confirmacao"], "CANCELADO_API")
-                    self.assertEqual(orders[0]["farmalider_status_pedido_nome"], "Cancelado")
+                    self.assertEqual(
+                        orders[0]["farmalider_status_pedido_nome"], "Cancelado"
+                    )
                     self.assertEqual(bi_order["pedido_status"], "3")
                     self.assertEqual(bi_order["pedido_status_nome"], "Cancelado")
                     self.assertEqual(build_sales_metrics(orders, items), [])
@@ -242,7 +242,9 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
                 bi_order = dict(zip(BI_ORDERS_COLUMNS, bi_rows[0], strict=True))
                 self.assertEqual(bi_order["pedido_status"], str(status))
                 self.assertEqual(bi_order["pedido_status_nome"], label)
-                self.assertEqual(len(build_sales_metrics(orders, items)), int(status == 4))
+                self.assertEqual(
+                    len(build_sales_metrics(orders, items)), int(status == 4)
+                )
 
     def test_pending_payment_order_is_preserved_in_bi_without_sale(self):
         contact, client = self.fixture(status=-1, payment=6)
@@ -250,7 +252,9 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
         self.assertEqual(orders[0]["status_validacao"], "OK")
         self.assertNotEqual(orders[0]["status_confirmacao"], "CANCELADO_API")
         self.assertEqual(orders[0]["farmalider_status_pedido"], "-1")
-        self.assertEqual(orders[0]["farmalider_status_pedido_nome"], "Pendente de pagamento")
+        self.assertEqual(
+            orders[0]["farmalider_status_pedido_nome"], "Pendente de pagamento"
+        )
         self.assertEqual(build_sales_metrics(orders, items), [])
         bi_rows = build_bi_order_rows(
             [row], orders, items, updated_at="2026-10-05T14:00:00Z"
@@ -295,7 +299,9 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
             with self.subTest(field_missing=missing):
                 contact, client = self.fixture(payment=None)
                 if missing:
-                    del client.get_cliente_by_cpf.return_value["ultimoPedido"]["formaPagamento"]
+                    del client.get_cliente_by_cpf.return_value["ultimoPedido"][
+                        "formaPagamento"
+                    ]
                     del client.get_pedido.return_value["capa"]["formaPagamento"]
                 row, orders, items = self.resolve_and_persist(contact, client)
                 self.assertEqual(orders[0]["farmalider_forma_pagamento"], "")
@@ -317,9 +323,7 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
         self.assertEqual(orders[0]["valor_origem"], "SOMA_ITENS_API")
         self.assertEqual(orders[0]["farmalider_frete"], "9.99")
         self.assertEqual(orders[0]["farmalider_forma_pagamento"], "2")
-        self.assertEqual(
-            orders[0]["farmalider_forma_pagamento_nome"], "Débito"
-        )
+        self.assertEqual(orders[0]["farmalider_forma_pagamento_nome"], "Débito")
         self.assertEqual(items[0]["produto_codigo"], "9001")
         self.assertEqual(items[0]["produto_nome"], "Produto sintético")
         self.assertEqual(
@@ -341,17 +345,21 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
 
     def test_api_first_ignores_stale_weni_order_identity(self):
         contact, client = self.fixture()
-        contact["fields"]["ultimo_pedido"] = json.dumps({
-            "pedido_id": "400",
-            "data_hora": "2026-10-01T10:00:00-03:00",
-            "valor_total_compra": "1.00",
-            "produtos": [{
-                "nome": "Pedido antigo",
-                "quantidade": 1,
-                "valor_unitario": 1,
-                "valor_total": 1,
-            }],
-        })
+        contact["fields"]["ultimo_pedido"] = json.dumps(
+            {
+                "pedido_id": "400",
+                "data_hora": "2026-10-01T10:00:00-03:00",
+                "valor_total_compra": "1.00",
+                "produtos": [
+                    {
+                        "nome": "Pedido antigo",
+                        "quantidade": 1,
+                        "valor_unitario": 1,
+                        "valor_total": 1,
+                    }
+                ],
+            }
+        )
         _, orders, items = self.resolve_and_persist(contact, client)
         self.assertEqual(orders[0]["pedido_id"], "500")
         self.assertEqual(items[0]["produto_nome"], "Produto sintético")
@@ -368,9 +376,7 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
         )
         _, orders, items = self.resolve_and_persist(contact, client)
         self.assertEqual(orders[0]["status_validacao"], "OK")
-        self.assertEqual(
-            items[0]["produto_nome"], "Descrição atual do GET pedido"
-        )
+        self.assertEqual(items[0]["produto_nome"], "Descrição atual do GET pedido")
 
     def test_missing_description_rejects_pedido_snapshot(self):
         contact, client = self.fixture()
@@ -378,9 +384,7 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
         del client.get_cliente_by_cpf.return_value["itens"][0]["descricao"]
         _, orders, items = self.resolve_and_persist(contact, client)
         self.assertEqual(items, [])
-        self.assertTrue(
-            not orders or orders[0]["status_validacao"] == "ERRO"
-        )
+        self.assertTrue(not orders or orders[0]["status_validacao"] == "ERRO")
 
     def test_cancelled_latest_order_is_auditable_but_not_sale(self):
         contact, client = self.fixture(status=3, cancelled=True)
@@ -401,7 +405,9 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
             with self.subTest(status=status):
                 contact, client = self.fixture(status=status)
                 _, orders, items = self.resolve_and_persist(contact, client)
-                self.assertEqual(len(build_sales_metrics(orders, items)), int(status in (4, 1, 2)))
+                self.assertEqual(
+                    len(build_sales_metrics(orders, items)), int(status in (4, 1, 2))
+                )
 
     def test_cancelled_and_unknown_states_stay_out_of_sales(self):
         for status in (3, 99):

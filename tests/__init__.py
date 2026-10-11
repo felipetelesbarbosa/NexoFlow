@@ -1,4 +1,5 @@
 """Ambiente sintético da suíte, instalado antes dos módulos do projeto."""
+
 import socket
 import sys
 from types import ModuleType

@@ -1,4 +1,5 @@
 """Local-only failure journal; public logs never receive CPF or response text."""
+
 from __future__ import annotations
 
 import json
@@ -15,9 +16,23 @@ from pedido_utils import BUSINESS_TIMEZONE
 
 _WRITE_LOCK = threading.Lock()
 _DIAGNOSTIC_KEYS = {
-    "message", "mensagem", "msg", "error", "erro", "title", "detail",
-    "exceptionmessage", "errormessage", "description", "descricao",
-    "status", "statuscode", "code", "codigo", "success", "sucesso",
+    "message",
+    "mensagem",
+    "msg",
+    "error",
+    "erro",
+    "title",
+    "detail",
+    "exceptionmessage",
+    "errormessage",
+    "description",
+    "descricao",
+    "status",
+    "statuscode",
+    "code",
+    "codigo",
+    "success",
+    "sucesso",
 }
 
 
@@ -42,15 +57,31 @@ def sanitize_error_body(raw: bytes, token: str) -> dict:
     def clean(text: str) -> str:
         if "-----BEGIN" in text or "private_key" in text.casefold():
             return "[conteúdo sensível omitido]"
-        for secret in sorted({token, quote(token, safe=""), quote_plus(token)}, key=len, reverse=True):
+        for secret in sorted(
+            {token, quote(token, safe=""), quote_plus(token)}, key=len, reverse=True
+        ):
             if secret:
                 text = text.replace(secret, "[credencial removida]")
         text = re.sub(r"(?i)https?://[^\s<>]+", "[URL removida]", text)
-        text = re.sub(r"(?i)\b(?:bearer|basic)\s+[\w+/=.-]+", "[autenticação removida]", text)
-        text = re.sub(r"(?i)\b(?:token|senha|password|passwd|secret|api[_-]?key|authorization|cookie)\b\s*[:=]\s*(?:\"[^\"]*\"|'[^']*'|[^\s,;]+)", "[credencial removida]", text)
+        text = re.sub(
+            r"(?i)\b(?:bearer|basic)\s+[\w+/=.-]+", "[autenticação removida]", text
+        )
+        text = re.sub(
+            r"(?i)\b(?:token|senha|password|passwd|secret|api[_-]?key|authorization|cookie)\b\s*[:=]\s*(?:\"[^\"]*\"|'[^']*'|[^\s,;]+)",
+            "[credencial removida]",
+            text,
+        )
         text = re.sub(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", "[email removido]", text)
-        text = re.sub(r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b|\b\d{8,}\b", "[identificador removido]", text)
-        text = re.sub(r"\+?\d{2}\s*\(?\d{2}\)?\s*\d{4,5}[-\s]\d{4}\b|\(?\d{2}\)?\s*\d{4,5}[-\s]\d{4}\b", "[telefone removido]", text)
+        text = re.sub(
+            r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b|\b\d{8,}\b",
+            "[identificador removido]",
+            text,
+        )
+        text = re.sub(
+            r"\+?\d{2}\s*\(?\d{2}\)?\s*\d{4,5}[-\s]\d{4}\b|\(?\d{2}\)?\s*\d{4,5}[-\s]\d{4}\b",
+            "[telefone removido]",
+            text,
+        )
         return text[:2048]
 
     if isinstance(value, str):
@@ -67,14 +98,29 @@ def sanitize_error_body(raw: bytes, token: str) -> dict:
         elif item is None or isinstance(item, bool):
             fields[normalized] = item
         elif isinstance(item, int) or isinstance(item, float) and math.isfinite(item):
-            fields[normalized] = item if abs(item) < 10_000_000 else "[identificador removido]"
-    return {"estado": "campos_diagnosticos_sanitizados", "campos": fields, "campos_omitidos": len(value) - len(fields)}
+            fields[normalized] = (
+                item if abs(item) < 10_000_000 else "[identificador removido]"
+            )
+    return {
+        "estado": "campos_diagnosticos_sanitizados",
+        "campos": fields,
+        "campos_omitidos": len(value) - len(fields),
+    }
 
 
-def append_private_failure(*, execution_id: str, reference: str, cpf: str,
-                           status: int, attempts: int, reason: str,
-                           environment: str, raw: bytes, token: str,
-                           summary: str) -> Path | None:
+def append_private_failure(
+    *,
+    execution_id: str,
+    reference: str,
+    cpf: str,
+    status: int,
+    attempts: int,
+    reason: str,
+    environment: str,
+    raw: bytes,
+    token: str,
+    summary: str,
+) -> Path | None:
     if not re.fullmatch(r"[0-9]+", cpf):
         return None
     record = {
@@ -90,12 +136,18 @@ def append_private_failure(*, execution_id: str, reference: str, cpf: str,
         "diagnostico_publico": summary,
         "resposta": sanitize_error_body(raw, token),
     }
-    data = (json.dumps(record, ensure_ascii=False, allow_nan=False) + "\n").encode("utf-8")
+    data = (json.dumps(record, ensure_ascii=False, allow_nan=False) + "\n").encode(
+        "utf-8"
+    )
     directory = private_diagnostic_directory()
     path = directory / f"farmalider_falhas_{execution_id}.jsonl"
     with _WRITE_LOCK:
         directory.mkdir(parents=True, exist_ok=True, mode=0o700)
-        descriptor = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600)
+        descriptor = os.open(
+            path,
+            os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0),
+            0o600,
+        )
         with os.fdopen(descriptor, "ab") as stream:
             stream.write(data)
     return path

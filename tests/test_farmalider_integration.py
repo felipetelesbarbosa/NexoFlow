@@ -38,17 +38,21 @@ class FarmaliderIntegrationTests(unittest.TestCase):
         self.assertEqual(nome, "Cliente Teste")
 
     def test_pedido_id_becomes_official_key(self):
-        raw = json.dumps({
-            "pedido_id": 123456,
-            "data_hora": "2026-09-30T16:07:00Z",
-            "valor_total_compra": 110.80,
-            "produtos": [{
-                "nome": "Produto",
-                "quantidade": 1,
-                "valor_unitario": 110.80,
-                "valor_total": 110.80,
-            }],
-        })
+        raw = json.dumps(
+            {
+                "pedido_id": 123456,
+                "data_hora": "2026-09-30T16:07:00Z",
+                "valor_total_compra": 110.80,
+                "produtos": [
+                    {
+                        "nome": "Produto",
+                        "quantidade": 1,
+                        "valor_unitario": 110.80,
+                        "valor_total": 110.80,
+                    }
+                ],
+            }
+        )
         order, items = parse_ultimo_pedido_raw(
             raw,
             contact_uuid="uuid-1",
@@ -60,17 +64,21 @@ class FarmaliderIntegrationTests(unittest.TestCase):
         self.assertEqual(items[0]["pedido_id"], "123456")
 
     def test_api_confirms_order_and_customer(self):
-        raw = json.dumps({
-            "pedido_id": 123456,
-            "data_hora": "2026-09-30T16:07:00Z",
-            "valor_total_compra": 110.80,
-            "produtos": [{
-                "nome": "Produto",
-                "quantidade": 2,
-                "valor_unitario": 55.40,
-                "valor_total": 110.80,
-            }],
-        })
+        raw = json.dumps(
+            {
+                "pedido_id": 123456,
+                "data_hora": "2026-09-30T16:07:00Z",
+                "valor_total_compra": 110.80,
+                "produtos": [
+                    {
+                        "nome": "Produto",
+                        "quantidade": 2,
+                        "valor_unitario": 55.40,
+                        "valor_total": 110.80,
+                    }
+                ],
+            }
+        )
         order, items = parse_ultimo_pedido_raw(
             raw,
             contact_uuid="uuid-1",
@@ -91,16 +99,18 @@ class FarmaliderIntegrationTests(unittest.TestCase):
                 "cancelamento": None,
                 "entrega": None,
             },
-            "itens": [{
-                "codPedido": 123456,
-                "codProduto": 9999,
-                "descricao": "Produto oficial",
-                "quantidade": 2,
-                "valor": 55.40,
-                "total": 110.80,
-                "filialId": 24,
-                "desconto": 0,
-            }],
+            "itens": [
+                {
+                    "codPedido": 123456,
+                    "codProduto": 9999,
+                    "descricao": "Produto oficial",
+                    "quantidade": 2,
+                    "valor": 55.40,
+                    "total": 110.80,
+                    "filialId": 24,
+                    "desconto": 0,
+                }
+            ],
         }
         order, items = apply_pedido_api_confirmation(
             order,

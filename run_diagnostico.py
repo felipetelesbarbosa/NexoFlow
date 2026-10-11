@@ -18,6 +18,7 @@ def run() -> int:
 
     # Importa o diagnóstico existente somente depois de configurar a rede.
     from logging_config import configure_logging
+
     configure_logging()
     from diagnostico import main
 

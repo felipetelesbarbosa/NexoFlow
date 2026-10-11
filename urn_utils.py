@@ -29,12 +29,28 @@ def urn_channel(urn: Any) -> str:
     if not text:
         return ""
     scheme = text.split(":", 1)[0].strip().casefold()
-    if scheme == "whatsapp" or scheme.startswith("whatsapp-") or scheme.startswith("whatsapp_"):
+    if (
+        scheme == "whatsapp"
+        or scheme.startswith("whatsapp-")
+        or scheme.startswith("whatsapp_")
+    ):
         return "whatsapp"
-    if scheme == "instagram" or scheme.startswith("instagram-") or scheme.startswith("instagram_"):
+    if (
+        scheme == "instagram"
+        or scheme.startswith("instagram-")
+        or scheme.startswith("instagram_")
+    ):
         return "instagram"
     if (
-        scheme in {"facebook", "messenger", "facebookmessenger", "facebook-messenger", "facebook_messenger", "fb"}
+        scheme
+        in {
+            "facebook",
+            "messenger",
+            "facebookmessenger",
+            "facebook-messenger",
+            "facebook_messenger",
+            "fb",
+        }
         or scheme.startswith("facebook-")
         or scheme.startswith("facebook_")
         or scheme.startswith("messenger-")
@@ -111,7 +127,11 @@ def resolve_contact_urns(
     for channel in CHANNEL_PRIORITY:
         native_candidates = by_channel[channel]
         if native_candidates:
-            chosen = resolved[channel] if resolved[channel] in native_candidates else native_candidates[0]
+            chosen = (
+                resolved[channel]
+                if resolved[channel] in native_candidates
+                else native_candidates[0]
+            )
             principal_urn = chosen
             principal_channel = channel
             break

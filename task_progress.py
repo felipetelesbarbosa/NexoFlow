@@ -36,9 +36,14 @@ class TaskProgress:
     """
 
     def __init__(
-        self, label: str, total: int | None, *, unit: str = "contatos",
+        self,
+        label: str,
+        total: int | None,
+        *,
+        unit: str = "contatos",
         byte_count: Callable[[], int] | None = None,
-        detail: Callable[[], str] | None = None, interval: float = 2.0,
+        detail: Callable[[], str] | None = None,
+        interval: float = 2.0,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.label, self.total, self.unit = label, total, unit
@@ -86,7 +91,11 @@ class TaskProgress:
             now = self.clock()
             elapsed = max(0.0, now - self._started)
             done = self.completed
-            size = max(0, self.byte_count() - self._initial_bytes) if self.byte_count else 0
+            size = (
+                max(0, self.byte_count() - self._initial_bytes)
+                if self.byte_count
+                else 0
+            )
             while len(self._samples) > 1 and self._samples[1][0] <= now - 10:
                 self._samples.popleft()
             baseline, old_done, old_size = self._samples[0]
@@ -94,12 +103,18 @@ class TaskProgress:
             rate = (done - old_done) / period if period > 0 else 0.0
             throughput = (size - old_size) / period if period > 0 else 0.0
             self._samples.append((now, done, size))
-            success = finished and not failed and (self.total is None or done == self.total)
+            success = (
+                finished and not failed and (self.total is None or done == self.total)
+            )
             if self.total is None:
                 bar = "[coletando]"
                 count = f"{done} {self.unit}; total ainda desconhecido"
             else:
-                fraction = min(done / self.total, 1.0) if self.total else (1.0 if success else 0.0)
+                fraction = (
+                    min(done / self.total, 1.0)
+                    if self.total
+                    else (1.0 if success else 0.0)
+                )
                 percent = 100 if success else min(99, int(fraction * 100))
                 filled = 20 if success else min(19, int(fraction * 20))
                 bar = f"[{'#' * filled}{'-' * (20 - filled)}] {percent:3d}%"
@@ -110,13 +125,25 @@ class TaskProgress:
                 eta = _duration(max(0, self.total - done) * elapsed / done)
             else:
                 eta = "calculando" if self.total is not None else "indisponível"
-            volume = f" | JSONL: {_byte_rate(throughput)}; {size / 1_000_000:.2f} MB gravados" if self.byte_count else ""
+            volume = (
+                f" | JSONL: {_byte_rate(throughput)}; {size / 1_000_000:.2f} MB gravados"
+                if self.byte_count
+                else ""
+            )
             details = f" | {self.detail()}" if self.detail else ""
             state = " | interrompido" if failed else (" | concluído" if success else "")
             logging.info(
                 "%s %s | %s | %.1f %s/s%s | decorrido=%s | restante estimado=%s%s%s",
-                self.label, bar, count, rate, self.unit, volume,
-                _duration(elapsed), eta, details, state,
+                self.label,
+                bar,
+                count,
+                rate,
+                self.unit,
+                volume,
+                _duration(elapsed),
+                eta,
+                details,
+                state,
             )
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:

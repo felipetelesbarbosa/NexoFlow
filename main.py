@@ -108,29 +108,36 @@ class OrderStats:
     api_errors: int = 0
 
 
-def _apply_request_metrics(stats: ClienteValidationStats, metrics: dict[str, Any]) -> None:
+def _apply_request_metrics(
+    stats: ClienteValidationStats, metrics: dict[str, Any]
+) -> None:
     for attribute, key in {
         "http_requests": "total_requests",
-        "retries": "retries", "rate_limits": "rate_limits",
-        "server_errors": "server_errors", "network_errors": "network_errors",
-        "slow_requests": "slow_requests", "responses_200": "responses_200",
-        "responses_404": "responses_404", "concurrency_limit": "concurrency_limit",
+        "retries": "retries",
+        "rate_limits": "rate_limits",
+        "server_errors": "server_errors",
+        "network_errors": "network_errors",
+        "slow_requests": "slow_requests",
+        "responses_200": "responses_200",
+        "responses_404": "responses_404",
+        "concurrency_limit": "concurrency_limit",
         "recovery_activations": "recovery_activations",
         "server_error_unique_queries": "server_error_unique_queries",
         "server_error_serial_queries": "server_error_serial_queries",
     }.items():
         setattr(stats, attribute, int(metrics.get(key, 0)))
     for key in (
-        "average_response_ms", "p95_response_ms", "max_response_ms", "effective_delay_ms",
+        "average_response_ms",
+        "p95_response_ms",
+        "max_response_ms",
+        "effective_delay_ms",
     ):
         setattr(stats, key, float(metrics.get(key, 0)))
 
 
 def validate_configuration() -> None:
     weni_token = str(getattr(secrets, "WENI_API_TOKEN", "")).strip()
-    spreadsheet_id = str(
-        getattr(secrets, "GOOGLE_SPREADSHEET_ID", "")
-    ).strip()
+    spreadsheet_id = str(getattr(secrets, "GOOGLE_SPREADSHEET_ID", "")).strip()
 
     if not weni_token or weni_token == TOKEN_PLACEHOLDER:
         raise RuntimeError(
@@ -168,7 +175,9 @@ def utc_iso(dt: datetime) -> str:
 
 
 def _completion_controls(
-    sync_started: datetime, *, api_errors: int,
+    sync_started: datetime,
+    *,
+    api_errors: int,
 ) -> tuple[str, dict[str, str]]:
     """Do not advance the incremental cursor while CPF lookups need a retry."""
     if api_errors:
@@ -225,7 +234,8 @@ def _format_ms_as_seconds(milliseconds: float) -> str:
 def _query_cliente(
     cpf: str,
     farm_client: FarmaliderClient,
-    response_cache: dict[str, dict[str, Any] | list[dict[str, Any]] | None] | None = None,
+    response_cache: dict[str, dict[str, Any] | list[dict[str, Any]] | None]
+    | None = None,
 ) -> ClienteResult:
     try:
         api_cliente = farm_client.get_cliente_by_cpf(cpf)
@@ -253,7 +263,8 @@ def _apply_cliente_result(
 
 
 def _preserve_cliente_on_api_error(
-    row: Row, existing_by_uuid: dict[str, Row] | None,
+    row: Row,
+    existing_by_uuid: dict[str, Row] | None,
 ) -> bool:
     """Keep prior verified details, while recording the current lookup as failed."""
     if not existing_by_uuid:
@@ -264,9 +275,16 @@ def _preserve_cliente_on_api_error(
     cpf = normalize_cpf(row.get("cpf_normalizado") or row.get("cpf"))
     existing_cpf = normalize_cpf(existing.get("cpf_normalizado") or existing.get("cpf"))
     status = str(existing.get("farmalider_cliente_status") or "").strip()
-    if not is_valid_cpf(cpf) or cpf != existing_cpf or status not in {
-        "CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO", "ERRO_API",
-    }:
+    if (
+        not is_valid_cpf(cpf)
+        or cpf != existing_cpf
+        or status
+        not in {
+            "CPF_CONFIRMADO",
+            "CPF_INVALIDO_ENCONTRADO",
+            "ERRO_API",
+        }
+    ):
         return False
     if not str(existing.get("farmalider_cliente_id") or "").strip():
         return False
@@ -300,12 +318,19 @@ def _reusable_farmalider_result(
     if not existing:
         return None
     cpf = normalize_cpf(row.get("cpf", ""))
-    existing_cpf = normalize_cpf(existing.get("cpf_normalizado") or existing.get("cpf", ""))
+    existing_cpf = normalize_cpf(
+        existing.get("cpf_normalizado") or existing.get("cpf", "")
+    )
     if not is_valid_cpf(cpf) or cpf != existing_cpf:
         return None
 
     status = str(existing.get("farmalider_cliente_status") or "").strip()
-    if status not in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO", "CPF_DIVERGENTE_API", "CPF_NAO_ENCONTRADO"}:
+    if status not in {
+        "CPF_CONFIRMADO",
+        "CPF_INVALIDO_ENCONTRADO",
+        "CPF_DIVERGENTE_API",
+        "CPF_NAO_ENCONTRADO",
+    }:
         return None
     consulted = _parse_iso_datetime(
         str(existing.get("farmalider_cliente_consultado_em") or "")
@@ -334,7 +359,8 @@ def validate_contacts(
     sync_time: str,
     existing_by_uuid: dict[str, Row] | None = None,
     reuse_existing: bool = False,
-    cliente_responses_by_cpf: dict[str, dict[str, Any] | list[dict[str, Any]] | None] | None = None,
+    cliente_responses_by_cpf: dict[str, dict[str, Any] | list[dict[str, Any]] | None]
+    | None = None,
     cliente_lookup_status_by_cpf: dict[str, str] | None = None,
     identity_by_uuid: dict[str, dict[str, Any]] | None = None,
 ) -> ClienteValidationStats:
@@ -394,7 +420,9 @@ def validate_contacts(
 
     unique_cpfs = list(rows_by_cpf)
     cache: dict[str, ClienteResult] = {}
-    response_cache = cliente_responses_by_cpf if cliente_responses_by_cpf is not None else {}
+    response_cache = (
+        cliente_responses_by_cpf if cliente_responses_by_cpf is not None else {}
+    )
 
     if unique_cpfs and farm_client is not None:
         parallel_min = max(1, int(FARMALIDER_PARALLEL_MIN_CPFS))
@@ -418,7 +446,7 @@ def validate_contacts(
         # Separate batches are a completion barrier, including when a phase is
         # smaller than the batch/chunk size. Never mix phases in the executor.
         batches = [
-            (label, phase[start:start + batch_size])
+            (label, phase[start : start + batch_size])
             for label, phase in (("válidos", valid_cpfs), ("inválidos", invalid_cpfs))
             for start in range(0, len(phase), batch_size)
         ]
@@ -435,11 +463,7 @@ def validate_contacts(
             batch_size,
             parallel_min,
             delay_ms,
-            (
-                f" (~{rate_cap:.0f} inícios/s no máximo)"
-                if rate_cap > 0
-                else ""
-            ),
+            (f" (~{rate_cap:.0f} inícios/s no máximo)" if rate_cap > 0 else ""),
         )
 
         executor = ThreadPoolExecutor(
@@ -450,17 +474,24 @@ def validate_contacts(
 
         try:
             for batch_number, (phase, batch) in enumerate(batches, start=1):
-                logging.info("FarmaLíder: etapa de CPFs %s | lote %s/%s | %s consultas.",
-                             phase, batch_number, total_batches, len(batch))
+                logging.info(
+                    "FarmaLíder: etapa de CPFs %s | lote %s/%s | %s consultas.",
+                    phase,
+                    batch_number,
+                    total_batches,
+                    len(batch),
+                )
                 batch_errors = 0
                 batch_completed = 0
                 # Evaluate complete, bounded sub-batches. The first responses
                 # to finish may be fast failures while successful calls are slow.
                 for chunk_start in range(0, len(batch), 100):
-                    chunk = batch[chunk_start:chunk_start + 100]
+                    chunk = batch[chunk_start : chunk_start + 100]
                     futures = {
                         executor.submit(
-                            _query_cliente, cpf, farm_client,
+                            _query_cliente,
+                            cpf,
+                            farm_client,
                             response_cache,
                         ): cpf
                         for cpf in chunk
@@ -483,16 +514,23 @@ def validate_contacts(
                         batch_completed += 1
                         if result[0] == "ERRO_API":
                             batch_errors += 1
-                            contact_refs = sorted({
-                                farm_client.weni_contact_diagnostic_ref(
-                                    str(row["contact_uuid"])
+                            contact_refs = (
+                                sorted(
+                                    {
+                                        farm_client.weni_contact_diagnostic_ref(
+                                            str(row["contact_uuid"])
+                                        )
+                                        for row in rows_by_cpf[cpf]
+                                        if row.get("contact_uuid")
+                                    }
                                 )
-                                for row in rows_by_cpf[cpf]
-                                if row.get("contact_uuid")
-                            }) if isinstance(farm_client, FarmaliderClient) else []
+                                if isinstance(farm_client, FarmaliderClient)
+                                else []
+                            )
                             lookup_ref = (
                                 farm_client.cpf_diagnostic_ref(cpf)
-                                if isinstance(farm_client, FarmaliderClient) else "-"
+                                if isinstance(farm_client, FarmaliderClient)
+                                else "-"
                             )
                             logging.warning(
                                 "FarmaLíder cliente/cpf [consulta %s]: falha para %s "
@@ -552,9 +590,7 @@ def validate_contacts(
                     metrics["rate_limits"],
                     metrics["server_errors"],
                     metrics.get("slow_requests", 0),
-                    _format_ms_as_seconds(
-                        metrics.get("p95_response_ms", 0.0)
-                    ),
+                    _format_ms_as_seconds(metrics.get("p95_response_ms", 0.0)),
                     _format_ms_as_seconds(metrics["max_response_ms"]),
                     metrics["effective_delay_ms"],
                     metrics.get("concurrency_limit", worker_count),
@@ -569,11 +605,16 @@ def validate_contacts(
             for row in cpf_rows:
                 result = query_result
                 if not is_valid_cpf(cpf) and cpf in response_cache:
-                    identity = (identity_by_uuid or {}).get(str(row.get("contact_uuid") or ""), row)
-                    result = cliente_link_status(cpf, response_cache[cpf], weni_identity=identity)
+                    identity = (identity_by_uuid or {}).get(
+                        str(row.get("contact_uuid") or ""), row
+                    )
+                    result = cliente_link_status(
+                        cpf, response_cache[cpf], weni_identity=identity
+                    )
                 _apply_cliente_result(row, result)
                 if result[0] == "ERRO_API" and _preserve_cliente_on_api_error(
-                    row, existing_by_uuid,
+                    row,
+                    existing_by_uuid,
                 ):
                     stats.prior_details_retained += 1
 
@@ -597,13 +638,20 @@ def validate_contacts(
 
     identity_counts = {
         status: sum(row.get("farmalider_cliente_status") == status for row in rows)
-        for status in ("CPF_INVALIDO_ENCONTRADO", "CPF_IDENTIDADE_INSUFICIENTE",
-                       "CPF_IDENTIDADE_DIVERGENTE", "CPF_IDENTIDADE_AMBIGUA")
+        for status in (
+            "CPF_INVALIDO_ENCONTRADO",
+            "CPF_IDENTIDADE_INSUFICIENTE",
+            "CPF_IDENTIDADE_DIVERGENTE",
+            "CPF_IDENTIDADE_AMBIGUA",
+        )
     }
     if stats.invalid:
-        logging.info("FarmaLíder: identidade de contatos com CPF inválido: %s.", identity_counts)
+        logging.info(
+            "FarmaLíder: identidade de contatos com CPF inválido: %s.", identity_counts
+        )
     stats.elapsed_seconds = time.monotonic() - started
     return stats
+
 
 def build_orders(
     relevant_contacts: list[Contact],
@@ -611,7 +659,8 @@ def build_orders(
     rows_by_uuid: dict[str, Row],
     farm_client: FarmaliderClient | None,
     sync_time: str,
-    cliente_responses_by_cpf: dict[str, dict[str, Any] | list[dict[str, Any]] | None] | None = None,
+    cliente_responses_by_cpf: dict[str, dict[str, Any] | list[dict[str, Any]] | None]
+    | None = None,
     cliente_lookup_status_by_cpf: dict[str, str] | None = None,
 ) -> tuple[list[Row], list[Row], OrderStats]:
     snapshots: dict[str, tuple[Row, list[Row]]] = {}
@@ -621,7 +670,13 @@ def build_orders(
 
     # CPF duplicates can point to the same official order. Select a complete
     # order/items snapshot consistently, regardless of Weni pagination order.
-    for contact in sorted(relevant_contacts, key=lambda row: (cpf_query_priority(get_fields(row).get("cpf")), str(row.get("uuid") or ""))):
+    for contact in sorted(
+        relevant_contacts,
+        key=lambda row: (
+            cpf_query_priority(get_fields(row).get("cpf")),
+            str(row.get("uuid") or ""),
+        ),
+    ):
         fields = get_fields(contact)
         contact_uuid = str(contact.get("uuid") or "")
         contact_row = rows_by_uuid.get(contact_uuid, {})
@@ -749,9 +804,7 @@ def main() -> int:
         bi_snapshot_date = (sync_started - timedelta(hours=3)).date().isoformat()
         logging.info("Iniciando sincronização Weni → FarmaLíder → Google Sheets.")
 
-        spreadsheet_id = str(
-            getattr(secrets, "GOOGLE_SPREADSHEET_ID", "")
-        ).strip()
+        spreadsheet_id = str(getattr(secrets, "GOOGLE_SPREADSHEET_ID", "")).strip()
         weni_token = str(getattr(secrets, "WENI_API_TOKEN", "")).strip()
         farm_settings = load_farmalider_settings()
         farm_client = open_farmalider_client(farm_settings)
@@ -773,13 +826,9 @@ def main() -> int:
             try:
                 full_quarter = int(raw_quarter)
             except ValueError as exc:
-                raise RuntimeError(
-                    "FULL_SYNC_QUARTER deve ser 1, 2, 3 ou 4."
-                ) from exc
+                raise RuntimeError("FULL_SYNC_QUARTER deve ser 1, 2, 3 ou 4.") from exc
             if full_quarter not in {1, 2, 3, 4}:
-                raise RuntimeError(
-                    "FULL_SYNC_QUARTER deve ser 1, 2, 3 ou 4."
-                )
+                raise RuntimeError("FULL_SYNC_QUARTER deve ser 1, 2, 3 ou 4.")
 
         last_success = None
         if not force_full:
@@ -857,8 +906,7 @@ def main() -> int:
                 contacts
             )
             normalized = [
-                normalize_contact(contact, sync_time)
-                for contact in contacts_to_process
+                normalize_contact(contact, sync_time) for contact in contacts_to_process
             ]
             valid_unique_cpfs = {
                 normalize_cpf(row.get("cpf", ""))
@@ -880,8 +928,14 @@ def main() -> int:
 
             logging.info(
                 "FarmaLíder: CPFs inválidos únicos para consulta posterior=%s.",
-                len({normalize_cpf(row.get("cpf")) for row in normalized
-                     if normalize_cpf(row.get("cpf")) and not is_valid_cpf(row.get("cpf"))}),
+                len(
+                    {
+                        normalize_cpf(row.get("cpf"))
+                        for row in normalized
+                        if normalize_cpf(row.get("cpf"))
+                        and not is_valid_cpf(row.get("cpf"))
+                    }
+                ),
             )
 
             if not force_full and after is not None and not contacts_to_process:
@@ -924,7 +978,9 @@ def main() -> int:
             for row in base_records_before
             if row.get("contact_uuid")
         }
-        cliente_responses_by_cpf: dict[str, dict[str, Any] | list[dict[str, Any]] | None] = {}
+        cliente_responses_by_cpf: dict[
+            str, dict[str, Any] | list[dict[str, Any]] | None
+        ] = {}
         cliente_lookup_status_by_cpf: dict[str, str] = {}
         cliente_stats = validate_contacts(
             normalized,
@@ -933,8 +989,10 @@ def main() -> int:
             sync_time=sync_time,
             existing_by_uuid=existing_by_uuid,
             reuse_existing=not force_full,
-            identity_by_uuid={str(contact.get("uuid") or ""): weni_customer_identity(contact)
-                              for contact in contacts_to_process},
+            identity_by_uuid={
+                str(contact.get("uuid") or ""): weni_customer_identity(contact)
+                for contact in contacts_to_process
+            },
             cliente_responses_by_cpf=cliente_responses_by_cpf,
             cliente_lookup_status_by_cpf=cliente_lookup_status_by_cpf,
         )
@@ -966,13 +1024,12 @@ def main() -> int:
         )
 
         rows_by_uuid = {
-            row["contact_uuid"]: row
-            for row in normalized
-            if row.get("contact_uuid")
+            row["contact_uuid"]: row for row in normalized if row.get("contact_uuid")
         }
         order_rows, item_rows, order_stats = build_orders(
             [
-                contact for contact in contacts_to_process
+                contact
+                for contact in contacts_to_process
                 if is_relevant_contact(contact)
                 or bool(normalize_cpf(get_fields(contact).get("cpf")))
             ],
@@ -987,12 +1044,8 @@ def main() -> int:
             _apply_request_metrics(cliente_stats, farm_client.metrics_snapshot())
 
         postprocess_started = time.monotonic()
-        logging.info(
-            "Google Sheets: etapa 2/4 - Pedidos e itens."
-        )
-        order_result = (
-            sheets.upsert_orders_detailed(order_rows) if order_rows else None
-        )
+        logging.info("Google Sheets: etapa 2/4 - Pedidos e itens.")
+        order_result = sheets.upsert_orders_detailed(order_rows) if order_rows else None
         item_result = (
             sheets.upsert_order_items_detailed(item_rows) if item_rows else None
         )
@@ -1001,20 +1054,18 @@ def main() -> int:
         items_inserted = item_result.inserted if item_result else 0
         items_updated = item_result.updated if item_result else 0
 
-        logging.info(
-            "Google Sheets: etapa 3/4 - Métricas de contatos e anúncios."
-        )
+        logging.info("Google Sheets: etapa 3/4 - Métricas de contatos e anúncios.")
         ad_metrics = build_daily_metrics(contact_result.final_records)
         sheets.replace_metrics(ad_metrics)
 
-        logging.info(
-            "Google Sheets: etapa 4/4 - Métricas de vendas e fechamento."
-        )
+        logging.info("Google Sheets: etapa 4/4 - Métricas de vendas e fechamento.")
         all_order_records = (
             order_result.final_records if order_result else sheets.load_order_records()
         )
         all_item_records = (
-            item_result.final_records if item_result else sheets.load_order_item_records()
+            item_result.final_records
+            if item_result
+            else sheets.load_order_item_records()
         )
         sales_metrics = build_sales_metrics(all_order_records, all_item_records)
         sheets.replace_sales_metrics(sales_metrics)
@@ -1102,30 +1153,36 @@ def main() -> int:
                 )
         status_stats = sheets.request_stats()
         status_elapsed = time.monotonic() - total_started_monotonic
-        sheets.replace_bi_status([
-            sync_time,
-            APP_VERSION,
-            completion_status,
-            (
-                f"carga_completa_25_parte_{full_quarter}"
-                if full_quarter is not None
-                else ("carga_completa" if force_full or after is None else "incremental")
-            ),
-            round(status_elapsed, 2),
-            contacts_api_total,
-            len(contacts_to_process),
-            cliente_stats.unique_queries,
-            cliente_stats.http_requests,
-            cliente_stats.retries,
-            cliente_stats.rate_limits,
-            cliente_stats.server_errors,
-            status_stats["reads"],
-            status_stats["writes"],
-            inserted,
-            updated,
-            contact_result.unchanged,
-            order_stats.confirmed_api,
-        ])
+        sheets.replace_bi_status(
+            [
+                sync_time,
+                APP_VERSION,
+                completion_status,
+                (
+                    f"carga_completa_25_parte_{full_quarter}"
+                    if full_quarter is not None
+                    else (
+                        "carga_completa"
+                        if force_full or after is None
+                        else "incremental"
+                    )
+                ),
+                round(status_elapsed, 2),
+                contacts_api_total,
+                len(contacts_to_process),
+                cliente_stats.unique_queries,
+                cliente_stats.http_requests,
+                cliente_stats.retries,
+                cliente_stats.rate_limits,
+                cliente_stats.server_errors,
+                status_stats["reads"],
+                status_stats["writes"],
+                inserted,
+                updated,
+                contact_result.unchanged,
+                order_stats.confirmed_api,
+            ]
+        )
         logging.info(
             "Google Sheets: BI 7/7 - BI_Status atualizado; camada BI concluída em %.2fs.",
             time.monotonic() - bi_started,
@@ -1135,13 +1192,9 @@ def main() -> int:
             {
                 **completion_controls,
                 "ultima_execucao_contatos_api": str(len(contacts)),
-                "ultima_execucao_contatos_relevantes": str(
-                    len(relevant_contacts)
-                ),
+                "ultima_execucao_contatos_relevantes": str(len(relevant_contacts)),
                 "ultima_execucao_contatos_com_cpf": str(len(cpf_contacts)),
-                "ultima_execucao_contatos_processados": str(
-                    len(contacts_to_process)
-                ),
+                "ultima_execucao_contatos_processados": str(len(contacts_to_process)),
                 "ultima_execucao_cpfs_unicos_consultados": str(
                     cliente_stats.unique_queries
                 ),
@@ -1154,9 +1207,7 @@ def main() -> int:
                 "ultima_execucao_cpfs_confirmados_farmalider": str(
                     cliente_stats.confirmed
                 ),
-                "ultima_execucao_cpfs_nao_encontrados": str(
-                    cliente_stats.not_found
-                ),
+                "ultima_execucao_cpfs_nao_encontrados": str(cliente_stats.not_found),
                 "ultima_execucao_cpfs_invalidos": str(cliente_stats.invalid),
                 "ultima_execucao_erros_cliente_farmalider": str(
                     cliente_stats.api_errors
@@ -1164,24 +1215,30 @@ def main() -> int:
                 "ultima_execucao_farmalider_detalhes_anteriores_mantidos": str(
                     cliente_stats.prior_details_retained
                 ),
-                "ultima_execucao_farmalider_recuperacoes_serial": str(cliente_stats.recovery_activations),
-                "ultima_execucao_farmalider_limite_final": str(cliente_stats.concurrency_limit),
-                "ultima_execucao_farmalider_5xx_consultas_distintas": str(cliente_stats.server_error_unique_queries),
-                "ultima_execucao_farmalider_5xx_consultas_em_serial": str(cliente_stats.server_error_serial_queries),
-                "ultima_execucao_farmalider_respostas_200": str(cliente_stats.responses_200),
-                "ultima_execucao_farmalider_respostas_404": str(cliente_stats.responses_404),
+                "ultima_execucao_farmalider_recuperacoes_serial": str(
+                    cliente_stats.recovery_activations
+                ),
+                "ultima_execucao_farmalider_limite_final": str(
+                    cliente_stats.concurrency_limit
+                ),
+                "ultima_execucao_farmalider_5xx_consultas_distintas": str(
+                    cliente_stats.server_error_unique_queries
+                ),
+                "ultima_execucao_farmalider_5xx_consultas_em_serial": str(
+                    cliente_stats.server_error_serial_queries
+                ),
+                "ultima_execucao_farmalider_respostas_200": str(
+                    cliente_stats.responses_200
+                ),
+                "ultima_execucao_farmalider_respostas_404": str(
+                    cliente_stats.responses_404
+                ),
                 "ultima_execucao_farmalider_http_requests": str(
                     cliente_stats.http_requests
                 ),
-                "ultima_execucao_farmalider_retries": str(
-                    cliente_stats.retries
-                ),
-                "ultima_execucao_farmalider_429": str(
-                    cliente_stats.rate_limits
-                ),
-                "ultima_execucao_farmalider_5xx": str(
-                    cliente_stats.server_errors
-                ),
+                "ultima_execucao_farmalider_retries": str(cliente_stats.retries),
+                "ultima_execucao_farmalider_429": str(cliente_stats.rate_limits),
+                "ultima_execucao_farmalider_5xx": str(cliente_stats.server_errors),
                 "ultima_execucao_farmalider_erros_rede": str(
                     cliente_stats.network_errors
                 ),
@@ -1211,12 +1268,8 @@ def main() -> int:
                 "ultima_execucao_pedidos_atualizados": str(orders_updated),
                 "ultima_execucao_itens_inseridos": str(items_inserted),
                 "ultima_execucao_itens_atualizados": str(items_updated),
-                "ultima_execucao_erros_ultimo_pedido": str(
-                    order_stats.parse_errors
-                ),
-                "ultima_execucao_erros_pedido_farmalider": str(
-                    order_stats.api_errors
-                ),
+                "ultima_execucao_erros_ultimo_pedido": str(order_stats.parse_errors),
+                "ultima_execucao_erros_pedido_farmalider": str(order_stats.api_errors),
                 "ultima_execucao_metricas_ads": str(len(ad_metrics)),
                 "ultima_execucao_metricas_vendas": str(sales_metrics_count),
                 **(
@@ -1323,9 +1376,7 @@ def main() -> int:
                     {
                         "ultima_execucao_status": "erro",
                         "ultima_execucao_erro_tipo": exc.__class__.__name__,
-                        "ultima_execucao_erro_em_utc": utc_iso(
-                            datetime.now(UTC)
-                        ),
+                        "ultima_execucao_erro_em_utc": utc_iso(datetime.now(UTC)),
                     }
                 )
             except Exception:

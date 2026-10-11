@@ -35,45 +35,87 @@ VALID_CPF = "52998224725"
 SETTINGS = FarmaliderSettings(True, "synthetic-token", False)
 
 
-def customer_payload(identifier=101, *, name="Cliente Árvore", email="arvore@example.test",
-                     phone="91987654321", cpf=0, order_id=201):
+def customer_payload(
+    identifier=101,
+    *,
+    name="Cliente Árvore",
+    email="arvore@example.test",
+    phone="91987654321",
+    cpf=0,
+    order_id=201,
+):
     return {
-        "cliente": {"id": identifier, "cpf": cpf, "nome": name,
-                    "email": email, "telefone": phone},
-        "ultimoPedido": {"id": order_id, "codCliente": identifier,
-                         "emissao": "2026-10-08T10:00:00", "status": 2,
-                         "formaPagamento": 1, "frete": 0},
-        "itens": [{"codPedido": order_id, "descricao": "Produto sintético",
-                   "quantidade": 1, "valor": 10, "total": 10}],
+        "cliente": {
+            "id": identifier,
+            "cpf": cpf,
+            "nome": name,
+            "email": email,
+            "telefone": phone,
+        },
+        "ultimoPedido": {
+            "id": order_id,
+            "codCliente": identifier,
+            "emissao": "2026-10-08T10:00:00",
+            "status": 2,
+            "formaPagamento": 1,
+            "frete": 0,
+        },
+        "itens": [
+            {
+                "codPedido": order_id,
+                "descricao": "Produto sintético",
+                "quantidade": 1,
+                "valor": 10,
+                "total": 10,
+            }
+        ],
     }
 
 
-def identity(*, name="Cliente Árvore", email="arvore@example.test", phone="91987654321"):
+def identity(
+    *, name="Cliente Árvore", email="arvore@example.test", phone="91987654321"
+):
     return {"nome": name, "email": email, "telefone": phone}
 
 
-def weni_contact(uuid="synthetic-a", *, name="Cliente Árvore", email="arvore@example.test",
-                 phone="91987654321", cpf="0", pedido_id=None):
+def weni_contact(
+    uuid="synthetic-a",
+    *,
+    name="Cliente Árvore",
+    email="arvore@example.test",
+    phone="91987654321",
+    cpf="0",
+    pedido_id=None,
+):
     fields = {"cpf": cpf, "nome": name, "email": email}
     if pedido_id is not None:
         fields["pedido_id"] = pedido_id
         fields["ultimo_pedido"] = {"pedido_id": pedido_id}
-    return {"uuid": uuid, "name": name, "fields": fields,
-            "urns": [f"tel:+55{phone}"] if phone else []}
+    return {
+        "uuid": uuid,
+        "name": name,
+        "fields": fields,
+        "urns": [f"tel:+55{phone}"] if phone else [],
+    }
 
 
 def farm_client(payload):
     farm = Mock()
     farm.get_cliente_by_cpf.return_value = payload
     farm.metrics_snapshot.return_value = {
-        "total_requests": 1, "retries": 0, "rate_limits": 0,
-        "server_errors": 0, "network_errors": 0,
-        "max_response_ms": 1, "effective_delay_ms": 0,
+        "total_requests": 1,
+        "retries": 0,
+        "rate_limits": 0,
+        "server_errors": 0,
+        "network_errors": 0,
+        "max_response_ms": 1,
+        "effective_delay_ms": 0,
     }
     candidates = payload if isinstance(payload, list) else [payload]
     orders = {
         str(candidate["ultimoPedido"]["id"]): {
-            "capa": candidate["ultimoPedido"], "itens": candidate["itens"],
+            "capa": candidate["ultimoPedido"],
+            "itens": candidate["itens"],
         }
         for candidate in candidates
         if isinstance(candidate, dict) and "ultimoPedido" in candidate
@@ -107,62 +149,96 @@ class InvalidCpfIdentityTests(unittest.TestCase):
         cases = [
             ({}, "CPF_IDENTIDADE_INSUFICIENTE"),
             (identity(email="", phone=""), "CPF_IDENTIDADE_INSUFICIENTE"),
-            (identity(name="", email="arvore@example.test"), "CPF_IDENTIDADE_INSUFICIENTE"),
+            (
+                identity(name="", email="arvore@example.test"),
+                "CPF_IDENTIDADE_INSUFICIENTE",
+            ),
             (identity(name="Outro cliente"), "CPF_IDENTIDADE_DIVERGENTE"),
-            (identity(email="other@example.test", phone="92987654321"), "CPF_IDENTIDADE_DIVERGENTE"),
+            (
+                identity(email="other@example.test", phone="92987654321"),
+                "CPF_IDENTIDADE_DIVERGENTE",
+            ),
         ]
         for weni_identity, status in cases:
             with self.subTest(identity=weni_identity):
-                self.assertEqual(cliente_link_status("0", payload, weni_identity=weni_identity),
-                                 (status, "", ""))
-        self.assertEqual(cliente_link_status("0", payload),
-                         ("CPF_IDENTIDADE_INSUFICIENTE", "", ""))
+                self.assertEqual(
+                    cliente_link_status("0", payload, weni_identity=weni_identity),
+                    (status, "", ""),
+                )
+        self.assertEqual(
+            cliente_link_status("0", payload), ("CPF_IDENTIDADE_INSUFICIENTE", "", "")
+        )
 
     def test_email_or_phone_each_suffices_with_the_same_name(self):
         for weni_identity in [identity(phone=""), identity(email="")]:
             with self.subTest(identity=weni_identity):
-                self.assertEqual(cliente_link_status("0", customer_payload(),
-                                                    weni_identity=weni_identity),
-                                 ("CPF_INVALIDO_ENCONTRADO", "101", "Cliente Árvore"))
+                self.assertEqual(
+                    cliente_link_status(
+                        "0", customer_payload(), weni_identity=weni_identity
+                    ),
+                    ("CPF_INVALIDO_ENCONTRADO", "101", "Cliente Árvore"),
+                )
 
     def test_name_and_email_comparison_normalizes_case_accents_and_spaces(self):
         result = cliente_link_status(
-            "00000000000", customer_payload(),
-            weni_identity=identity(name="  CLIENTE   ARVORE  ",
-                                   email="  ARVORE@EXAMPLE.TEST  ", phone=""),
+            "00000000000",
+            customer_payload(),
+            weni_identity=identity(
+                name="  CLIENTE   ARVORE  ", email="  ARVORE@EXAMPLE.TEST  ", phone=""
+            ),
         )
         self.assertEqual(result[0:2], ("CPF_INVALIDO_ENCONTRADO", "101"))
 
     def test_phone_accepts_brazil_country_code_but_preserves_ddd_and_digits(self):
         for phone in ["+55 (91) 98765-4321", "91987654321"]:
             with self.subTest(phone=phone):
-                self.assertEqual(cliente_link_status("0", customer_payload(),
-                                                    weni_identity=identity(email="", phone=phone))[0],
-                                 "CPF_INVALIDO_ENCONTRADO")
+                self.assertEqual(
+                    cliente_link_status(
+                        "0",
+                        customer_payload(),
+                        weni_identity=identity(email="", phone=phone),
+                    )[0],
+                    "CPF_INVALIDO_ENCONTRADO",
+                )
         for api_phone, weni_phone in [
             ("92987654321", "91987654321"),
             ("9198765432", "91998765432"),
         ]:
             with self.subTest(api_phone=api_phone, weni_phone=weni_phone):
-                self.assertEqual(cliente_link_status(
-                    "0", customer_payload(email="", phone=api_phone),
-                    weni_identity=identity(email="", phone=weni_phone),
-                )[0], "CPF_IDENTIDADE_DIVERGENTE")
+                self.assertEqual(
+                    cliente_link_status(
+                        "0",
+                        customer_payload(email="", phone=api_phone),
+                        weni_identity=identity(email="", phone=weni_phone),
+                    )[0],
+                    "CPF_IDENTIDADE_DIVERGENTE",
+                )
 
     def test_partial_name_and_malformed_email_do_not_establish_identity(self):
-        self.assertEqual(cliente_link_status(
-            "0", customer_payload(), weni_identity=identity(name="Cliente"),
-        )[0], "CPF_IDENTIDADE_DIVERGENTE")
+        self.assertEqual(
+            cliente_link_status(
+                "0",
+                customer_payload(),
+                weni_identity=identity(name="Cliente"),
+            )[0],
+            "CPF_IDENTIDADE_DIVERGENTE",
+        )
         result = cliente_link_status(
-            "0", customer_payload(email="same", phone=""),
+            "0",
+            customer_payload(email="same", phone=""),
             weni_identity=identity(email="same", phone=""),
         )
         self.assertNotEqual(result[0], "CPF_INVALIDO_ENCONTRADO")
         self.assertEqual(result[1:], ("", ""))
 
     def test_selects_matching_customer_in_each_supported_candidate_shape(self):
-        wrong = customer_payload(102, name="Cliente Palmeira", email="palmeira@example.test",
-                                 phone="92987654321", order_id=202)
+        wrong = customer_payload(
+            102,
+            name="Cliente Palmeira",
+            email="palmeira@example.test",
+            phone="92987654321",
+            order_id=202,
+        )
         wanted = customer_payload()
         for payload in [
             [wrong, wanted],
@@ -172,7 +248,9 @@ class InvalidCpfIdentityTests(unittest.TestCase):
             {"cliente": [wrong["cliente"], wanted["cliente"]]},
         ]:
             with self.subTest(shape=payload):
-                result, selected = select_cliente_response("0", payload, weni_identity=identity())
+                result, selected = select_cliente_response(
+                    "0", payload, weni_identity=identity()
+                )
                 self.assertEqual(result[0:2], ("CPF_INVALIDO_ENCONTRADO", "101"))
                 self.assertIsInstance(selected, dict)
                 selected_customer = selected.get("cliente", selected)
@@ -180,7 +258,8 @@ class InvalidCpfIdentityTests(unittest.TestCase):
 
     def test_no_matching_candidate_blocks_even_with_other_customers_present(self):
         result, selected = select_cliente_response(
-            "0", [customer_payload(), customer_payload(102, order_id=202)],
+            "0",
+            [customer_payload(), customer_payload(102, order_id=202)],
             weni_identity=identity(name="Cliente ausente"),
         )
         self.assertEqual(result, ("CPF_IDENTIDADE_DIVERGENTE", "", ""))
@@ -188,7 +267,8 @@ class InvalidCpfIdentityTests(unittest.TestCase):
 
     def test_two_distinct_matching_customers_are_ambiguous(self):
         result, selected = select_cliente_response(
-            "0", [customer_payload(), customer_payload(102, order_id=202)],
+            "0",
+            [customer_payload(), customer_payload(102, order_id=202)],
             weni_identity=identity(),
         )
         self.assertEqual(result, ("CPF_IDENTIDADE_AMBIGUA", "", ""))
@@ -196,7 +276,8 @@ class InvalidCpfIdentityTests(unittest.TestCase):
 
     def test_conflicting_snapshots_for_same_customer_fail_closed(self):
         result, selected = select_cliente_response(
-            "0", [customer_payload(), customer_payload(order_id=202)],
+            "0",
+            [customer_payload(), customer_payload(order_id=202)],
             weni_identity=identity(),
         )
         self.assertNotEqual(result[0], "CPF_INVALIDO_ENCONTRADO")
@@ -206,29 +287,45 @@ class InvalidCpfIdentityTests(unittest.TestCase):
     def test_invalid_matching_still_requires_same_cpf_and_positive_customer_id(self):
         for payload in [customer_payload(cpf=1), customer_payload(identifier=0)]:
             with self.subTest(customer=payload["cliente"]):
-                result, selected = select_cliente_response("0", payload, weni_identity=identity())
+                result, selected = select_cliente_response(
+                    "0", payload, weni_identity=identity()
+                )
                 self.assertNotEqual(result[0], "CPF_INVALIDO_ENCONTRADO")
                 self.assertEqual(result[1:], ("", ""))
                 self.assertIsNone(selected)
 
     def test_valid_cpf_keeps_mathematical_cpf_identity_behavior(self):
-        self.assertEqual(cliente_link_status(VALID_CPF, customer_payload(cpf=VALID_CPF),
-                                            weni_identity=identity(name="Outro cliente")),
-                         ("CPF_CONFIRMADO", "101", "Cliente Árvore"))
+        self.assertEqual(
+            cliente_link_status(
+                VALID_CPF,
+                customer_payload(cpf=VALID_CPF),
+                weni_identity=identity(name="Outro cliente"),
+            ),
+            ("CPF_CONFIRMADO", "101", "Cliente Árvore"),
+        )
 
     def test_raw_weni_wrapped_fields_and_whatsapp_urn_are_used(self):
-        contact = {"uuid": "synthetic-wrapped", "name": "Nome do canal",
-                   "fields": {"cpf": {"value": "0"},
-                              "nome": {"value": "Cliente Árvore"},
-                              "email": {"value": ""}},
-                   "urns": ["whatsapp:+5591987654321", "instagram:synthetic-id"]}
+        contact = {
+            "uuid": "synthetic-wrapped",
+            "name": "Nome do canal",
+            "fields": {
+                "cpf": {"value": "0"},
+                "nome": {"value": "Cliente Árvore"},
+                "email": {"value": ""},
+            },
+            "urns": ["whatsapp:+5591987654321", "instagram:synthetic-id"],
+        }
         farm = farm_client(customer_payload(email=""))
-        order, items = resolve_contact_order(contact, farm_client=farm, captured_at=CAPTURED_AT)
+        order, items = resolve_contact_order(
+            contact, farm_client=farm, captured_at=CAPTURED_AT
+        )
         self.assertEqual(order["status_validacao"], "OK")
         self.assertEqual(order["farmalider_cliente_id"], "101")
         self.assertEqual(len(items), 1)
 
-    def test_invalid_identity_guard_detects_native_phone_change_despite_saved_phone(self):
+    def test_invalid_identity_guard_detects_native_phone_change_despite_saved_phone(
+        self,
+    ):
         contact = weni_contact(email="")
         contact["fields"]["telefone"] = "91987654321"
         changed = deepcopy(contact)
@@ -239,89 +336,154 @@ class InvalidCpfIdentityTests(unittest.TestCase):
         contact = weni_contact(email="", phone="")
         contact["urns"] = ["whatsapp:+5591987654321"]
         contact["fields"]["contact_urn_whatsapp"] = "whatsapp:+5592987654321"
-        payload = [customer_payload(102, email="", phone="92987654321", order_id=202),
-                   customer_payload(email="")]
+        payload = [
+            customer_payload(102, email="", phone="92987654321", order_id=202),
+            customer_payload(email=""),
+        ]
         farm = farm_client(payload)
-        order, items = resolve_contact_order(contact, farm_client=farm, captured_at=CAPTURED_AT)
+        order, items = resolve_contact_order(
+            contact, farm_client=farm, captured_at=CAPTURED_AT
+        )
         self.assertIsNotNone(order)
         self.assertEqual(order["status_validacao"], "OK")
         self.assertEqual(order["farmalider_cliente_id"], "101")
         self.assertEqual(items[0]["pedido_id"], "201")
         row = normalize_contact(contact, CAPTURED_AT)
-        validate_contacts([row], farm_client=farm, farm_settings=SETTINGS, sync_time=CAPTURED_AT)
+        validate_contacts(
+            [row], farm_client=farm, farm_settings=SETTINGS, sync_time=CAPTURED_AT
+        )
         self.assertEqual(row["farmalider_cliente_id"], "101")
 
-    def test_shared_cpf_raw_response_is_resolved_per_contact_for_customers_and_orders(self):
-        contacts = [weni_contact(),
-                    weni_contact("synthetic-b", name="Cliente Palmeira", email="palmeira@example.test",
-                                 phone="92987654321"),
-                    weni_contact("synthetic-c", name="Cliente ausente", email="absent@example.test",
-                                 phone="93987654321")]
-        payload = [customer_payload(102, name="Cliente Palmeira", email="palmeira@example.test",
-                                    phone="92987654321", order_id=202), customer_payload()]
+    def test_shared_cpf_raw_response_is_resolved_per_contact_for_customers_and_orders(
+        self,
+    ):
+        contacts = [
+            weni_contact(),
+            weni_contact(
+                "synthetic-b",
+                name="Cliente Palmeira",
+                email="palmeira@example.test",
+                phone="92987654321",
+            ),
+            weni_contact(
+                "synthetic-c",
+                name="Cliente ausente",
+                email="absent@example.test",
+                phone="93987654321",
+            ),
+        ]
+        payload = [
+            customer_payload(
+                102,
+                name="Cliente Palmeira",
+                email="palmeira@example.test",
+                phone="92987654321",
+                order_id=202,
+            ),
+            customer_payload(),
+        ]
         original_payload = deepcopy(payload)
         farm = farm_client(payload)
         rows = [normalize_contact(contact, CAPTURED_AT) for contact in contacts]
         responses, lookup_statuses = {}, {}
-        stats = validate_contacts(rows, farm_client=farm, farm_settings=SETTINGS,
-                                  sync_time=CAPTURED_AT, cliente_responses_by_cpf=responses,
-                                  cliente_lookup_status_by_cpf=lookup_statuses)
-        self.assertEqual([row["farmalider_cliente_id"] for row in rows], ["101", "102", ""])
-        self.assertEqual(rows[2]["farmalider_cliente_status"], "CPF_IDENTIDADE_DIVERGENTE")
+        stats = validate_contacts(
+            rows,
+            farm_client=farm,
+            farm_settings=SETTINGS,
+            sync_time=CAPTURED_AT,
+            cliente_responses_by_cpf=responses,
+            cliente_lookup_status_by_cpf=lookup_statuses,
+        )
+        self.assertEqual(
+            [row["farmalider_cliente_id"] for row in rows], ["101", "102", ""]
+        )
+        self.assertEqual(
+            rows[2]["farmalider_cliente_status"], "CPF_IDENTIDADE_DIVERGENTE"
+        )
         self.assertEqual(stats.unique_queries, 1)
         self.assertEqual(stats.confirmed, 2)
         orders, items, _ = build_orders(
-            contacts, rows_by_uuid={row["contact_uuid"]: row for row in rows},
-            farm_client=farm, sync_time=CAPTURED_AT,
-            cliente_responses_by_cpf=responses, cliente_lookup_status_by_cpf=lookup_statuses,
+            contacts,
+            rows_by_uuid={row["contact_uuid"]: row for row in rows},
+            farm_client=farm,
+            sync_time=CAPTURED_AT,
+            cliente_responses_by_cpf=responses,
+            cliente_lookup_status_by_cpf=lookup_statuses,
         )
-        confirmed = {order["contact_uuid"]: order for order in orders
-                     if order.get("status_validacao") == "OK"}
+        confirmed = {
+            order["contact_uuid"]: order
+            for order in orders
+            if order.get("status_validacao") == "OK"
+        }
         self.assertEqual(set(confirmed), {"synthetic-a", "synthetic-b"})
         self.assertEqual(confirmed["synthetic-a"]["pedido_id"], "201")
         self.assertEqual(confirmed["synthetic-b"]["pedido_id"], "202")
-        self.assertEqual({item["contact_uuid"] for item in items}, {"synthetic-a", "synthetic-b"})
+        self.assertEqual(
+            {item["contact_uuid"] for item in items}, {"synthetic-a", "synthetic-b"}
+        )
         farm.get_cliente_by_cpf.assert_called_once_with("0")
         self.assertEqual(payload, original_payload)
         self.assertTrue(all(contact["fields"]["cpf"] == "0" for contact in contacts))
 
-    def test_raw_contact_identity_map_preserves_ambiguity_hidden_by_normalized_phone(self):
+    def test_raw_contact_identity_map_preserves_ambiguity_hidden_by_normalized_phone(
+        self,
+    ):
         contact = weni_contact(email="", phone="")
         contact["fields"].update(telefone="91987654321", celular="92987654321")
         row = normalize_contact(contact, CAPTURED_AT)
         self.assertNotIn("celular", row)
-        payload = [customer_payload(email=""),
-                   customer_payload(102, email="", phone="92987654321", order_id=202)]
+        payload = [
+            customer_payload(email=""),
+            customer_payload(102, email="", phone="92987654321", order_id=202),
+        ]
         farm = farm_client(payload)
         validate_contacts(
-            [row], farm_client=farm, farm_settings=SETTINGS, sync_time=CAPTURED_AT,
+            [row],
+            farm_client=farm,
+            farm_settings=SETTINGS,
+            sync_time=CAPTURED_AT,
             identity_by_uuid={row["contact_uuid"]: weni_customer_identity(contact)},
         )
         self.assertEqual(row["farmalider_cliente_status"], "CPF_IDENTIDADE_AMBIGUA")
         self.assertEqual(row["farmalider_cliente_id"], "")
-        order, items = resolve_contact_order(contact, farm_client=farm, captured_at=CAPTURED_AT)
+        order, items = resolve_contact_order(
+            contact, farm_client=farm, captured_at=CAPTURED_AT
+        )
         self.assertEqual(order["status_confirmacao"], row["farmalider_cliente_status"])
         self.assertEqual(items, [])
 
     def test_selected_envelope_keeps_its_own_snapshot(self):
-        payload = [customer_payload(102, name="Cliente Palmeira", email="palmeira@example.test",
-                                    phone="92987654321", order_id=202), customer_payload()]
+        payload = [
+            customer_payload(
+                102,
+                name="Cliente Palmeira",
+                email="palmeira@example.test",
+                phone="92987654321",
+                order_id=202,
+            ),
+            customer_payload(),
+        ]
         farm = farm_client(payload)
         farm.get_pedido.return_value = None
         farm.get_pedido.side_effect = None
-        order, items = resolve_contact_order(weni_contact(), farm_client=farm,
-                                             captured_at=CAPTURED_AT)
+        order, items = resolve_contact_order(
+            weni_contact(), farm_client=farm, captured_at=CAPTURED_AT
+        )
         self.assertEqual(order["pedido_id"], "201")
         self.assertEqual(order["farmalider_cliente_id"], "101")
         self.assertEqual(items[0]["pedido_id"], "201")
 
     def test_customer_list_never_borrows_an_outer_order_snapshot(self):
         envelope = customer_payload()
-        payload = {"cliente": [envelope["cliente"]],
-                   "ultimoPedido": envelope["ultimoPedido"], "itens": envelope["itens"]}
+        payload = {
+            "cliente": [envelope["cliente"]],
+            "ultimoPedido": envelope["ultimoPedido"],
+            "itens": envelope["itens"],
+        }
         farm = farm_client(payload)
-        order, items = resolve_contact_order(weni_contact(), farm_client=farm,
-                                             captured_at=CAPTURED_AT)
+        order, items = resolve_contact_order(
+            weni_contact(), farm_client=farm, captured_at=CAPTURED_AT
+        )
         self.assertEqual(items, [])
         self.assertTrue(order is None or order.get("status_validacao") != "OK")
         farm.get_pedido.assert_not_called()
@@ -329,18 +491,26 @@ class InvalidCpfIdentityTests(unittest.TestCase):
     def test_invalid_identity_failure_does_not_use_weni_order_locators(self):
         for payload, status in [
             (customer_payload(name="Outro cliente"), "CPF_IDENTIDADE_DIVERGENTE"),
-            ([customer_payload(), customer_payload(102, order_id=202)], "CPF_IDENTIDADE_AMBIGUA"),
+            (
+                [customer_payload(), customer_payload(102, order_id=202)],
+                "CPF_IDENTIDADE_AMBIGUA",
+            ),
         ]:
             with self.subTest(status=status):
                 farm = farm_client(payload)
-                order, items = resolve_contact_order(weni_contact(pedido_id="201"),
-                                                     farm_client=farm, captured_at=CAPTURED_AT,
-                                                     linked_cliente_id="101")
+                order, items = resolve_contact_order(
+                    weni_contact(pedido_id="201"),
+                    farm_client=farm,
+                    captured_at=CAPTURED_AT,
+                    linked_cliente_id="101",
+                )
                 self.assertEqual(order["status_confirmacao"], status)
                 self.assertEqual(items, [])
                 farm.get_pedido.assert_not_called()
 
-    def test_404_and_500_do_not_recover_invalid_cpf_using_stale_customer_or_locator(self):
+    def test_404_and_500_do_not_recover_invalid_cpf_using_stale_customer_or_locator(
+        self,
+    ):
         for failure in [None, FarmaliderError("synthetic HTTP 500")]:
             with self.subTest(failure=type(failure).__name__):
                 farm = farm_client(customer_payload())
@@ -348,21 +518,29 @@ class InvalidCpfIdentityTests(unittest.TestCase):
                     farm.get_cliente_by_cpf.side_effect = failure
                 else:
                     farm.get_cliente_by_cpf.return_value = None
-                order, items = resolve_contact_order(weni_contact(pedido_id="201"),
-                                                     farm_client=farm, captured_at=CAPTURED_AT,
-                                                     linked_cliente_id="101")
+                order, items = resolve_contact_order(
+                    weni_contact(pedido_id="201"),
+                    farm_client=farm,
+                    captured_at=CAPTURED_AT,
+                    linked_cliente_id="101",
+                )
                 self.assertNotEqual(order["status_validacao"], "OK")
                 self.assertEqual(items, [])
                 farm.get_pedido.assert_not_called()
 
-    def test_known_invalid_cpf_lookup_failure_never_repeats_lookup_or_uses_locator(self):
+    def test_known_invalid_cpf_lookup_failure_never_repeats_lookup_or_uses_locator(
+        self,
+    ):
         for status in ["CPF_NAO_ENCONTRADO", "ERRO_API", "CPF_REJEITADO_API"]:
             with self.subTest(status=status):
                 farm = farm_client(customer_payload())
-                order, items = resolve_contact_order(weni_contact(pedido_id="201"),
-                                                     farm_client=farm, captured_at=CAPTURED_AT,
-                                                     linked_cliente_id="101",
-                                                     cliente_lookup_status=status)
+                order, items = resolve_contact_order(
+                    weni_contact(pedido_id="201"),
+                    farm_client=farm,
+                    captured_at=CAPTURED_AT,
+                    linked_cliente_id="101",
+                    cliente_lookup_status=status,
+                )
                 self.assertNotEqual(order["status_validacao"], "OK")
                 self.assertEqual(items, [])
                 farm.get_cliente_by_cpf.assert_not_called()
@@ -370,13 +548,22 @@ class InvalidCpfIdentityTests(unittest.TestCase):
 
     def test_recent_invalid_persistent_result_is_revalidated(self):
         row = normalize_contact(weni_contact(), CAPTURED_AT)
-        existing = dict(row, farmalider_cliente_status="CPF_INVALIDO_ENCONTRADO",
-                        farmalider_cliente_id="999", farmalider_cliente_nome="Cliente anterior",
-                        farmalider_cliente_consultado_em=datetime.now(UTC).isoformat())
+        existing = dict(
+            row,
+            farmalider_cliente_status="CPF_INVALIDO_ENCONTRADO",
+            farmalider_cliente_id="999",
+            farmalider_cliente_nome="Cliente anterior",
+            farmalider_cliente_consultado_em=datetime.now(UTC).isoformat(),
+        )
         farm = farm_client(customer_payload())
-        stats = validate_contacts([row], farm_client=farm, farm_settings=SETTINGS,
-                                  sync_time=CAPTURED_AT, existing_by_uuid={row["contact_uuid"]: existing},
-                                  reuse_existing=True)
+        stats = validate_contacts(
+            [row],
+            farm_client=farm,
+            farm_settings=SETTINGS,
+            sync_time=CAPTURED_AT,
+            existing_by_uuid={row["contact_uuid"]: existing},
+            reuse_existing=True,
+        )
         farm.get_cliente_by_cpf.assert_called_once_with("0")
         self.assertEqual(stats.cache_reused, 0)
         self.assertEqual(row["farmalider_cliente_id"], "101")
@@ -385,36 +572,60 @@ class InvalidCpfIdentityTests(unittest.TestCase):
         for old_status in ["CPF_INVALIDO_ENCONTRADO", "ERRO_API"]:
             with self.subTest(old_status=old_status):
                 row = normalize_contact(weni_contact(), CAPTURED_AT)
-                existing = dict(row, farmalider_cliente_status=old_status,
-                                farmalider_cliente_id="999", farmalider_cliente_nome="Cliente anterior",
-                                farmalider_cliente_consultado_em=CAPTURED_AT)
+                existing = dict(
+                    row,
+                    farmalider_cliente_status=old_status,
+                    farmalider_cliente_id="999",
+                    farmalider_cliente_nome="Cliente anterior",
+                    farmalider_cliente_consultado_em=CAPTURED_AT,
+                )
                 farm = farm_client(customer_payload())
-                farm.get_cliente_by_cpf.side_effect = FarmaliderError("synthetic HTTP 500")
-                stats = validate_contacts([row], farm_client=farm, farm_settings=SETTINGS,
-                                          sync_time=CAPTURED_AT,
-                                          existing_by_uuid={row["contact_uuid"]: existing})
+                farm.get_cliente_by_cpf.side_effect = FarmaliderError(
+                    "synthetic HTTP 500"
+                )
+                stats = validate_contacts(
+                    [row],
+                    farm_client=farm,
+                    farm_settings=SETTINGS,
+                    sync_time=CAPTURED_AT,
+                    existing_by_uuid={row["contact_uuid"]: existing},
+                )
                 self.assertEqual(row["farmalider_cliente_status"], "ERRO_API")
                 self.assertEqual(row["farmalider_cliente_id"], "")
                 self.assertEqual(stats.prior_details_retained, 0)
 
     def test_legacy_invalid_cpf_confirmation_is_excluded_from_sales_and_bi(self):
         contact = weni_contact()
-        order, items = resolve_contact_order(contact, farm_client=farm_client(customer_payload()),
-                                             captured_at=CAPTURED_AT)
+        order, items = resolve_contact_order(
+            contact,
+            farm_client=farm_client(customer_payload()),
+            captured_at=CAPTURED_AT,
+        )
         legacy_order = dict(order, origem_pedido="FARMALIDER_PEDIDO_API")
         self.assertEqual(legacy_order["status_confirmacao"], "CONFIRMADO_API")
         self.assertEqual(legacy_order["status_validacao"], "OK")
         self.assertEqual(build_sales_metrics([legacy_order], items), [])
-        self.assertEqual(build_bi_order_rows([normalize_contact(contact, CAPTURED_AT)],
-                                             [legacy_order], items, updated_at=CAPTURED_AT), [])
+        self.assertEqual(
+            build_bi_order_rows(
+                [normalize_contact(contact, CAPTURED_AT)],
+                [legacy_order],
+                items,
+                updated_at=CAPTURED_AT,
+            ),
+            [],
+        )
 
-    def test_identity_verified_invalid_orders_count_for_all_official_discovery_paths(self):
+    def test_identity_verified_invalid_orders_count_for_all_official_discovery_paths(
+        self,
+    ):
         for source in ["pedido", "cpf-fallback", "weni-locator"]:
             with self.subTest(source=source):
                 contact = weni_contact(pedido_id="201")
                 payload = customer_payload()
-                official_order = {"capa": deepcopy(payload["ultimoPedido"]),
-                                  "itens": deepcopy(payload["itens"])}
+                official_order = {
+                    "capa": deepcopy(payload["ultimoPedido"]),
+                    "itens": deepcopy(payload["itens"]),
+                }
                 if source == "weni-locator":
                     del payload["ultimoPedido"]
                     del payload["itens"]
@@ -425,24 +636,35 @@ class InvalidCpfIdentityTests(unittest.TestCase):
                 elif source == "weni-locator":
                     farm.get_pedido.side_effect = None
                     farm.get_pedido.return_value = official_order
-                order, items = resolve_contact_order(contact, farm_client=farm,
-                                                     captured_at=CAPTURED_AT)
+                order, items = resolve_contact_order(
+                    contact, farm_client=farm, captured_at=CAPTURED_AT
+                )
                 self.assertEqual(order["status_validacao"], "OK")
                 self.assertTrue(order["origem_pedido"].endswith("_IDENTIDADE_VALIDADA"))
                 metrics = build_sales_metrics([order], items)
                 self.assertEqual(len(metrics), 1)
                 self.assertEqual(metrics[0][1:4], [1, 1, 1])
                 self.assertEqual(metrics[0][5], "10.00")
-                self.assertEqual(len(build_bi_order_rows(
-                    [normalize_contact(contact, CAPTURED_AT)], [order], items,
-                    updated_at=CAPTURED_AT,
-                )), 1)
+                self.assertEqual(
+                    len(
+                        build_bi_order_rows(
+                            [normalize_contact(contact, CAPTURED_AT)],
+                            [order],
+                            items,
+                            updated_at=CAPTURED_AT,
+                        )
+                    ),
+                    1,
+                )
 
-    def test_persisted_legacy_order_and_new_identity_failure_stay_excluded_from_bi(self):
+    def test_persisted_legacy_order_and_new_identity_failure_stay_excluded_from_bi(
+        self,
+    ):
         contact = weni_contact()
         farm = farm_client(customer_payload())
-        old_order, old_items = resolve_contact_order(contact, farm_client=farm,
-                                                     captured_at=CAPTURED_AT)
+        old_order, old_items = resolve_contact_order(
+            contact, farm_client=farm, captured_at=CAPTURED_AT
+        )
         old_order["origem_pedido"] = "FARMALIDER_PEDIDO_API"
         store = GoogleSheetsStore.__new__(GoogleSheetsStore)
         store.orders = MemoryWorksheet("Pedidos", ORDER_COLUMNS)
@@ -452,27 +674,43 @@ class InvalidCpfIdentityTests(unittest.TestCase):
         first = store.upsert_orders_detailed([old_order])
         first_items = store.upsert_order_items_detailed(old_items)
         contact["fields"]["nome"] = "Cliente ausente"
-        failure, failure_items = resolve_contact_order(contact, farm_client=farm,
-                                                        captured_at=CAPTURED_AT)
+        failure, failure_items = resolve_contact_order(
+            contact, farm_client=farm, captured_at=CAPTURED_AT
+        )
         self.assertEqual(failure["status_confirmacao"], "CPF_IDENTIDADE_DIVERGENTE")
         self.assertEqual(failure_items, [])
         final = store.upsert_orders_detailed([failure])
         self.assertEqual(len(final.final_records), 2)
-        historical = next(row for row in final.final_records
-                          if row["pedido_chave"] == old_order["pedido_chave"])
+        historical = next(
+            row
+            for row in final.final_records
+            if row["pedido_chave"] == old_order["pedido_chave"]
+        )
         self.assertEqual(historical, first.final_records[0])
-        self.assertEqual(build_sales_metrics(final.final_records, first_items.final_records), [])
-        self.assertEqual(build_bi_order_rows(
-            [normalize_contact(contact, CAPTURED_AT)], final.final_records,
-            first_items.final_records, updated_at=CAPTURED_AT,
-        ), [])
+        self.assertEqual(
+            build_sales_metrics(final.final_records, first_items.final_records), []
+        )
+        self.assertEqual(
+            build_bi_order_rows(
+                [normalize_contact(contact, CAPTURED_AT)],
+                final.final_records,
+                first_items.final_records,
+                updated_at=CAPTURED_AT,
+            ),
+            [],
+        )
 
     def test_invalid_frozen_plan_rejects_name_email_and_native_phone_drift(self):
         contact = weni_contact()
-        plan = _build_contact_plan(contact, context_messages=[], candidate_message_ids=set(),
-                                   farm_client=farm_client(customer_payload()),
-                                   captured_at=CAPTURED_AT,
-                                   opt_out_group_name="Opt-Out LGPD", opt_out_group_uuid="synthetic-group")
+        plan = _build_contact_plan(
+            contact,
+            context_messages=[],
+            candidate_message_ids=set(),
+            farm_client=farm_client(customer_payload()),
+            captured_at=CAPTURED_AT,
+            opt_out_group_name="Opt-Out LGPD",
+            opt_out_group_uuid="synthetic-group",
+        )
         self.assertTrue(plan.order_validated)
         self.assertIn("__invalid_cpf_identity", plan.guards)
         self.assertIn("__native_urns", plan.guards)
@@ -487,36 +725,57 @@ class InvalidCpfIdentityTests(unittest.TestCase):
                 else:
                     changed["urns"] = ["tel:+5592987654321"]
                 prepared, conflict = _prepare_frozen_plan_for_apply(
-                    plan, changed, opt_in_group_name="Opt-In LGPD", opt_in_group_uuid="",
-                    opt_out_group_name="Opt-Out LGPD", opt_out_group_uuid="synthetic-group",
+                    plan,
+                    changed,
+                    opt_in_group_name="Opt-In LGPD",
+                    opt_in_group_uuid="",
+                    opt_out_group_name="Opt-Out LGPD",
+                    opt_out_group_uuid="synthetic-group",
                 )
                 self.assertIsNone(prepared)
                 self.assertTrue(conflict)
         prepared, conflict = _prepare_frozen_plan_for_apply(
-            plan, contact, opt_in_group_name="Opt-In LGPD", opt_in_group_uuid="",
-            opt_out_group_name="Opt-Out LGPD", opt_out_group_uuid="synthetic-group",
+            plan,
+            contact,
+            opt_in_group_name="Opt-In LGPD",
+            opt_in_group_uuid="",
+            opt_out_group_name="Opt-Out LGPD",
+            opt_out_group_uuid="synthetic-group",
         )
         self.assertIsNotNone(prepared)
         self.assertEqual(conflict, "")
 
     def test_old_invalid_frozen_plan_without_identity_guard_is_not_auditable(self):
         contact = weni_contact()
-        plan = _build_contact_plan(contact, context_messages=[], candidate_message_ids=set(),
-                                   farm_client=farm_client(customer_payload()),
-                                   captured_at=CAPTURED_AT,
-                                   opt_out_group_name="Opt-Out LGPD", opt_out_group_uuid="synthetic-group")
+        plan = _build_contact_plan(
+            contact,
+            context_messages=[],
+            candidate_message_ids=set(),
+            farm_client=farm_client(customer_payload()),
+            captured_at=CAPTURED_AT,
+            opt_out_group_name="Opt-Out LGPD",
+            opt_out_group_uuid="synthetic-group",
+        )
         legacy_plan = deepcopy(plan)
         del legacy_plan.guards["__invalid_cpf_identity"]
         with self.assertRaises(PlanAuditError):
             audit_plans([legacy_plan], opt_out_group_available=True)
 
-    def test_customer_transport_accepts_candidate_lists_but_order_transport_rejects_them(self):
+    def test_customer_transport_accepts_candidate_lists_but_order_transport_rejects_them(
+        self,
+    ):
         client = FarmaliderClient("synthetic-token")
         response = Mock(status_code=200, headers={})
         response.json.return_value = [customer_payload()]
         try:
-            with patch.object(client.session, "get", return_value=response), \
-                 patch.object(client, "_request_slot", side_effect=lambda _: nullcontext(RequestPermit(0, 4))):
+            with (
+                patch.object(client.session, "get", return_value=response),
+                patch.object(
+                    client,
+                    "_request_slot",
+                    side_effect=lambda _: nullcontext(RequestPermit(0, 4)),
+                ),
+            ):
                 self.assertEqual(client.get_cliente_by_cpf("0"), [customer_payload()])
                 with self.assertRaises(FarmaliderError):
                     client.get_pedido("201")

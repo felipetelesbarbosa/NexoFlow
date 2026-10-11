@@ -6,11 +6,24 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 
 TEXT_EXTENSIONS = {
-    ".py", ".pyi", ".md", ".txt", ".bat", ".toml",
-    ".json", ".yml", ".yaml", ".ini", ".cfg",
+    ".py",
+    ".pyi",
+    ".md",
+    ".txt",
+    ".bat",
+    ".toml",
+    ".json",
+    ".yml",
+    ".yaml",
+    ".ini",
+    ".cfg",
 }
 EXCLUDED_DIRS = {
-    ".venv", ".git", "__pycache__", "logs", "credentials",
+    ".venv",
+    ".git",
+    "__pycache__",
+    "logs",
+    "credentials",
 }
 EXCLUDED_FILES = {
     "secrets_config.py",

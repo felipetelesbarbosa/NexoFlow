@@ -83,7 +83,9 @@ def _make_farmalider_client() -> FarmaliderClient:
         raise RuntimeError("FarmaLíder API está desativada em secrets_config.py.")
     token = str(getattr(secrets, "FARMALIDER_API_TOKEN", "") or "").strip()
     if not token or "COLE_SEU_TOKEN" in token:
-        raise RuntimeError("Token FarmaLíder não está configurado em secrets_config.py.")
+        raise RuntimeError(
+            "Token FarmaLíder não está configurado em secrets_config.py."
+        )
     use_hml = bool(getattr(secrets, "FARMALIDER_USE_HML", False))
     _prepare_network()
     return FarmaliderClient(token, use_hml=use_hml)
@@ -157,11 +159,15 @@ def _show_messages(messages: list[dict[str, Any]]) -> None:
         direction = str(item.get("direction") or "").lower()
         side = "CLIENTE" if direction in {"in", "incoming", "inbound"} else "SAÍDA"
         created = _safe_text(item.get("created_on"), max_len=30)
-        text = _safe_text(item.get("text") or item.get("msg") or item.get("type"), max_len=140)
+        text = _safe_text(
+            item.get("text") or item.get("msg") or item.get("type"), max_len=140
+        )
         print(f"{created} | {side:<7} | {text}")
 
 
-def _show_simple_records(title: str, records: Iterable[dict[str, Any]], keys: list[str]) -> None:
+def _show_simple_records(
+    title: str, records: Iterable[dict[str, Any]], keys: list[str]
+) -> None:
     records = list(records)
     _title(f"{title} ({len(records)})")
     if not records:
@@ -176,13 +182,17 @@ def _show_simple_records(title: str, records: Iterable[dict[str, Any]], keys: li
         print(f"{index:>3}. " + " | ".join(values))
 
 
-def _show_farmalider_payload(title: str, payload: dict[str, Any] | list[dict[str, Any]] | None) -> None:
+def _show_farmalider_payload(
+    title: str, payload: dict[str, Any] | list[dict[str, Any]] | None
+) -> None:
     _title(title)
     if payload is None:
         print("Nenhum registro encontrado.")
         return
     if isinstance(payload, list):
-        print(f"Clientes retornados: {len(payload)}. Nenhum cliente selecionado automaticamente.")
+        print(
+            f"Clientes retornados: {len(payload)}. Nenhum cliente selecionado automaticamente."
+        )
         print("Use --json para comparar os dados com o contato da Weni.")
         return
     scalar_items: list[tuple[str, Any]] = []
@@ -214,8 +224,12 @@ def _run_windows_target(filename: str) -> int:
         raise RuntimeError(f"Arquivo não encontrado: {path}")
     if os.name == "nt":
         if path.suffix.lower() in {".bat", ".cmd"}:
-            completed = subprocess.run(["cmd.exe", "/d", "/c", str(path)], cwd=BASE_DIR, check=False,
-                                       env={**os.environ, "NEXOFLOW_LAUNCHER": "1"})
+            completed = subprocess.run(
+                ["cmd.exe", "/d", "/c", str(path)],
+                cwd=BASE_DIR,
+                check=False,
+                env={**os.environ, "NEXOFLOW_LAUNCHER": "1"},
+            )
         else:
             completed = subprocess.run([str(path)], cwd=BASE_DIR, check=False)
         return int(completed.returncode)
@@ -227,7 +241,7 @@ def _tail_lines(path: Path, lines: int) -> list[str]:
         return []
     with path.open("r", encoding="utf-8", errors="replace") as handle:
         data = handle.readlines()
-    return [line.rstrip("\r\n") for line in data[-max(1, lines):]]
+    return [line.rstrip("\r\n") for line in data[-max(1, lines) :]]
 
 
 def _follow_file(path: Path, lines: int) -> int:
@@ -280,7 +294,9 @@ def _print_commands() -> None:
     print()
     print("ANALYTICS")
     print("  nexo analytics               Executa o NexoFlow Analytics")
-    print("  nexo analytics planilhas     Consulta os exports e atualiza o Google Sheets")
+    print(
+        "  nexo analytics planilhas     Consulta os exports e atualiza o Google Sheets"
+    )
     print()
     print("CONSULTAS WENI - SOMENTE LEITURA")
     print("  nexo api weni status")
@@ -313,7 +329,9 @@ def _status(local_only: bool) -> int:
     _title(f"NexoFlow {VERSION} - Status")
     print(f"Pasta.................... {BASE_DIR}")
     print(f"Python................... {sys.version.split()[0]}")
-    print(f"Ambiente virtual......... {'OK' if (BASE_DIR / '.venv').exists() else 'não encontrado'}")
+    print(
+        f"Ambiente virtual......... {'OK' if (BASE_DIR / '.venv').exists() else 'não encontrado'}"
+    )
     try:
         proxy = _prepare_network()
     except Exception as exc:
@@ -324,10 +342,16 @@ def _status(local_only: bool) -> int:
     if state_path.exists():
         try:
             state = json.loads(state_path.read_text(encoding="utf-8"))
-            last = state.get("last_success_utc") or state.get("last_successful_sync_started_at") or "não informado"
+            last = (
+                state.get("last_success_utc")
+                or state.get("last_successful_sync_started_at")
+                or "não informado"
+            )
             pending = state.get("pending_conflict_uuids") or []
             print(f"Último checkpoint Weni... {_safe_text(last)}")
-            print(f"Conflitos pendentes...... {len(pending) if isinstance(pending, list) else 0}")
+            print(
+                f"Conflitos pendentes...... {len(pending) if isinstance(pending, list) else 0}"
+            )
         except Exception:
             print("Checkpoint Weni........... arquivo presente, mas não pôde ser lido")
     else:
@@ -532,6 +556,7 @@ def _add_output_flags(parser: argparse.ArgumentParser) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     from config import FARMALIDER_MAX_WORKERS
+
     parser = argparse.ArgumentParser(
         prog="nexo",
         add_help=True,
@@ -540,35 +565,67 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command")
 
-    sub.add_parser("ajuda", aliases=["help", "comandos"], help="lista todos os comandos")
+    sub.add_parser(
+        "ajuda", aliases=["help", "comandos"], help="lista todos os comandos"
+    )
     sub.add_parser("versao", aliases=["version"], help="mostra a versão do NexoFlow")
 
     status = sub.add_parser("status", help="mostra status local e conexões")
     status.add_argument("--local", action="store_true", help="não consulta APIs")
 
-    sub.add_parser("diagnostico", aliases=["doctor", "check"], help="check-up e conexões")
+    sub.add_parser(
+        "diagnostico", aliases=["doctor", "check"], help="check-up e conexões"
+    )
     analytics = sub.add_parser("analytics", help="executa o NexoFlow Analytics")
-    analytics.add_argument("analytics_op", nargs="?", choices=["planilhas"], help="carga pelos exports de conversas e contatos")
+    analytics.add_argument(
+        "analytics_op",
+        nargs="?",
+        choices=["planilhas"],
+        help="carga pelos exports de conversas e contatos",
+    )
 
     weni = sub.add_parser("weni", help="rotinas seguras de atualização da Weni")
     weni_sub = weni.add_subparsers(dest="weni_op")
-    weni_sub.add_parser("testar", aliases=["teste", "test"], help="testa acessos sem gravar")
-    weni_sub.add_parser("dry-run", aliases=["simular"], help="simula alterações sem gravar")
-    weni_sub.add_parser("atualizar", aliases=["update"], help="atualização incremental segura")
-    weni_sub.add_parser("carga-completa", aliases=["full"], help="carga completa com revisão humana")
-    recompra = weni_sub.add_parser("recompra", help="auditoria, simulação e aplicação revisada da recompra D+25")
-    recompra.add_argument("recompra_op", choices=["auditoria", "dry-run", "aplicar", "atualizar"])
+    weni_sub.add_parser(
+        "testar", aliases=["teste", "test"], help="testa acessos sem gravar"
+    )
+    weni_sub.add_parser(
+        "dry-run", aliases=["simular"], help="simula alterações sem gravar"
+    )
+    weni_sub.add_parser(
+        "atualizar", aliases=["update"], help="atualização incremental segura"
+    )
+    weni_sub.add_parser(
+        "carga-completa", aliases=["full"], help="carga completa com revisão humana"
+    )
+    recompra = weni_sub.add_parser(
+        "recompra", help="auditoria, simulação e aplicação revisada da recompra D+25"
+    )
+    recompra.add_argument(
+        "recompra_op", choices=["auditoria", "dry-run", "aplicar", "atualizar"]
+    )
     recompra.add_argument("--revisao", default="logs/recompra_review.json")
     recompra.add_argument("--contato", help="UUID de um contato para a simulação")
     recompra.add_argument("--full", action="store_true")
-    recompra.add_argument("--workers", type=int, choices=range(1, FARMALIDER_MAX_WORKERS + 1),
-                          help=f"consultas FarmaLíder simultâneas no dry-run (padrão: {FARMALIDER_MAX_WORKERS})")
-    weni_sub.add_parser("planilhas", help="carga de pedidos a partir dos exports XLSX, com revisão humana")
+    recompra.add_argument(
+        "--workers",
+        type=int,
+        choices=range(1, FARMALIDER_MAX_WORKERS + 1),
+        help=f"consultas FarmaLíder simultâneas no dry-run (padrão: {FARMALIDER_MAX_WORKERS})",
+    )
+    weni_sub.add_parser(
+        "planilhas",
+        help="carga de pedidos a partir dos exports XLSX, com revisão humana",
+    )
 
     logs = sub.add_parser("logs", help="consulta logs do NexoFlow")
     logs.add_argument("tipo", nargs="?", default="weni", choices=["weni", "analytics"])
-    logs.add_argument("--linhas", type=int, default=50, help="quantidade de linhas (padrão: 50)")
-    logs.add_argument("--seguir", "--follow", action="store_true", help="acompanha o log ao vivo")
+    logs.add_argument(
+        "--linhas", type=int, default=50, help="quantidade de linhas (padrão: 50)"
+    )
+    logs.add_argument(
+        "--seguir", "--follow", action="store_true", help="acompanha o log ao vivo"
+    )
 
     api = sub.add_parser("api", help="consultas GET amigáveis e somente leitura")
     api_sub = api.add_subparsers(dest="api_target")
@@ -586,7 +643,9 @@ def build_parser() -> argparse.ArgumentParser:
     ident = p.add_mutually_exclusive_group(required=True)
     ident.add_argument("--uuid")
     ident.add_argument("--urn")
-    p.add_argument("--limite", type=int, default=10, choices=range(1, 101), metavar="1-100")
+    p.add_argument(
+        "--limite", type=int, default=10, choices=range(1, 101), metavar="1-100"
+    )
     _add_output_flags(p)
     p = api_weni_sub.add_parser("grupos", help="lista grupos da Weni")
     p.add_argument("--nome")
@@ -595,7 +654,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--chave", help="ex.: cpf, contact_urn")
     _add_output_flags(p)
 
-    api_farma = api_sub.add_parser("farmalider", aliases=["farma"], help="consultas GET na FarmaLíder")
+    api_farma = api_sub.add_parser(
+        "farmalider", aliases=["farma"], help="consultas GET na FarmaLíder"
+    )
     api_farma_sub = api_farma.add_subparsers(dest="farma_action")
     p = api_farma_sub.add_parser("status", help="testa a API FarmaLíder")
     _add_output_flags(p)
@@ -629,17 +690,36 @@ def run(argv: list[str] | None = None) -> int:
         if args.command in {"diagnostico", "doctor", "check"}:
             return _doctor()
         if args.command == "analytics":
-            return _run_windows_target("executar_analytics_planilhas.bat" if args.analytics_op == "planilhas" else "NexoFlow Analytics.exe")
+            return _run_windows_target(
+                "executar_analytics_planilhas.bat"
+                if args.analytics_op == "planilhas"
+                else "NexoFlow Analytics.exe"
+            )
         if args.command == "weni":
             if args.weni_op == "recompra":
                 if args.recompra_op == "atualizar":
                     return _run_windows_target("atualizar_recompra.bat")
                 from run_recompra import main as recompra_main
-                arguments = [{"auditoria": "--check-only", "dry-run": "--dry-run", "aplicar": "--apply"}[args.recompra_op]]
-                arguments += ["--require-review" if args.recompra_op == "aplicar" else "--review-out", args.revisao]
-                if args.contato: arguments += ["--contact", args.contato]
-                if args.full: arguments.append("--full")
-                if args.workers is not None: arguments += ["--workers", str(args.workers)]
+
+                arguments = [
+                    {
+                        "auditoria": "--check-only",
+                        "dry-run": "--dry-run",
+                        "aplicar": "--apply",
+                    }[args.recompra_op]
+                ]
+                arguments += [
+                    "--require-review"
+                    if args.recompra_op == "aplicar"
+                    else "--review-out",
+                    args.revisao,
+                ]
+                if args.contato:
+                    arguments += ["--contact", args.contato]
+                if args.full:
+                    arguments.append("--full")
+                if args.workers is not None:
+                    arguments += ["--workers", str(args.workers)]
                 return recompra_main(arguments)
             mapping = {
                 "testar": "testar_update_weni.bat",

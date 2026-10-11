@@ -1,4 +1,5 @@
 """Preservação real de arquivos sintéticos em diretórios temporários do Windows."""
+
 import os
 import subprocess
 import tempfile
@@ -8,16 +9,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-@unittest.skipUnless(os.name == 'nt', 'Requer Windows PowerShell')
+@unittest.skipUnless(os.name == "nt", "Requer Windows PowerShell")
 class ImportsLifecycleWindowsTests(unittest.TestCase):
     def run_harness(self, installer, body):
-        source = ROOT / 'installer' / installer
+        source = ROOT / "installer" / installer
         literal = str(source).replace("'", "''")
-        with tempfile.TemporaryDirectory(prefix='nexo importacoes ') as temp:
+        with tempfile.TemporaryDirectory(prefix="nexo importacoes ") as temp:
             root = Path(temp)
             root_literal = str(root).replace("'", "''")
-            harness = root / 'harness.ps1'
-            harness.write_text(f"""$ErrorActionPreference = 'Stop'
+            harness = root / "harness.ps1"
+            harness.write_text(
+                f"""$ErrorActionPreference = 'Stop'
 $root = '{root_literal}'
 $InstallDir = Join-Path $root 'instalado'
 $DataDir = Join-Path $root 'preservado'
@@ -33,14 +35,33 @@ function Write-Fixture([string]$path, [string]$text) {{
     [IO.File]::WriteAllText($path, $text)
 }}
 {body}
-""", encoding='utf-8-sig')
-            result = subprocess.run([str(Path(os.environ['SystemRoot']) / 'System32/WindowsPowerShell/v1.0/powershell.exe'),
-                                     '-NoLogo','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',str(harness)],
-                                    capture_output=True,timeout=45,check=False)
-            self.assertEqual(result.returncode,0,result.stdout + result.stderr)
+""",
+                encoding="utf-8-sig",
+            )
+            result = subprocess.run(
+                [
+                    str(
+                        Path(os.environ["SystemRoot"])
+                        / "System32/WindowsPowerShell/v1.0/powershell.exe"
+                    ),
+                    "-NoLogo",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(harness),
+                ],
+                capture_output=True,
+                timeout=45,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_uninstall_preserves_all_imports_and_conflicting_previous_backups(self):
-        self.run_harness('uninstall.ps1', r"""
+        self.run_harness(
+            "uninstall.ps1",
+            r"""
 $source = Join-Path $InstallDir 'importacoes'
 $target = Join-Path $DataDir 'importacoes'
 Write-Fixture (Join-Path $source 'Conversas_Delivery.xlsx') 'nova versao sintetica'
@@ -64,10 +85,15 @@ Assert-True (-not (Test-Path -LiteralPath (Join-Path $DataDir 'secrets_config.py
 $before = @(Get-ChildItem -LiteralPath $target -File -Recurse).Count
 Preserve-Imports
 Assert-True (@(Get-ChildItem -LiteralPath $target -File -Recurse).Count -eq $before) 'A preservacao repetida duplicou arquivos.'
-""")
+""",
+        )
 
-    def test_reinstall_empty_backup_never_erases_preserved_imports_and_conflicts_keep_both(self):
-        self.run_harness('install.ps1', r"""
+    def test_reinstall_empty_backup_never_erases_preserved_imports_and_conflicts_keep_both(
+        self,
+    ):
+        self.run_harness(
+            "install.ps1",
+            r"""
 $saved = Join-Path $root 'backup salvo'
 $current = Join-Path $root 'backup instalado'
 Write-Fixture (Join-Path $saved 'importacoes\Contatos_Delivery.xlsx') 'contatos preservados'
@@ -82,20 +108,26 @@ Restore-PrivateData -Backup $current -Target $InstallDir
 Assert-True ((Get-Content -LiteralPath (Join-Path $target 'Contatos_Delivery.xlsx') -Raw) -eq 'contatos mais recentes') 'A restauracao atual falhou.'
 $history = @(Get-ChildItem -LiteralPath (Join-Path $target 'historico_preservado') -Recurse -File)
 Assert-True ($history.Count -eq 1) 'A restauracao perdeu a versao anterior.'
-""")
+""",
+        )
 
     def test_unsafe_preservation_destination_blocks_deletion(self):
-        self.run_harness('uninstall.ps1', r"""
+        self.run_harness(
+            "uninstall.ps1",
+            r"""
 Write-Fixture (Join-Path $InstallDir 'importacoes\arquivo.txt') 'preservar'
 $DataDir = Join-Path $InstallDir 'backup interno'
 $blocked = $false
 try { Preserve-Imports } catch { $blocked = $true }
 Assert-True $blocked 'Destino dentro da instalacao nao foi bloqueado.'
 Assert-True (Test-Path -LiteralPath (Join-Path $InstallDir 'importacoes\arquivo.txt')) 'Arquivo foi removido apos erro de preservacao.'
-""")
+""",
+        )
 
     def test_actual_stage2_preserves_imports_when_optional_data_is_removed(self):
-        self.run_harness('uninstall.ps1', r"""
+        self.run_harness(
+            "uninstall.ps1",
+            r"""
 Write-Fixture (Join-Path $InstallDir 'importacoes\Conversas_Delivery.xlsx') 'export sintetico'
 Write-Fixture (Join-Path $DataDir 'secrets_config.py') 'configuracao sintetica'
 Write-Fixture (Join-Path $DataDir 'logs\arquivo.txt') 'log sintetico'
@@ -115,4 +147,5 @@ Assert-True (-not (Test-Path -LiteralPath $InstallDir)) 'A instalacao nao foi re
 Assert-True ((Get-Content -LiteralPath (Join-Path $DataDir 'importacoes\Conversas_Delivery.xlsx') -Raw) -eq 'export sintetico') 'Stage2 apagou o export.'
 Assert-True (-not (Test-Path -LiteralPath (Join-Path $DataDir 'secrets_config.py'))) 'Stage2 nao removeu configuracao opcional.'
 Assert-True (-not (Test-Path -LiteralPath (Join-Path $DataDir 'logs'))) 'Stage2 nao removeu logs opcionais.'
-""")
+""",
+        )

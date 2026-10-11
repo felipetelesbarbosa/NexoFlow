@@ -13,17 +13,21 @@ from config import TIPO_PRIMEIRO_ANUNCIO, TIPO_ULTIMO_ANUNCIO
 
 class AnalyticsTests(unittest.TestCase):
     def sample_contact(self):
-        ultimo_pedido = json.dumps({
-            "pedido_id": 123456,
-            "data_hora": "2026-09-30T16:07:00Z",
-            "valor_total_compra": 25.00,
-            "produtos": [{
-                "nome": "Produto Teste",
-                "quantidade": 1,
-                "valor_unitario": 25.00,
-                "valor_total": 25.00,
-            }],
-        })
+        ultimo_pedido = json.dumps(
+            {
+                "pedido_id": 123456,
+                "data_hora": "2026-09-30T16:07:00Z",
+                "valor_total_compra": 25.00,
+                "produtos": [
+                    {
+                        "nome": "Produto Teste",
+                        "quantidade": 1,
+                        "valor_unitario": 25.00,
+                        "valor_total": 25.00,
+                    }
+                ],
+            }
+        )
 
         return {
             "uuid": "contact-1",

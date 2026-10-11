@@ -1,4 +1,5 @@
 """Concurrency, cooldown and early stopping for transient FarmaLíder errors."""
+
 from __future__ import annotations
 
 import logging
@@ -31,7 +32,9 @@ class FarmaliderRecoveryTests(unittest.TestCase):
         try:
             failure = response(500)
             failure.headers["Retry-After"] = "0"
-            self.assertEqual([client._retry_delay(i, failure) for i in (1, 2, 3)], [5, 10, 20])
+            self.assertEqual(
+                [client._retry_delay(i, failure) for i in (1, 2, 3)], [5, 10, 20]
+            )
             failure.headers["Retry-After"] = "60"
             self.assertEqual(client._retry_delay(1, failure), 60)
             failure.headers["Retry-After"] = "inf"
@@ -44,8 +47,11 @@ class FarmaliderRecoveryTests(unittest.TestCase):
         old = RequestPermit(0, 4)
         try:
             client._protect_after_failure(
-                endpoint_label="cliente/cpf", diagnostic_ref="opaque-one", permit=old,
-                delay=5, status_code=500,
+                endpoint_label="cliente/cpf",
+                diagnostic_ref="opaque-one",
+                permit=old,
+                delay=5,
+                status_code=500,
             )
             for _ in range(20):
                 client._mark_healthy(old, "cliente/cpf")
@@ -65,8 +71,11 @@ class FarmaliderRecoveryTests(unittest.TestCase):
                 client._mark_healthy(current, "cliente/cpf")
             self.assertAlmostEqual(client.metrics_snapshot()["effective_delay_ms"], 10)
             client._protect_after_failure(
-                endpoint_label="cliente/cpf", diagnostic_ref="opaque-two", permit=current,
-                delay=5, status_code=500,
+                endpoint_label="cliente/cpf",
+                diagnostic_ref="opaque-two",
+                permit=current,
+                delay=5,
+                status_code=500,
             )
             self.assertEqual(client.metrics_snapshot()["concurrency_limit"], 1)
         finally:
@@ -78,10 +87,15 @@ class FarmaliderRecoveryTests(unittest.TestCase):
             with client._request_gate:
                 client._effective_delay_seconds = 1
             client._protect_after_failure(
-                endpoint_label="cliente/cpf", diagnostic_ref="opaque",
-                permit=RequestPermit(0, 1), delay=0, status_code=429,
+                endpoint_label="cliente/cpf",
+                diagnostic_ref="opaque",
+                permit=RequestPermit(0, 1),
+                delay=0,
+                status_code=429,
             )
-            self.assertGreaterEqual(client.metrics_snapshot()["effective_delay_ms"], 1000)
+            self.assertGreaterEqual(
+                client.metrics_snapshot()["effective_delay_ms"], 1000
+            )
         finally:
             client.close()
 
@@ -90,8 +104,11 @@ class FarmaliderRecoveryTests(unittest.TestCase):
         try:
             old = RequestPermit(0, 4)
             client._protect_after_failure(
-                endpoint_label="cliente/cpf", diagnostic_ref="opaque",
-                permit=old, delay=0, status_code=500,
+                endpoint_label="cliente/cpf",
+                diagnostic_ref="opaque",
+                permit=old,
+                delay=0,
+                status_code=500,
             )
             client._mark_healthy(old, "cliente/cpf")
             self.assertNotIn("cliente/cpf", client._route_failures)
@@ -103,8 +120,11 @@ class FarmaliderRecoveryTests(unittest.TestCase):
         client = FarmaliderClient("synthetic")
         try:
             client._protect_after_failure(
-                endpoint_label="cliente/cpf", diagnostic_ref="opaque", permit=RequestPermit(0, 4),
-                delay=0.08, status_code=500,
+                endpoint_label="cliente/cpf",
+                diagnostic_ref="opaque",
+                permit=RequestPermit(0, 4),
+                delay=0.08,
+                status_code=500,
             )
             protected_at = time.monotonic()
             with client._request_gate:
@@ -149,14 +169,20 @@ class FarmaliderRecoveryTests(unittest.TestCase):
 
         try:
             client._protect_after_failure(
-                endpoint_label="cliente/cpf", diagnostic_ref="opaque", permit=RequestPermit(0, 4),
-                delay=0, status_code=500,
+                endpoint_label="cliente/cpf",
+                diagnostic_ref="opaque",
+                permit=RequestPermit(0, 4),
+                delay=0,
+                status_code=500,
             )
             with client._request_gate:
                 client._effective_delay_seconds = 0
             with patch.object(client, "_get_session", return_value=Mock(get=get)):
                 with ThreadPoolExecutor(max_workers=3) as executor:
-                    futures = [executor.submit(client.get_cliente_by_cpf, f"fixture-{i}") for i in range(3)]
+                    futures = [
+                        executor.submit(client.get_cliente_by_cpf, f"fixture-{i}")
+                        for i in range(3)
+                    ]
                     self.assertTrue(first_started.wait(timeout=1))
                     time.sleep(0.02)
                     self.assertEqual(calls, 1)
@@ -190,7 +216,9 @@ class FarmaliderRecoveryTests(unittest.TestCase):
         invalid = response(200)
         invalid.json.side_effect = ValueError("unsafe server content")
         try:
-            with patch.object(client.session, "get", side_effect=[invalid, response(404)]):
+            with patch.object(
+                client.session, "get", side_effect=[invalid, response(404)]
+            ):
                 with self.assertRaises(FarmaliderError):
                     client.get_cliente_by_cpf("synthetic-one")
                 self.assertEqual(client._in_flight, 0)
@@ -210,16 +238,22 @@ class FarmaliderRecoveryTests(unittest.TestCase):
             client = FarmaliderClient("synthetic")
             get = Mock(return_value=response(500))
             try:
-                rows = [{"contact_uuid": f"fixture-{i}", "cpf": f"{i:011d}"} for i in range(100)]
+                rows = [
+                    {"contact_uuid": f"fixture-{i}", "cpf": f"{i:011d}"}
+                    for i in range(100)
+                ]
                 with patch.object(client, "_get_session", return_value=Mock(get=get)):
                     with self.assertRaises(FarmaliderUnavailableError):
                         validate_contacts(
-                            rows, farm_client=client,
+                            rows,
+                            farm_client=client,
                             farm_settings=FarmaliderSettings(True, "synthetic", False),
                             sync_time="2026-10-07T00:00:00+00:00",
                         )
                 self.assertEqual(get.call_count, 12)
-                self.assertEqual(client.metrics_snapshot()["server_error_unique_queries"], 3)
+                self.assertEqual(
+                    client.metrics_snapshot()["server_error_unique_queries"], 3
+                )
                 self.assertEqual(client.metrics_snapshot()["open_circuits"], 1)
                 self.assertEqual(client._in_flight, 0)
             finally:
@@ -230,22 +264,31 @@ class FarmaliderRecoveryTests(unittest.TestCase):
         try:
             for _ in range(12):
                 client._protect_after_failure(
-                    endpoint_label="cliente/cpf", diagnostic_ref="same-query",
-                    permit=RequestPermit(client._recovery_generation, 1), delay=0, status_code=500,
+                    endpoint_label="cliente/cpf",
+                    diagnostic_ref="same-query",
+                    permit=RequestPermit(client._recovery_generation, 1),
+                    delay=0,
+                    status_code=500,
                 )
             self.assertEqual(client.metrics_snapshot()["open_circuits"], 0)
-            client._mark_healthy(RequestPermit(client._recovery_generation, 1), "cliente/cpf")
+            client._mark_healthy(
+                RequestPermit(client._recovery_generation, 1), "cliente/cpf"
+            )
             self.assertNotIn("cliente/cpf", client._route_failures)
         finally:
             client.close()
 
     def test_order_pipeline_propagates_service_interruption(self):
         client = Mock()
-        client.get_cliente_by_cpf.side_effect = FarmaliderUnavailableError("circuit open")
+        client.get_cliente_by_cpf.side_effect = FarmaliderUnavailableError(
+            "circuit open"
+        )
         contact = {"uuid": "fixture", "fields": {"cpf": "52998224725"}}
         with self.assertRaises(FarmaliderUnavailableError):
             build_orders(
-                [contact], rows_by_uuid={"fixture": {}}, farm_client=client,
+                [contact],
+                rows_by_uuid={"fixture": {}},
+                farm_client=client,
                 sync_time="2026-10-07T00:00:00+00:00",
             )
 
@@ -285,7 +328,10 @@ class FarmaliderRecoveryTests(unittest.TestCase):
             failure.headers["X-Request-ID"] = "unsafe token or personal data"
             self.assertIn("trace_id=-", client._safe_server_error_summary(failure))
             failure.headers["X-Request-ID"] = "a9b5a7e1-fb2d-4c10-a322-fb05cdfc828a"
-            self.assertIn("trace_id=a9b5a7e1-fb2d-4c10-a322-fb05cdfc828a", client._safe_server_error_summary(failure))
+            self.assertIn(
+                "trace_id=a9b5a7e1-fb2d-4c10-a322-fb05cdfc828a",
+                client._safe_server_error_summary(failure),
+            )
         finally:
             client.close()
 

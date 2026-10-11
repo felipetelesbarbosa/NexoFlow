@@ -1,4 +1,5 @@
 """HTTP 500 diagnostics and protection of previous customer validation."""
+
 from __future__ import annotations
 
 import json
@@ -34,18 +35,18 @@ def _response(status: int, body: bytes = b"", content_type: str = "") -> Mock:
 
 
 def _logged_messages(warnings: Mock) -> str:
-    return "\n".join(
-        call.args[0] % call.args[1:] for call in warnings.call_args_list
-    )
+    return "\n".join(call.args[0] % call.args[1:] for call in warnings.call_args_list)
 
 
 class FarmaliderServerErrorTests(unittest.TestCase):
     def test_500_logs_only_safe_body_classification_and_opaque_lookup_ref(self) -> None:
         token = "test-token-should-never-be-logged"
         email = "person@example.invalid"
-        body = json.dumps({
-            "message": f"Bad customer {CPF}, {email}, token={token}",
-        }).encode()
+        body = json.dumps(
+            {
+                "message": f"Bad customer {CPF}, {email}, token={token}",
+            }
+        ).encode()
         response = _response(500, body, "application/json; charset=utf-8")
         client = FarmaliderClient(token)
         expected_ref = client.cpf_diagnostic_ref(CPF)
@@ -56,12 +57,17 @@ class FarmaliderServerErrorTests(unittest.TestCase):
             client.weni_contact_diagnostic_ref("contact-one"),
         )
         self.assertNotEqual(
-            expected_ref, client.weni_contact_diagnostic_ref("contact-one"),
+            expected_ref,
+            client.weni_contact_diagnostic_ref("contact-one"),
         )
         try:
             with (
                 patch.object(client.session, "get", return_value=response) as get,
-                patch.object(client, "_request_slot", side_effect=lambda _: nullcontext(RequestPermit(0, 4))),
+                patch.object(
+                    client,
+                    "_request_slot",
+                    side_effect=lambda _: nullcontext(RequestPermit(0, 4)),
+                ),
                 patch("farmalider_client.time.sleep"),
                 patch("farmalider_client.logging.warning") as warnings,
             ):
@@ -81,7 +87,11 @@ class FarmaliderServerErrorTests(unittest.TestCase):
     def test_generic_backend_message_is_classified_without_echoing_body(self) -> None:
         client = FarmaliderClient("synthetic")
         try:
-            response = _response(500, b"Object reference not set to an instance of an object.", "text/plain")
+            response = _response(
+                500,
+                b"Object reference not set to an instance of an object.",
+                "text/plain",
+            )
             summary = client._safe_server_error_summary(response)
             self.assertIn("categoria=null_reference", summary)
             self.assertNotIn("Object reference", summary)
@@ -103,11 +113,13 @@ class FarmaliderServerErrorTests(unittest.TestCase):
             recovered = _response(404)
             with (
                 patch.object(
-                    client.session, "get",
+                    client.session,
+                    "get",
                     side_effect=[ReadTimeout("slow"), recovered],
                 ) as get,
                 patch.object(
-                    client, "_request_slot",
+                    client,
+                    "_request_slot",
                     side_effect=lambda _: nullcontext(RequestPermit(0, 4)),
                 ),
                 patch.object(client, "_protect_after_failure"),
@@ -130,11 +142,13 @@ class FarmaliderServerErrorTests(unittest.TestCase):
             recovered = _response(404)
             with (
                 patch.object(
-                    client.session, "get",
+                    client.session,
+                    "get",
                     side_effect=[failure, recovered],
                 ) as get,
                 patch.object(
-                    client, "_request_slot",
+                    client,
+                    "_request_slot",
                     side_effect=lambda _: nullcontext(RequestPermit(0, 4)),
                 ),
                 patch.object(client, "_protect_after_failure"),
@@ -152,11 +166,10 @@ class FarmaliderServerErrorTests(unittest.TestCase):
         client = FarmaliderClient("synthetic")
         try:
             with (
+                patch.object(client.session, "get", return_value=_response(401)) as get,
                 patch.object(
-                    client.session, "get", return_value=_response(401)
-                ) as get,
-                patch.object(
-                    client, "_request_slot",
+                    client,
+                    "_request_slot",
                     side_effect=lambda _: nullcontext(RequestPermit(0, 4)),
                 ),
             ):
@@ -174,7 +187,8 @@ class FarmaliderServerErrorTests(unittest.TestCase):
                     client.session, "get", side_effect=ReadTimeout("slow")
                 ) as get,
                 patch.object(
-                    client, "_request_slot",
+                    client,
+                    "_request_slot",
                     side_effect=lambda _: nullcontext(RequestPermit(0, 4)),
                 ),
                 patch.object(client, "_protect_after_failure"),
@@ -182,9 +196,7 @@ class FarmaliderServerErrorTests(unittest.TestCase):
                 patch.object(client, "_sleep_before_retry"),
                 patch("farmalider_client.FARMALIDER_MAX_RETRIES", 3),
             ):
-                with self.assertRaisesRegex(
-                    FarmaliderError, r"após 3 tentativa\(s\)"
-                ):
+                with self.assertRaisesRegex(FarmaliderError, r"após 3 tentativa\(s\)"):
                     client.test_connection()
             self.assertEqual(get.call_count, 3)
         finally:
@@ -202,13 +214,23 @@ class FarmaliderServerErrorTests(unittest.TestCase):
     def test_404_is_not_retried_and_network_exception_hides_url_and_token(self) -> None:
         client = FarmaliderClient("top-secret-token")
         try:
-            with patch.object(client.session, "get", return_value=_response(404)) as get:
+            with patch.object(
+                client.session, "get", return_value=_response(404)
+            ) as get:
                 self.assertIsNone(client.get_cliente_by_cpf(CPF))
             self.assertEqual(get.call_count, 1)
-            unsafe_url = f"https://api.example.invalid/cliente/cpf/{CPF}?token=top-secret-token"
+            unsafe_url = (
+                f"https://api.example.invalid/cliente/cpf/{CPF}?token=top-secret-token"
+            )
             with (
-                patch.object(client.session, "get", side_effect=ConnectionError(unsafe_url)),
-                patch.object(client, "_request_slot", side_effect=lambda _: nullcontext(RequestPermit(0, 4))),
+                patch.object(
+                    client.session, "get", side_effect=ConnectionError(unsafe_url)
+                ),
+                patch.object(
+                    client,
+                    "_request_slot",
+                    side_effect=lambda _: nullcontext(RequestPermit(0, 4)),
+                ),
                 patch("farmalider_client.FARMALIDER_MAX_RETRIES", 1),
             ):
                 try:
@@ -226,14 +248,20 @@ class FarmaliderServerErrorTests(unittest.TestCase):
         farm = Mock()
         farm.get_cliente_by_cpf.side_effect = FarmaliderError("HTTP 500")
         farm.metrics_snapshot.return_value = {
-            "total_requests": 4, "retries": 3, "rate_limits": 0,
-            "server_errors": 4, "network_errors": 0,
-            "slow_requests": 0, "average_response_ms": 1.0,
-            "p95_response_ms": 1.0, "max_response_ms": 1.0,
+            "total_requests": 4,
+            "retries": 3,
+            "rate_limits": 0,
+            "server_errors": 4,
+            "network_errors": 0,
+            "slow_requests": 0,
+            "average_response_ms": 1.0,
+            "p95_response_ms": 1.0,
+            "max_response_ms": 1.0,
             "effective_delay_ms": 10.0,
         }
         previous = {
-            "contact_uuid": "contact-one", "cpf_normalizado": CPF,
+            "contact_uuid": "contact-one",
+            "cpf_normalizado": CPF,
             "farmalider_cliente_status": "CPF_CONFIRMADO",
             "farmalider_cliente_id": "321",
             "farmalider_cliente_nome": "Cliente anterior",
@@ -271,7 +299,8 @@ class FarmaliderServerErrorTests(unittest.TestCase):
         # A second partial run must not erase the previously confirmed ID.
         repeated = {"contact_uuid": "contact-one", "cpf": CPF}
         validate_contacts(
-            [repeated], farm_client=farm,
+            [repeated],
+            farm_client=farm,
             farm_settings=FarmaliderSettings(True, "synthetic", False),
             sync_time=NEW_TIME,
             existing_by_uuid={"contact-one": rows[0]},
@@ -283,20 +312,27 @@ class FarmaliderServerErrorTests(unittest.TestCase):
         farm = Mock()
         farm.get_cliente_by_cpf.side_effect = FarmaliderError("HTTP 500")
         farm.metrics_snapshot.return_value = {
-            "total_requests": 4, "retries": 3, "rate_limits": 0,
-            "server_errors": 4, "network_errors": 0,
-            "slow_requests": 0, "average_response_ms": 1.0,
-            "p95_response_ms": 1.0, "max_response_ms": 1.0,
+            "total_requests": 4,
+            "retries": 3,
+            "rate_limits": 0,
+            "server_errors": 4,
+            "network_errors": 0,
+            "slow_requests": 0,
+            "average_response_ms": 1.0,
+            "p95_response_ms": 1.0,
+            "max_response_ms": 1.0,
             "effective_delay_ms": 10.0,
         }
         row = {"contact_uuid": "contact-one", "cpf": CPF}
         previous = {
-            "contact_uuid": "contact-one", "cpf_normalizado": CPF,
+            "contact_uuid": "contact-one",
+            "cpf_normalizado": CPF,
             "farmalider_cliente_status": "CPF_NAO_ENCONTRADO",
             "farmalider_cliente_consultado_em": OLD_TIME,
         }
         validate_contacts(
-            [row], farm_client=farm,
+            [row],
+            farm_client=farm,
             farm_settings=FarmaliderSettings(True, "synthetic", False),
             sync_time=NEW_TIME,
             existing_by_uuid={"contact-one": previous},
@@ -343,8 +379,10 @@ class FarmaliderServerErrorTests(unittest.TestCase):
         for status in ("CPF_NAO_ENCONTRADO", "ERRO_API"):
             with self.subTest(status=status):
                 orders, items, _ = build_orders(
-                    [contact], rows_by_uuid={"synthetic-contact": {}},
-                    farm_client=api, sync_time=NEW_TIME,
+                    [contact],
+                    rows_by_uuid={"synthetic-contact": {}},
+                    farm_client=api,
+                    sync_time=NEW_TIME,
                     cliente_lookup_status_by_cpf={CPF: status},
                 )
                 self.assertEqual(len(orders), 1)
@@ -396,10 +434,15 @@ class FarmaliderServerErrorTests(unittest.TestCase):
 
         farm.get_cliente_by_cpf.side_effect = query
         farm.metrics_snapshot.return_value = {
-            "total_requests": 100, "retries": 0, "rate_limits": 0,
-            "server_errors": 30, "network_errors": 0,
-            "slow_requests": 0, "average_response_ms": 1.0,
-            "p95_response_ms": 1.0, "max_response_ms": 1.0,
+            "total_requests": 100,
+            "retries": 0,
+            "rate_limits": 0,
+            "server_errors": 30,
+            "network_errors": 0,
+            "slow_requests": 0,
+            "average_response_ms": 1.0,
+            "p95_response_ms": 1.0,
+            "max_response_ms": 1.0,
             "effective_delay_ms": 10.0,
         }
         rows = [
@@ -414,7 +457,8 @@ class FarmaliderServerErrorTests(unittest.TestCase):
             patch("main.logging.warning"),
         ):
             stats = validate_contacts(
-                rows, farm_client=farm,
+                rows,
+                farm_client=farm,
                 farm_settings=FarmaliderSettings(True, "synthetic", False),
                 sync_time=NEW_TIME,
             )

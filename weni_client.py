@@ -46,9 +46,7 @@ class WeniClient:
     @staticmethod
     def format_datetime(dt: datetime) -> str:
         return (
-            dt.astimezone(UTC)
-            .isoformat(timespec="milliseconds")
-            .replace("+00:00", "Z")
+            dt.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
         )
 
     def _request_json(
@@ -60,7 +58,9 @@ class WeniClient:
         json_body: dict[str, Any] | None = None,
     ) -> Any:
         last_error = "erro desconhecido"
-        max_attempts = MAX_RETRIES if method.upper() == "GET" or self.retry_mutations else 1
+        max_attempts = (
+            MAX_RETRIES if method.upper() == "GET" or self.retry_mutations else 1
+        )
 
         for attempt in range(1, max_attempts + 1):
             try:
@@ -73,9 +73,7 @@ class WeniClient:
                 )
 
                 if response.status_code == 401:
-                    raise WeniError(
-                        "Weni retornou 401. Verifique o token da API."
-                    )
+                    raise WeniError("Weni retornou 401. Verifique o token da API.")
                 if response.status_code == 403:
                     raise WeniError(
                         "Weni retornou 403 (acesso negado). Confira permissões do token e regras de acesso."
@@ -114,7 +112,9 @@ class WeniClient:
                             reason="falha recuperável ao acessar Weni"
                         )
                 else:
-                    last_error = "[RESPOSTA_INVALIDA] A resposta da Weni não contém JSON válido."
+                    last_error = (
+                        "[RESPOSTA_INVALIDA] A resposta da Weni não contém JSON válido."
+                    )
                 if attempt >= max_attempts:
                     break
                 wait = float(2 ** (attempt - 1))
@@ -129,8 +129,7 @@ class WeniClient:
                 time.sleep(wait)
 
         raise WeniError(
-            "Não foi possível acessar a API da Weni. "
-            f"Diagnóstico: {last_error}"
+            f"Não foi possível acessar a API da Weni. Diagnóstico: {last_error}"
         ) from None
 
     def _get_json(
@@ -222,13 +221,19 @@ class WeniClient:
         item_label: str,
         max_results: int | None = None,
     ) -> list[dict[str, Any]]:
-        with TaskProgress(f"Consulta Weni: {item_label}", None, unit="registros") as progress:
-            return list(progress.track(self._iter_paginated(
-                base_url,
-                params,
-                item_label=item_label,
-                max_results=max_results,
-            )))
+        with TaskProgress(
+            f"Consulta Weni: {item_label}", None, unit="registros"
+        ) as progress:
+            return list(
+                progress.track(
+                    self._iter_paginated(
+                        base_url,
+                        params,
+                        item_label=item_label,
+                        max_results=max_results,
+                    )
+                )
+            )
 
     def iter_contacts(
         self,
@@ -254,7 +259,9 @@ class WeniClient:
         after: datetime | None = None,
         limit: int = PAGE_LIMIT,
     ) -> list[dict[str, Any]]:
-        with TaskProgress("Consulta Weni: contatos", None, unit="registros") as progress:
+        with TaskProgress(
+            "Consulta Weni: contatos", None, unit="registros"
+        ) as progress:
             return list(progress.track(self.iter_contacts(after=after, limit=limit)))
 
     def get_contact(
@@ -378,14 +385,17 @@ class WeniClient:
     def list_campaign_events(self, campaign_uuid: str) -> list[dict[str, Any]]:
         return self._list_paginated(
             "https://flows.weni.ai/api/v2/campaign_events.json",
-            {"campaign": campaign_uuid}, item_label="eventos de campanha",
+            {"campaign": campaign_uuid},
+            item_label="eventos de campanha",
         )
 
     def get_org(self) -> dict[str, Any]:
         return self._get_json("https://flows.weni.ai/api/v2/org.json")
 
     def get_flow_definition(self, flow_uuid: str) -> dict[str, Any]:
-        return self._get_json("https://flows.weni.ai/api/v2/definitions.json", params={"flow": flow_uuid})
+        return self._get_json(
+            "https://flows.weni.ai/api/v2/definitions.json", params={"flow": flow_uuid}
+        )
 
     def test_connection(self) -> dict[str, Any]:
         payload = self._get_json(
@@ -419,4 +429,6 @@ class WeniClient:
                 for item in groups
             ),
         }
+
+
 # NexoFlow 1.0

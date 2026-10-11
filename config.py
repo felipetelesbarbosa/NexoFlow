@@ -59,9 +59,7 @@ LOG_FILE: Final = LOG_DIR / "nexoflow.log"
 # FarmaLíder
 # Com proxy corporativo: URL interna, sem porta 3200.
 # Sem proxy: URL externa, com porta 3200.
-FARMALIDER_API_BASE_URL_PROXY: Final = (
-    "https://api.farmalider.net.br/farmalider"
-)
+FARMALIDER_API_BASE_URL_PROXY: Final = "https://api.farmalider.net.br/farmalider"
 FARMALIDER_API_BASE_URL_EXTERNAL: Final = (
     "https://api.farmalider.net.br:3200/farmalider"
 )

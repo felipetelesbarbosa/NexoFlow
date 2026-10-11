@@ -173,9 +173,7 @@ CPF_CONTEXT_PATTERNS = (
 
 # Aceita 11 dígitos contínuos ou a apresentação usual 000.000.000-00.
 # Os lookarounds impedem capturar um trecho de telefone/código maior.
-CPF_TOKEN_PATTERN = re.compile(
-    r"(?<!\d)(\d{3}[.\s]?\d{3}[.\s]?\d{3}[-\s]?\d{2})(?!\d)"
-)
+CPF_TOKEN_PATTERN = re.compile(r"(?<!\d)(\d{3}[.\s]?\d{3}[.\s]?\d{3}[-\s]?\d{2})(?!\d)")
 
 
 def _normalize_cpf(value: str) -> str:
@@ -319,7 +317,7 @@ def _previous_prompt(views: list[MessageView], index: int) -> MessageView | None
     # quando a API não informar direction. Limita a busca a 8 mensagens para
     # evitar usar contexto distante.
     fallback: MessageView | None = None
-    for candidate in reversed(views[max(0, index - 8):index]):
+    for candidate in reversed(views[max(0, index - 8) : index]):
         if not candidate.text:
             continue
         if fallback is None:

@@ -88,13 +88,15 @@ class OrderParserCharacterizationTests(unittest.TestCase):
         self.assertEqual(snapshot["quantidade_itens"], "1.5")
         self.assertEqual(
             snapshot["produtos"],
-            [{
-                "nome": None,
-                "codigo": "9001",
-                "quantidade": "1.5",
-                "valor_unitario": "15.00",
-                "valor_total": "19.00",
-            }],
+            [
+                {
+                    "nome": None,
+                    "codigo": "9001",
+                    "quantidade": "1.5",
+                    "valor_unitario": "15.00",
+                    "valor_total": "19.00",
+                }
+            ],
         )
 
     def test_invalid_later_item_discards_all_items(self):
@@ -153,9 +155,7 @@ class OrderParserCharacterizationTests(unittest.TestCase):
 
     def test_empty_products_are_accepted_without_invented_items(self):
         payload = self.payload()
-        payload.update(
-            produtos=[], valor_total_compra="5.50", quantidade_itens="0"
-        )
+        payload.update(produtos=[], valor_total_compra="5.50", quantidade_itens="0")
         order, items = self.parse(payload)
         self.assertEqual(order["status_validacao"], "OK")
         self.assertEqual(order["quantidade_produtos"], "0")

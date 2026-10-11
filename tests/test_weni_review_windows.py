@@ -19,7 +19,9 @@ REPOSITORY = Path(__file__).resolve().parents[1]
 class WeniReviewBatchWindowsTests(unittest.TestCase):
     """Run the real BAT, replacing only its external service and UI calls."""
 
-    def _wait_until(self, predicate, process, output_path: Path, description: str) -> None:
+    def _wait_until(
+        self, predicate, process, output_path: Path, description: str
+    ) -> None:
         deadline = time.monotonic() + 15
         while time.monotonic() < deadline:
             if predicate():
@@ -30,7 +32,9 @@ class WeniReviewBatchWindowsTests(unittest.TestCase):
                     f"{output_path.read_text(encoding='utf-8', errors='replace')}"
                 )
             time.sleep(0.05)
-        self.fail(f"Timed out waiting for {description}\n{output_path.read_text(encoding='utf-8', errors='replace')}")
+        self.fail(
+            f"Timed out waiting for {description}\n{output_path.read_text(encoding='utf-8', errors='replace')}"
+        )
 
     def _close_process(self, process) -> None:
         if process.poll() is None:
@@ -100,15 +104,20 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
             encoding="utf-8",
         )
 
-        (directory / "scripts" / "resultado_carga_weni.ps1").write_text("fixture", encoding="ascii")
+        (directory / "scripts" / "resultado_carga_weni.ps1").write_text(
+            "fixture", encoding="ascii"
+        )
         (directory / "result_stub.py").write_text(
             "import sys,time,json\nfrom pathlib import Path\n"
             "args=sys.argv[1:]\n"
             "if '-RecordOnly' in args: raise SystemExit(0)\n"
             "Path('result_waiting.json').write_text(json.dumps(args))\n"
             "while not Path('result_ack').exists(): time.sleep(.05)\n",
-            encoding="utf-8")
-        batch = (REPOSITORY / "atualizar_weni_carga_completa.bat").read_text(encoding="utf-8")
+            encoding="utf-8",
+        )
+        batch = (REPOSITORY / "atualizar_weni_carga_completa.bat").read_text(
+            encoding="utf-8"
+        )
         # Production continues using CON. Only the isolated fixture accepts a pipe.
         batch = batch.replace(" < CON", "")
         self.assertIn('".venv\\Scripts\\python.exe"', batch)
@@ -121,7 +130,9 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
             ),
             batch,
         )
-        self.assertEqual(note_count, 1, "Notepad fixture must replace exactly one external call")
+        self.assertEqual(
+            note_count, 1, "Notepad fixture must replace exactly one external call"
+        )
         batch, gate_count = re.subn(
             r'(?m)^"%SystemRoot%\\System32\\WindowsPowerShell\\v1\.0\\powershell\.exe"[^\n]*confirmar_revisao_weni\.ps1[^\n]*$',
             lambda match: (
@@ -129,23 +140,46 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
             ),
             batch,
         )
-        self.assertEqual(gate_count, 1, "Review fixture must replace exactly one external call")
+        self.assertEqual(
+            gate_count, 1, "Review fixture must replace exactly one external call"
+        )
         batch = re.sub(
             r'(?m)^"%SystemRoot%\\System32\\WindowsPowerShell\\v1\.0\\powershell\.exe"[^\n]*resultado_carga_weni\.ps1"(.*)$',
-            lambda match: f'"{sys.executable}" "{directory / "result_stub.py"}"'+match.group(1), batch)
-        (directory / "atualizar_weni_carga_completa.bat").write_text(batch, encoding="utf-8")
+            lambda match: (
+                f'"{sys.executable}" "{directory / "result_stub.py"}"' + match.group(1)
+            ),
+            batch,
+        )
+        (directory / "atualizar_weni_carga_completa.bat").write_text(
+            batch, encoding="utf-8"
+        )
 
-    def _run_batch_case(self, *, part: int, decision: int, closed_stdin=False, direct=False, apply_code=0) -> None:
+    def _run_batch_case(
+        self,
+        *,
+        part: int,
+        decision: int,
+        closed_stdin=False,
+        direct=False,
+        apply_code=0,
+    ) -> None:
         with tempfile.TemporaryDirectory(prefix="nexoflow review ") as temporary:
             directory = Path(temporary)
             self._fixture(directory)
-            if apply_code: (directory/"apply_error").write_text(str(apply_code))
+            if apply_code:
+                (directory / "apply_error").write_text(str(apply_code))
             output_path = directory / "console.log"
-            env={**os.environ, "NEXOFLOW_LAUNCHER":"1"}
-            if direct: env.pop("NEXOFLOW_LAUNCHER",None)
+            env = {**os.environ, "NEXOFLOW_LAUNCHER": "1"}
+            if direct:
+                env.pop("NEXOFLOW_LAUNCHER", None)
             with output_path.open("wb") as output:
                 process = subprocess.Popen(
-                    [os.environ.get("COMSPEC", "cmd.exe"), "/d", "/c", "atualizar_weni_carga_completa.bat"],
+                    [
+                        os.environ.get("COMSPEC", "cmd.exe"),
+                        "/d",
+                        "/c",
+                        "atualizar_weni_carga_completa.bat",
+                    ],
                     cwd=directory,
                     stdin=subprocess.PIPE,
                     env=env,
@@ -155,88 +189,142 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
                 try:
                     process.stdin.write(f"{part}\r\n".encode("ascii"))
                     process.stdin.flush()
-                    if closed_stdin: process.stdin.close()
+                    if closed_stdin:
+                        process.stdin.close()
                     self._wait_until(
-                        lambda: (directory / "review_waiting.json").exists()
-                        and (directory / "notepad_closed.json").exists(),
+                        lambda: (
+                            (directory / "review_waiting.json").exists()
+                            and (directory / "notepad_closed.json").exists()
+                        ),
                         process,
                         output_path,
                         "the human review gate after Notepad has closed",
                     )
                     time.sleep(0.2)
-                    self.assertIsNone(process.poll(), "Closing Notepad must not close the CMD")
-                    self.assertFalse((directory / "apply.json").exists(), "Apply must wait for approval")
+                    self.assertIsNone(
+                        process.poll(), "Closing Notepad must not close the CMD"
+                    )
+                    self.assertFalse(
+                        (directory / "apply.json").exists(),
+                        "Apply must wait for approval",
+                    )
 
                     suffix = f"_25_parte_{part}" if part else ""
                     snapshot_name = f"logs\\weni_update_review_full{suffix}.json"
                     review_name = f"weni_update_review_full{suffix}.txt"
-                    note_args = json.loads((directory / "notepad_closed.json").read_text(encoding="utf-8"))
+                    note_args = json.loads(
+                        (directory / "notepad_closed.json").read_text(encoding="utf-8")
+                    )
                     self.assertEqual(len(note_args), 1)
                     self.assertEqual(Path(note_args[0]).name, review_name)
                     self.assertTrue(Path(note_args[0]).is_absolute())
-                    gate_args = json.loads((directory / "review_waiting.json").read_text(encoding="utf-8"))
+                    gate_args = json.loads(
+                        (directory / "review_waiting.json").read_text(encoding="utf-8")
+                    )
                     self.assertEqual(gate_args, ["-Part", str(part)] if part else [])
 
-                    dry_args = json.loads((directory / "dry_run.json").read_text(encoding="utf-8"))
+                    dry_args = json.loads(
+                        (directory / "dry_run.json").read_text(encoding="utf-8")
+                    )
                     self.assertIn("--full", dry_args)
-                    self.assertEqual(dry_args[dry_args.index("--review-out") + 1], snapshot_name)
+                    self.assertEqual(
+                        dry_args[dry_args.index("--review-out") + 1], snapshot_name
+                    )
                     if part:
-                        self.assertEqual(dry_args[dry_args.index("--quarter") + 1], str(part))
+                        self.assertEqual(
+                            dry_args[dry_args.index("--quarter") + 1], str(part)
+                        )
                     else:
                         self.assertNotIn("--quarter", dry_args)
 
-                    pending=directory/"review_decision.pending"
-                    pending.write_text(str(decision),encoding="ascii")
-                    os.replace(pending,directory/"review_decision.txt")
+                    pending = directory / "review_decision.pending"
+                    pending.write_text(str(decision), encoding="ascii")
+                    os.replace(pending, directory / "review_decision.txt")
                     expected_output = {
                         0: "[ETAPA 6/6]",
                         2: "Operação cancelada",
                         3: "Processo interrompido",
                     }[decision]
-                    if decision == 0 and apply_code: expected_output=f"Código de saída: {apply_code}"
+                    if decision == 0 and apply_code:
+                        expected_output = f"Código de saída: {apply_code}"
                     self._wait_until(
-                        lambda: expected_output in output_path.read_text(encoding="utf-8", errors="replace"),
+                        lambda: (
+                            expected_output
+                            in output_path.read_text(encoding="utf-8", errors="replace")
+                        ),
                         process,
                         output_path,
                         "the final diagnostic and console pause",
                     )
                     time.sleep(0.2)
-                    self.assertIsNone(process.poll(), "The final diagnostic must remain visible until Enter")
+                    self.assertIsNone(
+                        process.poll(),
+                        "The final diagnostic must remain visible until Enter",
+                    )
                     if decision == 0:
-                        applied = json.loads((directory / "apply.json").read_text(encoding="utf-8"))
+                        applied = json.loads(
+                            (directory / "apply.json").read_text(encoding="utf-8")
+                        )
                         self.assertEqual(
-                            applied["args"][applied["args"].index("--require-review") + 1], snapshot_name
+                            applied["args"][
+                                applied["args"].index("--require-review") + 1
+                            ],
+                            snapshot_name,
                         )
                         self.assertEqual(applied["snapshot"]["dry_run_args"], dry_args)
-                        self.assertEqual(applied["snapshot"]["fixture"], "frozen-review-snapshot")
+                        self.assertEqual(
+                            applied["snapshot"]["fixture"], "frozen-review-snapshot"
+                        )
                         self.assertIn("--full", applied["args"])
                         if part:
-                            self.assertEqual(applied["args"][applied["args"].index("--quarter") + 1], str(part))
+                            self.assertEqual(
+                                applied["args"][applied["args"].index("--quarter") + 1],
+                                str(part),
+                            )
                         else:
                             self.assertNotIn("--quarter", applied["args"])
                     else:
-                        self.assertFalse((directory / "apply.json").exists(), "Cancellation or UI failure must not apply")
-                    (directory/"result_ack").touch()
+                        self.assertFalse(
+                            (directory / "apply.json").exists(),
+                            "Cancellation or UI failure must not apply",
+                        )
+                    (directory / "result_ack").touch()
                     if direct:
-                        time.sleep(.3)
-                        self.assertIsNone(process.poll(), "Duplo clique deve preservar a sessão após a carga")
-                        process.stdin.write(b"exit\r\n");process.stdin.flush()
-                    self.assertEqual(process.wait(timeout=10), apply_code if decision == 0 else decision)
+                        time.sleep(0.3)
+                        self.assertIsNone(
+                            process.poll(),
+                            "Duplo clique deve preservar a sessão após a carga",
+                        )
+                        process.stdin.write(b"exit\r\n")
+                        process.stdin.flush()
+                    self.assertEqual(
+                        process.wait(timeout=10),
+                        apply_code if decision == 0 else decision,
+                    )
                 finally:
                     self._close_process(process)
 
-    def test_missing_review_helper_fails_before_services_and_keeps_console_open(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="nexoflow missing review ") as temporary:
+    def test_missing_review_helper_fails_before_services_and_keeps_console_open(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory(
+            prefix="nexoflow missing review "
+        ) as temporary:
             directory = Path(temporary)
             self._fixture(directory)
             (directory / "scripts" / "confirmar_revisao_weni.ps1").unlink()
             output_path = directory / "console.log"
             with output_path.open("wb") as output:
                 process = subprocess.Popen(
-                    [os.environ.get("COMSPEC", "cmd.exe"), "/d", "/c", "atualizar_weni_carga_completa.bat"],
+                    [
+                        os.environ.get("COMSPEC", "cmd.exe"),
+                        "/d",
+                        "/c",
+                        "atualizar_weni_carga_completa.bat",
+                    ],
                     cwd=directory,
                     stdin=subprocess.PIPE,
-                    env={**os.environ, "NEXOFLOW_LAUNCHER":"1"},
+                    env={**os.environ, "NEXOFLOW_LAUNCHER": "1"},
                     stdout=output,
                     stderr=subprocess.STDOUT,
                 )
@@ -244,56 +332,106 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
                     process.stdin.write(b"0\r\n")
                     process.stdin.flush()
                     self._wait_until(
-                        lambda: "[ERRO] Código de saída: 3" in output_path.read_text(encoding="utf-8", errors="replace"),
+                        lambda: (
+                            "[ERRO] Código de saída: 3"
+                            in output_path.read_text(encoding="utf-8", errors="replace")
+                        ),
                         process,
                         output_path,
                         "the missing-helper diagnostic and console pause",
                     )
                     time.sleep(0.2)
-                    self.assertIsNone(process.poll(), "The missing-helper diagnostic must remain visible")
-                    for marker in ("dry_run.json", "notepad_closed.json", "review_waiting.json", "apply.json"):
-                        self.assertFalse((directory / marker).exists(), f"Missing helper must prevent {marker}")
-                    (directory/"result_ack").touch()
+                    self.assertIsNone(
+                        process.poll(),
+                        "The missing-helper diagnostic must remain visible",
+                    )
+                    for marker in (
+                        "dry_run.json",
+                        "notepad_closed.json",
+                        "review_waiting.json",
+                        "apply.json",
+                    ):
+                        self.assertFalse(
+                            (directory / marker).exists(),
+                            f"Missing helper must prevent {marker}",
+                        )
+                    (directory / "result_ack").touch()
                     self.assertEqual(process.wait(timeout=10), 3)
                 finally:
                     self._close_process(process)
 
     def test_closed_stdin_still_waits_for_final_result_acknowledgment(self):
-        self._run_batch_case(part=0,decision=0,closed_stdin=True)
+        self._run_batch_case(part=0, decision=0, closed_stdin=True)
 
     def test_apply_failure_after_confirmation_waits_with_closed_stdin(self):
-        self._run_batch_case(part=0,decision=0,closed_stdin=True,apply_code=9)
+        self._run_batch_case(part=0, decision=0, closed_stdin=True, apply_code=9)
 
     def test_result_script_records_failure_and_waits_without_stdin(self):
         with tempfile.TemporaryDirectory(prefix="nexo result ") as temp:
-            root=Path(temp);(root/'scripts').mkdir()
-            (root/'scripts'/'resultado_carga_weni.ps1').write_bytes((REPOSITORY/'scripts'/'resultado_carga_weni.ps1').read_bytes())
-            harness=root/'result.ps1'
+            root = Path(temp)
+            (root / "scripts").mkdir()
+            (root / "scripts" / "resultado_carga_weni.ps1").write_bytes(
+                (REPOSITORY / "scripts" / "resultado_carga_weni.ps1").read_bytes()
+            )
+            harness = root / "result.ps1"
             harness.write_text(
                 '. "$PSScriptRoot/scripts/resultado_carga_weni.ps1" -ResultCode 9 -Stage ERRO -Snapshot "logs/test.json"\n'
-                'function Show-WeniResult { param([string]$Message)\n'
+                "function Show-WeniResult { param([string]$Message)\n"
                 ' Set-Content -LiteralPath "$PSScriptRoot/ready" -Value $Message -Encoding UTF8\n'
                 ' while (-not (Test-Path -LiteralPath "$PSScriptRoot/ack")) { Start-Sleep -Milliseconds 50 }\n}\n'
-                'exit (Complete-WeniResult)\n',encoding='utf-8-sig')
-            out=root/'out.log'
-            with out.open('wb') as output:
-                ps=Path(os.environ['SystemRoot'])/'System32/WindowsPowerShell/v1.0/powershell.exe'
-                process=subprocess.Popen([str(ps),'-NoLogo','-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',str(harness)],cwd=root,stdin=subprocess.DEVNULL,stdout=output,stderr=subprocess.STDOUT)
+                "exit (Complete-WeniResult)\n",
+                encoding="utf-8-sig",
+            )
+            out = root / "out.log"
+            with out.open("wb") as output:
+                ps = (
+                    Path(os.environ["SystemRoot"])
+                    / "System32/WindowsPowerShell/v1.0/powershell.exe"
+                )
+                process = subprocess.Popen(
+                    [
+                        str(ps),
+                        "-NoLogo",
+                        "-NoProfile",
+                        "-STA",
+                        "-ExecutionPolicy",
+                        "Bypass",
+                        "-File",
+                        str(harness),
+                    ],
+                    cwd=root,
+                    stdin=subprocess.DEVNULL,
+                    stdout=output,
+                    stderr=subprocess.STDOUT,
+                )
                 try:
-                    self._wait_until(lambda:(root/'ready').exists(),process,out,'final result acknowledgment')
+                    self._wait_until(
+                        lambda: (root / "ready").exists(),
+                        process,
+                        out,
+                        "final result acknowledgment",
+                    )
                     self.assertIsNone(process.poll())
-                    log=(root/'logs'/'weni_full_launcher.log').read_text(encoding='utf-8-sig')
-                    self.assertIn('etapa=ERRO',log);self.assertIn('código=9',log);self.assertIn('-03:00',log)
-                    (root/'ack').touch();self.assertEqual(process.wait(timeout=15),0)
-                finally:self._close_process(process)
+                    log = (root / "logs" / "weni_full_launcher.log").read_text(
+                        encoding="utf-8-sig"
+                    )
+                    self.assertIn("etapa=ERRO", log)
+                    self.assertIn("código=9", log)
+                    self.assertIn("-03:00", log)
+                    (root / "ack").touch()
+                    self.assertEqual(process.wait(timeout=15), 0)
+                finally:
+                    self._close_process(process)
 
     def test_direct_batch_session_stays_open_after_result(self):
-        self._run_batch_case(part=0,decision=0,direct=True)
+        self._run_batch_case(part=0, decision=0, direct=True)
 
     def test_full_load_waits_for_approval_and_applies_the_frozen_snapshot(self) -> None:
         self._run_batch_case(part=0, decision=0)
 
-    def test_all_four_parts_wait_for_approval_and_apply_their_own_snapshot(self) -> None:
+    def test_all_four_parts_wait_for_approval_and_apply_their_own_snapshot(
+        self,
+    ) -> None:
         for part in (1, 2, 3, 4):
             with self.subTest(part=part):
                 self._run_batch_case(part=part, decision=0)
@@ -313,7 +451,9 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
 class WeniReviewDialogWindowsTests(unittest.TestCase):
     """Test the actual PowerShell decision logic while replacing the GUI only."""
 
-    def _run_dialog(self, expression: str, expected_code: int, *, part: str = "") -> None:
+    def _run_dialog(
+        self, expression: str, expected_code: int, *, part: str = ""
+    ) -> None:
         script = REPOSITORY / "scripts" / "confirmar_revisao_weni.ps1"
         script_literal = str(script).replace("'", "''")
         with tempfile.TemporaryDirectory(prefix="nexoflow dialog ") as temporary:
@@ -329,7 +469,13 @@ class WeniReviewDialogWindowsTests(unittest.TestCase):
             )
             result = subprocess.run(
                 [
-                    str(Path(os.environ["SystemRoot"]) / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe"),
+                    str(
+                        Path(os.environ["SystemRoot"])
+                        / "System32"
+                        / "WindowsPowerShell"
+                        / "v1.0"
+                        / "powershell.exe"
+                    ),
                     "-NoLogo",
                     "-NoProfile",
                     "-NonInteractive",
@@ -343,7 +489,9 @@ class WeniReviewDialogWindowsTests(unittest.TestCase):
                 timeout=45,
                 check=False,
             )
-            self.assertEqual(expected_code, result.returncode, result.stdout + result.stderr)
+            self.assertEqual(
+                expected_code, result.returncode, result.stdout + result.stderr
+            )
 
     def test_exact_confirmation_and_trimmed_case_variant_are_accepted(self) -> None:
         for value in ("CARGA COMPLETA REVISADA", "  carga completa revisada  "):

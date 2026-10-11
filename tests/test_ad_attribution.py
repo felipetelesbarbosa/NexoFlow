@@ -32,7 +32,9 @@ class GoogleAdsAttributionTests(unittest.TestCase):
             "created_on": "2026-10-03T12:00:00Z",
             "direction": "in",
             "urn": "messenger:abc",
-            "metadata": {"source_url": "https://example.com/?utm_source=google&utm_medium=paid_search&gclid=G-2"},
+            "metadata": {
+                "source_url": "https://example.com/?utm_source=google&utm_medium=paid_search&gclid=G-2"
+            },
         }
         result = extract_google_ads_attribution(message)
         self.assertIsNotNone(result)
@@ -46,7 +48,9 @@ class GoogleAdsAttributionTests(unittest.TestCase):
             "created_on": "2026-10-03T12:00:00Z",
             "direction": "in",
             "urn": "instagram:abc",
-            "metadata": {"source_url": "https://example.com/?utm_source=google&utm_medium=display&gbraid=BR123"},
+            "metadata": {
+                "source_url": "https://example.com/?utm_source=google&utm_medium=display&gbraid=BR123"
+            },
         }
         result = extract_google_ads_attribution(message)
         self.assertIsNotNone(result)
@@ -79,7 +83,9 @@ class GoogleAdsAttributionTests(unittest.TestCase):
             "created_on": "2026-10-03T12:00:00Z",
             "direction": "in",
             "urn": "whatsapp:1",
-            "metadata": {"source_url": "https://example.com/?utm_source=google&utm_medium=cpc&gclid=G5"},
+            "metadata": {
+                "source_url": "https://example.com/?utm_source=google&utm_medium=cpc&gclid=G5"
+            },
         }
         result = extract_google_ads_attribution(message)
         self.assertIsNotNone(result)
@@ -105,7 +111,6 @@ class GoogleAdsAttributionTests(unittest.TestCase):
             "metadata": {"source_url": "https://example.com/?gclid=SHOULD_NOT_COUNT"},
         }
         self.assertIsNone(extract_google_ads_attribution(message))
-
 
     def test_customer_pasting_gclid_url_in_free_text_is_not_attribution(self):
         message = {

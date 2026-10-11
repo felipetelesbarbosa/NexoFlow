@@ -16,9 +16,15 @@ def build_parser() -> argparse.ArgumentParser:
         )
     )
     mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--check-only", action="store_true", help="testa acessos sem alterar dados")
-    mode.add_argument("--dry-run", action="store_true", help="monta e audita o plano sem gravar")
-    mode.add_argument("--apply", action="store_true", help="audita e aplica as alterações")
+    mode.add_argument(
+        "--check-only", action="store_true", help="testa acessos sem alterar dados"
+    )
+    mode.add_argument(
+        "--dry-run", action="store_true", help="monta e audita o plano sem gravar"
+    )
+    mode.add_argument(
+        "--apply", action="store_true", help="audita e aplica as alterações"
+    )
     parser.add_argument(
         "--full",
         action="store_true",
@@ -41,7 +47,11 @@ def build_parser() -> argparse.ArgumentParser:
             "faz controle de conflito por contato"
         ),
     )
-    parser.add_argument("--recompra", action="store_true", help="executa a rotina de recompra, com revisão própria e sem mudar os demais processos")
+    parser.add_argument(
+        "--recompra",
+        action="store_true",
+        help="executa a rotina de recompra, com revisão própria e sem mudar os demais processos",
+    )
     return parser
 
 
@@ -51,12 +61,24 @@ def main() -> int:
         raise SystemExit("--quarter exige --full.")
     if args.recompra:
         if args.quarter is not None:
-            raise SystemExit("Recompra não usa partes: membros expirados precisam ser verificados em cada execução.")
+            raise SystemExit(
+                "Recompra não usa partes: membros expirados precisam ser verificados em cada execução."
+            )
         from run_recompra import main as recompra_main
-        arguments = ["--check-only" if args.check_only else "--dry-run" if args.dry_run else "--apply"]
-        if args.full: arguments.append("--full")
-        if args.review_out: arguments += ["--review-out", args.review_out]
-        if args.require_review: arguments += ["--require-review", args.require_review]
+
+        arguments = [
+            "--check-only"
+            if args.check_only
+            else "--dry-run"
+            if args.dry_run
+            else "--apply"
+        ]
+        if args.full:
+            arguments.append("--full")
+        if args.review_out:
+            arguments += ["--review-out", args.review_out]
+        if args.require_review:
+            arguments += ["--require-review", args.require_review]
         return recompra_main(arguments)
     status = configure_proxy()
 
@@ -85,27 +107,42 @@ def main() -> int:
                 print("[AVISO] Grupo Opt-Out LGPD não foi localizado.")
             missing_fields = list(weni.get("missing_multichannel_fields") or [])
             if missing_fields:
-                print("[ERRO] Campos multicanal ausentes na Weni: " + ", ".join(missing_fields))
-                print("       Crie-os como campos Texto antes de executar o NexoFlow Weni.")
+                print(
+                    "[ERRO] Campos multicanal ausentes na Weni: "
+                    + ", ".join(missing_fields)
+                )
+                print(
+                    "       Crie-os como campos Texto antes de executar o NexoFlow Weni."
+                )
                 return 1
             print("[OK] Campos multicanal da Weni localizados.")
             missing_order_fields = list(weni.get("missing_order_fields") or [])
             if missing_order_fields:
-                print("[ERRO] Campos de pedido obrigatórios ausentes na Weni: " + ", ".join(missing_order_fields))
+                print(
+                    "[ERRO] Campos de pedido obrigatórios ausentes na Weni: "
+                    + ", ".join(missing_order_fields)
+                )
                 print("       Crie todos os campos antes de executar o NexoFlow Weni.")
                 print("       O NexoFlow não grava snapshot parcial de pedido.")
                 return 1
             print("[OK] Campos obrigatórios de pedido localizados.")
             missing_google_ads = list(weni.get("missing_google_ads_fields") or [])
             if missing_google_ads:
-                print("[AVISO] Campos de atribuição Google Ads ausentes: " + ", ".join(missing_google_ads))
-                print("        O NexoFlow continuará funcionando, mas a atribuição Google Ads ficará parcial até esses campos existirem.")
+                print(
+                    "[AVISO] Campos de atribuição Google Ads ausentes: "
+                    + ", ".join(missing_google_ads)
+                )
+                print(
+                    "        O NexoFlow continuará funcionando, mas a atribuição Google Ads ficará parcial até esses campos existirem."
+                )
             else:
                 print("[OK] Campos de atribuição Google Ads localizados.")
             if farm.get("ok"):
                 print("[OK] FarmaLíder API acessível para confirmação de pedidos.")
             else:
-                print("[AVISO] FarmaLíder indisponível/desabilitada; compras não serão atualizadas.")
+                print(
+                    "[AVISO] FarmaLíder indisponível/desabilitada; compras não serão atualizadas."
+                )
             return 0
 
         review_out = Path(args.review_out) if args.review_out else None
@@ -137,12 +174,20 @@ def main() -> int:
         print(f"Campos propostos: {stats.field_changes}")
         print(f"Ações de grupo: {stats.group_actions}")
         print(f"Pedidos confirmados pela FarmaLíder: {stats.purchase_confirmed}")
-        print(f"Contatos com pedido validado (inclusive sem alteração): {stats.orders_validated}")
-        print(f"Contatos com pedido cancelado por pagamento 0: {stats.orders_cancelled_payment_zero}")
-        print(f"Contatos com pedido pendente de pagamento: {stats.orders_pending_payment}")
+        print(
+            f"Contatos com pedido validado (inclusive sem alteração): {stats.orders_validated}"
+        )
+        print(
+            f"Contatos com pedido cancelado por pagamento 0: {stats.orders_cancelled_payment_zero}"
+        )
+        print(
+            f"Contatos com pedido pendente de pagamento: {stats.orders_pending_payment}"
+        )
         if stats.invalid_cpf_checked:
             print("CPFs inválidos: " + _invalid_cpf_summary(stats))
-            print("Contagens por contato, incluindo cancelados; não são vendas nem pedidos únicos.")
+            print(
+                "Contagens por contato, incluindo cancelados; não são vendas nem pedidos únicos."
+            )
         if stats.payment_unmapped_codes:
             print(
                 "Pagamento não identificado por código: "
@@ -160,7 +205,9 @@ def main() -> int:
             if stats.contacts_conflicted:
                 print(f"Contatos ignorados por conflito: {stats.contacts_conflicted}")
             if stats.contacts_already_satisfied:
-                print(f"Contatos já no estado revisado: {stats.contacts_already_satisfied}")
+                print(
+                    f"Contatos já no estado revisado: {stats.contacts_already_satisfied}"
+                )
             if args.full and require_review is not None:
                 print(
                     "Modo: APPLY SNAPSHOT CONGELADO. Novas mensagens/contatos "

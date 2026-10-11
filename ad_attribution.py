@@ -109,7 +109,9 @@ def _text(value: Any) -> str:
     return ""
 
 
-def _flatten_strings(value: Any, *, path: tuple[str, ...] = (), depth: int = 0) -> list[tuple[str, str]]:
+def _flatten_strings(
+    value: Any, *, path: tuple[str, ...] = (), depth: int = 0
+) -> list[tuple[str, str]]:
     """Extrai strings de metadados sem interpretar objetos arbitrários como atribuição."""
     if depth > 5:
         return []
@@ -137,7 +139,10 @@ def _last_key(path: str) -> str:
 def _query_values(text: str) -> dict[str, str]:
     values: dict[str, str] = {}
     candidates = list(_URL_RE.findall(text))
-    if not candidates and any(token in text.casefold() for token in ("gclid=", "gbraid=", "wbraid=", "utm_source=")):
+    if not candidates and any(
+        token in text.casefold()
+        for token in ("gclid=", "gbraid=", "wbraid=", "utm_source=")
+    ):
         candidates.append(text)
 
     for candidate in candidates:
@@ -162,7 +167,9 @@ def _query_values(text: str) -> dict[str, str]:
     return values
 
 
-def _first_field(items: Iterable[tuple[str, str]], keys: set[str] | tuple[str, ...]) -> str:
+def _first_field(
+    items: Iterable[tuple[str, str]], keys: set[str] | tuple[str, ...]
+) -> str:
     key_set = set(keys)
     for path, value in items:
         if _last_key(path) in key_set and value:
@@ -212,11 +219,18 @@ def _is_google_source(source: str) -> bool:
 
 
 def _message_id(message: dict[str, Any]) -> str:
-    return str(message.get("id") or message.get("uuid") or message.get("message_id") or "").strip()
+    return str(
+        message.get("id") or message.get("uuid") or message.get("message_id") or ""
+    ).strip()
 
 
 def _message_created_on(message: dict[str, Any]) -> str:
-    return str(message.get("created_on") or message.get("created_at") or message.get("timestamp") or "").strip()
+    return str(
+        message.get("created_on")
+        or message.get("created_at")
+        or message.get("timestamp")
+        or ""
+    ).strip()
 
 
 def _message_urn(message: dict[str, Any]) -> str:
@@ -232,7 +246,9 @@ def _message_urn(message: dict[str, Any]) -> str:
     return ""
 
 
-def extract_google_ads_attribution(message: dict[str, Any]) -> GoogleAdsAttribution | None:
+def extract_google_ads_attribution(
+    message: dict[str, Any],
+) -> GoogleAdsAttribution | None:
     """
     Detecta somente evidência explícita de Google Ads.
 
@@ -262,7 +278,11 @@ def extract_google_ads_attribution(message: dict[str, Any]) -> GoogleAdsAttribut
         # de anúncio durante uma conversa já existente.
         if key not in structured_keys:
             continue
-        if not url and key in _URL_KEYS and value.lower().startswith(("http://", "https://")):
+        if (
+            not url
+            and key in _URL_KEYS
+            and value.lower().startswith(("http://", "https://"))
+        ):
             url = value
         for qkey, qvalue in _query_values(value).items():
             query.setdefault(qkey, qvalue)
@@ -286,8 +306,17 @@ def extract_google_ads_attribution(message: dict[str, Any]) -> GoogleAdsAttribut
 
     source = _first_field(items, _SOURCE_KEYS) or query.get("utm_source", "")
     medium = _first_field(items, _MEDIUM_KEYS) or query.get("utm_medium", "")
-    explicit_type = _first_field(items, _CAMPAIGN_TYPE_KEYS) or query.get("utm_campaign_type", "") or query.get("campaign_type", "") or query.get("google_ads_campaign_type", "")
-    ad_id = _first_field(items, _CAMPAIGN_ID_KEYS) or query.get("ad_id", "") or query.get("creative_id", "")
+    explicit_type = (
+        _first_field(items, _CAMPAIGN_TYPE_KEYS)
+        or query.get("utm_campaign_type", "")
+        or query.get("campaign_type", "")
+        or query.get("google_ads_campaign_type", "")
+    )
+    ad_id = (
+        _first_field(items, _CAMPAIGN_ID_KEYS)
+        or query.get("ad_id", "")
+        or query.get("creative_id", "")
+    )
     title = _first_field(items, _TITLE_KEYS) or query.get("utm_content", "")
 
     # Marcadores explícitos em chaves também contam, mesmo sem UTM.
@@ -296,8 +325,20 @@ def extract_google_ads_attribution(message: dict[str, Any]) -> GoogleAdsAttribut
         for path, _ in items
     )
     paid_medium = str(medium or "").strip().casefold() in {
-        "cpc", "ppc", "paid", "paid_search", "paid-search", "search", "sem",
-        "display", "banner", "gdn", "video", "youtube", "paid_video", "paid-video",
+        "cpc",
+        "ppc",
+        "paid",
+        "paid_search",
+        "paid-search",
+        "search",
+        "sem",
+        "display",
+        "banner",
+        "gdn",
+        "video",
+        "youtube",
+        "paid_video",
+        "paid-video",
     }
     google_source = _is_google_source(source)
 

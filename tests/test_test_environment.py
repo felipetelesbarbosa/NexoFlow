@@ -1,4 +1,5 @@
 """A suíte não consulta configuração ou rede da máquina operacional."""
+
 import socket
 import sys
 import unittest

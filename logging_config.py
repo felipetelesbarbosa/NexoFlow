@@ -13,7 +13,8 @@ class BelemFormatter(logging.Formatter):
 
     def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
         local = datetime.fromtimestamp(
-            record.created, timezone(timedelta(hours=-3), "America/Belem"),
+            record.created,
+            timezone(timedelta(hours=-3), "America/Belem"),
         )
         if datefmt:
             return local.strftime(datefmt)
