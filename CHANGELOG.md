@@ -2,6 +2,7 @@
 
 ## NexoFlow 1.0
 
+- Weni com ícone azul e ciano, contato e balão de conversa, seguindo a estética do Analytics e do Recompra. Executável, imagem e atalhos atualizados.
 - Recompra com ícone próprio de sacola e setas circulares; Planilha com ícone azul alinhado à identidade do NexoFlow. Executáveis e atalhos atualizados.
 - CMD da Weni permanece aberto após a conclusão, erro ou cancelamento, inclusive quando iniciado por outro launcher. Fechar o aviso final ou pressionar ENTER não encerra a sessão; use EXIT para fechar.
 - Testes usam configuração fictícia em memória e bloqueiam conexões reais; check-up, unittest e pytest independem de credenciais locais. Compatibilidade testada no Windows com Python 3.11, 3.13 e 3.14.

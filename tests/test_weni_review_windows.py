@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -18,6 +19,27 @@ REPOSITORY = Path(__file__).resolve().parents[1]
 @unittest.skipUnless(os.name == "nt", "Requires Windows CMD and Windows PowerShell")
 class WeniReviewBatchWindowsTests(unittest.TestCase):
     """Run the real BAT, replacing only its external service and UI calls."""
+
+    def test_native_weni_launcher_runs_after_icon_update(self):
+        with tempfile.TemporaryDirectory(prefix="nexo weni icon ") as temporary:
+            directory = Path(temporary)
+            executable = directory / "NexoFlow Weni.exe"
+            shutil.copy2(REPOSITORY / executable.name, executable)
+            (directory / "atualizar_weni.bat").write_text(
+                "@echo off\necho SYNTHETIC_WENI_LAUNCH_OK\nexit /b 0\n",
+                encoding="ascii",
+            )
+            completed = subprocess.run(
+                [str(executable)],
+                cwd=directory,
+                env={**os.environ, "NEXOFLOW_INTERNAL_BUILD_INFO": "1"},
+                capture_output=True,
+                timeout=15,
+                check=False,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertIn(b"SYNTHETIC_WENI_LAUNCH_OK", completed.stdout)
+            self.assertIn(b"NexoFlowWeniIconRevision=1.0", completed.stdout)
 
     def _wait_until(
         self, predicate, process, output_path: Path, description: str
