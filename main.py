@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import secrets_config as secrets
 from analytics import (
@@ -857,7 +858,9 @@ def main() -> int:
                 "Sincronização incremental desde %s UTC | horário local=%s "
                 "(%s min de sobreposição).",
                 utc_iso(after),
-                after.astimezone().isoformat(timespec="seconds"),
+                after.astimezone(ZoneInfo("America/Belem")).isoformat(
+                    timespec="seconds"
+                ),
                 SYNC_OVERLAP_MINUTES,
             )
         else:
@@ -1173,7 +1176,10 @@ def main() -> int:
             # durante as quatro cargas sejam capturadas pela próxima incremental.
             completion_controls.pop("ultima_sincronizacao_sucesso_utc", None)
             if completion_status == "sucesso" and full_quarter == 4:
-                assert quarter_context is not None
+                if quarter_context is None:
+                    raise RuntimeError(
+                        "Contexto da carga fracionada ausente; checkpoint preservado."
+                    )
                 completion_controls["ultima_sincronizacao_sucesso_utc"] = str(
                     quarter_context["captured_at_utc"]
                 )
@@ -1414,6 +1420,8 @@ def main() -> int:
     finally:
         if farm_client is not None:
             farm_client.close()
+        if sheets is not None:
+            sheets.close()
 
 
 if __name__ == "__main__":

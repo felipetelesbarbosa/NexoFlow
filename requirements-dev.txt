@@ -1,0 +1,4 @@
+# Verificações locais e de CI; não são dependências do programa instalado.
+ruff==0.17.0
+pyright==1.1.414
+pip-audit==2.10.1

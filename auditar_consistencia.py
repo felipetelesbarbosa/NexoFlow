@@ -531,6 +531,12 @@ def check_google_sheets_retry_if_configured() -> None:
         "build_bi_order_rows",
         "opt_in_lgpd",
         "maior_de_18_anos",
+        "BI_Publico",
+        "BI_Clientes_Vendas",
+        "BI_Produtos_ABC",
+        "BI_Qualidade",
+        "replace_looker_tables",
+        "_replace_summary_atomically",
     ]
     bi_source = (
         config_text
@@ -540,13 +546,15 @@ def check_google_sheets_retry_if_configured() -> None:
         + main_text
         + "\n"
         + read("analytics.py")
+        + "\n"
+        + read("looker_bi.py")
     )
     missing_bi = [item for item in bi_required if item not in bi_source]
     if missing_bi:
         fail("Camada BI/Looker Studio 1.0 incompleta: " + ", ".join(missing_bi))
     else:
         ok(
-            "Camada BI/Looker Studio contém as sete tabelas, incluindo BI_Pedidos, métricas e campos LGPD/maioridade."
+            "Camada BI/Looker Studio contém as tabelas operacionais e comerciais, com tipos numéricos, cobertura de itens e migração financeira atômica."
         )
 
     diagnostico_text = read("diagnostico.py")

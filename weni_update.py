@@ -1885,7 +1885,9 @@ def load_review_snapshot(
     for raw in raw_plans:
         if not isinstance(raw, dict):
             raise PlanAuditError("Snapshot de revisão contém plano inválido.")
-        display = raw.get("display") if isinstance(raw.get("display"), dict) else {}
+        display = raw.get("display")
+        if not isinstance(display, dict):
+            display = {}
         raw_actions = raw.get("group_actions") or []
         if not isinstance(raw_actions, list):
             raise PlanAuditError("Snapshot de revisão contém ações de grupo inválidas.")
@@ -2315,6 +2317,8 @@ def run_update(
         }
 
         if frozen_full_apply:
+            if require_review is None:
+                raise PlanAuditError("A aplicação exige um snapshot revisado.")
             plans, review_payload, digest = load_review_snapshot(
                 full=True,
                 json_path=Path(require_review),
@@ -2326,11 +2330,9 @@ def run_update(
                 opt_in_group_available=opt_in_available,
             )
 
-            summary = (
-                review_payload.get("summary")
-                if isinstance(review_payload.get("summary"), dict)
-                else {}
-            )
+            summary = review_payload.get("summary")
+            if not isinstance(summary, dict):
+                summary = {}
             stats.messages_incoming = int(summary.get("messages_incoming") or 0)
             stats.contacts_considered = int(
                 summary.get("contacts_considered") or len(plans)
@@ -2371,11 +2373,9 @@ def run_update(
                     and count > 0
                 }
             captured_at = str(review_payload.get("captured_at_utc") or "").strip()
-            reviewed_partition = (
-                review_payload.get("partition")
-                if isinstance(review_payload.get("partition"), dict)
-                else {}
-            )
+            reviewed_partition = review_payload.get("partition")
+            if not isinstance(reviewed_partition, dict):
+                reviewed_partition = {}
             quarter_campaign_id = str(reviewed_partition.get("campaign_id") or "")
             if quarter is not None:
                 logging.info(
@@ -2565,7 +2565,10 @@ def run_update(
             )
             return stats
 
-        assert window is not None
+        if window is None:
+            raise PlanAuditError(
+                "Janela de atualização ausente; aplicação interrompida."
+            )
 
         quarter_context: dict[str, Any] | None = None
         selected_uuids: set[str] | None = None

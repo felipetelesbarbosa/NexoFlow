@@ -218,7 +218,7 @@ def read_delivery_spreadsheets(directory, *, cutoff):
             contacts[uid]
         ):
             reason = reason or "NOME_DIVERGENTE_NO_EXPORT"
-        if reason:
+        if reason or opened is None or ended is None:
             summary[reason] += 1
             rejected.append(
                 {"linha": number, "chat_contact_uuid": chat_uid, "motivo": reason}

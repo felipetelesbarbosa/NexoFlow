@@ -4,7 +4,9 @@ import copy
 import hashlib
 import json
 import logging
+import math
 import time
+from collections import Counter
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
@@ -14,6 +16,7 @@ import gspread
 if TYPE_CHECKING:
     from gspread.worksheet import Worksheet
 from gspread.exceptions import APIError, SpreadsheetNotFound, WorksheetNotFound
+from gspread.utils import ValueInputOption
 from requests.exceptions import RequestException
 
 from analytics import (
@@ -583,7 +586,7 @@ class GoogleSheetsStore:
                 lambda: ws.update(
                     range_name=f"A1:{last_col}1",
                     values=[headers],
-                    value_input_option="RAW",
+                    value_input_option=ValueInputOption.raw,
                 ),
             )
             structure_changed = True
@@ -603,7 +606,7 @@ class GoogleSheetsStore:
                     lambda: ws.update(
                         range_name=f"A1:{last_col}1",
                         values=[new_headers],
-                        value_input_option="RAW",
+                        value_input_option=ValueInputOption.raw,
                     ),
                 )
                 structure_changed = True
@@ -791,9 +794,98 @@ class GoogleSheetsStore:
                 continue
             current = "" if current_row[index] is None else str(current_row[index])
             merged = "" if merged_row[index] is None else str(merged_row[index])
+            if isinstance(merged_row[index], (int, float)) and not isinstance(
+                merged_row[index], bool
+            ):
+                from analytics import _to_decimal
+
+                try:
+                    if _to_decimal(current, header) == _to_decimal(merged, header):
+                        continue
+                except ValueError:
+                    pass
             if current != merged:
                 return True
         return False
+
+    def _append_keyed_batch(self, ws, batch, headers, key_name, value_input_option):
+        attempted = False
+        key_index = headers.index(key_name)
+
+        def write():
+            nonlocal attempted
+            pending = batch
+            if attempted:
+                # Timeout pode ocorrer depois de o servidor incluir as linhas.
+                # Antes de repetir, reler as chaves e atualizar posições já
+                # persistidas em vez de incluir a mesma linha novamente.
+                values = self._read_with_retry(
+                    f"confirmar inserções em {ws.title}", ws.get_all_values
+                )
+                if not values or values[0] != headers:
+                    raise RuntimeError(
+                        "Schema mudou durante a confirmação de escrita; reexecute a carga."
+                    )
+                positions = {
+                    str(row[key_index]): i + 2
+                    for i, row in enumerate(values[1:])
+                    if len(row) > key_index and row[key_index] != ""
+                }
+                pending, updates = [], []
+                for row in batch:
+                    position = positions.get(str(row[key_index]))
+                    if position is None:
+                        pending.append(row)
+                    else:
+                        updates.append(
+                            {
+                                "range": f"A{position}:{column_letter(len(headers))}{position}",
+                                "values": [row],
+                            }
+                        )
+                if updates:
+                    ws.batch_update(
+                        copy.deepcopy(updates), value_input_option=value_input_option
+                    )
+            attempted = True
+            if pending:
+                return ws.append_rows(
+                    copy.deepcopy(pending), value_input_option=value_input_option
+                )
+            return None
+
+        return self._write_with_retry(f"append_rows em {ws.title}", write)
+
+    def _append_history_batch(self, batch):
+        attempted = False
+
+        def write():
+            nonlocal attempted
+            pending = batch
+            if attempted:
+                values = self._read_with_retry(
+                    "confirmar histórico incluído", self.history.get_all_values
+                )
+                # Linhas de histórico têm corte temporal e ação próprios.
+                # Comparar a linha completa, não apenas o UUID do contato.
+                committed = Counter(
+                    tuple(str(cell) for cell in row) for row in values[1:]
+                )
+                pending = []
+                for row in batch:
+                    identity = tuple(str(cell) for cell in row)
+                    if committed[identity]:
+                        committed[identity] -= 1
+                    else:
+                        pending.append(row)
+            attempted = True
+            if pending:
+                return self.history.append_rows(
+                    copy.deepcopy(pending), value_input_option=ValueInputOption.raw
+                )
+            return None
+
+        return self._write_with_retry("append_rows em Historico_Alteracoes", write)
 
     def _upsert_records_detailed(
         self,
@@ -980,13 +1072,7 @@ class GoogleSheetsStore:
                 len(appends),
             )
         for batch in append_batches:
-            self._write_with_retry(
-                f"append_rows em {ws.title}",
-                lambda batch=batch: ws.append_rows(
-                    batch,
-                    value_input_option=value_input_option,
-                ),
-            )
+            self._append_keyed_batch(ws, batch, headers, key_name, value_input_option)
             processed += len(batch)
             if self._should_log_progress(processed, len(appends)):
                 logging.info(
@@ -1162,13 +1248,7 @@ class GoogleSheetsStore:
         )
         processed = 0
         for batch in batches:
-            self._write_with_retry(
-                "append_rows em Historico_Alteracoes",
-                lambda batch=batch: self.history.append_rows(
-                    batch,
-                    value_input_option="RAW",
-                ),
-            )
+            self._append_history_batch(batch)
             processed += len(batch)
             if self._should_log_progress(processed, len(rows)):
                 logging.info(
@@ -1225,10 +1305,6 @@ class GoogleSheetsStore:
                     cols=max(ws.col_count, len(headers)),
                 ),
             )
-        self._write_with_retry(
-            f"clear em {ws.title}",
-            ws.clear,
-        )
         offset = 1
         batches = self._adaptive_batches(
             data, max_items=GOOGLE_SHEETS_APPEND_BATCH_SIZE
@@ -1252,6 +1328,22 @@ class GoogleSheetsStore:
                     len(data),
                     self._progress_percent(last, len(data)),
                 )
+        # Gravar antes de limpar: uma falha inicial não deve apagar a tabela
+        # anterior. Limpar só o excedente após todos os lotes concluírem.
+        obsolete = []
+        if len(current) > len(data):
+            obsolete.append(
+                f"A{len(data) + 1}:{column_letter(ws.col_count)}{len(current)}"
+            )
+        old_width = max((len(row) for row in current), default=0)
+        if old_width > len(headers):
+            obsolete.append(
+                f"{column_letter(len(headers) + 1)}1:{column_letter(old_width)}{len(data)}"
+            )
+        if obsolete:
+            self._write_with_retry(
+                f"limpar excedente em {ws.title}", lambda: ws.batch_clear(obsolete)
+            )
         return True
 
     def replace_metrics(self, rows: list[list[Any]]) -> None:
@@ -1268,7 +1360,12 @@ class GoogleSheetsStore:
         for row in rows:
             values = []
             for header, value in zip(headers, row, strict=True):
-                if header in DATE_COLUMNS and value not in ("", None):
+                if isinstance(value, float) and not math.isfinite(value):
+                    raise ValueError("Medida BI não finita; gravação interrompida.")
+                if header in DATE_COLUMNS | {"data_snapshot"} and value not in (
+                    "",
+                    None,
+                ):
                     value = (date.fromisoformat(str(value)) - date(1899, 12, 30)).days
                 values.append("" if value is None else value)
             typed.append(values)
@@ -1287,9 +1384,11 @@ class GoogleSheetsStore:
                     "range": f"{letter}2:{letter}{max(2, ws.row_count)}",
                     "format": {
                         "numberFormat": {
-                            "type": "DATE" if header in DATE_COLUMNS else "NUMBER",
+                            "type": "DATE"
+                            if header in DATE_COLUMNS | {"data_snapshot"}
+                            else "NUMBER",
                             "pattern": "yyyy-mm-dd"
-                            if header in DATE_COLUMNS
+                            if header in DATE_COLUMNS | {"data_snapshot"}
                             else "0.########",
                         }
                     },
@@ -1325,20 +1424,94 @@ class GoogleSheetsStore:
                         value = float(_to_decimal(value, header))
                     converted.append(value)
                 rows.append(converted)
-            self._replace_table(
-                self.bi_summary,
-                headers,
-                self._typed_bi_rows(headers, rows),
-                force=True,
+            self._replace_summary_atomically(
+                headers, self._typed_bi_rows(headers, rows)
             )
             self._headers_cache[self.bi_summary.title] = headers[:]
-            self._format_bi_columns(
-                self.bi_summary,
-                headers,
-                text_columns={"atualizado_em"}
-                | (set(headers) - set(BI_SUMMARY_COLUMNS)),
-            )
             self.set_controls({revision: "2"})
+
+    def _replace_summary_atomically(self, headers, rows):
+        # Valores e formatos mudam na mesma transação. Se a migração falhar,
+        # uma retomada não pode interpretar números novos com formatos antigos.
+        ws = self.bi_summary
+        data = [headers, *rows]
+        requests = []
+        if ws.row_count < len(data) or ws.col_count < len(headers):
+            requests.append(
+                {
+                    "updateSheetProperties": {
+                        "properties": {
+                            "sheetId": ws.id,
+                            "gridProperties": {
+                                "rowCount": max(ws.row_count, len(data)),
+                                "columnCount": max(ws.col_count, len(headers)),
+                            },
+                        },
+                        "fields": "gridProperties.rowCount,gridProperties.columnCount",
+                    }
+                }
+            )
+        requests.append(
+            {
+                "updateCells": {
+                    "range": {
+                        "sheetId": ws.id,
+                        "startRowIndex": 0,
+                        "endRowIndex": max(ws.row_count, len(data)),
+                        "startColumnIndex": 0,
+                        "endColumnIndex": len(headers),
+                    },
+                    "rows": [
+                        {
+                            "values": [
+                                {
+                                    "userEnteredValue": {
+                                        "numberValue"
+                                        if isinstance(value, (int, float))
+                                        else "stringValue": value
+                                    }
+                                }
+                                for value in row
+                            ]
+                        }
+                        for row in data
+                    ],
+                    "fields": "userEnteredValue",
+                }
+            }
+        )
+        for index, header in enumerate(headers):
+            if header not in BI_SUMMARY_COLUMNS or header == "atualizado_em":
+                continue
+            is_date = header in DATE_COLUMNS
+            requests.append(
+                {
+                    "repeatCell": {
+                        "range": {
+                            "sheetId": ws.id,
+                            "startRowIndex": 1,
+                            "endRowIndex": max(ws.row_count, len(data)),
+                            "startColumnIndex": index,
+                            "endColumnIndex": index + 1,
+                        },
+                        "cell": {
+                            "userEnteredFormat": {
+                                "numberFormat": {
+                                    "type": "DATE" if is_date else "NUMBER",
+                                    "pattern": "yyyy-mm-dd"
+                                    if is_date
+                                    else "0.########",
+                                }
+                            }
+                        },
+                        "fields": "userEnteredFormat.numberFormat",
+                    }
+                }
+            )
+        self._write_with_retry(
+            "migração financeira atômica em BI_Resumo_Diario",
+            lambda: self.book.batch_update(copy.deepcopy({"requests": requests})),
+        )
 
     def upsert_bi_summary(self, record: dict[str, Any]) -> UpsertResult:
         self.migrate_bi_summary_numbers()
@@ -1354,9 +1527,13 @@ class GoogleSheetsStore:
     def replace_looker_tables(self, tables: dict[str, list[list[Any]]]) -> None:
         if set(tables) != set(LOOKER_SCHEMAS):
             raise ValueError("Conjunto de tabelas comerciais BI incompleto.")
+        prepared = {
+            title: self._typed_bi_rows(headers, tables[title])
+            for title, headers in LOOKER_SCHEMAS.items()
+        }
         for title, headers in LOOKER_SCHEMAS.items():
             ws = getattr(self, "looker_" + title)
-            values = self._typed_bi_rows(headers, tables[title])
+            values = prepared[title]
             self._replace_table(ws, headers, values, force=True)
             self._format_bi_columns(ws, headers, text_columns=TEXT_COLUMNS)
             logging.info(
@@ -1369,6 +1546,7 @@ class GoogleSheetsStore:
             records,
             "chave",
             ignore_compare_fields={"atualizado_em"},
+            preserve_types=True,
             value_input_option="USER_ENTERED",
         )
 
@@ -1378,50 +1556,49 @@ class GoogleSheetsStore:
             records,
             "chave",
             ignore_compare_fields={"atualizado_em"},
+            preserve_types=True,
             value_input_option="USER_ENTERED",
         )
 
+    def _replace_typed_bi(self, ws, headers, rows, *, text_columns):
+        values = self._typed_bi_rows(headers, rows)
+        self._replace_table(ws, headers, values, force=True)
+        self._format_bi_columns(ws, headers, text_columns=text_columns)
+
     def replace_bi_sales(self, rows: list[list[Any]]) -> None:
-        self._replace_table(
-            self.bi_sales, BI_SALES_COLUMNS, rows, value_input_option="USER_ENTERED"
+        self._replace_typed_bi(
+            self.bi_sales, BI_SALES_COLUMNS, rows, text_columns={"atualizado_em"}
         )
 
     def replace_bi_ads(self, rows: list[list[Any]]) -> None:
-        self._replace_table(
-            self.bi_ads, BI_ADS_COLUMNS, rows, value_input_option="USER_ENTERED"
+        self._replace_typed_bi(
+            self.bi_ads,
+            BI_ADS_COLUMNS,
+            rows,
+            text_columns=set(BI_ADS_COLUMNS[1:7]) | {"atualizado_em"},
         )
 
     def replace_bi_orders(self, rows: list[list[Any]]) -> None:
-        # USER_ENTERED interpreta datas e números, mas CEP e localização são
-        # texto: o apóstrofo preserva zeros iniciais e bloqueia fórmulas.
-        text_indexes = [
-            BI_ORDERS_COLUMNS.index(column)
-            for column in (
-                "cidade",
-                "estado",
-                "cep",
-                "bairro",
-                "genero",
-                "cliente_chave",
-            )
-        ]
-        safe_rows = []
-        for row in rows:
-            safe = list(row)
-            for index in text_indexes:
-                if index < len(safe) and safe[index] != "":
-                    safe[index] = "'" + str(safe[index])
-            safe_rows.append(safe)
-        self._replace_table(
+        numeric = {
+            "pedido_valor",
+            "pedido_frete",
+            "pedido_faturamento_total",
+            "idade",
+            "venda_valida",
+        }
+        self._replace_typed_bi(
             self.bi_orders,
             BI_ORDERS_COLUMNS,
-            safe_rows,
-            value_input_option="USER_ENTERED",
+            rows,
+            text_columns=set(BI_ORDERS_COLUMNS) - numeric - {"data"},
         )
 
     def replace_bi_status(self, row: list[Any]) -> None:
-        self._replace_table(
-            self.bi_status, BI_STATUS_COLUMNS, [row], value_input_option="USER_ENTERED"
+        self._replace_typed_bi(
+            self.bi_status,
+            BI_STATUS_COLUMNS,
+            [row],
+            text_columns=set(BI_STATUS_COLUMNS[:4]),
         )
 
     def upsert_delivery_tickets(self, records: list[dict[str, Any]]) -> UpsertResult:
@@ -1434,7 +1611,7 @@ class GoogleSheetsStore:
             records,
             "ticket_uuid",
             ignore_compare_fields={"atualizado_em"},
-            value_input_option="RAW",
+            value_input_option=ValueInputOption.raw,
         )
 
     def refresh_delivery_bi(
@@ -1523,17 +1700,13 @@ class GoogleSheetsStore:
                 "batch_update em Controle",
                 lambda updates=updates: self.control.batch_update(
                     copy.deepcopy(updates),
-                    value_input_option="RAW",
+                    value_input_option=ValueInputOption.raw,
                 ),
             )
 
         if appends:
-            self._write_with_retry(
-                "append_rows em Controle",
-                lambda: self.control.append_rows(
-                    appends,
-                    value_input_option="RAW",
-                ),
+            self._append_keyed_batch(
+                self.control, appends, CONTROL_COLUMNS, "chave", ValueInputOption.raw
             )
 
         # Atualiza o cache local sem nova leitura da API.
@@ -1548,12 +1721,8 @@ class GoogleSheetsStore:
         self._control_values_cache = cached
 
     def append_event(self, row: list[Any]) -> None:
-        self._write_with_retry(
-            "append_row em Eventos_Anuncios",
-            lambda: self.events.append_row(
-                row,
-                value_input_option="RAW",
-            ),
+        self._append_keyed_batch(
+            self.events, [row], EVENT_COLUMNS, "event_id", ValueInputOption.raw
         )
 
     def existing_event_ids(self) -> set[str]:

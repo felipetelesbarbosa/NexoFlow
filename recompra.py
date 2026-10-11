@@ -416,7 +416,7 @@ def state_lock(path=STATE):
             "Outra carga de recompra está em execução ou foi interrompida. Verifique antes de remover o lock."
         ) from exc
     try:
-        with os.fdopen(fd, "w") as handle:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
             handle.write(str(os.getpid()))
         yield
     finally:
@@ -666,12 +666,14 @@ def resolve_latest(contact, farm, captured_at, lookup_cache=None, saved=None):
             and previous[0].get("status_validacao") == "OK"
             and previous[1]
         ):
-            recovered.append(previous)
+            previous_dt = business_order_datetime(previous[0].get("data_hora"))
+            if previous_dt is not None:
+                recovered.append((previous_dt, previous))
     return (
         max(
             recovered,
-            key=lambda pair: business_order_datetime(pair[0].get("data_hora")),
-        )
+            key=lambda pair: pair[0],
+        )[1]
         if recovered
         else latest
     )
@@ -724,7 +726,7 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
         and items
         and all(names)
     )
-    if valid:
+    if valid and dt is not None:
         order_id = text(order.get("pedido_id"))
         # Para a cronologia do agendamento, somente pedido_data é consultado.
         # Uma data posterior não pode ser substituída por pedido mais antigo.
@@ -1127,6 +1129,13 @@ def apply_review(
                         for g in expected["groups"]
                         if g not in {structure["group_uuid"], GROUP}
                     ]
+                    purchase_dt = business_order_datetime(
+                        fresh["purchase"]["data_hora"]
+                    )
+                    if purchase_dt is None:
+                        raise RuntimeError(
+                            "Data da compra inválida; inclusão no grupo interrompida."
+                        )
                     if (
                         actual != expected
                         or refused(latest)
@@ -1158,12 +1167,7 @@ def apply_review(
                         )
                     if (
                         not 0
-                        <= (
-                            now_fn().astimezone(TZ).date()
-                            - business_order_datetime(
-                                fresh["purchase"]["data_hora"]
-                            ).date()
-                        ).days
+                        <= (now_fn().astimezone(TZ).date() - purchase_dt.date()).days
                         <= 25
                     ):
                         check_day()

@@ -134,6 +134,9 @@ SCHEMAS = {
         "anuncios_disponiveis",
         "custo_anuncios_disponivel",
         "motivo_historico",
+        "pedidos_sem_itens",
+        "pedidos_com_itens_divergentes",
+        "abc_periodo_disponivel",
     ],
 }
 DATE_COLUMNS = {
@@ -203,14 +206,21 @@ def reporting_period(
 
 
 def _rank_products(
-    product_groups: dict[str, dict[str, Any]], start: str, end: str, updated_at: str
+    product_groups: dict[str, dict[str, Any]],
+    start: str,
+    end: str,
+    updated_at: str,
+    *,
+    items_complete: bool = True,
 ) -> tuple[list[list[Any]], list[tuple[str, dict[str, Any]]], Decimal]:
     rows: list[list[Any]] = []
     ranked = sorted(
         product_groups.items(), key=lambda pair: (-pair[1]["revenue"], pair[0])
     )
     total_products = sum((p["revenue"] for _, p in ranked), Decimal(0))
-    abc_available = total_products > 0 and all(p["sku"] for _, p in ranked)
+    abc_available = (
+        items_complete and total_products > 0 and all(p["sku"] for _, p in ranked)
+    )
     unit_rank: dict[str, int] = {}
     previous_units: Decimal | None = None
     rank = 0
@@ -285,6 +295,8 @@ def _period_kpis(
     start: str,
     end: str,
     updated_at: str,
+    *,
+    items_complete: bool = True,
 ) -> list[list[Any]]:
     rows: list[list[Any]] = []
     period_orders = [r for r in orders_by_key.values() if start <= r["bi_date"] <= end]
@@ -313,7 +325,7 @@ def _period_kpis(
                 / total_products
                 * 100
             )
-            if total_products
+            if total_products and items_complete
             else "",
             sum(n > 1 for n in buyer_counts.values()),
             0,
@@ -447,6 +459,7 @@ def build_looker_tables(
     products_by_order: dict[str, set[str]] = defaultdict(set)
     names: dict[str, tuple[str, str]] = {}
     missing_sku = category_items = 0
+    item_revenue_by_order: dict[str, Decimal] = defaultdict(Decimal)
     period_items: list[dict[str, Any]] = []
     for item in _unique(item_records, "item_chave"):
         order = orders_by_key.get(item.get("pedido_chave", ""))
@@ -461,6 +474,7 @@ def build_looker_tables(
         if quantity <= 0 or revenue < 0 or unit < 0:
             raise ValueError("Item de venda com quantidade ou valor inválido.")
         missing_sku += not bool(sku)
+        item_revenue_by_order[order["pedido_chave"]] += revenue
         category_items += bool(category)
         tables["BI_Itens"].append(
             [
@@ -505,14 +519,35 @@ def build_looker_tables(
             if (order["bi_date"], name) > names.get(sku, ("", "")):
                 names[sku] = (order["bi_date"], name)
 
+    missing_items = {key for key in orders_by_key if key not in item_revenue_by_order}
+    divergent_items = {
+        key
+        for key, revenue in item_revenue_by_order.items()
+        if abs(revenue - orders_by_key[key]["bi_products"]) > Decimal("0.01")
+    }
+    period_keys = {
+        key for key, row in orders_by_key.items() if start <= row["bi_date"] <= end
+    }
+    items_complete = not bool(period_keys & (missing_items | divergent_items))
     tables["BI_Produtos_ABC"], ranked, total_products = _rank_products(
-        product_groups, start, end, updated_at
+        product_groups,
+        start,
+        end,
+        updated_at,
+        items_complete=items_complete,
     )
     tables["BI_Produtos_Juntos"] = _product_pairs(
         products_by_order, names, start, end, updated_at
     )
     tables["BI_KPIs_Periodo"] = _period_kpis(
-        orders_by_key, period_items, ranked, total_products, start, end, updated_at
+        orders_by_key,
+        period_items,
+        ranked,
+        total_products,
+        start,
+        end,
+        updated_at,
+        items_complete=items_complete,
     )
     observed_dates = [r["bi_date"] for r in orders_by_key.values()]
     tables["BI_Qualidade"].append(
@@ -539,6 +574,9 @@ def build_looker_tables(
             ),
             0,
             "A API retorna somente o último pedido. O histórico acumula compras identificadas nas coletas; compras nunca capturadas e cobertura completa não são comprovadas.",
+            len(missing_items),
+            len(divergent_items),
+            int(bool(ranked) and all(row[13] for row in tables["BI_Produtos_ABC"])),
         ]
     )
     return tables

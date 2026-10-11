@@ -1408,7 +1408,8 @@ def parse_ultimo_pedido(
         json.dumps(derived_payload, ensure_ascii=False),
         **context,
     )
-    assert derived_order is not None
+    if derived_order is None:
+        return original_order, original_items
     derived_order["ultimo_pedido_raw"] = raw
     if derived_order["origem_pedido"] == "WENI_ULTIMO_PEDIDO":
         derived_order["origem_pedido"] = "WENI_PEDIDO_FIELDS"
@@ -1824,10 +1825,16 @@ def build_bi_conversion_records(
     updated_at: str,
 ) -> list[dict[str, Any]]:
     valid_orders = _bi_valid_orders(order_records)
+    buyer_uuids = {r.get("contact_uuid", "").strip() for r in valid_orders}
+    buyer_keys = {bi_customer_key(r) for r in valid_orders}
     buyers = {
         r.get("contact_uuid", "").strip()
-        for r in valid_orders
+        for r in base_records
         if r.get("contact_uuid", "").strip()
+        and (
+            r.get("contact_uuid", "").strip() in buyer_uuids
+            or bi_customer_key({}, r) in buyer_keys
+        )
     }
     stages = [
         (1, "Contatos", len(base_records)),

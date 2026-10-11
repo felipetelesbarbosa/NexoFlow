@@ -314,15 +314,15 @@ class TypedSheetTests(unittest.TestCase):
         store._read_with_retry = Mock(
             side_effect=lambda description, operation: operation()
         )
-        store._replace_table = Mock()
+        store._replace_summary_atomically = Mock()
         store._format_bi_columns = Mock()
         store.set_controls = Mock()
         store.migrate_bi_summary_numbers()
-        written_headers, rows = store._replace_table.call_args.args[1:]
+        written_headers, rows = store._replace_summary_atomically.call_args.args
         self.assertEqual(written_headers, headers)
         self.assertEqual(rows[0][-1], 1170.06)
         self.assertEqual(store._headers_cache["BI_Resumo_Diario"], headers)
-        self.assertEqual(store._format_bi_columns.call_args.args[1], headers)
+        store._format_bi_columns.assert_not_called()
         store.set_controls.assert_called_once_with({"_bi_numeric_revision": "2"})
 
     def test_summary_uses_iso_key_and_native_amount_to_avoid_dates_and_duplicate_days(

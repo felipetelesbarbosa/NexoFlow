@@ -721,7 +721,8 @@ class RecompraMutationRetryTests(unittest.TestCase):
         client = WeniClient("TOKEN_SINTETICO_WENI", retry_mutations=False)
         self.addCleanup(client.close)
 
-        def request(method, url, *, params, json, timeout):
+        def request(method, url, *, params, json, timeout, allow_redirects=False):
+            self.assertFalse(allow_redirects)
             if method == "GET":
                 return self.response(payload={"results": [deepcopy(contact)]})
             self.assertEqual(method, "POST")

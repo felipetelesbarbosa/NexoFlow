@@ -2,6 +2,10 @@
 
 ## NexoFlow 1.0
 
+- Auditoria geral: validações explícitas de datas e snapshots, tipos revisados, conexões fechadas e paginação validada. Escritas no Sheets reconciliam inclusões após timeout e preservam a tabela anterior até concluir os novos lotes.
+- BI legado mantém números, datas e identificadores literais; migração financeira grava valores e formatos em uma única transação. Curva ABC sinaliza itens ausentes/divergentes e a conversão considera a base atual. Delivery atualiza também as fontes comerciais.
+- CI bloqueia publicação quando lint, análise de tipos, auditoria de dependências ou testes Windows falham. A suíte Windows roda com e sem o modo UTF-8 do Python.
+
 - Check-up com leitura UTF-8 explícita nos testes de pacotes, corrigindo a falha de acentuação no Windows. CI também valida esses testes sem forçar o modo UTF-8 do Python.
 
 - Camada comercial para Looker com histórico acumulado, clientes por chave estável, itens com tipos numéricos, KPIs por período, Curva ABC e produtos comprados juntos. Migração do faturamento interpretado como data e campos opcionais de gênero/categoria sem inferência; cobertura histórica e ausência de anúncios sinalizadas.

@@ -122,6 +122,10 @@ def main():
                 rejected,
             )
         else:
+            if chats is None:
+                raise RuntimeError(
+                    "Configure a API de atendimentos antes de continuar."
+                )
             rooms = chats.list_closed_rooms(cutoff=cutoff)
             tickets, rejected = select_tickets(rooms, cutoff=cutoff)
             contacts = weni.list_contacts() if tickets else []

@@ -1,6 +1,7 @@
 """Dimensões de cliente e datas enviadas ao Sheets, sem integrações externas."""
 
 import unittest
+from datetime import date
 from unittest.mock import Mock
 
 from analytics import (
@@ -130,6 +131,7 @@ class CustomerDimensionsTests(unittest.TestCase):
         store = GoogleSheetsStore.__new__(GoogleSheetsStore)
         store.bi_orders = Mock()
         store._replace_table = Mock()
+        store._format_bi_columns = Mock()
         store.replace_bi_orders(rows)
         written = dict(
             zip(
@@ -138,10 +140,10 @@ class CustomerDimensionsTests(unittest.TestCase):
                 strict=False,
             )
         )
-        self.assertEqual(written["cep"], "'01234567")
-        self.assertEqual(written["cidade"], "'=1+1")
+        self.assertEqual(written["cep"], "01234567")
+        self.assertEqual(written["cidade"], "=1+1")
         self.assertEqual(written["idade"], 37)
-        self.assertEqual(written["data"], "2026-06-05")
+        self.assertEqual(written["data"], (date(2026, 6, 5) - date(1899, 12, 30)).days)
         self.assertEqual(rows[0][BI_ORDERS_COLUMNS.index("cep")], "01234567")
 
 

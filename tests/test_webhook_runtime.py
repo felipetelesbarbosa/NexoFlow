@@ -251,6 +251,7 @@ class WebhookRuntimeTests(unittest.TestCase):
         response = webhook_eventos.receive_event(self.event(), self.secret)
         self.assertEqual(response["status"], "duplicate")
         self.store.append_event.assert_not_called()
+        self.store.close.assert_called_once_with()
 
     def test_event_failed_write_propagates_and_replay_attempts_again(self):
         self.store.existing_event_ids.return_value = set()
@@ -260,6 +261,7 @@ class WebhookRuntimeTests(unittest.TestCase):
         response = webhook_eventos.receive_event(self.event(), self.secret)
         self.assertEqual(response["status"], "created")
         self.assertEqual(self.store.append_event.call_count, 2)
+        self.assertEqual(self.store.close.call_count, 2)
 
 
 if __name__ == "__main__":

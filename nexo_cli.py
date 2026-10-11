@@ -128,8 +128,12 @@ def _print_kv(label: str, value: Any) -> None:
 
 
 def _show_weni_contact(contact: dict[str, Any]) -> None:
-    fields = contact.get("fields") if isinstance(contact.get("fields"), dict) else {}
-    urns = contact.get("urns") if isinstance(contact.get("urns"), list) else []
+    fields = contact.get("fields")
+    if not isinstance(fields, dict):
+        fields = {}
+    urns = contact.get("urns")
+    if not isinstance(urns, list):
+        urns = []
     _title("Weni - Contato")
     _print_kv("UUID", contact.get("uuid"))
     _print_kv("Nome Weni", contact.get("name"))

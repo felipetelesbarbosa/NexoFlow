@@ -256,6 +256,7 @@ class DeliveryTicketsTests(unittest.TestCase):
                 {"key": key} for key in REQUIRED_ORDER_FIELDS
             ]
             store = Mock()
+            store.get_control.return_value = ""
             for method in (
                 store.upsert_contacts_detailed,
                 store.upsert_orders_detailed,
@@ -268,6 +269,8 @@ class DeliveryTicketsTests(unittest.TestCase):
             self.assertEqual(store.upsert_contacts_detailed.call_args.args[0], [])
             self.assertEqual(store.upsert_orders_detailed.call_args.args[0], [])
             self.assertEqual(store.upsert_delivery_tickets.call_args.args[0], [])
+            store.replace_looker_tables.assert_called_once()
+            store.close.assert_called_once_with()
 
     def test_legacy_ultima_compra_is_omitted_and_same_snapshot_resumes(self):
         plans, delivery = self.reconcile()

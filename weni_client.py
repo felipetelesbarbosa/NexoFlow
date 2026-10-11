@@ -5,7 +5,7 @@ import time
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 import requests
 
@@ -70,7 +70,13 @@ class WeniClient:
                     params=params,
                     json=json_body,
                     timeout=REQUEST_TIMEOUT_SECONDS,
+                    allow_redirects=False,
                 )
+
+                if 300 <= response.status_code < 400:
+                    raise WeniError(
+                        "A API da Weni retornou um redirecionamento inesperado."
+                    )
 
                 if response.status_code == 401:
                     raise WeniError("Weni retornou 401. Verifique o token da API.")
@@ -191,8 +197,26 @@ class WeniClient:
         url: str | None = base_url
         first_request = True
         page = 1
+        visited: set[str] = set()
+        endpoint = urlsplit(base_url)
 
         while url:
+            destination = urlsplit(url)
+            if (
+                destination[:2] != endpoint[:2]
+                or destination.path != endpoint.path
+                or destination.fragment
+                or destination.username
+                or destination.password
+            ):
+                raise WeniError(
+                    "Paginação da Weni retornou um destino diferente do endpoint configurado."
+                )
+            if url in visited:
+                raise WeniError(
+                    "Paginação da Weni repetiu uma página; leitura interrompida."
+                )
+            visited.add(url)
             payload = self._get_json(
                 url,
                 params=params if first_request else None,

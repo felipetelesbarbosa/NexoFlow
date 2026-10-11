@@ -672,6 +672,7 @@ class FarmaliderClient:
                         url,
                         params={"token": self.token},
                         timeout=FARMALIDER_REQUEST_TIMEOUT_SECONDS,
+                        allow_redirects=False,
                     )
                 except requests.RequestException as exc:
                     self._record_request(
@@ -930,6 +931,7 @@ class FarmaliderClient:
                         url,
                         params={"token": self.token},
                         timeout=FARMALIDER_REQUEST_TIMEOUT_SECONDS,
+                        allow_redirects=False,
                     )
                 except requests.RequestException as exc:
                     elapsed = time.monotonic() - started

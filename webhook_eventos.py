@@ -76,7 +76,11 @@ def receive_event(
         )
     with WEBHOOK_WRITE_LOCK:
         store = GoogleSheetsStore(GOOGLE_SPREADSHEET_ID)
-        if event_id in store.existing_event_ids():
-            return {"status": "duplicate", "event_id": event_id}
-        store.append_event(row)
+        try:
+            if event_id in store.existing_event_ids():
+                return {"status": "duplicate", "event_id": event_id}
+            store.append_event(row)
+        finally:
+            store.close()
+
     return {"status": "created", "event_id": event_id}

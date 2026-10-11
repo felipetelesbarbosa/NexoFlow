@@ -343,7 +343,8 @@ Distribuição oficial do **NexoFlow 1.0**.
 O arquivo `NexoFlow-Setup-$Version.zip` contém o instalador do NexoFlow 1.0 e foi validado automaticamente em Windows para primeira instalação e atualização de uma instalação existente.
 
 Melhorias desta distribuição do NexoFlow 1.0:
-- tabelas comerciais para Looker Studio com clientes, histórico de vendas, itens, Curva ABC, produtos comprados juntos e KPIs por período; correção dos tipos monetários e campos opcionais sem preenchimento artificial;
+- tabelas comerciais para Looker Studio com histórico de vendas, KPIs e Curva ABC com cobertura de itens; tipos monetários corrigidos e migração financeira atômica;
+- check-up corrigido para a codificação padrão do Windows; escritas no Sheets reconciliam inclusões após timeout; validação de código, tipos e dependências antes da publicação;
 - Weni com ícone azul e ciano, contato e balão de conversa, seguindo a estética dos outros componentes do NexoFlow;
 - Recompra com ícone próprio de sacola e setas circulares; Planilha com ícone azul alinhado ao NexoFlow, nos executáveis e atalhos;
 - CMD da Weni permanece aberto após conclusão, erro ou cancelamento, inclusive por outro launcher; fechar o aviso final ou pressionar ENTER não encerra a sessão; use EXIT para fechar;

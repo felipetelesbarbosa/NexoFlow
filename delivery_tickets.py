@@ -93,9 +93,12 @@ def delivery_ticket_key(chat_contact_uuid, opened, ended, *, fallback=""):
     except ValueError:
         return fallback
     dates = [_datetime(opened), _datetime(ended)]
-    if not all(dates):
+    if any(value is None for value in dates):
         return fallback
-    natural = [contact_id, *(date.astimezone(UTC).isoformat() for date in dates)]
+    natural = [
+        contact_id,
+        *(value.astimezone(UTC).isoformat() for value in dates if value is not None),
+    ]
     return str(uuid5(NAMESPACE_URL, "nexoflow:delivery:" + json.dumps(natural)))
 
 
@@ -447,6 +450,9 @@ def apply_delivery_review(path, weni, *, store_factory=None, target=None):
         raise ValueError(
             "Snapshot Delivery ausente ou alterado; execute a reconciliação novamente."
         )
+    cutoff_dt = business_order_datetime(delivery.get("cutoff"))
+    if cutoff_dt is None:
+        raise ValueError("Data de corte Delivery inválida; execute um novo dry-run.")
     frozen_target = delivery.get("target", "both")
     target = frozen_target if target is None else target
     if target not in {"weni", "analytics", "both"} or target != frozen_target:
@@ -571,52 +577,75 @@ def apply_delivery_review(path, weni, *, store_factory=None, target=None):
             "orders": len(keys),
             "target": target,
         }
+    if store_factory is None:
+        raise ValueError(
+            "Google Sheets deve estar configurado para o destino revisado."
+        )
     store = store_factory()
-    base = store.upsert_contacts_detailed(current_contacts)
-    all_orders = store.upsert_orders_detailed(orders).final_records
-    all_items = store.upsert_order_items_detailed(items).final_records
-    store.upsert_delivery_tickets(tickets)
-    store.refresh_delivery_bi(all_orders)
-    from analytics import (
-        build_bi_conversion_records,
-        build_bi_order_rows,
-        build_bi_sales_rows,
-        build_bi_summary_record,
-        build_sales_metrics,
-    )
+    try:
+        base = store.upsert_contacts_detailed(current_contacts)
+        all_orders = store.upsert_orders_detailed(orders).final_records
+        all_items = store.upsert_order_items_detailed(items).final_records
+        store.upsert_delivery_tickets(tickets)
+        store.refresh_delivery_bi(all_orders)
+        from analytics import (
+            build_bi_conversion_records,
+            build_bi_order_rows,
+            build_bi_sales_rows,
+            build_bi_summary_record,
+            build_sales_metrics,
+        )
 
-    snapshot_date = business_order_datetime(delivery["cutoff"]).date().isoformat()
-    store.replace_sales_metrics(build_sales_metrics(all_orders, all_items))
-    store.replace_bi_orders(
-        build_bi_order_rows(
-            base.final_records, all_orders, all_items, updated_at=delivery["cutoff"]
+        snapshot_date = cutoff_dt.date().isoformat()
+        store.replace_sales_metrics(build_sales_metrics(all_orders, all_items))
+        store.replace_bi_orders(
+            build_bi_order_rows(
+                base.final_records, all_orders, all_items, updated_at=delivery["cutoff"]
+            )
         )
-    )
-    store.replace_bi_sales(
-        build_bi_sales_rows(
-            all_orders,
-            all_items,
-            snapshot_date=snapshot_date,
-            updated_at=delivery["cutoff"],
+        store.replace_bi_sales(
+            build_bi_sales_rows(
+                all_orders,
+                all_items,
+                snapshot_date=snapshot_date,
+                updated_at=delivery["cutoff"],
+            )
         )
-    )
-    store.upsert_bi_summary(
-        build_bi_summary_record(
-            base.final_records,
-            all_orders,
-            all_items,
-            snapshot_date=snapshot_date,
-            updated_at=delivery["cutoff"],
+        store.upsert_bi_summary(
+            build_bi_summary_record(
+                base.final_records,
+                all_orders,
+                all_items,
+                snapshot_date=snapshot_date,
+                updated_at=delivery["cutoff"],
+            )
         )
-    )
-    store.upsert_bi_conversion(
-        build_bi_conversion_records(
-            base.final_records,
-            all_orders,
-            snapshot_date=snapshot_date,
-            updated_at=delivery["cutoff"],
+        store.upsert_bi_conversion(
+            build_bi_conversion_records(
+                base.final_records,
+                all_orders,
+                snapshot_date=snapshot_date,
+                updated_at=delivery["cutoff"],
+            )
         )
-    )
+        from looker_bi import build_looker_tables
+
+        history_started = store.get_control("historico_observado_desde")
+        store.replace_looker_tables(
+            build_looker_tables(
+                base.final_records,
+                all_orders,
+                all_items,
+                snapshot_date=snapshot_date,
+                updated_at=delivery["cutoff"],
+                history_observed_since=history_started or snapshot_date,
+            )
+        )
+        if not history_started:
+            store.set_controls({"historico_observado_desde": snapshot_date})
+    finally:
+        store.close()
+
     logging.info(
         "Delivery: contatos aceitos=%s; conflitos=%s; tickets enviados=%s; pedidos únicos enviados=%s.",
         len(accepted),

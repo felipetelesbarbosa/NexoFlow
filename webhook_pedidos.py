@@ -113,15 +113,21 @@ def receive_order(
 
     with WEBHOOK_WRITE_LOCK:
         store = GoogleSheetsStore(_spreadsheet_id())
-        orders_result = store.upsert_orders_detailed([order])
-        items_result = store.upsert_order_items_detailed(items)
+        try:
+            orders_result = store.upsert_orders_detailed([order])
+            items_result = store.upsert_order_items_detailed(items)
 
-        # Os upserts já devolveram as tabelas finais: não relê as mesmas abas.
-        # Reenvios ainda comparam/reparam a aba de métricas caso uma gravação
-        # anterior tenha falhado depois de persistir os pedidos ou itens.
-        store.replace_sales_metrics(
-            build_sales_metrics(orders_result.final_records, items_result.final_records)
-        )
+            # Os upserts já devolveram as tabelas finais: não relê as mesmas abas.
+            # Reenvios ainda comparam/reparam a aba de métricas caso uma gravação
+            # anterior tenha falhado depois de persistir os pedidos ou itens.
+            store.replace_sales_metrics(
+                build_sales_metrics(
+                    orders_result.final_records, items_result.final_records
+                )
+            )
+
+        finally:
+            store.close()
 
     return {
         "status": "ok",

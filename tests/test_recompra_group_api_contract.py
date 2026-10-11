@@ -48,7 +48,17 @@ class FakeWeniTransport:
         self.pending_checked = False
         self.state_path = None
 
-    def request(self, method, url, *, params=None, json=None, timeout=None):
+    def request(
+        self,
+        method,
+        url,
+        *,
+        params=None,
+        json=None,
+        timeout=None,
+        allow_redirects=False,
+    ):
+        assert allow_redirects is False
         self.calls.append((method, url, deepcopy(params), deepcopy(json)))
         if method == "GET" and url == WENI_CONTACTS_API_URL:
             assert params["uuid"] == self.contact["uuid"]
