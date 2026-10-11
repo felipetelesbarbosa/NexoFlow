@@ -2,6 +2,8 @@
 
 ## NexoFlow 1.0
 
+- `atualizar_tudo.bat` executa as cargas completas, Planilhas, Recompra e sincronização incremental em ordem, mantendo as revisões humanas e interrompendo o fluxo diante de erros, conflitos ou consultas parciais. Looker Studio recebe orientação para atualização manual ao final.
+
 - Compra posterior ainda não confirmada pela API pode ser sinalizada na Weni e no Sheets, com bloqueio da referência antiga de recompra e indicadores de pendência no BI.
 
 - Revalidação de pedidos: a Recompra não recupera um pedido antigo quando o último pedido oficial está incompleto ou cancelado. Falhas de itens preservam os sinais oficiais de cancelamento e permanecem bloqueadas para venda e agendamento.

@@ -5,6 +5,14 @@ set "PYTHONIOENCODING=utf-8"
 cd /d "%~dp0"
 title NexoFlow Weni - Carga Completa
 set "NEXOFLOW_LAUNCHER=1"
+set "WORKFLOW_MODE="
+set "STRICT_ARG="
+if /i "%~1"=="--fluxo-completo" (
+    set "WORKFLOW_MODE=1"
+    set "STRICT_ARG=--require-complete"
+    set "OPCAO=0"
+    goto :opcao_escolhida
+)
 
 cls
 echo ==========================================================
@@ -26,6 +34,8 @@ echo.
 set "OPCAO="
 set /p "OPCAO=Opção: " < CON
 
+
+:opcao_escolhida
 set "PART="
 set "PART_ARG="
 set "REVIEW_JSON=logs\weni_update_review_full.json"
@@ -95,7 +105,7 @@ if exist "%REVIEW_TXT%" del /q "%REVIEW_TXT%" >nul 2>&1
 echo.
 echo [ETAPA 3/6] Dry-run + auditoria + snapshot congelado
 echo ----------------------------------------------------------
-".venv\Scripts\python.exe" run_update_weni.py --dry-run --full %PART_ARG% --review-out "%REVIEW_JSON%"
+".venv\Scripts\python.exe" run_update_weni.py --dry-run --full %PART_ARG% %STRICT_ARG% --review-out "%REVIEW_JSON%"
 set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto :erro
 
@@ -145,12 +155,13 @@ set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto :erro
 echo [ETAPA 5/6] Aplicando snapshot congelado com validação por contato
 echo ----------------------------------------------------------
-".venv\Scripts\python.exe" run_update_weni.py --apply --full %PART_ARG% --require-review "%REVIEW_JSON%"
+".venv\Scripts\python.exe" run_update_weni.py --apply --full %PART_ARG% %STRICT_ARG% --require-review "%REVIEW_JSON%"
 set "RC=%ERRORLEVEL%"
 "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -STA -ExecutionPolicy Bypass -File "%~dp0scripts\resultado_carga_weni.ps1" -RecordOnly -Stage "APPLY_RETORNOU" -ResultCode %RC% -Snapshot "%REVIEW_JSON%"
 if not "%RC%"=="0" goto :erro
 
 echo.
+if defined WORKFLOW_MODE goto :recompra_fim
 if defined PART if not "%PART%"=="4" goto :recompra_fim
 rem Recompra é uma etapa independente, com auditoria e revisão próprias.
 ".venv\Scripts\python.exe" -c "import sys,secrets_config as s; sys.exit(0 if getattr(s,'RECOMPRA_ENABLED',False) else 10)"
@@ -196,6 +207,7 @@ call :resultado
 exit /b %RC%
 
 :resultado
+if defined WORKFLOW_MODE exit /b 0
 echo [INFO] O resultado permanecerá no terminal. Digite EXIT quando quiser fechar.
 if not exist "%~dp0scripts\resultado_carga_weni.ps1" (
     call :aguardar_saida
@@ -206,6 +218,7 @@ call :aguardar_saida
 exit /b 0
 
 :aguardar_saida
+if defined WORKFLOW_MODE exit /b 0
 if defined NEXOFLOW_TERMINAL exit /b 0
 setlocal EnableDelayedExpansion
 :aguardar_exit

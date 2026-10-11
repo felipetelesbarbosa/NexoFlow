@@ -13,6 +13,11 @@ def main():
     parser = argparse.ArgumentParser(
         description="Reconcilia as tags Pedido, Pedido is deleted (legada, inclusive com data de exclusão) e Pedido finalizado do Weni Chats com a FarmaLíder."
     )
+    parser.add_argument(
+        "--require-complete",
+        action="store_true",
+        help="interrompe o fluxo se houver consultas de pedido incompletas",
+    )
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument(
         "--dry-run",
@@ -152,6 +157,14 @@ def main():
         if imported is not None:
             delivery["spreadsheet_import"] = import_report
         write_delivery_review(plans, delivery, args.review_out)
+        if args.require_complete and any(
+            str(row.get("resultado_validacao", "")).startswith("ERRO_")
+            for row in delivery["tickets"]
+        ):
+            print(
+                "[AVISO] Consulta de pedidos parcial. Nenhuma aplicação foi autorizada pelo fluxo completo."
+            )
+            return 3
         print(f"[OK] Revisão gerada em {args.review_out.with_suffix('.txt')}.")
         print(
             f"Tickets: {len(tickets)} | clientes: {len(plans)} | pedidos únicos: {len(delivery['orders'])}."

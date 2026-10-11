@@ -2,6 +2,8 @@
 chcp 65001 >nul
 setlocal EnableExtensions DisableDelayedExpansion
 set "PYTHONIOENCODING=utf-8"
+set "STRICT_ARG="
+if defined NEXOFLOW_FULL_WORKFLOW set "STRICT_ARG=--require-complete"
 cd /d "%~dp0"
 set "DESTINO=%~1"
 if /I "%DESTINO%"=="weni" goto :destino_ok
@@ -27,7 +29,7 @@ echo   Conversas_Delivery.xlsx
 echo   Contatos_Delivery.xlsx
 echo.
 echo [1/3] Validando vínculos e consultando pedidos na FarmaLíder...
-".venv\Scripts\python.exe" run_delivery_tickets.py --dry-run --planilhas --target "%DESTINO%" --review-out "%REVIEW_JSON%"
+".venv\Scripts\python.exe" run_delivery_tickets.py --dry-run %STRICT_ARG% --planilhas --target "%DESTINO%" --review-out "%REVIEW_JSON%"
 set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto :erro_consulta
 echo.

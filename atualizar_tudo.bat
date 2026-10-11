@@ -1,0 +1,85 @@
+@echo off
+chcp 65001 >nul
+setlocal EnableExtensions DisableDelayedExpansion
+set "PYTHONIOENCODING=utf-8"
+set "NEXOFLOW_LAUNCHER=1"
+set "NEXOFLOW_FULL_WORKFLOW=1"
+set "FORCE_FULL_SYNC="
+set "FULL_SYNC_QUARTER="
+cd /d "%~dp0"
+title NexoFlow 1.0 - Atualização completa
+
+echo ==========================================================
+echo NexoFlow 1.0 - Atualização completa em ordem
+echo ==========================================================
+echo As cargas integrais serão executadas com 100%% da base.
+echo Cada aplicação Weni, Planilhas e Recompra exige sua revisão.
+echo Falha, cancelamento ou carga parcial interrompe o fluxo.
+echo.
+set "ETAPA=Preparação"
+set "RC=1"
+if not exist ".venv\Scripts\python.exe" goto :ambiente_ausente
+for %%F in (atualizar_weni_carga_completa.bat atualizar_weni_planilhas.bat executar_analytics_planilhas.bat executar_carga_completa.bat atualizar_recompra.bat executar_manual.bat) do if not exist "%%F" goto :componente_ausente
+if not exist "importacoes\Conversas_Delivery.xlsx" goto :planilhas_ausentes
+if not exist "importacoes\Contatos_Delivery.xlsx" goto :planilhas_ausentes
+
+set "ETAPA=1/5 - Weni: carga completa 100%%"
+echo [ETAPA %ETAPA%]
+call "%~dp0atualizar_weni_carga_completa.bat" --fluxo-completo
+set "RC=%ERRORLEVEL%"
+if not "%RC%"=="0" goto :interrompido
+
+set "ETAPA=2/5 - Planilhas: Weni"
+echo [ETAPA %ETAPA%]
+call "%~dp0atualizar_weni_planilhas.bat"
+set "RC=%ERRORLEVEL%"
+if not "%RC%"=="0" goto :interrompido
+set "ETAPA=2/5 - Planilhas: Analytics e Google Sheets"
+echo [ETAPA %ETAPA%]
+call "%~dp0executar_analytics_planilhas.bat"
+set "RC=%ERRORLEVEL%"
+if not "%RC%"=="0" goto :interrompido
+
+set "ETAPA=3/5 - Analytics: carga completa 100%%"
+echo [ETAPA %ETAPA%]
+call "%~dp0executar_carga_completa.bat" --fluxo-completo
+set "RC=%ERRORLEVEL%"
+if not "%RC%"=="0" goto :interrompido
+
+set "ETAPA=4/5 - Recompra: revisão e aplicação"
+echo [ETAPA %ETAPA%]
+call "%~dp0atualizar_recompra.bat"
+set "RC=%ERRORLEVEL%"
+if not "%RC%"=="0" goto :interrompido
+
+set "ETAPA=5/5 - Analytics: sincronização incremental"
+echo [ETAPA %ETAPA%]
+set "FORCE_FULL_SYNC="
+set "FULL_SYNC_QUARTER="
+call "%~dp0executar_manual.bat"
+set "RC=%ERRORLEVEL%"
+if not "%RC%"=="0" goto :interrompido
+echo.
+echo [OK] As cinco etapas foram concluídas.
+echo No Looker Studio, atualize os dados e os campos das fontes alteradas.
+echo Essa atualização no Looker precisa ser feita na interface do painel.
+goto :fim
+
+:ambiente_ausente
+echo [ERRO] Ambiente virtual ausente. Execute instalar.bat primeiro.
+goto :interrompido
+:componente_ausente
+echo [ERRO] Componente ausente. Reinstale o Setup atualizado do NexoFlow.
+goto :interrompido
+:planilhas_ausentes
+echo [ERRO] Coloque Conversas_Delivery.xlsx e Contatos_Delivery.xlsx em importacoes.
+goto :interrompido
+:interrompido
+echo.
+echo [INTERROMPIDO] %ETAPA% - código de saída: %RC%.
+echo As próximas etapas não foram executadas.
+echo Confira os logs e o snapshot revisado antes de retomar uma aplicação parcial.
+:fim
+echo.
+pause
+exit /b %RC%

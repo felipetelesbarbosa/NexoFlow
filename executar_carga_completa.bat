@@ -4,11 +4,18 @@ setlocal EnableExtensions
 set "PYTHONIOENCODING=utf-8"
 cd /d "%~dp0"
 title NexoFlow Analytics - Carga Completa
+set "WORKFLOW_MODE="
+if /i "%~1"=="--fluxo-completo" set "WORKFLOW_MODE=1"
 
 if not exist ".venv\Scripts\python.exe" (
     echo Ambiente virtual não encontrado. Execute instalar.bat primeiro.
-    pause
+    if not defined WORKFLOW_MODE pause
     exit /b 1
+)
+
+if defined WORKFLOW_MODE (
+    set "OPCAO=0"
+    goto :opcao_escolhida
 )
 
 cls
@@ -29,6 +36,7 @@ echo Elas usam uma base congelada e devem ser executadas em ordem.
 echo.
 set /p "OPCAO=Opção: "
 
+:opcao_escolhida
 set "FULL_SYNC_QUARTER="
 if "%OPCAO%"=="0" goto :executar
 if "%OPCAO%"=="1" set "FULL_SYNC_QUARTER=1"
@@ -37,7 +45,7 @@ if "%OPCAO%"=="3" set "FULL_SYNC_QUARTER=3"
 if "%OPCAO%"=="4" set "FULL_SYNC_QUARTER=4"
 if not defined FULL_SYNC_QUARTER (
     echo [ERRO] Opção inválida.
-    pause
+    if not defined WORKFLOW_MODE pause
     exit /b 2
 )
 
@@ -64,5 +72,5 @@ if "%EXIT_CODE%"=="3" (
     echo Execute novamente a mesma parte depois de consultar logs\nexoflow.log.
 )
 if "%EXIT_CODE%"=="0" echo [OK] Carga concluída.
-pause
+if not defined WORKFLOW_MODE pause
 exit /b %EXIT_CODE%

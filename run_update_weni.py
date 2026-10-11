@@ -15,6 +15,11 @@ def build_parser() -> argparse.ArgumentParser:
             "flows e confirmação de pedidos da FarmaLíder."
         )
     )
+    parser.add_argument(
+        "--require-complete",
+        action="store_true",
+        help="interrompe o fluxo se houver consultas de pedido incompletas",
+    )
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument(
         "--check-only", action="store_true", help="testa acessos sem alterar dados"
@@ -75,6 +80,8 @@ def main() -> int:
         ]
         if args.full:
             arguments.append("--full")
+        if args.require_complete:
+            arguments.append("--require-complete")
         if args.review_out:
             arguments += ["--review-out", args.review_out]
         if args.require_review:
@@ -215,6 +222,13 @@ def main() -> int:
                 )
             else:
                 print("Modo: APPLY. Alterações auditadas e gravadas.")
+        if args.require_complete and (
+            stats.orders_api_failed
+            or stats.contacts_conflicted
+            or stats.contacts_failed
+        ):
+            print("[AVISO] Carga Weni parcial. O fluxo completo não pode continuar.")
+            return 3
         return 0
     except Exception as exc:
         logging.exception("NexoFlow Weni falhou: %s", exc)

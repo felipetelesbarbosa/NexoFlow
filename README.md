@@ -654,6 +654,14 @@ Proteções principais:
 
 ## Operação recomendada
 
+### Atualizar tudo em ordem
+
+Execute `atualizar_tudo.bat` na pasta instalada do NexoFlow, após colocar `Conversas_Delivery.xlsx` e `Contatos_Delivery.xlsx` em `importacoes`.
+
+O fluxo executa Weni completa (100%), Planilhas → Weni, Planilhas → Analytics/Google Sheets, Analytics completo (100%), Recompra e Analytics incremental, nessa ordem. Revise os relatórios e confirme cada aplicação quando solicitado. A Recompra ocorre somente na quarta etapa, mesmo quando habilitada para execução após a carga Weni individual.
+
+Erro, cancelamento, conflito ou consulta parcial interrompe a sequência. Confira os logs antes de retomar; uma aplicação parcial precisa ser reconciliada com o mesmo snapshot revisado. Ao concluir, atualize manualmente os dados e os campos das fontes alteradas no Looker Studio. O terminal permanece aberto para mostrar o resultado final.
+
 ### Carga completa fragmentada em 25%
 
 Para reduzir o tempo e o risco operacional de uma carga integral longa, `atualizar_weni_carga_completa.bat` e `executar_carga_completa.bat` permitem escolher **100%** ou uma das quatro partes de **25%**.

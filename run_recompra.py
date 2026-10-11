@@ -12,6 +12,11 @@ def build_parser():
     parser = argparse.ArgumentParser(
         description="NexoFlow 1.0 — Recompra FarmaLíder D+25"
     )
+    parser.add_argument(
+        "--require-complete",
+        action="store_true",
+        help="interrompe o fluxo se houver consultas de pedido incompletas",
+    )
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument(
         "--check-only",
@@ -170,6 +175,15 @@ def main(argv=None):
         ensure_review_current(review, now_local())
         write_review(review, args.review_out)
         ensure_review_current(review, now_local())
+        if args.require_complete and any(
+            str(plan.get("reason", "")).startswith("ERRO_")
+            or str(plan.get("order_resolution_status", "")).startswith("ERRO_")
+            for plan in plans
+        ):
+            print(
+                "[AVISO] Recompra com consultas incompletas. O fluxo completo foi interrompido antes da aplicação."
+            )
+            return 3
         print(
             "[OK] Dry-run concluído; nenhuma gravação na Weni. Revise "
             + str(args.review_out.with_suffix(".txt"))

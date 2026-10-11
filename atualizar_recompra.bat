@@ -2,6 +2,8 @@
 chcp 65001 >nul
 setlocal EnableExtensions DisableDelayedExpansion
 set "PYTHONIOENCODING=utf-8"
+set "STRICT_ARG="
+if defined NEXOFLOW_FULL_WORKFLOW set "STRICT_ARG=--require-complete"
 cd /d "%~dp0"
 title NexoFlow 1.0 - Recompra FarmaLíder
 set "REVIEW_JSON=logs\recompra_review.json"
@@ -11,7 +13,7 @@ set "REVIEW_REFRESHES=0"
 set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto :fim
 :gerar_revisao
-".venv\Scripts\python.exe" run_recompra.py --dry-run --review-out "%REVIEW_JSON%"
+".venv\Scripts\python.exe" run_recompra.py --dry-run %STRICT_ARG% --review-out "%REVIEW_JSON%"
 set "RC=%ERRORLEVEL%"
 if "%RC%"=="4" goto :renovar_revisao
 if not "%RC%"=="0" goto :fim

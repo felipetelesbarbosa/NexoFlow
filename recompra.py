@@ -711,6 +711,7 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
         "warnings": [],
     }
     diagnostic = text((order or {}).get("status_confirmacao"))
+    plan["order_resolution_status"] = diagnostic
     if diagnostic.startswith("CPF_") or diagnostic.startswith("ERRO_"):
         plan["reason"] = diagnostic
     # A recusa e o cancelamento prevalecem até sobre pedidos que a API

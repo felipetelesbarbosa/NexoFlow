@@ -206,6 +206,7 @@ class UpdateStats:
     purchase_confirmed: int = 0
     purchase_skipped: int = 0
     orders_validated: int = 0
+    orders_api_failed: int = 0
     payment_unmapped_codes: dict[str, int] = field(default_factory=dict)
     orders_cancelled_payment_zero: int = 0
     orders_pending_payment: int = 0
@@ -288,7 +289,12 @@ class _InvalidCpfBatch:
 
 
 def _record_validated_order(stats: UpdateStats, plan: ContactUpdatePlan) -> None:
-    """Count contacts with a validated order, including unchanged/cancelled ones."""
+    """Count validated orders and incomplete queries, including unchanged contacts."""
+    if (
+        plan.order_resolution_status.startswith("ERRO_")
+        or plan.order_resolution_status == "API_DESABILITADA"
+    ):
+        stats.orders_api_failed += 1
     if not plan.order_validated:
         return
     stats.orders_validated += 1
@@ -2523,6 +2529,7 @@ def run_update(
             stats.orders_cancelled_payment_zero = int(
                 summary.get("orders_cancelled_payment_zero") or 0
             )
+            stats.orders_api_failed = int(summary.get("orders_api_failed") or 0)
             stats.orders_pending_payment = int(
                 summary.get("orders_pending_payment") or 0
             )
