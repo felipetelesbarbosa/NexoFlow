@@ -830,7 +830,7 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn("function Install-OptionalUninstaller", install)
         self.assertIn("NexoFlow Uninstall.exe", install)
         self.assertIn("A instalação continuará normalmente", install)
-        required_line = "foreach ($requiredFile in @('NexoFlow Analytics.exe','NexoFlow Weni.exe','NexoFlow Recompra.exe','NexoFlow Terminal.exe','NexoFlow Planilha.exe','executar_planilha.bat','assets\\NexoFlow_Planilha.ico','installer\\uninstall.ps1','desinstalar_nexoflow.cmd','scripts\\confirmar_revisao_weni.ps1','scripts\\resultado_carga_weni.ps1'))"
+        required_line = "foreach ($requiredFile in @('NexoFlow Analytics.exe','NexoFlow Weni.exe','NexoFlow Recompra.exe','NexoFlow Terminal.exe','NexoFlow Planilha.exe','executar_planilha.bat','assets\\NexoFlow_Planilha.ico','assets\\NexoFlow_Recompra.ico','installer\\uninstall.ps1','desinstalar_nexoflow.cmd','scripts\\confirmar_revisao_weni.ps1','scripts\\resultado_carga_weni.ps1'))"
         self.assertIn(required_line, install)
         self.assertNotIn(
             "'NexoFlow Uninstall.exe')) {\n        Ensure-InstalledPayloadFile", install
@@ -905,6 +905,8 @@ class CurrentIntegrationTests(unittest.TestCase):
             "NexoFlow.ico",
             "NexoFlow_Weni.ico",
             "NexoFlow_Terminal.ico",
+            "NexoFlow_Recompra.ico",
+            "NexoFlow_Planilha.ico",
             "installer.ico",
             "uninstaller.ico",
         ):

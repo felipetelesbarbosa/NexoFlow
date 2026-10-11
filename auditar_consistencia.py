@@ -580,6 +580,8 @@ def check_windows_lifecycle() -> None:
         "assets/NexoFlow.ico",
         "assets/NexoFlow_Weni.ico",
         "assets/NexoFlow_Terminal.ico",
+        "assets/NexoFlow_Recompra.ico",
+        "assets/NexoFlow_Planilha.ico",
         "assets/installer.ico",
         "assets/uninstaller.ico",
         "README INSTALACAO.md",
@@ -781,6 +783,8 @@ def check_windows_lifecycle() -> None:
         "NexoFlow Terminal.exe",
         "NexoFlow Terminal.lnk",
         "NexoFlow_Terminal.ico",
+        "NexoFlow_Recompra.ico",
+        "NexoFlow_Planilha.ico",
         "Documentacao NexoFlow.html",
     ]:
         if required_text not in install:
@@ -941,6 +945,8 @@ def check_windows_lifecycle() -> None:
         "NexoFlow.ico",
         "NexoFlow_Weni.ico",
         "NexoFlow_Terminal.ico",
+        "NexoFlow_Recompra.ico",
+        "NexoFlow_Planilha.ico",
         "installer.ico",
         "uninstaller.ico",
     ]:

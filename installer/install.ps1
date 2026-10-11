@@ -1085,7 +1085,7 @@ try {
     if ($installRc -ne 0) { throw "A preparação do ambiente Python falhou (código $installRc). Os arquivos e dados privados foram preservados." }
 
     Write-Step 'Validando componentes instalados'
-    foreach ($requiredFile in @('NexoFlow Analytics.exe','NexoFlow Weni.exe','NexoFlow Recompra.exe','NexoFlow Terminal.exe','NexoFlow Planilha.exe','executar_planilha.bat','assets\NexoFlow_Planilha.ico','installer\uninstall.ps1','desinstalar_nexoflow.cmd','scripts\confirmar_revisao_weni.ps1','scripts\resultado_carga_weni.ps1')) {
+    foreach ($requiredFile in @('NexoFlow Analytics.exe','NexoFlow Weni.exe','NexoFlow Recompra.exe','NexoFlow Terminal.exe','NexoFlow Planilha.exe','executar_planilha.bat','assets\NexoFlow_Planilha.ico','assets\NexoFlow_Recompra.ico','installer\uninstall.ps1','desinstalar_nexoflow.cmd','scripts\confirmar_revisao_weni.ps1','scripts\resultado_carga_weni.ps1')) {
         Ensure-InstalledPayloadFile -RelativePath $requiredFile
     }
 
@@ -1098,6 +1098,7 @@ try {
     $recompraExe = Join-Path $InstallDir 'NexoFlow Recompra.exe'
     $appIcon = Join-Path $InstallDir 'assets\NexoFlow.ico'
     $updateIcon = Join-Path $InstallDir 'assets\NexoFlow_Weni.ico'
+    $recompraIcon = Join-Path $InstallDir 'assets\NexoFlow_Recompra.ico'
     $terminalIcon = Join-Path $InstallDir 'assets\NexoFlow_Terminal.ico'
     $uninstallCmd = Join-Path $InstallDir 'desinstalar_nexoflow.cmd'
     $terminalExe = Join-Path $InstallDir 'NexoFlow Terminal.exe'
@@ -1134,12 +1135,12 @@ try {
     if (Test-Path -LiteralPath $startMenu) { Remove-Item -LiteralPath $startMenu -Recurse -Force -ErrorAction SilentlyContinue }
     Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Analytics.lnk') -TargetPath $appExe -WorkingDirectory $InstallDir -Description 'Valida o ambiente e executa uma sincronização incremental do NexoFlow' -IconPath $appIcon
     Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Weni.lnk') -TargetPath $updateExe -WorkingDirectory $InstallDir -Description 'Audita e atualiza contatos e campos da Weni' -IconPath $updateIcon
-    Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Recompra.lnk') -TargetPath $recompraExe -WorkingDirectory $InstallDir -Description 'Recompra FarmaLider D+25 com revisao antes de incluir na Weni' -IconPath $updateIcon
+    Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Recompra.lnk') -TargetPath $recompraExe -WorkingDirectory $InstallDir -Description 'Recompra FarmaLider D+25 com revisao antes de incluir na Weni' -IconPath $recompraIcon
     Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Planilha.lnk') -TargetPath $planilhaExe -WorkingDirectory $InstallDir -Description 'Cargas por planilhas para Weni e Analytics, com revisão humana' -IconPath $planilhaIcon
     Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Terminal.lnk') -TargetPath $terminalExe -WorkingDirectory $InstallDir -Description 'Terminal NexoFlow com ambiente e proxy preparados para a sessao' -IconPath $terminalIcon
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Analytics.lnk') -TargetPath $appExe -WorkingDirectory $InstallDir -Description 'Sincronização manual segura do NexoFlow' -IconPath $appIcon
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Weni.lnk') -TargetPath $updateExe -WorkingDirectory $InstallDir -Description 'Atualização segura de contatos e campos da Weni' -IconPath $updateIcon
-    Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Recompra.lnk') -TargetPath $recompraExe -WorkingDirectory $InstallDir -Description 'Recompra FarmaLider D+25 com revisao obrigatoria' -IconPath $updateIcon
+    Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Recompra.lnk') -TargetPath $recompraExe -WorkingDirectory $InstallDir -Description 'Recompra FarmaLider D+25 com revisao obrigatoria' -IconPath $recompraIcon
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Planilha.lnk') -TargetPath $planilhaExe -WorkingDirectory $InstallDir -Description 'Cargas por planilhas para Weni e Analytics, com revisão humana' -IconPath $planilhaIcon
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Terminal.lnk') -TargetPath $terminalExe -WorkingDirectory $InstallDir -Description 'Terminal NexoFlow com ambiente e proxy preparados para a sessao' -IconPath $terminalIcon
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'Desinstalar NexoFlow.lnk') -TargetPath $uninstallCmd -WorkingDirectory $InstallDir -Description 'Desinstala o NexoFlow' -IconPath (Join-Path $InstallDir 'assets\uninstaller.ico')
