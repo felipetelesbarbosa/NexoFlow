@@ -4,7 +4,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parent
 
 
@@ -36,7 +35,7 @@ def main() -> int:
 
     try:
         _configure_proxy()
-    except Exception as exc:
+    except (ImportError, SyntaxError, OSError, ValueError) as exc:
         print(
             "[ERRO] Não foi possível configurar o proxy para o pip: "
             f"{exc}"

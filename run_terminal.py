@@ -8,7 +8,6 @@ from pathlib import Path
 
 from proxy_config import configure_proxy
 
-
 BASE_DIR = Path(__file__).resolve().parent
 
 
@@ -90,7 +89,7 @@ def main() -> int:
             check=False,
         )
         return int(completed.returncode)
-    except Exception as exc:
+    except (OSError, RuntimeError, ValueError) as exc:
         print(f"[ERRO] Não foi possível abrir o NexoFlow Terminal: {exc}", file=sys.stderr)
         return 1
 

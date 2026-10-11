@@ -8,7 +8,7 @@ from proxy_config import configure_proxy
 def run() -> int:
     try:
         status = configure_proxy()
-    except Exception as exc:
+    except (OSError, ValueError) as exc:
         print(f"[ERRO] Configuração de proxy inválida: {exc}")
         return 1
 

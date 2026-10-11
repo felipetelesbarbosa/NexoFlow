@@ -7,10 +7,10 @@ import threading
 import time
 import urllib.request
 from dataclasses import dataclass
+from http.client import HTTPException
 from urllib.parse import quote
 
 import secrets_config as secrets
-
 
 VALID_MODES = {"auto", "on", "off"}
 DIRECT_TEST_URL = "https://pypi.org/simple/pip/"
@@ -58,7 +58,7 @@ def _read_settings() -> tuple[str, str, int, str, str, str, float]:
     try:
         port = int(raw_port or 0)
     except (TypeError, ValueError):
-        raise ValueError("PROXY_PORT precisa ser um número inteiro.")
+        raise ValueError("PROXY_PORT precisa ser um número inteiro.") from None
 
     user = str(getattr(secrets, "PROXY_USER", "")).strip()
     password = str(getattr(secrets, "PROXY_PASSWORD", ""))
@@ -117,7 +117,9 @@ def _direct_internet_available(timeout: float) -> bool:
         )
         with opener.open(request, timeout=max(timeout, 3.0)) as response:
             return 200 <= getattr(response, "status", 200) < 500
-    except Exception:
+    except (OSError, HTTPException):
+        # URLError, erros TLS e timeouts são subclasses de OSError.
+        # Erros de programação não devem ser confundidos com falta de rede.
         return False
 
 
