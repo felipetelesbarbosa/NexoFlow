@@ -16,7 +16,7 @@ Em `secrets_config.py`:
 
 ```python
 PROXY_MODE = "auto"
-PROXY_HOST = "10.1.15.3"
+PROXY_HOST = "proxy.exemplo.invalid"
 PROXY_PORT = 8020
 PROXY_USER = "..."
 PROXY_PASSWORD = "..."
@@ -25,6 +25,7 @@ PROXY_DETECTION_TIMEOUT = 1.5
 ```
 
 Nunca coloque credenciais reais em documentação versionada.
+`proxy.exemplo.invalid` é fictício: substitua pelo endereço autorizado da sua rede.
 
 ## Modos
 

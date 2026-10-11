@@ -2,6 +2,12 @@
 
 ## NexoFlow 1.0
 
+- Testes usam configuração fictícia em memória e bloqueiam conexões reais; check-up, unittest e pytest independem de credenciais locais. Compatibilidade testada no Windows com Python 3.11, 3.13 e 3.14.
+- Webhooks opcionais com comparação segura do segredo, validação explícita do schema e serialização das gravações entre threads do mesmo processo. Pedidos e itens reutilizam os snapshots dos upserts, eliminando duas releituras completas; métricas continuam reparáveis após falhas.
+- Parser de pedidos separado em validações de itens e totais, com testes de caracterização. Tratamento de erros periféricos especifica falhas esperadas e mantém os bloqueios de aplicação, checkpoint e auditoria.
+- Documentação Markdown na raiz como fonte única do HTML, com geração e verificação de integridade. Exemplos de proxy usam domínio fictício; metadados do projeto preservam NexoFlow 1.0 e Python >=3.11.
+- Resumos da Recompra e da aplicação a cada 1.000 contatos, com resumo final inclusive para o último lote parcial.
+
 - Progresso das consultas e atualizações Weni a cada 2 segundos: barra por etapa, contatos/registros por segundo, tempo decorrido e previsão de término. Auditoria JSONL informa bytes efetivamente gravados por segundo; conflitos e contatos já corretos também avançam o progresso.
 
 - Versão mínima do Requests elevada para 2.33.0, excluindo versões com vulnerabilidades conhecidas sem alterar o limite de compatibilidade da série 2.

@@ -2,6 +2,12 @@
 
 Índice da documentação técnica do NexoFlow 1.0.
 
+A [documentação operacional](../Documentacao%20NexoFlow.md) tem uma única fonte
+Markdown na raiz. O [HTML para instalação](../Documentacao%20NexoFlow.html) é
+gerado dessa fonte: instale o Pandoc e execute `python scripts/build_documentation.py`
+após editá-la. `python scripts/build_documentation.py --check` confere a
+sincronização sem exigir Pandoc. Não edite o HTML manualmente.
+
 Para operação, instalação e geração de um novo dry-run/carga completa após reinstalar, consulte [Instalação](../README%20INSTALACAO.md), [Terminal](../README%20TERMINAL.md) e [Pedidos](../README%20PEDIDOS.md). A distribuição estável permanece na [release v1.0](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.0).
 
 - [FarmaLíder API](FARMALIDER%20API.md)

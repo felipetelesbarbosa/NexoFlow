@@ -37,7 +37,8 @@ WEBHOOK_SHARED_SECRET = "TROQUE_POR_UM_SEGREDO_FORTE"
 # off  = nunca configura o proxy pelo projeto
 PROXY_MODE = "auto"
 
-PROXY_HOST = "10.1.15.3"
+# Exemplo fictício: substitua pelo endereço autorizado da sua rede.
+PROXY_HOST = "proxy.exemplo.invalid"
 PROXY_PORT = 8020
 
 # Na máquina pessoal, é mais seguro manter estes dois vazios e
