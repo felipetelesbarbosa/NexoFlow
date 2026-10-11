@@ -6,11 +6,8 @@
   "exclude": [
     ".venv",
     "__pycache__",
-    "webhook_eventos.py",
-    "webhook_pedidos.py",
-    "run_webhook.py",
-    "run_webhook_pedidos.py",
-    "tests"
+    "tests",
+    "secrets_config.py"
   ],
   "venvPath": ".",
   "venv": ".venv",

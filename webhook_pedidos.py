@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import FastAPI, Header, HTTPException
@@ -10,7 +10,7 @@ from pydantic import BaseModel
 import secrets_config as secrets
 from analytics import build_sales_metrics, parse_ultimo_pedido_raw
 from google_sheets import GoogleSheetsStore
-
+from webhook_runtime import WEBHOOK_WRITE_LOCK, shared_secret_matches
 
 app = FastAPI(
     title="NexoFlow - Pedidos",
@@ -67,7 +67,7 @@ def receive_order(
             detail="WEBHOOK_SHARED_SECRET não configurado.",
         )
 
-    if x_webhook_secret != expected:
+    if not shared_secret_matches(expected, x_webhook_secret):
         raise HTTPException(status_code=401, detail="Não autorizado.")
 
     raw = (
@@ -84,9 +84,7 @@ def receive_order(
             else body.contact_urn
         )
 
-    captured_at = datetime.now(timezone.utc).isoformat(
-        timespec="seconds"
-    )
+    captured_at = datetime.now(UTC).isoformat(timespec="seconds")
 
     order, items = parse_ultimo_pedido_raw(
         raw,
@@ -113,22 +111,23 @@ def receive_order(
             },
         )
 
-    store = GoogleSheetsStore(_spreadsheet_id())
-    orders_inserted, orders_updated = store.upsert_orders([order])
-    items_inserted, items_updated = store.upsert_order_items(items)
+    with WEBHOOK_WRITE_LOCK:
+        store = GoogleSheetsStore(_spreadsheet_id())
+        orders_result = store.upsert_orders_detailed([order])
+        items_result = store.upsert_order_items_detailed(items)
 
-    # Mantém a métrica diária atualizada caso o webhook seja ativado.
-    full_orders = store.load_order_records()
-    full_items = store.load_order_item_records()
-    store.replace_sales_metrics(
-        build_sales_metrics(full_orders, full_items)
-    )
+        # Os upserts já devolveram as tabelas finais: não relê as mesmas abas.
+        # Reenvios ainda comparam/reparam a aba de métricas caso uma gravação
+        # anterior tenha falhado depois de persistir os pedidos ou itens.
+        store.replace_sales_metrics(
+            build_sales_metrics(orders_result.final_records, items_result.final_records)
+        )
 
     return {
         "status": "ok",
         "pedido_chave": order["pedido_chave"],
-        "orders_inserted": orders_inserted,
-        "orders_updated": orders_updated,
-        "items_inserted": items_inserted,
-        "items_updated": items_updated,
+        "orders_inserted": orders_result.inserted,
+        "orders_updated": orders_result.updated,
+        "items_inserted": items_result.inserted,
+        "items_updated": items_result.updated,
     }
