@@ -4,6 +4,37 @@
 
 A rotina **NexoFlow Weni** elimina o processo manual de exportar mensagens/contatos da Weni, tratar planilhas e importar uma nova planilha. Ela consulta a API da Weni, monta um plano de alterações, audita obrigatoriamente esse plano e só então permite gravar os campos.
 
+## Acompanhamento no CMD
+
+Durante consultas, preparação, dry-run e aplicação, o CMD e o log recebem
+atualizações a cada 2 segundos, inclusive durante espera pela API:
+
+```text
+Aplicação Weni [##########----------]  50% | 9500/19000 contatos | 30.0 contatos/s | decorrido=00:05:17 | restante estimado=00:05:17 | aplicados=9400; conflitos=50; já corretos=50; falhas=0
+```
+
+A barra vai de 0% a 100% **em cada etapa com total conhecido**. Um contato
+avança a contagem depois de seu processamento e do registro de auditoria,
+inclusive se for ignorado por conflito ou já estiver correto. Aplicados são
+mostrados separadamente: percentual processado não significa percentual gravado.
+Falhas interrompem a etapa sem indicar conclusão.
+
+A velocidade de contatos/registros usa o trabalho concluído nos últimos dez
+segundos; o tempo restante usa a média desde o início da etapa. Esperas e
+repetições de API entram no tempo medido. A estimativa pode mudar conforme a API
+fica mais rápida ou mais lenta; sem processamento concluído, aparece “calculando”.
+Na auditoria JSONL, a velocidade adicional usa os bytes UTF-8 efetivamente
+escritos pelo programa, sem contar conteúdo de execuções anteriores. B/s, KB/s e
+MB/s usam unidades decimais; não representam velocidade de rede nem fsync do disco.
+
+Consultas paginadas cujo total ainda é desconhecido mostram registros recebidos,
+registros/s e tempo decorrido, sem inventar porcentagem ou previsão. O 100% da
+aplicação indica o término da etapa; a execução completa termina com o resumo e
+a atualização do checkpoint.
+
+A atualização do código passa a valer nas próximas execuções. Uma execução já
+aberta continua usando o código carregado no início.
+
 ## Execução recomendada
 
 ### Uso diário

@@ -21,6 +21,7 @@ from config import (
 )
 from network_diagnostics import classify_network_failure
 from proxy_config import refresh_network_route
+from task_progress import TaskProgress
 
 
 class WeniError(RuntimeError):
@@ -221,14 +222,13 @@ class WeniClient:
         item_label: str,
         max_results: int | None = None,
     ) -> list[dict[str, Any]]:
-        return list(
-            self._iter_paginated(
+        with TaskProgress(f"Consulta Weni: {item_label}", None, unit="registros") as progress:
+            return list(progress.track(self._iter_paginated(
                 base_url,
                 params,
                 item_label=item_label,
                 max_results=max_results,
-            )
-        )
+            )))
 
     def iter_contacts(
         self,
@@ -254,7 +254,8 @@ class WeniClient:
         after: datetime | None = None,
         limit: int = PAGE_LIMIT,
     ) -> list[dict[str, Any]]:
-        return list(self.iter_contacts(after=after, limit=limit))
+        with TaskProgress("Consulta Weni: contatos", None, unit="registros") as progress:
+            return list(progress.track(self.iter_contacts(after=after, limit=limit)))
 
     def get_contact(
         self,

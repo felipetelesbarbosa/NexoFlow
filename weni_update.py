@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import secrets_config as secrets
+from task_progress import TaskProgress
 from analytics import (
     get_fields,
     is_valid_cpf,
@@ -291,16 +292,6 @@ def _record_validated_order(stats: UpdateStats, plan: ContactUpdatePlan) -> None
             "Este aviso informativo aparece uma vez por código nesta execução.",
             code,
             farmalider_payment_method_display(code),
-        )
-
-
-def _log_planning_progress(stats: UpdateStats, *, processed: int, total: int) -> None:
-    if processed == 1 or processed % 100 == 0 or processed == total:
-        logging.info(
-            "Preparação Weni: %s/%s contato(s) percorrido(s); "
-            "%s contato(s) com pedido validado; %s contato(s) com alterações propostas. "
-            "Nenhuma gravação foi iniciada.",
-            processed, total, stats.orders_validated, stats.plans_with_changes,
         )
 
 
@@ -712,6 +703,7 @@ def _save_state(payload: dict[str, Any], path: Path = WENI_UPDATE_STATE_FILE) ->
 
 
 _AUDIT_HANDLES: dict[str, Any] = {}
+_AUDIT_BYTES_WRITTEN = 0
 
 
 def _append_audit(event: dict[str, Any], path: Path = WENI_UPDATE_AUDIT_FILE) -> None:
@@ -720,13 +712,17 @@ def _append_audit(event: dict[str, Any], path: Path = WENI_UPDATE_AUDIT_FILE) ->
     Em cargas completas isso evita dezenas de milhares de open/close sem
     alterar a ordem nem a durabilidade por linha (buffering=1).
     """
+    global _AUDIT_BYTES_WRITTEN
     path.parent.mkdir(parents=True, exist_ok=True)
     key = str(path.resolve())
     handle = _AUDIT_HANDLES.get(key)
     if handle is None or getattr(handle, "closed", True):
         handle = path.open("a", encoding="utf-8", buffering=1)
         _AUDIT_HANDLES[key] = handle
-    handle.write(json.dumps(event, ensure_ascii=False, default=str) + "\n")
+    line = json.dumps(event, ensure_ascii=False, default=str) + "\n"
+    handle.write(line)
+    # TextIO converte LF para CRLF no Windows; contar bytes realmente escritos.
+    _AUDIT_BYTES_WRITTEN += len(line.encode("utf-8")) + (1 if os.linesep == "\r\n" else 0)
 
 
 def _close_audit_handles() -> None:
@@ -2154,121 +2150,113 @@ def run_update(
             )
 
             conflicted_uuids: list[str] = []
-            for index, plan in enumerate(plans, start=1):
-                # Em atendimento 24h, relê somente este contato imediatamente
-                # antes da escrita. Mudanças em outros contatos não cancelam a carga.
-                current_contact = weni.get_contact(uuid=plan.contact_uuid)
-                stats.contacts_modified += 1
-                if current_contact is None:
-                    stats.contacts_conflicted += 1
-                    conflicted_uuids.append(plan.contact_uuid)
-                    reason = "contato não localizado no momento do apply"
-                    _append_audit(
-                        _audit_plan_event(
-                            plan,
-                            mode="apply-frozen",
-                            status="conflict_skipped",
-                            error=reason,
+            with TaskProgress("Aplicação do snapshot", len(plans), detail=lambda: f"aplicados={stats.contacts_updated}; conflitos={stats.contacts_conflicted}; já corretos={stats.contacts_already_satisfied}; falhas={stats.contacts_failed}") as progress:
+                for index, plan in progress.track(enumerate(plans, start=1)):
+                    # Em atendimento 24h, relê somente este contato imediatamente
+                    # antes da escrita. Mudanças em outros contatos não cancelam a carga.
+                    current_contact = weni.get_contact(uuid=plan.contact_uuid)
+                    stats.contacts_modified += 1
+                    if current_contact is None:
+                        stats.contacts_conflicted += 1
+                        conflicted_uuids.append(plan.contact_uuid)
+                        reason = "contato não localizado no momento do apply"
+                        _append_audit(
+                            _audit_plan_event(
+                                plan,
+                                mode="apply-frozen",
+                                status="conflict_skipped",
+                                error=reason,
+                            )
                         )
-                    )
-                    logging.warning(
-                        "Conflito %s/%s em %s: %s",
-                        index,
-                        len(plans),
-                        plan.contact_uuid,
-                        reason,
-                    )
-                    continue
+                        logging.warning(
+                            "Conflito %s/%s em %s: %s",
+                            index,
+                            len(plans),
+                            plan.contact_uuid,
+                            reason,
+                        )
+                        continue
 
-                prepared, conflict = _prepare_frozen_plan_for_apply(
-                    plan,
-                    current_contact,
-                    opt_in_group_name=WENI_UPDATE_OPT_IN_GROUP,
-                    opt_in_group_uuid=opt_in_uuid,
-                    opt_out_group_name=WENI_UPDATE_OPT_OUT_GROUP,
-                    opt_out_group_uuid=opt_out_uuid,
-                )
-                if prepared is None:
-                    stats.contacts_conflicted += 1
-                    conflicted_uuids.append(plan.contact_uuid)
-                    _append_audit(
-                        _audit_plan_event(
-                            plan,
-                            mode="apply-frozen",
-                            status="conflict_skipped",
-                            error=conflict,
+                    prepared, conflict = _prepare_frozen_plan_for_apply(
+                        plan,
+                        current_contact,
+                        opt_in_group_name=WENI_UPDATE_OPT_IN_GROUP,
+                        opt_in_group_uuid=opt_in_uuid,
+                        opt_out_group_name=WENI_UPDATE_OPT_OUT_GROUP,
+                        opt_out_group_uuid=opt_out_uuid,
+                    )
+                    if prepared is None:
+                        stats.contacts_conflicted += 1
+                        conflicted_uuids.append(plan.contact_uuid)
+                        _append_audit(
+                            _audit_plan_event(
+                                plan,
+                                mode="apply-frozen",
+                                status="conflict_skipped",
+                                error=conflict,
+                            )
                         )
-                    )
-                    logging.warning(
-                        "Conflito %s/%s em %s: %s",
-                        index,
-                        len(plans),
-                        plan.contact_uuid,
-                        conflict,
-                    )
-                    continue
+                        logging.warning(
+                            "Conflito %s/%s em %s: %s",
+                            index,
+                            len(plans),
+                            plan.contact_uuid,
+                            conflict,
+                        )
+                        continue
 
-                if not prepared.has_changes:
-                    _track_open_order(
-                        open_order_uuids,
-                        plan.contact_uuid,
-                        plan.fields.get(
-                            "pedido_status",
-                            get_fields(current_contact).get("pedido_status"),
-                        ),
-                    )
-                    stats.contacts_already_satisfied += 1
-                    _append_audit(
-                        _audit_plan_event(
-                            plan,
-                            mode="apply-frozen",
-                            status="already_satisfied",
+                    if not prepared.has_changes:
+                        _track_open_order(
+                            open_order_uuids,
+                            plan.contact_uuid,
+                            plan.fields.get(
+                                "pedido_status",
+                                get_fields(current_contact).get("pedido_status"),
+                            ),
                         )
-                    )
-                    continue
+                        stats.contacts_already_satisfied += 1
+                        _append_audit(
+                            _audit_plan_event(
+                                plan,
+                                mode="apply-frozen",
+                                status="already_satisfied",
+                            )
+                        )
+                        continue
 
-                try:
-                    _execute_contact_plan(weni, prepared)
-                    _track_open_order(
-                        open_order_uuids,
-                        prepared.contact_uuid,
-                        prepared.fields.get(
-                            "pedido_status",
-                            get_fields(current_contact).get("pedido_status"),
-                        ),
-                    )
-                    stats.contacts_updated += 1
-                    _append_audit(
-                        _audit_plan_event(
-                            prepared,
-                            mode="apply-frozen",
-                            status="applied",
+                    try:
+                        _execute_contact_plan(weni, prepared)
+                        _track_open_order(
+                            open_order_uuids,
+                            prepared.contact_uuid,
+                            prepared.fields.get(
+                                "pedido_status",
+                                get_fields(current_contact).get("pedido_status"),
+                            ),
                         )
-                    )
-                except Exception as exc:
-                    stats.contacts_failed += 1
-                    _append_audit(
-                        _audit_plan_event(
-                            prepared,
-                            mode="apply-frozen",
-                            status="failed",
-                            error=exc.__class__.__name__,
+                        stats.contacts_updated += 1
+                        _append_audit(
+                            _audit_plan_event(
+                                prepared,
+                                mode="apply-frozen",
+                                status="applied",
+                            )
                         )
-                    )
-                    raise RuntimeError(
-                        "Falha durante a gravação do snapshot congelado na Weni. "
-                        "O checkpoint não foi avançado."
-                    ) from exc
+                    except Exception as exc:
+                        stats.contacts_failed += 1
+                        _append_audit(
+                            _audit_plan_event(
+                                prepared,
+                                mode="apply-frozen",
+                                status="failed",
+                                error=exc.__class__.__name__,
+                            )
+                        )
+                        raise RuntimeError(
+                            "Falha durante a gravação do snapshot congelado na Weni. "
+                            "O checkpoint não foi avançado."
+                        ) from exc
 
-                if index % 250 == 0:
-                    logging.info(
-                        "Aplicação do snapshot: %s/%s revisados | aplicados=%s | conflitos=%s | já satisfeitos=%s",
-                        index,
-                        len(plans),
-                        stats.contacts_updated,
-                        stats.contacts_conflicted,
-                        stats.contacts_already_satisfied,
-                    )
 
             if quarter is None:
                 state_payload = {
@@ -2483,89 +2471,87 @@ def run_update(
         )
 
         prepared_contacts = []
-        for preparation_index, contact_uuid in enumerate(sorted(all_contact_uuids), start=1):
-            contact = contacts_by_uuid.get(contact_uuid)
-            if contact is None:
-                contact = weni.get_contact(uuid=contact_uuid)
-            if contact is None:
-                logging.warning("Contato %s não foi localizado; ignorando.", contact_uuid)
-                continue
+        with TaskProgress("Preparação da fila Weni", len(all_contact_uuids)) as progress:
+            for preparation_index, contact_uuid in progress.track(enumerate(sorted(all_contact_uuids), start=1)):
+                contact = contacts_by_uuid.get(contact_uuid)
+                if contact is None:
+                    contact = weni.get_contact(uuid=contact_uuid)
+                if contact is None:
+                    logging.warning("Contato %s não foi localizado; ignorando.", contact_uuid)
+                    continue
 
-            candidate_messages = incoming_by_contact.get(contact_uuid, [])
-            candidate_ids = {
-                message_id(item) for item in candidate_messages if message_id(item)
-            }
-            if window.full:
-                context = full_context_by_contact.get(contact_uuid, candidate_messages)
-            else:
-                context = _build_context_for_contact(
-                    weni,
-                    contact_uuid=contact_uuid,
-                    candidate_messages=candidate_messages,
-                    started_at=window.started_at,
-                    full=False,
+                candidate_messages = incoming_by_contact.get(contact_uuid, [])
+                candidate_ids = {
+                    message_id(item) for item in candidate_messages if message_id(item)
+                }
+                if window.full:
+                    context = full_context_by_contact.get(contact_uuid, candidate_messages)
+                else:
+                    context = _build_context_for_contact(
+                        weni,
+                        contact_uuid=contact_uuid,
+                        candidate_messages=candidate_messages,
+                        started_at=window.started_at,
+                        full=False,
+                    )
+                    if not context:
+                        context = candidate_messages
+
+                # Determine priority from the effective CPF, including a valid CPF
+                # inferred from messages. Preparation performs no FarmaLíder GET.
+                evidences = infer_contact_fields(context, candidate_message_ids=candidate_ids)
+                effective_cpf = (
+                    evidences["cpf"].value if "cpf" in evidences
+                    else get_fields(contact).get("cpf")
                 )
-                if not context:
-                    context = candidate_messages
-
-            # Determine priority from the effective CPF, including a valid CPF
-            # inferred from messages. Preparation performs no FarmaLíder GET.
-            evidences = infer_contact_fields(context, candidate_message_ids=candidate_ids)
-            effective_cpf = (
-                evidences["cpf"].value if "cpf" in evidences
-                else get_fields(contact).get("cpf")
-            )
-            prepared_contacts.append((cpf_query_priority(effective_cpf), contact_uuid,
-                                      contact, context, candidate_ids))
-            if preparation_index % 100 == 0:
-                logging.info("Weni: preparando fila de consultas: %s/%s contatos.",
-                             preparation_index, len(all_contact_uuids))
+                prepared_contacts.append((cpf_query_priority(effective_cpf), contact_uuid,
+                                          contact, context, candidate_ids))
 
         previous_phase = None
         invalid_batch = _InvalidCpfBatch()
-        for index, (priority, contact_uuid, contact, context, candidate_ids) in enumerate(
-            sorted(prepared_contacts, key=lambda entry: (entry[0], entry[1])), start=1
-        ):
-            if priority != previous_phase:
-                invalid_batch.flush()
-                logging.info("Weni: etapa de consulta FarmaLíder: %s.",
-                             ("CPFs válidos", "CPFs inválidos", "contatos sem CPF")[priority])
-                previous_phase = priority
-            try:
-                plan = _build_contact_plan(
-                    contact,
-                    context_messages=context,
-                    candidate_message_ids=candidate_ids,
-                    farm_client=farm,
-                    opt_out_group_name=WENI_UPDATE_OPT_OUT_GROUP,
-                    opt_out_group_uuid=opt_out_uuid,
-                    captured_at=captured_at,
-                    opt_in_group_name=WENI_UPDATE_OPT_IN_GROUP,
-                    opt_in_group_uuid=opt_in_uuid,
-                    available_weni_fields=available_weni_fields,
+        with TaskProgress("Preparação Weni", len(prepared_contacts), detail=lambda: f"pedidos validados={stats.orders_validated}; alterações propostas={stats.plans_with_changes}; nenhuma gravação na Weni") as progress:
+            for index, (priority, contact_uuid, contact, context, candidate_ids) in progress.track(enumerate(
+                sorted(prepared_contacts, key=lambda entry: (entry[0], entry[1])), start=1
+            )):
+                if priority != previous_phase:
+                    invalid_batch.flush()
+                    logging.info("Weni: etapa de consulta FarmaLíder: %s.",
+                                 ("CPFs válidos", "CPFs inválidos", "contatos sem CPF")[priority])
+                    previous_phase = priority
+                try:
+                    plan = _build_contact_plan(
+                        contact,
+                        context_messages=context,
+                        candidate_message_ids=candidate_ids,
+                        farm_client=farm,
+                        opt_out_group_name=WENI_UPDATE_OPT_OUT_GROUP,
+                        opt_out_group_uuid=opt_out_uuid,
+                        captured_at=captured_at,
+                        opt_in_group_name=WENI_UPDATE_OPT_IN_GROUP,
+                        opt_in_group_uuid=opt_in_uuid,
+                        available_weni_fields=available_weni_fields,
+                    )
+                except BaseException:
+                    invalid_batch.flush(interrupted=True)
+                    raise
+                if priority == 1:
+                    _record_invalid_cpf_result(stats, plan)
+                    invalid_batch.record(plan)
+                stats.contacts_considered += 1
+                _record_validated_order(stats, plan)
+                _track_open_order(
+                    open_order_uuids,
+                    contact_uuid,
+                    plan.fields.get("pedido_status", get_fields(contact).get("pedido_status")),
                 )
-            except BaseException:
-                invalid_batch.flush(interrupted=True)
-                raise
-            if priority == 1:
-                _record_invalid_cpf_result(stats, plan)
-                invalid_batch.record(plan)
-            stats.contacts_considered += 1
-            _record_validated_order(stats, plan)
-            _track_open_order(
-                open_order_uuids,
-                contact_uuid,
-                plan.fields.get("pedido_status", get_fields(contact).get("pedido_status")),
-            )
-            if plan.purchase_confirmed:
-                stats.purchase_confirmed += 1
-            elif str(get_fields(contact).get("ultimo_pedido") or "").strip():
-                stats.purchase_skipped += 1
+                if plan.purchase_confirmed:
+                    stats.purchase_confirmed += 1
+                elif str(get_fields(contact).get("ultimo_pedido") or "").strip():
+                    stats.purchase_skipped += 1
 
-            if plan.has_changes:
-                plans.append(plan)
-            stats.plans_with_changes = len(plans)
-            _log_planning_progress(stats, processed=index, total=len(all_contact_uuids))
+                if plan.has_changes:
+                    plans.append(plan)
+                stats.plans_with_changes = len(plans)
 
         invalid_batch.flush()
         if stats.invalid_cpf_checked:
@@ -2648,56 +2634,58 @@ def run_update(
 
         mode = "apply" if apply else "dry-run"
         if not apply:
-            for plan in plans:
-                _append_audit(_audit_plan_event(plan, mode=mode, status="planned"))
+            with TaskProgress("Gravação da auditoria JSONL (dry-run)", len(plans), unit="registros", byte_count=lambda: _AUDIT_BYTES_WRITTEN) as progress:
+                for plan in progress.track(plans):
+                    _append_audit(_audit_plan_event(plan, mode=mode, status="planned"))
             logging.info("DRY-RUN concluído. Nenhum contato foi alterado na Weni.")
             return stats
 
         conflicted_uuids: list[str] = []
-        for plan in plans:
-            try:
-                if plan.order_validated or any(action.group_name == "Recompra FarmaLíder" for action in plan.group_actions):
-                    current_contact = weni.get_contact(uuid=plan.contact_uuid)
-                    prepared = None
-                    conflict = "contato não localizado no momento do apply"
-                    if current_contact is not None:
-                        prepared, conflict = _prepare_frozen_plan_for_apply(
+        with TaskProgress("Aplicação Weni", len(plans), detail=lambda: f"aplicados={stats.contacts_updated}; conflitos={stats.contacts_conflicted}; já corretos={stats.contacts_already_satisfied}; falhas={stats.contacts_failed}") as progress:
+            for plan in progress.track(plans):
+                try:
+                    if plan.order_validated or any(action.group_name == "Recompra FarmaLíder" for action in plan.group_actions):
+                        current_contact = weni.get_contact(uuid=plan.contact_uuid)
+                        prepared = None
+                        conflict = "contato não localizado no momento do apply"
+                        if current_contact is not None:
+                            prepared, conflict = _prepare_frozen_plan_for_apply(
+                                plan,
+                                current_contact,
+                                opt_in_group_name=WENI_UPDATE_OPT_IN_GROUP,
+                                opt_in_group_uuid=opt_in_uuid,
+                                opt_out_group_name=WENI_UPDATE_OPT_OUT_GROUP,
+                                opt_out_group_uuid=opt_out_uuid,
+                            )
+                        if prepared is None:
+                            stats.contacts_conflicted += 1
+                            conflicted_uuids.append(plan.contact_uuid)
+                            _append_audit(_audit_plan_event(plan, mode=mode, status="conflict_skipped", error=conflict))
+                            continue
+                        if not prepared.has_changes:
+                            stats.contacts_already_satisfied += 1
+                            _append_audit(_audit_plan_event(plan, mode=mode, status="already_satisfied"))
+                            continue
+                        audit_plans([prepared], opt_out_group_available=opt_out_available, opt_in_group_available=opt_in_available)
+                        plan = prepared
+                    _execute_contact_plan(weni, plan)
+                    stats.contacts_updated += 1
+                    _append_audit(_audit_plan_event(plan, mode=mode, status="applied"))
+                except Exception as exc:
+                    stats.contacts_failed += 1
+                    _append_audit(
+                        _audit_plan_event(
                             plan,
-                            current_contact,
-                            opt_in_group_name=WENI_UPDATE_OPT_IN_GROUP,
-                            opt_in_group_uuid=opt_in_uuid,
-                            opt_out_group_name=WENI_UPDATE_OPT_OUT_GROUP,
-                            opt_out_group_uuid=opt_out_uuid,
+                            mode=mode,
+                            status="failed",
+                            error=exc.__class__.__name__,
                         )
-                    if prepared is None:
-                        stats.contacts_conflicted += 1
-                        conflicted_uuids.append(plan.contact_uuid)
-                        _append_audit(_audit_plan_event(plan, mode=mode, status="conflict_skipped", error=conflict))
-                        continue
-                    if not prepared.has_changes:
-                        stats.contacts_already_satisfied += 1
-                        _append_audit(_audit_plan_event(plan, mode=mode, status="already_satisfied"))
-                        continue
-                    audit_plans([prepared], opt_out_group_available=opt_out_available, opt_in_group_available=opt_in_available)
-                    plan = prepared
-                _execute_contact_plan(weni, plan)
-                stats.contacts_updated += 1
-                _append_audit(_audit_plan_event(plan, mode=mode, status="applied"))
-            except Exception as exc:
-                stats.contacts_failed += 1
-                _append_audit(
-                    _audit_plan_event(
-                        plan,
-                        mode=mode,
-                        status="failed",
-                        error=exc.__class__.__name__,
                     )
-                )
-                # Não avança checkpoint. A próxima execução reprocessará a janela
-                # e corrigirá com segurança o que já tiver sido gravado.
-                raise RuntimeError(
-                    "Falha durante a gravação na Weni. O checkpoint não foi avançado."
-                ) from exc
+                    # Não avança checkpoint. A próxima execução reprocessará a janela
+                    # e corrigirá com segurança o que já tiver sido gravado.
+                    raise RuntimeError(
+                        "Falha durante a gravação na Weni. O checkpoint não foi avançado."
+                    ) from exc
 
         _save_state(
             {

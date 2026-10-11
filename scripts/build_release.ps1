@@ -313,6 +313,8 @@ Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/payload ma
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/NexoFlow Recompra.exe"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/NexoFlow Recompra.exe"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/weni_update.py"
+Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/task_progress.py"
+Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/task_progress.py"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/analytics.py"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/confirmar_revisao_weni.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/confirmar_revisao_weni.ps1"
@@ -336,6 +338,7 @@ Distribuição oficial do **NexoFlow 1.0**.
 O arquivo `NexoFlow-Setup-$Version.zip` contém o instalador do NexoFlow 1.0 e foi validado automaticamente em Windows para primeira instalação e atualização de uma instalação existente.
 
 Melhorias desta distribuição do NexoFlow 1.0:
+- progresso Weni a cada 2 segundos com barra de 0% a 100% por etapa, contatos/registros por segundo, tempo decorrido e previsão de término; auditoria JSONL mede bytes efetivamente gravados por segundo; consultas sem total conhecido mostram quantidade e velocidade;
 - Requests exige versão 2.33.0 ou superior na série 2, excluindo versões antigas com vulnerabilidades conhecidas;
 - publicação verifica segredos em todo o histórico Git e nos ZIPs extraídos, confere os hashes dos pacotes e bloqueia o release se alguma etapa falhar;
 - testes e empacotamento usam permissão de leitura no GitHub; somente a etapa final de publicação pode atualizar a tag e o release, com Actions fixadas por commit;

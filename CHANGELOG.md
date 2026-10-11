@@ -2,6 +2,8 @@
 
 ## NexoFlow 1.0
 
+- Progresso das consultas e atualizações Weni a cada 2 segundos: barra por etapa, contatos/registros por segundo, tempo decorrido e previsão de término. Auditoria JSONL informa bytes efetivamente gravados por segundo; conflitos e contatos já corretos também avançam o progresso.
+
 - Versão mínima do Requests elevada para 2.33.0, excluindo versões com vulnerabilidades conhecidas sem alterar o limite de compatibilidade da série 2.
 - Publicação protegida por varredura Gitleaks do histórico e dos ZIPs extraídos, com validação dos checksums e exceção exata para o trecho público `3200/farmalider`. Achados ou falhas bloqueiam o release; relatórios não entram nos pacotes.
 - Permissões do CI separadas: testes e build usam leitura, e somente o job de publicação recebe escrita. Actions fixadas por SHA e política de segurança com configuração local, relato privado de vulnerabilidades e orientações administrativas para tornar o projeto público.
