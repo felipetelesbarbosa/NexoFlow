@@ -89,6 +89,7 @@ function Assert-Installed {
         "installer\uninstall.ps1",
         "scripts\confirmar_revisao_weni.ps1",
         "scripts\resultado_carga_weni.ps1",
+        "scripts\build_documentation.py",
         "desinstalar_nexoflow.cmd",
         ".venv\Scripts\python.exe"
     )) {
@@ -130,6 +131,7 @@ try {
     $projectArchive = [IO.Compression.ZipFile]::OpenRead($projectZip)
     try {
         Assert-True ($null -ne $projectArchive.GetEntry('NexoFlow/importacoes/')) 'Pasta importacoes ausente no projeto completo.'
+        Assert-True ($null -ne $projectArchive.GetEntry('NexoFlow/scripts/build_documentation.py')) 'Verificador da documentação ausente no projeto completo.'
         Assert-True (@($projectArchive.Entries | Where-Object { $_.FullName.StartsWith('NexoFlow/importacoes/') -and -not $_.FullName.EndsWith('/') }).Count -eq 0) 'O projeto completo não deve incluir arquivos privados em importacoes.'
     } finally { $projectArchive.Dispose() }
 
