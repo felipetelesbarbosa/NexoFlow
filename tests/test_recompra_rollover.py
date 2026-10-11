@@ -1,20 +1,19 @@
 """Expiração de revisão à meia-noite, com relógio e serviços sintéticos."""
-from contextlib import ExitStack
-from copy import deepcopy
-from datetime import datetime, timezone
 import json
-from pathlib import Path
 import tempfile
 import unittest
+from contextlib import ExitStack
+from copy import deepcopy
+from datetime import UTC, datetime
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import requests
 
 import recompra
 from run_recompra import main as run_recompra
-from test_recompra import STRUCTURE, fixture
+from tests.test_recompra import STRUCTURE, fixture
 from weni_client import WeniClient, WeniError
-
 
 BEFORE = datetime(2026, 10, 9, 23, 59, 59, tzinfo=recompra.TZ)
 AFTER = datetime(2026, 10, 10, 0, 0, 1, tzinfo=recompra.TZ)
@@ -38,8 +37,8 @@ class RecompraReviewDateTests(unittest.TestCase):
 
     def test_current_review_uses_business_date_even_when_utc_day_already_changed(self):
         review = self.review()
-        self.assertEqual(BEFORE.astimezone(timezone.utc).date().isoformat(), "2026-10-10")
-        recompra.ensure_review_current(review, BEFORE.astimezone(timezone.utc))
+        self.assertEqual(BEFORE.astimezone(UTC).date().isoformat(), "2026-10-10")
+        recompra.ensure_review_current(review, BEFORE.astimezone(UTC))
 
     def test_expired_review_has_specific_error_and_refresh_permission(self):
         self.assertEqual(recompra.REVIEW_EXPIRED_EXIT_CODE, 4)

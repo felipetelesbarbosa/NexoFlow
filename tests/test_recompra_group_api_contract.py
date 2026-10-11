@@ -1,18 +1,24 @@
 """Contrato real de métodos HTTP Weni, porém somente com transporte sintético."""
-from copy import deepcopy
-from datetime import datetime
 import json
-from pathlib import Path
 import tempfile
 import unittest
+from copy import deepcopy
+from datetime import datetime
+from pathlib import Path
 from unittest.mock import patch
 
-from config import WENI_CONTACTS_API_URL, WENI_CONTACT_ACTIONS_API_URL
-from recompra import (GROUP, TZ, apply_review, load_state, make_review,
-                      propose, cancelled_order_reason)
-from test_recompra import STRUCTURE, fixture
+from config import WENI_CONTACT_ACTIONS_API_URL, WENI_CONTACTS_API_URL
+from recompra import (
+    GROUP,
+    TZ,
+    apply_review,
+    cancelled_order_reason,
+    load_state,
+    make_review,
+    propose,
+)
+from tests.test_recompra import STRUCTURE, fixture
 from weni_client import WeniClient
-
 
 NOW = datetime(2026, 10, 10, 11, 30, tzinfo=TZ)
 

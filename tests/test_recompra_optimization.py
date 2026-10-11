@@ -1,22 +1,30 @@
 """Otimizações de recompra com fixtures sintéticas, sem chamadas externas."""
+import tempfile
+import unittest
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import ExitStack
 from copy import deepcopy
 from pathlib import Path
-import tempfile
 from threading import Barrier, Event, Lock
-import unittest
 from unittest.mock import Mock, patch
 
 from analytics import cpf_query_priority
 from config import FARMALIDER_MAX_WORKERS
 from farmalider_client import FarmaliderBadRequestError
-from recompra import (RecompraReadCache, apply_review, atomic_json, build_plans,
-                      load_state, make_review, plan_needs_apply, propose,
-                      resolve_latest)
-from test_recompra import NOW, STRUCTURE, fixture
-from run_recompra import build_parser, main as run_recompra
-
+from recompra import (
+    RecompraReadCache,
+    apply_review,
+    atomic_json,
+    build_plans,
+    load_state,
+    make_review,
+    plan_needs_apply,
+    propose,
+    resolve_latest,
+)
+from run_recompra import build_parser
+from run_recompra import main as run_recompra
+from tests.test_recompra import NOW, STRUCTURE, fixture
 
 TIMEOUT = 10
 
@@ -219,6 +227,24 @@ class RecompraReadCacheTests(unittest.TestCase):
 
 
 class RecompraPlanBuildTests(unittest.TestCase):
+    def test_progress_uses_large_batches_and_reports_the_final_partial_batch(self):
+        contacts = [synthetic_contact(index) for index in range(2050)]
+        with (
+            patch("recompra.resolve_latest", return_value=(None, [])),
+            patch("recompra.logging.info") as info,
+        ):
+            plans = build_plans(
+                contacts, Mock(), STRUCTURE, {"contacts": {}}, now=NOW
+            )
+        self.assertEqual(len(plans), 2050)
+        progress_counts = [
+            call.args[1] for call in info.call_args_list
+            if "velocidade=" in call.args[0]
+        ]
+        self.assertEqual(progress_counts, [1000, 2000])
+        self.assertEqual(info.call_args.args[1], 2050)
+        self.assertIn("duração=", info.call_args.args[0])
+
     def test_queries_run_in_parallel_with_no_more_than_four_workers(self):
         barrier = Barrier(5)
         release = Event()
@@ -359,6 +385,27 @@ class RecompraApplyOptimizationTests(unittest.TestCase):
         self.assertEqual(farm.mock_calls, [])
         resolver.assert_not_called()
         writer.assert_not_called()
+
+    def test_apply_progress_uses_large_batches_and_keeps_the_final_summary(self):
+        _, _, _, saved, state, plan = self.existing_plan(record={"admitted": True})
+        plans = []
+        for index in range(2050):
+            uid = f"contato-ficticio-{index}"
+            current = deepcopy(plan)
+            current["contact_uuid"] = uid
+            plans.append(current)
+            state["contacts"][uid] = deepcopy(saved)
+        atomic_json(self.state_path, state)
+        review = make_review(plans, STRUCTURE, now=NOW, state=state)
+        with patch("recompra.logging.info") as info:
+            result = self.apply(review, Mock(), Mock())
+        self.assertEqual(result, {"sem_mudanca": 2050})
+        progress_counts = [
+            call.args[1] for call in info.call_args_list
+            if "contatos=%s/%s" in call.args[0]
+        ]
+        self.assertEqual(progress_counts, [1000, 2000])
+        self.assertEqual(info.call_args.args[1], 2050)
 
     def test_no_purchase_plan_preserves_saved_purchase_without_reads_or_writes(self):
         contact, order, items = fixture(26)

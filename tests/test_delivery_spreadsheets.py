@@ -1,19 +1,26 @@
 """Fixtures sintéticas, sem dados pessoais nem chamadas externas."""
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import Mock
 
 import openpyxl
 
 from delivery_spreadsheets import (
-    CONTACTS_FILENAME, CONVERSATIONS_FILENAME, DeliverySpreadsheetError,
-    read_delivery_spreadsheets, validate_current_contacts,
+    CONTACTS_FILENAME,
+    CONVERSATIONS_FILENAME,
+    DeliverySpreadsheetError,
+    read_delivery_spreadsheets,
+    validate_current_contacts,
 )
-from delivery_tickets import apply_delivery_review, select_tickets, write_delivery_review
-import test_delivery_tickets as fixtures
-from test_delivery_tickets import contact, NOW
+from delivery_tickets import (
+    apply_delivery_review,
+    select_tickets,
+    write_delivery_review,
+)
+from tests import test_delivery_tickets as fixtures
+from tests.test_delivery_tickets import NOW, contact
 
 CHAT = "30000000-0000-0000-0000-000000000001"
 OTHER = "10000000-0000-0000-0000-000000000002"

@@ -7,11 +7,27 @@ from unittest.mock import patch
 
 
 class ProxyConfigTests(unittest.TestCase):
+    def setUp(self):
+        self._module_snapshot = {
+            name: sys.modules.get(name) for name in ("secrets_config", "proxy_config")
+        }
+        self._environment_patch = patch.dict(os.environ)
+        self._environment_patch.start()
+        self.addCleanup(self._environment_patch.stop)
+        self.addCleanup(self._restore_modules)
+
+    def _restore_modules(self):
+        for name, module in self._module_snapshot.items():
+            if module is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = module
+
     def load_module(self, **values):
         fake = types.ModuleType("secrets_config")
         defaults = {
             "PROXY_MODE": "auto",
-            "PROXY_HOST": "10.1.15.3",
+            "PROXY_HOST": "proxy.test.invalid",
             "PROXY_PORT": 8020,
             "PROXY_USER": "usuario",
             "PROXY_PASSWORD": "s@nh:a/complexa",
@@ -57,6 +73,7 @@ class ProxyConfigTests(unittest.TestCase):
         self.assertTrue(status.has_credentials)
         self.assertEqual(os.environ.get("WENI_PROXY_ACTIVE"), "1")
         self.assertIn("HTTP_PROXY", os.environ)
+        self.assertIn("proxy.test.invalid:8020", os.environ["HTTP_PROXY"])
         self.assertNotIn("s@nh:a/complexa", os.environ["HTTP_PROXY"])
         self.assertIn("s%40nh%3Aa%2Fcomplexa", os.environ["HTTP_PROXY"])
 
