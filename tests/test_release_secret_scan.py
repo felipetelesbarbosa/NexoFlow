@@ -157,7 +157,9 @@ class ReleaseSecretScanTests(unittest.TestCase):
                 ],
             )
             self.assertEqual(
-                (extracted / "NexoFlow-1.0/NexoFlow/pasta/README.txt").read_text(),
+                (extracted / "NexoFlow-1.0/NexoFlow/pasta/README.txt").read_text(
+                    encoding="utf-8"
+                ),
                 "portátil",
             )
 
@@ -175,7 +177,7 @@ class ReleaseSecretScanTests(unittest.TestCase):
     def test_external_hashes_must_cover_both_packages_exactly_once(self):
         self.write_packages()
         checksum = self.assets / scan.CHECKSUM_NAME
-        valid_lines = checksum.read_text().splitlines()
+        valid_lines = checksum.read_text(encoding="utf-8").splitlines()
         for invalid in (
             "",
             valid_lines[0],
@@ -358,7 +360,7 @@ class ReleaseSecretScanTests(unittest.TestCase):
         self.assertEqual(result, 0)
         reports = list(report_dir.glob("nexoflow-secrets-*/gitleaks-report.json"))
         self.assertEqual(len(reports), 1)
-        self.assertEqual(json.loads(reports[0].read_text()), [])
+        self.assertEqual(json.loads(reports[0].read_text(encoding="utf-8")), [])
         if os.name != "nt":
             self.assertEqual(stat.S_IMODE(reports[0].stat().st_mode), 0o600)
             self.assertEqual(stat.S_IMODE(reports[0].parent.stat().st_mode), 0o700)

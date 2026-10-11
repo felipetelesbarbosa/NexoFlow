@@ -2,6 +2,8 @@
 
 ## NexoFlow 1.0
 
+- Check-up com leitura UTF-8 explícita nos testes de pacotes, corrigindo a falha de acentuação no Windows. CI também valida esses testes sem forçar o modo UTF-8 do Python.
+
 - Camada comercial para Looker com histórico acumulado, clientes por chave estável, itens com tipos numéricos, KPIs por período, Curva ABC e produtos comprados juntos. Migração do faturamento interpretado como data e campos opcionais de gênero/categoria sem inferência; cobertura histórica e ausência de anúncios sinalizadas.
 
 - Weni com ícone azul e ciano, contato e balão de conversa, seguindo a estética do Analytics e do Recompra. Executável, imagem e atalhos atualizados.

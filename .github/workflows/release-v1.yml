@@ -84,6 +84,14 @@ jobs:
           python scripts/build_documentation.py --check
           if ($LASTEXITCODE -ne 0) { throw "A documentação HTML está desatualizada." }
 
+      - name: Testar leitura UTF-8 sem forçar a codificação do Windows
+        shell: pwsh
+        env:
+          PYTHONUTF8: "0"
+        run: |
+          python -m unittest tests.test_release_secret_scan -v
+          if ($LASTEXITCODE -ne 0) { throw "Os testes de leitura com a codificação padrão do Windows falharam." }
+
   validar-e-publicar:
     needs: [verificar-segredos, validar-python]
     runs-on: windows-latest
