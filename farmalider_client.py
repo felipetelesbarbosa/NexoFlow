@@ -12,15 +12,13 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from email.utils import parsedate_to_datetime
-from typing import Any
+from typing import Any, cast
 
 import requests
-from network_diagnostics import classify_network_failure
-from private_diagnostics import append_private_failure
 
 from config import (
-    FARMALIDER_429_COOLDOWN_SECONDS,
     FARMALIDER_5XX_COOLDOWN_SECONDS,
+    FARMALIDER_429_COOLDOWN_SECONDS,
     FARMALIDER_CIRCUIT_MIN_5XX,
     FARMALIDER_CIRCUIT_MIN_DISTINCT_QUERIES,
     FARMALIDER_MAX_ADAPTIVE_DELAY_SECONDS,
@@ -34,6 +32,8 @@ from config import (
     FARMALIDER_SLOW_REQUEST_SECONDS,
     farmalider_api_base_url,
 )
+from network_diagnostics import classify_network_failure
+from private_diagnostics import append_private_failure
 
 
 class FarmaliderError(RuntimeError):
@@ -384,7 +384,7 @@ class FarmaliderClient:
         return "delivery"
 
     def _diagnostic_ref(self, kind: str, identity: str | int) -> str:
-        message = f"{kind}:{identity}".encode("utf-8")
+        message = f"{kind}:{identity}".encode()
         return hmac.new(
             self._diagnostic_key, message, hashlib.sha256
         ).hexdigest()[:12]
@@ -778,10 +778,14 @@ class FarmaliderClient:
             raise
 
     def get_pedido(self, codigo: str | int) -> dict[str, Any] | None:
-        return self._request_json(
-            self._delivery_path(f"pedido/{codigo}"),
-            allow_not_found=True,
-            diagnostic_ref=self._diagnostic_ref("pedido", codigo),
+        # Listas são aceitas somente no GET de cliente; este GET já as rejeita.
+        return cast(
+            dict[str, Any] | None,
+            self._request_json(
+                self._delivery_path(f"pedido/{codigo}"),
+                allow_not_found=True,
+                diagnostic_ref=self._diagnostic_ref("pedido", codigo),
+            ),
         )
 
     def test_connection(self) -> dict[str, Any]:

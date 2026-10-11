@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Any, cast
 
 from pedido_utils import (
     business_order_datetime,
@@ -479,7 +479,14 @@ def apply_pedido_api_confirmation(
 
 
 def _empty_order(contact: dict[str, Any], captured_at: str) -> dict[str, str]:
-    from analytics import ORDER_COLUMNS, get_fields, get_phone_and_urn, normalize_cpf, normalize_order_source, normalize_value
+    from analytics import (
+        ORDER_COLUMNS,
+        get_fields,
+        get_phone_and_urn,
+        normalize_cpf,
+        normalize_order_source,
+        normalize_value,
+    )
 
     fields = get_fields(contact)
     order = {field: "" for field in ORDER_COLUMNS}
@@ -527,9 +534,9 @@ def _ultimo_pedido_locator_id(fields: dict[str, Any]) -> str:
 
 def resolve_contact_order(
     contact: dict[str, Any], *, farm_client: Any, captured_at: str,
-    linked_cliente_id: str = "", cliente_response: dict[str, Any] | None = None,
+    linked_cliente_id: str = "", cliente_response: dict[str, Any] | list[dict[str, Any]] | None = None,
     cliente_lookup_status: str = "",
-    pedido_responses_by_id: dict[str, dict[str, Any] | None] | None = None,
+    pedido_responses_by_id: dict[str, dict[str, Any] | list[dict[str, Any]] | None] | None = None,
 ) -> tuple[dict[str, str] | None, list[dict[str, str]]]:
     """
     Resolve o pedido usando a FarmaLíder como fonte de verdade.
@@ -545,7 +552,10 @@ def resolve_contact_order(
     """
     from analytics import get_fields, is_valid_cpf, normalize_cpf
     from farmalider_client import (
-        FarmaliderBadRequestError, FarmaliderAuthError, FarmaliderError, FarmaliderUnavailableError,
+        FarmaliderAuthError,
+        FarmaliderBadRequestError,
+        FarmaliderError,
+        FarmaliderUnavailableError,
     )
 
     fields = get_fields(contact)
@@ -559,7 +569,7 @@ def resolve_contact_order(
     if farm_client is None:
         return None, []
 
-    def fetch_pedido(order_id: str) -> dict[str, Any] | None:
+    def fetch_pedido(order_id: str) -> dict[str, Any] | list[dict[str, Any]] | None:
         if not order_id:
             return None
         if pedido_responses_by_id is not None and order_id in pedido_responses_by_id:
@@ -741,6 +751,8 @@ def resolve_contact_order(
     if not pedido_id:
         return resolve_weni_locators(expected_cliente_id=linked_id)
 
+    # pedido_id é produzido acima somente quando latest é um objeto JSON.
+    latest = cast(dict[str, Any], latest)
     latest_owner = (
         _positive_id(latest.get("codCliente"))
         if "codCliente" in latest

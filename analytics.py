@@ -5,25 +5,23 @@ import json
 import os
 import tempfile
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
-from typing import Any
+from typing import Any, cast
 
 from config import TIPO_PRIMEIRO_ANUNCIO, TIPO_ULTIMO_ANUNCIO
-from urn_utils import resolve_contact_urns
 from pedido_utils import (
     business_order_datetime,
+    effective_order_status_code,
     farmalider_order_status_name,
     farmalider_payment_method_display,
-    effective_order_status_code,
     is_order_sale,
-    normalize_farmalider_order_status_code,
     normalize_farmalider_payment_code,
     parse_weni_order_list,
     weni_order_datetime_text,
 )
-
+from urn_utils import resolve_contact_urns
 
 AD_FIELDS = [
     "primeiro_anuncio_origem",
@@ -133,13 +131,13 @@ def _full_load_25_new_manifest(
             "A Weni não retornou contatos para criar a carga completa 25%."
         )
     captured = (
-        datetime.now(timezone.utc)
+        datetime.now(UTC)
         .isoformat(timespec="microseconds")
         .replace("+00:00", "Z")
     )
     digest = _full_load_25_digest(uuids)
     campaign_id = hashlib.sha256(
-        f"{captured}|{digest}".encode("utf-8")
+        f"{captured}|{digest}".encode()
     ).hexdigest()[:16]
     return {
         "schema_version": 1,
@@ -254,7 +252,7 @@ def mark_full_load_quarter_complete(
     payload.setdefault("completed_at_utc", {})[
         f"{component}_{part}"
     ] = (
-        datetime.now(timezone.utc)
+        datetime.now(UTC)
         .isoformat(timespec="seconds")
         .replace("+00:00", "Z")
     )
@@ -272,8 +270,8 @@ def mark_full_load_quarter_complete(
 def full_load_quarter_datetime(value: str) -> datetime:
     parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 BASE_COLUMNS = [
@@ -607,7 +605,7 @@ def is_valid_cpf(value: Any) -> bool:
     def digit(base: str, factor: int) -> str:
         total = sum(
             int(n) * weight
-            for n, weight in zip(base, range(factor, 1, -1))
+            for n, weight in zip(base, range(factor, 1, -1), strict=False)
         )
         result = (total * 10) % 11
         return "0" if result == 10 else str(result)
@@ -898,6 +896,104 @@ def _item_key(pedido_chave: str, position: int) -> str:
     return hashlib.sha256(basis.encode("utf-8")).hexdigest()[:32]
 
 
+def _parse_order_items(
+    produtos: list[Any],
+    *,
+    pedido_chave: str,
+    pedido_id: str,
+    data_hora: str,
+    data: str,
+    hora: str,
+    contact_uuid: str,
+    phone: str,
+    client_name: str,
+    captured_at: str,
+) -> tuple[list[dict[str, str]], Decimal, Decimal]:
+    """Valida os itens preservando quantidades, descontos e valores de origem."""
+    item_rows: list[dict[str, str]] = []
+    total_itens = Decimal("0")
+    total_unidades = Decimal("0")
+
+    for position, product in enumerate(produtos, start=1):
+        if not isinstance(product, dict):
+            raise ValueError(
+                f"produto na posição {position} não é um objeto."
+            )
+
+        nome = normalize_value(product.get("nome")).strip()
+        codigo = normalize_value(product.get("codigo") or product.get("codProduto")).strip()
+        if not nome and not codigo:
+            raise ValueError(
+                f"produto na posição {position} sem nome ou código."
+            )
+
+        quantidade = _quantity(product.get("quantidade"))
+        valor_unitario = _to_decimal(
+            product.get("valor_unitario"),
+            f"produto {position}.valor_unitario",
+        )
+        valor_total = _to_decimal(
+            product.get("valor_total"),
+            f"produto {position}.valor_total",
+        )
+        if valor_unitario < 0 or valor_total < 0:
+            raise ValueError(f"produto {position} possui valor negativo.")
+
+        total_itens += valor_total
+        total_unidades += quantidade
+
+        item_rows.append(
+            {
+                "item_chave": _item_key(pedido_chave, position),
+                "pedido_chave": pedido_chave,
+                "pedido_id": pedido_id,
+                "data_hora": data_hora,
+                "data": data,
+                "hora": hora,
+                "contact_uuid": contact_uuid,
+                "telefone": phone,
+                "cliente": client_name,
+                "produto_ordem": str(position),
+                "produto_nome": nome,
+                "produto_codigo": codigo,
+                "quantidade": _quantity_text(quantidade),
+                "valor_unitario": _money(valor_unitario),
+                "valor_total": _money(valor_total),
+                "capturado_em": captured_at,
+            }
+        )
+
+    return item_rows, total_itens, total_unidades
+
+
+def _parse_order_totals(
+    payload: dict[str, Any],
+    *,
+    total_compra: Decimal,
+    total_itens: Decimal,
+    total_unidades: Decimal,
+) -> tuple[Decimal, Decimal, str]:
+    """Confere frete, diferença e quantidade sem recalcular valores dos itens."""
+    comparison_total = total_itens
+    if normalize_value(payload.get("farmalider_frete")).strip():
+        freight = _to_decimal(payload["farmalider_frete"], "farmalider_frete")
+        if freight < 0:
+            raise ValueError("farmalider_frete não pode ser negativo.")
+        comparison_total += freight
+    difference = total_compra - comparison_total
+    status = (
+        "OK"
+        if abs(difference) <= Decimal("0.01")
+        else "ATENÇÃO_TOTAL_DIVERGENTE"
+    )
+    if "quantidade_itens" in payload:
+        reported_qty = _quantity(payload["quantidade_itens"])
+        if reported_qty != total_unidades:
+            raise ValueError("quantidade_itens diverge da soma das quantidades dos produtos.")
+
+    return comparison_total, difference, status
+
+
 def parse_ultimo_pedido_raw(
     raw: str,
     *,
@@ -960,75 +1056,24 @@ def parse_ultimo_pedido_raw(
             contact_uuid, data_hora, raw, pedido_id
         )
 
-        item_rows: list[dict[str, str]] = []
-        total_itens = Decimal("0")
-        total_unidades = Decimal("0")
-
-        for position, product in enumerate(produtos, start=1):
-            if not isinstance(product, dict):
-                raise ValueError(
-                    f"produto na posição {position} não é um objeto."
-                )
-
-            nome = normalize_value(product.get("nome")).strip()
-            codigo = normalize_value(product.get("codigo") or product.get("codProduto")).strip()
-            if not nome and not codigo:
-                raise ValueError(
-                    f"produto na posição {position} sem nome ou código."
-                )
-
-            quantidade = _quantity(product.get("quantidade"))
-            valor_unitario = _to_decimal(
-                product.get("valor_unitario"),
-                f"produto {position}.valor_unitario",
-            )
-            valor_total = _to_decimal(
-                product.get("valor_total"),
-                f"produto {position}.valor_total",
-            )
-            if valor_unitario < 0 or valor_total < 0:
-                raise ValueError(f"produto {position} possui valor negativo.")
-
-            total_itens += valor_total
-            total_unidades += quantidade
-
-            item_rows.append(
-                {
-                    "item_chave": _item_key(pedido_chave, position),
-                    "pedido_chave": pedido_chave,
-                    "pedido_id": pedido_id,
-                    "data_hora": data_hora,
-                    "data": data,
-                    "hora": hora,
-                    "contact_uuid": contact_uuid,
-                    "telefone": phone,
-                    "cliente": client_name,
-                    "produto_ordem": str(position),
-                    "produto_nome": nome,
-                    "produto_codigo": codigo,
-                    "quantidade": _quantity_text(quantidade),
-                    "valor_unitario": _money(valor_unitario),
-                    "valor_total": _money(valor_total),
-                    "capturado_em": captured_at,
-                }
-            )
-
-        comparison_total = total_itens
-        if normalize_value(payload.get("farmalider_frete")).strip():
-            freight = _to_decimal(payload["farmalider_frete"], "farmalider_frete")
-            if freight < 0:
-                raise ValueError("farmalider_frete não pode ser negativo.")
-            comparison_total += freight
-        difference = total_compra - comparison_total
-        status = (
-            "OK"
-            if abs(difference) <= Decimal("0.01")
-            else "ATENÇÃO_TOTAL_DIVERGENTE"
+        item_rows, total_itens, total_unidades = _parse_order_items(
+            produtos,
+            pedido_chave=pedido_chave,
+            pedido_id=pedido_id,
+            data_hora=data_hora,
+            data=data,
+            hora=hora,
+            contact_uuid=contact_uuid,
+            phone=phone,
+            client_name=client_name,
+            captured_at=captured_at,
         )
-        if "quantidade_itens" in payload:
-            reported_qty = _quantity(payload["quantidade_itens"])
-            if reported_qty != total_unidades:
-                raise ValueError("quantidade_itens diverge da soma das quantidades dos produtos.")
+        comparison_total, difference, status = _parse_order_totals(
+            payload,
+            total_compra=total_compra,
+            total_itens=total_itens,
+            total_unidades=total_unidades,
+        )
 
         order_row = {
             "pedido_chave": pedido_chave,
@@ -1237,7 +1282,7 @@ def _derived_order_payload(fields: dict[str, Any]) -> dict[str, Any] | None:
     if product_names and all(product_names) and len(product_names) == len(quantities) == len(unit_values):
         rows: list[dict[str, Any]] = []
         try:
-            for name, qty_raw, unit_raw in zip(product_names, quantities, unit_values):
+            for name, qty_raw, unit_raw in zip(product_names, quantities, unit_values, strict=False):
                 qty = _to_decimal(qty_raw, "quantidade")
                 unit = _to_decimal(unit_raw, "valor_unitario")
                 rows.append({
@@ -1320,6 +1365,8 @@ def parse_ultimo_pedido(
             else (original_order, original_items)
         )
 
+    # original_valid só pode ser verdadeiro para uma linha já produzida.
+    original_order = cast(dict[str, str], original_order)
     if derived_valid:
         confirmation = derived_order.get("status_confirmacao", "")
         verified = (

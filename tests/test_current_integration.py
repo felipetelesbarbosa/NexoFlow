@@ -1,29 +1,29 @@
 import os
 import tempfile
 import threading
-from pathlib import Path
 import unittest
-from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 from requests.exceptions import ReadTimeout, RequestException
 
-import config
 import analytics
+import config
 from analytics import (
     mark_full_load_quarter_complete,
     prepare_full_load_quarter,
 )
 from farmalider_client import FarmaliderClient, FarmaliderError
 from google_sheets import GoogleSheetsStore
-from weni_client import WeniClient
 from main import (
     FarmaliderSettings,
     _format_ms_as_seconds,
     split_contacts,
     validate_contacts,
 )
+from weni_client import WeniClient
 
 
 def _ico_images(path: Path) -> list[bytes]:
@@ -604,7 +604,7 @@ class CurrentIntegrationTests(unittest.TestCase):
     def test_validate_contacts_reuses_recent_farmalider_cache_incrementally(self) -> None:
         farm = Mock()
         settings = FarmaliderSettings(enabled=True, token="x", use_hml=False)
-        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        now = datetime.now(UTC).isoformat(timespec="seconds")
         rows = [{"contact_uuid": "u1", "cpf": "52998224725"}]
         existing = {
             "u1": {

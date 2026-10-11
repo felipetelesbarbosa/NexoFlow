@@ -267,7 +267,7 @@ def serialize_pedido_products(
         "farmalider_forma_pagamento", "farmalider_forma_pagamento_nome",
         "valor_origem", "valor_total_weni", "diferenca_total_weni_api",
     )
-    payload = {key: "" if order.get(key) is None else str(order.get(key)) for key in metadata_fields}
+    payload: dict[str, Any] = {key: "" if order.get(key) is None else str(order.get(key)) for key in metadata_fields}
     for key in ("valor_total_compra", "valor_total_api_itens", "farmalider_frete", "total_api"):
         payload[key] = _number_text(order.get(key), money=True)
     for key in ("quantidade_itens", "quantidade_itens_api", "quantidade_produtos"):
