@@ -40,6 +40,7 @@ STATE = Path("logs/recompra_state.json")
 REVIEW = Path("logs/recompra_review.json")
 AUDIT = Path("logs/recompra_audit.jsonl")
 REVIEW_EXPIRED_EXIT_CODE = 4
+PROGRESS_LOG_EVERY_CONTACTS = 1000
 
 
 class PreAdmissionConflict(RuntimeError):
@@ -174,7 +175,7 @@ def build_plans(contacts, farm, structure, state, *, now=None, workers=FARMALIDE
                     for plan in pool.map(plan_contact, batch):
                         plans.append(plan)
                         results[plan["reason"]] += 1
-                        if len(plans) % 100 == 0:
+                        if len(plans) % PROGRESS_LOG_EVERY_CONTACTS == 0:
                             elapsed = max(monotonic() - started, 0.001)
                             logging.info("Recompra: contatos=%s; velocidade=%.1f/s; resultados=%s; cache=%s.",
                                          len(plans), len(plans) / elapsed, dict(results), reads.metrics())
@@ -629,7 +630,7 @@ def apply_review(review, weni, farm, *, state_path=STATE, now_fn=now_local, audi
         reads = RecompraReadCache(farm)
         for index, reviewed in enumerate(review["plans"], 1):
             check_day()
-            if index > 1 and (index - 1) % 100 == 0:
+            if index > 1 and (index - 1) % PROGRESS_LOG_EVERY_CONTACTS == 0:
                 logging.info("Recompra aplicação: contatos=%s/%s; resultados=%s; cache=%s.",
                              index - 1, len(review["plans"]), dict(summary), reads.metrics())
             audit_plan(reviewed)
