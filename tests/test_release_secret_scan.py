@@ -20,7 +20,9 @@ class ReleaseSecretScanTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name)
+        # No Windows, TEMP pode usar o alias 8.3 RUNNER~1. Compare caminhos
+        # canônicos, como os que o scanner recebe, sem alterar a verificação.
+        self.root = Path(self.temporary.name).resolve()
         self.repo = self.root / "repo"
         self.assets = self.root / "assets"
         self.repo.mkdir()
