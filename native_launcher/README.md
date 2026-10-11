@@ -2,7 +2,7 @@
 
 Fontes dos launchers Windows distribuídos no NexoFlow 1.0.
 
-Cada executável é compilado separadamente por tag (`analytics`, `updateweni`, `terminal`, `setup` ou `uninstall`), evitando que um componente carregue código de outro.
+Cada executável é compilado separadamente por tag (`analytics`, `updateweni`, `recompra`, `planilha`, `terminal`, `setup` ou `uninstall`), evitando que um componente carregue código de outro.
 
 Objetivos:
 
@@ -19,7 +19,7 @@ O `NexoFlow Terminal.exe` inicia diretamente `run_terminal.py` com o Python da `
 
 ### Ícones incorporados nos executáveis
 
-Os ícones dos cinco programas são incorporados ao próprio PE como recursos `RT_ICON` e `RT_GROUP_ICON` durante a criação dos ZIPs. Assim, o Explorador do Windows exibe o ícone específico mesmo ao visualizar o arquivo `.exe`, sem depender de um atalho ou de um arquivo `.ico` ao lado.
+Os ícones dos sete programas são incorporados ao próprio PE como recursos `RT_ICON` e `RT_GROUP_ICON` durante a criação dos ZIPs. Assim, o Explorador do Windows exibe o ícone específico mesmo ao visualizar o arquivo `.exe`, sem depender de um atalho ou de um arquivo `.ico` ao lado.
 
 | Executável | Ícone |
 |---|---|
@@ -27,6 +27,7 @@ Os ícones dos cinco programas são incorporados ao próprio PE como recursos `R
 | `NexoFlow Analytics.exe` | `assets/NexoFlow.ico` |
 | `NexoFlow Weni.exe` | `assets/NexoFlow_Weni.ico` |
 | `NexoFlow Recompra.exe` | `assets/NexoFlow_Weni.ico` |
+| `NexoFlow Planilha.exe` | `assets/NexoFlow_Planilha.ico` |
 | `NexoFlow Terminal.exe` | `assets/NexoFlow_Terminal.ico` |
 | `NexoFlow Uninstall.exe` | `assets/uninstaller.ico` |
 
@@ -39,7 +40,7 @@ O `NexoFlow Uninstall.exe` é um launcher nativo **opcional** para `installer\un
 
 ### Português brasileiro
 
-Os pacotes recompilam os cinco launchers a partir destes fontes. A saída do console usa UTF-8 e os recursos de versão usam a tabela pt-BR 0416/04B0, preservando acentos e cedilha. A versão permanece NexoFlow 1.0.
+Os pacotes recompilam os sete launchers a partir destes fontes. A saída do console usa UTF-8 e os recursos de versão usam a tabela pt-BR 0416/04B0, preservando acentos e cedilha. A versão permanece NexoFlow 1.0.
 
 ## NexoFlow Planilha
 

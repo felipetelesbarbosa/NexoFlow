@@ -1,4 +1,4 @@
-# NexoFlow 1.0 — Installer
+# NexoFlow 1.0 — Instalador
 
 Scripts de instalação e desinstalação do NexoFlow 1.0.
 
