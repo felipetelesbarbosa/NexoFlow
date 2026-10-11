@@ -40,7 +40,7 @@ O **NexoFlow Analytics** organiza os dados operacionais, pedidos, atribuição d
 
 Os pacotes são atualizados no [release NexoFlow 1.0](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.0) após testes, auditoria e validação do Setup no Windows. A versão permanece **1.0**.
 
-Consulte a [política de segurança e as configurações para publicação pública](SECURITY.md). Credenciais e dados reais de clientes devem permanecer locais, fora do Git e dos pacotes.
+O NexoFlow não inclui credenciais. Configure suas próprias chaves e tokens conforme o [aviso de segurança](SECURITY.md).
 
 ## Idioma e codificação
 

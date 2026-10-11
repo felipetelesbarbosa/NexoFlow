@@ -341,10 +341,7 @@ O arquivo `NexoFlow-Setup-$Version.zip` contém o instalador do NexoFlow 1.0 e f
 
 Melhorias desta distribuição do NexoFlow 1.0:
 - progresso Weni a cada 2 segundos com barra de 0% a 100% por etapa, contatos/registros por segundo, tempo decorrido e previsão de término; auditoria JSONL mede bytes efetivamente gravados por segundo; consultas sem total conhecido mostram quantidade e velocidade;
-- Requests exige versão 2.33.0 ou superior na série 2, excluindo versões antigas com vulnerabilidades conhecidas;
-- publicação verifica segredos em todo o histórico Git e nos ZIPs extraídos, confere os hashes dos pacotes e bloqueia o release se alguma etapa falhar;
-- testes e empacotamento usam permissão de leitura no GitHub; somente a etapa final de publicação pode atualizar a tag e o release, com Actions fixadas por commit;
-- política de segurança e orientações para acesso público em SECURITY.md; credenciais e diagnósticos privados continuam fora do Git e dos pacotes;
+- o NexoFlow não inclui chaves, tokens ou credenciais; use suas próprias credenciais nas integrações, conforme SECURITY.md;
 - identificação e documentação padronizadas como NexoFlow 1.0, com os componentes Planilha e Recompra nos índices e instruções de assinatura e desinstalação alinhadas ao Setup;
 - recompra processa contatos durante a paginação, consulta a FarmaLíder com até quatro workers e cache limitado por execução, reduzindo leituras e gravações redundantes sem alterar a validação de identidade;
 - revisão de recompra expirada na virada do dia gera um novo dry-run uma vez no launcher e exige nova confirmação; se a aplicação já iniciou, interrompe e preserva o estado;
@@ -358,18 +355,15 @@ Melhorias desta distribuição do NexoFlow 1.0:
 - pagamento 0 cancela o pedido: forma de pagamento Cancelado e status 3 na Weni e no BI, preservando os códigos brutos da API na tabela de pedidos;
 - de-para de status atualizado: EmAberto=-2; PendenteDePagamento=-1; EmProcessamento=0; ProntoParaRota=4; EmTransito=1; Concluido=2; Cancelado=3;
 - estados -2, -1, 0, 4 e 1 permanecem em rechecagem; vendas e ultima_compra consideram pedidos em 4 (Pronto para rota), 1 (Em trânsito) ou 2 (Concluído), validados pela API e não cancelados;
-- diagnóstico privado local identifica CPFs com falhas 5xx persistentes e captura campos seguros da resposta, fora dos logs públicos e dos pacotes;
 - diagnóstico seguro de proxy identifica autenticação 407, bloqueio de túnel 403, TLS, DNS, timeout e conexão recusada; resposta 400/404 da FarmaLíder não é apresentada como autenticação confirmada;
 - listas de pedido com leitura CSV preservam vírgulas e aspas nos nomes dos produtos, sem desalinhamento artificial na Weni e no Analytics;
 - códigos numéricos de pagamento não documentados são preservados e exibidos como não identificados, com o código recebido, sem inventar a forma de pagamento;
 - pagamento sem de-para aparece em INFO uma vez por código; resumo por código e progresso distinguem contatos com pedido validado de alterações propostas e gravadas;
 - preparação e auditoria continuam antes de qualquer gravação; listas realmente inconsistentes permanecem bloqueadas;
 - cooldown global e recuperação serial após falhas 5xx da FarmaLíder, com retorno gradual da concorrência e redução do intervalo quando a API se recupera;
-- diagnóstico de HTTP 500 com referências opacas por execução e classificação da resposta, sem publicar CPF, tokens ou texto livre do servidor;
 - HTTP 404 continua representando cliente não encontrado; HTTP 500 permanece uma falha da API;
 - consultas por CPF que já falharam não são repetidas na mesma carga; dados previamente confirmados são preservados quando o CPF continua o mesmo;
 - cargas incompletas aparecem como parciais e preservam o marco incremental para uma nova tentativa;
-- empacotamento bloqueado quando arquivos privados estão rastreados no Git.
 
 - carga por planilhas de conversas e contatos com comandos nexo weni planilhas e nexo analytics planilhas, validação de identidade e revisão humana por destino;
 - cargas por planilha Weni e Analytics aguardam confirmação gráfica explícita, mesmo sem entrada de console; fechar o Bloco de Notas não encerra a espera;
