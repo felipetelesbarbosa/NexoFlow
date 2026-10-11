@@ -2,6 +2,8 @@
 
 ## Atendimentos Delivery com as tags Pedido e Pedido finalizado
 
+A tag legada `Pedido is deleted` também é aceita como `Pedido`, por correspondência exata, desconsiderando maiúsculas e espaços duplicados. O formato de export `Pedido_is_deleted_<data e hora com fuso>` é aceito somente para a antiga tag Pedido, com timestamp válido. Ela seleciona atendimentos; não significa cancelamento do pedido na FarmaLíder.
+
 O comando `run_delivery_tickets.py` reconcilia os clientes dos atendimentos humanos encerrados com essas tags. As tags são lidas na **API externa v2 do Weni Chats**, não nos tópicos/setores ou nas etiquetas de mensagens da API de Flows.
 
 ### Carga por planilhas — Weni e Analytics
@@ -10,7 +12,7 @@ Coloque os dois exports originais na pasta `C:\NexoFlow\importacoes`, com estes 
 
 | Arquivo | Export e estrutura original |
 | --- | --- |
-| `Conversas_Delivery.xlsx` | Conversas encerradas, aba `rooms`, com as tags Pedido ou Pedido Finalizado. |
+| `Conversas_Delivery.xlsx` | Conversas encerradas, aba `rooms`, com as tags Pedido, Pedido Finalizado ou a tag legada Pedido excluída. |
 | `Contatos_Delivery.xlsx` | Contatos da mesma organização, abas `Contact` ou `Contact 1`, `Contact 2` etc., com UUID, nome, CPF, e-mail e URNs nativas. |
 
 Renomeie apenas os arquivos. Preserve abas, cabeçalhos e dados originais. Os exports ficam fora do Git e dos pacotes; o Setup e o projeto completo incluem a pasta `importacoes` vazia. Na desinstalação, a pasta e seus arquivos são sempre preservados em `C:\NexoFlow Data\importacoes`, inclusive se você optar por remover configurações, credenciais e logs. O Setup restaura as importações na reinstalação. Cópias anteriores com o mesmo nome e conteúdo diferente ficam em `historico_preservado`; uma cópia vazia não apaga os arquivos preservados.
@@ -22,7 +24,7 @@ nexo weni planilhas
 nexo analytics planilhas
 ```
 
-O primeiro comando consulta a FarmaLíder e aplica somente os campos de pedido na Weni. O segundo consulta novamente a FarmaLíder e publica os contatos/pedidos/itens e indicadores no Google Sheets, sem gravar na Weni. Recomenda-se executar Weni primeiro e Analytics depois. Cada execução prepara um snapshot próprio e abre o relatório no Bloco de Notas; digite `PLANILHAS REVISADAS` no CMD somente depois de conferir os resultados. Cancelar, fechar a janela ou falhar na consulta/auditoria impede a aplicação. Fechar o Bloco de Notas não confirma a carga.
+O primeiro comando consulta a FarmaLíder, aplica os campos de pedido na Weni e remove uma referência antiga de Recompra quando necessário e revisado. O segundo consulta novamente a FarmaLíder e publica os contatos/pedidos/itens e indicadores no Google Sheets, sem gravar na Weni. Recomenda-se executar Weni primeiro e Analytics depois. Cada execução prepara um snapshot próprio e abre o relatório no Bloco de Notas; digite `PLANILHAS REVISADAS` no CMD somente depois de conferir os resultados. Cancelar, fechar a janela ou falhar na consulta/auditoria impede a aplicação. Fechar o Bloco de Notas não confirma a carga.
 
 Essa modalidade não precisa do token `project_auth` do Chats. Continua exigindo token de contatos da Weni, token FarmaLíder e, para Analytics, credencial/ID da planilha Google. O importador cruza o UUID interno do Chats com o UUID de contatos/Flows por URN nativa única e nome correspondente; não usa nome ou CPF sozinho para unir contatos. URNs duplicadas, nomes divergentes, datas inválidas, conversas abertas, ausência de atendente e setores diferentes são excluídos com motivo.
 
@@ -63,7 +65,7 @@ Para identificar a origem da API, abra Atendimento/Chats no navegador, pressione
 
 Referências oficiais: [configuração `project_auth` da integração com Flows](https://github.com/weni-ai/chats-engine/blob/main/chats/apps/projects/usecases/integrate_ticketers.py) e [autenticação do projeto na API externa](https://github.com/weni-ai/chats-engine/blob/main/chats/apps/accounts/authentication/drf/authorization.py). O índice de API v2 de Flows enviado no chat não contém instruções para obter o token de Chats.
 
-A API externa também documenta o filtro `tag_name`, por exemplo `GET /v2/external/rooms_metrics/?is_active=false&tag_name=Pedido`. Para a segunda tag, o valor é `Pedido%20finalizado`, respeitando o nome cadastrado. O NexoFlow lê todas as páginas encerradas e compara as duas tags localmente, para lidar com capitalização, tickets com ambas as tags e diferenças de espaços sem duplicação.
+A API externa também documenta o filtro `tag_name`, por exemplo `GET /v2/external/rooms_metrics/?is_active=false&tag_name=Pedido`. Para a segunda tag, o valor é `Pedido%20finalizado`, respeitando o nome cadastrado. O NexoFlow lê todas as páginas encerradas e compara as tags e seus aliases legados localmente, para lidar com capitalização, tickets com múltiplas tags e diferenças de espaços sem duplicação.
 
 O campo opcional `WENI_CHATS_ORDER_ID_FIELD` identifica um campo comprovadamente específico do ticket que contém o ID oficial do pedido. Deixe vazio até documentar esse vínculo. Não use automaticamente `pedido_id` herdado do contato: ele pode representar uma compra anterior. Sem evidência específica, o vínculo do pedido com o atendimento continua pendente.
 
@@ -83,11 +85,11 @@ Depois de revisar:
 python run_delivery_tickets.py --apply --require-review logs/delivery_review.json
 ```
 
-O apply relê cada contato e bloqueia alterações nas informações usadas para identificar o cliente ou validar o pedido. Contatos em conflito não são gravados nem publicados como reconciliação bem-sucedida. As gravações são idempotentes; se uma integração falhar depois de outras gravações, retome com o mesmo snapshot. Esse comando não altera o checkpoint da carga geral, grupos ou consentimento LGPD.
+O apply relê cada contato e bloqueia alterações nas informações usadas para identificar o cliente ou validar o pedido. Contatos em conflito não são gravados nem publicados como reconciliação bem-sucedida. Cada POST tem tentativa única; se uma integração falhar depois de outras gravações, retome com o mesmo snapshot, que verifica o estado atual antes de executar operações pendentes. Esse comando não altera o checkpoint da carga geral nem o consentimento LGPD. Ao gravar na Weni, remove primeiro a associação revisada ao grupo Recompra FarmaLíder quando a referência mudou ou ficou inelegível, para cancelar o evento antigo. Não inclui clientes no grupo nem dispara mensagens; a nova admissão exige a rotina própria de Recompra.
 
 ### Validação e limitações
 
-- Seleciona exatamente as tags Pedido e Pedido finalizado, desconsiderando maiúsculas e espaços duplicados. Exige encerramento, evidência de atendente e `contact.external_id` válido para o UUID de contato da Weni. IDs internos de contato do Chats não substituem esse vínculo.
+- Seleciona exatamente as tags Pedido, Pedido is deleted (legada) e Pedido finalizado, desconsiderando maiúsculas e espaços duplicados. Exige encerramento, evidência de atendente e `contact.external_id` válido para o UUID de contato da Weni. IDs internos de contato do Chats não substituem esse vínculo.
 - Deduplica tickets e clientes; consulta primeiro CPFs válidos e depois os inválidos preenchidos, incluindo zero. CPF inválido mantém a exigência de nome completo + e-mail ou nome completo + telefone, do mesmo cliente. Ambiguidade, divergência e dados insuficientes bloqueiam o pedido.
 - Usa a lógica oficial de confirmação FarmaLíder já existente, preservando proprietário, itens, descrição, quantidades, preços, status, pagamento e emissão. Uma tag não confirma venda. HTTP 500 não significa ausência de cliente ou pedido.
 - Atualiza os campos `pedido_*`, usando `pedido_data` como referência temporal. A carga Delivery não escreve `ultima_compra`. Não substitui um pedido mais recente na Weni por outro mais antigo. Vendas são status 4, 1 e 2, sem cancelamento ou pagamento 0.

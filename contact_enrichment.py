@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from config import WENI_UPDATE_CONTEXT_LOOKBACK_HOURS
+
 
 @dataclass(frozen=True)
 class FieldEvidence:
@@ -125,6 +127,7 @@ AGE_CONTEXT_PATTERNS = (
 
 MAJORITY_CONTEXT_MARKERS = (
     "maior de 18",
+    "mais de 18 anos",
     "18 anos ou mais",
     "maior de idade",
     "tem 18 anos",
@@ -276,7 +279,13 @@ def _is_majority_question(text: str) -> bool:
 
 def _is_lgpd_context(text: str) -> bool:
     normalized = normalize_text(text)
-    return any(marker in normalized for marker in LGPD_CONTEXT_MARKERS)
+    return any(marker in normalized for marker in LGPD_CONTEXT_MARKERS) or bool(
+        re.search(
+            r"\b(?:uso|utilizacao|tratamento)\s+(?:de|dos|das)\s+"
+            r"(?:(?:seus|suas|meus|minhas)\s+)?dados\b",
+            normalized,
+        )
+    )
 
 
 def _yes_no(text: str) -> bool | None:
@@ -307,8 +316,184 @@ def _direct_lgpd(text: str) -> str | None:
     accept = tuple(normalize_text(item) for item in LGPD_ACCEPT_MARKERS)
     if any(marker in normalized for marker in refuse):
         return "recusado"
+    response = _lgpd_response(text)
+    if response is False:
+        if _direct_majority(text) == "não" and re.search(
+            r"\b(?:aceito|autorizo|concordo com|consinto com)\s+(?:o\s+|a\s+)?"
+            r"(?:uso|tratamento|utilizacao|lgpd|politica de privacidade|dados pessoais)\b",
+            normalized,
+        ):
+            return "ativo"
+        return "recusado"
+    if _is_uncertain_lgpd_response(normalized):
+        return None
     if any(marker in normalized for marker in accept):
         return "ativo"
+    return None
+
+
+def _is_uncertain_lgpd_response(text: str) -> bool:
+    return bool(
+        re.search(
+            r"\b(?:nao sei|nao entendi|nao tenho certeza|talvez|depende)\b"
+            r"|\b(?:aceito|concordo|autorizo|sim)\s+se\b",
+            text,
+        )
+    )
+
+
+def _lgpd_response(text: str) -> bool | None:
+    """Decisão expressa em resposta à pergunta, incluindo frases compostas."""
+    normalized = normalize_text(text)
+    if any(normalize_text(marker) in normalized for marker in LGPD_REFUSE_MARKERS):
+        return False
+    if re.match(r"^(?:eu\s+)?(?:nao|n|recuso)\b", normalized) and not re.search(
+        r"\b(?:nao sei|nao entendi|nao tenho certeza)\b", normalized
+    ):
+        return False
+    if _is_uncertain_lgpd_response(normalized):
+        return None
+    if re.match(
+        r"^(?:eu\s+)?(?:sim|s|aceito|concordo|autorizo|consinto)\b", normalized
+    ):
+        return True
+    return None
+
+
+def _is_unambiguous_lgpd_question(text: str) -> bool:
+    normalized = normalize_text(text)
+    if not _is_lgpd_context(text) or text.count("?") > 1:
+        return False
+    if (
+        _is_age_question(normalized)
+        or _is_cpf_context(normalized)
+        or re.search(
+            r"\b(?:marketing|ofertas|promocoes|propaganda|publicidade|campanhas)\b"
+            r"|receber novidades",
+            normalized,
+        )
+    ):
+        return False
+    if _is_majority_question(normalized):
+        return _is_combined_majority_lgpd_question(text)
+    return bool(
+        re.search(
+            r"\b(?:aceita|aceitar|concorda|concordar|autoriza|autorizar|consente|consentir)\b",
+            normalized,
+        )
+        or (
+            re.search(
+                r"\b(?:responda|responder|responde|digite|envie)\b"
+                r"(?:\s+(?:com|apenas))?\s*[^a-z0-9]*(?:sim|aceito|concordo)\b",
+                normalized,
+            )
+            and re.search(r"\b(?:termos|consentimento|autorizacao)\b", normalized)
+        )
+    )
+
+
+def _is_combined_majority_lgpd_question(text: str) -> bool:
+    """SIM confirma ambos apenas quando o fluxo explicita a confirmação conjunta."""
+    normalized = normalize_text(text)
+    if (
+        text.count("?") > 1
+        or not _is_lgpd_context(normalized)
+        or _is_cpf_context(normalized)
+        or re.search(
+            r"\b(?:marketing|ofertas|promocoes|propaganda|publicidade|campanhas)\b"
+            r"|receber novidades",
+            normalized,
+        )
+        or not re.search(r"\b(?:confirme|confirma|confirmar)\b", normalized)
+        or not re.search(r"\b(?:entrega|pedido|atendimento)\b", normalized)
+        or not re.search(
+            r"\b(?:responda|digite|envie)\b(?:\s+(?:com|apenas))?\s*[^a-z0-9]*sim\b",
+            normalized,
+        )
+    ):
+        return False
+    majority = re.search(
+        r"\b(?:maior de 18|mais de 18 anos|18 anos ou mais|maior de idade)\b",
+        normalized,
+    )
+    authorization = re.search(
+        r"\b(?:autoriza|autorizar|concorda|consente)\b", normalized
+    )
+    if majority is None or authorization is None:
+        return False
+    earlier, later = sorted((majority, authorization), key=lambda match: match.start())
+    return bool(re.search(r"\be\b", normalized[earlier.end() : later.start()]))
+
+
+def _lgpd_decision(
+    views: list[MessageView], index: int
+) -> tuple[str, bool, str] | None:
+    current = views[index]
+    # Uma mensagem do próprio bot/atendente não declara a vontade do cliente.
+    # Datas ausentes ou inválidas não podem vincular respostas a uma sessão.
+    current_dt = _parse_datetime(current.created_on)
+    if current.direction != "in" or current_dt == datetime.min.replace(tzinfo=UTC):
+        return None
+    direct = _direct_lgpd(current.text)
+    if direct is not None:
+        return direct, False, "decisão LGPD explícita na mensagem do cliente"
+
+    previous = _previous_prompt(views, index)
+    if previous is None or previous.direction != "out":
+        return None
+    previous_dt = _parse_datetime(previous.created_on)
+    elapsed = (current_dt - previous_dt).total_seconds()
+    if (
+        previous_dt == datetime.min.replace(tzinfo=UTC)
+        or elapsed < 0
+        or elapsed > WENI_UPDATE_CONTEXT_LOOKBACK_HOURS * 3600
+        or not _is_unambiguous_lgpd_question(previous.text)
+    ):
+        return None
+
+    decision = _lgpd_response(current.text)
+    combined = _is_combined_majority_lgpd_question(previous.text)
+    if (
+        combined
+        and decision is False
+        and not any(
+            normalize_text(marker) in normalize_text(current.text)
+            for marker in LGPD_REFUSE_MARKERS
+        )
+    ):
+        # Um NÃO isolado pode negar a maioridade ou a autorização. Não atribuir
+        # automaticamente ambas as negativas sem o cliente indicar o escopo.
+        return None
+    if decision is not None:
+        return (
+            "ativo" if decision else "recusado",
+            False,
+            f"resposta explícita à pergunta LGPD {previous.message_id}",
+        )
+    if combined:
+        return None
+    continuation = normalize_text(current.text).strip(".!?,;:")
+    if continuation in {
+        "pode continuar",
+        "continuar",
+        "pode prosseguir",
+        "podemos continuar",
+        "vamos continuar",
+        "vamos seguir",
+        "quero continuar",
+        "quero continuar o atendimento",
+        "quero seguir com o atendimento",
+        "pode continuar com o atendimento",
+        "pode prosseguir com o atendimento",
+        "quero fazer meu pedido",
+        "quero fazer o pedido",
+        "vamos fazer o pedido",
+    }:
+        return (
+            "ativo",
+            True,
+            f"continuidade explícita do atendimento após pergunta LGPD {previous.message_id}; sem consentimento de marketing",
+        )
     return None
 
 
@@ -331,18 +516,33 @@ def infer_contact_fields(
     context_messages: Iterable[dict[str, Any]],
     *,
     candidate_message_ids: set[str],
+    current_lgpd: Any = None,
 ) -> dict[str, FieldEvidence]:
     """
     Infere somente campos de baixo risco a partir de mensagens novas.
 
-    Respostas curtas (ex.: "Sim", "Não", "27" ou um CPF isolado) só são aceitas
-    quando há contexto explícito imediatamente anterior sobre maioridade, LGPD, idade ou CPF.
+    Respostas curtas (ex.: "Sim", "Não", "27" ou um CPF isolado) exigem
+    contexto explícito sobre maioridade, LGPD, idade ou CPF. Decisões LGPD
+    exigem mensagem recebida e data válida; respostas contextuais usam a janela
+    de sessão configurada. Continuidade não substitui uma recusa registrada.
     Para CPF, somente documentos com 11 dígitos e dígitos verificadores válidos são aceitos.
     """
     views = [_view(message) for message in context_messages]
     views.sort(key=lambda item: (_parse_datetime(item.created_on), item.message_id))
 
     evidences: dict[str, FieldEvidence] = {}
+    lgpd_refused = normalize_text(current_lgpd) in {
+        "recusado",
+        "recuso",
+        "nao",
+        "negado",
+        "inativo",
+        "opt-out",
+        "opt out",
+        "false",
+        "0",
+        "nao autorizado",
+    }
 
     def save(field: str, value: str | int, current: MessageView, reason: str) -> None:
         evidences[field] = FieldEvidence(
@@ -354,6 +554,9 @@ def infer_contact_fields(
         )
 
     for index, current in enumerate(views):
+        lgpd = _lgpd_decision(views, index)
+        if lgpd is not None and lgpd[0] == "recusado":
+            lgpd_refused = True
         if current.message_id not in candidate_message_ids:
             continue
         if not current.text:
@@ -387,14 +590,12 @@ def infer_contact_fields(
                 "maioridade declarada explicitamente",
             )
 
-        direct_lgpd = _direct_lgpd(current.text)
-        if direct_lgpd is not None:
-            save(
-                "opt_in_lgpd",
-                direct_lgpd,
-                current,
-                "decisão LGPD explícita na mensagem",
-            )
+        if lgpd is not None:
+            value, implicit, reason = lgpd
+            if not implicit or not lgpd_refused:
+                save("opt_in_lgpd", value, current, reason)
+                if not implicit and value == "ativo":
+                    lgpd_refused = False
 
         previous = _previous_prompt(views, index)
         if previous is None:
@@ -425,23 +626,34 @@ def infer_contact_fields(
             )
 
         yes_no = _yes_no(current.text)
-        if yes_no is None:
-            continue
-
         if _is_majority_question(previous.text):
-            save(
-                "maior_de_18_anos",
-                "sim" if yes_no else "não",
-                current,
-                "resposta contextual à validação de maioridade",
-            )
-
-        if _is_lgpd_context(previous.text):
-            save(
-                "opt_in_lgpd",
-                "ativo" if yes_no else "recusado",
-                current,
-                "resposta contextual à solicitação LGPD",
-            )
+            if _is_lgpd_context(previous.text):
+                current_dt = _parse_datetime(current.created_on)
+                previous_dt = _parse_datetime(previous.created_on)
+                elapsed = (current_dt - previous_dt).total_seconds()
+                if (
+                    _is_combined_majority_lgpd_question(previous.text)
+                    and direct_majority is None
+                    and current.direction == "in"
+                    and previous.direction == "out"
+                    and current_dt != datetime.min.replace(tzinfo=UTC)
+                    and previous_dt != datetime.min.replace(tzinfo=UTC)
+                    and 0 <= elapsed <= WENI_UPDATE_CONTEXT_LOOKBACK_HOURS * 3600
+                    and re.match(r"^(?:eu\s+)?sim\b", normalize_text(current.text))
+                    and not _is_uncertain_lgpd_response(normalize_text(current.text))
+                ):
+                    save(
+                        "maior_de_18_anos",
+                        "sim",
+                        current,
+                        "resposta SIM à confirmação conjunta de maioridade e LGPD",
+                    )
+            elif yes_no is not None:
+                save(
+                    "maior_de_18_anos",
+                    "sim" if yes_no else "não",
+                    current,
+                    "resposta contextual à validação de maioridade",
+                )
 
     return evidences

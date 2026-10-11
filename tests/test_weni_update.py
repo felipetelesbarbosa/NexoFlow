@@ -1118,6 +1118,52 @@ class WeniUpdateTests(unittest.TestCase):
         self.assertEqual(plan.fields["pedido_data"], "03/10/26 22:30:00")
         self.assertEqual(plan.fields["ultima_compra"], "2026-10-03T22:30:00-03:00")
 
+    def test_same_order_corrects_future_weni_date_and_current_status(self) -> None:
+        for current_id in ("123", "000123", {"value": "123"}):
+            for status in (2, 3):
+                with self.subTest(current_id=current_id, status=status):
+                    contact = self._purchase_contact(include_raw=False)
+                    contact["fields"].update(
+                        pedido_id=current_id,
+                        pedido_data="04-10-2026 12:21",
+                        pedido_status="1",
+                    )
+                    farm = self._purchase_api()
+                    farm.get_pedido.return_value["capa"]["status"] = status
+                    plan = self._purchase_plan(contact, farm)
+                    self.assertTrue(plan.order_validated)
+                    self.assertEqual(plan.fields["pedido_data"], "03/10/26 09:00:00")
+                    self.assertEqual(plan.fields["pedido_status"], str(status))
+                    self.assertEqual(plan.purchase_confirmed, status == 2)
+                    audit_plans([plan], opt_out_group_available=True)
+
+    def test_different_or_unknown_order_preserves_newer_weni_date(self) -> None:
+        for current_id in ("456", "", "123.0", True):
+            with self.subTest(current_id=current_id):
+                contact = self._purchase_contact(include_raw=False)
+                contact["fields"].update(
+                    pedido_id=current_id,
+                    pedido_data="04-10-2026 12:21",
+                    pedido_status="1",
+                )
+                plan = self._purchase_plan(contact, self._purchase_api())
+                self.assertFalse(plan.order_validated)
+                self.assertFalse(plan.purchase_confirmed)
+                self.assertFalse(
+                    any(name.startswith("pedido_") for name in plan.fields)
+                )
+
+    def test_latest_api_order_replaces_older_weni_order(self) -> None:
+        contact = self._purchase_contact(include_raw=False)
+        contact["fields"].update(pedido_id="456", pedido_data="18-09-2026 12:21")
+        farm = self._purchase_api()
+        farm.get_pedido.return_value["capa"]["emissao"] = "2026-10-09T12:21:00"
+        plan = self._purchase_plan(contact, farm)
+        self.assertTrue(plan.order_validated)
+        self.assertEqual(plan.fields["pedido_id"], "123")
+        self.assertEqual(plan.fields["pedido_data"], "09/10/26 12:21:00")
+        farm.get_pedido.assert_called_once_with("123")
+
     def test_missing_optional_weni_order_field_is_skipped(self) -> None:
         contact = self._purchase_contact(include_raw=False)
         farm = self._purchase_api()

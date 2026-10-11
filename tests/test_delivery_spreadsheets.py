@@ -112,6 +112,22 @@ class DeliverySpreadsheetsTests(unittest.TestCase):
         self.assertEqual(tickets[0]["custom_fields"], {})
         self.assertEqual(len(report["sources"][0]["sha256"]), 64)
 
+    def test_deleted_order_tag_imports_only_exact_legacy_alias(self):
+        for tag, expected in [
+            ("Pedido is deleted", 1),
+            (" PEDIDO  IS   DELETED ", 1),
+            ("Pedido_is_deleted_2026-09-29 11:53:51.275814+00:00", 1),
+            ("Pedido_is_deleted_2026-09-29 13:04:10.754801+00:00", 1),
+            ("Pedido_is_deleted_2026-02-30T13:04:10Z", 0),
+            ("Pedido_is_deleted_2026-09-29 13:04:10", 0),
+            ("Orcamento_is_deleted_2026-09-29 11:53:51.275814+00:00", 0),
+            ("Pedido is deleted extra", 0),
+            ("Pedido cancelado", 0),
+        ]:
+            with self.subTest(tag=tag):
+                self.room_rows[0][6] = repr([tag])
+                self.assertEqual(len(self.read()[0]), expected)
+
     def test_repeated_urn_columns_are_preserved_and_conflicting_contacts_block(self):
         self.contact_rows[0][2] = "5591111111111"
         self.contact_rows[0][3] = "5591987654321"

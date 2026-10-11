@@ -13,7 +13,7 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from analytics import get_fields
-from delivery_tickets import TAGS, delivery_ticket_key
+from delivery_tickets import delivery_ticket_key, is_order_tag
 from farmalider_integration import _identity_name
 from urn_utils import native_contact_urns
 
@@ -184,7 +184,7 @@ def read_delivery_spreadsheets(directory, *, cutoff):
     for number, headers, values in _rows(room_path, "rooms", required):
         row = dict(zip(headers, values, strict=False))
         tags = _tags(row.get("tags_list"))
-        if not any(" ".join(tag.casefold().split()) in TAGS for tag in tags):
+        if not any(is_order_tag(tag) for tag in tags):
             continue
         summary["ATENDIMENTOS_COM_TAG"] += 1
         reason = ""

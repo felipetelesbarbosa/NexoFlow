@@ -255,6 +255,9 @@ O primeiro anúncio válido é preservado. O último anúncio só é substituíd
 
 ## Regras de LGPD
 
+- Decisões usam mensagens recebidas, com data válida. Respostas compostas são aceitas quando o sentido está claro; respostas contextuais exigem uma pergunta compatível na janela de 24 horas.
+- Continuar expressamente o atendimento após uma pergunta única de autorização dos dados pode indicar aceite operacional, preservando recusas já registradas. Isso não altera `marketing_opt_in`.
+- Uma pergunta que pede explicitamente `SIM` para confirmar maioridade e autorizar os dados para pedido/entrega permite registrar ambas as confirmações. Uma resposta negativa isolada não identifica qual requisito foi recusado.
 - aceite inequívoco em contexto explícito de LGPD/consentimento pode definir `opt_in_lgpd = ativo`;
 - recusa inequívoca pode definir `opt_in_lgpd = recusado`;
 - `Sim`/`Não` sem contexto de LGPD nunca altera consentimento;
@@ -311,6 +314,10 @@ Regras:
 - `ultima_compra`, quando o campo existe, avança nas rotinas convencionais somente para pedido confirmado pela FarmaLíder com status efetivo 4, 1 ou 2, sem cancelamento explícito e sem pagamento 0; somente esses pedidos entram nas métricas de venda.
 
 Os campos `pedido_id`, `pedido_data`, `pedido_status`, `pedido_produtos`, `pedido_quantidade_itens`, `pedido_valor_produtos`, `pedido_valor` e `pedido_forma_pagamento` são obrigatórios na Weni. Se qualquer um estiver ausente, o preflight bloqueia a execução antes de qualquer atualização de pedido.
+
+`pedido_quantidade_itens` e `pedido_forma_pagamento` devem ser **Texto**. O primeiro guarda uma lista alinhada aos produtos, como `2, 1`; o segundo guarda os códigos de pagamento como texto e o valor `Cancelado`. Em campos Numéricos, esses valores podem aparecer vazios ou perder a lista. O preflight bloqueia tipos incompatíveis informados pela API; o NexoFlow não altera o cadastro dos campos automaticamente. Antes de migrar uma instalação existente, confira os fluxos e filtros que usam esses campos e preserve `pedido_data` como Data e hora. Quando a resposta da gravação contém os campos do contato, o NexoFlow também verifica se os valores propostos foram preservados.
+
+O campo opcional de Texto `pedido_revisao_pendente` sinaliza uma compra posterior ainda não confirmada pela API. Ele guarda a data da evidência, sem alterar `pedido_data` ou inventar número e produtos. Com esse campo, o bloqueio da referência antiga de recompra permanece entre instalações. Uma confirmação oficial no mesmo dia ou depois resolve a pendência; o NexoFlow Weni grava `resolvido`. No Sheets, o campo aparece em `Base_Contatos`, com indicadores em `BI_Publico`, `BI_Clientes` e `BI_Qualidade`.
 
 Pedidos com status -2, -1, 0, 1 ou 4 permanecem na fila de rechecagem até chegarem a 2, Concluído, ou 3, Cancelado. Os estados -2, -1 e 0 não contam como vendas; 4 e 1 já contam, mas continuam em rechecagem.
 

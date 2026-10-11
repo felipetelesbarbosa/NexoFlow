@@ -59,6 +59,24 @@ class AnalyticsTests(unittest.TestCase):
         self.assertTrue(is_meta_ads_contact(contact))
         self.assertTrue(is_relevant_contact(contact))
 
+    def test_pending_purchase_marker_is_preserved_without_changing_order_date(self):
+        from analytics import BASE_COLUMNS, HISTORY_COLUMNS
+
+        source = self.sample_contact()
+        source["fields"].update(
+            pedido_data="18/09/26 12:21:00",
+            pedido_revisao_pendente={"value": "2026-10-09T15:00:00-03:00"},
+        )
+        row = normalize_contact(source, "2026-10-11T12:00:00-03:00")
+        self.assertEqual(row["pedido_revisao_pendente"], "2026-10-09T15:00:00-03:00")
+        self.assertEqual(row["pedido_data"], "18/09/26 12:21:00")
+        self.assertEqual(BASE_COLUMNS[-1], "pedido_revisao_pendente")
+        self.assertEqual(HISTORY_COLUMNS[-1], "pedido_revisao_pendente")
+        source["fields"]["pedido_revisao_pendente"] = "resolvido"
+        self.assertEqual(
+            normalize_contact(source, "now")["pedido_revisao_pendente"], "resolvido"
+        )
+
     def test_normalizes_uuid_cpf_and_ad_fields(self):
         row = normalize_contact(
             self.sample_contact(),

@@ -596,6 +596,31 @@ class PedidoResolutionTests(unittest.TestCase):
         self.assertEqual(order["status_validacao"], "ERRO")
         self.assertEqual(items, [])
 
+    def test_business_datetime_accepts_explicit_brazilian_export_formats(self):
+        for date in ("18/09/26", "18/09/2026", "18-09-26", "18-09-2026"):
+            for time, seconds in (("12:21", "00"), ("12:21:37", "37")):
+                with self.subTest(date=date, time=time):
+                    parsed = business_order_datetime(f"{date} {time}")
+                    self.assertIsNotNone(parsed)
+                    self.assertEqual(
+                        parsed.isoformat(), f"2026-09-18T12:21:{seconds}-03:00"
+                    )
+
+    def test_business_datetime_keeps_day_first_and_rejects_invalid_exports(self):
+        self.assertEqual(
+            business_order_datetime("09-10-2026 12:21").isoformat(),
+            "2026-10-09T12:21:00-03:00",
+        )
+        for raw in (
+            "31-09-2026 12:21",
+            "10-18-2026 12:21",
+            "18-09-2026 25:21",
+            "18-09-2026",
+            "18 de setembro de 2026 12:21",
+        ):
+            with self.subTest(raw=raw):
+                self.assertIsNone(business_order_datetime(raw))
+
     def test_item_order_identity_mismatch_is_rejected(self):
         pedido = pedido_payload()
         pedido["itens"][0]["codPedido"] = 999

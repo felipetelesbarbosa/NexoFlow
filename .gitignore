@@ -30,3 +30,7 @@ Thumbs.db
 
 # Estado, auditoria e revisão privados da recompra
 logs/recompra*
+logs/weni*state*.json
+logs/weni*review*.json
+logs/weni*review*.txt
+logs/weni*audit*.jsonl

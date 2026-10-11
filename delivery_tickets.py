@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 from collections import Counter
 from copy import deepcopy
 from datetime import UTC, datetime
@@ -32,10 +33,13 @@ from pedido_utils import business_order_datetime, effective_order_status_code
 from weni_client import WeniError
 from weni_update import (
     ContactUpdatePlan,
+    GroupAction,
     PlanAuditError,
     UpdateStats,
     _apply_purchase_candidate,
+    _available_weni_fields,
     _ensure_order_fields,
+    _execute_contact_plan,
     _prepare_frozen_plan_for_apply,
     audit_plans,
     load_review_snapshot,
@@ -75,7 +79,26 @@ DELIVERY_ORDER_COLUMNS = [
     "quantidade_atendimentos",
     "atualizado_em",
 ]
-TAGS = {"pedido", "pedido finalizado"}
+TAGS = {"pedido", "pedido finalizado", "pedido is deleted"}
+
+
+def is_order_tag(value):
+    """Accept exact order labels and Weni's timestamped deleted Pedido label."""
+    if not isinstance(value, str):
+        return False
+    raw = value.strip()
+    if " ".join(raw.casefold().split()) in TAGS:
+        return True
+    prefix = "pedido_is_deleted_"
+    if not raw.casefold().startswith(prefix):
+        return False
+    timestamp = raw[len(prefix) :]
+    if not re.fullmatch(
+        r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})",
+        timestamp,
+    ):
+        return False
+    return _datetime(timestamp) is not None
 
 
 def _datetime(value):
@@ -115,7 +138,7 @@ def select_tickets(rooms, *, cutoff):
         names = [
             str(tag.get("name") or "").strip() for tag in tags if isinstance(tag, dict)
         ]
-        if not any(" ".join(name.casefold().split()) in TAGS for name in names):
+        if not any(is_order_tag(name) for name in names):
             continue
         ended = _datetime(room.get("ended_at"))
         if ended is None or ended > cutoff or room.get("is_active") is True:
@@ -180,6 +203,45 @@ def ticket_order_link(ticket, order, *, order_id_field=""):
     return "SEM_VINCULO_COMPROVADO"
 
 
+def _recompra_removals(plan, contact, captured_at):
+    """Invalidate the old D+25 reference without admitting a new campaign entry."""
+    from recompra import GROUP, OPT_OUT, TZ, member, refused
+
+    fields = get_fields(contact)
+    reference = business_order_datetime(
+        plan.fields.get("pedido_data", fields.get("pedido_data"))
+    )
+    local_now = business_order_datetime(captured_at)
+    expired = reference is None or bool(
+        local_now and (local_now.astimezone(TZ).date() - reference.date()).days > 25
+    )
+    if not (
+        "pedido_data" in plan.fields
+        or (plan.order_validated and not plan.purchase_confirmed)
+        or expired
+        or refused(contact)
+        or member(contact, "", OPT_OUT)
+    ):
+        return []
+    return [
+        GroupAction(
+            "remove",
+            group_uuid,
+            "referência de recompra mudou, expirou ou cliente inelegível; reavaliar na rotina de recompra",
+            GROUP,
+        )
+        for group_uuid in sorted(
+            {
+                str(group["uuid"])
+                for group in contact.get("groups", []) or []
+                if isinstance(group, dict)
+                and group.get("name") == GROUP
+                and group.get("uuid")
+            }
+        )
+    ]
+
+
 def _order_plan(contact, resolved, farm, captured_at, available_fields):
     fields = get_fields(contact)
     plan = ContactUpdatePlan(
@@ -196,6 +258,9 @@ def _order_plan(contact, resolved, farm, captured_at, available_fields):
     plan.fields.pop("ultima_compra", None)
     plan.previous.pop("ultima_compra", None)
     plan.evidence.pop("ultima_compra", None)
+    plan.group_actions.extend(_recompra_removals(plan, contact, captured_at))
+    if plan.group_actions:
+        plan.guards["marketing_opt_in"] = fields.get("marketing_opt_in")
     # Always guard the identity, including orders kept only in Sheets because Weni has a newer snapshot.
     plan.guards["__invalid_cpf_identity"] = weni_identity_guard(contact)
     for name in (
@@ -464,7 +529,7 @@ def apply_delivery_review(path, weni, *, store_factory=None, target=None):
             "Google Sheets deve estar configurado para o destino revisado."
         )
     audit_plans(plans, opt_out_group_available=True, opt_in_group_available=True)
-    available = {item.get("key") for item in weni.list_fields()}
+    available = _available_weni_fields(weni)
     _ensure_order_fields(available)
     # A orientação vigente usa pedido_data; não editar o arquivo revisado.
     # A projeção abaixo somente elimina a escrita legada de ultima_compra.
@@ -517,15 +582,30 @@ def apply_delivery_review(path, weni, *, store_factory=None, target=None):
         if prepared is None:
             conflicts.add(plan.contact_uuid)
             continue
+        if target in {"weni", "both"}:
+            reviewed_groups = {
+                action.group
+                for action in plan.group_actions
+                if action.action == "remove"
+                and action.group_name == "Recompra FarmaLíder"
+            }
+            if any(
+                action.group not in reviewed_groups
+                for action in _recompra_removals(plan, current, delivery["cutoff"])
+            ):
+                # An admission after the review may have scheduled an old event.
+                # Do not change its reference without reviewing its removal.
+                conflicts.add(plan.contact_uuid)
+                continue
         audit_plans(
             [prepared], opt_out_group_available=True, opt_in_group_available=True
         )
-        if prepared.fields and target in {"weni", "both"}:
+        if prepared.has_changes and target in {"weni", "both"}:
             try:
-                weni.update_contact_fields(plan.contact_uuid, prepared.fields)
+                _execute_contact_plan(weni, prepared)
             except WeniError as exc:
                 raise WeniError(
-                    f"Delivery etapa=GRAVAR_CAMPOS contato_ref={reference}: {exc}"
+                    f"Delivery etapa=GRAVAR_CAMPOS_OU_REMOVER_RECOMPRA contato_ref={reference}: {exc}"
                 ) from None
         accepted.add(plan.contact_uuid)
         merged = deepcopy(current)

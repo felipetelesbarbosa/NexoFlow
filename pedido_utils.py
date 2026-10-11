@@ -157,7 +157,16 @@ def business_order_datetime(value: Any) -> datetime | None:
     elif isinstance(value, str) and value.strip():
         raw = value.strip()
         parsed = None
-        for fmt in ("%d/%m/%y %H:%M:%S", "%d/%m/%Y %H:%M:%S"):
+        for fmt in (
+            "%d/%m/%y %H:%M:%S",
+            "%d/%m/%Y %H:%M:%S",
+            "%d/%m/%y %H:%M",
+            "%d/%m/%Y %H:%M",
+            "%d-%m-%y %H:%M:%S",
+            "%d-%m-%Y %H:%M:%S",
+            "%d-%m-%y %H:%M",
+            "%d-%m-%Y %H:%M",
+        ):
             try:
                 parsed = datetime.strptime(raw, fmt)
                 break

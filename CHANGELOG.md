@@ -2,6 +2,13 @@
 
 ## NexoFlow 1.0
 
+- Compra posterior ainda não confirmada pela API pode ser sinalizada na Weni e no Sheets, com bloqueio da referência antiga de recompra e indicadores de pendência no BI.
+
+- Revalidação de pedidos: a Recompra não recupera um pedido antigo quando o último pedido oficial está incompleto ou cancelado. Falhas de itens preservam os sinais oficiais de cancelamento e permanecem bloqueadas para venda e agendamento.
+- Weni corrige data e status do mesmo pedido confirmado, mantendo a proteção contra pedidos diferentes mais antigos. Datas brasileiras com barras ou hífens e horários sem segundos são reconhecidas.
+- Delivery reconhece a antiga tag Pedido nos exports com marca de exclusão e remove a referência anterior da Recompra antes de atualizar campos, sem repetir POSTs automaticamente.
+- LGPD reconhece respostas compostas e continuidade inequívoca do atendimento, com contexto e evidência da mensagem do cliente. O aceite conjunto de maioridade e dados para entrega respeita a pergunta explícita; recusas e consentimento de Marketing permanecem separados.
+
 - Auditoria geral: validações explícitas de datas e snapshots, tipos revisados, conexões fechadas e paginação validada. Escritas no Sheets reconciliam inclusões após timeout e preservam a tabela anterior até concluir os novos lotes.
 - BI legado mantém números, datas e identificadores literais; migração financeira grava valores e formatos em uma única transação. Curva ABC sinaliza itens ausentes/divergentes e a conversão considera a base atual. Delivery atualiza também as fontes comerciais.
 - CI bloqueia publicação quando lint, análise de tipos, auditoria de dependências ou testes Windows falham. A suíte Windows roda com e sem o modo UTF-8 do Python.

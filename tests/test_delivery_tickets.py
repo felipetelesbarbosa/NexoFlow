@@ -4,6 +4,7 @@ import unittest
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from delivery_tickets import (
@@ -123,6 +124,30 @@ class DeliveryTicketsTests(unittest.TestCase):
         self.assertEqual(len(selected), 2)
         self.assertTrue(all(ticket["contact_uuid"] == CONTACT for ticket in selected))
         self.assertEqual(sum(rejected.values()), 3)
+
+    def test_deleted_order_tag_is_exact_legacy_alias(self):
+        for tag, expected in [
+            ("Pedido is deleted", True),
+            (" PEDIDO  IS   DELETED ", True),
+            ("Pedido_is_deleted_2026-09-29 11:53:51.275814+00:00", True),
+            ("PEDIDO_is_deleted_2026-09-29T13:04:10.754801+00:00", True),
+            ("Pedido_is_deleted_2026-09-29T13:04:10Z", True),
+            ("Pedido_is_deleted_2026-09-29 13:04:10", False),
+            ("Pedido_is_deleted_2026-02-30T13:04:10Z", False),
+            ("Pedido_is_deleted_2026-09-29T13:04:10+99:00", False),
+            ("Pedido_is_deleted_2026-09-29T13:04:10Z extra", False),
+            ("Pedido_is_deleted_invalido", False),
+            ("Pedido_is_deleted_", False),
+            ("Orcamento_is_deleted_2026-09-29 11:53:51.275814+00:00", False),
+            ("Pedido cancelado_is_deleted_2026-09-29T13:04:10Z", False),
+            ("Pedido is deleted extra", False),
+            ("Pedidos is deleted", False),
+            ("Pedido cancelado", False),
+        ]:
+            with self.subTest(tag=tag):
+                self.assertEqual(
+                    bool(selection([room(tags=[{"name": tag}])])), expected
+                )
 
     def test_cutoff_and_dates_without_timezone_are_not_guessed(self):
         for ended in ["2026-10-09T00:00:00Z", "2026-10-08T15:00:00", "invalid"]:
@@ -339,6 +364,185 @@ class DeliveryTicketsTests(unittest.TestCase):
             self.assertIn("GRAVAR_CAMPOS", str(caught.exception))
             self.assertIn("HTTP=400", str(caught.exception))
             self.assertNotIn(plans[0].contact_uuid, str(caught.exception))
+
+    def _campaign_contact(self):
+        current = contact()
+        current["groups"] = [
+            {"uuid": "recompra-synthetic", "name": "Recompra FarmaLíder"}
+        ]
+        current["fields"].update(
+            pedido_data="01/05/26 10:00:00", marketing_opt_in="ativo"
+        )
+        return current
+
+    def _apply_weni_review(self, plans, delivery, current, weni=None):
+        weni = weni or Mock()
+        weni.list_fields.return_value = [{"key": key} for key in REQUIRED_ORDER_FIELDS]
+        weni.get_contact.return_value = current
+        delivery["target"] = "weni"
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "review.json"
+            write_delivery_review(plans, delivery, path)
+            result = apply_delivery_review(path, weni, target="weni")
+        return result, weni
+
+    def test_new_order_removes_old_campaign_before_updating_fields(self):
+        current = self._campaign_contact()
+        current["groups"].append(dict(current["groups"][0]))
+        plans, delivery = self.reconcile(contacts=[current])
+        self.assertEqual(
+            [(action.action, action.group) for action in plans[0].group_actions],
+            [("remove", "recompra-synthetic")],
+        )
+        result, weni = self._apply_weni_review(plans, delivery, current)
+        self.assertEqual(result["conflicts"], 0)
+        weni.contact_group_action.assert_called_once_with(
+            CONTACT, action="remove", group="recompra-synthetic"
+        )
+        calls = [call[0] for call in weni.mock_calls]
+        self.assertLess(
+            calls.index("contact_group_action"), calls.index("update_contact_fields")
+        )
+        self.assertNotIn(
+            "marketing_opt_in", weni.update_contact_fields.call_args.args[1]
+        )
+
+    def test_cancelled_same_date_order_removes_campaign(self):
+        current = self._campaign_contact()
+        current["fields"]["pedido_data"] = "01/06/26 10:00:00"
+        client = farm()
+        client.get_pedido.return_value["capa"]["formaPagamento"] = 0
+        plans, delivery = self.reconcile(contacts=[current], client=client)
+        self.assertNotIn("pedido_data", plans[0].fields)
+        self.assertFalse(plans[0].purchase_confirmed)
+        _, weni = self._apply_weni_review(plans, delivery, current)
+        weni.contact_group_action.assert_called_once_with(
+            CONTACT, action="remove", group="recompra-synthetic"
+        )
+
+    def test_removal_failure_does_not_update_fields_or_retry_post(self):
+        from weni_client import WeniError
+
+        current = self._campaign_contact()
+        plans, delivery = self.reconcile(contacts=[current])
+        weni = Mock()
+        weni.contact_group_action.side_effect = WeniError("HTTP=500")
+        with self.assertRaises(WeniError):
+            self._apply_weni_review(plans, delivery, current, weni)
+        weni.contact_group_action.assert_called_once()
+        weni.update_contact_fields.assert_not_called()
+
+    def test_delivery_entrypoint_disables_automatic_mutation_retries(self):
+        from run_delivery_tickets import main
+
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "run_delivery_tickets.py",
+                    "--apply",
+                    "--require-review",
+                    "synthetic.json",
+                ],
+            ),
+            patch.dict(
+                "sys.modules",
+                {
+                    "secrets_config": SimpleNamespace(
+                        WENI_API_TOKEN="synthetic-token",
+                        GOOGLE_SPREADSHEET_ID="synthetic-sheet",
+                    )
+                },
+            ),
+            patch("weni_client.WeniClient") as weni_factory,
+            patch(
+                "delivery_tickets.apply_delivery_review", return_value={"conflicts": 0}
+            ),
+            patch("logging_config.configure_logging"),
+            patch("builtins.print"),
+            patch("proxy_config.configure_proxy"),
+        ):
+            self.assertEqual(main(), 0)
+        weni_factory.assert_called_once_with("synthetic-token", retry_mutations=False)
+
+    def test_partial_apply_resumes_without_repeating_completed_group_removal(self):
+        from weni_client import WeniError
+
+        current = self._campaign_contact()
+        plans, delivery = self.reconcile(contacts=[current])
+        delivery["target"] = "weni"
+        weni = Mock()
+        weni.list_fields.return_value = [{"key": key} for key in REQUIRED_ORDER_FIELDS]
+        weni.get_contact.side_effect = lambda **kwargs: deepcopy(current)
+        weni.contact_group_action.side_effect = lambda *args, **kwargs: current.update(
+            groups=[]
+        )
+        weni.update_contact_fields.side_effect = WeniError("HTTP=500")
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "review.json"
+            write_delivery_review(plans, delivery, path)
+            with self.assertRaises(WeniError):
+                apply_delivery_review(path, weni, target="weni")
+            self.assertEqual(current["groups"], [])
+            weni.update_contact_fields.side_effect = lambda uid, fields: current[
+                "fields"
+            ].update(fields)
+            result = apply_delivery_review(path, weni, target="weni")
+        self.assertEqual(result["conflicts"], 0)
+        weni.contact_group_action.assert_called_once()
+        self.assertEqual(current["fields"]["pedido_data"], "01/06/26 10:00:00")
+
+    def test_same_recent_sale_does_not_remove_campaign_for_other_order_fields(self):
+        current = self._campaign_contact()
+        current["fields"]["pedido_data"] = "06/10/26 10:00:00"
+        client = farm()
+        client.get_pedido.return_value["capa"]["emissao"] = "2026-10-06T10:00:00"
+        plans, _ = self.reconcile(contacts=[current], client=client)
+        self.assertTrue(plans[0].fields)
+        self.assertNotIn("pedido_data", plans[0].fields)
+        self.assertEqual(plans[0].group_actions, [])
+
+    def test_marketing_consent_changed_after_removal_review_blocks_apply(self):
+        current = self._campaign_contact()
+        plans, delivery = self.reconcile(contacts=[current])
+        current["fields"]["marketing_opt_in"] = "recusado"
+        result, weni = self._apply_weni_review(plans, delivery, current)
+        self.assertEqual(result["conflicts"], 1)
+        weni.contact_group_action.assert_not_called()
+        weni.update_contact_fields.assert_not_called()
+
+    def test_campaign_admission_after_review_blocks_unreviewed_reference_change(self):
+        original = contact()
+        plans, delivery = self.reconcile(contacts=[original])
+        current = deepcopy(original)
+        current["groups"] = self._campaign_contact()["groups"]
+        result, weni = self._apply_weni_review(plans, delivery, current)
+        self.assertEqual(result["conflicts"], 1)
+        weni.contact_group_action.assert_not_called()
+        weni.update_contact_fields.assert_not_called()
+
+    def test_analytics_target_does_not_remove_campaign(self):
+        current = self._campaign_contact()
+        plans, delivery = self.reconcile(contacts=[current])
+        delivery["target"] = "analytics"
+        weni, store = Mock(), Mock()
+        weni.list_fields.return_value = [{"key": key} for key in REQUIRED_ORDER_FIELDS]
+        weni.get_contact.return_value = current
+        store.get_control.return_value = ""
+        for method in (
+            store.upsert_contacts_detailed,
+            store.upsert_orders_detailed,
+            store.upsert_order_items_detailed,
+        ):
+            method.return_value.final_records = []
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "review.json"
+            write_delivery_review(plans, delivery, path)
+            apply_delivery_review(
+                path, weni, store_factory=lambda: store, target="analytics"
+            )
+        weni.contact_group_action.assert_not_called()
+        weni.update_contact_fields.assert_not_called()
 
     def test_snapshot_delivery_data_tampering_blocks_before_external_calls(self):
         plans, delivery = self.reconcile()

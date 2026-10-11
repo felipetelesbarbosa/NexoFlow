@@ -306,6 +306,7 @@ BASE_COLUMNS = [
     "bairro",
     "genero",
     "ultima_compra",
+    "pedido_revisao_pendente",
 ]
 
 HISTORY_COLUMNS = [
@@ -726,6 +727,9 @@ def normalize_contact(
     row = {
         "genero": normalize_value(fields.get("genero")).strip(),
         "ultima_compra": normalize_value(fields.get("ultima_compra")).strip(),
+        "pedido_revisao_pendente": normalize_value(
+            fields.get("pedido_revisao_pendente")
+        ).strip(),
         "cidade": normalize_value(fields.get("cidade")).strip(),
         "estado": normalize_value(fields.get("estado")).strip(),
         "cep": normalize_value(fields.get("cep")).strip(),

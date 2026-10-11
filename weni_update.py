@@ -62,6 +62,14 @@ from pedido_utils import (
     serialize_weni_order_list,
     weni_order_datetime_text,
 )
+from purchase_checks import (
+    PENDING_PURCHASE_FIELD,
+    contact_pending_purchase_check,
+    infer_pending_purchase_check,
+    load_pending_purchase_checks,
+    merge_purchase_checks,
+    normalize_purchase_checks,
+)
 from task_progress import TaskProgress
 from urn_utils import (
     CHANNEL_FIELD_MAP,
@@ -69,9 +77,10 @@ from urn_utils import (
     resolve_contact_urns,
     urn_channel,
 )
-from weni_client import WeniClient
+from weni_client import WeniClient, WeniError
 
 ALLOWED_WRITE_FIELDS = {
+    PENDING_PURCHASE_FIELD,
     "contact_urn",
     "contact_urn_whatsapp",
     "contact_urn_instagram",
@@ -175,6 +184,7 @@ class ContactUpdatePlan:
     order_found: bool = False
     purchase_confirmed: bool = False
     purchase_confirmation: str = ""
+    official_order_date: str = ""
 
     @property
     def has_changes(self) -> bool:
@@ -718,7 +728,37 @@ def _load_state(path: Path = WENI_UPDATE_STATE_FILE) -> dict[str, Any]:
         return {}
 
 
+def _purchase_check_state_payload(
+    plans: list[ContactUpdatePlan], conflicted_uuids: list[str] | None = None
+) -> dict[str, Any]:
+    pending = {}
+    resolved = {}
+    conflicted = set(conflicted_uuids or [])
+    for plan in plans:
+        if check := plan.guards.get("__pending_purchase_check"):
+            pending[plan.contact_uuid] = check
+        if (
+            check := plan.guards.get("__pending_purchase_check_resolved")
+        ) and plan.contact_uuid not in conflicted:
+            resolved[plan.contact_uuid] = check
+    return {
+        "pending_purchase_checks": normalize_purchase_checks(pending),
+        "_resolved_purchase_checks": normalize_purchase_checks(resolved),
+    }
+
+
 def _save_state(payload: dict[str, Any], path: Path = WENI_UPDATE_STATE_FILE) -> None:
+    payload = dict(payload)
+    pending = merge_purchase_checks(
+        load_pending_purchase_checks(path), payload.get("pending_purchase_checks")
+    )
+    for uid, check in normalize_purchase_checks(
+        payload.pop("_resolved_purchase_checks", None)
+    ).items():
+        if pending.get(uid) == check:
+            pending.pop(uid)
+    if pending or "pending_purchase_checks" in payload:
+        payload["pending_purchase_checks"] = pending
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temp_name = tempfile.mkstemp(
         prefix="weni-update-", suffix=".json", dir=path.parent
@@ -883,6 +923,14 @@ def _apply_purchase_candidate(
         if farm_client is not None
         else "API_DESABILITADA"
     )
+    if (
+        order is not None
+        and order.get("_farmalider_cabecalho_verificado") == "1"
+        and _purchase_is_cancelled(order)
+    ):
+        # A verified negative header is enough to withdraw scheduling. Missing
+        # items still prevent every partial pedido_* update and sale admission.
+        plan.purchase_confirmation = "CANCELADO_API"
     if order is not None and str(order.get("status_confirmacao") or "").startswith(
         "CPF_IDENTIDADE_"
     ):
@@ -921,6 +969,7 @@ def _apply_purchase_candidate(
     # A confirmed order may remain unchanged or be older than Weni's snapshot.
     # Diagnostic counts must not confuse those cases with a missing order.
     plan.order_found = True
+    plan.official_order_date = proposed_dt.isoformat()
 
     names = [(item.get("produto_nome") or "").strip() for item in items]
     quantities = [_weni_number_text(item.get("quantidade")) for item in items]
@@ -937,7 +986,20 @@ def _apply_purchase_candidate(
     current_order_date = business_order_datetime(
         normalize_value(current_fields.get("pedido_data"))
     )
-    if current_order_date is not None and current_order_date > proposed_dt:
+    current_order_id = normalize_value(current_fields.get("pedido_id")).strip()
+    same_order = (
+        current_order_id.isascii()
+        and current_order_id.isdigit()
+        and str(int(current_order_id)) == pedido_id
+    )
+    # A different, newer order must remain intact. For the same verified ID,
+    # the official emission also corrects a mistaken Weni date; otherwise that
+    # date would prevent current status/payment, including cancellation, updates.
+    if (
+        not same_order
+        and current_order_date is not None
+        and current_order_date > proposed_dt
+    ):
         return False
 
     proposed_date = weni_order_datetime_text(proposed_dt)
@@ -1004,6 +1066,7 @@ def _build_contact_plan(
     opt_in_group_name: str = WENI_UPDATE_OPT_IN_GROUP,
     opt_in_group_uuid: str = "",
     available_weni_fields: set[str] | None = None,
+    pending_purchase_check: dict[str, str] | None = None,
 ) -> ContactUpdatePlan:
     contact_uuid = str(contact.get("uuid") or "").strip()
     fields = get_fields(contact)
@@ -1018,6 +1081,7 @@ def _build_contact_plan(
     evidences = infer_contact_fields(
         context_messages,
         candidate_message_ids=candidate_message_ids,
+        current_lgpd=fields.get("opt_in_lgpd"),
     )
     for field_name, evidence in evidences.items():
         _set_field_if_changed(
@@ -1112,7 +1176,57 @@ def _build_contact_plan(
         captured_at=captured_at,
         available_weni_fields=available_weni_fields,
     )
-    if plan.order_validated:
+    observed_check = infer_pending_purchase_check(
+        context_messages, captured_at=captured_at
+    )
+    if observed_check:
+        observed_date = business_order_datetime(observed_check["observed_at"])
+        known_dates = [
+            business_order_datetime(normalize_value(fields.get("pedido_data"))),
+            business_order_datetime(plan.official_order_date),
+        ]
+        if observed_date and any(
+            known and known.date() >= observed_date.date() for known in known_dates
+        ):
+            # Automatic evidence only introduces a restriction for a newer
+            # day. Existing reviewed/portable restrictions still require API
+            # confirmation; Weni's date alone never clears those restrictions.
+            observed_check = None
+    checks = merge_purchase_checks(
+        {contact_uuid: current_check}
+        if (
+            current_check := contact_pending_purchase_check(
+                contact, pending_purchase_check
+            )
+        )
+        else {},
+        {contact_uuid: observed_check} if observed_check else {},
+    )
+    check = checks.get(contact_uuid)
+    resolved = False
+    if check:
+        observed = business_order_datetime(check["observed_at"])
+        official = business_order_datetime(plan.official_order_date)
+        resolved = bool(official and observed and official.date() >= observed.date())
+        key = (
+            "__pending_purchase_check_resolved"
+            if resolved
+            else "__pending_purchase_check"
+        )
+        plan.guards[key] = check
+        plan.guards[PENDING_PURCHASE_FIELD] = fields.get(PENDING_PURCHASE_FIELD)
+        if (
+            available_weni_fields is None
+            or PENDING_PURCHASE_FIELD in available_weni_fields
+        ):
+            _set_field_if_changed(
+                plan,
+                fields,
+                PENDING_PURCHASE_FIELD,
+                "resolvido" if resolved else check["observed_at"],
+                reason="revisão de compra posterior; emissão oficial preservada",
+            )
+    if plan.order_validated or plan.purchase_confirmation == "CANCELADO_API":
         effective_cpf = normalize_cpf(plan.fields.get("cpf", fields.get("cpf")))
         if effective_cpf and not is_valid_cpf(effective_cpf):
             plan.guards["__invalid_cpf_identity"] = weni_identity_guard(contact)
@@ -1149,15 +1263,19 @@ def _build_contact_plan(
         if (
             "pedido_data" in plan.fields
             or (plan.order_validated and not plan.purchase_confirmed)
+            or plan.purchase_confirmation == "CANCELADO_API"
             or expired
             or refused(contact)
             or member(contact, "", OPT_OUT)
+            or (check and not resolved)
         ):
             plan.group_actions.append(
                 GroupAction(
                     "remove",
                     campaign_groups[0]["uuid"],
-                    "referência de recompra mudou, expirou ou cliente inelegível; reavaliar na rotina de recompra",
+                    "compra posterior pendente de confirmação pela API"
+                    if check and not resolved
+                    else "referência de recompra mudou, expirou ou cliente inelegível; reavaliar na rotina de recompra",
                     GROUP,
                 )
             )
@@ -1179,7 +1297,20 @@ def _execute_contact_plan(weni, plan):
             plan.contact_uuid, action="remove", group=action.group
         )
     if plan.fields:
-        weni.update_contact_fields(plan.contact_uuid, plan.fields)
+        response = weni.update_contact_fields(plan.contact_uuid, plan.fields)
+        if isinstance(response, dict) and isinstance(response.get("fields"), dict):
+            persisted = get_fields(response)
+            mismatched = sorted(
+                name
+                for name, proposed in plan.fields.items()
+                if not _same_value(name, persisted.get(name), proposed)
+            )
+            if mismatched:
+                raise WeniError(
+                    "A Weni não confirmou a persistência dos campos atualizados: "
+                    + ", ".join(mismatched)
+                    + ". Confira o estado atual antes de retomar o plano revisado."
+                )
     for action in plan.group_actions:
         if action not in removals:
             weni.contact_group_action(
@@ -1251,6 +1382,20 @@ def audit_plans(
                 "recusado",
             }:
                 errors.append(f"{plan.contact_uuid}: valor inválido em opt_in_lgpd")
+
+        if PENDING_PURCHASE_FIELD in plan.fields:
+            marker = normalize_value(plan.fields[PENDING_PURCHASE_FIELD]).strip()
+            key = (
+                "__pending_purchase_check_resolved"
+                if marker == "resolvido"
+                else "__pending_purchase_check"
+            )
+            if not plan.guards.get(key) or (
+                marker != "resolvido" and business_order_datetime(marker) is None
+            ):
+                errors.append(
+                    f"{plan.contact_uuid}: revisão de pedido sem evidência válida"
+                )
 
         if "pedido_status" in plan.fields:
             if not farmalider_order_status_name(plan.fields["pedido_status"]):
@@ -1997,6 +2142,12 @@ def _prepare_frozen_plan_for_apply(
         )
 
     for guard_name, expected in plan.guards.items():
+        if guard_name in {
+            "__pending_purchase_check",
+            "__pending_purchase_check_resolved",
+        }:
+            normalize_purchase_checks({plan.contact_uuid: expected})
+            continue
         if guard_name == "__invalid_cpf_identity":
             if weni_identity_guard(current_contact) != expected:
                 conflicts.append(
@@ -2142,6 +2293,25 @@ def _resolve_required_groups(
 
 def _available_weni_fields(client: WeniClient) -> set[str]:
     fields = client.list_fields()
+    wrong_types = []
+    for item in fields:
+        if not isinstance(item, dict):
+            continue
+        key = str(item.get("key") or "").strip()
+        if key not in {"pedido_quantidade_itens", "pedido_forma_pagamento"}:
+            continue
+        # Older API responses/test doubles may omit type metadata. When
+        # declared, number/date cannot preserve CSV or the Cancelado sentinel.
+        value_type = item.get("value_type") or item.get("type")
+        if value_type and str(value_type).strip().casefold() != "text":
+            wrong_types.append(key)
+    if wrong_types:
+        raise PlanAuditError(
+            "Campos de pedido precisam ser Texto na Weni: "
+            + ", ".join(sorted(set(wrong_types)))
+            + ". Quantidades usam listas e pagamento pode conter Cancelado. "
+            "Corrija os tipos antes de executar; nenhuma atualização foi iniciada."
+        )
     return {
         str(item.get("key") or "").strip()
         for item in fields
@@ -2310,6 +2480,9 @@ def run_update(
             )
 
         state = _load_state()
+        pending_purchase_checks = normalize_purchase_checks(
+            state.get("pending_purchase_checks")
+        )
         open_order_uuids = {
             str(item).strip()
             for item in (state.get("open_order_uuids") or [])
@@ -2555,6 +2728,7 @@ def run_update(
                     "sim" if component_complete else "não",
                     "sim" if campaign_complete else "não",
                 )
+            state_payload.update(_purchase_check_state_payload(plans, conflicted_uuids))
             _save_state(state_payload)
             logging.info(
                 "Snapshot congelado concluído: aplicados=%s | conflitos ignorados=%s | já satisfeitos=%s. "
@@ -2759,7 +2933,9 @@ def run_update(
                 # Determine priority from the effective CPF, including a valid CPF
                 # inferred from messages. Preparation performs no FarmaLíder GET.
                 evidences = infer_contact_fields(
-                    context, candidate_message_ids=candidate_ids
+                    context,
+                    candidate_message_ids=candidate_ids,
+                    current_lgpd=get_fields(contact).get("opt_in_lgpd"),
                 )
                 effective_cpf = (
                     evidences["cpf"].value
@@ -2818,6 +2994,9 @@ def run_update(
                         opt_in_group_name=WENI_UPDATE_OPT_IN_GROUP,
                         opt_in_group_uuid=opt_in_uuid,
                         available_weni_fields=available_weni_fields,
+                        pending_purchase_check=pending_purchase_checks.get(
+                            contact_uuid
+                        ),
                     )
                 except BaseException:
                     invalid_batch.flush(interrupted=True)
@@ -2839,7 +3018,9 @@ def run_update(
                 elif str(get_fields(contact).get("ultimo_pedido") or "").strip():
                     stats.purchase_skipped += 1
 
-                if plan.has_changes:
+                if plan.has_changes or any(
+                    key.startswith("__pending_purchase_check") for key in plan.guards
+                ):
                     plans.append(plan)
                 stats.plans_with_changes = len(plans)
 
@@ -3020,6 +3201,7 @@ def run_update(
                 "open_order_uuids": sorted(open_order_uuids),
                 "field_changes": stats.field_changes,
                 "group_actions": stats.group_actions,
+                **_purchase_check_state_payload(plans, conflicted_uuids),
             }
         )
         return stats

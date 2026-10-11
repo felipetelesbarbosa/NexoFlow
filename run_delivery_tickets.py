@@ -11,7 +11,7 @@ from pathlib import Path
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Reconcilia as tags Pedido e Pedido finalizado do Weni Chats com a FarmaLíder."
+        description="Reconcilia as tags Pedido, Pedido is deleted (legada, inclusive com data de exclusão) e Pedido finalizado do Weni Chats com a FarmaLíder."
     )
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument(
@@ -64,7 +64,7 @@ def main():
     from logging_config import configure_logging
     from weni_chats_client import WeniChatsClient
     from weni_client import WeniClient
-    from weni_update import _open_farmalider
+    from weni_update import _available_weni_fields, _open_farmalider
 
     configure_logging(Path("logs/nexoflow_delivery.log"))
     weni, chats, farm = None, None, None
@@ -83,7 +83,9 @@ def main():
                 str(getattr(secrets, "WENI_CHATS_API_BASE_URL", "")),
                 str(getattr(secrets, "WENI_CHATS_API_TOKEN", "")),
             )
-        weni = WeniClient(secrets.WENI_API_TOKEN)
+        # A timeout can follow a committed group removal. Resume from the
+        # reviewed snapshot after reading the current state; never repeat POST.
+        weni = WeniClient(secrets.WENI_API_TOKEN, retry_mutations=False)
         if args.apply:
             spreadsheet_id = str(getattr(secrets, "GOOGLE_SPREADSHEET_ID", ""))
 
@@ -134,7 +136,7 @@ def main():
             len(tickets),
             rejected,
         )
-        available = {item.get("key") for item in weni.list_fields()}
+        available = _available_weni_fields(weni)
         plans, delivery = reconcile_tickets(
             tickets,
             contacts,

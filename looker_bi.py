@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from collections import defaultdict
 from datetime import date, timedelta
 from decimal import Decimal
@@ -12,12 +13,17 @@ from typing import Any
 from analytics import (
     _bi_customer_age,
     _bi_float,
+    _order_customer_identity_verified,
     _order_revenue_parts,
     _sales_order_is_valid,
     _to_decimal,
     bi_customer_key,
 )
 from pedido_utils import business_order_datetime
+from purchase_checks import (
+    contact_pending_purchase_check,
+    official_order_resolves_check,
+)
 
 SCHEMAS = {
     "BI_Publico": [
@@ -34,6 +40,7 @@ SCHEMAS = {
         "compra_identificada",
         "ultima_compra_identificada",
         "atualizado_em",
+        "compra_pendente_validacao",
     ],
     "BI_Clientes": [
         "cliente_chave",
@@ -42,6 +49,7 @@ SCHEMAS = {
         "faturamento_identificado",
         "ultima_compra_identificada",
         "atualizado_em",
+        "compra_pendente_validacao",
     ],
     "BI_Clientes_Vendas": [
         "venda_chave",
@@ -137,6 +145,7 @@ SCHEMAS = {
         "pedidos_sem_itens",
         "pedidos_com_itens_divergentes",
         "abc_periodo_disponivel",
+        "contatos_com_compra_pendente_validacao",
     ],
 }
 DATE_COLUMNS = {
@@ -360,9 +369,54 @@ def build_looker_tables(
     base_by_uuid = {
         r.get("contact_uuid", ""): r for r in base_records if r.get("contact_uuid")
     }
-    orders = [
-        r for r in _unique(order_records, "pedido_chave") if _sales_order_is_valid(r)
-    ]
+    all_orders = _unique(order_records, "pedido_chave")
+    orders = [r for r in all_orders if _sales_order_is_valid(r)]
+    official_by_contact: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for record in all_orders:
+        emitted = business_order_datetime(record.get("data_hora"))
+        if (
+            _order_customer_identity_verified(record)
+            and emitted is not None
+            and emitted.date().isoformat() <= snapshot_date
+        ):
+            official_by_contact[record.get("contact_uuid", "")].append(record)
+    pending_by_contact = {}
+    invalid_checks = 0
+    for uuid, base in base_by_uuid.items():
+        try:
+            check = contact_pending_purchase_check(
+                {
+                    "uuid": uuid,
+                    "fields": {
+                        "pedido_revisao_pendente": base.get(
+                            "pedido_revisao_pendente", ""
+                        )
+                    },
+                }
+            )
+        except RuntimeError:
+            # A malformed marker still needs review; never turn it into an
+            # apparent confirmation or expose its raw value in BI/logs.
+            pending_by_contact[uuid] = 1
+            invalid_checks += 1
+        else:
+            pending_by_contact[uuid] = int(
+                bool(check)
+                and not any(
+                    official_order_resolves_check(check, record)
+                    for record in official_by_contact.get(uuid, [])
+                )
+            )
+    if invalid_checks:
+        logging.warning(
+            "BI: %s contato(s) com marcador de revisão de pedido inválido; pendência de validação mantida.",
+            invalid_checks,
+        )
+    pending_customers = {
+        bi_customer_key({}, base_by_uuid[uuid])
+        for uuid, pending in pending_by_contact.items()
+        if pending
+    }
     orders_by_key: dict[str, dict[str, Any]] = {}
     customer_orders: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for order in orders:
@@ -407,6 +461,8 @@ def build_looker_tables(
         uuid = row.get("contact_uuid", "")
         buyer_contacts.add(uuid)
         last_by_contact[uuid] = max(last_by_contact.get(uuid, ""), row["bi_date"])
+        if pending_by_contact.get(uuid):
+            pending_customers.add(row["bi_customer"])
     for customer in sorted(customer_orders):
         history = sorted(
             customer_orders[customer], key=lambda r: (r["bi_date"], r["pedido_chave"])
@@ -419,6 +475,7 @@ def build_looker_tables(
                 _bi_float(sum((r["bi_total"] for r in history), Decimal(0))),
                 history[-1]["bi_date"],
                 updated_at,
+                int(customer in pending_customers),
             ]
         )
     ages = cities = genders = 0
@@ -452,6 +509,7 @@ def build_looker_tables(
                 int(bool(customer_history) or uuid in buyer_contacts),
                 public_last,
                 updated_at,
+                pending_by_contact.get(uuid, 0),
             ]
         )
 
@@ -577,6 +635,7 @@ def build_looker_tables(
             len(missing_items),
             len(divergent_items),
             int(bool(ranked) and all(row[13] for row in tables["BI_Produtos_ABC"])),
+            sum(pending_by_contact.values()),
         ]
     )
     return tables

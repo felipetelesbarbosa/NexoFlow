@@ -1,5 +1,7 @@
 # NexoFlow 1.0 — Recompra FarmaLíder D+25
 
+Uma nova compra identificada em conversa e ainda ausente na API bloqueia o agendamento com a referência antiga. O campo opcional de Texto `pedido_revisao_pendente` na Weni mantém essa restrição entre instalações. A rotina reconsulta o pedido oficial; a data da conversa nunca substitui a emissão do pedido.
+
 ## Regra operacional vigente
 
 A regra final considera as respostas mais recentes: o grupo **Recompra FarmaLíder** contém os contatos cuja **última compra confirmada tem de 0 a 25 dias**, inclusive, pela data local em `America/Belem`. Com 26 dias ou mais, o contato sai. Datas futuras, ausentes ou inválidas não autorizam entrada. O envio ocorre **exclusivamente no D+25**, pela campanha e pelo fluxo existentes na Weni; o NexoFlow não envia WhatsApp nem cria, ativa ou modifica a campanha.
@@ -30,7 +32,7 @@ A compra deve ser confirmada pela API FarmaLíder, respeitar 0 a 25 dias no fuso
 - Não lê, usa como localizador, compara, valida existência nem grava `ultimo_pedido`. O campo é responsabilidade das demais integrações do NexoFlow. O validador oficial FarmaLíder verifica status, pagamento e itens antes da inclusão; itens incompletos bloqueiam a admissão.
 - Produtos com vírgulas mantêm aspas de CSV; não são artificialmente divididos. Produtos não são substituídos por códigos.
 - Não substitui uma compra confirmada mais recente por um pedido antigo. Um pedido recente cancelado ou pendente não apaga a compra confirmada anterior.
-- Quando o último pedido da API não é uma venda, tenta revalidar um ID de compra anterior **somente do estado privado de recompra**. Nunca consulta o campo Weni `ultimo_pedido`. Só aceita GET oficial com o mesmo cliente. Sem ID conhecido, não inventa histórico de compras.
+- O agendamento usa somente o último pedido informado pela API. Pedido novo incompleto, cancelado ou com ID inválido não permite recuperar uma compra antiga do estado para agendar o D+25. O histórico permanece preservado para auditoria; nunca consulta o campo Weni `ultimo_pedido`.
 - Retira o grupo antes de alterar uma referência que já estava agendada; verifica a remoção, atualiza campos e relê o contato antes da admissão. Nova compra recalcula a janela usando sua data.
 - A atualização Weni convencional também inclui no seu plano auditado uma remoção preventiva quando a referência muda, o pedido deixa de ser venda, há recusa ou o prazo expira. Executa essa remoção antes dos campos; a admissão fica na rotina de recompra revisada.
 - `logs/recompra_state.json` registra por UUID e ID do pedido a compra de referência, intenção pendente e admissão reconhecida. Não registra admissão como mensagem enviada.

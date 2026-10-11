@@ -26,8 +26,10 @@ from analytics import (
     get_fields,
     normalize_value,
 )
-from config import FARMALIDER_MAX_WORKERS
+from config import FARMALIDER_MAX_WORKERS, WENI_UPDATE_STATE_FILE
+from farmalider_client import FarmaliderError
 from farmalider_integration import (
+    _positive_id,
     resolve_contact_order,
     select_cliente_response,
     weni_customer_identity,
@@ -40,6 +42,14 @@ from pedido_utils import (
     serialize_pedido_products,
     serialize_weni_order_list,
 )
+from purchase_checks import (
+    PENDING_PURCHASE_FIELD,
+    contact_pending_purchase_check,
+    load_pending_purchase_checks,
+    merge_purchase_checks,
+    official_order_resolves_check,
+    register_pending_purchase_checks,
+)
 
 GROUP = "Recompra FarmaLíder"
 OPT_OUT = "Opt-Out Marketing"
@@ -50,7 +60,13 @@ REFUSAL_EXPRESSION = '@(if(or(lower(trim(fields.marketing_opt_in)) = "recusado",
 # Somente os campos essenciais ao agendamento e ao texto da campanha.
 # ultimo_pedido pertence às demais integrações, nunca à recompra.
 FIELDS = {"pedido_data", "pedido_produtos"}
-GUARD_FIELDS = FIELDS | {"cpf", "nome", "email", "marketing_opt_in"}
+GUARD_FIELDS = FIELDS | {
+    "cpf",
+    "nome",
+    "email",
+    "marketing_opt_in",
+    PENDING_PURCHASE_FIELD,
+}
 STATE = Path("logs/recompra_state.json")
 REVIEW = Path("logs/recompra_review.json")
 AUDIT = Path("logs/recompra_audit.jsonl")
@@ -201,8 +217,8 @@ def build_plans(
     started = monotonic()
 
     def plan_contact(contact):
-        saved = state["contacts"].get(contact["uuid"])
-        order, items = resolve_latest(contact, reads, now.isoformat(), saved=saved)
+        saved = _saved_with_purchase_check(state, contact["uuid"])
+        order, items = _resolve_checked_contact(contact, reads, now.isoformat(), saved)
         return propose(contact, order, items, structure, saved, now=now)
 
     prioritized = iter_prioritized_contacts(contacts)
@@ -247,6 +263,7 @@ def plan_needs_apply(plan, saved=None):
     if (
         plan["action"]
         or plan["fields"]
+        or plan.get("purchase_check_resolved")
         or (plan["purchase"] and plan["purchase"] != saved.get("purchase"))
     ):
         return True
@@ -389,19 +406,53 @@ def atomic_json(path, value):
             os.unlink(filename)
 
 
-def load_state(path=STATE):
+def load_state(path=STATE, *, purchase_checks_path=None):
     path = Path(path)
     if not path.exists():
-        return {"schema": 1, "contacts": {}}
+        data = {"schema": 1, "contacts": {}}
+    else:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if data.get("schema") != 1 or not isinstance(data.get("contacts"), dict):
+                raise ValueError()
+        except (ValueError, OSError, AttributeError) as exc:
+            raise RuntimeError(
+                "Estado de recompra inválido. Aplicação bloqueada para evitar duplicidade; preserve o arquivo e investigue."
+            ) from exc
+    source_path = _purchase_check_path(path, purchase_checks_path)
+    if source_path is not None:
+        pending = merge_purchase_checks(
+            data.get("pending_purchase_checks"),
+            load_pending_purchase_checks(source_path),
+        )
+        if pending or "pending_purchase_checks" in data:
+            data["pending_purchase_checks"] = pending
+    return data
+
+
+def _purchase_check_path(state_path, explicit=None):
+    if explicit is not None:
+        return Path(explicit)
+    return (
+        WENI_UPDATE_STATE_FILE
+        if Path(state_path).resolve() == STATE.resolve()
+        else None
+    )
+
+
+def _saved_with_purchase_check(state, uid):
+    saved = state["contacts"].get(uid) or {}
+    check = (state.get("pending_purchase_checks") or {}).get(uid)
+    return {**saved, "pending_purchase_check": check} if check else saved
+
+
+def _resolve_checked_contact(contact, farm, captured_at, saved):
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if data.get("schema") != 1 or not isinstance(data.get("contacts"), dict):
-            raise ValueError()
-        return data
-    except (ValueError, OSError, AttributeError) as exc:
-        raise RuntimeError(
-            "Estado de recompra inválido. Aplicação bloqueada para evitar duplicidade; preserve o arquivo e investigue."
-        ) from exc
+        return resolve_latest(contact, farm, captured_at, saved=saved)
+    except FarmaliderError:
+        if contact_pending_purchase_check(contact, saved.get("pending_purchase_check")):
+            return {"status_confirmacao": "ERRO_API"}, []
+        raise
 
 
 @contextmanager
@@ -624,58 +675,17 @@ def resolve_latest(contact, farm, captured_at, lookup_cache=None, saved=None):
     # Sem ultimoPedido, não reconstruir a compra a partir de campos soltos.
     if not selected or not isinstance(selected.get("ultimoPedido"), dict):
         return None, []
-    latest = resolve_contact_order(
+    if not _positive_id(selected["ultimoPedido"].get("id")):
+        return {"status_confirmacao": "PEDIDO_ID_INVALIDO_API"}, []
+    # The current CPF response determines which order is latest. An older
+    # purchase in local state cannot replace it when its items/API GET fail,
+    # even if that older purchase can still be fetched and is a valid sale.
+    return resolve_contact_order(
         safe_contact,
         farm_client=farm,
         captured_at=captured_at,
         linked_cliente_id=result[1],
         cliente_response=payload,
-    )
-    if latest[0] and (
-        cancelled_order_reason(latest[0])
-        or (
-            _sales_order_is_valid(latest[0])
-            and latest[0].get("status_validacao") == "OK"
-        )
-    ):
-        # Um último pedido cancelado não deve ativar um pedido antigo do
-        # histórico local, ainda que este tenha sido válido anteriormente.
-        return latest
-    # Recuperação somente por ID de compra previamente validado em estado
-    # local. Nunca usar o campo Weni ultimo_pedido como localizador.
-    candidates = {text(((saved or {}).get("purchase") or {}).get("pedido_id"))}
-    recovered = []
-    for candidate in candidates - {"", text((latest[0] or {}).get("pedido_id"))}:
-        if not candidate.isascii() or not candidate.isdigit():
-            continue
-        reference_payload = {
-            "cliente": selected["cliente"],
-            "ultimoPedido": {"id": candidate, "codCliente": result[1]},
-            "itens": [],
-        }
-        previous = resolve_contact_order(
-            safe_contact,
-            farm_client=farm,
-            captured_at=captured_at,
-            linked_cliente_id=result[1],
-            cliente_response=reference_payload,
-        )
-        if (
-            previous[0]
-            and _sales_order_is_valid(previous[0])
-            and previous[0].get("status_validacao") == "OK"
-            and previous[1]
-        ):
-            previous_dt = business_order_datetime(previous[0].get("data_hora"))
-            if previous_dt is not None:
-                recovered.append((previous_dt, previous))
-    return (
-        max(
-            recovered,
-            key=lambda pair: pair[0],
-        )[1]
-        if recovered
-        else latest
     )
 
 
@@ -715,6 +725,23 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
         if in_group:
             plan["action"] = "remove"
         return plan
+    pending_check = contact_pending_purchase_check(
+        contact, saved.get("pending_purchase_check")
+    )
+    if pending_check:
+        pending_check = merge_purchase_checks({uid: pending_check})[uid]
+        plan["pending_purchase_check"] = pending_check
+        plan["purchase_check_resolved"] = official_order_resolves_check(
+            pending_check, order
+        )
+        if not plan["purchase_check_resolved"]:
+            plan["reason"] = "PEDIDO_POSTERIOR_PENDENTE_API"
+            plan["warnings"].append(
+                "Compra posterior identificada; aguardar confirmação oficial."
+            )
+            if in_group:
+                plan["action"] = "remove"
+            return plan
     dt = business_order_datetime((order or {}).get("data_hora"))
     names = [text(item.get("produto_nome")) for item in items]
     valid = bool(
@@ -980,7 +1007,14 @@ def diagnose_state(state_path=STATE, audit_path=AUDIT):
 
 
 def apply_review(
-    review, weni, farm, *, state_path=STATE, now_fn=now_local, audit_path=AUDIT
+    review,
+    weni,
+    farm,
+    *,
+    state_path=STATE,
+    now_fn=now_local,
+    audit_path=AUDIT,
+    purchase_checks_path=None,
 ):
     """Somente snapshots revisados; conflito ou confirmação incerta bloqueia inclusão."""
     now = now_fn()
@@ -999,7 +1033,12 @@ def apply_review(
         ensure_review_current(review, now_fn(), allow_refresh=not writes_started)
 
     with state_lock(state_path):
-        state = load_state(state_path)
+        state = (
+            load_state(state_path, purchase_checks_path=purchase_checks_path)
+            if purchase_checks_path is not None
+            else load_state(state_path)
+        )
+        check_path = _purchase_check_path(state_path, purchase_checks_path)
         check_day()
         if digest(state) != review["state_sha256"]:
             raise RuntimeError("Estado mudou após a revisão. Gere um novo dry-run.")
@@ -1016,7 +1055,7 @@ def apply_review(
                 )
             audit_plan(reviewed)
             uid = reviewed["contact_uuid"]
-            saved = state["contacts"].get(uid, {})
+            saved = _saved_with_purchase_check(state, uid)
             # Um plano sem trabalho não autoriza novas alterações descobertas
             # depois da revisão; elas serão propostas no próximo dry-run.
             if not plan_needs_apply(reviewed, saved):
@@ -1030,8 +1069,8 @@ def apply_review(
                     {"contact_uuid": uid, "status": "CONFLITO_CONTATO"}, audit_path
                 )
                 continue
-            order, items = resolve_latest(
-                current, reads, now_fn().isoformat(), saved=saved
+            order, items = _resolve_checked_contact(
+                current, reads, now_fn().isoformat(), saved
             )
             check_day()
             fresh = propose(current, order, items, structure, saved, now=now_fn())
@@ -1048,7 +1087,14 @@ def apply_review(
                     "due_today",
                     "within_window",
                 )
-            ) or fresh.get("warnings", []) != reviewed.get("warnings", []):
+            ) or any(
+                fresh.get(key) != reviewed.get(key)
+                for key in (
+                    "warnings",
+                    "pending_purchase_check",
+                    "purchase_check_resolved",
+                )
+            ):
                 summary["conflitos"] += 1
                 append_audit(
                     {"contact_uuid": uid, "status": "CONFLITO_PEDIDO_OU_DIA"},
@@ -1061,7 +1107,7 @@ def apply_review(
                 continue
             # Persistir intenção antes de qualquer inclusão: uma resposta perdida
             # não autoriza reentrar no grupo na próxima execução.
-            previous_state = deepcopy(saved)
+            previous_state = deepcopy(state["contacts"].get(uid, {}))
             contact_state = state["contacts"].setdefault(uid, {"orders": {}})
             contact_state.setdefault("orders", {})
             if fresh["purchase"]:
@@ -1108,6 +1154,15 @@ def apply_review(
                     weni.update_contact_fields(uid, fresh["fields"])
                 if action in {"add", "replace"}:
                     stage = "reler_antes_inclusao"
+                    if check_path is not None:
+                        latest_check = load_pending_purchase_checks(check_path).get(uid)
+                        initial_check = (
+                            state.get("pending_purchase_checks") or {}
+                        ).get(uid)
+                        if latest_check and latest_check != initial_check:
+                            raise PreAdmissionConflict(
+                                "Evidência de compra posterior mudou após a revisão."
+                            )
                     # Releitura imediatamente antes de admitir: recusa concorrente
                     # e mudanças externas não podem ser ignoradas.
                     latest = weni.get_contact(uuid=uid)
@@ -1218,6 +1273,15 @@ def apply_review(
                     )
                 if fresh["in_group"] and fresh["order_id"] and action == "":
                     entry.update({"admitted": True, "pending": False})
+                if fresh.get("purchase_check_resolved"):
+                    resolved = {uid: fresh["pending_purchase_check"]}
+                    if check_path is not None:
+                        register_pending_purchase_checks(
+                            {}, path=check_path, resolved=resolved
+                        )
+                    state.get("pending_purchase_checks", {}).pop(uid, None)
+                    writes_started = True
+                    atomic_json(state_path, state)
                 if contact_state != persisted_state:
                     stage = "persistir_confirmacao"
                     writes_started = True
@@ -1230,6 +1294,7 @@ def apply_review(
                         "pedido_id": fresh["order_id"],
                         "status": "APLICADO",
                         "action": action,
+                        "reason": fresh["reason"],
                         "group_confirmed": action in {"add", "replace"},
                         "at": now_fn().isoformat(),
                     },

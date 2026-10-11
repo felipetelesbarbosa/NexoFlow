@@ -202,6 +202,127 @@ class LookerBITests(unittest.TestCase):
             records(tables, "BI_KPIs_Periodo")[0]["variacao_pedidos_pct"], ""
         )
 
+    def test_pending_purchase_is_visible_without_replacing_confirmed_purchase(self):
+        base = [
+            normalize_contact(
+                {
+                    "uuid": "u1",
+                    "name": "Cliente sintético",
+                    "fields": {
+                        "pedido_data": "18/09/26 12:21:00",
+                        "pedido_revisao_pendente": "2026-10-09T15:00:00-03:00",
+                    },
+                },
+                "now",
+            )
+        ]
+        tables = self.build([order(1, day="2026-09-18")], [item(1)], base=base)
+        public = records(tables, "BI_Publico")[0]
+        customer = records(tables, "BI_Clientes")[0]
+        self.assertEqual(public["compra_pendente_validacao"], 1)
+        self.assertEqual(customer["compra_pendente_validacao"], 1)
+        self.assertEqual(public["ultima_compra_identificada"], "2026-09-18")
+        self.assertEqual(customer["ultima_compra_identificada"], "2026-09-18")
+        self.assertEqual(len(tables["BI_Clientes_Vendas"]), 1)
+        self.assertEqual(
+            records(tables, "BI_Qualidade")[0][
+                "contatos_com_compra_pendente_validacao"
+            ],
+            1,
+        )
+        self.assertEqual(SCHEMAS["BI_Publico"][-1], "compra_pendente_validacao")
+        self.assertEqual(SCHEMAS["BI_Clientes"][-1], "compra_pendente_validacao")
+        self.assertEqual(
+            SCHEMAS["BI_Qualidade"][-1], "contatos_com_compra_pendente_validacao"
+        )
+        self.assertNotIn("2026-10-09", str(tables))
+
+    def test_resolved_or_absent_pending_marker_does_not_create_purchase(self):
+        for marker in ("", "resolvido", " RESOLVIDO "):
+            with self.subTest(marker=marker):
+                base = [
+                    normalize_contact(
+                        {"uuid": "u1", "fields": {"pedido_revisao_pendente": marker}},
+                        "now",
+                    )
+                ]
+                tables = self.build(base=base)
+                self.assertEqual(
+                    records(tables, "BI_Publico")[0]["compra_pendente_validacao"], 0
+                )
+                self.assertEqual(
+                    records(tables, "BI_Publico")[0]["compra_identificada"], 0
+                )
+                self.assertEqual(tables["BI_Clientes_Vendas"], [])
+
+    def test_official_new_order_resolves_pending_even_when_not_a_sale(self):
+        base = [
+            {
+                "contact_uuid": "u1",
+                "pedido_revisao_pendente": "2026-10-09T15:00:00-03:00",
+            }
+        ]
+        for status, confirmation in [
+            ("2", "CONFIRMADO_API"),
+            ("3", "CANCELADO_API"),
+            ("-1", "CONFIRMADO_API"),
+        ]:
+            with self.subTest(status=status):
+                official = dict(
+                    order(2, day="2026-10-09", status=status),
+                    status_confirmacao=confirmation,
+                )
+                tables = self.build([official], base=base)
+                self.assertEqual(
+                    records(tables, "BI_Publico")[0]["compra_pendente_validacao"], 0
+                )
+                self.assertEqual(
+                    records(tables, "BI_Qualidade")[0][
+                        "contatos_com_compra_pendente_validacao"
+                    ],
+                    0,
+                )
+                if status != "2":
+                    self.assertEqual(tables["BI_Clientes_Vendas"], [])
+
+    def test_unverified_wrong_contact_or_future_order_does_not_resolve_pending(self):
+        base = [
+            {
+                "contact_uuid": "u1",
+                "pedido_revisao_pendente": "2026-10-09T15:00:00-03:00",
+            }
+        ]
+        candidates = [
+            dict(order(2, day="2026-10-09"), status_confirmacao="ERRO_API"),
+            dict(order(2, day="2026-10-09"), status_validacao="ERRO"),
+            order(2, uuid="u2", day="2026-10-09"),
+            dict(
+                order(2, day="2026-10-09"),
+                cpf_normalizado="0",
+                origem_pedido="FARMALIDER_PEDIDO_API",
+            ),
+            order(2, day="2026-12-01"),
+        ]
+        for candidate in candidates:
+            with self.subTest(candidate=candidate):
+                tables = self.build([candidate], base=base)
+                self.assertEqual(
+                    records(tables, "BI_Publico")[0]["compra_pendente_validacao"], 1
+                )
+
+    def test_invalid_pending_marker_warns_without_exposing_raw_content(self):
+        base = [
+            {"contact_uuid": "u1", "pedido_revisao_pendente": "invalid-private-content"}
+        ]
+        with self.assertLogs(level="WARNING") as caught:
+            tables = self.build(base=base)
+        self.assertEqual(
+            records(tables, "BI_Publico")[0]["compra_pendente_validacao"], 1
+        )
+        self.assertEqual(records(tables, "BI_Publico")[0]["compra_identificada"], 0)
+        self.assertNotIn("invalid-private-content", str(tables))
+        self.assertNotIn("invalid-private-content", str(caught.output))
+
     def test_gender_is_explicit_optional_and_age_zero_is_informed(self):
         base = [
             normalize_contact(

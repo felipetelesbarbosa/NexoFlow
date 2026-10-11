@@ -294,10 +294,11 @@ def _pedido_from_cliente_payload(
     if not isinstance(payload, dict):
         return None
     latest = payload.get("ultimoPedido")
-    items = payload.get("itens")
-    if not isinstance(latest, dict) or not isinstance(items, list) or not items:
+    if not isinstance(latest, dict):
         return None
-    return {"capa": dict(latest), "itens": items}
+    # Pass missing/malformed items through canonical validation as well. A
+    # verified header can still establish cancellation, but never a full sale.
+    return {"capa": dict(latest), "itens": payload.get("itens")}
 
 
 def _failure(
@@ -376,6 +377,7 @@ def apply_pedido_api_confirmation(
     from analytics import _item_key
 
     order = dict(order)
+    order.pop("_farmalider_cabecalho_verificado", None)
     if pedido_api is None:
         return _failure(
             order, [], "PEDIDO_NAO_ENCONTRADO_API", "Pedido não encontrado na API."
@@ -402,6 +404,7 @@ def apply_pedido_api_confirmation(
 
     api_cliente_id = _positive_id(capa.get("codCliente"))
     linked_id = _positive_id(linked_cliente_id)
+    ownership_verified = bool(linked_id)
     if not api_cliente_id:
         return _failure(
             order,
@@ -428,6 +431,18 @@ def apply_pedido_api_confirmation(
             "PEDIDO_CLIENTE_DIVERGENTE_API",
             "Proprietário do pedido divergente.",
         )
+
+    # Negative official signals remain actionable when item/date validation
+    # fails later. Copy them only after verifying both order ID and ownership;
+    # status_validacao stays ERRO unless the complete order succeeds below.
+    for target, source in (
+        ("farmalider_status_pedido", "status"),
+        ("farmalider_forma_pagamento", "formaPagamento"),
+        ("farmalider_cancelamento", "cancelamento"),
+    ):
+        order[target] = _text(capa.get(source))
+    if ownership_verified:
+        order["_farmalider_cabecalho_verificado"] = "1"
 
     emitted = business_order_datetime(capa.get("emissao"))
     if emitted is None:
@@ -913,6 +928,13 @@ def resolve_contact_order(
     latest = payload.get("ultimoPedido") if isinstance(payload, dict) else None
     pedido_id = _positive_id(latest.get("id")) if isinstance(latest, dict) else ""
     if not pedido_id:
+        if isinstance(latest, dict) and latest:
+            return _failure(
+                _empty_order(contact, captured_at),
+                [],
+                "PEDIDO_ID_INVALIDO_API",
+                "Último pedido oficial possui identidade ausente ou inválida.",
+            )
         return resolve_weni_locators(expected_cliente_id=linked_id)
 
     # pedido_id é produzido acima somente quando latest é um objeto JSON.
