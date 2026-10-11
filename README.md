@@ -32,6 +32,8 @@ Weni -> NexoFlow Analytics -> FarmaLíder API -> Google Sheets -> Looker Studio
 O **NexoFlow Weni** enriquece e atualiza contatos com regras controladas.  
 O **NexoFlow Analytics** organiza os dados operacionais, pedidos, atribuição de anúncios e indicadores usados no Google Sheets e no Looker Studio.
 
+Ao terminar uma carga Weni, a janela permanece aberta para conferir o resultado. Fechar o aviso final não fecha o CMD; digite `EXIT` quando quiser encerrar a sessão.
+
 ## Downloads do NexoFlow 1.0
 
 - [Setup instalável](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.0/NexoFlow-Setup-1.0.zip)

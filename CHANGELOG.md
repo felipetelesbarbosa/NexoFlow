@@ -2,6 +2,7 @@
 
 ## NexoFlow 1.0
 
+- CMD da Weni permanece aberto após a conclusão, erro ou cancelamento, inclusive quando iniciado por outro launcher. Fechar o aviso final ou pressionar ENTER não encerra a sessão; use EXIT para fechar.
 - Testes usam configuração fictícia em memória e bloqueiam conexões reais; check-up, unittest e pytest independem de credenciais locais. Compatibilidade testada no Windows com Python 3.11, 3.13 e 3.14.
 - Webhooks opcionais com comparação segura do segredo, validação explícita do schema e serialização das gravações entre threads do mesmo processo. Pedidos e itens reutilizam os snapshots dos upserts, eliminando duas releituras completas; métricas continuam reparáveis após falhas.
 - Parser de pedidos separado em validações de itens e totais, com testes de caracterização. Tratamento de erros periféricos especifica falhas esperadas e mantém os bloqueios de aplicação, checkpoint e auditoria.

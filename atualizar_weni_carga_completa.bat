@@ -1,13 +1,13 @@
 @echo off
 chcp 65001 >nul
-rem Duplo clique mantém uma sessão visível mesmo diante de erro do BAT.
-if not defined NEXOFLOW_LAUNCHER (
-    set "NEXOFLOW_LAUNCHER=1"
+setlocal EnableExtensions DisableDelayedExpansion
+rem A flag dos subprocessos não indica que existe um terminal persistente.
+if not defined NEXOFLOW_TERMINAL if not defined NEXOFLOW_WENI_SESSION (
+    set "NEXOFLOW_WENI_SESSION=1"
     echo Depois de conferir o resultado, digite EXIT para fechar esta sessão.
     "%SystemRoot%\System32\cmd.exe" /d /k call "%~f0"
     exit /b
 )
-setlocal EnableExtensions DisableDelayedExpansion
 set "PYTHONIOENCODING=utf-8"
 cd /d "%~dp0"
 title NexoFlow Weni - Carga Completa
@@ -203,6 +203,7 @@ call :resultado
 exit /b %RC%
 
 :resultado
+echo [INFO] O resultado permanecerá no terminal. Digite EXIT quando quiser fechar.
 if not exist "%~dp0scripts\resultado_carga_weni.ps1" (
     pause < CON
     exit /b

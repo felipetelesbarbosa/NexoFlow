@@ -161,6 +161,7 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
         decision: int,
         closed_stdin=False,
         direct=False,
+        shared_launcher=False,
         apply_code=0,
     ) -> None:
         with tempfile.TemporaryDirectory(prefix="nexoflow review ") as temporary:
@@ -170,8 +171,12 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
                 (directory / "apply_error").write_text(str(apply_code))
             output_path = directory / "console.log"
             env = {**os.environ, "NEXOFLOW_LAUNCHER": "1"}
+            env.pop("NEXOFLOW_WENI_SESSION", None)
+            env.pop("NEXOFLOW_TERMINAL", None)
             if direct:
                 env.pop("NEXOFLOW_LAUNCHER", None)
+            elif not shared_launcher:
+                env["NEXOFLOW_TERMINAL"] = "1"
             with output_path.open("wb") as output:
                 process = subprocess.Popen(
                     [
@@ -289,11 +294,17 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
                             "Cancellation or UI failure must not apply",
                         )
                     (directory / "result_ack").touch()
-                    if direct:
+                    if direct or shared_launcher:
                         time.sleep(0.3)
                         self.assertIsNone(
                             process.poll(),
-                            "Duplo clique deve preservar a sessão após a carga",
+                            "A sessão deve permanecer aberta após fechar o aviso final",
+                        )
+                        process.stdin.write(b"\r\n")
+                        process.stdin.flush()
+                        time.sleep(0.2)
+                        self.assertIsNone(
+                            process.poll(), "ENTER não deve fechar a sessão concluída"
                         )
                         process.stdin.write(b"exit\r\n")
                         process.stdin.flush()
@@ -324,7 +335,11 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
                     ],
                     cwd=directory,
                     stdin=subprocess.PIPE,
-                    env={**os.environ, "NEXOFLOW_LAUNCHER": "1"},
+                    env={
+                        **os.environ,
+                        "NEXOFLOW_LAUNCHER": "1",
+                        "NEXOFLOW_TERMINAL": "1",
+                    },
                     stdout=output,
                     stderr=subprocess.STDOUT,
                 )
@@ -425,6 +440,109 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
 
     def test_direct_batch_session_stays_open_after_result(self):
         self._run_batch_case(part=0, decision=0, direct=True)
+
+    def test_shared_launcher_flag_does_not_close_session_after_result(self):
+        self._run_batch_case(part=0, decision=0, shared_launcher=True)
+
+    def test_shared_launcher_keeps_error_and_cancellation_visible(self):
+        for decision, apply_code in ((0, 9), (2, 0)):
+            with self.subTest(decision=decision, apply_code=apply_code):
+                self._run_batch_case(
+                    part=0,
+                    decision=decision,
+                    apply_code=apply_code,
+                    shared_launcher=True,
+                )
+
+    def test_incremental_launcher_stays_open_after_final_pause(self):
+        for apply_code in (0, 9):
+            with (
+                self.subTest(apply_code=apply_code),
+                tempfile.TemporaryDirectory(prefix="nexo incremental ") as temporary,
+            ):
+                directory = Path(temporary)
+                self._fixture(directory)
+                (directory / "secrets_config.py").write_text(
+                    "RECOMPRA_ENABLED = False\n", encoding="ascii"
+                )
+                (directory / "run_update_weni.py").write_text(
+                    "import sys\nfrom pathlib import Path\n"
+                    "if '--apply' in sys.argv:\n"
+                    "    Path('apply.json').write_text('synthetic')\n"
+                    f"    raise SystemExit({apply_code})\n",
+                    encoding="ascii",
+                )
+                batch = (REPOSITORY / "atualizar_weni.bat").read_text(encoding="utf-8")
+                batch = batch.replace(" < CON", "").replace(
+                    '".venv\\Scripts\\python.exe"', f'"{sys.executable}"'
+                )
+                batch, count = re.subn(
+                    r'(?m)^"%SystemRoot%\\System32\\WindowsPowerShell\\v1\.0\\powershell\.exe"[^\n]*confirmar_revisao_weni\.ps1[^\n]*$',
+                    lambda match, directory=directory: (
+                        f'"{sys.executable}" "{directory / "review_gate_stub.py"}"'
+                    ),
+                    batch,
+                )
+                self.assertEqual(count, 1)
+                (directory / "atualizar_weni.bat").write_text(batch, encoding="utf-8")
+                env = {**os.environ, "NEXOFLOW_LAUNCHER": "1"}
+                env.pop("NEXOFLOW_WENI_SESSION", None)
+                env.pop("NEXOFLOW_TERMINAL", None)
+                output_path = directory / "console.log"
+                with output_path.open("wb") as output:
+                    process = subprocess.Popen(
+                        [
+                            os.environ.get("COMSPEC", "cmd.exe"),
+                            "/d",
+                            "/c",
+                            "atualizar_weni.bat",
+                        ],
+                        cwd=directory,
+                        env=env,
+                        stdin=subprocess.PIPE,
+                        stdout=output,
+                        stderr=subprocess.STDOUT,
+                    )
+                    try:
+                        self._wait_until(
+                            lambda directory=directory: (
+                                directory / "review_waiting.json"
+                            ).exists(),
+                            process,
+                            output_path,
+                            "incremental approval",
+                        )
+                        self.assertFalse((directory / "apply.json").exists())
+                        pending = directory / "review_decision.pending"
+                        pending.write_text("0")
+                        os.replace(pending, directory / "review_decision.txt")
+                        expected = (
+                            "A aplicação foi interrompida"
+                            if apply_code
+                            else "NexoFlow Weni concluído com sucesso"
+                        )
+                        self._wait_until(
+                            lambda expected=expected, output_path=output_path: (
+                                expected
+                                in output_path.read_text(
+                                    encoding="utf-8", errors="replace"
+                                )
+                            ),
+                            process,
+                            output_path,
+                            "incremental result",
+                        )
+                        process.stdin.write(b"\r\n")
+                        process.stdin.flush()
+                        time.sleep(0.3)
+                        self.assertIsNone(
+                            process.poll(), "PAUSE não deve encerrar a janela Weni"
+                        )
+                        process.stdin.write(b"exit\r\n")
+                        process.stdin.flush()
+                        self.assertEqual(process.wait(timeout=10), apply_code)
+                    finally:
+                        self._close_process(process)
 
     def test_full_load_waits_for_approval_and_applies_the_frozen_snapshot(self) -> None:
         self._run_batch_case(part=0, decision=0)

@@ -1,6 +1,12 @@
 @echo off
 chcp 65001 >nul
-setlocal EnableExtensions
+setlocal EnableExtensions DisableDelayedExpansion
+rem Preserva a janela mesmo após PAUSE ou quando outro launcher inicia a Weni.
+if not defined NEXOFLOW_TERMINAL if not defined NEXOFLOW_WENI_SESSION (
+    set "NEXOFLOW_WENI_SESSION=1"
+    "%SystemRoot%\System32\cmd.exe" /d /k call "%~f0"
+    exit /b
+)
 set "PYTHONIOENCODING=utf-8"
 cd /d "%~dp0"
 title NexoFlow Weni
@@ -82,6 +88,7 @@ echo [INFO] Etapa Recompra nao executada: RECOMPRA_ENABLED=False.
 :recompra_fim
 echo [OK] NexoFlow Weni concluído com sucesso.
 echo Auditoria: OK ^| Gravação: OK
+echo [INFO] O resultado permanecerá no terminal. Digite EXIT quando quiser fechar.
 echo ==========================================================
 echo.
 pause < CON

@@ -340,6 +340,7 @@ Distribuição oficial do **NexoFlow 1.0**.
 O arquivo `NexoFlow-Setup-$Version.zip` contém o instalador do NexoFlow 1.0 e foi validado automaticamente em Windows para primeira instalação e atualização de uma instalação existente.
 
 Melhorias desta distribuição do NexoFlow 1.0:
+- CMD da Weni permanece aberto após conclusão, erro ou cancelamento, inclusive por outro launcher; fechar o aviso final ou pressionar ENTER não encerra a sessão; use EXIT para fechar;
 - progresso Weni a cada 2 segundos com barra de 0% a 100% por etapa, contatos/registros por segundo, tempo decorrido e previsão de término; auditoria JSONL mede bytes efetivamente gravados por segundo; consultas sem total conhecido mostram quantidade e velocidade;
 - o NexoFlow não inclui chaves, tokens ou credenciais; use suas próprias credenciais nas integrações, conforme SECURITY.md;
 - identificação e documentação padronizadas como NexoFlow 1.0, com os componentes Planilha e Recompra nos índices e instruções de assinatura e desinstalação alinhadas ao Setup;
