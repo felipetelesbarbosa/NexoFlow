@@ -1,0 +1,83 @@
+# NexoFlow 1.0
+name: CodeQL Advanced
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '40 5 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analisar (${{ matrix.language }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: actions
+            os: ubuntu-latest
+            build-mode: none
+          - language: python
+            os: ubuntu-latest
+            build-mode: none
+          - language: go
+            os: windows-latest
+            build-mode: manual
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Preparar Go dos launchers Windows
+        if: matrix.language == 'go'
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: '1.25.x'
+          cache: false
+
+      - name: Inicializar CodeQL
+        uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      - name: Compilar todas as variantes dos launchers
+        if: matrix.language == 'go'
+        shell: pwsh
+        env:
+          GO111MODULE: 'off'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $outputDir = Join-Path $env:RUNNER_TEMP 'codeql-launchers'
+          New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
+          # Cada variante tem seu próprio main; as tags não podem ser combinadas.
+          # -a força a compilação sob o CodeQL, sem reutilizar objetos em cache.
+          $tags = @('analytics', 'updateweni', 'recompra', 'planilha', 'terminal', 'setup', 'uninstall')
+          foreach ($tag in $tags) {
+            Write-Host "Compilando launcher: $tag"
+            & go build -a -tags $tag -o (Join-Path $outputDir "$tag.exe") ./native_launcher
+            if ($LASTEXITCODE -ne 0) { throw "Falha ao compilar o launcher $tag para o CodeQL." }
+          }
+
+      - name: Analisar e enviar resultados
+        uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+        with:
+          category: '/language:${{ matrix.language }}'

@@ -20,6 +20,19 @@ Os testes e o build usam permissão de leitura no GitHub. A permissão de escrit
 
 O CI verifica o conteúdo **após o push**. Ele não substitui o bloqueio de segredos antes do push oferecido pelo GitHub, nem garante a ausência de todos os dados pessoais ou de formatos de segredos desconhecidos. Confira também nomes de arquivos, conteúdo de exemplos, histórico e assets antes de tornar o projeto público.
 
+## Análise CodeQL
+
+O workflow [CodeQL Advanced](.github/workflows/codeql.yml) analisa Python,
+GitHub Actions e Go separadamente. A análise Go usa Windows e compila os sete
+launchers com suas tags individuais, incluindo `common.go` em cada variante.
+Os executáveis dessa análise ficam somente na pasta temporária do runner.
+
+Use o **Advanced Setup** do CodeQL e mantenha o **Default Setup** desativado,
+para evitar análises automáticas duplicadas e compilação sem as tags Windows.
+O workflow roda em atualizações da `main`, pull requests, semanalmente e por
+acionamento manual. Ele envia os resultados à área **Security → Code scanning**
+e não altera o workflow de publicação dos pacotes.
+
 ## Relatar uma vulnerabilidade
 
 Na aba **Security**, use **Report a vulnerability** quando o recurso de relato privado estiver ativado. Envie uma descrição, os passos para reproduzir e a versão afetada, com exemplos fictícios e sem credenciais ou dados de clientes.
