@@ -314,14 +314,15 @@ class LookerBITests(unittest.TestCase):
         base = [
             {"contact_uuid": "u1", "pedido_revisao_pendente": "invalid-private-content"}
         ]
-        with self.assertLogs(level="WARNING") as caught:
+        with patch("looker_bi.logging.warning") as warning:
             tables = self.build(base=base)
         self.assertEqual(
             records(tables, "BI_Publico")[0]["compra_pendente_validacao"], 1
         )
         self.assertEqual(records(tables, "BI_Publico")[0]["compra_identificada"], 0)
         self.assertNotIn("invalid-private-content", str(tables))
-        self.assertNotIn("invalid-private-content", str(caught.output))
+        warning.assert_called_once()
+        self.assertNotIn("invalid-private-content", str(warning.call_args))
 
     def test_gender_is_explicit_optional_and_age_zero_is_informed(self):
         base = [
