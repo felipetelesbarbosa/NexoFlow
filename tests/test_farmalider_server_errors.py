@@ -6,19 +6,19 @@ import time
 import traceback
 import unittest
 from contextlib import nullcontext
+from datetime import UTC, datetime
 from unittest.mock import Mock, patch
 
 from requests.exceptions import ConnectionError, ReadTimeout
 
 from farmalider_client import FarmaliderClient, FarmaliderError, RequestPermit
-from farmalider_integration import resolve_contact_order
-from datetime import datetime, timezone
-
 from main import (
-    FarmaliderSettings, PARTIAL_SYNC_EXIT_CODE, _completion_controls,
-    build_orders, validate_contacts,
+    PARTIAL_SYNC_EXIT_CODE,
+    FarmaliderSettings,
+    _completion_controls,
+    build_orders,
+    validate_contacts,
 )
-
 
 CPF = "52998224725"  # Synthetic, checksum-valid test fixture.
 OLD_TIME = "2026-09-01T12:00:00+00:00"
@@ -305,7 +305,7 @@ class FarmaliderServerErrorTests(unittest.TestCase):
         self.assertEqual(row["farmalider_cliente_id"], "")
 
     def test_partial_run_keeps_incremental_checkpoint_for_retry(self) -> None:
-        started = datetime(2026, 10, 7, tzinfo=timezone.utc)
+        started = datetime(2026, 10, 7, tzinfo=UTC)
         status, controls = _completion_controls(started, api_errors=1)
         self.assertEqual(status, "parcial")
         self.assertEqual(PARTIAL_SYNC_EXIT_CODE, 3)

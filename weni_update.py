@@ -6,26 +6,25 @@ import logging
 import os
 import tempfile
 from dataclasses import asdict, dataclass, field, replace
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
 import secrets_config as secrets
-from task_progress import TaskProgress
-from analytics import (
-    get_fields,
-    is_valid_cpf,
-    cpf_query_priority,
-    normalize_cpf,
-    normalize_value,
-    prepare_full_load_quarter,
-    mark_full_load_quarter_complete,
-)
 from ad_attribution import (
     GOOGLE_ADS_ORIGIN,
     GOOGLE_ADS_WRITE_FIELDS,
     extract_google_ads_attribution,
+)
+from analytics import (
+    cpf_query_priority,
+    get_fields,
+    is_valid_cpf,
+    mark_full_load_quarter_complete,
+    normalize_cpf,
+    normalize_value,
+    prepare_full_load_quarter,
 )
 from config import (
     FARMALIDER_BATCH_SIZE,
@@ -44,7 +43,10 @@ from contact_enrichment import (
     message_id,
 )
 from farmalider_client import (
-    FarmaliderAuthError, FarmaliderClient, FarmaliderError, FarmaliderUnavailableError,
+    FarmaliderAuthError,
+    FarmaliderClient,
+    FarmaliderError,
+    FarmaliderUnavailableError,
 )
 from farmalider_integration import resolve_contact_order, weni_identity_guard
 from pedido_utils import (
@@ -60,14 +62,14 @@ from pedido_utils import (
     serialize_weni_order_list,
     weni_order_datetime_text,
 )
-from weni_client import WeniClient
+from task_progress import TaskProgress
 from urn_utils import (
     CHANNEL_FIELD_MAP,
     native_contact_urns,
     resolve_contact_urns,
     urn_channel,
 )
-
+from weni_client import WeniClient
 
 ALLOWED_WRITE_FIELDS = {
     "contact_urn",
@@ -307,11 +309,11 @@ class PlanAuditError(RuntimeError):
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def iso_utc(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat(timespec="seconds").replace(
+    return value.astimezone(UTC).isoformat(timespec="seconds").replace(
         "+00:00", "Z"
     )
 
@@ -329,8 +331,8 @@ def _parse_datetime(value: Any) -> datetime | None:
         try:
             parsed = datetime.fromisoformat(candidate)
             if parsed.tzinfo is None:
-                parsed = parsed.replace(tzinfo=timezone.utc)
-            return parsed.astimezone(timezone.utc)
+                parsed = parsed.replace(tzinfo=UTC)
+            return parsed.astimezone(UTC)
         except ValueError:
             pass
 
@@ -341,7 +343,7 @@ def _parse_datetime(value: Any) -> datetime | None:
         "%d/%m/%Y %H:%M",
     ):
         try:
-            return datetime.strptime(text, fmt).replace(tzinfo=timezone.utc)
+            return datetime.strptime(text, fmt).replace(tzinfo=UTC)
         except ValueError:
             continue
     return None
@@ -670,7 +672,7 @@ def _contact_in_group(contact: dict[str, Any], *, group_name: str, group_uuid: s
 def _message_sort_key(message: dict[str, Any]) -> tuple[datetime, str]:
     return (
         _parse_datetime(message_created_on(message))
-        or datetime.min.replace(tzinfo=timezone.utc),
+        or datetime.min.replace(tzinfo=UTC),
         message_id(message),
     )
 
@@ -1066,7 +1068,7 @@ def _build_contact_plan(
             "pedido_valor_produtos", "pedido_valor", "pedido_forma_pagamento",
         ):
             plan.guards[key] = fields.get(key)
-    from recompra import refused, member, GROUP, OPT_OUT, TZ
+    from recompra import GROUP, OPT_OUT, TZ, member, refused
     campaign_groups = [g for g in contact.get("groups", []) or [] if isinstance(g, dict) and g.get("name") == GROUP and g.get("uuid")]
     if campaign_groups:
         reference = business_order_datetime(plan.fields.get("pedido_data", fields.get("pedido_data")))
@@ -2472,7 +2474,7 @@ def run_update(
 
         prepared_contacts = []
         with TaskProgress("Preparação da fila Weni", len(all_contact_uuids)) as progress:
-            for preparation_index, contact_uuid in progress.track(enumerate(sorted(all_contact_uuids), start=1)):
+            for _preparation_index, contact_uuid in progress.track(enumerate(sorted(all_contact_uuids), start=1)):
                 contact = contacts_by_uuid.get(contact_uuid)
                 if contact is None:
                     contact = weni.get_contact(uuid=contact_uuid)
@@ -2510,7 +2512,7 @@ def run_update(
         previous_phase = None
         invalid_batch = _InvalidCpfBatch()
         with TaskProgress("Preparação Weni", len(prepared_contacts), detail=lambda: f"pedidos validados={stats.orders_validated}; alterações propostas={stats.plans_with_changes}; nenhuma gravação na Weni") as progress:
-            for index, (priority, contact_uuid, contact, context, candidate_ids) in progress.track(enumerate(
+            for _index, (priority, contact_uuid, contact, context, candidate_ids) in progress.track(enumerate(
                 sorted(prepared_contacts, key=lambda entry: (entry[0], entry[1])), start=1
             )):
                 if priority != previous_phase:

@@ -94,14 +94,14 @@ def read_delivery_spreadsheets(directory, *, cutoff):
     contacts, urn_index, summary, rejected = {}, defaultdict(set), Counter(), []
     contact_path, room_path = directory / CONTACTS_FILENAME, directory / CONVERSATIONS_FILENAME
     aliases = {"Pedido Produtos": "pedido_produtos", "ID do Cliente": "id_do_cliente"}
-    for number, headers, values in _rows(contact_path, "Contact", {"Contact UUID", "Name", "Field:CPF", "Field:Email"}):
-        row = dict(zip(headers, values))
+    for _number, headers, values in _rows(contact_path, "Contact", {"Contact UUID", "Name", "Field:CPF", "Field:Email"}):
+        row = dict(zip(headers, values, strict=False))
         uid = _uuid(row.get("Contact UUID"))
         if not uid:
             summary["CONTATO_UUID_INVALIDO"] += 1
             continue
         fields, urns = {}, []
-        for header, value in zip(headers, values):
+        for header, value in zip(headers, values, strict=False):
             if header.startswith("Field:"):
                 key = header[6:]
                 fields[aliases.get(key, key.lower().replace(" ", "_"))] = "" if value is None else str(value)
@@ -120,7 +120,7 @@ def read_delivery_spreadsheets(directory, *, cutoff):
     tickets, seen = [], set()
     required = {"contact__uuid", "contact__name", "urn", "created_on", "ended_at", "is_active", "tags_list", "user__email"}
     for number, headers, values in _rows(room_path, "rooms", required):
-        row = dict(zip(headers, values))
+        row = dict(zip(headers, values, strict=False))
         tags = _tags(row.get("tags_list"))
         if not any(" ".join(tag.casefold().split()) in TAGS for tag in tags):
             continue

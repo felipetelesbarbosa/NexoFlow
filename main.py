@@ -6,7 +6,7 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import secrets_config as secrets
@@ -19,14 +19,14 @@ from analytics import (
     build_bi_summary_record,
     build_daily_metrics,
     build_sales_metrics,
+    cpf_query_priority,
     get_fields,
     is_relevant_contact,
     is_valid_cpf,
-    cpf_query_priority,
+    mark_full_load_quarter_complete,
     normalize_contact,
     normalize_cpf,
     prepare_full_load_quarter,
-    mark_full_load_quarter_complete,
 )
 from config import (
     FARMALIDER_BATCH_ERROR_ABORT_MIN_ERRORS,
@@ -40,8 +40,8 @@ from config import (
     SYNC_OVERLAP_MINUTES,
 )
 from farmalider_client import (
-    FarmaliderBadRequestError,
     FarmaliderAuthError,
+    FarmaliderBadRequestError,
     FarmaliderClient,
     FarmaliderError,
     FarmaliderUnavailableError,
@@ -164,7 +164,7 @@ def parse_control_datetime(value: str) -> datetime | None:
 
 
 def utc_iso(dt: datetime) -> str:
-    return dt.astimezone(timezone.utc).isoformat(timespec="seconds")
+    return dt.astimezone(UTC).isoformat(timespec="seconds")
 
 
 def _completion_controls(
@@ -285,8 +285,8 @@ def _parse_iso_datetime(value: str) -> datetime | None:
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
         if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=timezone.utc)
-        return parsed.astimezone(timezone.utc)
+            parsed = parsed.replace(tzinfo=UTC)
+        return parsed.astimezone(UTC)
     except ValueError:
         return None
 
@@ -374,7 +374,7 @@ def validate_contacts(
             reused = _reusable_farmalider_result(
                 row,
                 existing,
-                now=datetime.now(timezone.utc),
+                now=datetime.now(UTC),
             )
             if reused is not None:
                 _apply_cliente_result(row, reused)
@@ -743,7 +743,7 @@ def main() -> int:
     try:
         validate_configuration()
         total_started_monotonic = time.monotonic()
-        sync_started = datetime.now(timezone.utc)
+        sync_started = datetime.now(UTC)
         sync_time = utc_iso(sync_started)
         # FarmaLíder/Grupo Líder opera em Belém (UTC-3, sem horário de verão).
         bi_snapshot_date = (sync_started - timedelta(hours=3)).date().isoformat()
@@ -1324,7 +1324,7 @@ def main() -> int:
                         "ultima_execucao_status": "erro",
                         "ultima_execucao_erro_tipo": exc.__class__.__name__,
                         "ultima_execucao_erro_em_utc": utc_iso(
-                            datetime.now(timezone.utc)
+                            datetime.now(UTC)
                         ),
                     }
                 )

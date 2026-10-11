@@ -8,12 +8,12 @@ import re
 import subprocess
 import sys
 import time
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from farmalider_client import FarmaliderClient
 from weni_client import WeniClient
-
 
 BASE_DIR = Path(__file__).resolve().parent
 LOG_DIR = BASE_DIR / "logs"

@@ -1,13 +1,17 @@
 import json
-from contextlib import nullcontext
-from pathlib import Path
 import tempfile
 import unittest
+from contextlib import nullcontext
+from pathlib import Path
 from unittest.mock import Mock, patch
 
-from farmalider_client import FarmaliderClient, FarmaliderError, FarmaliderUnavailableError, RequestPermit
+from farmalider_client import (
+    FarmaliderClient,
+    FarmaliderError,
+    FarmaliderUnavailableError,
+    RequestPermit,
+)
 from private_diagnostics import append_private_failure, sanitize_error_body
-
 
 CPF = "52998224725"
 

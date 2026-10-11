@@ -1,15 +1,34 @@
 """Recompra com fixtures sintéticas; nenhuma mensagem ou API real."""
-from copy import deepcopy
-from datetime import datetime, timedelta
 import json
-from pathlib import Path
 import tempfile
 import unittest
+from copy import deepcopy
+from datetime import datetime, timedelta
+from pathlib import Path
 from unittest.mock import Mock, patch
 
-from recompra import (TZ, GROUP, OPT_OUT, FIELDS, DAY_EXPRESSION, REFUSAL_EXPRESSION, propose, guard, make_review,
-                      apply_review, load_state, read_review, write_review, resolve_latest, validate_flow_guards)
-from weni_update import ContactUpdatePlan, GroupAction, _execute_contact_plan, _build_contact_plan
+from recompra import (
+    DAY_EXPRESSION,
+    FIELDS,
+    GROUP,
+    OPT_OUT,
+    REFUSAL_EXPRESSION,
+    TZ,
+    apply_review,
+    load_state,
+    make_review,
+    propose,
+    read_review,
+    resolve_latest,
+    validate_flow_guards,
+    write_review,
+)
+from weni_update import (
+    ContactUpdatePlan,
+    GroupAction,
+    _build_contact_plan,
+    _execute_contact_plan,
+)
 
 NOW = datetime(2026, 10, 9, 13, 57, tzinfo=TZ)
 STRUCTURE = {'group_uuid':'g-recompra','opt_out_uuid':'g-out','event_uuid':'event',

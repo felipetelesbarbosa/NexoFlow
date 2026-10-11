@@ -1,20 +1,25 @@
 """Consulta da base preserva identificadores inválidos e barreiras de prioridade."""
-import threading
-import unittest
-from datetime import datetime, timezone
-from contextlib import nullcontext
-from pathlib import Path
 import json
 import tempfile
+import threading
+import unittest
+from contextlib import nullcontext
+from datetime import UTC, datetime
+from pathlib import Path
 from unittest.mock import Mock, patch
 
+import weni_update
 from analytics import is_valid_cpf, normalize_cpf
-from farmalider_client import FarmaliderBadRequestError, FarmaliderError, FarmaliderClient, RequestPermit
+from farmalider_client import (
+    FarmaliderBadRequestError,
+    FarmaliderClient,
+    FarmaliderError,
+    RequestPermit,
+)
 from farmalider_integration import cliente_link_status, resolve_contact_order
 from main import FarmaliderSettings, validate_contacts
 from nexo_cli import _normalize_cpf
 from private_diagnostics import append_private_failure
-import weni_update
 
 VALID = "52998224725"
 OTHER_VALID = "16899535009"
@@ -172,7 +177,7 @@ class CpfQueryPriorityTests(unittest.TestCase):
             {"uuid": "g1", "name": "Opt-Out LGPD"}, {"uuid": "g2", "name": "Opt-In LGPD"}]
         client.list_contacts.return_value = contacts
         client.list_messages.return_value = []
-        window = weni_update.UpdateWindow(datetime.now(timezone.utc), None, True)
+        window = weni_update.UpdateWindow(datetime.now(UTC), None, True)
         with patch("weni_update.WeniClient", return_value=client), \
              patch("weni_update._open_farmalider", return_value=farm), \
              patch("weni_update._load_state", return_value={}), \

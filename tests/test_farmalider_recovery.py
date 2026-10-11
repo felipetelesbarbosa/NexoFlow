@@ -6,11 +6,14 @@ import threading
 import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import Mock, patch
 
 from farmalider_client import (
-    FarmaliderClient, FarmaliderError, FarmaliderUnavailableError, RequestPermit,
+    FarmaliderClient,
+    FarmaliderError,
+    FarmaliderUnavailableError,
+    RequestPermit,
 )
 from logging_config import BelemFormatter
 from main import FarmaliderSettings, build_orders, validate_contacts
@@ -288,7 +291,7 @@ class FarmaliderRecoveryTests(unittest.TestCase):
 
     def test_logs_always_use_belem_utc_minus_three(self):
         record = logging.LogRecord("fixture", logging.INFO, "", 0, "message", (), None)
-        record.created = datetime(2026, 10, 7, 4, 0, tzinfo=timezone.utc).timestamp()
+        record.created = datetime(2026, 10, 7, 4, 0, tzinfo=UTC).timestamp()
         record.msecs = 123
         formatted = BelemFormatter("%(asctime)s | %(message)s").format(record)
         self.assertEqual(formatted, "2026-10-07 01:00:00,123 -03:00 | message")

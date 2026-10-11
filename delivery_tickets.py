@@ -7,18 +7,38 @@ import logging
 import os
 from collections import Counter
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from uuid import UUID, NAMESPACE_URL, uuid5
+from uuid import NAMESPACE_URL, UUID, uuid5
 
-from analytics import _sales_order_is_valid, cpf_query_priority, get_fields, normalize_contact
-from farmalider_client import FarmaliderAuthError, FarmaliderError, FarmaliderUnavailableError
-from farmalider_integration import apply_pedido_api_confirmation, resolve_contact_order, weni_identity_guard
+from analytics import (
+    _sales_order_is_valid,
+    cpf_query_priority,
+    get_fields,
+    normalize_contact,
+)
+from farmalider_client import (
+    FarmaliderAuthError,
+    FarmaliderError,
+    FarmaliderUnavailableError,
+)
+from farmalider_integration import (
+    apply_pedido_api_confirmation,
+    resolve_contact_order,
+    weni_identity_guard,
+)
 from pedido_utils import business_order_datetime, effective_order_status_code
 from weni_client import WeniError
 from weni_update import (
-    ContactUpdatePlan, UpdateStats, PlanAuditError, _apply_purchase_candidate, _ensure_order_fields,
-    _prepare_frozen_plan_for_apply, audit_plans, load_review_snapshot, write_review_snapshot,
+    ContactUpdatePlan,
+    PlanAuditError,
+    UpdateStats,
+    _apply_purchase_candidate,
+    _ensure_order_fields,
+    _prepare_frozen_plan_for_apply,
+    audit_plans,
+    load_review_snapshot,
+    write_review_snapshot,
 )
 
 TICKET_COLUMNS = [
@@ -52,7 +72,7 @@ def delivery_ticket_key(chat_contact_uuid, opened, ended, *, fallback=""):
     dates = [_datetime(opened), _datetime(ended)]
     if not all(dates):
         return fallback
-    natural = [contact_id, *(date.astimezone(timezone.utc).isoformat() for date in dates)]
+    natural = [contact_id, *(date.astimezone(UTC).isoformat() for date in dates)]
     return str(uuid5(NAMESPACE_URL, "nexoflow:delivery:" + json.dumps(natural)))
 
 
@@ -214,7 +234,7 @@ def build_delivery_order_records(tickets, orders, *, updated_at):
             int(_sales_order_is_valid(order)),
             "CONFIRMADO_POR_ID" if "CONFIRMADO_POR_ID" in links else "SEM_VINCULO_COMPROVADO",
             len(unique), updated_at,
-        ])))
+        ], strict=False)))
     return records
 
 
@@ -327,7 +347,13 @@ def apply_delivery_review(path, weni, *, store_factory=None, target=None):
     all_items = store.upsert_order_items_detailed(items).final_records
     store.upsert_delivery_tickets(tickets)
     store.refresh_delivery_bi(all_orders)
-    from analytics import build_bi_conversion_records, build_bi_order_rows, build_bi_sales_rows, build_bi_summary_record, build_sales_metrics
+    from analytics import (
+        build_bi_conversion_records,
+        build_bi_order_rows,
+        build_bi_sales_rows,
+        build_bi_summary_record,
+        build_sales_metrics,
+    )
     snapshot_date = business_order_datetime(delivery["cutoff"]).date().isoformat()
     store.replace_sales_metrics(build_sales_metrics(all_orders, all_items))
     store.replace_bi_orders(build_bi_order_rows(base.final_records, all_orders, all_items, updated_at=delivery["cutoff"]))

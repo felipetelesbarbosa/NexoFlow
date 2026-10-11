@@ -39,7 +39,7 @@ class SheetSchemaLayoutTests(unittest.TestCase):
             with self.subTest(layout=layout):
                 store = self.store(layout)
                 physical = {title: list(headers) for title, headers in store._schema_map().items()}
-                store.ensure_structure.side_effect = lambda **kwargs: store._headers_cache.update(physical)
+                store.ensure_structure.side_effect = lambda store=store, physical=physical, **kwargs: store._headers_cache.update(physical)
                 store._initialize_structure(validate_structure=False)
                 store.ensure_structure.assert_called_once()
                 saved = store.set_controls.call_args.args[0]

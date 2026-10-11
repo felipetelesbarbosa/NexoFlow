@@ -2,7 +2,13 @@
 import unittest
 from unittest.mock import Mock
 
-from analytics import BASE_COLUMNS, HISTORY_COLUMNS, BI_ORDERS_COLUMNS, build_bi_order_rows, normalize_contact
+from analytics import (
+    BASE_COLUMNS,
+    BI_ORDERS_COLUMNS,
+    HISTORY_COLUMNS,
+    build_bi_order_rows,
+    normalize_contact,
+)
 from google_sheets import GoogleSheetsStore
 
 
@@ -31,7 +37,7 @@ class CustomerDimensionsTests(unittest.TestCase):
             'valor_total_compra': '10', 'farmalider_status_pedido': '2', 'farmalider_forma_pagamento': '3',
         }], [], updated_at='2026-10-09T10:00:00-03:00')
         self.assertEqual(len(rows), 1)
-        return rows, dict(zip(BI_ORDERS_COLUMNS, rows[0]))
+        return rows, dict(zip(BI_ORDERS_COLUMNS, rows[0], strict=False))
 
     def test_order_joins_its_customer_only_and_keeps_order_date_distinct_from_sync(self):
         _, row = self.build_order([
@@ -62,7 +68,7 @@ class CustomerDimensionsTests(unittest.TestCase):
         store.bi_orders = Mock()
         store._replace_table = Mock()
         store.replace_bi_orders(rows)
-        written = dict(zip(BI_ORDERS_COLUMNS, store._replace_table.call_args.args[2][0]))
+        written = dict(zip(BI_ORDERS_COLUMNS, store._replace_table.call_args.args[2][0], strict=False))
         self.assertEqual(written['cep'], "'01234567")
         self.assertEqual(written['cidade'], "'=1+1")
         self.assertEqual(written['idade'], 37)

@@ -1,5 +1,5 @@
-import threading
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -101,7 +101,7 @@ class TaskProgressTests(unittest.TestCase):
 
     def test_nested_contact_queries_keep_only_parent_bar(self):
         with self.progress(2) as parent:
-            for item in parent.track(range(2)):
+            for _item in parent.track(range(2)):
                 with TaskProgress("Consulta de contato", None) as child:
                     child.advance(10)
                     self.assertIsNone(child._thread)

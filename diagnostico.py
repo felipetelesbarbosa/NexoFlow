@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import sys
+from urllib.parse import urlsplit
 
 import requests
-from urllib.parse import urlsplit
 
 import secrets_config as secrets
 from config import (
@@ -16,8 +16,8 @@ from config import (
 )
 from farmalider_client import FarmaliderClient, FarmaliderError
 from google_sheets import GoogleSheetsStore
-from weni_client import WeniClient, WeniError
 from network_diagnostics import classify_network_failure
+from weni_client import WeniClient, WeniError
 
 
 def safe_failure(error: Exception) -> str:

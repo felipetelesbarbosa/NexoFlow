@@ -3,13 +3,12 @@ import unittest
 
 from analytics import (
     BASE_COLUMNS,
-    ORDER_ITEM_COLUMNS,
     ORDER_COLUMNS,
+    ORDER_ITEM_COLUMNS,
     build_sales_metrics,
     normalize_contact,
     parse_ultimo_pedido,
 )
-
 
 EXAMPLE_PAYLOAD = {
     "data_hora": "2026-09-30T16:07:00Z",

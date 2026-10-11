@@ -1,13 +1,13 @@
 """Local-only failure journal; public logs never receive CPF or response text."""
 from __future__ import annotations
 
-from datetime import datetime
 import json
 import math
 import os
-from pathlib import Path
 import re
 import threading
+from datetime import datetime
+from pathlib import Path
 from urllib.parse import quote, quote_plus
 
 from config import LOG_DIR

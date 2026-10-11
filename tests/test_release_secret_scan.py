@@ -1,17 +1,17 @@
 """Validação de publicação com arquivos e respostas do scanner sintéticos."""
-from contextlib import redirect_stdout
 import hashlib
 import io
 import json
 import os
-from pathlib import Path
 import stat
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import patch
 import warnings
 import zipfile
+from contextlib import redirect_stdout
+from pathlib import Path
+from unittest.mock import patch
 
 from scripts import check_release_secrets as scan
 
@@ -43,7 +43,7 @@ class ReleaseSecretScanTests(unittest.TestCase):
         )
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
-            for name, package_entries in zip(scan.PACKAGE_NAMES, entries):
+            for name, package_entries in zip(scan.PACKAGE_NAMES, entries, strict=False):
                 with zipfile.ZipFile(self.assets / name, "w", compression=zipfile.ZIP_STORED) as archive:
                     for member, content in package_entries:
                         archive.writestr(member, content)
@@ -252,7 +252,7 @@ class ReleaseSecretScanTests(unittest.TestCase):
     def test_missing_or_invalid_report_blocks_publication(self):
         for content in (None, "invalid json DADO_SINTETICO_NUNCA_EXIBIR", '{"unexpected": []}', '["unexpected"]'):
             with self.subTest(content=content):
-                def scanner(command, **kwargs):
+                def scanner(command, *, content=content, **kwargs):
                     report = Path(command[command.index("--report-path") + 1])
                     if content is None:
                         report.unlink()

@@ -6,18 +6,17 @@ reproduzidos no console, mesmo quando ele termina com erro.
 from __future__ import annotations
 
 import argparse
-from contextlib import ExitStack
 import hashlib
 import json
 import ntpath
-from pathlib import Path, PurePosixPath
 import re
 import shutil
 import stat
 import subprocess
 import tempfile
 import zipfile
-
+from contextlib import ExitStack
+from pathlib import Path, PurePosixPath
 
 PACKAGE_NAMES = ("NexoFlow-Setup-1.0.zip", "NexoFlow-1.0.zip")
 CHECKSUM_NAME = "SHA256SUMS-1.0.txt"
@@ -123,7 +122,7 @@ def extract_packages(assets_dir: Path, destination: Path) -> None:
         with ExitStack() as stack:
             archives = [stack.enter_context(zipfile.ZipFile(package)) for package in packages]
             plans = [validated_members(archive) for archive in archives]
-            for package, archive, plan in zip(packages, archives, plans):
+            for package, archive, plan in zip(packages, archives, plans, strict=False):
                 root = destination / package.stem
                 root.mkdir(parents=True, exist_ok=False)
                 for info, path, is_directory in plan:

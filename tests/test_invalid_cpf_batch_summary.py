@@ -2,8 +2,13 @@ import unittest
 from unittest.mock import Mock, patch
 
 from weni_update import (
-    ContactUpdatePlan, UpdateStats, _InvalidCpfBatch, _apply_purchase_candidate,
-    _invalid_cpf_summary, _plan_digest, _record_invalid_cpf_result,
+    ContactUpdatePlan,
+    UpdateStats,
+    _apply_purchase_candidate,
+    _invalid_cpf_summary,
+    _InvalidCpfBatch,
+    _plan_digest,
+    _record_invalid_cpf_result,
 )
 
 

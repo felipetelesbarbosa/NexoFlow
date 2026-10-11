@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -25,9 +25,14 @@ def main():
         from proxy_config import configure_proxy
         configure_proxy()
     import secrets_config as secrets
-    from logging_config import configure_logging
-    from delivery_tickets import apply_delivery_review, reconcile_tickets, select_tickets, write_delivery_review
+    from delivery_tickets import (
+        apply_delivery_review,
+        reconcile_tickets,
+        select_tickets,
+        write_delivery_review,
+    )
     from google_sheets import GoogleSheetsStore
+    from logging_config import configure_logging
     from weni_chats_client import WeniChatsClient
     from weni_client import WeniClient
     from weni_update import _open_farmalider
@@ -37,7 +42,7 @@ def main():
         if not getattr(secrets, "WENI_API_TOKEN", ""):
             raise RuntimeError("Token da Weni não configurado.")
         imported = None
-        cutoff = datetime.now(timezone.utc)
+        cutoff = datetime.now(UTC)
         if args.dry_run and args.planilhas:
             from delivery_spreadsheets import read_delivery_spreadsheets
             imported = read_delivery_spreadsheets(args.import_dir, cutoff=cutoff)
@@ -88,8 +93,8 @@ def main():
         return 0
     except Exception as exc:
         # SDK errors can contain private/authenticated URLs; never print the original exception text.
-        from weni_chats_client import WeniChatsError
         from delivery_spreadsheets import DeliverySpreadsheetError
+        from weni_chats_client import WeniChatsError
         from weni_client import WeniError
         from weni_update import PlanAuditError
         if isinstance(exc, (WeniChatsError, DeliverySpreadsheetError, WeniError, PlanAuditError)):

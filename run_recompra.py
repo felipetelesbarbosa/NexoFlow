@@ -1,8 +1,8 @@
 """Rotina incremental de recompra, sempre com revisão antes dos POSTs."""
 import argparse
 import json
-from pathlib import Path
 import logging
+from pathlib import Path
 
 
 def build_parser():
@@ -27,8 +27,15 @@ def main(argv=None):
     parser = build_parser(); args = parser.parse_args(argv)
     if (args.apply or args.check_review) and not args.require_review:
         parser.error('--apply e --check-review exigem --require-review.')
-    from recompra import (ensure_review_current, now_local, read_review, ReviewExpiredError,
-                          REVIEW_EXPIRED_EXIT_CODE, diagnose_state, safe_error_frames)
+    from recompra import (
+        REVIEW_EXPIRED_EXIT_CODE,
+        ReviewExpiredError,
+        diagnose_state,
+        ensure_review_current,
+        now_local,
+        read_review,
+        safe_error_frames,
+    )
     if args.diagnose_state:
         try:
             print(json.dumps(diagnose_state(), ensure_ascii=False, indent=2))
@@ -55,9 +62,19 @@ def main(argv=None):
     from logging_config import configure_logging
     configure_logging(Path('logs/nexoflow_recompra.log'))
     import secrets_config as secrets
+    from recompra import (
+        STATE,
+        apply_review,
+        build_plans,
+        inspect_structure,
+        load_state,
+        make_review,
+        now_local,
+        read_review,
+        write_review,
+    )
     from weni_client import WeniClient
     from weni_update import _open_farmalider
-    from recompra import inspect_structure, now_local, load_state, STATE, build_plans, make_review, write_review, read_review, apply_review
     weni = None; farm = None
     try:
         if not getattr(secrets, 'WENI_API_TOKEN', ''): raise RuntimeError('Token Weni não configurado.')

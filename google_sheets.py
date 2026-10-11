@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import copy
-from datetime import datetime, timezone
 import hashlib
 import json
 import logging
 import time
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 import gspread
@@ -15,15 +15,13 @@ if TYPE_CHECKING:
     from gspread.worksheet import Worksheet
 from gspread.exceptions import APIError, SpreadsheetNotFound, WorksheetNotFound
 from requests.exceptions import RequestException
-from network_diagnostics import classify_network_failure
-from proxy_config import refresh_network_route
 
 from analytics import (
     BASE_COLUMNS,
     BI_ADS_COLUMNS,
     BI_CHANNEL_COLUMNS,
-    BI_ORDERS_COLUMNS,
     BI_CONVERSION_COLUMNS,
+    BI_ORDERS_COLUMNS,
     BI_SALES_COLUMNS,
     BI_STATUS_COLUMNS,
     BI_SUMMARY_COLUMNS,
@@ -50,8 +48,8 @@ from config import (
     SHEET_BASE_CONTATOS,
     SHEET_BI_ADS,
     SHEET_BI_CANAIS,
-    SHEET_BI_PEDIDOS,
     SHEET_BI_CONVERSAO,
+    SHEET_BI_PEDIDOS,
     SHEET_BI_RESUMO_DIARIO,
     SHEET_BI_STATUS,
     SHEET_BI_VENDAS,
@@ -64,6 +62,8 @@ from config import (
     SHEET_METRICAS_VENDAS,
     SHEET_PEDIDOS,
 )
+from network_diagnostics import classify_network_failure
+from proxy_config import refresh_network_route
 
 
 def column_letter(number: int) -> str:
@@ -258,7 +258,7 @@ class GoogleSheetsStore:
 
     @staticmethod
     def now_iso() -> str:
-        return datetime.now(timezone.utc).isoformat(timespec="seconds")
+        return datetime.now(UTC).isoformat(timespec="seconds")
 
     def _wait_before_write(self) -> None:
         """Mantém uma cadência segura entre requisições de escrita."""
@@ -491,7 +491,7 @@ class GoogleSheetsStore:
 
     def _read_header_bounded(
         self,
-        ws: "Worksheet",
+        ws: Worksheet,
         expected_headers: list[str],
         *,
         description: str | None = None,
@@ -522,7 +522,7 @@ class GoogleSheetsStore:
         rows: int = 1000,
         *,
         existing_sheets: dict[str, Any] | None = None,
-    ) -> "Worksheet":
+    ) -> Worksheet:
         ws = (existing_sheets or {}).get(title)
         created = False
         structure_changed = False
@@ -671,7 +671,7 @@ class GoogleSheetsStore:
         records = []
         for row in values[1:]:
             padded = row + [""] * (len(headers) - len(row))
-            records.append(dict(zip(headers, padded)))
+            records.append(dict(zip(headers, padded, strict=False)))
         return records
 
     def load_base_snapshot(
@@ -861,7 +861,7 @@ class GoogleSheetsStore:
                     }
                 )
                 final_rows[row_number - 2] = merged
-                changed_records.append(dict(zip(headers, merged)))
+                changed_records.append(dict(zip(headers, merged, strict=False)))
                 updated += 1
             else:
                 appended = [
@@ -871,7 +871,7 @@ class GoogleSheetsStore:
                 appends.append(appended)
                 final_rows.append(appended)
                 existing[key] = (len(final_rows) + 1, appended)
-                changed_records.append(dict(zip(headers, appended)))
+                changed_records.append(dict(zip(headers, appended, strict=False)))
                 inserted += 1
 
         update_batches = self._adaptive_batches(
@@ -956,7 +956,7 @@ class GoogleSheetsStore:
             updated=updated,
             unchanged=unchanged,
             changed_records=changed_records,
-            final_records=[dict(zip(headers, row)) for row in final_rows],
+            final_records=[dict(zip(headers, row, strict=False)) for row in final_rows],
         )
 
     def upsert_contacts_detailed(
@@ -1255,7 +1255,11 @@ class GoogleSheetsStore:
             ignore_compare_fields={"atualizado_em"}, value_input_option="RAW")
 
     def refresh_delivery_bi(self, orders: list[dict[str, str]] | None = None, *, create: bool = True) -> None:
-        from delivery_tickets import TICKET_COLUMNS, DELIVERY_ORDER_COLUMNS, build_delivery_order_records
+        from delivery_tickets import (
+            DELIVERY_ORDER_COLUMNS,
+            TICKET_COLUMNS,
+            build_delivery_order_records,
+        )
         known = getattr(self, "_known_sheets", {})
         if not create and not all(title in known for title in ("Tickets_Delivery_Weni", "BI_Delivery_Pedidos")):
             return

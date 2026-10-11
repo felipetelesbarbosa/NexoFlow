@@ -1,6 +1,12 @@
 """Recompra D+25: planos revisados, sem envio nem edição da campanha."""
 from __future__ import annotations
 
+import json
+import logging
+import os
+import tempfile
+import traceback
+import unicodedata
 from collections import Counter, OrderedDict
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import contextmanager
@@ -8,23 +14,31 @@ from copy import deepcopy
 from datetime import datetime, timedelta
 from hashlib import sha256
 from itertools import groupby, islice
-import json
-import logging
-import os
 from pathlib import Path
-import tempfile
-import traceback
 from threading import Lock
 from time import monotonic, sleep
-import unicodedata
 from zoneinfo import ZoneInfo
 
-from analytics import get_fields, normalize_value, cpf_query_priority, _sales_order_is_valid
+from analytics import (
+    _sales_order_is_valid,
+    cpf_query_priority,
+    get_fields,
+    normalize_value,
+)
 from config import FARMALIDER_MAX_WORKERS
-from farmalider_integration import resolve_contact_order, select_cliente_response, weni_customer_identity
-from pedido_utils import (business_order_datetime, serialize_pedido_products,
-                          serialize_weni_order_list, normalize_farmalider_order_status_code,
-                          normalize_farmalider_payment_code, is_order_cancelled)
+from farmalider_integration import (
+    resolve_contact_order,
+    select_cliente_response,
+    weni_customer_identity,
+)
+from pedido_utils import (
+    business_order_datetime,
+    is_order_cancelled,
+    normalize_farmalider_order_status_code,
+    normalize_farmalider_payment_code,
+    serialize_pedido_products,
+    serialize_weni_order_list,
+)
 
 GROUP = "Recompra FarmaLíder"
 OPT_OUT = "Opt-Out Marketing"

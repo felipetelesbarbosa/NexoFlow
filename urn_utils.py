@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-
 CHANNEL_PRIORITY = ("whatsapp", "instagram", "facebook")
 CHANNEL_FIELD_MAP = {
     "whatsapp": "contact_urn_whatsapp",

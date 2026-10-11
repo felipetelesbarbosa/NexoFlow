@@ -2,29 +2,27 @@ import json
 import tempfile
 import unittest
 from copy import deepcopy
-from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 from analytics import parse_ultimo_pedido
 from pedido_utils import parse_weni_order_list
-
 from weni_update import (
     ContactUpdatePlan,
     GroupAction,
     PlanAuditError,
+    UpdateStats,
+    UpdateWindow,
     _build_contact_plan,
     _load_state,
     _prepare_frozen_plan_for_apply,
     _resolve_required_groups,
-    _track_open_order,
     _save_state,
+    _track_open_order,
     audit_plans,
-    UpdateStats,
-    UpdateWindow,
-    run_update,
     load_review_snapshot,
+    run_update,
     verify_review_snapshot,
     write_review_snapshot,
 )
@@ -655,7 +653,7 @@ class WeniUpdateTests(unittest.TestCase):
         farm = self._purchase_api()
         names = ['Produto 0,5 MG', 'Produto "Especial", 30 CPR']
         for payload in (farm.get_cliente_by_cpf.return_value, farm.get_pedido.return_value):
-            for item, name in zip(payload["itens"], names):
+            for item, name in zip(payload["itens"], names, strict=False):
                 item["descricao"] = name
         plan = self._purchase_plan(contact, farm)
         audit_plans([plan], opt_out_group_available=True)
@@ -821,7 +819,7 @@ class WeniUpdateTests(unittest.TestCase):
                     audit_plans([plan], opt_out_group_available=True)
 
     def test_unknown_payment_summary_counts_unchanged_and_cancelled_orders_without_writes(self) -> None:
-        started = datetime(2026, 10, 3, 12, 1, tzinfo=timezone.utc)
+        started = datetime(2026, 10, 3, 12, 1, tzinfo=UTC)
         contact = self._purchase_contact(include_raw=False)
         farm = self._purchase_api()
         farm.get_cliente_by_cpf.return_value["ultimoPedido"].update(
@@ -954,7 +952,7 @@ class WeniUpdateTests(unittest.TestCase):
     def test_open_states_are_saved_queued_and_use_configured_sales_policy(self) -> None:
         for status in (-2, -1, 0, 4, 1):
             with self.subTest(status=status):
-                started = datetime(2026, 10, 3, 12, 1, tzinfo=timezone.utc)
+                started = datetime(2026, 10, 3, 12, 1, tzinfo=UTC)
                 contact = self._purchase_contact(include_raw=False)
                 contact["fields"]["ultima_compra"] = "2026-10-01T10:00:00-03:00"
                 farm = self._purchase_api()
@@ -1086,7 +1084,7 @@ class WeniUpdateTests(unittest.TestCase):
         })
 
     def test_incremental_order_apply_rechecks_identity_and_queues_conflict(self) -> None:
-        started = datetime(2026, 10, 3, 12, 1, tzinfo=timezone.utc)
+        started = datetime(2026, 10, 3, 12, 1, tzinfo=UTC)
         contact = self._purchase_contact(include_raw=False)
         client = self._incremental_purchase_client(contact)
         current = deepcopy(contact)
@@ -1114,7 +1112,7 @@ class WeniUpdateTests(unittest.TestCase):
         )
 
     def test_incremental_apply_skips_already_written_order_fields(self) -> None:
-        started = datetime(2026, 10, 3, 12, 1, tzinfo=timezone.utc)
+        started = datetime(2026, 10, 3, 12, 1, tzinfo=UTC)
         contact = self._purchase_contact(include_raw=False)
         farm = self._purchase_api()
         planned = self._purchase_plan(contact, farm)
@@ -1345,7 +1343,6 @@ class WeniUpdateTests(unittest.TestCase):
             self.assertEqual(result.contacts_updated, 1)
             client.update_contact_fields.assert_called_once_with("u2", {"idade": 31})
             save_state_mock.assert_called_once()
-            statuses = [call.kwargs.get("status") for call in []]
             self.assertEqual(append_audit_mock.call_count, 2)
 
     @patch("weni_update._save_state")
@@ -1361,9 +1358,9 @@ class WeniUpdateTests(unittest.TestCase):
         append_audit_mock,
         save_state_mock,
     ) -> None:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        started = datetime(2026, 10, 3, 12, 0, tzinfo=timezone.utc)
+        started = datetime(2026, 10, 3, 12, 0, tzinfo=UTC)
         resolve_window_mock.return_value = UpdateWindow(
             started_at=started,
             after=started,
@@ -1416,9 +1413,9 @@ class WeniUpdateTests(unittest.TestCase):
         append_audit_mock,
         save_state_mock,
     ) -> None:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        started = datetime(2026, 10, 3, 12, 0, tzinfo=timezone.utc)
+        started = datetime(2026, 10, 3, 12, 0, tzinfo=UTC)
         resolve_window_mock.return_value = UpdateWindow(
             started_at=started,
             after=started,
@@ -1458,9 +1455,9 @@ class WeniUpdateTests(unittest.TestCase):
         append_audit_mock,
         save_state_mock,
     ) -> None:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        started = datetime(2026, 10, 3, 12, 0, tzinfo=timezone.utc)
+        started = datetime(2026, 10, 3, 12, 0, tzinfo=UTC)
         resolve_window_mock.return_value = UpdateWindow(
             started_at=started,
             after=None,
@@ -1500,9 +1497,9 @@ class WeniUpdateTests(unittest.TestCase):
         append_audit_mock,
         save_state_mock,
     ) -> None:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        started = datetime(2026, 10, 3, 12, 0, tzinfo=timezone.utc)
+        started = datetime(2026, 10, 3, 12, 0, tzinfo=UTC)
         resolve_window_mock.return_value = UpdateWindow(
             started_at=started,
             after=started,
@@ -1535,9 +1532,9 @@ class WeniUpdateTests(unittest.TestCase):
     def test_missing_order_fields_blocks_before_contact_reads(
         self, client_cls, resolve_window_mock, _open_farmalider_mock
     ) -> None:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        started = datetime(2026, 10, 3, 12, 0, tzinfo=timezone.utc)
+        started = datetime(2026, 10, 3, 12, 0, tzinfo=UTC)
         resolve_window_mock.return_value = UpdateWindow(
             started_at=started,
             after=started,
@@ -1563,9 +1560,9 @@ class WeniUpdateTests(unittest.TestCase):
     def test_missing_multichannel_fields_blocks_before_contact_reads(
         self, client_cls, resolve_window_mock, _open_farmalider_mock
     ) -> None:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        started = datetime(2026, 10, 3, 12, 0, tzinfo=timezone.utc)
+        started = datetime(2026, 10, 3, 12, 0, tzinfo=UTC)
         resolve_window_mock.return_value = UpdateWindow(
             started_at=started,
             after=started,

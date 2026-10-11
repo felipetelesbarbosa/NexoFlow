@@ -1,9 +1,9 @@
 """Synthetic customer-identity regressions for populated invalid CPFs."""
 
+import unittest
 from contextlib import nullcontext
 from copy import deepcopy
-from datetime import datetime, timezone
-import unittest
+from datetime import UTC, datetime
 from unittest.mock import Mock, patch
 
 from analytics import (
@@ -21,15 +21,14 @@ from farmalider_integration import (
     weni_customer_identity,
     weni_identity_guard,
 )
-from main import FarmaliderSettings, build_orders, validate_contacts
 from google_sheets import GoogleSheetsStore
+from main import FarmaliderSettings, build_orders, validate_contacts
 from weni_update import (
     PlanAuditError,
     _build_contact_plan,
     _prepare_frozen_plan_for_apply,
     audit_plans,
 )
-
 
 CAPTURED_AT = "2026-10-08T10:00:00-03:00"
 VALID_CPF = "52998224725"
@@ -373,7 +372,7 @@ class InvalidCpfIdentityTests(unittest.TestCase):
         row = normalize_contact(weni_contact(), CAPTURED_AT)
         existing = dict(row, farmalider_cliente_status="CPF_INVALIDO_ENCONTRADO",
                         farmalider_cliente_id="999", farmalider_cliente_nome="Cliente anterior",
-                        farmalider_cliente_consultado_em=datetime.now(timezone.utc).isoformat())
+                        farmalider_cliente_consultado_em=datetime.now(UTC).isoformat())
         farm = farm_client(customer_payload())
         stats = validate_contacts([row], farm_client=farm, farm_settings=SETTINGS,
                                   sync_time=CAPTURED_AT, existing_by_uuid={row["contact_uuid"]: existing},
@@ -521,6 +520,14 @@ class InvalidCpfIdentityTests(unittest.TestCase):
                 self.assertEqual(client.get_cliente_by_cpf("0"), [customer_payload()])
                 with self.assertRaises(FarmaliderError):
                     client.get_pedido("201")
+                # O contrato de pedido é objeto ou ausência; nunca lista.
+                pedido_payload = {"capa": {"id": 201}, "itens": []}
+                response.json.return_value = pedido_payload
+                self.assertIs(client.get_pedido("201"), pedido_payload)
+                response.status_code = 404
+                response.json.reset_mock()
+                self.assertIsNone(client.get_pedido("201"))
+                response.json.assert_not_called()
         finally:
             client.close()
 

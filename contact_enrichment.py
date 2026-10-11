@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Iterable
+from datetime import UTC, datetime
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -71,16 +72,16 @@ def message_direction(message: dict[str, Any]) -> str:
 def _parse_datetime(value: str) -> datetime:
     text = (value or "").strip()
     if not text:
-        return datetime.min.replace(tzinfo=timezone.utc)
+        return datetime.min.replace(tzinfo=UTC)
     try:
         if text.endswith("Z"):
             text = text[:-1] + "+00:00"
         dt = datetime.fromisoformat(text)
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(timezone.utc)
+            dt = dt.replace(tzinfo=UTC)
+        return dt.astimezone(UTC)
     except ValueError:
-        return datetime.min.replace(tzinfo=timezone.utc)
+        return datetime.min.replace(tzinfo=UTC)
 
 
 def _view(message: dict[str, Any]) -> MessageView:
@@ -189,7 +190,7 @@ def _is_valid_cpf(value: str) -> bool:
     def digit(base: str, factor: int) -> str:
         total = sum(
             int(number) * weight
-            for number, weight in zip(base, range(factor, 1, -1))
+            for number, weight in zip(base, range(factor, 1, -1), strict=False)
         )
         result = (total * 10) % 11
         return "0" if result == 10 else str(result)

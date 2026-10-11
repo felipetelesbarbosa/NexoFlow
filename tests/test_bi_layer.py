@@ -16,8 +16,8 @@ from analytics import (
     build_bi_sales_rows,
     build_bi_summary_record,
     build_sales_metrics,
-    parse_ultimo_pedido,
     normalize_contact,
+    parse_ultimo_pedido,
 )
 from config import (
     SHEET_BI_ADS,
@@ -175,7 +175,7 @@ class BILayerTests(unittest.TestCase):
             base, orders, items, updated_at="2026-10-06T21:00:00-03:00",
         )
         self.assertEqual(len(rows), 1)
-        record = dict(zip(BI_ORDERS_COLUMNS, rows[0]))
+        record = dict(zip(BI_ORDERS_COLUMNS, rows[0], strict=False))
         self.assertEqual(record["pedido_data"], "05/06/26 15:45:27")
         self.assertEqual(
             record["pedido_produtos"],

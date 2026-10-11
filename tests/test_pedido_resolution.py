@@ -22,7 +22,6 @@ from pedido_utils import (
     weni_order_datetime_text,
 )
 
-
 CAPTURED_AT = "2026-10-06T18:00:00Z"
 SYNTHETIC_CPF = "52998224725"
 

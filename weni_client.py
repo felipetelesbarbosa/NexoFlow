@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Iterator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urljoin
 
@@ -46,7 +46,7 @@ class WeniClient:
     @staticmethod
     def format_datetime(dt: datetime) -> str:
         return (
-            dt.astimezone(timezone.utc)
+            dt.astimezone(UTC)
             .isoformat(timespec="milliseconds")
             .replace("+00:00", "Z")
         )

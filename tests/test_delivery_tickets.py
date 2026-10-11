@@ -2,17 +2,20 @@ import json
 import tempfile
 import unittest
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 from delivery_tickets import (
-    apply_delivery_review, build_delivery_order_records, reconcile_tickets,
-    select_tickets, ticket_order_link, write_delivery_review,
+    apply_delivery_review,
+    build_delivery_order_records,
+    reconcile_tickets,
+    select_tickets,
+    ticket_order_link,
+    write_delivery_review,
 )
 from weni_chats_client import WeniChatsClient, WeniChatsError
 from weni_update import REQUIRED_ORDER_FIELDS
-
 
 CONTACT = "10000000-0000-0000-0000-000000000001"
 TICKET = "20000000-0000-0000-0000-000000000001"
