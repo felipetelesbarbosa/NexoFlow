@@ -25,8 +25,9 @@ class DocumentationTests(unittest.TestCase):
             "# Operação\n\nRevisão antes da aplicação.\n", encoding="utf-8"
         )
 
-    def generate(self):
+    def generate(self, *, html_newline="\n"):
         rendered = '<!DOCTYPE html>\n<html lang="pt-BR"><body>Operação</body></html>\n'
+        rendered = rendered.replace("\n", html_newline)
         with patch.object(
             documentation.subprocess,
             "run",
@@ -66,9 +67,31 @@ class DocumentationTests(unittest.TestCase):
         )
 
     def test_windows_checkout_newlines_do_not_invalidate_the_documentation(self):
-        self.generate()
-        for path in (self.source, self.output):
-            path.write_bytes(path.read_bytes().replace(b"\n", b"\r\n"))
+        markdown = self.source.read_text(encoding="utf-8")
+        for initial_newline in ("\n", "\r\n"):
+            with self.subTest(initial_newline=repr(initial_newline)):
+                self.source.write_bytes(
+                    markdown.replace("\n", initial_newline).encode("utf-8")
+                )
+                self.generate()
+                for path in (self.source, self.output):
+                    # A fonte pode já ter CRLF; simular outro checkout não deve
+                    # criar CRCRLF e, portanto, linhas extras ao reler o texto.
+                    normalized = path.read_bytes().replace(b"\r\n", b"\n")
+                    path.write_bytes(normalized.replace(b"\n", b"\r\n"))
+                    self.assertNotIn(b"\r\r\n", path.read_bytes())
+                self.assertTrue(
+                    documentation.documentation_is_current(self.source, self.output)
+                )
+
+    def test_generation_normalizes_windows_source_and_pandoc_output(self):
+        self.source.write_bytes(
+            self.source.read_text(encoding="utf-8")
+            .replace("\n", "\r\n")
+            .encode("utf-8")
+        )
+        self.generate(html_newline="\r\n")
+        self.assertNotIn(b"\r\n", self.output.read_bytes())
         self.assertTrue(
             documentation.documentation_is_current(self.source, self.output)
         )
