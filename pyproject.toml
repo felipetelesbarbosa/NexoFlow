@@ -25,6 +25,8 @@ py-modules = [
   "farmalider_integration",
   "google_sheets",
   "logging_config",
+  "looker_bi",
+  "run_looker",
   "main",
   "network_diagnostics",
   "nexo_cli",

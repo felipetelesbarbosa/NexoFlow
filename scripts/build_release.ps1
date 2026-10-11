@@ -316,6 +316,9 @@ Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/weni_updat
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/task_progress.py"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/task_progress.py"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/analytics.py"
+Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/looker_bi.py"
+Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/run_looker.py"
+Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/looker_bi.py"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/confirmar_revisao_weni.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/confirmar_revisao_weni.ps1"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/resultado_carga_weni.ps1"
@@ -340,6 +343,7 @@ Distribuição oficial do **NexoFlow 1.0**.
 O arquivo `NexoFlow-Setup-$Version.zip` contém o instalador do NexoFlow 1.0 e foi validado automaticamente em Windows para primeira instalação e atualização de uma instalação existente.
 
 Melhorias desta distribuição do NexoFlow 1.0:
+- tabelas comerciais para Looker Studio com clientes, histórico de vendas, itens, Curva ABC, produtos comprados juntos e KPIs por período; correção dos tipos monetários e campos opcionais sem preenchimento artificial;
 - Weni com ícone azul e ciano, contato e balão de conversa, seguindo a estética dos outros componentes do NexoFlow;
 - Recompra com ícone próprio de sacola e setas circulares; Planilha com ícone azul alinhado ao NexoFlow, nos executáveis e atalhos;
 - CMD da Weni permanece aberto após conclusão, erro ou cancelamento, inclusive por outro launcher; fechar o aviso final ou pressionar ENTER não encerra a sessão; use EXIT para fechar;

@@ -62,6 +62,8 @@ from config import (
     SHEET_METRICAS_VENDAS,
     SHEET_PEDIDOS,
 )
+from looker_bi import DATE_COLUMNS, TEXT_COLUMNS
+from looker_bi import SCHEMAS as LOOKER_SCHEMAS
 from network_diagnostics import classify_network_failure
 from proxy_config import refresh_network_route
 
@@ -129,6 +131,9 @@ class GoogleSheetsStore:
         self._write_requests = 0
         self._initialize_structure(validate_structure=validate_structure)
 
+    def close(self) -> None:
+        self.client.http_client.session.close()
+
     @staticmethod
     def _schema_map() -> dict[str, list[str]]:
         return {
@@ -148,6 +153,7 @@ class GoogleSheetsStore:
             SHEET_BI_PEDIDOS: BI_ORDERS_COLUMNS,
             SHEET_BI_STATUS: BI_STATUS_COLUMNS,
             SHEET_CONTROLE: CONTROL_COLUMNS,
+            **LOOKER_SCHEMAS,
         }
 
     @classmethod
@@ -189,6 +195,7 @@ class GoogleSheetsStore:
             "bi_status": SHEET_BI_STATUS,
             "control": SHEET_CONTROLE,
         }
+        required.update({"looker_" + title: title for title in LOOKER_SCHEMAS})
         if any(title not in sheets_by_title for title in required.values()):
             return False
         for attribute, title in required.items():
@@ -685,6 +692,17 @@ class GoogleSheetsStore:
             existing_sheets=existing_sheets,
         )
 
+        for title, headers in LOOKER_SCHEMAS.items():
+            setattr(
+                self,
+                "looker_" + title,
+                self._get_or_create_sheet(
+                    title,
+                    headers,
+                    existing_sheets=existing_sheets,
+                ),
+            )
+
     @staticmethod
     def _values_to_records(values: list[list[str]]) -> list[dict[str, str]]:
         if len(values) <= 1:
@@ -786,6 +804,7 @@ class GoogleSheetsStore:
         existing_values: list[list[str]] | None = None,
         ignore_compare_fields: set[str] | None = None,
         value_input_option: str = "RAW",
+        preserve_types: bool = False,
     ) -> UpsertResult:
         # Consolida a carga antes de agendar writes: duas entradas da mesma
         # chave não podem atualizar uma linha futura ainda aguardando append.
@@ -870,7 +889,11 @@ class GoogleSheetsStore:
                 for index, header in enumerate(headers):
                     if header in record:
                         value = record.get(header, "")
-                        merged[index] = "" if value is None else str(value)
+                        merged[index] = (
+                            ""
+                            if value is None
+                            else (value if preserve_types else str(value))
+                        )
                 if not self._record_changed(
                     current_row,
                     merged,
@@ -892,7 +915,11 @@ class GoogleSheetsStore:
                 appended = [
                     ""
                     if record.get(header, "") is None
-                    else str(record.get(header, ""))
+                    else (
+                        record.get(header, "")
+                        if preserve_types
+                        else str(record.get(header, ""))
+                    )
                     for header in headers
                 ]
                 appends.append(appended)
@@ -1174,13 +1201,14 @@ class GoogleSheetsStore:
         rows: list[list[Any]],
         *,
         value_input_option: str = "RAW",
+        force: bool = False,
     ) -> bool:
         data = [headers] + rows
         current = self._read_with_retry(
             f"ler {ws.title} antes de substituir tabela",
             ws.get_all_values,
         )
-        if self._normalize_table(current) == self._normalize_table(data):
+        if not force and self._normalize_table(current) == self._normalize_table(data):
             logging.info(
                 "Google Sheets: %s sem alterações; escrita ignorada.",
                 ws.title,
@@ -1201,14 +1229,29 @@ class GoogleSheetsStore:
             f"clear em {ws.title}",
             ws.clear,
         )
-        self._write_with_retry(
-            f"update em {ws.title}",
-            lambda: ws.update(
-                range_name=f"A1:{last_col}{last_row}",
-                values=data,
-                value_input_option=value_input_option,
-            ),
+        offset = 1
+        batches = self._adaptive_batches(
+            data, max_items=GOOGLE_SHEETS_APPEND_BATCH_SIZE
         )
+        for batch in batches:
+            first, last = offset, offset + len(batch) - 1
+            self._write_with_retry(
+                f"update em {ws.title}",
+                lambda batch=batch, first=first, last=last: ws.update(
+                    range_name=f"A{first}:{last_col}{last}",
+                    values=batch,
+                    value_input_option=value_input_option,
+                ),
+            )
+            offset = last + 1
+            if self._should_log_progress(last, len(data)):
+                logging.info(
+                    "Google Sheets: %s - %s/%s linha(s) (%.0f%%).",
+                    ws.title,
+                    last,
+                    len(data),
+                    self._progress_percent(last, len(data)),
+                )
         return True
 
     def replace_metrics(self, rows: list[list[Any]]) -> None:
@@ -1217,14 +1260,108 @@ class GoogleSheetsStore:
     def replace_sales_metrics(self, rows: list[list[Any]]) -> None:
         self._replace_table(self.sales_metrics, SALES_METRIC_COLUMNS, rows)
 
+    @staticmethod
+    def _typed_bi_rows(headers: list[str], rows: list[list[Any]]) -> list[list[Any]]:
+        from datetime import date
+
+        typed = []
+        for row in rows:
+            values = []
+            for header, value in zip(headers, row, strict=True):
+                if header in DATE_COLUMNS and value not in ("", None):
+                    value = (date.fromisoformat(str(value)) - date(1899, 12, 30)).days
+                values.append("" if value is None else value)
+            typed.append(values)
+        return typed
+
+    def _format_bi_columns(
+        self, ws, headers: list[str], *, text_columns: set[str]
+    ) -> None:
+        formats = []
+        for index, header in enumerate(headers, 1):
+            if header in text_columns:
+                continue
+            letter = column_letter(index)
+            formats.append(
+                {
+                    "range": f"{letter}2:{letter}{max(2, ws.row_count)}",
+                    "format": {
+                        "numberFormat": {
+                            "type": "DATE" if header in DATE_COLUMNS else "NUMBER",
+                            "pattern": "yyyy-mm-dd"
+                            if header in DATE_COLUMNS
+                            else "0.########",
+                        }
+                    },
+                }
+            )
+        if formats:
+            self._write_with_retry(
+                f"tipos numéricos em {ws.title}", lambda: ws.batch_format(formats)
+            )
+
+    def migrate_bi_summary_numbers(self) -> None:
+        from analytics import _to_decimal
+
+        # Migração única: recuperar os valores monetários visíveis que o Sheets
+        # interpretou como yyyy.mm; preservar as linhas históricas da base.
+        revision = "_bi_numeric_revision"
+        if self.get_control(revision) != "2":
+            old = self._read_with_retry(
+                "migrar números de BI_Resumo_Diario", self.bi_summary.get_all_values
+            )
+            headers = list(old[0]) if old else BI_SUMMARY_COLUMNS[:]
+            rows = []
+            for previous in self._values_to_records(old):
+                if not previous.get("data"):
+                    continue
+                converted = []
+                for header in headers:
+                    value = previous.get(header, "")
+                    if (
+                        header in set(BI_SUMMARY_COLUMNS) - {"data", "atualizado_em"}
+                        and value != ""
+                    ):
+                        value = float(_to_decimal(value, header))
+                    converted.append(value)
+                rows.append(converted)
+            self._replace_table(
+                self.bi_summary,
+                headers,
+                self._typed_bi_rows(headers, rows),
+                force=True,
+            )
+            self._headers_cache[self.bi_summary.title] = headers[:]
+            self._format_bi_columns(
+                self.bi_summary,
+                headers,
+                text_columns={"atualizado_em"}
+                | (set(headers) - set(BI_SUMMARY_COLUMNS)),
+            )
+            self.set_controls({revision: "2"})
+
     def upsert_bi_summary(self, record: dict[str, Any]) -> UpsertResult:
+        self.migrate_bi_summary_numbers()
         return self._upsert_records_detailed(
             self.bi_summary,
             [record],
             "data",
             ignore_compare_fields={"atualizado_em"},
+            preserve_types=True,
             value_input_option="USER_ENTERED",
         )
+
+    def replace_looker_tables(self, tables: dict[str, list[list[Any]]]) -> None:
+        if set(tables) != set(LOOKER_SCHEMAS):
+            raise ValueError("Conjunto de tabelas comerciais BI incompleto.")
+        for title, headers in LOOKER_SCHEMAS.items():
+            ws = getattr(self, "looker_" + title)
+            values = self._typed_bi_rows(headers, tables[title])
+            self._replace_table(ws, headers, values, force=True)
+            self._format_bi_columns(ws, headers, text_columns=TEXT_COLUMNS)
+            logging.info(
+                "Google Sheets: %s atualizada (%s registro(s)).", title, len(values)
+            )
 
     def upsert_bi_channels(self, records: list[dict[str, Any]]) -> UpsertResult:
         return self._upsert_records_detailed(
@@ -1259,7 +1396,14 @@ class GoogleSheetsStore:
         # texto: o apóstrofo preserva zeros iniciais e bloqueia fórmulas.
         text_indexes = [
             BI_ORDERS_COLUMNS.index(column)
-            for column in ("cidade", "estado", "cep", "bairro")
+            for column in (
+                "cidade",
+                "estado",
+                "cep",
+                "bairro",
+                "genero",
+                "cliente_chave",
+            )
         ]
         safe_rows = []
         for row in rows:

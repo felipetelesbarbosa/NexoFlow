@@ -53,6 +53,7 @@ from farmalider_integration import (
 )
 from google_sheets import GoogleSheetsStore
 from logging_config import configure_logging
+from looker_bi import build_looker_tables, reporting_period
 from weni_client import WeniClient
 
 Contact = dict[str, Any]
@@ -802,6 +803,11 @@ def main() -> int:
         sync_time = utc_iso(sync_started)
         # FarmaLíder/Grupo Líder opera em Belém (UTC-3, sem horário de verão).
         bi_snapshot_date = (sync_started - timedelta(hours=3)).date().isoformat()
+        looker_start, looker_end = reporting_period(
+            bi_snapshot_date,
+            os.getenv("NEXOFLOW_BI_INICIO") or None,
+            os.getenv("NEXOFLOW_BI_FIM") or None,
+        )
         logging.info("Iniciando sincronização Weni → FarmaLíder → Google Sheets.")
 
         spreadsheet_id = str(getattr(secrets, "GOOGLE_SPREADSHEET_ID", "")).strip()
@@ -1132,6 +1138,26 @@ def main() -> int:
         )
         sheets.replace_bi_orders(bi_orders)
         logging.info("Google Sheets: BI 6/7 - BI_Pedidos atualizado.")
+        history_started = (
+            sheets.get_control("historico_observado_desde") or bi_snapshot_date
+        )
+        looker_tables = build_looker_tables(
+            contact_result.final_records,
+            all_order_records,
+            all_item_records,
+            snapshot_date=bi_snapshot_date,
+            updated_at=sync_time,
+            period_start=looker_start,
+            period_end=looker_end,
+            history_observed_since=history_started,
+        )
+        sheets.replace_looker_tables(looker_tables)
+        sheets.set_controls(
+            {
+                "historico_observado_desde": history_started,
+                "historico_ultima_coleta": sync_time,
+            }
+        )
         # Keep optional Delivery metrics current when existing orders change status/value.
         # The ordinary Analytics load does not create these tabs or infer new ticket tags.
         sheets.refresh_delivery_bi(all_order_records, create=False)

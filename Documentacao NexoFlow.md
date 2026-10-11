@@ -30,7 +30,7 @@ Os oito campos `pedido_*` do contrato são obrigatórios na Weni; o preflight bl
 
 
 ### Camada BI para Looker Studio
-O NexoFlow 1.0 transforma o NexoFlow Analytics em uma camada analítica pronta para o Looker Studio. O projeto passa a criar/manter automaticamente `BI_Resumo_Diario`, `BI_Canais`, `BI_Conversao`, `BI_Vendas`, `BI_Ads`, `BI_Pedidos` e `BI_Status`. O resumo diário usa uma linha por dia; canais e conversão mantêm snapshots diários; vendas são uma série por data; Ads apresenta uma linha zero até existir atribuição; Status registra a saúde da última execução.
+O NexoFlow 1.0 transforma o NexoFlow Analytics em uma camada analítica pronta para o Looker Studio. O projeto passa a criar/manter automaticamente `BI_Resumo_Diario`, `BI_Canais`, `BI_Conversao`, `BI_Vendas`, `BI_Ads`, `BI_Pedidos` e `BI_Status`. O resumo diário usa uma linha por dia; canais e conversão mantêm snapshots diários; vendas são uma série por data; Ads mantém medidas vazias até existir atribuição; Status registra a saúde da última execução.
 
 Para que os totais do dashboard representem a base Weni completa, `Base_Contatos` passa a preservar todos os contatos retornados pela Weni, mesmo sem CPF, pedido ou anúncio. Também entram no schema analítico `idade`, `maior_de_18_anos` e `opt_in_lgpd`. Após instalar o NexoFlow 1.0, recomenda-se uma única carga completa para preencher contatos históricos antes excluídos e inicializar a camada BI; depois, o incremental mantém tudo atualizado.
 
@@ -374,3 +374,12 @@ Consulte também `README.md`, `README INSTALACAO.md`, `README WENI.md` e `CHANGE
 ## NexoFlow Planilha
 
 `NexoFlow Planilha.exe` abre o menu das cargas por planilha para Weni e Analytics e da pasta `importacoes`. Use `Conversas_Delivery.xlsx` e `Contatos_Delivery.xlsx`; cada destino exige revisão humana antes da aplicação. Consulte [Delivery e carga por planilhas](README%20DELIVERY.md).
+
+
+### Dados comerciais e histórico observado
+
+O Analytics preserva os pedidos e itens já identificados no Google Sheets; cada chave de pedido é atualizada sem duplicar a compra nem apagar os pedidos anteriores. A API fornece apenas o último pedido por cliente. Coletas regulares acumulam histórico observado, mas não recuperam compras antigas nunca capturadas nem garantem que todas as compras entre duas coletas tenham sido registradas.
+
+As fontes comerciais `BI_Publico`, `BI_Clientes`, `BI_Clientes_Vendas`, `BI_Itens`, `BI_Produtos_ABC`, `BI_Produtos_Juntos`, `BI_KPIs_Periodo` e `BI_Qualidade` agrupam pessoas por chave estável e fornecem medidas numéricas, datas, rankings de produtos e combinações por pedido. As fontes novas não expõem CPF, telefone, e-mail, número original de pedido, status ou pagamento. Gênero e categoria ficam vazios quando ausentes; não são deduzidos.
+
+`BI_Clientes_Vendas` e `BI_Itens` aceitam filtros livres por data no Looker. ABC, combinações e KPIs consolidados usam um período explícito de 30 dias por padrão; outro período pode ser recalculado com `nexo looker --inicio AAAA-MM-DD --fim AAAA-MM-DD`, usando apenas o histórico do Sheets. Recompra completa e comparações ficam indisponíveis enquanto não houver cobertura comprovada. Confira as [fontes, fórmulas e orientações do Looker](README.md#dados-comerciais-para-o-looker-studio).

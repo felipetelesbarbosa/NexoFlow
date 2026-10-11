@@ -20,6 +20,18 @@ class NexoCliTests(unittest.TestCase):
                 self.assertEqual(nexo_cli.run(args), 0)
                 runner.assert_called_once_with(expected)
 
+    def test_looker_routes_dates_to_the_sheet_rebuild(self):
+        with patch("run_looker.run", return_value=0) as runner:
+            self.assertEqual(
+                nexo_cli.run(
+                    ["looker", "--inicio", "2026-10-01", "--fim", "2026-10-11"]
+                ),
+                0,
+            )
+        runner.assert_called_once_with(
+            ["--inicio", "2026-10-01", "--fim", "2026-10-11"]
+        )
+
     def test_help_lists_friendly_commands(self) -> None:
         out = io.StringIO()
         with redirect_stdout(out):

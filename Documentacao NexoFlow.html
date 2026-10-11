@@ -280,7 +280,7 @@ automaticamente <code>BI_Resumo_Diario</code>, <code>BI_Canais</code>,
 <code>BI_Conversao</code>, <code>BI_Vendas</code>, <code>BI_Ads</code>,
 <code>BI_Pedidos</code> e <code>BI_Status</code>. O resumo diário usa
 uma linha por dia; canais e conversão mantêm snapshots diários; vendas
-são uma série por data; Ads apresenta uma linha zero até existir
+são uma série por data; Ads mantém medidas vazias até existir
 atribuição; Status registra a saúde da última execução.</p>
 <p>Para que os totais do dashboard representem a base Weni completa,
 <code>Base_Contatos</code> passa a preservar todos os contatos
@@ -800,6 +800,32 @@ planilha para Weni e Analytics e da pasta <code>importacoes</code>. Use
 <code>Contatos_Delivery.xlsx</code>; cada destino exige revisão humana
 antes da aplicação. Consulte <a href="README%20DELIVERY.md">Delivery e
 carga por planilhas</a>.</p>
+<h3 id="dados-comerciais-e-histórico-observado">Dados comerciais e
+histórico observado</h3>
+<p>O Analytics preserva os pedidos e itens já identificados no Google
+Sheets; cada chave de pedido é atualizada sem duplicar a compra nem
+apagar os pedidos anteriores. A API fornece apenas o último pedido por
+cliente. Coletas regulares acumulam histórico observado, mas não
+recuperam compras antigas nunca capturadas nem garantem que todas as
+compras entre duas coletas tenham sido registradas.</p>
+<p>As fontes comerciais <code>BI_Publico</code>,
+<code>BI_Clientes</code>, <code>BI_Clientes_Vendas</code>,
+<code>BI_Itens</code>, <code>BI_Produtos_ABC</code>,
+<code>BI_Produtos_Juntos</code>, <code>BI_KPIs_Periodo</code> e
+<code>BI_Qualidade</code> agrupam pessoas por chave estável e fornecem
+medidas numéricas, datas, rankings de produtos e combinações por pedido.
+As fontes novas não expõem CPF, telefone, e-mail, número original de
+pedido, status ou pagamento. Gênero e categoria ficam vazios quando
+ausentes; não são deduzidos.</p>
+<p><code>BI_Clientes_Vendas</code> e <code>BI_Itens</code> aceitam
+filtros livres por data no Looker. ABC, combinações e KPIs consolidados
+usam um período explícito de 30 dias por padrão; outro período pode ser
+recalculado com
+<code>nexo looker --inicio AAAA-MM-DD --fim AAAA-MM-DD</code>, usando
+apenas o histórico do Sheets. Recompra completa e comparações ficam
+indisponíveis enquanto não houver cobertura comprovada. Confira as <a
+href="README.md#dados-comerciais-para-o-looker-studio">fontes, fórmulas
+e orientações do Looker</a>.</p>
 </body>
 </html>
-<!-- NexoFlow documentation: source-sha256=85f4f401ef0b102efc8114ccbeb3d1399eacdcbd327a3475f4c35479500ffc9d content-sha256=5e3183b0e14b618ae697cf0e9b450884ccd8aa9a8c2d8ae868419bf2c33688dc -->
+<!-- NexoFlow documentation: source-sha256=99116c757be9308278e658704b4361b5a5d60caea7a7d688cb742b47b7a2515a content-sha256=6d39821d9bd58e416d52e04601ed6f419eefeb268f090bbc2ab515ada04dd079 -->

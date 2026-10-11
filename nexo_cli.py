@@ -295,6 +295,9 @@ def _print_commands() -> None:
     print("ANALYTICS")
     print("  nexo analytics               Executa o NexoFlow Analytics")
     print(
+        "  nexo looker --inicio AAAA-MM-DD --fim AAAA-MM-DD  Recalcula KPIs do Sheets"
+    )
+    print(
         "  nexo analytics planilhas     Consulta os exports e atualiza o Google Sheets"
     )
     print()
@@ -584,6 +587,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="carga pelos exports de conversas e contatos",
     )
 
+    looker = sub.add_parser(
+        "looker", help="recalcula os KPIs usando o histórico do Google Sheets"
+    )
+    looker.add_argument("--inicio", help="Início do período, AAAA-MM-DD")
+    looker.add_argument("--fim", help="Fim do período, AAAA-MM-DD")
+
     weni = sub.add_parser("weni", help="rotinas seguras de atualização da Weni")
     weni_sub = weni.add_subparsers(dest="weni_op")
     weni_sub.add_parser(
@@ -695,6 +704,15 @@ def run(argv: list[str] | None = None) -> int:
                 if args.analytics_op == "planilhas"
                 else "NexoFlow Analytics.exe"
             )
+        if args.command == "looker":
+            from run_looker import run as looker_run
+
+            arguments = []
+            if args.inicio:
+                arguments += ["--inicio", args.inicio]
+            if args.fim:
+                arguments += ["--fim", args.fim]
+            return looker_run(arguments)
         if args.command == "weni":
             if args.weni_op == "recompra":
                 if args.recompra_op == "atualizar":

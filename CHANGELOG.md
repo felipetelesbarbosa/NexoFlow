@@ -2,6 +2,8 @@
 
 ## NexoFlow 1.0
 
+- Camada comercial para Looker com histórico acumulado, clientes por chave estável, itens com tipos numéricos, KPIs por período, Curva ABC e produtos comprados juntos. Migração do faturamento interpretado como data e campos opcionais de gênero/categoria sem inferência; cobertura histórica e ausência de anúncios sinalizadas.
+
 - Weni com ícone azul e ciano, contato e balão de conversa, seguindo a estética do Analytics e do Recompra. Executável, imagem e atalhos atualizados.
 - Recompra com ícone próprio de sacola e setas circulares; Planilha com ícone azul alinhado à identidade do NexoFlow. Executáveis e atalhos atualizados.
 - CMD da Weni permanece aberto após a conclusão, erro ou cancelamento, inclusive quando iniciado por outro launcher. Fechar o aviso final ou pressionar ENTER não encerra a sessão; use EXIT para fechar.

@@ -730,3 +730,38 @@ Grupo sincronizado com a última compra confirmada entre 0 e 25 dias, remoção 
 ## NexoFlow Planilha
 
 O Setup instala **NexoFlow Planilha.exe** com ícone próprio e atalho na Área de Trabalho. O menu permite executar as cargas por planilha para Weni ou Analytics/Google Sheets e abrir `importacoes`. Use `Conversas_Delivery.xlsx` e `Contatos_Delivery.xlsx`; cada carga mantém a revisão humana antes de aplicar.
+
+## Dados comerciais para o Looker Studio
+
+O Analytics preserva os pedidos identificados em `Pedidos_FarmaLider` e seus itens em `Itens_Pedidos_FarmaLider`. Uma nova compra acrescenta uma chave de pedido; uma nova coleta do mesmo pedido atualiza essa chave, sem duplicar a venda nem apagar outros pedidos. Cancelamentos e mudanças de status permanecem no histórico operacional e atualizam os resultados comerciais. Execute as coletas regularmente: a API retorna apenas o último pedido, portanto várias compras entre duas coletas podem não ser capturadas.
+
+As novas abas comerciais são reconstruídas a partir de **todo o histórico já gravado**, não apenas dos contatos processados na execução atual. Elas mantêm nomes completos e chaves opacas para relacionamentos internos, sem CPF, telefone, e-mail, número original de pedido, status ou pagamento.
+
+| Fonte | Uso no Looker |
+| --- | --- |
+| `BI_Publico` | Uma linha por contato atual: canal principal, cidade, estado, gênero, idade e compra identificada. Use contagem de contatos, soma de `compra_identificada`, diferença e percentual para os quatro cards. Não aplique o período de vendas à base atual; `criado_em` é cadastro na Weni, sem comprovação de aquisição por Marketing. |
+| `BI_Clientes` | Uma linha por pessoa: pedidos e faturamento identificados e última compra identificada no histórico disponível. Não use esta tabela para métricas filtradas por data de compra. |
+| `BI_Clientes_Vendas` | Uma linha por venda válida: cliente, chave estável, data, receita dos produtos, frete e faturamento. Fonte de Meus clientes, Vendas, Top 10 e indicadores do período escolhido no relatório. |
+| `BI_Itens` | Uma linha por item de venda válida: SKU, nome, categoria quando informada, quantidade, preço unitário e receita do item. Fonte dos rankings e filtros livres por data, sem multiplicar o total do pedido entre produtos. |
+| `BI_Produtos_ABC` | Todos os produtos do período indicado em `periodo_inicio` e `periodo_fim`, com rankings, participação, participação acumulada e classes. |
+| `BI_Produtos_Juntos` | Pares de SKUs do período indicado, contando pedidos distintos; várias linhas do mesmo SKU num pedido não multiplicam uma combinação. |
+| `BI_KPIs_Periodo` | Indicadores já calculados para o período explícito: clientes, pedidos, faturamento, ticket, pedidos e receita por cliente, SKUs distintos e participação dos cinco produtos de maior receita. |
+| `BI_Qualidade` | Cobertura de idade e cadastro, início das novas coletas observadas e disponibilidade dos indicadores dependentes de histórico e anúncios. Use fora das páginas comerciais, na configuração ou em Atualização dos dados. |
+
+Em `BI_Clientes_Vendas`, agrupe **somente por `cliente_chave`**, usando `cliente` como nome de apresentação. Não agrupe pela data ou pelo nome. Pedidos = `SUM(pedidos)`; clientes = `COUNT_DISTINCT(cliente_chave)`; pedidos por cliente = `SUM(pedidos) / COUNT_DISTINCT(cliente_chave)`; receita média por cliente = `SUM(faturamento) / COUNT_DISTINCT(cliente_chave)`; ticket = `SUM(faturamento) / SUM(pedidos)`. A última compra do período é `MAX(data)`; a última identificada em todo o histórico vem de `BI_Clientes`. Não some compradores diários nem tire média dos tickets diários. Top 10 por pedidos pode desempatar por faturamento; quantidades empatadas não indicam um líder exclusivo.
+
+A Curva ABC utiliza a receita de **todos os itens** do período, sem frete. Produtos são ordenados por receita; um produto que cruza o limite permanece na classe iniciada antes dele (A até 80%, B até 95%, C depois). Produtos empatados em receita mantêm o mesmo ranking e a mesma classe; um grupo empatado pode ultrapassar o limite. Sem receita positiva ou SKU para todos os itens do período, `abc_disponivel=0` e as classes ficam vazias. Receita não representa lucro. Quantidades fracionárias são preservadas quando a origem as fornece; formatar como inteiro não deve ocultar uma fração real.
+
+**Períodos:** as tabelas de fatos (`BI_Clientes_Vendas` e `BI_Itens`) aceitam o filtro de datas do relatório. ABC, combinações e `BI_KPIs_Periodo` são calculados por padrão para os últimos 30 dias, inclusive hoje; não podem ser refiltrados para outro período como se os cálculos fossem refeitos automaticamente. Para outro intervalo, execute no Terminal:
+
+```text
+nexo looker --inicio 2026-10-01 --fim 2026-10-11
+```
+
+Esse comando utiliza o histórico do Sheets e não consulta Weni ou FarmaLíder. A carga normal também aceita `NEXOFLOW_BI_INICIO` e `NEXOFLOW_BI_FIM` no ambiente. Confira as datas das tabelas de período antes de apresentar os resultados. No Looker, mantenha essas tabelas com o intervalo explícito e evite misturá-las a um filtro de outro período.
+
+**Cobertura histórica:** pedidos antigos retornados como último pedido não comprovam todas as compras antigas. O início das novas coletas é registrado em `Controle.historico_observado_desde`. O histórico é acumulado, mas não declarado completo; recompra completa, clientes sem compras recentes e variações comparativas permanecem indisponíveis enquanto a origem não comprovar cobertura suficiente. `clientes_com_multiplas_compras_identificadas` conta apenas as compras registradas e não é uma taxa completa de recompra.
+
+**Campos opcionais:** `genero` é lido somente de `@fields.genero`; não há dedução pelo nome nem preenchimento automático na Weni. Quando o campo não existir ou estiver vazio, o valor fica vazio. `ultima_compra` da Weni também é preservada na base operacional. Categoria é exportada somente quando a resposta oficial de cada item trouxer `categoria` como texto; ausência permanece vazia. Investimento e atribuição compatível continuam necessários para ROAS e custos de anúncios; ausência não significa custo ou receita iguais a zero.
+
+**Tipos e atualização:** a migração corrige valores numéricos de `BI_Resumo_Diario` que haviam sido interpretados como datas e preserva as linhas anteriores. As novas tabelas gravam datas como datas e medidas como números; identificadores de produto e nomes permanecem texto literal. Depois de instalar o Setup atualizado, execute uma carga completa do Analytics para preencher os campos atuais da Weni. Adicione as novas abas como fontes no Looker, atualize os campos de `Base_Contatos`/`BI_Pedidos` e configure moeda com duas casas decimais. Ocultar as chaves internas na apresentação não interfere no agrupamento.

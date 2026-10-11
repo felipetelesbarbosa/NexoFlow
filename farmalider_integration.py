@@ -490,6 +490,9 @@ def apply_pedido_api_confirmation(
                     "produto_ordem": str(position),
                     "produto_nome": name,
                     "produto_codigo": code,
+                    "categoria": (api_item.get("categoria") or "").strip()
+                    if isinstance(api_item.get("categoria"), str)
+                    else "",
                     "quantidade": _quantity_text(quantity),
                     "valor_unitario": f"{unit:.2f}",
                     "valor_total": f"{total:.2f}",

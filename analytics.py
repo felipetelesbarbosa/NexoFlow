@@ -304,6 +304,8 @@ BASE_COLUMNS = [
     "estado",
     "cep",
     "bairro",
+    "genero",
+    "ultima_compra",
 ]
 
 HISTORY_COLUMNS = [
@@ -424,6 +426,7 @@ ORDER_ITEM_COLUMNS = [
     "valor_unitario",
     "valor_total",
     "capturado_em",
+    "categoria",
 ]
 
 SALES_METRIC_COLUMNS = [
@@ -559,6 +562,9 @@ BI_ORDERS_COLUMNS = [
     "cep",
     "bairro",
     "idade",
+    "cliente_chave",
+    "venda_valida",
+    "genero",
 ]
 
 
@@ -718,6 +724,8 @@ def normalize_contact(
         returned_other_ad = "Não informado"
 
     row = {
+        "genero": normalize_value(fields.get("genero")).strip(),
+        "ultima_compra": normalize_value(fields.get("ultima_compra")).strip(),
         "cidade": normalize_value(fields.get("cidade")).strip(),
         "estado": normalize_value(fields.get("estado")).strip(),
         "cep": normalize_value(fields.get("cep")).strip(),
@@ -1486,7 +1494,7 @@ def build_sales_metrics(
 
         date = record.get("data", "").strip()
         order_key = record.get("pedido_chave", "").strip()
-        contact_uuid = record.get("contact_uuid", "").strip()
+        contact_uuid = bi_customer_key(record)
         if not date or not order_key:
             continue
 
@@ -1889,6 +1897,29 @@ def _bi_customer_age(value: Any) -> int | str:
     return ""
 
 
+def bi_customer_key(order: dict[str, Any], base: dict[str, Any] | None = None) -> str:
+    """Identidade estável da pessoa; nunca nome, data ou CPF em claro."""
+    base = base or {}
+    customer = str(order.get("farmalider_cliente_id") or "").strip()
+    if not customer and str(order.get("status_confirmacao") or "").startswith(
+        "CONFIRMADO_API"
+    ):
+        customer = str(order.get("farmalider_cod_cliente") or "").strip()
+    if not customer and str(base.get("farmalider_cliente_status") or "") in {
+        "CPF_CONFIRMADO",
+        "CPF_INVALIDO_ENCONTRADO",
+    }:
+        customer = str(base.get("farmalider_cliente_id") or "").strip()
+    if customer:
+        identity = "farmalider:" + customer
+    else:
+        uuid = str(order.get("contact_uuid") or base.get("contact_uuid") or "").strip()
+        if not uuid:
+            return ""
+        identity = "weni:" + uuid
+    return hashlib.sha256(identity.encode()).hexdigest()[:32]
+
+
 def build_bi_order_rows(
     base_records: list[dict[str, str]],
     order_records: list[dict[str, str]],
@@ -1978,6 +2009,9 @@ def build_bi_order_rows(
                 (base.get("cep") or "").strip(),
                 (base.get("bairro") or "").strip(),
                 _bi_customer_age(base.get("idade")),
+                bi_customer_key(order, base),
+                int(_sales_order_is_valid(order)),
+                (base.get("genero") or "").strip(),
             ]
         )
     return rows
@@ -2083,11 +2117,11 @@ def build_bi_ads_rows(
                 "",
                 "",
                 "Sem conversas atribuídas a anúncios",
-                0,
-                0,
-                0,
-                0,
-                0.0,
+                "",
+                "",
+                "",
+                "",
+                "",
                 updated_at,
             ]
         )

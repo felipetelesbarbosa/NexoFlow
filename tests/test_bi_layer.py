@@ -119,7 +119,7 @@ class BILayerTests(unittest.TestCase):
         )
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0][1], "Sem dados")
-        self.assertEqual(rows[0][7], 0)
+        self.assertEqual(rows[0][7:12], ["", "", "", "", ""])
 
     def test_bi_conversion_has_four_contact_funnel_stages(self) -> None:
         base = [
