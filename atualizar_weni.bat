@@ -1,12 +1,6 @@
 @echo off
 chcp 65001 >nul
 setlocal EnableExtensions DisableDelayedExpansion
-rem Preserva a janela mesmo após PAUSE ou quando outro launcher inicia a Weni.
-if not defined NEXOFLOW_TERMINAL if not defined NEXOFLOW_WENI_SESSION (
-    set "NEXOFLOW_WENI_SESSION=1"
-    "%SystemRoot%\System32\cmd.exe" /d /k call "%~f0"
-    exit /b
-)
 set "PYTHONIOENCODING=utf-8"
 cd /d "%~dp0"
 title NexoFlow Weni
@@ -15,7 +9,7 @@ set "NEXOFLOW_LAUNCHER=1"
 if not exist "%~dp0scripts\confirmar_revisao_weni.ps1" (
     echo [ERRO] Componente de confirmação ausente: scripts\confirmar_revisao_weni.ps1
     echo Reinstale o Setup atualizado do NexoFlow 1.0 antes de continuar.
-    pause < CON
+    call :aguardar_saida
     exit /b 1
 )
 
@@ -63,7 +57,7 @@ set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" (
     echo.
     echo [INFO] Operação cancelada. Nenhuma alteração foi aplicada.
-    pause < CON
+    call :aguardar_saida
     exit /b 2
 )
 
@@ -91,32 +85,32 @@ echo Auditoria: OK ^| Gravação: OK
 echo [INFO] O resultado permanecerá no terminal. Digite EXIT quando quiser fechar.
 echo ==========================================================
 echo.
-pause < CON
+call :aguardar_saida
 exit /b 0
 
 :erro_recompra
 echo [AVISO] Atualizacao Weni concluida, MAS recompra nao foi concluida.
 echo [AVISO] Nao considere a inclusao no grupo Recompra FarmaLider confirmada.
 echo [AVISO] Confira logs\nexoflow_recompra.log e logs\recompra_audit.jsonl.
-pause < CON
+call :aguardar_saida
 exit /b %RC%
 
 :erro_checkup
 echo.
 echo [ERRO] Check-up falhou. Nenhuma alteração foi feita na Weni.
-pause < CON
+call :aguardar_saida
 exit /b %RC%
 
 :erro_conexoes
 echo.
 echo [ERRO] Teste de conexões falhou. Nenhuma alteração foi feita na Weni.
-pause < CON
+call :aguardar_saida
 exit /b %RC%
 
 :erro_dryrun
 echo.
 echo [ERRO] Dry-run/auditoria falhou. Nenhuma alteração foi feita na Weni.
-pause < CON
+call :aguardar_saida
 exit /b %RC%
 
 :erro_apply
@@ -124,5 +118,17 @@ echo.
 echo [ERRO] A aplicação foi interrompida.
 echo O checkpoint NÃO foi avançado. Execute novamente após corrigir o problema.
 echo Consulte logs\nexoflow_update_weni.log e logs\weni_update_audit.jsonl.
-pause < CON
+call :aguardar_saida
 exit /b %RC%
+
+:aguardar_saida
+if defined NEXOFLOW_TERMINAL exit /b 0
+setlocal EnableDelayedExpansion
+:aguardar_exit
+set "WENI_EXIT="
+set /p "WENI_EXIT=Digite EXIT para fechar esta janela: " < CON
+if /i "!WENI_EXIT!"=="EXIT" goto :saida_confirmada
+goto :aguardar_exit
+:saida_confirmada
+endlocal
+exit /b 0

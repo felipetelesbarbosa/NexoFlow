@@ -1,13 +1,6 @@
 @echo off
 chcp 65001 >nul
 setlocal EnableExtensions DisableDelayedExpansion
-rem A flag dos subprocessos não indica que existe um terminal persistente.
-if not defined NEXOFLOW_TERMINAL if not defined NEXOFLOW_WENI_SESSION (
-    set "NEXOFLOW_WENI_SESSION=1"
-    echo Depois de conferir o resultado, digite EXIT para fechar esta sessão.
-    "%SystemRoot%\System32\cmd.exe" /d /k call "%~f0"
-    exit /b
-)
 set "PYTHONIOENCODING=utf-8"
 cd /d "%~dp0"
 title NexoFlow Weni - Carga Completa
@@ -45,7 +38,7 @@ if "%OPCAO%"=="3" set "PART=3"
 if "%OPCAO%"=="4" set "PART=4"
 if not defined PART (
     echo [ERRO] Opção inválida.
-    pause < CON
+    call :aguardar_saida
     exit /b 2
 )
 
@@ -205,9 +198,21 @@ exit /b %RC%
 :resultado
 echo [INFO] O resultado permanecerá no terminal. Digite EXIT quando quiser fechar.
 if not exist "%~dp0scripts\resultado_carga_weni.ps1" (
-    pause < CON
+    call :aguardar_saida
     exit /b
 )
 "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -STA -ExecutionPolicy Bypass -File "%~dp0scripts\resultado_carga_weni.ps1" -ResultCode %RC% -Stage "%RESULT_STAGE%" -Snapshot "%REVIEW_JSON%"
-if errorlevel 1 pause < CON
+call :aguardar_saida
+exit /b 0
+
+:aguardar_saida
+if defined NEXOFLOW_TERMINAL exit /b 0
+setlocal EnableDelayedExpansion
+:aguardar_exit
+set "WENI_EXIT="
+set /p "WENI_EXIT=Digite EXIT para fechar esta janela: " < CON
+if /i "!WENI_EXIT!"=="EXIT" goto :saida_confirmada
+goto :aguardar_exit
+:saida_confirmada
+endlocal
 exit /b 0
