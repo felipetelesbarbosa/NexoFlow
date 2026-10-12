@@ -30,6 +30,7 @@ from farmalider_integration import (
     weni_identity_guard,
 )
 from pedido_utils import business_order_datetime, effective_order_status_code
+from product_scope import PHARMACY_SCOPE_VERSION
 from weni_client import WeniError
 from weni_update import (
     ContactUpdatePlan,
@@ -673,12 +674,12 @@ def apply_delivery_review(path, weni, *, store_factory=None, target=None):
             order_records=orders_result.final_records,
             item_records=items_result.final_records,
             include_history=(
-                store.get_control("escopo_farmacia_versao") != "human_products_v1"
+                store.get_control("escopo_farmacia_versao") != PHARMACY_SCOPE_VERSION
             ),
         )
         base.final_records = scope.contacts
         all_orders, all_items = scope.orders, scope.items
-        if store.get_control("escopo_farmacia_versao") != "human_products_v1":
+        if store.get_control("escopo_farmacia_versao") != PHARMACY_SCOPE_VERSION:
             store.resanitize_pharmacy_bi_snapshots(
                 base.final_records, all_orders, all_items
             )

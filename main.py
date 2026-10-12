@@ -56,6 +56,7 @@ from farmalider_integration import (
 from google_sheets import GoogleSheetsStore
 from logging_config import configure_logging
 from looker_bi import build_looker_tables, reporting_period
+from product_scope import PHARMACY_SCOPE_VERSION
 from task_progress import TaskProgress, request_progress
 from weni_client import WeniClient
 
@@ -1067,7 +1068,7 @@ def main() -> int:
         logging.info("Google Sheets: etapa 2/4 - Pedidos e itens.")
         order_result, item_result = sheets.upsert_pharmacy_orders(order_rows, item_rows)
         scope_pending = (
-            sheets.get_control("escopo_farmacia_versao") != "human_products_v1"
+            sheets.get_control("escopo_farmacia_versao") != PHARMACY_SCOPE_VERSION
         )
         pharmacy_scope = sheets.reconcile_pharmacy_scope(
             base_records=contact_result.final_records,
@@ -1239,7 +1240,7 @@ def main() -> int:
         sheets.set_controls(
             {
                 **completion_controls,
-                "escopo_farmacia_versao": "human_products_v1",
+                "escopo_farmacia_versao": PHARMACY_SCOPE_VERSION,
                 "ultima_execucao_contatos_api": str(len(contacts)),
                 "ultima_execucao_contatos_relevantes": str(len(relevant_contacts)),
                 "ultima_execucao_contatos_com_cpf": str(len(cpf_contacts)),

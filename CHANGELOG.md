@@ -2,6 +2,8 @@
 
 ## NexoFlow 1.0
 
+- Catálogo pet amplia a higienização por código de referência e nome exato, reconhecendo também abreviações verificadas da API. A atualização reprocessa o histórico e os indicadores do Sheets e exige nova revisão da Recompra; o catálogo original permanece fora dos pacotes públicos.
+
 - Recompra e BI da farmácia excluem produtos pet, de uso animal e veterinários. Pedidos mistos mantêm apenas os itens humanos na mensagem e nos dados comerciais, com o valor desses itens sem frete. Cargas saneiam dados antigos, preservam contatos e proteções de CPF/LGPD, e exigem nova revisão da campanha. Snapshots antigos não classificam uma compra nova.
 
 - Analytics informa barra, velocidade e tempo restante por etapa nas consultas de CPF, validação de pedidos e gravações do Sheets. O indicador continua ativo durante respostas lentas e retries; apenas linhas confirmadas avançam a gravação, e falhas não exibem conclusão de 100%.

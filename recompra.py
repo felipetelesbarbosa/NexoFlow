@@ -42,7 +42,7 @@ from pedido_utils import (
     serialize_pedido_products,
     serialize_weni_order_list,
 )
-from product_scope import is_animal_product, pharmacy_items
+from product_scope import PHARMACY_SCOPE_VERSION, is_animal_product, pharmacy_items
 from purchase_checks import (
     PENDING_PURCHASE_FIELD,
     contact_pending_purchase_check,
@@ -53,7 +53,7 @@ from purchase_checks import (
 )
 
 GROUP = "Recompra FarmaLíder"
-PRODUCT_POLICY = "JANELA_0_A_25_SEM_RECUSA_PRODUTOS_HUMANOS"
+PRODUCT_POLICY = f"JANELA_0_A_25_SEM_RECUSA_PRODUTOS_HUMANOS_{PHARMACY_SCOPE_VERSION}"
 OPT_OUT = "Opt-Out Marketing"
 FLOW = "Recompra FarmaLíder D+25"
 TZ = ZoneInfo("America/Belem")
@@ -805,6 +805,7 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
             plan["campaign_products"] = [
                 {
                     "produto_nome": text(item.get("produto_nome")),
+                    "produto_codigo": text(item.get("produto_codigo")),
                     "categoria": text(item.get("categoria")),
                 }
                 for item in eligible_items

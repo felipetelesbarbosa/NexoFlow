@@ -14,7 +14,7 @@ Conforme a orientação posterior do responsável, bloqueiam **Opt-Out Marketing
 
 ## Critérios obrigatórios de inclusão
 
-Pedidos somente pet, de uso animal ou veterinário são excluídos. Nos pedidos mistos, apenas os produtos humanos compõem `pedido_produtos` usado pela mensagem; o snapshot completo permanece na auditoria privada. O filtro considera nomes e categorias do catálogo, preservando embalagens PET e medicamentos humanos sem indicação animal. Revisões anteriores ao filtro precisam de um novo dry-run. No Sheets e no Looker, o pedido misto considera somente o valor dos itens humanos, sem frete.
+Pedidos somente pet, de uso animal ou veterinário são excluídos. Nos pedidos mistos, apenas os produtos humanos compõem `pedido_produtos` usado pela mensagem; o snapshot completo permanece na auditoria privada. O filtro considera nomes, categorias e correspondências exatas com os códigos de referência do catálogo pet, inclusive nos produtos com nomes abreviados da API. IDs de produto/SKU do e-commerce não são usados como códigos da API. A ausência no catálogo parcial não comprova uso humano. Revisões anteriores à atualização do filtro precisam de um novo dry-run. No Sheets e no Looker, o pedido misto considera somente o valor dos itens humanos, sem frete.
 
 O NexoFlow **não adiciona** ao grupo Recompra FarmaLíder contatos que apresentem qualquer um destes impedimentos, inclusive quando o dado está registrado nos campos Weni ou é confirmado na API FarmaLíder:
 

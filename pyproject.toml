@@ -46,6 +46,7 @@ py-modules = [
   "run_webhook_pedidos",
   "task_progress",
   "product_scope",
+  "pet_catalog",
   "pharmacy_scope",
   "urn_utils",
   "webhook_eventos",

@@ -1,6 +1,6 @@
 """Escopo comercial da farmácia, por evidência explícita no catálogo.
 
-O filtro usa nome e categoria; não presume uso animal de princípios ativos
+O filtro usa referência, nome e categoria; não presume uso animal de princípios ativos
 compartilhados com medicamentos humanos ou de embalagens identificadas PET.
 """
 
@@ -10,6 +10,10 @@ import re
 import unicodedata
 from functools import lru_cache
 from typing import Any
+
+from pet_catalog import CATALOG_REVISION, catalog_contains
+
+PHARMACY_SCOPE_VERSION = f"human_products_v2_{CATALOG_REVISION}"
 
 
 def _normalized(value: Any) -> str:
@@ -46,7 +50,8 @@ def is_animal_product(item: dict[str, Any]) -> bool:
     name = _normalized(item.get("produto_nome") or item.get("nome"))
     category = _normalized(item.get("categoria"))
     return bool(
-        _ANIMAL_TERMS.search(name)
+        catalog_contains(item)
+        or _ANIMAL_TERMS.search(name)
         or _PET_PRODUCT.search(name)
         or _ANIMAL_TERMS.search(category)
         or _CATEGORY_TERMS.search(category)
