@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import os
 import sys
 import time
@@ -55,6 +56,7 @@ from farmalider_integration import (
 from google_sheets import GoogleSheetsStore
 from logging_config import configure_logging
 from looker_bi import build_looker_tables, reporting_period
+from task_progress import TaskProgress, request_progress
 from weni_client import WeniClient
 
 Contact = dict[str, Any]
@@ -217,7 +219,7 @@ def split_contacts(
 
 
 def _format_duration(seconds: float) -> str:
-    seconds = max(0, int(round(seconds)))
+    seconds = max(0, math.ceil(seconds))
     minutes, sec = divmod(seconds, 60)
     hours, minutes = divmod(minutes, 60)
 
@@ -474,133 +476,137 @@ def validate_contacts(
         )
         completed = 0
 
-        try:
-            for batch_number, (phase, batch) in enumerate(batches, start=1):
-                logging.info(
-                    "FarmaLíder: etapa de CPFs %s | lote %s/%s | %s consultas.",
-                    phase,
-                    batch_number,
-                    total_batches,
-                    len(batch),
-                )
-                batch_errors = 0
-                batch_completed = 0
-                # Evaluate complete, bounded sub-batches. The first responses
-                # to finish may be fast failures while successful calls are slow.
-                for chunk_start in range(0, len(batch), 100):
-                    chunk = batch[chunk_start : chunk_start + 100]
-                    futures = {
-                        executor.submit(
-                            _query_cliente,
-                            cpf,
-                            farm_client,
-                            response_cache,
-                        ): cpf
-                        for cpf in chunk
-                    }
-                    for future in as_completed(futures):
-                        cpf = futures[future]
-                        try:
-                            result = future.result()
-                        except (FarmaliderAuthError, FarmaliderUnavailableError):
-                            if isinstance(farm_client, FarmaliderClient):
-                                farm_client.cancel_pending_requests()
-                            for pending in futures:
-                                pending.cancel()
-                            raise
+        with TaskProgress(
+            "FarmaLíder: consultas de CPF", len(unique_cpfs), unit="CPFs"
+        ) as progress:
+            try:
+                for batch_number, (phase, batch) in enumerate(batches, start=1):
+                    logging.info(
+                        "FarmaLíder: etapa de CPFs %s | lote %s/%s | %s consultas.",
+                        phase,
+                        batch_number,
+                        total_batches,
+                        len(batch),
+                    )
+                    batch_errors = 0
+                    batch_completed = 0
+                    # Evaluate complete, bounded sub-batches. The first responses
+                    # to finish may be fast failures while successful calls are slow.
+                    for chunk_start in range(0, len(batch), 100):
+                        chunk = batch[chunk_start : chunk_start + 100]
+                        futures = {
+                            executor.submit(
+                                _query_cliente,
+                                cpf,
+                                farm_client,
+                                response_cache,
+                            ): cpf
+                            for cpf in chunk
+                        }
+                        for future in as_completed(futures):
+                            cpf = futures[future]
+                            try:
+                                result = future.result()
+                            except (FarmaliderAuthError, FarmaliderUnavailableError):
+                                if isinstance(farm_client, FarmaliderClient):
+                                    farm_client.cancel_pending_requests()
+                                for pending in futures:
+                                    pending.cancel()
+                                raise
 
-                        cache[cpf] = result
-                        if cliente_lookup_status_by_cpf is not None:
-                            cliente_lookup_status_by_cpf[cpf] = result[0]
-                        completed += 1
-                        batch_completed += 1
-                        if result[0] == "ERRO_API":
-                            batch_errors += 1
-                            contact_refs = (
-                                sorted(
-                                    {
-                                        farm_client.weni_contact_diagnostic_ref(
-                                            str(row["contact_uuid"])
-                                        )
-                                        for row in rows_by_cpf[cpf]
-                                        if row.get("contact_uuid")
-                                    }
+                            cache[cpf] = result
+                            if cliente_lookup_status_by_cpf is not None:
+                                cliente_lookup_status_by_cpf[cpf] = result[0]
+                            completed += 1
+                            progress.advance()
+                            batch_completed += 1
+                            if result[0] == "ERRO_API":
+                                batch_errors += 1
+                                contact_refs = (
+                                    sorted(
+                                        {
+                                            farm_client.weni_contact_diagnostic_ref(
+                                                str(row["contact_uuid"])
+                                            )
+                                            for row in rows_by_cpf[cpf]
+                                            if row.get("contact_uuid")
+                                        }
+                                    )
+                                    if isinstance(farm_client, FarmaliderClient)
+                                    else []
                                 )
-                                if isinstance(farm_client, FarmaliderClient)
-                                else []
-                            )
-                            lookup_ref = (
-                                farm_client.cpf_diagnostic_ref(cpf)
-                                if isinstance(farm_client, FarmaliderClient)
-                                else "-"
-                            )
-                            logging.warning(
-                                "FarmaLíder cliente/cpf [consulta %s]: falha para %s "
-                                "contato(s) Weni; contato_ref=%s%s.",
-                                lookup_ref,
-                                len(rows_by_cpf[cpf]),
-                                ",".join(contact_refs[:3]) or "indisponivel",
-                                ",..." if len(contact_refs) > 3 else "",
+                                lookup_ref = (
+                                    farm_client.cpf_diagnostic_ref(cpf)
+                                    if isinstance(farm_client, FarmaliderClient)
+                                    else "-"
+                                )
+                                logging.warning(
+                                    "FarmaLíder cliente/cpf [consulta %s]: falha para %s "
+                                    "contato(s) Weni; contato_ref=%s%s.",
+                                    lookup_ref,
+                                    len(rows_by_cpf[cpf]),
+                                    ",".join(contact_refs[:3]) or "indisponivel",
+                                    ",..." if len(contact_refs) > 3 else "",
+                                )
+
+                        if (
+                            batch_completed >= 100
+                            and batch_errors >= FARMALIDER_BATCH_ERROR_ABORT_MIN_ERRORS
+                            and batch_errors / batch_completed
+                            >= FARMALIDER_BATCH_ERROR_ABORT_RATE
+                        ):
+                            raise FarmaliderError(
+                                "FarmaLíder apresentou taxa elevada de erros no lote "
+                                f"{batch_number}/{total_batches}: "
+                                f"{batch_errors}/{batch_completed} consultas concluídas "
+                                f"({batch_errors / batch_completed:.1%}). "
+                                "Carga interrompida antes de atualizar contatos "
+                                "e pedidos no Google Sheets."
                             )
 
+                    error_rate = batch_errors / len(batch) if batch else 0.0
                     if (
-                        batch_completed >= 100
-                        and batch_errors >= FARMALIDER_BATCH_ERROR_ABORT_MIN_ERRORS
-                        and batch_errors / batch_completed
-                        >= FARMALIDER_BATCH_ERROR_ABORT_RATE
+                        batch_errors >= FARMALIDER_BATCH_ERROR_ABORT_MIN_ERRORS
+                        and error_rate >= FARMALIDER_BATCH_ERROR_ABORT_RATE
                     ):
                         raise FarmaliderError(
                             "FarmaLíder apresentou taxa elevada de erros no lote "
                             f"{batch_number}/{total_batches}: "
-                            f"{batch_errors}/{batch_completed} consultas concluídas "
-                            f"({batch_errors / batch_completed:.1%}). "
-                            "Carga interrompida antes de atualizar contatos "
-                            "e pedidos no Google Sheets."
+                            f"{batch_errors}/{len(batch)} "
+                            f"({error_rate:.1%}). Carga interrompida antes da "
+                            "atualização de contatos e pedidos no Google Sheets."
                         )
 
-                error_rate = batch_errors / len(batch) if batch else 0.0
-                if (
-                    batch_errors >= FARMALIDER_BATCH_ERROR_ABORT_MIN_ERRORS
-                    and error_rate >= FARMALIDER_BATCH_ERROR_ABORT_RATE
-                ):
-                    raise FarmaliderError(
-                        "FarmaLíder apresentou taxa elevada de erros no lote "
-                        f"{batch_number}/{total_batches}: "
-                        f"{batch_errors}/{len(batch)} "
-                        f"({error_rate:.1%}). Carga interrompida antes da "
-                        "atualização de contatos e pedidos no Google Sheets."
+                    elapsed = max(time.monotonic() - started, 0.001)
+                    rate = completed / elapsed
+                    remaining = len(unique_cpfs) - completed
+                    eta = remaining / rate if rate > 0 else 0.0
+                    metrics = farm_client.metrics_snapshot()
+
+                    logging.info(
+                        "FarmaLíder: %s/%s CPFs concluídos | lote %s/%s | "
+                        "%.1f CPF/s | ETA %s | HTTP=%s retries=%s 429=%s 5xx=%s "
+                        "lentas=%s p95=%s max=%s delay=%.0fms limite=%s 200=%s 404=%s.",
+                        completed,
+                        len(unique_cpfs),
+                        batch_number,
+                        total_batches,
+                        rate,
+                        _format_duration(eta),
+                        metrics["total_requests"],
+                        metrics["retries"],
+                        metrics["rate_limits"],
+                        metrics["server_errors"],
+                        metrics.get("slow_requests", 0),
+                        _format_ms_as_seconds(metrics.get("p95_response_ms", 0.0)),
+                        _format_ms_as_seconds(metrics["max_response_ms"]),
+                        metrics["effective_delay_ms"],
+                        metrics.get("concurrency_limit", worker_count),
+                        metrics.get("responses_200", 0),
+                        metrics.get("responses_404", 0),
                     )
-
-                elapsed = max(time.monotonic() - started, 0.001)
-                rate = completed / elapsed
-                remaining = len(unique_cpfs) - completed
-                eta = remaining / rate if rate > 0 else 0.0
-                metrics = farm_client.metrics_snapshot()
-
-                logging.info(
-                    "FarmaLíder: %s/%s CPFs concluídos | lote %s/%s | "
-                    "%.1f CPF/s | ETA %s | HTTP=%s retries=%s 429=%s 5xx=%s "
-                    "lentas=%s p95=%s max=%s delay=%.0fms limite=%s 200=%s 404=%s.",
-                    completed,
-                    len(unique_cpfs),
-                    batch_number,
-                    total_batches,
-                    rate,
-                    _format_duration(eta),
-                    metrics["total_requests"],
-                    metrics["retries"],
-                    metrics["rate_limits"],
-                    metrics["server_errors"],
-                    metrics.get("slow_requests", 0),
-                    _format_ms_as_seconds(metrics.get("p95_response_ms", 0.0)),
-                    _format_ms_as_seconds(metrics["max_response_ms"]),
-                    metrics["effective_delay_ms"],
-                    metrics.get("concurrency_limit", worker_count),
-                    metrics.get("responses_200", 0),
-                    metrics.get("responses_404", 0),
-                )
-        finally:
-            executor.shutdown(wait=True, cancel_futures=True)
+            finally:
+                executor.shutdown(wait=True, cancel_futures=True)
 
         for cpf, cpf_rows in rows_by_cpf.items():
             query_result = cache.get(cpf, ("ERRO_API", "", ""))
@@ -672,82 +678,87 @@ def build_orders(
 
     # CPF duplicates can point to the same official order. Select a complete
     # order/items snapshot consistently, regardless of Weni pagination order.
-    for contact in sorted(
+    ordered_contacts = sorted(
         relevant_contacts,
         key=lambda row: (
             cpf_query_priority(get_fields(row).get("cpf")),
             str(row.get("uuid") or ""),
         ),
-    ):
-        fields = get_fields(contact)
-        contact_uuid = str(contact.get("uuid") or "")
-        contact_row = rows_by_uuid.get(contact_uuid, {})
-        cpf = normalize_cpf(fields.get("cpf"))
-        try:
-            order, items = resolve_contact_order(
-                contact,
-                farm_client=farm_client,
-                captured_at=sync_time,
-                linked_cliente_id=contact_row.get("farmalider_cliente_id", ""),
-                cliente_response=(cliente_responses_by_cpf or {}).get(cpf),
-                cliente_lookup_status=(
-                    contact_row.get("farmalider_cliente_status", "")
-                    if cpf and not is_valid_cpf(cpf)
-                    else (cliente_lookup_status_by_cpf or {}).get(cpf, "")
-                ),
-                pedido_responses_by_id=pedido_responses_by_id,
+    )
+    with TaskProgress(
+        "FarmaLíder: validação de pedidos", len(ordered_contacts), unit="contatos"
+    ) as progress:
+        for contact in progress.track(ordered_contacts):
+            fields = get_fields(contact)
+            contact_uuid = str(contact.get("uuid") or "")
+            contact_row = rows_by_uuid.get(contact_uuid, {})
+            cpf = normalize_cpf(fields.get("cpf"))
+            try:
+                with request_progress("FarmaLíder: consulta de pedido e itens"):
+                    order, items = resolve_contact_order(
+                        contact,
+                        farm_client=farm_client,
+                        captured_at=sync_time,
+                        linked_cliente_id=contact_row.get("farmalider_cliente_id", ""),
+                        cliente_response=(cliente_responses_by_cpf or {}).get(cpf),
+                        cliente_lookup_status=(
+                            contact_row.get("farmalider_cliente_status", "")
+                            if cpf and not is_valid_cpf(cpf)
+                            else (cliente_lookup_status_by_cpf or {}).get(cpf, "")
+                        ),
+                        pedido_responses_by_id=pedido_responses_by_id,
+                    )
+            except (FarmaliderAuthError, FarmaliderUnavailableError):
+                raise
+            except FarmaliderError:
+                stats.api_errors += 1
+                continue
+            if order is None:
+                continue
+
+            if order.get("status_confirmacao") == "ERRO_API":
+                stats.api_errors += 1
+
+            contact_uuid = order.get("contact_uuid", "")
+            contact_row = rows_by_uuid.get(contact_uuid, {})
+
+            order["cpf_normalizado"] = contact_row.get(
+                "cpf_normalizado",
+                order.get("cpf_normalizado", ""),
             )
-        except (FarmaliderAuthError, FarmaliderUnavailableError):
-            raise
-        except FarmaliderError:
-            stats.api_errors += 1
-            continue
-        if order is None:
-            continue
+            order["farmalider_cliente_id"] = contact_row.get(
+                "farmalider_cliente_id",
+                "",
+            ) or order.get("farmalider_cliente_id", "")
 
-        if order.get("status_confirmacao") == "ERRO_API":
-            stats.api_errors += 1
+            for key in (
+                "primeiro_anuncio_origem",
+                "primeiro_anuncio_id",
+                "primeiro_anuncio_titulo",
+                "primeiro_anuncio_data",
+                "primeiro_anuncio_tipo_campanha",
+                "primeiro_anuncio_canal_destino",
+                "ultimo_anuncio_origem",
+                "ultimo_anuncio_id",
+                "ultimo_anuncio_titulo",
+                "ultimo_anuncio_data",
+                "ultimo_anuncio_tipo_campanha",
+                "ultimo_anuncio_canal_destino",
+            ):
+                order[key] = contact_row.get(key, "")
 
-        contact_uuid = order.get("contact_uuid", "")
-        contact_row = rows_by_uuid.get(contact_uuid, {})
+            pedido_id = order.get("pedido_id", "").strip()
+            for item in items:
+                item["pedido_id"] = pedido_id
 
-        order["cpf_normalizado"] = contact_row.get(
-            "cpf_normalizado",
-            order.get("cpf_normalizado", ""),
-        )
-        order["farmalider_cliente_id"] = contact_row.get(
-            "farmalider_cliente_id",
-            "",
-        ) or order.get("farmalider_cliente_id", "")
+            order_key = order.get("pedido_chave", "").strip()
+            if not order_key:
+                continue
+            contacts_by_order.setdefault(order_key, set()).add(contact_uuid)
+            snapshots.setdefault(order_key, (order, items))
 
-        for key in (
-            "primeiro_anuncio_origem",
-            "primeiro_anuncio_id",
-            "primeiro_anuncio_titulo",
-            "primeiro_anuncio_data",
-            "primeiro_anuncio_tipo_campanha",
-            "primeiro_anuncio_canal_destino",
-            "ultimo_anuncio_origem",
-            "ultimo_anuncio_id",
-            "ultimo_anuncio_titulo",
-            "ultimo_anuncio_data",
-            "ultimo_anuncio_tipo_campanha",
-            "ultimo_anuncio_canal_destino",
-        ):
-            order[key] = contact_row.get(key, "")
-
-        pedido_id = order.get("pedido_id", "").strip()
-        for item in items:
-            item["pedido_id"] = pedido_id
-
-        order_key = order.get("pedido_chave", "").strip()
-        if not order_key:
-            continue
-        contacts_by_order.setdefault(order_key, set()).add(contact_uuid)
-        snapshots.setdefault(order_key, (order, items))
-
-        if order.get("status_validacao") == "ERRO":
-            stats.parse_errors += 1
+            if order.get("status_validacao") == "ERRO":
+                stats.parse_errors += 1
 
     order_rows: list[Row] = []
     items_by_key: dict[str, Row] = {}
@@ -1054,28 +1065,33 @@ def main() -> int:
 
         postprocess_started = time.monotonic()
         logging.info("Google Sheets: etapa 2/4 - Pedidos e itens.")
-        order_result = sheets.upsert_orders_detailed(order_rows) if order_rows else None
-        item_result = (
-            sheets.upsert_order_items_detailed(item_rows) if item_rows else None
+        order_result, item_result = sheets.upsert_pharmacy_orders(order_rows, item_rows)
+        scope_pending = (
+            sheets.get_control("escopo_farmacia_versao") != "human_products_v1"
         )
-        orders_inserted = order_result.inserted if order_result else 0
-        orders_updated = order_result.updated if order_result else 0
-        items_inserted = item_result.inserted if item_result else 0
-        items_updated = item_result.updated if item_result else 0
+        pharmacy_scope = sheets.reconcile_pharmacy_scope(
+            base_records=contact_result.final_records,
+            order_records=order_result.final_records,
+            item_records=item_result.final_records,
+            include_history=scope_pending,
+        )
+        contact_result.final_records = pharmacy_scope.contacts
+        orders_inserted = order_result.inserted
+        orders_updated = order_result.updated
+        items_inserted = item_result.inserted
+        items_updated = item_result.updated
 
         logging.info("Google Sheets: etapa 3/4 - Métricas de contatos e anúncios.")
         ad_metrics = build_daily_metrics(contact_result.final_records)
         sheets.replace_metrics(ad_metrics)
 
         logging.info("Google Sheets: etapa 4/4 - Métricas de vendas e fechamento.")
-        all_order_records = (
-            order_result.final_records if order_result else sheets.load_order_records()
-        )
-        all_item_records = (
-            item_result.final_records
-            if item_result
-            else sheets.load_order_item_records()
-        )
+        all_order_records = pharmacy_scope.orders
+        all_item_records = pharmacy_scope.items
+        if scope_pending:
+            sheets.resanitize_pharmacy_bi_snapshots(
+                contact_result.final_records, all_order_records, all_item_records
+            )
         sales_metrics = build_sales_metrics(all_order_records, all_item_records)
         sheets.replace_sales_metrics(sales_metrics)
         sales_metrics_count = len(sales_metrics)
@@ -1223,6 +1239,7 @@ def main() -> int:
         sheets.set_controls(
             {
                 **completion_controls,
+                "escopo_farmacia_versao": "human_products_v1",
                 "ultima_execucao_contatos_api": str(len(contacts)),
                 "ultima_execucao_contatos_relevantes": str(len(relevant_contacts)),
                 "ultima_execucao_contatos_com_cpf": str(len(cpf_contacts)),

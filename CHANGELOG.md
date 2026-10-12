@@ -2,6 +2,10 @@
 
 ## NexoFlow 1.0
 
+- Recompra e BI da farmácia excluem produtos pet, de uso animal e veterinários. Pedidos mistos mantêm apenas os itens humanos na mensagem e nos dados comerciais, com o valor desses itens sem frete. Cargas saneiam dados antigos, preservam contatos e proteções de CPF/LGPD, e exigem nova revisão da campanha. Snapshots antigos não classificam uma compra nova.
+
+- Analytics informa barra, velocidade e tempo restante por etapa nas consultas de CPF, validação de pedidos e gravações do Sheets. O indicador continua ativo durante respostas lentas e retries; apenas linhas confirmadas avançam a gravação, e falhas não exibem conclusão de 100%.
+
 - `atualizar_tudo.bat` executa as cargas completas, Planilhas, Recompra e sincronização incremental em ordem, mantendo as revisões humanas e interrompendo o fluxo diante de erros, conflitos ou consultas parciais. Looker Studio recebe orientação para atualização manual ao final.
 
 - Compra posterior ainda não confirmada pela API pode ser sinalizada na Weni e no Sheets, com bloqueio da referência antiga de recompra e indicadores de pendência no BI.

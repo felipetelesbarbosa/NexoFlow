@@ -10,6 +10,7 @@ from pydantic import BaseModel
 import secrets_config as secrets
 from analytics import build_sales_metrics, parse_ultimo_pedido_raw
 from google_sheets import GoogleSheetsStore
+from pharmacy_scope import plan_pharmacy_scope
 from webhook_runtime import WEBHOOK_WRITE_LOCK, shared_secret_matches
 
 app = FastAPI(
@@ -114,17 +115,26 @@ def receive_order(
     with WEBHOOK_WRITE_LOCK:
         store = GoogleSheetsStore(_spreadsheet_id())
         try:
-            orders_result = store.upsert_orders_detailed([order])
-            items_result = store.upsert_order_items_detailed(items)
+            orders_result, items_result = store.upsert_pharmacy_orders([order], items)
+            scope = plan_pharmacy_scope(
+                orders_result.final_records, items_result.final_records
+            )
+            if (
+                scope.changed_orders
+                or scope.removed_order_keys
+                or scope.removed_item_keys
+            ):
+                scope = store.reconcile_pharmacy_scope(
+                    base_records=[],
+                    order_records=orders_result.final_records,
+                    item_records=items_result.final_records,
+                    include_history=False,
+                )
 
             # Os upserts já devolveram as tabelas finais: não relê as mesmas abas.
             # Reenvios ainda comparam/reparam a aba de métricas caso uma gravação
             # anterior tenha falhado depois de persistir os pedidos ou itens.
-            store.replace_sales_metrics(
-                build_sales_metrics(
-                    orders_result.final_records, items_result.final_records
-                )
-            )
+            store.replace_sales_metrics(build_sales_metrics(scope.orders, scope.items))
 
         finally:
             store.close()

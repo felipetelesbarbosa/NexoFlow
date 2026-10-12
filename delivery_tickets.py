@@ -41,6 +41,7 @@ from weni_update import (
     _ensure_order_fields,
     _execute_contact_plan,
     _prepare_frozen_plan_for_apply,
+    _recompra_products_need_unscheduling,
     audit_plans,
     load_review_snapshot,
     write_review_snapshot,
@@ -217,6 +218,7 @@ def _recompra_removals(plan, contact, captured_at):
     )
     if not (
         "pedido_data" in plan.fields
+        or _recompra_products_need_unscheduling(plan)
         or (plan.order_validated and not plan.purchase_confirmed)
         or expired
         or refused(contact)
@@ -664,9 +666,22 @@ def apply_delivery_review(path, weni, *, store_factory=None, target=None):
     store = store_factory()
     try:
         base = store.upsert_contacts_detailed(current_contacts)
-        all_orders = store.upsert_orders_detailed(orders).final_records
-        all_items = store.upsert_order_items_detailed(items).final_records
+        orders_result, items_result = store.upsert_pharmacy_orders(orders, items)
         store.upsert_delivery_tickets(tickets)
+        scope = store.reconcile_pharmacy_scope(
+            base_records=base.final_records,
+            order_records=orders_result.final_records,
+            item_records=items_result.final_records,
+            include_history=(
+                store.get_control("escopo_farmacia_versao") != "human_products_v1"
+            ),
+        )
+        base.final_records = scope.contacts
+        all_orders, all_items = scope.orders, scope.items
+        if store.get_control("escopo_farmacia_versao") != "human_products_v1":
+            store.resanitize_pharmacy_bi_snapshots(
+                base.final_records, all_orders, all_items
+            )
         store.refresh_delivery_bi(all_orders)
         from analytics import (
             build_bi_conversion_records,

@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from task_progress import TaskProgress
+from task_progress import TaskProgress, request_progress
 
 
 class TaskProgressTests(unittest.TestCase):
@@ -119,6 +119,66 @@ class TaskProgressTests(unittest.TestCase):
         with self.progress(0):
             pass
         self.assertIn("100%", self.logs[-1])
+
+    def test_requests_show_activity_without_inflating_parent_counts(self):
+        with self.progress(10) as parent:
+            with request_progress("Sheets: lote"):
+                self.now = 3
+                parent.report()
+                self.assertIn("aguardando API: Sheets: lote", self.logs[-1])
+                self.assertIn("0/10", self.logs[-1])
+                self.assertNotIn("100%", self.logs[-1])
+            self.assertEqual(parent.activity, "")
+            self.assertEqual(parent.completed, 0)
+
+    def test_weighted_batches_count_only_acknowledged_rows(self):
+        with self.assertRaises(RuntimeError):
+            with self.progress(5, unit="linhas") as progress:
+                for index, _batch in enumerate(
+                    progress.track([[1, 2], [3, 4, 5]], weight=len)
+                ):
+                    self.now += 2
+                    if index == 1:
+                        raise RuntimeError("Escrita não confirmada")
+        self.assertEqual(progress.completed, 2)
+        self.assertIn("2/5 linhas", self.logs[-1])
+        self.assertNotIn("100%", self.logs[-1])
+
+    def test_cleanup_failure_never_reports_100_percent(self):
+        with self.assertRaises(RuntimeError):
+            with self.progress(2) as progress:
+                progress.advance(2)
+                progress.report()
+                self.assertIn("restante estimado=finalizando", self.logs[-1])
+                raise RuntimeError("Limpeza falhou")
+        self.assertIn("interrompido", self.logs[-1])
+        self.assertFalse(any("100%" in line for line in self.logs))
+
+    def test_standalone_request_heartbeat_and_failure(self):
+        seen = threading.Event()
+        original = TaskProgress
+
+        def capture(fmt, *args):
+            line = fmt % args
+            self.logs.append(line)
+            if "aguardando resposta da API" in line:
+                seen.set()
+
+        with (
+            patch("task_progress.logging.info", side_effect=capture),
+            patch(
+                "task_progress.TaskProgress",
+                side_effect=lambda *args, **kwargs: original(
+                    *args, **kwargs, interval=0.01
+                ),
+            ),
+        ):
+            with self.assertRaises(RuntimeError):
+                with request_progress("Google Sheets: teste"):
+                    self.assertTrue(seen.wait(1))
+                    raise RuntimeError("API falhou")
+        self.assertIn("interrompido", self.logs[-1])
+        self.assertFalse(any("100%" in line for line in self.logs))
 
 
 if __name__ == "__main__":

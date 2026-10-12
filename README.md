@@ -733,6 +733,8 @@ No Looker Studio, atualize os campos das fontes `Base_Contatos` e `BI_Pedidos` u
 
 ## Recompra FarmaLíder D+25
 
+A campanha é destinada a produtos para humanos. Itens identificados como pet, de uso animal ou veterinário pelo nome ou categoria ficam fora da mensagem. Pedidos somente animais não entram no grupo; pedidos mistos mantêm apenas os produtos humanos. As revisões anteriores a esse filtro precisam ser geradas novamente. Remover um agendamento mantém a proteção contra repetir a admissão do mesmo pedido.
+
 Grupo sincronizado com a última compra confirmada entre 0 e 25 dias, remoção depois de 25 dias e por recusa. O envio continua somente no D+25 pela campanha Weni. Execute `nexo weni recompra auditoria`, `dry-run` e `aplicar` com revisão, ou `nexo weni recompra atualizar`. Confira [implementação, configuração e limites da recompra](README%20RECOMPRA.md). A rotina não altera marketing_opt_in, não dispara WhatsApp e não modifica a campanha.
 
 ## NexoFlow Planilha
@@ -740,6 +742,8 @@ Grupo sincronizado com a última compra confirmada entre 0 e 25 dias, remoção 
 O Setup instala **NexoFlow Planilha.exe** com ícone próprio e atalho na Área de Trabalho. O menu permite executar as cargas por planilha para Weni ou Analytics/Google Sheets e abrir `importacoes`. Use `Conversas_Delivery.xlsx` e `Contatos_Delivery.xlsx`; cada carga mantém a revisão humana antes de aplicar.
 
 ## Dados comerciais para o Looker Studio
+
+O Sheets e o dashboard usam o recorte da farmácia: pedidos somente animais são excluídos, e pedidos mistos preservam os itens humanos e o valor desses itens, sem frete. A primeira execução atualizada também saneia os campos de pedido da Base_Contatos, o histórico e os indicadores já gravados. A identificação usa nomes e categorias disponíveis; embalagens PET e nomes de medicamentos humanos compartilhados com a veterinária não são classificados como animais por mera semelhança. Confira os relatórios quando o catálogo não identificar claramente o produto.
 
 O Analytics preserva os pedidos identificados em `Pedidos_FarmaLider` e seus itens em `Itens_Pedidos_FarmaLider`. Uma nova compra acrescenta uma chave de pedido; uma nova coleta do mesmo pedido atualiza essa chave, sem duplicar a venda nem apagar outros pedidos. Cancelamentos e mudanças de status permanecem no histórico operacional e atualizam os resultados comerciais. Execute as coletas regularmente: a API retorna apenas o último pedido, portanto várias compras entre duas coletas podem não ser capturadas.
 

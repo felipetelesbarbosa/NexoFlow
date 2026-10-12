@@ -476,8 +476,9 @@ def check_google_sheets_retry_if_configured() -> None:
     main_text = read("main.py")
     required_observability = [
         "GOOGLE_SHEETS_PROGRESS_EVERY_RECORDS",
-        "atualizações %s/%s",
-        "Historico_Alteracoes - %s/%s linhas",
+        "TaskProgress(",
+        "gravação confirmada",
+        "request_progress",
         "etapa 1/4 - Base_Contatos + Historico_Alteracoes",
         "leitura recuperada em %s na tentativa",
         "falha de rede/timeout durante escrita",

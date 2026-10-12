@@ -74,8 +74,10 @@ class WebhookRuntimeTests(unittest.TestCase):
                 "quantidade": "1",
             }
         ]
-        self.store.upsert_orders_detailed.return_value = _upsert_result(self.orders)
-        self.store.upsert_order_items_detailed.return_value = _upsert_result(self.items)
+        self.store.upsert_pharmacy_orders.return_value = (
+            _upsert_result(self.orders),
+            _upsert_result(self.items),
+        )
         self.order_factory = patch.object(
             webhook_pedidos, "GoogleSheetsStore", return_value=self.store
         ).start()
@@ -152,11 +154,9 @@ class WebhookRuntimeTests(unittest.TestCase):
         self.event_factory.assert_not_called()
 
     def test_orders_reuse_final_snapshots_without_redundant_reads(self):
-        self.store.upsert_orders_detailed.return_value = _upsert_result(
-            self.orders, inserted=1
-        )
-        self.store.upsert_order_items_detailed.return_value = _upsert_result(
-            self.items, updated=1
+        self.store.upsert_pharmacy_orders.return_value = (
+            _upsert_result(self.orders, inserted=1),
+            _upsert_result(self.items, updated=1),
         )
         response = webhook_pedidos.receive_order(self.order(), self.secret)
         self.assertEqual(response["orders_inserted"], 1)
@@ -167,11 +167,42 @@ class WebhookRuntimeTests(unittest.TestCase):
         self.store.load_order_records.assert_not_called()
         self.store.load_order_item_records.assert_not_called()
 
+    def test_pet_and_mixed_webhooks_use_real_paired_ingestion_before_sheet_writes(self):
+        from tests.test_pharmacy_scope import fixture, store_fixture
+
+        for pet_only in (True, False):
+            with self.subTest(pet_only=pet_only):
+                order, _, _ = fixture(pet_only=pet_only)
+                store = store_fixture()
+                store.close = MagicMock()
+                store.replace_sales_metrics = MagicMock()
+                body = webhook_pedidos.PedidoWebhook(
+                    contact_uuid="synthetic-contact",
+                    ultimo_pedido=order["ultimo_pedido_raw"],
+                )
+                with patch.object(
+                    webhook_pedidos, "GoogleSheetsStore", return_value=store
+                ):
+                    response = webhook_pedidos.receive_order(body, self.secret)
+                serialized = str(store.orders.values + store.order_items.values)
+                self.assertNotIn("Ração", serialized)
+                if pet_only:
+                    self.assertEqual(response["orders_inserted"], 0)
+                    store.replace_sales_metrics.assert_called_once_with([])
+                else:
+                    self.assertEqual(response["orders_inserted"], 1)
+                    self.assertEqual(
+                        store.load_order_records()[0]["valor_total_faturamento"],
+                        "18.00",
+                    )
+                    self.assertEqual(
+                        store.load_order_records()[0]["farmalider_frete"], "0.00"
+                    )
+
     def test_duplicate_order_still_checks_and_repairs_metrics(self):
         webhook_pedidos.receive_order(self.order(), self.secret)
         webhook_pedidos.receive_order(self.order(), self.secret)
-        self.assertEqual(self.store.upsert_orders_detailed.call_count, 2)
-        self.assertEqual(self.store.upsert_order_items_detailed.call_count, 2)
+        self.assertEqual(self.store.upsert_pharmacy_orders.call_count, 2)
         self.assertEqual(self.store.replace_sales_metrics.call_count, 2)
         self.assertEqual(
             self.store.replace_sales_metrics.call_args_list[0],
@@ -182,9 +213,9 @@ class WebhookRuntimeTests(unittest.TestCase):
         changed = copy.deepcopy(self.orders)
         changed[0]["valor_total_compra"] = "20.00"
         changed[0]["valor_produtos"] = "20.00"
-        self.store.upsert_orders_detailed.side_effect = [
-            _upsert_result(self.orders),
-            _upsert_result(changed),
+        self.store.upsert_pharmacy_orders.side_effect = [
+            (_upsert_result(self.orders), _upsert_result(self.items)),
+            (_upsert_result(changed), _upsert_result(self.items)),
         ]
         with patch.object(
             webhook_pedidos, "build_sales_metrics", wraps=build_sales_metrics

@@ -62,6 +62,7 @@ from pedido_utils import (
     serialize_weni_order_list,
     weni_order_datetime_text,
 )
+from product_scope import is_animal_product
 from purchase_checks import (
     PENDING_PURCHASE_FIELD,
     contact_pending_purchase_check,
@@ -185,6 +186,8 @@ class ContactUpdatePlan:
     purchase_confirmed: bool = False
     purchase_confirmation: str = ""
     official_order_date: str = ""
+    # Internal evidence survives the review; no new Weni field is created.
+    order_has_animal_products: bool = False
 
     @property
     def has_changes(self) -> bool:
@@ -1021,6 +1024,7 @@ def _apply_purchase_candidate(
     plan.order_payment_code = normalized_payment
     plan.purchase_confirmation = confirmation
     plan.purchase_confirmed = confirmation == "CONFIRMADO_API" and is_order_sale(order)
+    plan.order_has_animal_products = any(is_animal_product(item) for item in items)
     reason = "pedido oficial FarmaLíder atualizado por GET e normalizado para Weni"
 
     order_fields_to_write: dict[str, Any] = {
@@ -1058,6 +1062,16 @@ def _apply_purchase_candidate(
                 reason="pedido não cancelado confirmado pela API FarmaLíder",
             )
     return True
+
+
+def _recompra_products_need_unscheduling(plan: ContactUpdatePlan) -> bool:
+    """A carga completa não pode restaurar itens pet em campanha agendada."""
+    if "pedido_produtos" not in plan.fields:
+        return False
+    if plan.order_has_animal_products:
+        return True
+    names = parse_weni_order_list(normalize_value(plan.fields["pedido_produtos"]))
+    return any(is_animal_product({"produto_nome": name}) for name in names)
 
 
 def _build_contact_plan(
@@ -1268,6 +1282,7 @@ def _build_contact_plan(
         )
         if (
             "pedido_data" in plan.fields
+            or _recompra_products_need_unscheduling(plan)
             or (plan.order_validated and not plan.purchase_confirmed)
             or plan.purchase_confirmation == "CANCELADO_API"
             or expired
@@ -1646,6 +1661,11 @@ def _canonical_plan(plan: ContactUpdatePlan) -> dict[str, Any]:
         "order_validated": plan.order_validated,
         "purchase_confirmed": plan.purchase_confirmed,
         "purchase_confirmation": plan.purchase_confirmation,
+        **(
+            {"order_has_animal_products": True}
+            if plan.order_has_animal_products
+            else {}
+        ),
     }
 
 
@@ -2069,6 +2089,7 @@ def load_review_snapshot(
             order_validated=bool(raw.get("order_validated")),
             purchase_confirmed=bool(raw.get("purchase_confirmed")),
             purchase_confirmation=str(raw.get("purchase_confirmation") or ""),
+            order_has_animal_products=bool(raw.get("order_has_animal_products")),
         )
         plans.append(plan)
 
@@ -2133,6 +2154,30 @@ def _prepare_frozen_plan_for_apply(
     current_fields = get_fields(current_contact)
     pending_fields: dict[str, Any] = {}
     conflicts: list[str] = []
+
+    if _recompra_products_need_unscheduling(plan):
+        campaign_name = "Recompra FarmaLíder"
+        reviewed_removals = {
+            action.group
+            for action in plan.group_actions
+            if action.action == "remove" and action.group_name == campaign_name
+        }
+        if _contact_in_group(
+            current_contact, group_name=campaign_name, group_uuid=""
+        ) and (
+            not reviewed_removals
+            or any(
+                isinstance(group, dict)
+                and str(group.get("name") or "").strip().casefold()
+                == campaign_name.casefold()
+                and group.get("uuid") not in reviewed_removals
+                for group in current_contact.get("groups", []) or []
+            )
+        ):
+            return None, (
+                "grupo Recompra mudou após a revisão; revise sua remoção antes "
+                "de restaurar produtos pet"
+            )
 
     for field_name, proposed in plan.fields.items():
         current = current_fields.get(field_name)
@@ -2233,6 +2278,7 @@ def _prepare_frozen_plan_for_apply(
         order_payment_code=plan.order_payment_code,
         purchase_confirmed=plan.purchase_confirmed,
         purchase_confirmation=plan.purchase_confirmation,
+        order_has_animal_products=plan.order_has_animal_products,
     )
     return prepared, ""
 

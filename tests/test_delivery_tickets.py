@@ -288,11 +288,18 @@ class DeliveryTicketsTests(unittest.TestCase):
                 store.upsert_order_items_detailed,
             ):
                 method.return_value.final_records = []
+            store.upsert_pharmacy_orders.return_value = (
+                store.upsert_orders_detailed.return_value,
+                store.upsert_order_items_detailed.return_value,
+            )
+            store.reconcile_pharmacy_scope.return_value.orders = []
+            store.reconcile_pharmacy_scope.return_value.items = []
+            store.reconcile_pharmacy_scope.return_value.contacts = []
             result = apply_delivery_review(path, weni, store_factory=lambda: store)
             self.assertEqual(result["conflicts"], 1)
             weni.update_contact_fields.assert_not_called()
             self.assertEqual(store.upsert_contacts_detailed.call_args.args[0], [])
-            self.assertEqual(store.upsert_orders_detailed.call_args.args[0], [])
+            self.assertEqual(store.upsert_pharmacy_orders.call_args.args[0], [])
             self.assertEqual(store.upsert_delivery_tickets.call_args.args[0], [])
             store.replace_looker_tables.assert_called_once()
             store.close.assert_called_once_with()
@@ -535,6 +542,13 @@ class DeliveryTicketsTests(unittest.TestCase):
             store.upsert_order_items_detailed,
         ):
             method.return_value.final_records = []
+        store.upsert_pharmacy_orders.return_value = (
+            store.upsert_orders_detailed.return_value,
+            store.upsert_order_items_detailed.return_value,
+        )
+        store.reconcile_pharmacy_scope.return_value.orders = []
+        store.reconcile_pharmacy_scope.return_value.items = []
+        store.reconcile_pharmacy_scope.return_value.contacts = []
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "review.json"
             write_delivery_review(plans, delivery, path)

@@ -11,6 +11,7 @@ from pedido_utils import (
     farmalider_order_status_name,
     farmalider_payment_method_display,
     is_order_cancelled,
+    serialize_pedido_products,
 )
 
 
@@ -599,6 +600,9 @@ def apply_pedido_api_confirmation(
     order["status_confirmacao"] = (
         "CANCELADO_API" if is_order_cancelled(order) else "CONFIRMADO_API"
     )
+    # O GET substitui o snapshot legado do contato, inclusive categorias e
+    # itens; metadados antigos não podem classificar a compra oficial atual.
+    order["ultimo_pedido_raw"] = serialize_pedido_products(order, canonical_items)
     return order, canonical_items
 
 

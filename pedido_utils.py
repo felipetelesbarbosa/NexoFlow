@@ -287,6 +287,11 @@ def serialize_pedido_products(
     products = [
         {
             "nome": str(item.get("produto_nome") or "").strip() or None,
+            **(
+                {"categoria": str(item["categoria"]).strip()}
+                if item.get("categoria")
+                else {}
+            ),
             "codigo": str(item.get("produto_codigo") or "").strip() or None,
             "quantidade": _number_text(item.get("quantidade")),
             "valor_unitario": _number_text(item.get("valor_unitario"), money=True),

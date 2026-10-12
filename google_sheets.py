@@ -68,7 +68,18 @@ from config import (
 from looker_bi import DATE_COLUMNS, TEXT_COLUMNS
 from looker_bi import SCHEMAS as LOOKER_SCHEMAS
 from network_diagnostics import classify_network_failure
+from pharmacy_scope import (
+    PharmacyScopePlan,
+    filter_pharmacy_order,
+    plan_pharmacy_scope,
+    recalculate_scope_snapshots,
+    sanitize_contact_order,
+    sanitize_delivery_ticket,
+    sanitize_order_record,
+)
+from product_scope import pharmacy_items
 from proxy_config import refresh_network_route
+from task_progress import TaskProgress, request_progress
 
 
 def column_letter(number: int) -> str:
@@ -323,77 +334,78 @@ class GoogleSheetsStore:
 
     def _read_with_retry(self, description: str, func):
         """Executa leitura com timeout/retry para rede, 429 e erros 5xx."""
-        attempts = max(1, int(GOOGLE_SHEETS_READ_MAX_RETRIES))
+        with request_progress("Google Sheets: " + description):
+            attempts = max(1, int(GOOGLE_SHEETS_READ_MAX_RETRIES))
 
-        for attempt in range(1, attempts + 1):
-            attempt_started = time.monotonic()
-            try:
-                self._read_requests = getattr(self, "_read_requests", 0) + 1
-                result = func()
-                elapsed = time.monotonic() - attempt_started
-                if attempt > 1:
-                    logging.info(
-                        "Google Sheets: leitura recuperada em %s na tentativa %s/%s "
-                        "(%.1fs).",
+            for attempt in range(1, attempts + 1):
+                attempt_started = time.monotonic()
+                try:
+                    self._read_requests = getattr(self, "_read_requests", 0) + 1
+                    result = func()
+                    elapsed = time.monotonic() - attempt_started
+                    if attempt > 1:
+                        logging.info(
+                            "Google Sheets: leitura recuperada em %s na tentativa %s/%s "
+                            "(%.1fs).",
+                            description,
+                            attempt,
+                            attempts,
+                            elapsed,
+                        )
+                    return result
+                except APIError as exc:
+                    elapsed = time.monotonic() - attempt_started
+                    status = self._api_status_code(exc)
+                    if not self._retryable_status(status) or attempt >= attempts:
+                        raise
+
+                    retry_after = self._retry_after_seconds(exc)
+                    if status == 429:
+                        wait = retry_after if retry_after is not None else 5.0
+                    else:
+                        wait = (
+                            retry_after
+                            if retry_after is not None
+                            else min(
+                                2**attempt,
+                                30,
+                            )
+                        )
+
+                    logging.warning(
+                        "Google Sheets respondeu HTTP %s após %.1fs durante %s. "
+                        "Tentativa %s/%s. Aguardando %.1f s.",
+                        status,
+                        elapsed,
                         description,
                         attempt,
                         attempts,
+                        wait,
+                    )
+                    time.sleep(wait)
+                except RequestException as exc:
+                    elapsed = time.monotonic() - attempt_started
+                    failure = classify_network_failure(exc)
+                    if not failure.retryable or attempt >= attempts:
+                        raise
+
+                    refresh_network_route(
+                        reason=f"falha recuperável no Google Sheets ({description})"
+                    )
+                    wait = min(2**attempt, 30)
+                    logging.warning(
+                        "Google Sheets teve falha de rede/timeout após %.1fs durante %s: %s. "
+                        "Tentativa %s/%s. Aguardando %.1f s.",
                         elapsed,
+                        description,
+                        failure.summary,
+                        attempt,
+                        attempts,
+                        wait,
                     )
-                return result
-            except APIError as exc:
-                elapsed = time.monotonic() - attempt_started
-                status = self._api_status_code(exc)
-                if not self._retryable_status(status) or attempt >= attempts:
-                    raise
+                    time.sleep(wait)
 
-                retry_after = self._retry_after_seconds(exc)
-                if status == 429:
-                    wait = retry_after if retry_after is not None else 5.0
-                else:
-                    wait = (
-                        retry_after
-                        if retry_after is not None
-                        else min(
-                            2**attempt,
-                            30,
-                        )
-                    )
-
-                logging.warning(
-                    "Google Sheets respondeu HTTP %s após %.1fs durante %s. "
-                    "Tentativa %s/%s. Aguardando %.1f s.",
-                    status,
-                    elapsed,
-                    description,
-                    attempt,
-                    attempts,
-                    wait,
-                )
-                time.sleep(wait)
-            except RequestException as exc:
-                elapsed = time.monotonic() - attempt_started
-                failure = classify_network_failure(exc)
-                if not failure.retryable or attempt >= attempts:
-                    raise
-
-                refresh_network_route(
-                    reason=f"falha recuperável no Google Sheets ({description})"
-                )
-                wait = min(2**attempt, 30)
-                logging.warning(
-                    "Google Sheets teve falha de rede/timeout após %.1fs durante %s: %s. "
-                    "Tentativa %s/%s. Aguardando %.1f s.",
-                    elapsed,
-                    description,
-                    failure.summary,
-                    attempt,
-                    attempts,
-                    wait,
-                )
-                time.sleep(wait)
-
-        raise RuntimeError("Retry de leitura Google Sheets esgotado.")
+            raise RuntimeError("Retry de leitura Google Sheets esgotado.")
 
     @staticmethod
     def _should_log_progress(processed: int, total: int) -> bool:
@@ -459,64 +471,65 @@ class GoogleSheetsStore:
 
     def _write_with_retry(self, description: str, func):
         """Executa escrita com retry para 429 e erros 5xx."""
-        attempts = max(1, int(GOOGLE_SHEETS_WRITE_MAX_RETRIES))
+        with request_progress("Google Sheets: " + description):
+            attempts = max(1, int(GOOGLE_SHEETS_WRITE_MAX_RETRIES))
 
-        for attempt in range(1, attempts + 1):
-            self._wait_before_write()
+            for attempt in range(1, attempts + 1):
+                self._wait_before_write()
 
-            try:
-                self._write_requests = getattr(self, "_write_requests", 0) + 1
-                return func()
-            except APIError as exc:
-                status = self._api_status_code(exc)
-                if not self._retryable_status(status) or attempt >= attempts:
-                    raise
+                try:
+                    self._write_requests = getattr(self, "_write_requests", 0) + 1
+                    return func()
+                except APIError as exc:
+                    status = self._api_status_code(exc)
+                    if not self._retryable_status(status) or attempt >= attempts:
+                        raise
 
-                retry_after = self._retry_after_seconds(exc)
+                    retry_after = self._retry_after_seconds(exc)
 
-                if status == 429:
-                    wait = retry_after if retry_after is not None else 65.0
-                else:
-                    wait = (
-                        retry_after
-                        if retry_after is not None
-                        else min(
-                            2**attempt,
-                            30,
+                    if status == 429:
+                        wait = retry_after if retry_after is not None else 65.0
+                    else:
+                        wait = (
+                            retry_after
+                            if retry_after is not None
+                            else min(
+                                2**attempt,
+                                30,
+                            )
                         )
+
+                    logging.warning(
+                        "Google Sheets respondeu HTTP %s durante %s. "
+                        "Tentativa %s/%s. Aguardando %.1f s.",
+                        status,
+                        description,
+                        attempt,
+                        attempts,
+                        wait,
                     )
+                    time.sleep(wait)
+                except RequestException as exc:
+                    failure = classify_network_failure(exc)
+                    if not failure.retryable or attempt >= attempts:
+                        raise
 
-                logging.warning(
-                    "Google Sheets respondeu HTTP %s durante %s. "
-                    "Tentativa %s/%s. Aguardando %.1f s.",
-                    status,
-                    description,
-                    attempt,
-                    attempts,
-                    wait,
-                )
-                time.sleep(wait)
-            except RequestException as exc:
-                failure = classify_network_failure(exc)
-                if not failure.retryable or attempt >= attempts:
-                    raise
+                    refresh_network_route(
+                        reason=f"falha recuperável na escrita Google Sheets ({description})"
+                    )
+                    wait = min(2**attempt, 30)
+                    logging.warning(
+                        "Google Sheets teve falha de rede/timeout durante escrita %s: %s. "
+                        "Tentativa %s/%s. Aguardando %.1f s.",
+                        description,
+                        failure.summary,
+                        attempt,
+                        attempts,
+                        wait,
+                    )
+                    time.sleep(wait)
 
-                refresh_network_route(
-                    reason=f"falha recuperável na escrita Google Sheets ({description})"
-                )
-                wait = min(2**attempt, 30)
-                logging.warning(
-                    "Google Sheets teve falha de rede/timeout durante escrita %s: %s. "
-                    "Tentativa %s/%s. Aguardando %.1f s.",
-                    description,
-                    failure.summary,
-                    attempt,
-                    attempts,
-                    wait,
-                )
-                time.sleep(wait)
-
-        raise RuntimeError("Retry de escrita Google Sheets esgotado.")
+            raise RuntimeError("Retry de escrita Google Sheets esgotado.")
 
     def _read_header_bounded(
         self,
@@ -1038,50 +1051,39 @@ class GoogleSheetsStore:
             len(append_batches),
         )
 
-        processed = 0
-        if update_batches:
-            logging.info(
-                "Google Sheets: %s - enviando %s atualização(ões) em batches adaptativos (até %.1f MB).",
-                ws.title,
-                len(updates),
-                GOOGLE_SHEETS_MAX_BATCH_PAYLOAD_BYTES / 1_000_000,
-            )
-        for batch in update_batches:
-            self._write_with_retry(
-                f"batch_update em {ws.title}",
-                lambda batch=batch: ws.batch_update(
-                    copy.deepcopy(batch),
-                    value_input_option=value_input_option,
-                ),
-            )
-            processed += len(batch)
-            if self._should_log_progress(processed, len(updates)):
+        with TaskProgress(
+            f"Google Sheets: {ws.title} - gravação confirmada",
+            len(updates) + len(appends),
+            unit="linhas",
+        ) as progress:
+            if update_batches:
                 logging.info(
-                    "Google Sheets: %s - atualizações %s/%s (%.0f%%).",
+                    "Google Sheets: %s - enviando %s atualização(ões) em batches adaptativos (até %.1f MB).",
                     ws.title,
-                    processed,
                     len(updates),
-                    self._progress_percent(processed, len(updates)),
+                    GOOGLE_SHEETS_MAX_BATCH_PAYLOAD_BYTES / 1_000_000,
                 )
+            for batch in update_batches:
+                self._write_with_retry(
+                    f"batch_update em {ws.title}",
+                    lambda batch=batch: ws.batch_update(
+                        copy.deepcopy(batch),
+                        value_input_option=value_input_option,
+                    ),
+                )
+                progress.advance(len(batch))
 
-        processed = 0
-        if append_batches:
-            logging.info(
-                "Google Sheets: %s - enviando %s nova(s) linha(s) em batches adaptativos.",
-                ws.title,
-                len(appends),
-            )
-        for batch in append_batches:
-            self._append_keyed_batch(ws, batch, headers, key_name, value_input_option)
-            processed += len(batch)
-            if self._should_log_progress(processed, len(appends)):
+            if append_batches:
                 logging.info(
-                    "Google Sheets: %s - inserções %s/%s (%.0f%%).",
+                    "Google Sheets: %s - enviando %s nova(s) linha(s) em batches adaptativos.",
                     ws.title,
-                    processed,
                     len(appends),
-                    self._progress_percent(processed, len(appends)),
                 )
+            for batch in append_batches:
+                self._append_keyed_batch(
+                    ws, batch, headers, key_name, value_input_option
+                )
+                progress.advance(len(batch))
 
         logging.info(
             "Google Sheets: %s concluída em %.2fs | inseridos=%s | atualizados=%s | sem mudança=%s.",
@@ -1107,7 +1109,7 @@ class GoogleSheetsStore:
     ) -> UpsertResult:
         return self._upsert_records_detailed(
             self.base,
-            contacts,
+            [sanitize_contact_order(record) for record in contacts],
             "contact_uuid",
             existing_values=existing_values,
             ignore_compare_fields={
@@ -1126,7 +1128,17 @@ class GoogleSheetsStore:
     def upsert_orders_detailed(
         self,
         orders: list[dict[str, str]],
+        *,
+        items: list[dict[str, str]] | None = None,
     ) -> UpsertResult:
+        if items is not None:
+            orders = plan_pharmacy_scope(orders, items).orders
+        else:
+            orders = [
+                filtered
+                for record in orders
+                if (filtered := sanitize_order_record(record)) is not None
+            ]
         return self._upsert_records_detailed(
             self.orders,
             orders,
@@ -1155,6 +1167,13 @@ class GoogleSheetsStore:
             if not order_key or not item_key:
                 raise ValueError("Snapshot de itens sem identidade do pedido ou item.")
             active_keys.setdefault(order_key, set()).add(item_key)
+        items = pharmacy_items(items)
+        retained_keys: dict[str, set[str]] = {}
+        for item in items:
+            order_key = str(item.get("pedido_chave") or "").strip()
+            retained_keys.setdefault(order_key, set()).add(str(item["item_chave"]))
+        for key in active_keys:
+            active_keys[key] = retained_keys.get(key, set())
         result = self._upsert_records_detailed(
             self.order_items,
             items,
@@ -1228,6 +1247,7 @@ class GoogleSheetsStore:
         rows = []
 
         for contact in contacts:
+            contact = sanitize_contact_order(contact)
             uuid = contact.get("contact_uuid", "")
             action = "Atualizado" if uuid in existing_uuids_before_sync else "Inserido"
             record = {
@@ -1246,17 +1266,13 @@ class GoogleSheetsStore:
             len(rows),
             len(batches),
         )
-        processed = 0
-        for batch in batches:
-            self._append_history_batch(batch)
-            processed += len(batch)
-            if self._should_log_progress(processed, len(rows)):
-                logging.info(
-                    "Google Sheets: Historico_Alteracoes - %s/%s linhas (%.0f%%).",
-                    processed,
-                    len(rows),
-                    self._progress_percent(processed, len(rows)),
-                )
+        with TaskProgress(
+            "Google Sheets: Historico_Alteracoes - gravação confirmada",
+            len(rows),
+            unit="linhas",
+        ) as progress:
+            for batch in progress.track(batches, weight=len):
+                self._append_history_batch(batch)
         logging.info(
             "Google Sheets: Historico_Alteracoes concluída em %.2fs.",
             time.monotonic() - stage_started,
@@ -1295,55 +1311,51 @@ class GoogleSheetsStore:
             )
             return False
 
-        last_col = column_letter(len(headers))
-        last_row = max(len(data), 1)
-        if ws.row_count < last_row or ws.col_count < len(headers):
-            self._write_with_retry(
-                f"resize em {ws.title}",
-                lambda: ws.resize(
-                    rows=max(ws.row_count, last_row),
-                    cols=max(ws.col_count, len(headers)),
-                ),
-            )
-        offset = 1
-        batches = self._adaptive_batches(
-            data, max_items=GOOGLE_SHEETS_APPEND_BATCH_SIZE
-        )
-        for batch in batches:
-            first, last = offset, offset + len(batch) - 1
-            self._write_with_retry(
-                f"update em {ws.title}",
-                lambda batch=batch, first=first, last=last: ws.update(
-                    range_name=f"A{first}:{last_col}{last}",
-                    values=batch,
-                    value_input_option=value_input_option,
-                ),
-            )
-            offset = last + 1
-            if self._should_log_progress(last, len(data)):
-                logging.info(
-                    "Google Sheets: %s - %s/%s linha(s) (%.0f%%).",
-                    ws.title,
-                    last,
-                    len(data),
-                    self._progress_percent(last, len(data)),
+        with TaskProgress(
+            f"Google Sheets: {ws.title} - gravação confirmada", len(data), unit="linhas"
+        ) as progress:
+            last_col = column_letter(len(headers))
+            last_row = max(len(data), 1)
+            if ws.row_count < last_row or ws.col_count < len(headers):
+                self._write_with_retry(
+                    f"resize em {ws.title}",
+                    lambda: ws.resize(
+                        rows=max(ws.row_count, last_row),
+                        cols=max(ws.col_count, len(headers)),
+                    ),
                 )
-        # Gravar antes de limpar: uma falha inicial não deve apagar a tabela
-        # anterior. Limpar só o excedente após todos os lotes concluírem.
-        obsolete = []
-        if len(current) > len(data):
-            obsolete.append(
-                f"A{len(data) + 1}:{column_letter(ws.col_count)}{len(current)}"
+            offset = 1
+            batches = self._adaptive_batches(
+                data, max_items=GOOGLE_SHEETS_APPEND_BATCH_SIZE
             )
-        old_width = max((len(row) for row in current), default=0)
-        if old_width > len(headers):
-            obsolete.append(
-                f"{column_letter(len(headers) + 1)}1:{column_letter(old_width)}{len(data)}"
-            )
-        if obsolete:
-            self._write_with_retry(
-                f"limpar excedente em {ws.title}", lambda: ws.batch_clear(obsolete)
-            )
+            for batch in batches:
+                first, last = offset, offset + len(batch) - 1
+                self._write_with_retry(
+                    f"update em {ws.title}",
+                    lambda batch=batch, first=first, last=last: ws.update(
+                        range_name=f"A{first}:{last_col}{last}",
+                        values=batch,
+                        value_input_option=value_input_option,
+                    ),
+                )
+                progress.advance(len(batch))
+                offset = last + 1
+            # Gravar antes de limpar: uma falha inicial não deve apagar a tabela
+            # anterior. Limpar só o excedente após todos os lotes concluírem.
+            obsolete = []
+            if len(current) > len(data):
+                obsolete.append(
+                    f"A{len(data) + 1}:{column_letter(ws.col_count)}{len(current)}"
+                )
+            old_width = max((len(row) for row in current), default=0)
+            if old_width > len(headers):
+                obsolete.append(
+                    f"{column_letter(len(headers) + 1)}1:{column_letter(old_width)}{len(data)}"
+                )
+            if obsolete:
+                self._write_with_retry(
+                    f"limpar excedente em {ws.title}", lambda: ws.batch_clear(obsolete)
+                )
         return True
 
     def replace_metrics(self, rows: list[list[Any]]) -> None:
@@ -1608,7 +1620,14 @@ class GoogleSheetsStore:
         ws = self._get_or_create_sheet("Tickets_Delivery_Weni", TICKET_COLUMNS)
         return self._upsert_records_detailed(
             ws,
-            records,
+            [
+                sanitize_delivery_ticket(
+                    record,
+                    excluded_keys=getattr(self, "_pharmacy_excluded_keys", set()),
+                    retained_by_key=getattr(self, "_pharmacy_orders_by_key", {}),
+                )
+                for record in records
+            ],
             "ticket_uuid",
             ignore_compare_fields={"atualizado_em"},
             value_input_option=ValueInputOption.raw,
@@ -1731,6 +1750,246 @@ class GoogleSheetsStore:
             lambda: self.events.col_values(1),
         )
         return set(values[1:]) if len(values) > 1 else set()
+
+    def _clear_scope_records(
+        self, ws, records: list[dict[str, Any]], key_name: str, keys: set[str]
+    ) -> None:
+        if not keys:
+            return
+        headers = getattr(self, "_headers_cache", {}).get(ws.title)
+        if headers is None:
+            values = self._read_with_retry(
+                f"ler cabeçalho de {ws.title} para limpeza", ws.get_all_values
+            )
+            headers = list(values[0]) if values else []
+        if not headers:
+            raise ValueError(f"Cabeçalho ausente em {ws.title} para limpeza segura.")
+        last_col = column_letter(len(headers))
+        ranges = [
+            f"A{index + 2}:{last_col}{index + 2}"
+            for index, record in enumerate(records)
+            if str(record.get(key_name) or "") in keys
+        ]
+        with TaskProgress(
+            f"Google Sheets: {ws.title} - exclusão de itens pet confirmada",
+            len(ranges),
+            unit="linhas",
+        ) as progress:
+            for start in range(0, len(ranges), 100):
+                batch = ranges[start : start + 100]
+                self._write_with_retry(
+                    f"limpar registros fora do escopo da farmácia em {ws.title}",
+                    lambda batch=batch: ws.batch_clear(batch),
+                )
+                progress.advance(len(batch))
+
+    def _sanitize_scope_rows(
+        self, ws, sanitizer, *, values=None, value_input_option=ValueInputOption.raw
+    ) -> int:
+        """Atualiza somente linhas alteradas, preservando posições e colunas."""
+        if values is None:
+            values = self._read_with_retry(
+                f"ler {ws.title} para saneamento da farmácia", ws.get_all_values
+            )
+        if not values:
+            return 0
+        headers = list(values[0])
+        last_col = column_letter(len(headers))
+        updates = []
+        with TaskProgress(
+            f"Google Sheets: {ws.title} - análise de produtos",
+            len(values) - 1,
+            unit="registros",
+        ) as preparation:
+            for index, cells in enumerate(preparation.track(values[1:]), start=2):
+                padded = list(cells[: len(headers)]) + [""] * max(
+                    0, len(headers) - len(cells)
+                )
+                current = dict(zip(headers, padded, strict=True))
+                updated = sanitizer(current)
+                row = [updated.get(header, "") for header in headers]
+                if row != padded:
+                    updates.append(
+                        {"range": f"A{index}:{last_col}{index}", "values": [row]}
+                    )
+        batches = self._adaptive_batches(
+            updates, max_items=GOOGLE_SHEETS_UPDATE_BATCH_SIZE
+        )
+        with TaskProgress(
+            f"Google Sheets: {ws.title} - saneamento confirmado",
+            len(updates),
+            unit="linhas",
+        ) as progress:
+            for batch in batches:
+                self._write_with_retry(
+                    f"sanear recorte da farmácia em {ws.title}",
+                    lambda batch=batch: ws.batch_update(
+                        copy.deepcopy(batch), value_input_option=value_input_option
+                    ),
+                )
+                progress.advance(len(batch))
+        return len(updates)
+
+    def resanitize_pharmacy_bi_snapshots(
+        self,
+        contacts: list[dict[str, Any]],
+        orders: list[dict[str, Any]],
+        items: list[dict[str, Any]],
+    ) -> dict[str, int]:
+        """Corrige snapshots antigos de vendas preservando dados de contatos."""
+        summary_values = self._read_with_retry(
+            "ler snapshots de resumo para recorte da farmácia",
+            self.bi_summary.get_all_values,
+        )
+        conversion_values = self._read_with_retry(
+            "ler snapshots de conversão para recorte da farmácia",
+            self.bi_conversion.get_all_values,
+        )
+        summaries, conversions = recalculate_scope_snapshots(
+            self._values_to_records(summary_values),
+            self._values_to_records(conversion_values),
+            contacts,
+            orders,
+            items,
+        )
+        summary_iterator = iter(summaries)
+        conversion_iterator = iter(conversions)
+        return {
+            "resumos_saneados": self._sanitize_scope_rows(
+                self.bi_summary,
+                lambda _: next(summary_iterator),
+                values=summary_values,
+                value_input_option=ValueInputOption.user_entered,
+            ),
+            "conversoes_saneadas": self._sanitize_scope_rows(
+                self.bi_conversion,
+                lambda _: next(conversion_iterator),
+                values=conversion_values,
+                value_input_option=ValueInputOption.user_entered,
+            ),
+        }
+
+    def reconcile_pharmacy_scope(
+        self,
+        *,
+        base_records: list[dict[str, Any]] | None = None,
+        order_records: list[dict[str, Any]] | None = None,
+        item_records: list[dict[str, Any]] | None = None,
+        include_history: bool = True,
+    ) -> PharmacyScopePlan:
+        """Limpa fontes do Sheets; o chamador recalcula todas as tabelas de BI.
+
+        O plano é inteiramente calculado antes da primeira escrita. Limpezas
+        são idempotentes, não deslocam linhas nem removem contatos.
+        """
+        orders = self.load_order_records() if order_records is None else order_records
+        items = self.load_order_item_records() if item_records is None else item_records
+        contacts = self.load_base_records() if base_records is None else base_records
+        plan = plan_pharmacy_scope(orders, items, contacts)
+        # Corrigir totais antes de limpar os itens evita recalcular uma venda
+        # mista usando o total antigo na próxima execução após interrupção.
+        if plan.changed_orders:
+            self._upsert_records_detailed(
+                self.orders,
+                plan.changed_orders,
+                "pedido_chave",
+                ignore_compare_fields={"capturado_em", "farmalider_confirmado_em"},
+            )
+        self._clear_scope_records(
+            self.orders, orders, "pedido_chave", plan.removed_order_keys
+        )
+        self._clear_scope_records(
+            self.order_items, items, "item_chave", plan.removed_item_keys
+        )
+        if plan.changed_contacts:
+            self.upsert_contacts_detailed(plan.changed_contacts)
+        if include_history:
+            plan.history_changed = self._sanitize_scope_rows(
+                self.history, sanitize_contact_order
+            )
+        known = getattr(self, "_known_sheets", {})
+        if "Tickets_Delivery_Weni" in known:
+            changed_by_key = {
+                str(order.get("pedido_chave") or ""): order
+                for order in plan.changed_orders
+            }
+
+            def sanitize_ticket(record):
+                key = str(record.get("pedido_chave") or "")
+                result = dict(record)
+                if key in plan.removed_order_keys:
+                    result["resultado_validacao"] = "FORA_ESCOPO_FARMACIA"
+                    result["vinculo_atendimento"] = "FORA_ESCOPO_FARMACIA"
+                    for field in (
+                        "pedido_chave",
+                        "pedido_id",
+                        "pedido_data",
+                        "pedido_status",
+                        "pedido_valor",
+                    ):
+                        result[field] = ""
+                elif key in changed_by_key:
+                    result["pedido_valor"] = changed_by_key[key]["valor_total_compra"]
+                return result
+
+            plan.tickets_changed = self._sanitize_scope_rows(
+                known["Tickets_Delivery_Weni"], sanitize_ticket
+            )
+        logging.info("Google Sheets: recorte da farmácia concluído: %s.", plan.counts())
+        return plan
+
+    def upsert_pharmacy_orders(
+        self, orders: list[dict[str, Any]], items: list[dict[str, Any]]
+    ) -> tuple[UpsertResult, UpsertResult]:
+        """Grava um snapshot pareado, filtrando antes de enviar ao Google."""
+        by_order: dict[str, list[dict[str, Any]]] = {}
+        for item in items:
+            by_order.setdefault(str(item.get("pedido_chave") or ""), []).append(item)
+        retained_orders = []
+        retained_items = []
+        excluded_keys: set[str] = set()
+        for order in orders:
+            key = str(order.get("pedido_chave") or "")
+            filtered, human_items = filter_pharmacy_order(order, by_order.get(key, []))
+            if filtered is None:
+                excluded_keys.add(key)
+                continue
+            retained_orders.append(filtered)
+            retained_items.extend(human_items)
+        if excluded_keys:
+            old_orders = self.load_order_records()
+            old_items = self.load_order_item_records()
+            self._clear_scope_records(
+                self.orders, old_orders, "pedido_chave", excluded_keys
+            )
+            self._clear_scope_records(
+                self.order_items,
+                old_items,
+                "item_chave",
+                {
+                    str(item.get("item_chave") or "")
+                    for item in old_items
+                    if str(item.get("pedido_chave") or "") in excluded_keys
+                },
+            )
+        order_result = self.upsert_orders_detailed(retained_orders)
+        item_result = self.upsert_order_items_detailed(retained_items)
+        if item_result.removed:
+            # O upsert remove registros obsoletos de seu resultado em memória.
+            # Reconciliações posteriores usam índices físicos; linhas limpas
+            # continuam na aba e precisam permanecer no snapshot recebido.
+            item_result.final_records = self.load_order_item_records()
+        self._pharmacy_excluded_keys = (
+            getattr(self, "_pharmacy_excluded_keys", set()) | excluded_keys
+        ) - {str(order.get("pedido_chave") or "") for order in retained_orders}
+        by_key = getattr(self, "_pharmacy_orders_by_key", {}).copy()
+        by_key.update(
+            {str(order.get("pedido_chave") or ""): order for order in retained_orders}
+        )
+        for key in self._pharmacy_excluded_keys:
+            by_key.pop(key, None)
+        self._pharmacy_orders_by_key = by_key
+        return order_result, item_result
 
 
 # NexoFlow 1.0

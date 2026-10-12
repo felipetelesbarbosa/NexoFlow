@@ -6,6 +6,7 @@ import threading
 import time
 from collections import deque
 from collections.abc import Callable, Iterable, Iterator
+from contextlib import contextmanager
 from typing import TypeVar
 
 T = TypeVar("T")
@@ -50,6 +51,7 @@ class TaskProgress:
         self.byte_count, self.detail = byte_count, detail
         self.interval, self.clock = interval, clock
         self.completed = 0
+        self.activity = ""
         self._stop = threading.Event()
         self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
@@ -60,6 +62,9 @@ class TaskProgress:
         # preparação; evite abrir milhares de barras auxiliares nessa etapa.
         depth = getattr(_ACTIVE, "depth", 0)
         self._visible = depth == 0
+        self._parent = getattr(_ACTIVE, "current", None)
+        if self._visible:
+            _ACTIVE.current = self
         _ACTIVE.depth = depth + 1
         self._started = self.clock()
         self._initial_bytes = self.byte_count() if self.byte_count else 0
@@ -78,11 +83,18 @@ class TaskProgress:
         with self._lock:
             self.completed += count
 
-    def track(self, items: Iterable[T]) -> Iterator[T]:
+    def track(
+        self, items: Iterable[T], *, weight: Callable[[T], int] | None = None
+    ) -> Iterator[T]:
         for item in items:
             yield item
             # Inclui continue (conflitos/já satisfeitos), mas não itens com falha.
-            self.advance()
+            self.advance(weight(item) if weight else 1)
+
+    def set_activity(self, activity: str) -> str:
+        with self._lock:
+            previous, self.activity = self.activity, activity
+            return previous
 
     def report(self, *, finished: bool = False, failed: bool = False) -> None:
         if not self._visible:
@@ -121,6 +133,8 @@ class TaskProgress:
                 count = f"{done}/{self.total} {self.unit}"
             if success:
                 eta = "00:00:00"
+            elif self.total is not None and done == self.total and done > 0:
+                eta = "finalizando"
             elif self.total is not None and done > 0 and elapsed > 0:
                 eta = _duration(max(0, self.total - done) * elapsed / done)
             else:
@@ -131,6 +145,8 @@ class TaskProgress:
                 else ""
             )
             details = f" | {self.detail()}" if self.detail else ""
+            if self.activity:
+                details += f" | {self.activity}"
             state = " | interrompido" if failed else (" | concluído" if success else "")
             logging.info(
                 "%s %s | %s | %.1f %s/s%s | decorrido=%s | restante estimado=%s%s%s",
@@ -151,4 +167,23 @@ class TaskProgress:
         if self._thread is not None:
             self._thread.join()
         _ACTIVE.depth -= 1
+        _ACTIVE.current = self._parent
         self.report(finished=True, failed=exc_type is not None)
+
+
+@contextmanager
+def request_progress(label: str) -> Iterator[None]:
+    """Observe a blocking request without counting attempts as committed work."""
+    active = getattr(_ACTIVE, "current", None)
+    if active is not None:
+        previous = active.set_activity(f"aguardando API: {label}")
+        try:
+            yield
+        finally:
+            active.set_activity(previous)
+    else:
+        with TaskProgress(label, 1, unit="requisições") as progress:
+            progress.set_activity("aguardando resposta da API")
+            yield
+            progress.set_activity("")
+            progress.advance()

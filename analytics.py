@@ -977,6 +977,11 @@ def _parse_order_items(
                 "cliente": client_name,
                 "produto_ordem": str(position),
                 "produto_nome": nome,
+                **(
+                    {"categoria": normalize_value(product["categoria"]).strip()}
+                    if product.get("categoria")
+                    else {}
+                ),
                 "produto_codigo": codigo,
                 "quantidade": _quantity_text(quantidade),
                 "valor_unitario": _money(valor_unitario),

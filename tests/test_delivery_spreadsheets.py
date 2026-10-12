@@ -317,6 +317,13 @@ class DeliverySpreadsheetsTests(unittest.TestCase):
                     store.upsert_order_items_detailed,
                 ):
                     method.return_value.final_records = []
+                store.upsert_pharmacy_orders.return_value = (
+                    store.upsert_orders_detailed.return_value,
+                    store.upsert_order_items_detailed.return_value,
+                )
+                store.reconcile_pharmacy_scope.return_value.orders = []
+                store.reconcile_pharmacy_scope.return_value.items = []
+                store.reconcile_pharmacy_scope.return_value.contacts = []
                 factory = Mock(return_value=store)
                 result = apply_delivery_review(
                     path, weni, store_factory=factory, target=target

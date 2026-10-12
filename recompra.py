@@ -42,6 +42,7 @@ from pedido_utils import (
     serialize_pedido_products,
     serialize_weni_order_list,
 )
+from product_scope import is_animal_product, pharmacy_items
 from purchase_checks import (
     PENDING_PURCHASE_FIELD,
     contact_pending_purchase_check,
@@ -52,6 +53,7 @@ from purchase_checks import (
 )
 
 GROUP = "Recompra FarmaLíder"
+PRODUCT_POLICY = "JANELA_0_A_25_SEM_RECUSA_PRODUTOS_HUMANOS"
 OPT_OUT = "Opt-Out Marketing"
 FLOW = "Recompra FarmaLíder D+25"
 TZ = ZoneInfo("America/Belem")
@@ -709,6 +711,7 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
         "within_window": False,
         "scheduled_future": False,
         "warnings": [],
+        "campaign_products": [],
     }
     diagnostic = text((order or {}).get("status_confirmacao"))
     plan["order_resolution_status"] = diagnostic
@@ -744,7 +747,14 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
                 plan["action"] = "remove"
             return plan
     dt = business_order_datetime((order or {}).get("data_hora"))
-    names = [text(item.get("produto_nome")) for item in items]
+    eligible_items = pharmacy_items(items)
+    names = [text(item.get("produto_nome")) for item in eligible_items]
+    if items and not eligible_items:
+        plan["reason"] = "PEDIDO_SOMENTE_PRODUTOS_ANIMAIS"
+        plan["order_id"] = text((order or {}).get("pedido_id"))
+        if in_group:
+            plan["action"] = "remove"
+        return plan
     valid = bool(
         order
         and _sales_order_is_valid(order)
@@ -752,7 +762,8 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
         and dt
         and dt <= now
         and items
-        and all(names)
+        and all(text(item.get("produto_nome")) for item in items)
+        and names
     )
     if valid and dt is not None:
         order_id = text(order.get("pedido_id"))
@@ -791,6 +802,17 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
                     plan["action"] = "remove"
                 return plan
             plan["order_id"] = order_id
+            plan["campaign_products"] = [
+                {
+                    "produto_nome": text(item.get("produto_nome")),
+                    "categoria": text(item.get("categoria")),
+                }
+                for item in eligible_items
+            ]
+            if len(eligible_items) != len(items):
+                plan["warnings"].append(
+                    "Pedido misto: produtos animais excluídos da mensagem de recompra."
+                )
             plan["purchase"] = {
                 "pedido_id": order_id,
                 "data_hora": dt.isoformat(),
@@ -859,6 +881,33 @@ def audit_plan(plan):
         or not plan["purchase"]
     ):
         raise RuntimeError("Inclusão sem pedido validado na janela de 0 a 25 dias.")
+    if plan["reason"] == "JANELA_0_A_25" or plan["action"] in {"add", "replace"}:
+        products = plan.get("campaign_products")
+        if (
+            not isinstance(products, list)
+            or not products
+            or any(
+                not isinstance(item, dict)
+                or not text(item.get("produto_nome"))
+                or is_animal_product(item)
+                for item in products
+            )
+        ):
+            raise RuntimeError(
+                "Produtos da recompra não foram validados para a campanha humana. Gere um novo dry-run."
+            )
+        expected = serialize_weni_order_list(
+            [text(item["produto_nome"]) for item in products]
+        )
+        effective = plan["fields"].get(
+            "pedido_produtos", plan["guard"]["fields"].get("pedido_produtos")
+        )
+        if field_guard("pedido_produtos", effective) != field_guard(
+            "pedido_produtos", expected
+        ):
+            raise RuntimeError(
+                "Lista de produtos da campanha diverge da revisão de produtos humanos."
+            )
 
 
 def make_review(plans, structure, *, now=None, state=None):
@@ -869,7 +918,7 @@ def make_review(plans, structure, *, now=None, state=None):
         "schema": 1,
         "day": now.astimezone(TZ).date().isoformat(),
         "created_at": now.isoformat(),
-        "policy": "JANELA_0_A_25_SEM_RECUSA",
+        "policy": PRODUCT_POLICY,
         "structure": structure,
         "state_sha256": digest(state or {"schema": 1, "contacts": {}}),
         "plans": plans,
@@ -883,7 +932,7 @@ def write_review(review, path=REVIEW):
     lines = [
         "NexoFlow 1.0 — Revisão de recompra D+25",
         f"Dia local: {review['day']}",
-        "Política: grupo entre 0 e 25 dias; envio somente D+25, bloqueando recusas; marketing_opt_in não será alterado.",
+        "Política: grupo entre 0 e 25 dias; envio somente D+25, bloqueando recusas e pedidos somente animais. Pedidos mistos exibem apenas produtos humanos; marketing_opt_in não será alterado.",
         "Sem disparos, sem alterações de campanha. Horário já passado não cria envio retroativo.",
         "Pendências: " + "; ".join(review["structure"]["errors"]),
         f"Resultados: {dict(counts)}",
@@ -906,7 +955,7 @@ def read_review(path):
         not isinstance(review, dict)
         or data.get("sha256") != digest(review)
         or review.get("schema") != 1
-        or review.get("policy") != "JANELA_0_A_25_SEM_RECUSA"
+        or review.get("policy") != PRODUCT_POLICY
     ):
         raise RuntimeError("Revisão inválida ou alterada. Nenhuma aplicação iniciada.")
     for plan in review["plans"]:
@@ -1018,6 +1067,10 @@ def apply_review(
     purchase_checks_path=None,
 ):
     """Somente snapshots revisados; conflito ou confirmação incerta bloqueia inclusão."""
+    if review.get("policy") != PRODUCT_POLICY:
+        raise RuntimeError(
+            "Revisão anterior ao filtro de produtos animais. Gere um novo dry-run e revise antes de aplicar."
+        )
     now = now_fn()
     ensure_review_current(review, now)
     structure = inspect_structure(weni)
@@ -1094,6 +1147,7 @@ def apply_review(
                     "warnings",
                     "pending_purchase_check",
                     "purchase_check_resolved",
+                    "campaign_products",
                 )
             ):
                 summary["conflitos"] += 1
