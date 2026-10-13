@@ -4,6 +4,10 @@ O NexoFlow padroniza a grafia dos municípios conforme o IBGE e mantém os
 estados por extenso, como **Pará**. Os bairros de Belém e Ananindeua usam as
 referências abaixo, com acentos e correções de grafia revisadas.
 
+No campo cidade desta base, **Pa** significa **Belém**, conforme confirmação
+operacional. Variações de maiúsculas, espaços nas extremidades e caracteres
+invisíveis em **Manaus** recebem a grafia oficial **Manaus**.
+
 Conjuntos e subdivisões permanecem identificados: Cidade Nova 6 e Cidade
 Nova VI, por exemplo, passam a **Cidade Nova VI**. Qualificadores de distrito
 redundantes recebem o nome do bairro, como **Tapanã**.

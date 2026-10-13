@@ -23,7 +23,11 @@ def _text(value: Any) -> str:
 @lru_cache(maxsize=16384)
 def _key(value: str) -> str:
     decomposed = unicodedata.normalize("NFKD", value.casefold())
-    text = "".join(c for c in decomposed if not unicodedata.combining(c))
+    text = "".join(
+        c
+        for c in decomposed
+        if not unicodedata.combining(c) and unicodedata.category(c) != "Cf"
+    )
     return " ".join(re.findall(r"[a-z0-9]+", text))
 
 
@@ -38,6 +42,7 @@ _NEIGHBORHOODS = {
 
 # Grafias revisadas da base. Não usar similaridade livre para trocar localidades.
 _CITY_ALIASES = {
+    "pa": "Belém",  # Interpretação confirmada para o campo cidade desta base.
     "bele": "Belém",
     "belen": "Belém",
     "belenm": "Belém",
@@ -55,7 +60,6 @@ _CITY_ALIASES = {
 }
 _MISPLACED_CITY = {
     "para",
-    "pa",
     "parque verde",
     "cidade nova",
     "curucamba",

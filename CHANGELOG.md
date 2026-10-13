@@ -3,6 +3,7 @@
 ## NexoFlow 1.0
 
 - Padronização de cidades, estados por extenso e bairros nas revisões da Weni, no Sheets e nas fontes do Looker. Referências locais corrigem grafias e distritos redundantes, mantendo conjuntos e subdivisões. Alterações de endereço respeitam a conferência de conflito antes da aplicação.
+- Cidade `Pa` interpretada como Belém conforme confirmação operacional. Grafias de Manaus com diferenças de caixa, espaços nas extremidades ou caracteres invisíveis usam o mesmo nome oficial.
 
 - Catálogo pet amplia a higienização por código de referência e nome exato, reconhecendo também abreviações verificadas da API. A atualização reprocessa o histórico e os indicadores do Sheets e exige nova revisão da Recompra; o catálogo original permanece fora dos pacotes públicos.
 

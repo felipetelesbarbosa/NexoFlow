@@ -109,8 +109,8 @@ class GeographyTests(unittest.TestCase):
         )
 
     def test_misplaced_city_requires_unambiguous_context_without_cep(self):
-        self.assertEqual(canonical_geography("Pa", "Pará", "Umarizal")[0], "Belém")
-        self.assertEqual(canonical_geography("Pa", "Pará", "Coqueiro")[0], "Pa")
+        self.assertEqual(canonical_geography("Para", "Pará", "Umarizal")[0], "Belém")
+        self.assertEqual(canonical_geography("Para", "Pará", "Coqueiro")[0], "Para")
         row = {
             "cidade": "Cidade Nova",
             "estado": "Pará",
@@ -118,6 +118,30 @@ class GeographyTests(unittest.TestCase):
             "cep": "00000000",
         }
         self.assertEqual(normalize_geography(row)["cidade"], "Cidade Nova")
+
+    def test_confirmed_pa_city_is_belem_without_inferring_from_neighborhood(self):
+        for city in ("Pa", "PA", "pa"):
+            for neighborhood in ("", "Castanheira", "Curuçambá"):
+                self.assertEqual(
+                    canonical_geography(
+                        city, "Pará", neighborhood, postal_present=True
+                    )[0],
+                    "Belém",
+                )
+        self.assertEqual(canonical_geography("Pa", "AM", "")[0], "Pa")
+
+    def test_manaus_variants_and_invisible_characters_share_official_spelling(self):
+        for city in (
+            "Manaus",
+            "MANAUS",
+            "manaus\u00a0",
+            "Ma\u200bnaus",
+            "Manaus\ufeff",
+        ):
+            self.assertEqual(
+                canonical_geography(city, "AM", ""), ("Manaus", "Amazonas", "")
+            )
+        self.assertEqual(canonical_geography("Manhuaçu", "MG", "")[0], "Manhuaçu")
 
     def test_normalizer_idempotent_preserves_private_and_business_values(self):
         row = {
