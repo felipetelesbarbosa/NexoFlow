@@ -71,6 +71,7 @@ _NEIGHBORHOOD_ALIASES = {
     "val de caes": "Val-de-Cans",
     "val decaes": "Val-de-Cans",
     "curioutinga": "Curió-Utinga",
+    "tapanaicoaraci": "Tapanã",
     "curio utinga": "Curió-Utinga",
     "curio tinga": "Curió-Utinga",
     "sao braz": "São Brás",
@@ -133,6 +134,10 @@ _ROMANS = {
 _NUMBERS = {r.casefold(): number for number, r in _ROMANS.items()}
 
 _COMMON_NAMES = {
+    "icui": "Icuí",
+    "guajara": "Guajará",
+    "curio": "Curió",
+    "algusto montenegro": "Augusto Montenegro",
     "atlantico": "Atlântico",
     "atlantico 2": "Atlântico II",
     "atlantico ii": "Atlântico II",
@@ -153,16 +158,16 @@ def _neighborhood(value: str, city: str, uf: str) -> str:
         return _COMMON_NAMES[key]
     if not key or (uf and uf != "PA") or (city and city not in NEIGHBORHOODS):
         return value
-    candidates = (
-        (_NEIGHBORHOODS.get(city),)
-        if city in NEIGHBORHOODS
-        else tuple(_NEIGHBORHOODS.values())
-    )
+    # Corrigir a grafia não atribui um município: nomes dos dois catálogos
+    # locais permanecem reconhecíveis quando cidade e bairro estão em conflito.
+    candidates = tuple(_NEIGHBORHOODS.values())
     for catalog in candidates:
         if catalog and key in catalog:
             return catalog[key]
     if key.startswith("bairro "):
         return _neighborhood(value[7:].strip(), city, uf)
+    if key.startswith("icoaraci ") and key[9:] in _NEIGHBORHOODS["Belém"]:
+        return _NEIGHBORHOODS["Belém"][key[9:]]
     # Distrito redundante, sem apagar ruas/números nem escolher entre dois bairros.
     without_district = re.sub(r"\s+(?:icoaraci|outeiro|mosqueiro|bengui)$", "", key)
     if without_district != key:

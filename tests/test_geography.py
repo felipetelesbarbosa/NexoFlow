@@ -94,6 +94,20 @@ class GeographyTests(unittest.TestCase):
             canonical_geography("Santarém", "Pará", "Cfremacao")[2], "Cfremacao"
         )
 
+    def test_spelling_is_corrected_without_switching_a_conflicting_city(self):
+        self.assertEqual(
+            canonical_geography("Ananindeua", "PA", "Cabanazem"),
+            ("Ananindeua", "Pará", "Cabanagem"),
+        )
+        self.assertEqual(
+            canonical_geography("Belém", "Pará", "Levilandia"),
+            ("Belém", "Pará", "Levilândia"),
+        )
+        self.assertEqual(
+            canonical_geography("Belém", "Pará", "Icoaraci Ponta Grossa")[2],
+            "Ponta Grossa",
+        )
+
     def test_misplaced_city_requires_unambiguous_context_without_cep(self):
         self.assertEqual(canonical_geography("Pa", "Pará", "Umarizal")[0], "Belém")
         self.assertEqual(canonical_geography("Pa", "Pará", "Coqueiro")[0], "Pa")
