@@ -49,6 +49,7 @@ from farmalider_client import (
     FarmaliderUnavailableError,
 )
 from farmalider_integration import resolve_contact_order, weni_identity_guard
+from geography import GEOGRAPHY_FIELDS, geography_changes
 from pedido_utils import (
     business_order_datetime,
     effective_order_status_code,
@@ -81,6 +82,7 @@ from urn_utils import (
 from weni_client import WeniClient, WeniError
 
 ALLOWED_WRITE_FIELDS = {
+    *GEOGRAPHY_FIELDS,
     PENDING_PURCHASE_FIELD,
     "contact_urn",
     "contact_urn_whatsapp",
@@ -411,6 +413,8 @@ def _semantic_text(value: Any) -> str:
 
 
 def _same_value(field_name: str, current: Any, proposed: Any) -> bool:
+    if field_name in GEOGRAPHY_FIELDS:
+        return str(current or "") == str(proposed or "")
     if field_name == "cpf":
         current_cpf = normalize_cpf(current)
         proposed_cpf = normalize_cpf(proposed)
@@ -881,6 +885,31 @@ def _set_field_if_changed(
         plan.evidence[field_name] = {"reason": reason}
 
 
+def _sync_contact_geography_fields(
+    plan: ContactUpdatePlan,
+    fields: dict[str, Any],
+    available_fields: set[str] | None,
+) -> None:
+    changes = geography_changes(fields)
+    changes = {
+        key: value
+        for key, value in changes.items()
+        if available_fields is None or key in available_fields
+    }
+    if not changes:
+        return
+    for key in GEOGRAPHY_FIELDS | {"cep"}:
+        plan.guards[key] = fields.get(key)
+    for key, value in changes.items():
+        _set_field_if_changed(
+            plan,
+            fields,
+            key,
+            value,
+            reason="grafia padronizada por referência de município, UF e bairro",
+        )
+
+
 def _purchase_is_cancelled(order: dict[str, str]) -> bool:
     return is_order_cancelled(order)
 
@@ -1097,6 +1126,7 @@ def _build_contact_plan(
     )
 
     _sync_contact_channel_fields(plan, contact, fields)
+    _sync_contact_geography_fields(plan, fields, available_weni_fields)
 
     evidences = infer_contact_fields(
         context_messages,
@@ -1361,6 +1391,18 @@ def audit_plans(
             errors.append(
                 f"{plan.contact_uuid}: campos não autorizados: {', '.join(unknown)}"
             )
+
+        if GEOGRAPHY_FIELDS & set(plan.fields):
+            required = GEOGRAPHY_FIELDS | {"cep"}
+            expected = geography_changes(plan.guards)
+            if not required.issubset(plan.guards) or any(
+                expected.get(key) != value
+                for key, value in plan.fields.items()
+                if key in GEOGRAPHY_FIELDS
+            ):
+                errors.append(
+                    f"{plan.contact_uuid}: padronização de endereço sem fonte válida"
+                )
 
         for field_name, value in plan.fields.items():
             if value is None or str(value).strip() == "":

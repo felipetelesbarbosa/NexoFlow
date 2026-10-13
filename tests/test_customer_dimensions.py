@@ -35,7 +35,7 @@ class CustomerDimensionsTests(unittest.TestCase):
             {
                 "cidade": "Belém",
                 "bairro": "Nazaré",
-                "estado": "PA",
+                "estado": "Pará",
                 "cep": "01234-567",
                 "idade": "37",
             },

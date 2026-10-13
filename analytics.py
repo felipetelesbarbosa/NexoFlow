@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from config import TIPO_PRIMEIRO_ANUNCIO, TIPO_ULTIMO_ANUNCIO
+from geography import normalize_geography
 from pedido_utils import (
     business_order_datetime,
     effective_order_status_code,
@@ -710,7 +711,7 @@ def normalize_contact(
     contact: dict[str, Any],
     sync_time: str,
 ) -> dict[str, str]:
-    fields = get_fields(contact)
+    fields = normalize_geography(get_fields(contact))
     phone, urn = get_phone_and_urn(contact, fields)
     resolved_urns = resolve_contact_urns(contact, fields)
 
@@ -1945,7 +1946,7 @@ def build_bi_order_rows(
 ) -> list[list[Any]]:
     """Order-level table ready for Looker Studio detail/buyers pages."""
     base_by_uuid = {
-        (record.get("contact_uuid") or "").strip(): record
+        (record.get("contact_uuid") or "").strip(): normalize_geography(record)
         for record in base_records
         if (record.get("contact_uuid") or "").strip()
     }

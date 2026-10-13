@@ -2,6 +2,8 @@
 
 ## NexoFlow 1.0
 
+- Padronização de cidades, estados por extenso e bairros nas revisões da Weni, no Sheets e nas fontes do Looker. Referências locais corrigem grafias e distritos redundantes, mantendo conjuntos e subdivisões. Alterações de endereço respeitam a conferência de conflito antes da aplicação.
+
 - Catálogo pet amplia a higienização por código de referência e nome exato, reconhecendo também abreviações verificadas da API. A atualização reprocessa o histórico e os indicadores do Sheets e exige nova revisão da Recompra; o catálogo original permanece fora dos pacotes públicos.
 
 - Recompra e BI da farmácia excluem produtos pet, de uso animal e veterinários. Pedidos mistos mantêm apenas os itens humanos na mensagem e nos dados comerciais, com o valor desses itens sem frete. Cargas saneiam dados antigos, preservam contatos e proteções de CPF/LGPD, e exigem nova revisão da campanha. Snapshots antigos não classificam uma compra nova.

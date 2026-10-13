@@ -2,6 +2,12 @@
 
 **Carga por exports do Delivery:** coloque `Conversas_Delivery.xlsx` e `Contatos_Delivery.xlsx` em `C:\NexoFlow\importacoes` e execute `nexo weni planilhas` ou `nexo analytics planilhas`. Os destinos são separados e exigem revisão antes da aplicação. Consulte [Delivery e carga por planilhas](README%20DELIVERY.md).
 
+## Padronização do endereço
+
+Weni, Analytics e as fontes do Looker padronizam cidades, estados por extenso e bairros. Grafias como `Belem` e `Belenm` recebem **Belém**; `PA` recebe **Pará**. Conjuntos e subdivisões permanecem identificados, como **Cidade Nova VI**. As alterações de endereço da Weni passam pela revisão e pela conferência dos campos atuais antes da aplicação.
+
+As [referências e regras de endereço](docs/geografia.md) acompanham os pacotes. Casos sem referência confiável permanecem para conferência do cadastro.
+
 ## Consulta de CPFs válidos e inválidos
 
 Nas cargas Weni e Analytics, o NexoFlow consulta primeiro os CPFs matematicamente válidos e aguarda essa etapa terminar antes de consultar os inválidos preenchidos. A classificação usa 11 dígitos, rejeição de sequências repetidas e os dois dígitos verificadores. CPFs curtos, dígitos incorretos e valores como `0` ou `00000000000` também são consultados, na segunda etapa. Valores sem dígitos não geram GET. O CPF original permanece no cadastro; a consulta remove a formatação, sem completar, corrigir ou inventar dígitos.

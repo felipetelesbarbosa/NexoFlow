@@ -19,6 +19,7 @@ from analytics import (
     _to_decimal,
     bi_customer_key,
 )
+from geography import normalize_geography
 from pedido_utils import business_order_datetime
 from purchase_checks import (
     contact_pending_purchase_check,
@@ -367,7 +368,9 @@ def build_looker_tables(
     start, end = reporting_period(snapshot_date, period_start, period_end)
     tables: dict[str, list[list[Any]]] = {name: [] for name in SCHEMAS}
     base_by_uuid = {
-        r.get("contact_uuid", ""): r for r in base_records if r.get("contact_uuid")
+        r.get("contact_uuid", ""): normalize_geography(r)
+        for r in base_records
+        if r.get("contact_uuid")
     }
     all_orders = _unique(order_records, "pedido_chave")
     orders = [r for r in all_orders if _sales_order_is_valid(r)]

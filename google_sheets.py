@@ -65,6 +65,7 @@ from config import (
     SHEET_METRICAS_VENDAS,
     SHEET_PEDIDOS,
 )
+from geography import normalize_geography
 from looker_bi import DATE_COLUMNS, TEXT_COLUMNS
 from looker_bi import SCHEMAS as LOOKER_SCHEMAS
 from network_diagnostics import classify_network_failure
@@ -1109,7 +1110,10 @@ class GoogleSheetsStore:
     ) -> UpsertResult:
         return self._upsert_records_detailed(
             self.base,
-            [sanitize_contact_order(record) for record in contacts],
+            [
+                sanitize_contact_order(normalize_geography(record))
+                for record in contacts
+            ],
             "contact_uuid",
             existing_values=existing_values,
             ignore_compare_fields={
@@ -1247,7 +1251,7 @@ class GoogleSheetsStore:
         rows = []
 
         for contact in contacts:
-            contact = sanitize_contact_order(contact)
+            contact = sanitize_contact_order(normalize_geography(contact))
             uuid = contact.get("contact_uuid", "")
             action = "Atualizado" if uuid in existing_uuids_before_sync else "Inserido"
             record = {
