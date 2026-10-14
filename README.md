@@ -2,6 +2,10 @@
 
 **Carga por exports do Delivery:** coloque `Conversas_Delivery.xlsx` e `Contatos_Delivery.xlsx` em `C:\NexoFlow\importacoes` e execute `nexo weni planilhas` ou `nexo analytics planilhas`. Os destinos são separados e exigem revisão antes da aplicação. Consulte [Delivery e carga por planilhas](README%20DELIVERY.md).
 
+## Arquivos Google Sheets separados
+
+O NexoFlow pode manter operação, histórico de alterações e dashboard em três arquivos. As abas `BI_*` permanecem na planilha original, preservando os IDs das fontes do Looker. Execute `dividir_planilhas.bat` com todas as rotinas encerradas e os dois destinos compartilhados como Editor com sua conta de serviço. A cópia é conferida antes da ativação e da retirada das abas originais. Consulte [Divisão dos arquivos](docs/planilhas_separadas.md).
+
 ## Padronização do endereço
 
 Weni, Analytics e as fontes do Looker padronizam cidades, estados por extenso e bairros. Grafias como `Belem` e `Belenm` recebem **Belém**; `PA` recebe **Pará**. Conjuntos e subdivisões permanecem identificados, como **Cidade Nova VI**. As alterações de endereço da Weni passam pela revisão e pela conferência dos campos atuais antes da aplicação.

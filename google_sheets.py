@@ -81,6 +81,7 @@ from pharmacy_scope import (
 )
 from product_scope import pharmacy_items
 from proxy_config import refresh_network_route
+from sheets_storage import STORAGE_SHEET, SheetsStorage
 from task_progress import TaskProgress, request_progress
 
 
@@ -145,6 +146,9 @@ class GoogleSheetsStore:
         self._control_values_cache: list[list[str]] | None = None
         self._read_requests = 0
         self._write_requests = 0
+        self._hub_id = spreadsheet_id
+        self._storage_books: dict[str, Any] = {}
+        self._storage_layout: SheetsStorage | None = None
         self._initialize_structure(validate_structure=validate_structure)
 
     def close(self) -> None:
@@ -226,7 +230,58 @@ class GoogleSheetsStore:
             "listar abas da planilha",
             self.book.worksheets,
         )
+        storage_sheet = next(
+            (ws for ws in worksheets if ws.title == STORAGE_SHEET), None
+        )
+        if storage_sheet is not None:
+            values = self._read_with_retry(
+                "ler configuração dos arquivos Google Sheets",
+                lambda: storage_sheet.get("A1:B5"),
+            )
+            layout = SheetsStorage.from_values(values, self._hub_id)
+            books = {layout.dashboard: self.book}
+            for role, book_id in (
+                ("operação", layout.operations),
+                ("histórico", layout.history),
+            ):
+                books[book_id] = self._read_with_retry(
+                    f"abrir arquivo de {role}",
+                    lambda book_id=book_id: self.client.open_by_key(book_id),
+                )
+            self._storage_layout = layout
+            self._storage_books = books
+            worksheets = [
+                ws
+                for ws in worksheets
+                if layout.destination(ws.title) == layout.dashboard
+            ]
+            for book_id in (layout.operations, layout.history):
+                worksheets.extend(
+                    ws
+                    for ws in self._read_with_retry(
+                        "listar abas do arquivo separado", books[book_id].worksheets
+                    )
+                    if layout.destination(ws.title) == book_id
+                )
+            logging.info(
+                "Google Sheets: operação, histórico e dashboard em arquivos separados."
+            )
         sheets_by_title = {ws.title: ws for ws in worksheets}
+        if storage_sheet is not None:
+            required_data = {
+                SHEET_BASE_CONTATOS,
+                SHEET_HISTORICO,
+                SHEET_PEDIDOS,
+                SHEET_ITENS_PEDIDOS,
+                SHEET_CONTROLE,
+            }
+            missing = sorted(required_data - sheets_by_title.keys())
+            if missing:
+                raise RuntimeError(
+                    "Arquivos separados sem as abas essenciais: "
+                    + ", ".join(missing)
+                    + ". Confira a migração; nenhuma estrutura vazia foi criada."
+                )
         self._known_sheets = sheets_by_title
         expected = self.schema_fingerprint()
         stored = ""
@@ -559,6 +614,12 @@ class GoogleSheetsStore:
             headers.pop()
         return headers
 
+    def _book_for_title(self, title: str):
+        layout = getattr(self, "_storage_layout", None)
+        if layout is None:
+            return self.book
+        return self._storage_books[layout.destination(title)]
+
     def _get_or_create_sheet(
         self,
         title: str,
@@ -575,12 +636,12 @@ class GoogleSheetsStore:
             try:
                 ws = self._read_with_retry(
                     f"localizar aba {title}",
-                    lambda title=title: self.book.worksheet(title),
+                    lambda title=title: self._book_for_title(title).worksheet(title),
                 )
             except WorksheetNotFound:
                 ws = self._write_with_retry(
                     f"criação da aba {title}",
-                    lambda: self.book.add_worksheet(
+                    lambda: self._book_for_title(title).add_worksheet(
                         title=title,
                         rows=rows,
                         cols=max(len(headers), 5),

@@ -2,6 +2,8 @@
 
 ## NexoFlow 1.0
 
+- Operação, histórico e dashboard podem usar arquivos separados, com descoberta automática pela planilha original. A migração copia abas nativas, confere o conteúdo em blocos e só retira os originais após a ativação e nova conferência. As fontes BI do Looker mantêm arquivo e IDs das abas.
+
 - Sheets reserva exatamente as linhas necessárias antes de iniciar o upsert de cada tabela. Falta de capacidade nessa reserva interrompe a tabela antes de alterar registros existentes, com orientação para liberar espaço sem apagar dados automaticamente.
 
 - Sheets recupera falhas de rede durante a autenticação Google, revalida a rota configurada e repete a operação dentro dos limites existentes. Recusas de autenticação e falhas de certificado continuam interrompendo a execução.
