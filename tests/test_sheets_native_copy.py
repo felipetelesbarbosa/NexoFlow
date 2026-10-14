@@ -135,3 +135,35 @@ class NativeCopyTests(unittest.TestCase):
         self.assertEqual(
             self.client.books["operations"].sheets[0].values, source.values
         )
+
+    def test_omitted_trailing_empty_cell_metadata_is_equivalent_to_empty_cells(self):
+        self.migration.copy_and_verify(self.planned)
+        destination = self.client.books["operations"]
+        getter = destination.fetch_sheet_metadata
+        source = self.planned[0]
+        source.values[1][1] = ""
+        destination.sheets[0].values[1][1] = ""
+
+        def sparse_cells(params=None):
+            result = getter(params)
+            result["sheets"][0]["data"][0]["rowData"][1]["values"] = result["sheets"][
+                0
+            ]["data"][0]["rowData"][1]["values"][:1]
+            return result
+
+        # A origem representa uma célula vazia sem userEnteredValue.
+        original_book = self.client.books["dashboard"]
+        original_getter = original_book.fetch_sheet_metadata
+
+        def explicit_empty(params=None):
+            result = original_getter(params)
+            result["sheets"][0]["data"][0]["rowData"][1]["values"][1] = {}
+            return result
+
+        with (
+            patch.object(destination, "fetch_sheet_metadata", side_effect=sparse_cells),
+            patch.object(
+                original_book, "fetch_sheet_metadata", side_effect=explicit_empty
+            ),
+        ):
+            self.migration._verify_native(source, destination.sheets[0], destination)

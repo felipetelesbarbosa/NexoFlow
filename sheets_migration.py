@@ -139,7 +139,7 @@ class SheetsMigration:
             raise ValueError(f"Estrutura de grade divergente em {source.title}.")
 
         def safe_cells(sheet):
-            return [
+            rows = [
                 [
                     {
                         key: value
@@ -159,6 +159,12 @@ class SheetsMigration:
                 for data in sheet.get("data", [])
                 for row in data.get("rowData", [])
             ]
+            # O Google pode omitir células finais sem conteúdo nativo.
+            # Uma representação esparsa equivale às mesmas células vazias.
+            width = sheet["properties"]["gridProperties"]["columnCount"]
+            height = min(2, sheet["properties"]["gridProperties"]["rowCount"])
+            rows += [[] for _ in range(height - len(rows))]
+            return [row + [{} for _ in range(width - len(row))] for row in rows]
 
         if safe_cells(original) != safe_cells(copied):
             raise ValueError(f"Estrutura nativa divergente em {source.title}.")
