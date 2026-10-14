@@ -207,10 +207,17 @@ class SheetsMigration:
         worksheets = original.worksheets()
         config = next((ws for ws in worksheets if ws.title == STORAGE_SHEET), None)
         if config:
-            current = SheetsStorage.from_values(
-                config.get("A1:B5"), self.layout.dashboard
-            )
-            if current != self.layout:
+            values = config.get("A1:B5")
+            if not any(any(row) for row in values):
+                if not self.state["copies"] or not all(
+                    entry.get("verified") for entry in self.state["copies"].values()
+                ):
+                    raise ValueError(
+                        "Configuração vazia sem uma migração conferida para retomada."
+                    )
+            elif (
+                SheetsStorage.from_values(values, self.layout.dashboard) != self.layout
+            ):
                 raise ValueError("O arquivo original já aponta para outros destinos.")
         managed_titles = managed_titles | {"Tickets_Delivery_Weni"}
         planned = [
@@ -348,10 +355,57 @@ class SheetsMigration:
         existing = {ws.title: ws for ws in original.worksheets()}
         config = existing.get(STORAGE_SHEET)
         if config is None:
-            config = original.add_worksheet(title=STORAGE_SHEET, rows=5, cols=2)
-        config.update(
-            range_name="A1:B5", values=self.layout.values(), value_input_option="RAW"
-        )
+            occupied = {ws.id for ws in existing.values()}
+            sheet_id = 1
+            while sheet_id in occupied:
+                sheet_id += 1
+            original.batch_update(
+                {
+                    "requests": [
+                        {
+                            "addSheet": {
+                                "properties": {
+                                    "sheetId": sheet_id,
+                                    "title": STORAGE_SHEET,
+                                    "gridProperties": {
+                                        "rowCount": 5,
+                                        "columnCount": 2,
+                                        "frozenRowCount": 1,
+                                    },
+                                }
+                            }
+                        },
+                        {
+                            "updateCells": {
+                                "range": {
+                                    "sheetId": sheet_id,
+                                    "startRowIndex": 0,
+                                    "endRowIndex": 5,
+                                    "startColumnIndex": 0,
+                                    "endColumnIndex": 2,
+                                },
+                                "rows": [
+                                    {
+                                        "values": [
+                                            {"userEnteredValue": {"stringValue": value}}
+                                            for value in row
+                                        ]
+                                    }
+                                    for row in self.layout.values()
+                                ],
+                                "fields": "userEnteredValue",
+                            }
+                        },
+                    ]
+                }
+            )
+            config = original.get_worksheet_by_id(sheet_id)
+        else:
+            config.update(
+                range_name="A1:B5",
+                values=self.layout.values(),
+                value_input_option="RAW",
+            )
         if (
             SheetsStorage.from_values(config.get("A1:B5"), self.layout.dashboard)
             != self.layout

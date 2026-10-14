@@ -2,6 +2,8 @@
 
 ## NexoFlow 1.0
 
+- Ativação da divisão cria a aba de configuração e seus valores em um único batch atômico. Uma configuração vazia de uma interrupção anterior só pode ser reparada pela migração quando o registro privado comprova todas as cópias verificadas.
+
 - Transferência nativa usa blocos menores e grava apenas os campos necessários, com repetição idempotente em timeouts. Progresso retomado separa linhas antigas da medição de velocidade e tempo restante.
 
 - Migração do Sheets recupera erros internos da cópia integral de abas grandes com transferência nativa em blocos, preservando tipos de células, formatos e dimensões. Cada bloco confirmado registra a retomada; os originais só são retirados após nova comparação integral.

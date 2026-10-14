@@ -167,3 +167,24 @@ class NativeCopyTests(unittest.TestCase):
             ),
         ):
             self.migration._verify_native(source, destination.sheets[0], destination)
+
+    def test_activation_creates_and_populates_registry_in_one_atomic_batch(self):
+        self.migration.copy_and_verify(self.planned)
+        book = self.client.books["dashboard"]
+        with patch.object(book, "batch_update", wraps=book.batch_update) as write:
+            self.migration.activate(self.planned)
+        self.assertEqual(len(write.call_args.args[0]["requests"]), 2)
+        registry = next(ws for ws in book.sheets if ws.title == "NexoFlow_Arquivos")
+        self.assertEqual(registry.values, self.layout.values())
+
+    def test_empty_registry_after_interruption_is_repaired_only_with_verified_copies(
+        self,
+    ):
+        book = self.client.books["dashboard"]
+        book.add_worksheet(title="NexoFlow_Arquivos", rows=5, cols=2)
+        with self.assertRaisesRegex(ValueError, "sem uma migração"):
+            self.migration.plan({ws.title for ws in self.planned})
+        self.migration.copy_and_verify(self.planned)
+        self.assertEqual(len(self.migration.plan({ws.title for ws in self.planned})), 2)
+        self.migration.activate(self.planned)
+        self.assertTrue(self.migration.state["active"])

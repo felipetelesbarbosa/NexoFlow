@@ -129,6 +129,8 @@ class Book:
                     rows=grid["rowCount"],
                     cols=grid["columnCount"],
                 )
+                if "sheetId" in props:
+                    ws.id = props["sheetId"]
                 replies.append({"addSheet": {"properties": {"sheetId": ws.id}}})
             elif "updateCells" in request:
                 update = request["updateCells"]
