@@ -985,7 +985,7 @@ def _apply_purchase_candidate(
             )
             logging.log(
                 identity_level,
-                "Weni [contato_ref=%s]: pedido bloqueado: %s; nome e e-mail ou telefone não identificaram um cliente único.",
+                "Weni [contato_ref=%s]: pedido bloqueado: %s; primeiro nome ou telefone local não identificaram um cliente único.",
                 reference,
                 order["status_confirmacao"],
             )
@@ -1484,7 +1484,7 @@ def audit_plans(
                 and not plan.guards.get("__invalid_cpf_identity")
             ):
                 errors.append(
-                    f"{plan.contact_uuid}: CPF inválido exige nova validação de nome e e-mail ou telefone; gere outro dry-run"
+                    f"{plan.contact_uuid}: CPF inválido exige nova validação por primeiro nome ou telefone local; gere outro dry-run"
                 )
             payment = normalize_value(
                 plan.fields.get(
