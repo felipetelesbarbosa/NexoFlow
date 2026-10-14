@@ -20,6 +20,28 @@ class FarmaliderIntegrationTests(unittest.TestCase):
             "52998224725",
         )
 
+    def test_numeric_cpf_lost_leading_zeros_is_restored_only_with_valid_checksum(self):
+        full = "00000000191"
+        self.assertTrue(is_valid_cpf(full))
+        for raw in ("191", 191):
+            self.assertEqual(normalize_cpf(raw), full)
+            self.assertTrue(is_valid_cpf(raw))
+        for raw in ("0", "123", "11111111111", "", "¹", "１２３"):
+            self.assertEqual(normalize_cpf(raw), raw)
+            self.assertFalse(is_valid_cpf(raw))
+        self.assertEqual(normalize_cpf("52998224724"), "52998224724")
+        self.assertFalse(is_valid_cpf("52998224724"))
+
+    def test_zero_restored_valid_cpf_does_not_require_name_phone_or_email(self):
+        self.assertEqual(
+            cliente_link_status(
+                "191",
+                {"id": 321, "cpf": 191, "nome": "Cliente Teste"},
+                weni_identity={},
+            )[:2],
+            ("CPF_CONFIRMADO", "321"),
+        )
+
     def test_valid_cpf(self):
         self.assertTrue(is_valid_cpf("529.982.247-25"))
         self.assertFalse(is_valid_cpf("111.111.111-11"))

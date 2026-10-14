@@ -177,13 +177,16 @@
 inválidos</h2>
 <p>Nas cargas Weni e Analytics, o NexoFlow consulta primeiro os CPFs
 matematicamente válidos e aguarda essa etapa terminar antes de consultar
-os inválidos preenchidos. A classificação usa 11 dígitos, rejeição de
-sequências repetidas e os dois dígitos verificadores. CPFs curtos,
-dígitos incorretos e valores como <code>0</code> ou
-<code>00000000000</code> também são consultados, na segunda etapa.
-Valores sem dígitos não geram GET. O CPF original permanece no cadastro;
-a consulta remove a formatação, sem completar, corrigir ou inventar
-dígitos.</p>
+os inválidos preenchidos. Antes de classificar um CPF curto, o NexoFlow
+testa a reposição de zeros à esquerda até 11 dígitos; aceita essa forma
+somente quando os dois dígitos verificadores são válidos. A
+classificação rejeita sequências repetidas e dígitos incorretos.
+Identificadores que continuam inválidos após essa verificação e valores
+como <code>0</code> ou <code>00000000000</code> também são consultados,
+na segunda etapa. Valores sem dígitos não geram GET. O CPF original
+permanece no cadastro; a consulta remove a formatação e usa zeros à
+esquerda somente quando a validação matemática comprova a forma de 11
+dígitos. Não troca dígitos existentes.</p>
 <p>O Analytics deduplica os identificadores por execução e separa os
 lotes das duas etapas. As cargas Weni em partes seguem essa prioridade
 dentro da parte selecionada, preservando o manifesto e a revisão humana.
@@ -838,4 +841,4 @@ dos itens do período e sinaliza ausência ou divergência em
 comerciais.</p>
 </body>
 </html>
-<!-- NexoFlow documentation: source-sha256=477df932f5396edc8a4b638ff456991b72619830c9c5340e87b97283a97bc8db content-sha256=4e917b0455122e1aed39b78ee7add6b4d33d9266d42e7365c64c1450b400a4d7 -->
+<!-- NexoFlow documentation: source-sha256=97196b434f8e6095423c6aeff2361befe35bb9cbb2b571027712e5ecc63220e5 content-sha256=b6c1759e16277d49072ac20a2dc940c0b974f5f19b55cc918745c580d4490e95 -->

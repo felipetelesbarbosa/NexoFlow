@@ -594,14 +594,15 @@ BI_STATUS_COLUMNS = [
 
 def normalize_cpf(value: Any, pad_to_11: bool = False) -> str:
     digits = "".join(ch for ch in normalize_value(value) if ch.isdigit())
-    if pad_to_11 and digits and len(digits) < 11:
-        digits = digits.zfill(11)
+    if digits and len(digits) < 11:
+        candidate = digits.zfill(11)
+        if pad_to_11 or _cpf_checksum_valid(candidate):
+            digits = candidate
     return digits
 
 
-def is_valid_cpf(value: Any) -> bool:
-    cpf = normalize_cpf(value)
-    if len(cpf) != 11 or cpf == cpf[0] * 11:
+def _cpf_checksum_valid(cpf: str) -> bool:
+    if len(cpf) != 11 or not cpf.isascii() or not cpf.isdecimal() or cpf == cpf[0] * 11:
         return False
 
     def digit(base: str, factor: int) -> str:
@@ -613,6 +614,10 @@ def is_valid_cpf(value: Any) -> bool:
         return "0" if result == 10 else str(result)
 
     return cpf[9] == digit(cpf[:9], 10) and cpf[10] == digit(cpf[:10], 11)
+
+
+def is_valid_cpf(value: Any) -> bool:
+    return _cpf_checksum_valid(normalize_cpf(value))
 
 
 def cpf_query_priority(value: Any) -> int:
