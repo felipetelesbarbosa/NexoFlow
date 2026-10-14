@@ -84,7 +84,7 @@ class OrderItemReconciliationTests(unittest.TestCase):
     def test_duplicate_new_keys_create_one_row_and_repeat_without_writes(self):
         headers = ["pedido_chave", "contact_uuid", "valor_total_compra"]
         values = [headers]
-        ws = Mock(title="Pedidos_FarmaLider")
+        ws = Mock(title="Pedidos_FarmaLider", row_count=1000)
         ws.get_all_values.side_effect = lambda: deepcopy(values)
         ws.append_rows.side_effect = lambda rows, **kwargs: values.extend(
             deepcopy(rows)

@@ -24,6 +24,7 @@ from pedido_utils import serialize_pedido_products
 class MemoryWorksheet:
     def __init__(self, title, headers):
         self.title = title
+        self.row_count = 1000
         self.values = [list(headers)]
 
     def get_all_values(self):

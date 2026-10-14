@@ -129,6 +129,7 @@ class MemoryWorksheet:
 
     def __init__(self, title, columns):
         self.title = title
+        self.row_count = 1000
         self.values = [list(columns)]
 
     def get_all_values(self):

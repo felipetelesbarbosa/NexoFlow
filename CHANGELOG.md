@@ -2,6 +2,8 @@
 
 ## NexoFlow 1.0
 
+- Sheets reserva exatamente as linhas necessárias antes de iniciar o upsert de cada tabela. Falta de capacidade nessa reserva interrompe a tabela antes de alterar registros existentes, com orientação para liberar espaço sem apagar dados automaticamente.
+
 - Sheets recupera falhas de rede durante a autenticação Google, revalida a rota configurada e repete a operação dentro dos limites existentes. Recusas de autenticação e falhas de certificado continuam interrompendo a execução.
 
 - Padronização de cidades, estados por extenso e bairros nas revisões da Weni, no Sheets e nas fontes do Looker. Referências locais corrigem grafias e distritos redundantes, mantendo conjuntos e subdivisões. Alterações de endereço respeitam a conferência de conflito antes da aplicação.

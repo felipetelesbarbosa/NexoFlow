@@ -468,7 +468,7 @@ class TypedSheetTests(unittest.TestCase):
     ):
         headers = ["pedido_chave", "contact_uuid", "valor_total_compra"]
         values = [headers, ["FARMALIDER:1", "u1", "10"]]
-        ws = Mock(title="Pedidos_FarmaLider")
+        ws = Mock(title="Pedidos_FarmaLider", row_count=1000)
         ws.get_all_values.side_effect = lambda: copy.deepcopy(values)
         ws.append_rows.side_effect = lambda rows, **kwargs: values.extend(
             copy.deepcopy(rows)

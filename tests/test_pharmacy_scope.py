@@ -93,6 +93,7 @@ def fixture(*, pet_only=False, order_id="700"):
 class Worksheet:
     def __init__(self, title, headers, records=()):
         self.title = title
+        self.row_count = 1000
         self.values = [list(headers)] + [
             [str(record.get(header) or "") for header in headers] for record in records
         ]

@@ -902,6 +902,30 @@ class GoogleSheetsStore:
 
         return self._write_with_retry("append_rows em Historico_Alteracoes", write)
 
+    def _reserve_table_rows(self, ws, required_rows: int) -> None:
+        """Reserve only the rows needed, before changing existing records."""
+        current_rows = ws.row_count
+        if required_rows <= current_rows:
+            return
+        logging.info(
+            "Google Sheets: %s - reservando exatamente %s linha(s) adicionais.",
+            ws.title,
+            required_rows - current_rows,
+        )
+        try:
+            self._write_with_retry(
+                f"reservar linhas em {ws.title}",
+                lambda: ws.resize(rows=required_rows),
+            )
+        except APIError as exc:
+            if "number of cells" in str(exc).lower():
+                raise RuntimeError(
+                    f"Google Sheets: capacidade insuficiente para ampliar {ws.title}. "
+                    "Nenhuma gravação desta tabela foi iniciada. Libere células vazias "
+                    "ou arquive o histórico antes de retomar; os dados existentes foram preservados."
+                ) from exc
+            raise
+
     def _upsert_records_detailed(
         self,
         ws,
@@ -1034,6 +1058,9 @@ class GoogleSheetsStore:
                 existing[key] = (len(final_rows) + 1, appended)
                 changed_records.append(dict(zip(headers, appended, strict=False)))
                 inserted += 1
+
+        if appends:
+            self._reserve_table_rows(ws, len(values) + len(appends))
 
         update_batches = self._adaptive_batches(
             updates,

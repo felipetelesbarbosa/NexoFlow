@@ -96,7 +96,7 @@ class AnalyticsProgressTests(unittest.TestCase):
         )
         store = GoogleSheetsStore.__new__(GoogleSheetsStore)
         store._last_write_started_at = 0
-        ws = Mock(title="Base_Contatos")
+        ws = Mock(title="Base_Contatos", row_count=1000)
         ws.title = "Base_Contatos"
 
         def waiting(*args, **kwargs):
