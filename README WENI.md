@@ -311,7 +311,7 @@ Regras:
 - `pedido_id` é o primeiro localizador de fallback quando o GET por CPF não puder ser usado;
 - `ultimo_pedido` é o **último localizador**: ele pode vir de outra integração e serve somente para recuperar um ID de pedido que depois será confirmado em `GET pedido/{id}`;
 - `ultimo_pedido` nunca substitui a API como fonte de produtos, valores, status, data ou pagamento; se a FarmaLíder estiver indisponível, os campos `pedido_*` existentes são preservados e não são reconstruídos a partir do snapshot legado;
-- `ultima_compra`, quando o campo existe, avança nas rotinas convencionais somente para pedido confirmado pela FarmaLíder com status efetivo 4, 1 ou 2, sem cancelamento explícito e sem pagamento 0; somente esses pedidos entram nas métricas de venda.
+- `ultima_compra`, quando o campo existe, avança nas rotinas convencionais somente para pedido confirmado pela FarmaLíder com status efetivo -2, -1, 0, 4, 1 ou 2, sem cancelamento explícito e sem pagamento 0; somente esses pedidos entram nas métricas de venda.
 
 Os campos `pedido_id`, `pedido_data`, `pedido_status`, `pedido_produtos`, `pedido_quantidade_itens`, `pedido_valor_produtos`, `pedido_valor` e `pedido_forma_pagamento` são obrigatórios na Weni. Se qualquer um estiver ausente, o preflight bloqueia a execução antes de qualquer atualização de pedido.
 
@@ -319,7 +319,7 @@ Os campos `pedido_id`, `pedido_data`, `pedido_status`, `pedido_produtos`, `pedid
 
 O campo opcional de Texto `pedido_revisao_pendente` sinaliza uma compra posterior ainda não confirmada pela API. Ele guarda a data da evidência, sem alterar `pedido_data` ou inventar número e produtos. Com esse campo, o bloqueio da referência antiga de recompra permanece entre instalações. Uma confirmação oficial no mesmo dia ou depois resolve a pendência; o NexoFlow Weni grava `resolvido`. No Sheets, o campo aparece em `Base_Contatos`, com indicadores em `BI_Publico`, `BI_Clientes` e `BI_Qualidade`.
 
-Pedidos com status -2, -1, 0, 1 ou 4 permanecem na fila de rechecagem até chegarem a 2, Concluído, ou 3, Cancelado. Os estados -2, -1 e 0 não contam como vendas; 4 e 1 já contam, mas continuam em rechecagem.
+Pedidos com status -2, -1, 0, 1 ou 4 permanecem na fila de rechecagem até chegarem a 2, Concluído, ou 3, Cancelado. Todos os estados documentados não cancelados contam como vendas. A cada nova carga, os pedidos no escopo selecionado são reconsultados, mesmo sem nova mensagem ou alteração na Weni.
 
 ## Incremental e checkpoint
 

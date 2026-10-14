@@ -8,7 +8,7 @@ A regra final considera as respostas mais recentes: o grupo **Recompra FarmaLíd
 
 Exemplo em 09/10/2026: compras de 15/09 ficam no grupo (24 dias), compras de 14/09 ficam no grupo (25 dias) e compras de 13/09 saem (26 dias). Apenas a compra de 14/09 pode passar pela guarda D+25 do fluxo naquele dia. Uma compra de um ano atrás não recebe recuperação retroativa.
 
-A regra de confirmação é a mesma do NexoFlow: status 4, 1 ou 2, validação oficial da identidade e do pedido, produtos identificados e nenhuma condição de cancelamento, incluindo pagamento 0. Status -2, -1, 0 e 3 não autorizam essa campanha. Essa é a classificação operacional adotada; não acrescentamos um comprovante financeiro que a API não fornece.
+A regra de confirmação é a mesma do NexoFlow: status -2, -1, 0, 4, 1 ou 2, validação oficial da identidade e do pedido, produtos identificados e nenhuma condição de cancelamento, incluindo pagamento 0. Status 3 ou desconhecido não autoriza essa campanha; os demais estados documentados são vendas realizadas, mantendo as regras D+25 e de marketing. Essa é a classificação operacional adotada; não acrescentamos um comprovante financeiro que a API não fornece.
 
 Conforme a orientação posterior do responsável, bloqueiam **Opt-Out Marketing** e valores de recusa em `marketing_opt_in`, inclusive `recusado`, `Não`, `nao` e `negado`. Campo vazio não bloqueia nesta política, denominada `JANELA_0_A_25_SEM_RECUSA_PRODUTOS_HUMANOS`. Isso não é registrado como consentimento: o NexoFlow não preenche `marketing_opt_in` nem adiciona a Opt-In Marketing. Essa política substitui o critério anterior de exigir autorização positiva em outra origem.
 

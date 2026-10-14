@@ -1011,7 +1011,7 @@ def main() -> int:
             farm_settings=farm_settings,
             sync_time=sync_time,
             existing_by_uuid=existing_by_uuid,
-            reuse_existing=not force_full,
+            reuse_existing=False,
             identity_by_uuid={
                 str(contact.get("uuid") or ""): weni_customer_identity(contact)
                 for contact in contacts_to_process

@@ -358,7 +358,7 @@ pedido_faturamento_total = produtos + frete
 
 As abas `BI_Resumo_Diario` e `BI_Vendas` também separam faturamento de produtos, faturamento de frete e faturamento total. O campo de faturamento usado nos indicadores gerais passa a considerar **produtos + frete**, para bater com o valor total cobrado do pedido.
 
-No Analytics e no Looker Studio, pedidos validados pela API em qualquer estado documentado não cancelado entram nas métricas de venda, incluindo **Em processamento (0)**. Cancelamento explícito, status 3 ou pagamento 0 excluem a venda; status desconhecido permanece pendente. A mesma regra atualiza `ultima_compra` e a validação de venda da Recompra, preservando identidade, itens, janela D+25 e bloqueios de marketing. Toda nova carga reconsulta a API no escopo selecionado, inclusive pedidos anteriormente concluídos ou cancelados.
+Em todo o NexoFlow, pedidos validados pela API em qualquer estado documentado não cancelado entram nas métricas de venda, incluindo **Em processamento (0)**. Cancelamento explícito, status 3 ou pagamento 0 excluem a venda; status desconhecido permanece pendente. A mesma regra atualiza `ultima_compra` e a validação de venda da Recompra, preservando identidade, itens, janela D+25 e bloqueios de marketing. Toda nova carga reconsulta a API no escopo selecionado, inclusive pedidos anteriormente concluídos ou cancelados.
 
 Pedidos abertos em **Em aberto (-2)**, **Pendente de pagamento (-1)**, **Em processamento (0)**, **Pronto para rota (4)** ou **Em trânsito (1)** permanecem em fila de rechecagem até chegarem a **Concluído** ou **Cancelado**.
 

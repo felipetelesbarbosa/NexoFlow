@@ -128,7 +128,7 @@ De-para usado pela integração:
 
 A Weni recebe o **código efetivo** em `pedido_status`. Os nomes oficiais do enum, como `EmAberto`, `PendenteDePagamento`, `EmProcessamento`, `ProntoParaRota`, `EmTransito`, `Concluido` e `Cancelado`, são normalizados para -2 a 4. O Analytics deriva `pedido_status_nome` para apresentação no Google Sheets/Looker Studio. Se `formaPagamento=0` ou `_`, o status efetivo é 3, Cancelado, mesmo que a API informe outro status. Cancelamento explícito também prevalece. `Pedidos_FarmaLider` preserva o status bruto em `farmalider_status_pedido`; Weni e `BI_Pedidos` aplicam o status efetivo.
 
-Pedidos validados pela API com status efetivo 4 (Pronto para rota), 1 (Em trânsito) ou 2 (Concluído), sem cancelamento, contam como venda e atualizam `ultima_compra`. Os estados -2, -1, 0 e 3 ficam fora das métricas de venda.
+Pedidos validados pela API nos estados -2, -1, 0, 4, 1 e 2 contam como venda e atualizam `ultima_compra`. Status 3, cancelamento explícito ou pagamento 0 excluem a venda; estados desconhecidos permanecem pendentes.
 
 ## Forma de pagamento
 
@@ -192,7 +192,7 @@ Uma linha por item, com:
 
 ### Metricas_Vendas
 
-Agregação diária para pedidos validados pela API com status efetivo 4, 1 ou 2, sem cancelamento, compradores, unidades e faturamento.
+Agregação diária para pedidos validados pela API com status efetivo -2, -1, 0, 4, 1 ou 2, sem cancelamento, compradores, unidades e faturamento.
 
 ### BI_Pedidos
 
