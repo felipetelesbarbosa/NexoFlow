@@ -357,24 +357,39 @@ class SheetsMigration:
         # Fontes BI são valores materializados. Fórmulas que dependem de abas
         # movidas precisam de revisão, não de remoção automática.
         moving_names = {ws.title.casefold() for ws in worksheets}
-        for remaining in original.worksheets():
-            if remaining.id in moving_ids or remaining.title == STORAGE_SHEET:
-                continue
-            for _, rows in self._blocks(original, remaining):
-                if any(
-                    isinstance(value, str)
-                    and value.startswith("=")
-                    and any(
-                        f"{name}!" in value.casefold()
-                        or f"'{name}'!" in value.casefold()
-                        for name in moving_names
-                    )
-                    for row in rows
-                    for value in row
-                ):
-                    raise ValueError(
-                        f"Fórmula em {remaining.title} depende de uma aba movida; limpeza interrompida."
-                    )
+        remaining_sheets = [
+            ws
+            for ws in original.worksheets()
+            if ws.id not in moving_ids and ws.title != STORAGE_SHEET
+        ]
+        context = (
+            progress_factory(
+                "Migração: conferindo dependências do dashboard",
+                sum(ws.row_count for ws in remaining_sheets),
+                unit="linhas",
+            )
+            if progress_factory
+            else nullcontext(None)
+        )
+        with context as progress:
+            for remaining in remaining_sheets:
+                for row_count, rows in self._blocks(original, remaining):
+                    if any(
+                        isinstance(value, str)
+                        and value.startswith("=")
+                        and any(
+                            f"{name}!" in value.casefold()
+                            or f"'{name}'!" in value.casefold()
+                            for name in moving_names
+                        )
+                        for row in rows
+                        for value in row
+                    ):
+                        raise ValueError(
+                            f"Fórmula em {remaining.title} depende de uma aba movida; limpeza interrompida."
+                        )
+                    if progress:
+                        progress.advance(row_count)
         # Reconfere origem e destino imediatamente antes de cada retirada.
         for source in worksheets:
             entry = self.state["copies"][source.title]
