@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 import gspread
+from google.auth.exceptions import TransportError as GoogleAuthTransportError
 
 if TYPE_CHECKING:
     from gspread.worksheet import Worksheet
@@ -334,7 +335,7 @@ class GoogleSheetsStore:
         return status == 429 or (status is not None and 500 <= status < 600)
 
     def _read_with_retry(self, description: str, func):
-        """Executa leitura com timeout/retry para rede, 429 e erros 5xx."""
+        """Executa leitura com retry de rede/autenticação, 429 e erros 5xx."""
         with request_progress("Google Sheets: " + description):
             attempts = max(1, int(GOOGLE_SHEETS_READ_MAX_RETRIES))
 
@@ -384,7 +385,7 @@ class GoogleSheetsStore:
                         wait,
                     )
                     time.sleep(wait)
-                except RequestException as exc:
+                except (RequestException, GoogleAuthTransportError) as exc:
                     elapsed = time.monotonic() - attempt_started
                     failure = classify_network_failure(exc)
                     if not failure.retryable or attempt >= attempts:
@@ -471,7 +472,7 @@ class GoogleSheetsStore:
         }
 
     def _write_with_retry(self, description: str, func):
-        """Executa escrita com retry para 429 e erros 5xx."""
+        """Executa escrita com retry de rede/autenticação, 429 e erros 5xx."""
         with request_progress("Google Sheets: " + description):
             attempts = max(1, int(GOOGLE_SHEETS_WRITE_MAX_RETRIES))
 
@@ -510,7 +511,7 @@ class GoogleSheetsStore:
                         wait,
                     )
                     time.sleep(wait)
-                except RequestException as exc:
+                except (RequestException, GoogleAuthTransportError) as exc:
                     failure = classify_network_failure(exc)
                     if not failure.retryable or attempt >= attempts:
                         raise

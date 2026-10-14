@@ -2,6 +2,8 @@
 
 ## NexoFlow 1.0
 
+- Sheets recupera falhas de rede durante a autenticação Google, revalida a rota configurada e repete a operação dentro dos limites existentes. Recusas de autenticação e falhas de certificado continuam interrompendo a execução.
+
 - Padronização de cidades, estados por extenso e bairros nas revisões da Weni, no Sheets e nas fontes do Looker. Referências locais corrigem grafias e distritos redundantes, mantendo conjuntos e subdivisões. Alterações de endereço respeitam a conferência de conflito antes da aplicação.
 - Cidade `Pa` interpretada como Belém conforme confirmação operacional. Grafias de Manaus com diferenças de caixa, espaços nas extremidades ou caracteres invisíveis usam o mesmo nome oficial.
 
