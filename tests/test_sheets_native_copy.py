@@ -96,3 +96,42 @@ class NativeCopyTests(unittest.TestCase):
         self.assertTrue(
             result[1]["updateDimensionProperties"]["properties"]["hiddenByUser"]
         )
+
+    def test_real_transport_timeout_after_commit_retries_the_same_range(self):
+        from requests.exceptions import ReadTimeout
+
+        destination = self.client.books["operations"]
+        original = destination.batch_update
+        requests = []
+        failed = False
+
+        def lost_response(body):
+            nonlocal failed
+            result = original(body)
+            if any("updateCells" in item for item in body["requests"]):
+                requests.append(body)
+                if not failed:
+                    failed = True
+                    raise ReadTimeout("synthetic-sensitive-network-detail")
+            return result
+
+        with (
+            patch.object(self.planned[0], "copy_to", side_effect=server_error()),
+            patch.object(destination, "batch_update", side_effect=lost_response),
+            patch("sheets_native_copy.logging.warning") as warning,
+        ):
+            self.migration.copy_and_verify(self.planned)
+        self.assertEqual(requests[0], requests[1])
+        self.assertEqual(len(destination.sheets[0].values), self.planned[0].row_count)
+        self.assertNotIn(
+            "synthetic-sensitive-network-detail", str(warning.call_args_list)
+        )
+
+    def test_zero_false_and_leading_zero_text_keep_their_original_types(self):
+        source = self.planned[0]
+        source.values = [["id", "valor"], ["00123", 0], ["boolean", False]]
+        with patch.object(source, "copy_to", side_effect=server_error()):
+            self.migration.copy_and_verify(self.planned)
+        self.assertEqual(
+            self.client.books["operations"].sheets[0].values, source.values
+        )

@@ -180,6 +180,24 @@ class TaskProgressTests(unittest.TestCase):
         self.assertIn("interrompido", self.logs[-1])
         self.assertFalse(any("100%" in line for line in self.logs))
 
+    def test_resumed_progress_uses_only_new_work_for_speed_and_eta(self):
+        with self.progress(100, initial_completed=60) as progress:
+            self.assertIn(" 60%", self.logs[-1])
+            self.assertIn("restante estimado=calculando", self.logs[-1])
+            self.now = 2
+            progress.advance(10)
+            progress.report()
+            self.assertIn("5.0 contatos/s", self.logs[-1])
+            self.assertIn("restante estimado=00:00:06", self.logs[-1])
+            self.now = 8
+            progress.advance(30)
+        self.assertIn("100%", self.logs[-1])
+
+    def test_invalid_resume_count_is_rejected(self):
+        for count in (-1, 101):
+            with self.assertRaises(ValueError):
+                self.progress(100, initial_completed=count)
+
 
 if __name__ == "__main__":
     unittest.main()

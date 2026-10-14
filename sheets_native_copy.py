@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 import time
 from contextlib import nullcontext
 
+from google.auth.exceptions import TransportError as GoogleAuthTransportError
 from gspread.exceptions import APIError
 from gspread.utils import absolute_range_name, rowcol_to_a1
+from requests.exceptions import RequestException
+
+from network_diagnostics import classify_network_failure
 
 CELL_FIELDS = (
     "userEnteredValue,userEnteredFormat,note,dataValidation,textFormatRuns,chipRuns"
@@ -44,6 +49,21 @@ def write_native(migration, operation):
         except APIError as exc:
             if exc.code not in (429, 500, 502, 503, 504) or attempt == 5:
                 raise
+            logging.warning(
+                "Google Sheets: bloco nativo repetido após HTTP %s (%s/6).",
+                exc.code,
+                attempt + 1,
+            )
+            time.sleep(min(30, 2 ** (attempt + 1)))
+        except (RequestException, GoogleAuthTransportError) as exc:
+            failure = classify_network_failure(exc)
+            if not failure.retryable or attempt == 5:
+                raise
+            logging.warning(
+                "Google Sheets: repetindo o mesmo bloco após falha transitória [%s] (%s/6).",
+                failure.category,
+                attempt + 1,
+            )
             time.sleep(min(30, 2 ** (attempt + 1)))
     raise RuntimeError("Bloco não gravado.")
 
@@ -126,15 +146,17 @@ def copy_native_blocks(migration, source, destination, entry, *, progress_factor
             f"Migração: transferência em blocos de {source.title}",
             source.row_count,
             unit="linhas",
+            initial_completed=completed,
         )
         if progress_factory
         else nullcontext(None)
     )
     with context as progress:
-        if progress and completed:
-            progress.advance(completed)
         while completed < source.row_count:
-            end = min(source.row_count, completed + max(1, 40000 // source.col_count))
+            end = min(
+                source.row_count,
+                completed + min(400, max(1, 40000 // source.col_count)),
+            )
             target_range = absolute_range_name(
                 source.title, f"A{completed + 1}:{rowcol_to_a1(end, source.col_count)}"
             )
@@ -143,6 +165,8 @@ def copy_native_blocks(migration, source, destination, entry, *, progress_factor
                 + CELL_FIELDS
                 + ",pivotTable,dataSourceTable,dataSourceFormula)),rowMetadata(pixelSize,hiddenByUser),columnMetadata(pixelSize,hiddenByUser)))"
             )
+            if progress:
+                progress.set_activity("aguardando API: leitura do bloco de origem")
             response = migration._read(
                 lambda target_range=target_range, field_mask=field_mask: (
                     original.fetch_sheet_metadata(
@@ -200,6 +224,23 @@ def copy_native_blocks(migration, source, destination, entry, *, progress_factor
                     count //= 2
                 subset = rows[offset : offset + count]
                 begin = completed + offset
+                current_fields = sorted(
+                    {
+                        key
+                        for row in subset
+                        for cell in row["values"]
+                        for key in cell
+                        if key in CELL_FIELDS.split(",")
+                    }
+                    | {"userEnteredValue"}
+                )
+                block_key = f"{begin}:{begin + count}"
+                previous_fields = entry.setdefault("block_fields", {}).get(
+                    block_key, []
+                )
+                current_fields = sorted(set(current_fields) | set(previous_fields))
+                entry["block_fields"][block_key] = current_fields
+                migration._save()
                 requests = [
                     {
                         "updateCells": {
@@ -211,7 +252,7 @@ def copy_native_blocks(migration, source, destination, entry, *, progress_factor
                                 "endColumnIndex": source.col_count,
                             },
                             "rows": subset,
-                            "fields": CELL_FIELDS,
+                            "fields": ",".join(current_fields),
                         }
                     }
                 ]
@@ -229,6 +270,10 @@ def copy_native_blocks(migration, source, destination, entry, *, progress_factor
                             target.id, "COLUMNS", 0, data.get("columnMetadata", [])
                         )
                     )
+                if progress:
+                    progress.set_activity(
+                        "aguardando API: gravação do bloco no destino"
+                    )
                 write_native(
                     migration,
                     lambda requests=requests: destination.batch_update(
@@ -239,6 +284,7 @@ def copy_native_blocks(migration, source, destination, entry, *, progress_factor
                 entry["copied_rows"] = completed + offset
                 migration._save()
                 if progress:
+                    progress.set_activity("")
                     progress.advance(count)
             completed = end
     return target

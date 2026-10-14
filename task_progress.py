@@ -46,11 +46,15 @@ class TaskProgress:
         detail: Callable[[], str] | None = None,
         interval: float = 2.0,
         clock: Callable[[], float] = time.monotonic,
+        initial_completed: int = 0,
     ) -> None:
+        if initial_completed < 0 or (total is not None and initial_completed > total):
+            raise ValueError("Progresso inicial fora dos limites da tarefa.")
         self.label, self.total, self.unit = label, total, unit
         self.byte_count, self.detail = byte_count, detail
         self.interval, self.clock = interval, clock
-        self.completed = 0
+        self.completed = initial_completed
+        self._initial_completed = initial_completed
         self.activity = ""
         self._stop = threading.Event()
         self._lock = threading.Lock()
@@ -68,7 +72,7 @@ class TaskProgress:
         _ACTIVE.depth = depth + 1
         self._started = self.clock()
         self._initial_bytes = self.byte_count() if self.byte_count else 0
-        self._samples.append((self._started, 0, 0))
+        self._samples.append((self._started, self.completed, 0))
         self.report()
         if self._visible:
             self._thread = threading.Thread(target=self._heartbeat, daemon=True)
@@ -135,8 +139,16 @@ class TaskProgress:
                 eta = "00:00:00"
             elif self.total is not None and done == self.total and done > 0:
                 eta = "finalizando"
-            elif self.total is not None and done > 0 and elapsed > 0:
-                eta = _duration(max(0, self.total - done) * elapsed / done)
+            elif (
+                self.total is not None
+                and done > self._initial_completed
+                and elapsed > 0
+            ):
+                eta = _duration(
+                    max(0, self.total - done)
+                    * elapsed
+                    / (done - self._initial_completed)
+                )
             else:
                 eta = "calculando" if self.total is not None else "indisponível"
             volume = (

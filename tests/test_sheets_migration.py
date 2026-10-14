@@ -94,7 +94,17 @@ class Book:
                                     "values": [
                                         {
                                             "userEnteredValue": {
-                                                "stringValue": str(value)
+                                                (
+                                                    "boolValue"
+                                                    if isinstance(value, bool)
+                                                    else (
+                                                        "numberValue"
+                                                        if isinstance(
+                                                            value, (int, float)
+                                                        )
+                                                        else "stringValue"
+                                                    )
+                                                ): value
                                             }
                                         }
                                         for value in row
@@ -128,7 +138,7 @@ class Book:
                     ws.values.append([])
                 for index, row in enumerate(update["rows"], bounds["startRowIndex"]):
                     ws.values[index] = [
-                        cell.get("userEnteredValue", {}).get("stringValue", "")
+                        next(iter(cell.get("userEnteredValue", {}).values()), "")
                         for cell in row["values"]
                     ]
                 replies.append({})
