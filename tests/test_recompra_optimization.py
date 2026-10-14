@@ -240,6 +240,8 @@ class RecompraReadCacheTests(unittest.TestCase):
             second, _ = resolve_latest(contacts[1], cache, NOW.isoformat())
             divergent = deepcopy(contacts[1])
             divergent["fields"]["email"] = "unrelated@example.test"
+            divergent["name"] = "Outra pessoa"
+            divergent["fields"]["nome"] = "Outra pessoa"
             rejected, items = resolve_latest(divergent, cache, NOW.isoformat())
         self.assertEqual((first["pedido_id"], second["pedido_id"]), ("100", "200"))
         self.assertEqual(rejected["status_confirmacao"], "CPF_IDENTIDADE_DIVERGENTE")

@@ -15,4 +15,4 @@ Ao atualizar este repositório, mantenha a identificação pública **NexoFlow 1
 
 - Consultar primeiro CPFs válidos; depois inválidos preenchidos, incluindo zeros. Não corrigir/completar o CPF nem confundir presença na API com validade matemática.
 
-- CPF inválido exige nome completo + e-mail ou nome completo + telefone do mesmo cliente da Weni. Bloqueie ausência, divergência e ambiguidade; cache compartilhado de CPF não compartilha identidade/pedidos.
+- CPF inválido exige nome correspondente ou telefone correspondente do mesmo cliente da Weni. Bloqueie ausência, divergência e ambiguidade; cache compartilhado de CPF não compartilha identidade/pedidos.

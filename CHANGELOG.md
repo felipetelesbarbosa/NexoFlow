@@ -1,5 +1,6 @@
 # NexoFlow 1.0 — Changelog
 
+- CPF válido dispensa comparação de nome, telefone e e-mail. CPF inválido pode ser validado por nome ou telefone correspondente; nomes exibidos na Weni com forma abreviada são considerados, sem compartilhar identidade entre contatos nem permitir ambiguidade.
 - Analytics/Looker contabilizam pedidos API validados em estados documentados não cancelados, incluindo Em processamento; regra alinhada com Weni e Recompra e reconsulta em cada nova carga no escopo selecionado.
 - Inserções no Sheets delimitam a tabela desde a coluna A para evitar deslocamento de pedidos e histórico.
 

@@ -121,17 +121,41 @@ def weni_customer_identity(contact: dict[str, Any]) -> dict[str, Any]:
 
 
 def weni_identity_guard(contact: dict[str, Any]) -> str:
-    name, emails, phones = _identity_values(weni_customer_identity(contact))
-    value = json.dumps([name, sorted(emails), sorted(phones)], ensure_ascii=False)
+    identity = weni_customer_identity(contact)
+    name, emails, phones = _identity_values(identity)
+    values = [name, sorted(emails), sorted(phones)]
+    display_name = _identity_name(identity.get("weni_name"))
+    if len(display_name.split()) >= 2 and display_name != name:
+        values.append(display_name)
+    value = json.dumps(values, ensure_ascii=False)
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def _identity_matches(identity: dict[str, Any], cliente: dict[str, Any]) -> bool:
-    name, emails, phones = _identity_values(identity)
-    api_name, api_emails, api_phones = _identity_values(cliente)
-    return bool(
-        name and api_name == name and (emails & api_emails or phones & api_phones)
+def _compatible_name_forms(first: str, second: str) -> bool:
+    left, right = first.split(), second.split()
+    return len(left) == len(right) and all(
+        a == b or (len(a) == 1 and b.startswith(a)) or (len(b) == 1 and a.startswith(b))
+        for a, b in zip(left, right, strict=True)
     )
+
+
+def _identity_matches(identity: dict[str, Any], cliente: dict[str, Any]) -> bool:
+    name, _, phones = _identity_values(identity)
+    api_name, _, api_phones = _identity_values(cliente)
+    display_name = _identity_name(identity.get("weni_name"))
+    name_matches = bool(
+        name
+        and api_name
+        and (
+            api_name == name
+            or (
+                len(display_name.split()) >= 2
+                and _compatible_name_forms(name, display_name)
+                and api_name == display_name
+            )
+        )
+    )
+    return name_matches or bool(phones & api_phones)
 
 
 def _cliente_candidates(payload: Any) -> list[dict[str, Any]] | None:
@@ -198,7 +222,7 @@ def select_cliente_response(
     *,
     weni_identity: dict[str, Any] | None = None,
 ) -> tuple[tuple[str, str, str], dict[str, Any] | None]:
-    """Select one official customer; invalid CPFs require independent identity."""
+    """Select one official customer; invalid CPFs require a matching name or phone."""
     from analytics import is_valid_cpf, normalize_cpf
 
     cpf = normalize_cpf(weni_cpf)
@@ -223,8 +247,8 @@ def select_cliente_response(
     if not eligible:
         return checked[0][0], None
     if not is_valid_cpf(cpf):
-        name, emails, phones = _identity_values(weni_identity or {})
-        if not name or not (emails or phones):
+        name, _, phones = _identity_values(weni_identity or {})
+        if not name and not phones:
             return ("CPF_IDENTIDADE_INSUFICIENTE", "", ""), None
         # A matching person with a broken API ID cannot be silently discarded.
         if any(
