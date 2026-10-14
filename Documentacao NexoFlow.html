@@ -197,24 +197,25 @@ da mesma execução. CPFs válidos dispensam comparação de nome, telefone e
 e-mail. CPFs inválidos exigem nome ou telefone correspondente.</p>
 <p><code>CPF_CONFIRMADO</code> identifica um CPF matematicamente válido
 encontrado na API; <code>CPF_INVALIDO_ENCONTRADO</code> identifica um
-CPF inválido cujo cliente foi confirmado também pelo nome ou pelo
-telefone. Ambos alimentam o total de clientes encontrados, mas somente
-CPFs matematicamente válidos entram em <code>cpfs_validos</code>. HTTP
-400 registra <code>CPF_REJEITADO_API</code>, sem retry e sem contar como
-falha 500; HTTP 404 registra <code>CPF_NAO_ENCONTRADO</code>; falhas de
+CPF inválido cujo cliente foi confirmado também pelo primeiro nome ou
+pelo número local do telefone. Ambos alimentam o total de clientes
+encontrados, mas somente CPFs matematicamente válidos entram em
+<code>cpfs_validos</code>. HTTP 400 registra
+<code>CPF_REJEITADO_API</code>, sem retry e sem contar como falha 500;
+HTTP 404 registra <code>CPF_NAO_ENCONTRADO</code>; falhas de
 servidor/rede registram <code>ERRO_API</code>, sem autorizar um vínculo
 de cliente por CPF inválido. Os logs públicos mostram etapas e
 contagens, sem CPF. O diagnóstico privado de falhas 5xx aceita também
 identificadores curtos e zeros.</p>
 <p>Para CPF inválido, a coincidência do CPF não confirma a pessoa. É
-obrigatório comparar <strong>nome correspondente ou telefone
-correspondente</strong>. O nome é comparado integralmente após
-normalizar acentos, maiúsculas e espaços; não há aproximação por
-primeiro nome ou sobrenome. O e-mail não é obrigatório para essa
-validação. O telefone compara número completo com DDD, aceitando a
-formatação e o prefixo brasileiro 55, sem completar dígitos nem inserir
-o nono dígito. Números nativos da Weni têm precedência sobre campos
-antigos de telefone/WhatsApp.</p>
+obrigatório comparar <strong>primeiro nome correspondente ou número
+local do telefone correspondente</strong>. A comparação de nome usa
+somente o primeiro nome, desconsiderando acentos, maiúsculas e símbolos;
+sobrenomes não precisam coincidir. O e-mail não é obrigatório para essa
+validação. O telefone compara apenas o número local, ignorando o prefixo
+brasileiro +55 e o DDD, sem completar dígitos nem inserir o nono dígito.
+Números nativos da Weni têm precedência sobre campos antigos de
+telefone/WhatsApp.</p>
 <p>A resposta pode conter um cliente, uma lista de clientes ou listas em
 <code>cliente</code>/<code>clientes</code>. A seleção e a validação
 acontecem <strong>por contato Weni</strong>, mesmo quando a resposta GET
@@ -841,4 +842,4 @@ dos itens do período e sinaliza ausência ou divergência em
 comerciais.</p>
 </body>
 </html>
-<!-- NexoFlow documentation: source-sha256=97196b434f8e6095423c6aeff2361befe35bb9cbb2b571027712e5ecc63220e5 content-sha256=b6c1759e16277d49072ac20a2dc940c0b974f5f19b55cc918745c580d4490e95 -->
+<!-- NexoFlow documentation: source-sha256=24c2c00e8a350d72727ca2fa3637e74c1481d08143434c8dc9f32675a93e295b content-sha256=67a5fe201bbbc097633d5033c6b661a5bd28a86efb28489ad41b8d0e2c1028e1 -->

@@ -158,7 +158,7 @@ class InvalidCpfIdentityTests(unittest.TestCase):
             ),
             (identity(name="", phone=""), "CPF_IDENTIDADE_INSUFICIENTE"),
             (
-                identity(name="Outro cliente", phone="92987654321"),
+                identity(name="Outro cliente", phone="92911112222"),
                 "CPF_IDENTIDADE_DIVERGENTE",
             ),
         ]
@@ -167,6 +167,48 @@ class InvalidCpfIdentityTests(unittest.TestCase):
                 self.assertEqual(
                     cliente_link_status("0", payload, weni_identity=local)[0], status
                 )
+
+    def test_invalid_cpf_phone_matching_accepts_local_number_and_different_ddd(self):
+        for phone in ("987654321", "92987654321", "+55 (92) 98765-4321"):
+            with self.subTest(phone=phone):
+                self.assertEqual(
+                    cliente_link_status(
+                        "0",
+                        customer_payload(),
+                        weni_identity=identity(name="🌻", email="", phone=phone),
+                    )[0],
+                    "CPF_INVALIDO_ENCONTRADO",
+                )
+        self.assertEqual(
+            cliente_link_status(
+                "0",
+                customer_payload(phone="987654321"),
+                weni_identity=identity(name="🌻", email="", phone="91987654321"),
+            )[0],
+            "CPF_INVALIDO_ENCONTRADO",
+        )
+
+    def test_first_name_matching_ignores_accents_symbols_and_surnames(self):
+        self.assertEqual(
+            cliente_link_status(
+                "0",
+                customer_payload(name="Felipe Balcão", phone=""),
+                weni_identity=identity(
+                    name="💫 FÉLIPE Outro Sobrenome", email="", phone=""
+                ),
+            )[0],
+            "CPF_INVALIDO_ENCONTRADO",
+        )
+        result, selected = select_cliente_response(
+            "0",
+            [
+                customer_payload(name="Felipe Um", phone=""),
+                customer_payload(102, name="Felipe Dois", phone=""),
+            ],
+            weni_identity=identity(name="Felipe", email="", phone=""),
+        )
+        self.assertEqual(result[0], "CPF_IDENTIDADE_AMBIGUA")
+        self.assertIsNone(selected)
 
     def test_email_or_phone_each_suffices_with_the_same_name(self):
         for weni_identity in [identity(phone=""), identity(email="")]:
@@ -219,7 +261,7 @@ class InvalidCpfIdentityTests(unittest.TestCase):
         )
         self.assertEqual(result[0:2], ("CPF_INVALIDO_ENCONTRADO", "101"))
 
-    def test_phone_accepts_brazil_country_code_but_preserves_ddd_and_digits(self):
+    def test_phone_ignores_brazil_country_and_ddd_but_preserves_local_digits(self):
         for phone in ["+55 (91) 98765-4321", "91987654321"]:
             with self.subTest(phone=phone):
                 self.assertEqual(
@@ -231,7 +273,7 @@ class InvalidCpfIdentityTests(unittest.TestCase):
                     "CPF_INVALIDO_ENCONTRADO",
                 )
         for api_phone, weni_phone in [
-            ("92987654321", "91987654321"),
+            ("92911112222", "91987654321"),
             ("9198765432", "91998765432"),
         ]:
             with self.subTest(api_phone=api_phone, weni_phone=weni_phone):
@@ -246,14 +288,14 @@ class InvalidCpfIdentityTests(unittest.TestCase):
                     "CPF_IDENTIDADE_DIVERGENTE",
                 )
 
-    def test_partial_name_and_malformed_email_do_not_establish_identity(self):
+    def test_first_name_suffices_but_email_alone_does_not_establish_identity(self):
         self.assertEqual(
             cliente_link_status(
                 "0",
                 customer_payload(),
                 weni_identity=identity(name="Cliente", phone=""),
             )[0],
-            "CPF_IDENTIDADE_DIVERGENTE",
+            "CPF_INVALIDO_ENCONTRADO",
         )
         result = cliente_link_status(
             "0",
@@ -266,9 +308,9 @@ class InvalidCpfIdentityTests(unittest.TestCase):
     def test_selects_matching_customer_in_each_supported_candidate_shape(self):
         wrong = customer_payload(
             102,
-            name="Cliente Palmeira",
+            name="Outra Palmeira",
             email="palmeira@example.test",
-            phone="92987654321",
+            phone="92911112222",
             order_id=202,
         )
         wanted = customer_payload()
@@ -292,7 +334,7 @@ class InvalidCpfIdentityTests(unittest.TestCase):
         result, selected = select_cliente_response(
             "0",
             [customer_payload(), customer_payload(102, order_id=202)],
-            weni_identity=identity(name="Cliente ausente", phone="92911112222"),
+            weni_identity=identity(name="Pessoa ausente", phone="92911112222"),
         )
         self.assertEqual(result, ("CPF_IDENTIDADE_DIVERGENTE", "", ""))
         self.assertIsNone(selected)
@@ -367,10 +409,10 @@ class InvalidCpfIdentityTests(unittest.TestCase):
     def test_native_whatsapp_phone_takes_precedence_over_stale_saved_channel(self):
         contact = weni_contact(email="", phone="")
         contact["urns"] = ["whatsapp:+5591987654321"]
-        contact["fields"]["contact_urn_whatsapp"] = "whatsapp:+5592987654321"
+        contact["fields"]["contact_urn_whatsapp"] = "whatsapp:+5592911112222"
         payload = [
             customer_payload(
-                102, name="Outro cliente", email="", phone="92987654321", order_id=202
+                102, name="Outro cliente", email="", phone="92911112222", order_id=202
             ),
             customer_payload(email=""),
         ]
@@ -395,23 +437,23 @@ class InvalidCpfIdentityTests(unittest.TestCase):
             weni_contact(),
             weni_contact(
                 "synthetic-b",
-                name="Cliente Palmeira",
+                name="Outra Palmeira",
                 email="palmeira@example.test",
-                phone="92987654321",
+                phone="92911112222",
             ),
             weni_contact(
                 "synthetic-c",
-                name="Cliente ausente",
+                name="Pessoa ausente",
                 email="absent@example.test",
-                phone="93987654321",
+                phone="93911113333",
             ),
         ]
         payload = [
             customer_payload(
                 102,
-                name="Cliente Palmeira",
+                name="Outra Palmeira",
                 email="palmeira@example.test",
-                phone="92987654321",
+                phone="92911112222",
                 order_id=202,
             ),
             customer_payload(),
@@ -463,13 +505,13 @@ class InvalidCpfIdentityTests(unittest.TestCase):
         self,
     ):
         contact = weni_contact(email="", phone="")
-        contact["fields"].update(telefone="91987654321", celular="92987654321")
+        contact["fields"].update(telefone="91987654321", celular="92911112222")
         row = normalize_contact(contact, CAPTURED_AT)
         self.assertNotIn("celular", row)
         payload = [
             customer_payload(email=""),
             customer_payload(
-                102, name="Outro cliente", email="", phone="92987654321", order_id=202
+                102, name="Outro cliente", email="", phone="92911112222", order_id=202
             ),
         ]
         farm = farm_client(payload)
@@ -492,9 +534,9 @@ class InvalidCpfIdentityTests(unittest.TestCase):
         payload = [
             customer_payload(
                 102,
-                name="Cliente Palmeira",
+                name="Outra Palmeira",
                 email="palmeira@example.test",
-                phone="92987654321",
+                phone="92911112222",
                 order_id=202,
             ),
             customer_payload(),
@@ -712,8 +754,8 @@ class InvalidCpfIdentityTests(unittest.TestCase):
         store._write_with_retry = lambda label, operation: operation()
         first = store.upsert_orders_detailed([old_order])
         first_items = store.upsert_order_items_detailed(old_items)
-        contact["fields"]["nome"] = "Cliente ausente"
-        contact["name"] = "Cliente ausente"
+        contact["fields"]["nome"] = "Pessoa ausente"
+        contact["name"] = "Pessoa ausente"
         contact["urns"] = ["tel:92911112222"]
         failure, failure_items = resolve_contact_order(
             contact, farm_client=farm, captured_at=CAPTURED_AT

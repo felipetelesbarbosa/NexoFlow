@@ -15,4 +15,4 @@ Ao atualizar este repositório, mantenha a identificação pública **NexoFlow 1
 
 - Consultar primeiro CPFs válidos; depois inválidos preenchidos, incluindo zeros. Repor zeros à esquerda até 11 dígitos somente se os dígitos verificadores forem válidos. Não alterar dígitos existentes nem confundir presença na API com validade matemática.
 
-- CPF inválido exige nome correspondente ou telefone correspondente do mesmo cliente da Weni. Bloqueie ausência, divergência e ambiguidade; cache compartilhado de CPF não compartilha identidade/pedidos.
+- CPF inválido exige primeiro nome correspondente (normalizando acentos, maiúsculas e símbolos) ou número local do telefone correspondente, ignorando +55 e DDD, do mesmo cliente da Weni. Bloqueie ausência, divergência e ambiguidade; cache compartilhado de CPF não compartilha identidade/pedidos.

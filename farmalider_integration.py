@@ -72,8 +72,15 @@ def _identity_phone(value: Any) -> str:
     digits = re.sub(r"[^0-9]", "", text)
     if len(digits) in {12, 13} and digits.startswith("55"):
         digits = digits[2:]
-    # Never discard DDD or add a ninth digit. Repeated placeholders aren't evidence.
-    return digits if 10 <= len(digits) <= 15 and len(set(digits)) > 1 else ""
+    # Preserve full digits for guards; identity matching compares the local number.
+    return digits if 8 <= len(digits) <= 15 and len(set(digits)) > 1 else ""
+
+
+def _identity_local_phone(phone: str) -> str:
+    local = (
+        phone[2:] if len(phone) in {10, 11} else phone if len(phone) in {8, 9} else ""
+    )
+    return local if len(set(local)) > 1 else ""
 
 
 def _identity_values(identity: dict[str, Any]) -> tuple[str, set[str], set[str]]:
@@ -125,37 +132,31 @@ def weni_identity_guard(contact: dict[str, Any]) -> str:
     name, emails, phones = _identity_values(identity)
     values = [name, sorted(emails), sorted(phones)]
     display_name = _identity_name(identity.get("weni_name"))
-    if len(display_name.split()) >= 2 and display_name != name:
+    if display_name and display_name != name:
         values.append(display_name)
     value = json.dumps(values, ensure_ascii=False)
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def _compatible_name_forms(first: str, second: str) -> bool:
-    left, right = first.split(), second.split()
-    return len(left) == len(right) and all(
-        a == b or (len(a) == 1 and b.startswith(a)) or (len(b) == 1 and a.startswith(b))
-        for a, b in zip(left, right, strict=True)
-    )
+def _identity_first_names(identity: dict[str, Any]) -> set[str]:
+    import re
+
+    names = set()
+    for key in ("nome", "weni_name"):
+        match = re.search(r"[^\W\d_]+", _identity_name(identity.get(key)))
+        if match:
+            names.add(match.group())
+    return names
 
 
 def _identity_matches(identity: dict[str, Any], cliente: dict[str, Any]) -> bool:
-    name, _, phones = _identity_values(identity)
-    api_name, _, api_phones = _identity_values(cliente)
-    display_name = _identity_name(identity.get("weni_name"))
-    name_matches = bool(
-        name
-        and api_name
-        and (
-            api_name == name
-            or (
-                len(display_name.split()) >= 2
-                and _compatible_name_forms(name, display_name)
-                and api_name == display_name
-            )
-        )
-    )
-    return name_matches or bool(phones & api_phones)
+    _, _, phones = _identity_values(identity)
+    _, _, api_phones = _identity_values(cliente)
+    local_phones = {_identity_local_phone(phone) for phone in phones} - {""}
+    api_local_phones = {_identity_local_phone(phone) for phone in api_phones} - {""}
+    return bool(
+        _identity_first_names(identity) & _identity_first_names(cliente)
+    ) or bool(local_phones & api_local_phones)
 
 
 def _cliente_candidates(payload: Any) -> list[dict[str, Any]] | None:
@@ -222,7 +223,7 @@ def select_cliente_response(
     *,
     weni_identity: dict[str, Any] | None = None,
 ) -> tuple[tuple[str, str, str], dict[str, Any] | None]:
-    """Select one official customer; invalid CPFs require a matching name or phone."""
+    """Select one official customer; invalid CPFs require a matching first name or local phone."""
     from analytics import is_valid_cpf, normalize_cpf
 
     cpf = normalize_cpf(weni_cpf)
@@ -247,8 +248,10 @@ def select_cliente_response(
     if not eligible:
         return checked[0][0], None
     if not is_valid_cpf(cpf):
-        name, _, phones = _identity_values(weni_identity or {})
-        if not name and not phones:
+        _, _, phones = _identity_values(weni_identity or {})
+        if not _identity_first_names(weni_identity or {}) and not any(
+            _identity_local_phone(phone) for phone in phones
+        ):
             return ("CPF_IDENTIDADE_INSUFICIENTE", "", ""), None
         # A matching person with a broken API ID cannot be silently discarded.
         if any(

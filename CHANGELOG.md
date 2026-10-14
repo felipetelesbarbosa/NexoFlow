@@ -1,7 +1,7 @@
 # NexoFlow 1.0 — Changelog
 
 - Antes de classificar um CPF curto como inválido, restaurar zeros à esquerda somente quando o resultado de 11 dígitos passar nos verificadores. Valores como 0 e identificadores errados permanecem em validação por identidade.
-- CPF válido dispensa comparação de nome, telefone e e-mail. CPF inválido pode ser validado por nome ou telefone correspondente; nomes exibidos na Weni com forma abreviada são considerados, sem compartilhar identidade entre contatos nem permitir ambiguidade.
+- CPF válido dispensa comparação de nome, telefone e e-mail. CPF inválido pode ser validado pelo primeiro nome, normalizando acentos e símbolos, ou pelo número local do telefone, ignorando +55 e DDD. E-mail não é obrigatório; cache não compartilha identidade entre contatos e respostas ambíguas continuam pendentes.
 - Analytics/Looker contabilizam pedidos API validados em estados documentados não cancelados, incluindo Em processamento; regra alinhada com Weni e Recompra e reconsulta em cada nova carga no escopo selecionado.
 - Inserções no Sheets delimitam a tabela desde a coluna A para evitar deslocamento de pedidos e histórico.
 
