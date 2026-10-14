@@ -26,6 +26,7 @@ py-modules = [
   "google_sheets",
   "sheets_storage",
   "sheets_migration",
+  "sheets_native_copy",
   "run_sheets_migration",
   "geography",
   "geography_catalog",

@@ -70,11 +70,17 @@ class Book:
         return {"valueRanges": result}
 
     def fetch_sheet_metadata(self, params=None):
-        return {
-            "sheets": [
+        result = []
+        for ws in self.sheets:
+            start, end = 0, 2
+            if params and params.get("ranges"):
+                matched = re.search(r"!A(\d+):[A-Z]+(\d+)", params["ranges"][0])
+                start, end = int(matched[1]) - 1, int(matched[2])
+            result.append(
                 {
                     "properties": {
                         "sheetId": ws.id,
+                        "title": ws.title,
                         "gridProperties": {
                             "rowCount": ws.row_count,
                             "columnCount": ws.col_count,
@@ -82,6 +88,7 @@ class Book:
                     },
                     "data": [
                         {
+                            "startRow": start,
                             "rowData": [
                                 {
                                     "values": [
@@ -93,14 +100,41 @@ class Book:
                                         for value in row
                                     ]
                                 }
-                                for row in ws.values[:2]
-                            ]
+                                for row in ws.values[start:end]
+                            ],
                         }
                     ],
                 }
-                for ws in self.sheets
-            ]
-        }
+            )
+        return {"sheets": result}
+
+    def batch_update(self, body):
+        replies = []
+        for request in body["requests"]:
+            if "addSheet" in request:
+                props = request["addSheet"]["properties"]
+                grid = props["gridProperties"]
+                ws = self.add_worksheet(
+                    title=props["title"],
+                    rows=grid["rowCount"],
+                    cols=grid["columnCount"],
+                )
+                replies.append({"addSheet": {"properties": {"sheetId": ws.id}}})
+            elif "updateCells" in request:
+                update = request["updateCells"]
+                bounds = update["range"]
+                ws = self.get_worksheet_by_id(bounds["sheetId"])
+                while len(ws.values) < bounds["endRowIndex"]:
+                    ws.values.append([])
+                for index, row in enumerate(update["rows"], bounds["startRowIndex"]):
+                    ws.values[index] = [
+                        cell.get("userEnteredValue", {}).get("stringValue", "")
+                        for cell in row["values"]
+                    ]
+                replies.append({})
+            else:
+                replies.append({})
+        return {"replies": replies}
 
 
 class Client:

@@ -13,6 +13,7 @@ from typing import Any
 from gspread.exceptions import APIError
 from gspread.utils import absolute_range_name, rowcol_to_a1
 
+from sheets_native_copy import copy_native_blocks
 from sheets_storage import STORAGE_SHEET, SheetsStorage
 
 
@@ -245,12 +246,44 @@ class SheetsMigration:
                     if progress_factory
                     else nullcontext(None)
                 )
-                with copy_context as progress:
-                    result = source.copy_to(destination_id)
-                    if progress:
-                        progress.advance()
+                try:
+                    with copy_context as progress:
+                        result = source.copy_to(destination_id)
+                        if progress:
+                            progress.advance()
+                except APIError as exc:
+                    if exc.code not in (500, 502, 503, 504):
+                        raise
+                    candidates = [
+                        ws
+                        for ws in destination.worksheets()
+                        if ws.id not in entry["before_ids"]
+                    ]
+                    if len(candidates) == 1:
+                        result = {"sheetId": candidates[0].id}
+                    elif not candidates:
+                        entry["native_copy_failed"] = True
+                        self._save()
+                        copied = copy_native_blocks(
+                            self,
+                            source,
+                            destination,
+                            entry,
+                            progress_factory=progress_factory,
+                        )
+                        result = {"sheetId": copied.id}
+                    else:
+                        raise ValueError(
+                            "Cópia integral inconclusiva; os originais foram preservados."
+                        ) from exc
                 entry["target_id"] = result["sheetId"]
                 self._save()
+            elif entry.get("block_copy") or (
+                entry.get("native_copy_failed") and "target_id" not in entry
+            ):
+                copy_native_blocks(
+                    self, source, destination, entry, progress_factory=progress_factory
+                )
             elif "target_id" not in entry:
                 candidates = [ws for ws in targets if ws.id not in entry["before_ids"]]
                 if len(candidates) != 1:

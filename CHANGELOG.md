@@ -2,6 +2,8 @@
 
 ## NexoFlow 1.0
 
+- Migração do Sheets recupera erros internos da cópia integral de abas grandes com transferência nativa em blocos, preservando tipos de células, formatos e dimensões. Cada bloco confirmado registra a retomada; os originais só são retirados após nova comparação integral.
+
 - Operação, histórico e dashboard podem usar arquivos separados, com descoberta automática pela planilha original. A migração copia abas nativas, confere o conteúdo em blocos e só retira os originais após a ativação e nova conferência. As fontes BI do Looker mantêm arquivo e IDs das abas.
 
 - Sheets reserva exatamente as linhas necessárias antes de iniciar o upsert de cada tabela. Falta de capacidade nessa reserva interrompe a tabela antes de alterar registros existentes, com orientação para liberar espaço sem apagar dados automaticamente.
