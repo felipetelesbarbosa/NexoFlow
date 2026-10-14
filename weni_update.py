@@ -1512,10 +1512,11 @@ def audit_plans(
                     f"{plan.contact_uuid}: pagamento Cancelado exige pedido_status=3"
                 )
             if "ultima_compra" in plan.fields and (
-                status not in {"4", "1", "2"} or payment.casefold() == "cancelado"
+                status not in {"-2", "-1", "0", "4", "1", "2"}
+                or payment.casefold() == "cancelado"
             ):
                 errors.append(
-                    f"{plan.contact_uuid}: ultima_compra exige venda realizada (pedido_status=4, 1 ou 2) e não cancelada"
+                    f"{plan.contact_uuid}: ultima_compra exige status documentado não cancelado"
                 )
 
         if "contact_canal_principal" in plan.fields:
@@ -2869,7 +2870,10 @@ def run_update(
                 quarter_context["missing_contacts"],
             )
         else:
-            modified_contacts = weni.list_contacts(after=window.after)
+            # API status can change without modifying the Weni contact.
+            # Re-read contacts in every load so completed/cancelled orders are
+            # also queried again; message discovery still uses its checkpoint.
+            modified_contacts = weni.list_contacts(after=None)
 
         incoming_all = weni.list_messages(
             after=window.after,

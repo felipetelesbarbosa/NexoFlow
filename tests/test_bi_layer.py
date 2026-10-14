@@ -340,7 +340,7 @@ class BILayerTests(unittest.TestCase):
         ):
             with self.subTest(status=status):
                 base, order, items = self.order_fixture(status=status)
-                made = str(status) in {"4", "1", "2"}
+                made = str(status) in {"-2", "-1", "0", "4", "1", "2"}
                 self.assertEqual(len(items), 1)  # Every state remains auditable.
                 self.assertEqual(order["pedido_chave"], "FARMALIDER:500")
                 expected_sales = (

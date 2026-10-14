@@ -1,5 +1,8 @@
 # NexoFlow 1.0 — Changelog
 
+- Analytics/Looker contabilizam pedidos API validados em estados documentados não cancelados, incluindo Em processamento; regra alinhada com Weni e Recompra e reconsulta em cada nova carga no escopo selecionado.
+- Inserções no Sheets delimitam a tabela desde a coluna A para evitar deslocamento de pedidos e histórico.
+
 ## NexoFlow 1.0
 
 - Ativação da divisão cria a aba de configuração e seus valores em um único batch atômico. Uma configuração vazia de uma interrupção anterior só pode ser reparada pela migração quando o registro privado comprova todas as cópias verificadas.

@@ -64,6 +64,7 @@ class SheetAuditTests(unittest.TestCase):
                 ):
                     store._append_keyed_batch(ws, batch, ["id", "nome"], "id", "RAW")
                 self.assertEqual(stored, [["id", "nome"], *batch])
+                self.assertEqual(ws.append_rows.call_args.kwargs["table_range"], "A1:B")
                 self.assertEqual(
                     ws.append_rows.call_count, 1 if committed_count == 2 else 2
                 )
@@ -86,6 +87,7 @@ class SheetAuditTests(unittest.TestCase):
             store._append_history_batch(batch)
         self.assertEqual(stored, [headers, *batch])
         ws.append_rows.assert_called_once()
+        self.assertEqual(ws.append_rows.call_args.kwargs["table_range"], "A1:BF")
 
     def test_schema_change_during_append_retry_blocks_further_inclusion(self):
         store, ws, stored = store_and_sheet([["outra_coluna"]])

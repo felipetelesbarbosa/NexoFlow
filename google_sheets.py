@@ -926,7 +926,9 @@ class GoogleSheetsStore:
             attempted = True
             if pending:
                 return ws.append_rows(
-                    copy.deepcopy(pending), value_input_option=value_input_option
+                    copy.deepcopy(pending),
+                    value_input_option=value_input_option,
+                    table_range=f"A1:{column_letter(len(headers))}",
                 )
             return None
 
@@ -957,7 +959,9 @@ class GoogleSheetsStore:
             attempted = True
             if pending:
                 return self.history.append_rows(
-                    copy.deepcopy(pending), value_input_option=ValueInputOption.raw
+                    copy.deepcopy(pending),
+                    value_input_option=ValueInputOption.raw,
+                    table_range=f"A1:{column_letter(len(HISTORY_COLUMNS))}",
                 )
             return None
 

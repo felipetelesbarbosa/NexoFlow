@@ -115,8 +115,15 @@ class RecompraRulesTests(unittest.TestCase):
             propose(c, o, i, STRUCTURE, now=NOW)["reason"], "RECUSA_MARKETING"
         )
 
+    def test_documented_non_cancelled_states_are_sales_for_recompra(self):
+        for status in ("-2", "-1", "0", "4", "1", "2"):
+            with self.subTest(status=status):
+                c, o, items = fixture(status=status)
+                plan = propose(c, o, items, STRUCTURE, now=NOW)
+                self.assertNotEqual(plan["reason"], "SEM_PEDIDO_CONFIRMADO")
+
     def test_missing_date_products_identity_cancelled_and_pending(self):
-        for status in ("-2", "-1", "0", "3"):
+        for status in ("3",):
             c, o, i = fixture(grouped=True, status=status)
             p = propose(c, o, i, STRUCTURE, now=NOW)
             self.assertEqual(p["action"], "remove")

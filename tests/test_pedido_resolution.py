@@ -336,7 +336,8 @@ class PedidoResolutionTests(unittest.TestCase):
                 self.assertEqual(effective_order_status_code(order), str(code))
                 self.assertEqual(order["farmalider_status_pedido_nome"], label)
                 self.assertEqual(
-                    bool(build_sales_metrics([order], items)), code in (4, 1, 2)
+                    bool(build_sales_metrics([order], items)),
+                    code in (-2, -1, 0, 4, 1, 2),
                 )
 
     def test_payment_mapping_is_official(self):
@@ -465,7 +466,8 @@ class PedidoResolutionTests(unittest.TestCase):
                 self.assertEqual(is_order_completed(order), status == 2)
                 self.assertFalse(is_order_cancelled(order))
                 self.assertEqual(
-                    len(build_sales_metrics([order], items)), int(status in (4, 1, 2))
+                    len(build_sales_metrics([order], items)),
+                    int(status in (-2, -1, 0, 4, 1, 2)),
                 )
 
     def test_payment_zero_or_cancelled_literal_cancels_any_api_status(self):
@@ -543,7 +545,9 @@ class PedidoResolutionTests(unittest.TestCase):
                 self.assertEqual(order["farmalider_forma_pagamento_nome"], payment_name)
                 self.assertEqual(order["status_confirmacao"], confirmation)
                 self.assertEqual(is_order_cancelled(order), payment == "_")
-                self.assertEqual(build_sales_metrics([order], items), [])
+                self.assertEqual(
+                    len(build_sales_metrics([order], items)), int(payment != "_")
+                )
 
     def test_effective_order_status_uses_each_cancellation_signal(self):
         for cancellation in (

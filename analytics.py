@@ -1587,7 +1587,7 @@ def _order_customer_identity_verified(record: dict[str, str]) -> bool:
 
 
 def _sales_order_is_valid(record: dict[str, str]) -> bool:
-    """API-confirmed ready-for-route, in-transit and completed orders enter sales KPIs."""
+    """API-confirmed orders enter sales KPIs unless cancelled."""
     confirmation = str(record.get("status_confirmacao") or "")
     if not confirmation.startswith(
         "CONFIRMADO_API"

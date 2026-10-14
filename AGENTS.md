@@ -9,7 +9,7 @@ Ao atualizar este repositório, mantenha a identificação pública **NexoFlow 1
 - Preserve as credenciais e os diagnósticos privados fora do Git e dos pacotes públicos.
 - Use os nomes de pagamento: 0 Cancelado, 1 Dinheiro, 2 Débito, 3 Crédito, 4 Ticket, 5 Pix por Link de Pagamento, 6 Pix no POS.
 - Horários operacionais usam `America/Belem` (UTC-3).
-- Status de pedido: EmAberto=-2, PendenteDePagamento=-1, EmProcessamento=0, ProntoParaRota=4, EmTransito=1, Concluido=2, Cancelado=3. Estados abertos permanecem em rechecagem; ProntoParaRota, EmTransito e Concluido contam como venda, sem cancelamento nem pagamento 0.
+- Status de pedido: EmAberto=-2, PendenteDePagamento=-1, EmProcessamento=0, ProntoParaRota=4, EmTransito=1, Concluido=2, Cancelado=3. Estados abertos permanecem em rechecagem. Todos os estados documentados não cancelados (-2, -1, 0, 4, 1, 2) contam como venda validada; status 3 ou pagamento 0 exclui a venda. Weni, Analytics e Recompra usam a mesma regra. Toda nova carga reconsulta os pedidos no seu escopo para atualizar mudanças de status.
 
 - Textos apresentados ao usuário devem usar português brasileiro (pt-BR), com acentos e cedilha. Preserve identificadores técnicos. BAT/CMD em UTF-8 sem BOM com `chcp 65001`; PowerShell em UTF-8 com BOM; HTML com `lang="pt-BR"`; metadados dos executáveis em pt-BR.
 

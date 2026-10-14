@@ -97,7 +97,7 @@ class LookerBITests(unittest.TestCase):
         self.assertEqual(bi_customer_key({}, {}), "")
 
     def test_only_sales_enter_commercial_facts(self):
-        for status in ("-2", "-1", "0", "3", "99"):
+        for status in ("3", "99"):
             with self.subTest(status=status):
                 tables = self.build([order(1, status=status)], [item(1)])
                 self.assertEqual(tables["BI_Clientes_Vendas"], [])
@@ -282,8 +282,10 @@ class LookerBITests(unittest.TestCase):
                     ],
                     0,
                 )
-                if status != "2":
+                if status == "3":
                     self.assertEqual(tables["BI_Clientes_Vendas"], [])
+                else:
+                    self.assertEqual(len(tables["BI_Clientes_Vendas"]), 1)
 
     def test_unverified_wrong_contact_or_future_order_does_not_resolve_pending(self):
         base = [

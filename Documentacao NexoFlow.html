@@ -572,15 +572,19 @@ confirma o mesmo pedido por código e então escreve os campos
 <code>pedido_*</code>. <code>pedido_produtos</code> usa
 <code>descricao</code>; quantidades e valores unitários são listas
 posicionais separadas por vírgula; <code>pedido_valor</code> é a soma de
-<code>itens[].total</code>. Pedidos validados pela API com status
-efetivo 4 (Pronto para rota), 1 (Em trânsito) ou 2 (Concluído), sem
-cancelamento, contam como venda e atualizam <code>ultima_compra</code>.
-Pagamento 0 grava <code>pedido_forma_pagamento=Cancelado</code> e força
-status efetivo 3 na Weni/BI; <code>Pedidos_FarmaLider</code> mantém o
-status e o pagamento brutos da API. Os estados -2, Em aberto, -1,
-Pendente de pagamento, 0, Em processamento, 4, Pronto para rota, e 1, Em
-trânsito, permanecem em rechecagem até Concluído ou Cancelado; somente
--2, -1 e 0 ficam fora das vendas.</p>
+<code>itens[].total</code>. No Analytics/Looker, todos os estados
+documentados não cancelados de pedidos validados pela API contam como
+venda, incluindo Em processamento (0). A mesma regra vale para
+<code>ultima_compra</code> e Recompra, mantendo as demais validações.
+Cada nova carga reconsulta os pedidos no escopo selecionado, mesmo sem
+alteração do contato na Weni. Pagamento 0 grava
+<code>pedido_forma_pagamento=Cancelado</code> e força status efetivo 3
+na Weni/BI; <code>Pedidos_FarmaLider</code> mantém o status e o
+pagamento brutos da API. Os estados -2, Em aberto, -1, Pendente de
+pagamento, 0, Em processamento, 4, Pronto para rota, e 1, Em trânsito,
+permanecem em rechecagem até Concluído ou Cancelado; a rechecagem
+permanece ativa mesmo quando o pedido já conta como venda no
+dashboard.</p>
 <h2 id="auditoria-idempotência-e-checkpoint">Auditoria, idempotência e
 checkpoint</h2>
 <p>Antes de qualquer escrita, <code>audit_plans</code> valida todos os
@@ -834,4 +838,4 @@ dos itens do período e sinaliza ausência ou divergência em
 comerciais.</p>
 </body>
 </html>
-<!-- NexoFlow documentation: source-sha256=c23a66f543469f17cf86e452f1c1ecdac40008b84abff67746ac34b6c0c11cb7 content-sha256=8d346d6062cdf213d61514b11b2fbf7506b45714f3851e5197fedd19d6dde304 -->
+<!-- NexoFlow documentation: source-sha256=aafedba239d147ffff6329bc09bbba1a41c978ecda6532852eb818a0418a3c9c content-sha256=ec514b9eeaace0aaaac2be8d29099df1f6bf7def69533fd053ace569f957348a -->

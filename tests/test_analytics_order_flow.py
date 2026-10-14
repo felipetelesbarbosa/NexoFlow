@@ -244,10 +244,11 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
                 self.assertEqual(bi_order["pedido_status"], str(status))
                 self.assertEqual(bi_order["pedido_status_nome"], label)
                 self.assertEqual(
-                    len(build_sales_metrics(orders, items)), int(status == 4)
+                    len(build_sales_metrics(orders, items)),
+                    int(status in (-2, -1, 0, 4, 1, 2)),
                 )
 
-    def test_pending_payment_order_is_preserved_in_bi_without_sale(self):
+    def test_pending_payment_order_is_preserved_in_bi_as_non_cancelled_sale(self):
         contact, client = self.fixture(status=-1, payment=6)
         row, orders, items = self.resolve_and_persist(contact, client)
         self.assertEqual(orders[0]["status_validacao"], "OK")
@@ -256,7 +257,7 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
         self.assertEqual(
             orders[0]["farmalider_status_pedido_nome"], "Pendente de pagamento"
         )
-        self.assertEqual(build_sales_metrics(orders, items), [])
+        self.assertEqual(len(build_sales_metrics(orders, items)), 1)
         bi_rows = build_bi_order_rows(
             [row], orders, items, updated_at="2026-10-05T14:00:00Z"
         )
@@ -407,7 +408,8 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
                 contact, client = self.fixture(status=status)
                 _, orders, items = self.resolve_and_persist(contact, client)
                 self.assertEqual(
-                    len(build_sales_metrics(orders, items)), int(status in (4, 1, 2))
+                    len(build_sales_metrics(orders, items)),
+                    int(status in (-2, -1, 0, 4, 1, 2)),
                 )
 
     def test_cancelled_and_unknown_states_stay_out_of_sales(self):

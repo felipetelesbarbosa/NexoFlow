@@ -235,8 +235,11 @@ def is_order_completed(order: dict[str, Any]) -> bool:
 
 
 def is_order_sale(order: dict[str, Any]) -> bool:
-    """Business sales include ready-for-route, in-transit and completed orders."""
+    """Documented non-cancelled orders count as sales."""
     return not is_order_cancelled(order) and effective_order_status_code(order) in {
+        "-2",
+        "-1",
+        "0",
         "4",
         "1",
         "2",

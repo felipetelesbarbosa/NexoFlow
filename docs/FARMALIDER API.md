@@ -141,7 +141,7 @@ De-para usado pela integração:
 
 A Weni armazena o código efetivo em `pedido_status`. O normalizador aceita os códigos -2 a 4 e os nomes oficiais `EmAberto`, `PendenteDePagamento`, `EmProcessamento`, `ProntoParaRota`, `EmTransito`, `Concluido` e `Cancelado`. Cancelamento explícito ou `formaPagamento=0` ou `_` força o código 3, Cancelado. O helper `effective_order_status_code(order)` aplica essa regra para Weni/BI; o Analytics deriva o nome amigável. `Pedidos_FarmaLider` preserva o status bruto retornado pela API em `farmalider_status_pedido`, inclusive quando ele difere do status efetivo.
 
-Pedidos validados pela API com status efetivo 4 (Pronto para rota), 1 (Em trânsito) ou 2 (Concluído), sem cancelamento, entram nas métricas de venda e atualizam `ultima_compra`. Os estados -2, -1, 0, 1 e 4 permanecem em rechecagem até Concluído ou Cancelado. Os estados -2, -1 e 0 não contam como venda; 4 e 1 já contam. O estado 3 e o pagamento 0 ficam fora das vendas e encerram a rechecagem.
+No Analytics/Looker, pedidos validados pela API em estados documentados não cancelados entram nas métricas de venda, incluindo Em processamento (0). A mesma regra vale para `ultima_compra` e Recompra, mantendo as demais validações. Cada nova carga reconsulta os pedidos no escopo selecionado, mesmo sem alteração do contato na Weni. Os estados -2, -1, 0, 1 e 4 permanecem em rechecagem até Concluído ou Cancelado. Os estados -2, -1, 0, 4, 1 e 2 contam como venda no dashboard; estados desconhecidos ficam pendentes. O estado 3 e o pagamento 0 ficam fora das vendas e encerram a rechecagem.
 
 ## Forma de pagamento
 

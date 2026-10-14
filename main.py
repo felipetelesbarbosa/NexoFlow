@@ -895,7 +895,9 @@ def main() -> int:
             weni_started = time.monotonic()
             weni_client = WeniClient(weni_token)
             try:
-                contacts = weni_client.list_contacts(after=after)
+                # FarmaLíder status changes do not necessarily modify the Weni contact.
+                # Every load revalidates current orders for the selected scope.
+                contacts = weni_client.list_contacts(after=None)
             finally:
                 weni_client.close()
             contacts_api_total = len(contacts)

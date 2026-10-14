@@ -358,7 +358,7 @@ pedido_faturamento_total = produtos + frete
 
 As abas `BI_Resumo_Diario` e `BI_Vendas` também separam faturamento de produtos, faturamento de frete e faturamento total. O campo de faturamento usado nos indicadores gerais passa a considerar **produtos + frete**, para bater com o valor total cobrado do pedido.
 
-Pedidos validados pela API com status efetivo **4, Pronto para rota**, **1, Em trânsito**, ou **2, Concluído**, sem cancelamento explícito e sem pagamento 0 entram nas métricas de venda e atualizam `ultima_compra`. Pedidos em aberto, pendentes de pagamento, em processamento ou cancelados ficam fora.
+No Analytics e no Looker Studio, pedidos validados pela API em qualquer estado documentado não cancelado entram nas métricas de venda, incluindo **Em processamento (0)**. Cancelamento explícito, status 3 ou pagamento 0 excluem a venda; status desconhecido permanece pendente. A mesma regra atualiza `ultima_compra` e a validação de venda da Recompra, preservando identidade, itens, janela D+25 e bloqueios de marketing. Toda nova carga reconsulta a API no escopo selecionado, inclusive pedidos anteriormente concluídos ou cancelados.
 
 Pedidos abertos em **Em aberto (-2)**, **Pendente de pagamento (-1)**, **Em processamento (0)**, **Pronto para rota (4)** ou **Em trânsito (1)** permanecem em fila de rechecagem até chegarem a **Concluído** ou **Cancelado**.
 
@@ -739,7 +739,7 @@ A localização e a idade correspondem ao **cadastro atual na Weni**, inclusive 
 
 Depois de instalar a distribuição atualizada, execute uma **carga completa do Analytics** para preencher esses campos nos contatos já existentes. A carga Analytics por planilhas também exporta os campos dos contatos selecionados e relidos na Weni, após revisão humana. As colunas novas são acrescentadas sem deslocar os cabeçalhos existentes.
 
-No Looker Studio, atualize os campos das fontes `Base_Contatos` e `BI_Pedidos` uma vez após a migração. Use cidade, bairro, CEP e faixa etária como dimensões e filtros; para pedidos e faturamento por região, use `BI_Pedidos`, filtre vendas nos status 4, 1 e 2 e utilize `data` como dimensão de período. Não some snapshots da base ou idades. Para contagem de clientes, use pessoas únicas no contexto da fonte, não a quantidade de linhas de pedidos. O relatório não recebe automaticamente componentes novos apenas porque as colunas foram adicionadas.
+No Looker Studio, atualize os campos das fontes `Base_Contatos` e `BI_Pedidos` uma vez após a migração. Use cidade, bairro, CEP e faixa etária como dimensões e filtros; para pedidos e faturamento por região, use `BI_Pedidos`, filtre vendas por `venda_valida = 1` e utilize `data` como dimensão de período. Não some snapshots da base ou idades. Para contagem de clientes, use pessoas únicas no contexto da fonte, não a quantidade de linhas de pedidos. O relatório não recebe automaticamente componentes novos apenas porque as colunas foram adicionadas.
 
 ## Recompra FarmaLíder D+25
 

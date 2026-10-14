@@ -1054,8 +1054,10 @@ class WeniUpdateTests(unittest.TestCase):
                 farm = self._purchase_api()
                 farm.get_pedido.return_value["capa"]["status"] = status
                 plan = self._purchase_plan(contact, farm)
-                self.assertEqual(plan.purchase_confirmed, status in (4, 1, 2))
-                if status in (4, 1, 2):
+                self.assertEqual(
+                    plan.purchase_confirmed, status in (-2, -1, 0, 4, 1, 2)
+                )
+                if status in (-2, -1, 0, 4, 1, 2):
                     self.assertEqual(
                         plan.fields["ultima_compra"],
                         "2026-10-03T09:00:00-03:00",
@@ -1089,12 +1091,16 @@ class WeniUpdateTests(unittest.TestCase):
                     patch("weni_update._save_state") as save_mock,
                 ):
                     result = run_update(apply=True, full=False)
+                client.list_contacts.assert_called_once_with(after=None)
+                farm.get_cliente_by_cpf.assert_called()
                 self.assertEqual(result.orders_validated, 1)
-                self.assertEqual(result.purchase_confirmed, int(status in (4, 1, 2)))
+                self.assertEqual(
+                    result.purchase_confirmed, int(status in (-2, -1, 0, 4, 1, 2))
+                )
                 self.assertEqual(result.contacts_updated, 1)
                 saved_fields = client.update_contact_fields.call_args.args[1]
                 self.assertEqual(saved_fields["pedido_status"], str(status))
-                if status in (4, 1, 2):
+                if status in (-2, -1, 0, 4, 1, 2):
                     self.assertIn("ultima_compra", saved_fields)
                 else:
                     self.assertNotIn("ultima_compra", saved_fields)
