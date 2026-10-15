@@ -3,7 +3,8 @@ param(
     [switch]$Stage2,
     [string]$InstallDir = 'C:\NexoFlow',
     [string]$DataDir = 'C:\NexoFlow Data',
-    [int]$KeepDataFlag = 1
+    [int]$KeepDataFlag = 1,
+    [string]$ShortcutRootsBase64 = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -47,7 +48,8 @@ function Ensure-Administrator {
         '-ExecutionPolicy', 'Bypass',
         '-File', ('"' + $PSCommandPath + '"'),
         '-InstallDir', ('"' + $InstallDir + '"'),
-        '-DataDir', ('"' + $DataDir + '"')
+        '-DataDir', ('"' + $DataDir + '"'),
+        '-ShortcutRootsBase64', $ShortcutRootsBase64
     )
 
     try {
@@ -59,30 +61,69 @@ function Ensure-Administrator {
     }
 }
 
-function Remove-Shortcuts {
-    $desktop = [Environment]::GetFolderPath('CommonDesktopDirectory')
-    $userDesktop = [Environment]::GetFolderPath('Desktop')
-    foreach ($path in @(
-        (Join-Path $desktop 'NexoFlow Analytics.lnk'),
-        (Join-Path $userDesktop 'NexoFlow Analytics.lnk'),
-        (Join-Path $desktop 'NexoFlow Weni.lnk'),
-        (Join-Path $userDesktop 'NexoFlow Weni.lnk'),
-        (Join-Path $desktop 'NexoFlow Planilha.lnk'),
-        (Join-Path $userDesktop 'NexoFlow Planilha.lnk'),
-        (Join-Path $desktop 'NexoFlow Terminal.lnk'),
-        (Join-Path $userDesktop 'NexoFlow Terminal.lnk'),
-        (Join-Path $desktop 'NexoFlow - Update Weni.lnk'),
-        (Join-Path $userDesktop 'NexoFlow - Update Weni.lnk'),
-        (Join-Path $desktop 'NexoFlow Console.lnk'),
-        (Join-Path $userDesktop 'NexoFlow Console.lnk'),
-        (Join-Path $desktop 'NexoFlow.lnk'),
-        (Join-Path $userDesktop 'NexoFlow.lnk')
-    )) {
-        Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+function Get-ShortcutDirectories {
+    $roots = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($folder in @('CommonDesktopDirectory', 'Desktop', 'CommonPrograms', 'Programs')) {
+        $path = [Environment]::GetFolderPath($folder)
+        if ($path) { $roots.Add($path) }
     }
+    if ($env:USERPROFILE) { $roots.Add((Join-Path $env:USERPROFILE 'Desktop')) }
+    if ($env:APPDATA) { $roots.Add((Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs')) }
+    if ($env:ProgramData) { $roots.Add((Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs')) }
+    foreach ($oneDrive in @($env:OneDrive, $env:OneDriveConsumer, $env:OneDriveCommercial)) {
+        if (-not $oneDrive) { continue }
+        $roots.Add((Join-Path $oneDrive 'Desktop'))
+        $roots.Add((Join-Path $oneDrive 'Área de Trabalho'))
+    }
+    if ($ShortcutRootsBase64) {
+        # A elevação pode usar outra conta. Conservar as pastas identificadas
+        # antes do UAC e do Stage2, sem depender do destino atual dos atalhos.
+        $json = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($ShortcutRootsBase64))
+        foreach ($path in @($json | ConvertFrom-Json)) {
+            if ($path -isnot [string] -or -not [IO.Path]::IsPathRooted($path)) {
+                throw 'A lista de pastas de atalhos da desinstalação é inválida.'
+            }
+            $roots.Add($path)
+        }
+    }
+    return @($roots | Select-Object -Unique)
+}
 
-    $startMenu = Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs\NexoFlow'
-    Remove-Item -LiteralPath $startMenu -Recurse -Force -ErrorAction SilentlyContinue
+function Remove-Shortcuts {
+    # Nomes exatos atuais e legados. Não usar curingas nem resolver TargetPath:
+    # o Stage2 já removeu os executáveis quando chega a esta limpeza.
+    $names = @(
+        'NexoFlow Analytics.lnk',
+        'NexoFlow Weni.lnk',
+        'NexoFlow Recompra.lnk',
+        'NexoFlow Planilha.lnk',
+        'NexoFlow Terminal.lnk',
+        'NexoFlow - Update Weni.lnk',
+        'NexoFlow Console.lnk',
+        'NexoFlow.lnk',
+        'Desinstalar NexoFlow.lnk',
+        'NexoFlow Uninstall.lnk',
+        'Documentacao NexoFlow.lnk',
+        'Documentação NexoFlow.lnk',
+        'Weni WhatsApp Analytics.lnk',
+        'Weni WhatsApp Analytics - Sincronizar.lnk'
+    )
+    foreach ($root in (Get-ShortcutDirectories)) {
+        foreach ($directory in @($root, (Join-Path $root 'NexoFlow'), (Join-Path $root 'Weni WhatsApp Analytics'))) {
+            if (-not (Test-Path -LiteralPath $directory -PathType Container)) { continue }
+            foreach ($name in $names) {
+                $path = Join-Path $directory $name
+                if (Test-Path -LiteralPath $path -PathType Leaf) {
+                    Remove-Item -LiteralPath $path -Force -ErrorAction Stop
+                }
+            }
+            # Preservar qualquer arquivo/atalho alheio dentro da pasta do menu.
+            # A remoção sem -Recurse só acontece depois de conferir que está vazia.
+            if ($directory -ne $root -and @(Get-ChildItem -LiteralPath $directory -Force -ErrorAction Stop).Count -eq 0) {
+                Remove-Item -LiteralPath $directory -Force -ErrorAction Stop
+            }
+        }
+    }
 }
 
 function Remove-OptionalPrivateData {
@@ -290,6 +331,12 @@ function Remove-InstallDirectory {
     return $removed
 }
 
+# Capturar as pastas do usuário original antes de elevar ou iniciar o Stage2.
+if (-not $ShortcutRootsBase64) {
+    $shortcutRootsJson = ConvertTo-Json -InputObject @(Get-ShortcutDirectories) -Compress
+    $ShortcutRootsBase64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($shortcutRootsJson))
+}
+
 if ($Stage2) {
     # Fundamental: copiar o script para %TEMP% não basta. O processo também
     # precisa trocar explicitamente seu diretório atual, pois um CWD herdado em
@@ -372,7 +419,7 @@ try {
     Remove-Item -LiteralPath $tempScript -Force -ErrorAction SilentlyContinue
     Copy-Item -LiteralPath $PSCommandPath -Destination $tempScript -Force
     $keepFlag = if ($keep) { 1 } else { 0 }
-    $argLine = '-NoLogo -NoProfile -ExecutionPolicy Bypass -File "{0}" -Stage2 -InstallDir "{1}" -DataDir "{2}" -KeepDataFlag {3}' -f $tempScript, $InstallDir, $DataDir, $keepFlag
+    $argLine = '-NoLogo -NoProfile -ExecutionPolicy Bypass -File "{0}" -Stage2 -InstallDir "{1}" -DataDir "{2}" -KeepDataFlag {3} -ShortcutRootsBase64 "{4}"' -f $tempScript, $InstallDir, $DataDir, $keepFlag, $ShortcutRootsBase64
 
     $tempWorkingDir = [IO.Path]::GetTempPath()
     # Mantemos a janela visível. A release não oculta PowerShell no Stage2.

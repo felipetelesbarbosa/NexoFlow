@@ -149,3 +149,89 @@ Assert-True (-not (Test-Path -LiteralPath (Join-Path $DataDir 'secrets_config.py
 Assert-True (-not (Test-Path -LiteralPath (Join-Path $DataDir 'logs'))) 'Stage2 nao removeu logs opcionais.'
 """,
         )
+
+    def test_uninstall_removes_current_and_legacy_shortcuts_and_preserves_other_files(
+        self,
+    ):
+        self.run_harness(
+            "uninstall.ps1",
+            r"""
+$fixtureRoots = @(
+    (Join-Path $root 'desktop comum'),
+    (Join-Path $root 'desktop usuario'),
+    (Join-Path $root 'OneDrive\Área de Trabalho'),
+    (Join-Path $root 'menu comum'),
+    (Join-Path $root 'menu usuario')
+)
+function Get-ShortcutDirectories { return $fixtureRoots }
+$expectedNames = @(
+    'NexoFlow Analytics.lnk', 'NexoFlow Weni.lnk', 'NexoFlow Recompra.lnk',
+    'NexoFlow Planilha.lnk', 'NexoFlow Terminal.lnk', 'NexoFlow - Update Weni.lnk',
+    'NexoFlow Console.lnk', 'NexoFlow.lnk', 'Desinstalar NexoFlow.lnk',
+    'NexoFlow Uninstall.lnk', 'Documentacao NexoFlow.lnk', 'Documentação NexoFlow.lnk',
+    'Weni WhatsApp Analytics.lnk', 'Weni WhatsApp Analytics - Sincronizar.lnk'
+)
+foreach ($directory in $fixtureRoots) {
+    foreach ($name in $expectedNames) {
+        Write-Fixture (Join-Path $directory $name) 'atalho sintetico'
+        Write-Fixture (Join-Path (Join-Path $directory 'NexoFlow') $name) 'atalho sintetico'
+    }
+    Write-Fixture (Join-Path $directory 'NexoFlow Pessoal.lnk') 'atalho alheio'
+    Write-Fixture (Join-Path $directory 'anotacoes.txt') 'arquivo alheio'
+}
+$protectedMenu = Join-Path $fixtureRoots[0] 'NexoFlow'
+Write-Fixture (Join-Path $protectedMenu 'Outro aplicativo.lnk') 'preservar'
+$legacyMenu = Join-Path $fixtureRoots[1] 'Weni WhatsApp Analytics'
+Write-Fixture (Join-Path $legacyMenu 'Weni WhatsApp Analytics.lnk') 'atalho legado'
+# Um .lnk real cujo executável já foi removido também precisa ser apagado.
+$brokenPath = Join-Path $fixtureRoots[2] 'NexoFlow Recompra.lnk'
+Remove-Item -LiteralPath $brokenPath -Force
+$shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($brokenPath)
+$shortcut.TargetPath = Join-Path $InstallDir 'NexoFlow Recompra.exe'
+$shortcut.Save()
+Assert-True (-not (Test-Path -LiteralPath $shortcut.TargetPath)) 'A fixture deveria conter destino inexistente.'
+Remove-Shortcuts
+foreach ($directory in $fixtureRoots) {
+    foreach ($name in $expectedNames) {
+        Assert-True (-not (Test-Path -LiteralPath (Join-Path $directory $name))) "Atalho restante: $name"
+        Assert-True (-not (Test-Path -LiteralPath (Join-Path (Join-Path $directory 'NexoFlow') $name))) "Atalho restante no menu: $name"
+    }
+    Assert-True (Test-Path -LiteralPath (Join-Path $directory 'NexoFlow Pessoal.lnk')) 'Atalho de nome semelhante foi apagado.'
+    Assert-True (Test-Path -LiteralPath (Join-Path $directory 'anotacoes.txt')) 'Arquivo alheio foi apagado.'
+}
+Assert-True (Test-Path -LiteralPath (Join-Path $protectedMenu 'Outro aplicativo.lnk')) 'Atalho alheio dentro do menu foi apagado.'
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $fixtureRoots[1] 'NexoFlow'))) 'Pasta vazia do menu nao foi removida.'
+Assert-True (-not (Test-Path -LiteralPath $legacyMenu)) 'Pasta vazia do menu legado nao foi removida.'
+Remove-Shortcuts
+""",
+        )
+
+    def test_uninstall_finds_onedrive_and_original_user_roots_after_elevation(self):
+        self.run_harness(
+            "uninstall.ps1",
+            r"""
+$env:USERPROFILE = Join-Path $root 'usuario elevado'
+$env:APPDATA = Join-Path $root 'appdata elevado'
+$env:ProgramData = Join-Path $root 'programdata'
+$env:OneDrive = Join-Path $root 'OneDrive pessoal'
+$env:OneDriveConsumer = Join-Path $root 'OneDrive consumer'
+$env:OneDriveCommercial = Join-Path $root 'OneDrive empresa'
+$originalRoots = @((Join-Path $root 'usuario original\desktop redirecionado'), (Join-Path $root 'usuario original\menu'))
+$json = ConvertTo-Json -InputObject $originalRoots -Compress
+$ShortcutRootsBase64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($json))
+$actual = @(Get-ShortcutDirectories)
+foreach ($directory in @(
+    $originalRoots[0], $originalRoots[1],
+    (Join-Path $env:USERPROFILE 'Desktop'),
+    (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'),
+    (Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs'),
+    (Join-Path $env:OneDrive 'Desktop'),
+    (Join-Path $env:OneDrive 'Área de Trabalho'),
+    (Join-Path $env:OneDriveConsumer 'Desktop'),
+    (Join-Path $env:OneDriveCommercial 'Desktop')
+)) {
+    Assert-True ($actual -contains $directory) "Pasta de atalhos nao encontrada: $directory"
+}
+Assert-True ($actual.Count -eq @($actual | Select-Object -Unique).Count) 'Pastas de atalhos duplicadas.'
+""",
+        )

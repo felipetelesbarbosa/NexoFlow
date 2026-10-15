@@ -7,6 +7,8 @@
 - Analytics reconsulta por código os pedidos oficiais já observados no escopo da carga somente nos últimos 20 dias, incluindo concluídos e cancelados. Pedidos mais antigos permanecem preservados; a consulta por CPF continua descobrindo compras novas. Mudanças de status e itens atualizam o histórico; falhas preservam o snapshot anterior e o checkpoint.
 - Orientações do Looker usam os indicadores de venda validada, incluindo os estados -2, -1 e 0; validação do primeiro nome também aceita símbolos internos sem resolver identidades ambíguas.
 - Planilhas vincula conversas por UUID/URN, sem exigir igualdade do nome completo do canal. A validação do CPF e do pedido na API permanece obrigatória.
+- Desinstalação remove os atalhos oficiais de todos os componentes, incluindo Recompra, preservando atalhos de outros programas.
+- Ícone da Planilha redesenhado no padrão arredondado azul e ciano, com tamanho visual alinhado aos demais componentes.
 
 ## NexoFlow 1.0
 

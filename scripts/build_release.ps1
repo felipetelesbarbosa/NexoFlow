@@ -348,7 +348,8 @@ Melhorias desta distribuição do NexoFlow 1.0:
 - tabelas comerciais para Looker Studio com histórico de vendas, KPIs e Curva ABC com cobertura de itens; tipos monetários corrigidos e migração financeira atômica;
 - check-up corrigido para a codificação padrão do Windows; escritas no Sheets reconciliam inclusões após timeout; validação de código, tipos e dependências antes da publicação;
 - Weni com ícone azul e ciano, contato e balão de conversa, seguindo a estética dos outros componentes do NexoFlow;
-- Recompra com ícone próprio de sacola e setas circulares; Planilha com ícone azul alinhado ao NexoFlow, nos executáveis e atalhos;
+- Recompra com ícone próprio de sacola e setas circulares; Planilha com ícone circular azul e ciano, proporção alinhada aos demais componentes, nos executáveis e atalhos;
+- desinstalação remove os atalhos oficiais de todos os componentes, incluindo Recompra, nos locais de instalação e nos desktops e menus atendidos pelo Setup;
 - CMD da Weni permanece aberto após conclusão, erro ou cancelamento, inclusive por outro launcher; fechar o aviso final ou pressionar ENTER não encerra a sessão; use EXIT para fechar;
 - progresso Weni a cada 2 segundos com barra de 0% a 100% por etapa, contatos/registros por segundo, tempo decorrido e previsão de término; auditoria JSONL mede bytes efetivamente gravados por segundo; consultas sem total conhecido mostram quantidade e velocidade;
 - o NexoFlow não inclui chaves, tokens ou credenciais; use suas próprias credenciais nas integrações, conforme SECURITY.md;
