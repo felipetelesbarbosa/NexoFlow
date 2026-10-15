@@ -16,7 +16,7 @@ Os testes cobrem, entre outros pontos:
 - Update Weni, auditoria e segurança de escrita;
 - preparação dos webhooks opcionais.
 
-A suíte integra o `check-up.bat` e o fluxo de publicação do NexoFlow 1.0.
+A suíte integra o `comandos/check-up.bat` e o fluxo de publicação do NexoFlow 1.0.
 
 Na raiz do repositório, com as dependências instaladas, execute:
 

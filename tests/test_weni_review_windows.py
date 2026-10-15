@@ -23,9 +23,10 @@ class WeniReviewBatchWindowsTests(unittest.TestCase):
     def test_native_weni_launcher_runs_after_icon_update(self):
         with tempfile.TemporaryDirectory(prefix="nexo weni icon ") as temporary:
             directory = Path(temporary)
+            (directory / "comandos").mkdir()
             executable = directory / "NexoFlow Weni.exe"
             shutil.copy2(REPOSITORY / executable.name, executable)
-            (directory / "atualizar_weni.bat").write_text(
+            (directory / "comandos/atualizar_weni.bat").write_text(
                 "@echo off\necho SYNTHETIC_WENI_LAUNCH_OK\nexit /b 0\n",
                 encoding="ascii",
             )
@@ -72,13 +73,15 @@ class WeniReviewBatchWindowsTests(unittest.TestCase):
             process.stdin.close()
 
     def _fixture(self, directory: Path) -> None:
+        (directory / "app").mkdir()
+        (directory / "comandos").mkdir()
         (directory / "scripts").mkdir()
         (directory / "scripts" / "confirmar_revisao_weni.ps1").write_bytes(
             (REPOSITORY / "scripts" / "confirmar_revisao_weni.ps1").read_bytes()
         )
-        for name in ("check-up.bat", "testar_update_weni.bat"):
+        for name in ("comandos/check-up.bat", "comandos/testar_update_weni.bat"):
             (directory / name).write_text("@echo off\nexit /b 0\n", encoding="ascii")
-        (directory / "run_update_weni.py").write_text(
+        (directory / "app/run_update_weni.py").write_text(
             """import json
 import sys
 from pathlib import Path
@@ -137,7 +140,7 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
             "while not Path('result_ack').exists(): time.sleep(.05)\n",
             encoding="utf-8",
         )
-        batch = (REPOSITORY / "atualizar_weni_carga_completa.bat").read_text(
+        batch = (REPOSITORY / "comandos/atualizar_weni_carga_completa.bat").read_text(
             encoding="utf-8"
         )
         # Production continues using CON. Only the isolated fixture accepts a pipe.
@@ -172,7 +175,7 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
             ),
             batch,
         )
-        (directory / "atualizar_weni_carga_completa.bat").write_text(
+        (directory / "comandos/atualizar_weni_carga_completa.bat").write_text(
             batch, encoding="utf-8"
         )
 
@@ -205,7 +208,7 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
                         os.environ.get("COMSPEC", "cmd.exe"),
                         "/d",
                         "/c",
-                        "atualizar_weni_carga_completa.bat",
+                        "comandos/atualizar_weni_carga_completa.bat".replace("/", "\\"),
                     ],
                     cwd=directory,
                     stdin=subprocess.PIPE,
@@ -353,7 +356,7 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
                         os.environ.get("COMSPEC", "cmd.exe"),
                         "/d",
                         "/c",
-                        "atualizar_weni_carga_completa.bat",
+                        "comandos/atualizar_weni_carga_completa.bat".replace("/", "\\"),
                     ],
                     cwd=directory,
                     stdin=subprocess.PIPE,
@@ -487,14 +490,16 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
                 (directory / "secrets_config.py").write_text(
                     "RECOMPRA_ENABLED = False\n", encoding="ascii"
                 )
-                (directory / "run_update_weni.py").write_text(
+                (directory / "app/run_update_weni.py").write_text(
                     "import sys\nfrom pathlib import Path\n"
                     "if '--apply' in sys.argv:\n"
                     "    Path('apply.json').write_text('synthetic')\n"
                     f"    raise SystemExit({apply_code})\n",
                     encoding="ascii",
                 )
-                batch = (REPOSITORY / "atualizar_weni.bat").read_text(encoding="utf-8")
+                batch = (REPOSITORY / "comandos/atualizar_weni.bat").read_text(
+                    encoding="utf-8"
+                )
                 batch = batch.replace(" < CON", "").replace(
                     '".venv\\Scripts\\python.exe"', f'"{sys.executable}"'
                 )
@@ -506,7 +511,9 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
                     batch,
                 )
                 self.assertEqual(count, 1)
-                (directory / "atualizar_weni.bat").write_text(batch, encoding="utf-8")
+                (directory / "comandos/atualizar_weni.bat").write_text(
+                    batch, encoding="utf-8"
+                )
                 env = {**os.environ, "NEXOFLOW_LAUNCHER": "1"}
                 env.pop("NEXOFLOW_WENI_SESSION", None)
                 env.pop("NEXOFLOW_TERMINAL", None)
@@ -517,7 +524,7 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
                             os.environ.get("COMSPEC", "cmd.exe"),
                             "/d",
                             "/c",
-                            "atualizar_weni.bat",
+                            "comandos/atualizar_weni.bat".replace("/", "\\"),
                         ],
                         cwd=directory,
                         env=env,

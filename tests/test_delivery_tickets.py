@@ -448,7 +448,7 @@ class DeliveryTicketsTests(unittest.TestCase):
             patch(
                 "sys.argv",
                 [
-                    "run_delivery_tickets.py",
+                    "app/run_delivery_tickets.py",
                     "--apply",
                     "--require-review",
                     "synthetic.json",

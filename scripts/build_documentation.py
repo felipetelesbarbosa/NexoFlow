@@ -9,8 +9,8 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_NAME = "Documentacao NexoFlow.md"
-OUTPUT_NAME = "Documentacao NexoFlow.html"
+SOURCE_NAME = "docs/Documentacao NexoFlow.md"
+OUTPUT_NAME = "docs/Documentacao NexoFlow.html"
 MARKER = re.compile(
     r"<!-- NexoFlow documentation: source-sha256=([a-f0-9]{64}) "
     r"content-sha256=([a-f0-9]{64}) -->\n?\Z"

@@ -1,8 +1,10 @@
 @echo off
 chcp 65001 >nul
 setlocal EnableExtensions
+for %%I in ("%~dp0") do set "NEXOFLOW_HOME=%%~fI"
+set "PYTHONPATH=%NEXOFLOW_HOME%;%NEXOFLOW_HOME%\app;%PYTHONPATH%"
 set "PYTHONIOENCODING=utf-8"
-cd /d "%~dp0"
+cd /d "%NEXOFLOW_HOME%\"
 
 echo ==============================================
 echo NexoFlow - Preparação do ambiente
@@ -103,12 +105,12 @@ if exist "secrets_config.py" (
 )
 
 echo Atualizando pip...
-".venv\Scripts\python.exe" run_pip.py install --upgrade pip
+".venv\Scripts\python.exe" app\run_pip.py install --upgrade pip
 if errorlevel 1 goto :erro_proxy
 
 echo.
 echo Instalando dependências...
-".venv\Scripts\python.exe" run_pip.py install -r requirements.txt
+".venv\Scripts\python.exe" app\run_pip.py install -r requirements.txt
 if errorlevel 1 goto :erro_proxy
 
 echo.
@@ -120,8 +122,8 @@ if not defined NEXOFLOW_INSTALLER (
     echo Próximos passos:
     echo 1. Verifique secrets_config.py
     echo 2. Verifique credentials\google_credentials.json
-    echo 3. Execute check-up.bat
-    echo 4. Execute testar_conexoes.bat
+    echo 3. Execute comandos\check-up.bat
+    echo 4. Execute comandos\testar_conexoes.bat
     echo.
     pause
 )

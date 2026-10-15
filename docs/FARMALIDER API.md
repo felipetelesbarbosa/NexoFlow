@@ -236,7 +236,7 @@ A integração usa concorrência controlada:
 - telemetria de latência;
 - aviso de requisição lenta acima do limite configurado.
 
-Os valores operacionais ficam em `config.py`.
+Os valores operacionais ficam em `app/config.py`.
 
 ### Recuperação após falha
 

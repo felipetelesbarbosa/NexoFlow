@@ -7,8 +7,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from requests.exceptions import ReadTimeout, RequestException
-
 import analytics
 import config
 from analytics import (
@@ -23,6 +21,7 @@ from main import (
     split_contacts,
     validate_contacts,
 )
+from requests.exceptions import ReadTimeout, RequestException
 from weni_client import WeniClient
 
 
@@ -740,17 +739,37 @@ class CurrentIntegrationTests(unittest.TestCase):
 
     def test_safe_launcher_batch_gates_each_stage(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        text = (root / "executar_carga_segura.bat").read_text(encoding="utf-8")
-        self.assertIn('call "%~dp0check-up.bat"', text)
-        self.assertIn('call "%~dp0testar_conexoes.bat"', text)
-        self.assertIn('call "%~dp0executar_manual.bat"', text)
+        text = (
+            (root / "comandos/executar_carga_segura.bat")
+            .read_text(encoding="utf-8")
+            .replace("comandos\\", "comandos/")
+            .replace("app\\", "app/")
+        )
+        self.assertIn('call "%NEXOFLOW_HOME%\\comandos/check-up.bat"', text)
+        self.assertIn('call "%NEXOFLOW_HOME%\\comandos/testar_conexoes.bat"', text)
+        self.assertIn('call "%NEXOFLOW_HOME%\\comandos/executar_manual.bat"', text)
         self.assertGreaterEqual(text.count('if not "%RC%"=="0"'), 3)
 
     def test_individual_batches_support_launcher_mode_and_exit_codes(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        checkup = (root / "check-up.bat").read_text(encoding="utf-8")
-        conexoes = (root / "testar_conexoes.bat").read_text(encoding="utf-8")
-        manual = (root / "executar_manual.bat").read_text(encoding="utf-8")
+        checkup = (
+            (root / "comandos/check-up.bat")
+            .read_text(encoding="utf-8")
+            .replace("comandos\\", "comandos/")
+            .replace("app\\", "app/")
+        )
+        conexoes = (
+            (root / "comandos/testar_conexoes.bat")
+            .read_text(encoding="utf-8")
+            .replace("comandos\\", "comandos/")
+            .replace("app\\", "app/")
+        )
+        manual = (
+            (root / "comandos/executar_manual.bat")
+            .read_text(encoding="utf-8")
+            .replace("comandos\\", "comandos/")
+            .replace("app\\", "app/")
+        )
         self.assertIn("NEXOFLOW_LAUNCHER", checkup)
         self.assertIn("NEXOFLOW_LAUNCHER", conexoes)
         self.assertIn("NEXOFLOW_LAUNCHER", manual)
@@ -830,7 +849,7 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn("function Install-OptionalUninstaller", install)
         self.assertIn("NexoFlow Uninstall.exe", install)
         self.assertIn("A instalação continuará normalmente", install)
-        required_line = "foreach ($requiredFile in @('looker_bi.py','run_looker.py','NexoFlow Analytics.exe','NexoFlow Weni.exe','NexoFlow Recompra.exe','NexoFlow Terminal.exe','NexoFlow Planilha.exe','executar_planilha.bat','assets\\NexoFlow_Planilha.ico','assets\\NexoFlow_Recompra.ico','installer\\uninstall.ps1','desinstalar_nexoflow.cmd','scripts\\confirmar_revisao_weni.ps1','scripts\\resultado_carga_weni.ps1'))"
+        required_line = "foreach ($requiredFile in @('app/looker_bi.py','app/run_looker.py','NexoFlow Analytics.exe','NexoFlow Weni.exe','NexoFlow Recompra.exe','NexoFlow Terminal.exe','NexoFlow Planilha.exe','comandos/executar_planilha.bat','assets\\NexoFlow_Planilha.ico','assets\\NexoFlow_Recompra.ico','installer\\uninstall.ps1','desinstalar_nexoflow.cmd','scripts\\confirmar_revisao_weni.ps1','scripts\\resultado_carga_weni.ps1'))"
         self.assertIn(required_line, install)
         self.assertNotIn(
             "'NexoFlow Uninstall.exe')) {\n        Ensure-InstalledPayloadFile", install
@@ -867,7 +886,7 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn("Start-Process -FilePath $BundledPythonInstaller", install)
         self.assertIn("NÃO instalará Python 3.12", install)
         self.assertIn("NÃO usará WinGet", install)
-        self.assertIn("Documentacao NexoFlow.html", install)
+        self.assertIn("docs/Documentacao NexoFlow.html", install)
         self.assertIn("NexoFlow Data", uninstall)
         self.assertIn("YesNoCancel", uninstall)
         self.assertIn("Get-CimInstance Win32_Process", uninstall)
@@ -918,12 +937,12 @@ class CurrentIntegrationTests(unittest.TestCase):
 
     def test_operational_documentation_is_installed_at_root(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        self.assertTrue((root / "Documentacao NexoFlow.md").exists())
-        self.assertTrue((root / "Documentacao NexoFlow.html").exists())
+        self.assertTrue((root / "docs/Documentacao NexoFlow.md").exists())
+        self.assertTrue((root / "docs/Documentacao NexoFlow.html").exists())
 
     def test_main_has_clear_execution_summary(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        text = (root / "main.py").read_text(encoding="utf-8")
+        text = (root / "app/main.py").read_text(encoding="utf-8")
         self.assertIn("Weni: recebidos=%s", text)
         self.assertIn("CPFs válidos únicos para consulta=%s", text)
         self.assertIn("Resumo da execução:", text)
@@ -946,18 +965,18 @@ class CurrentIntegrationTests(unittest.TestCase):
         data = launcher.read_bytes()
         self.assertTrue(data.startswith(b"MZ"))
         self.assertIn(b"NexoFlowOperationLock", data)
-        self.assertIn(b"atualizar_weni.bat", data)
+        self.assertIn(b"comandos/atualizar_weni.bat", data)
         self.assertIn(b'requestedExecutionLevel level="asInvoker"', data)
         self.assertNotIn(b"powershell.exe", data)
         self.assertNotIn(b"-ExecutionPolicy", data)
         for name in (
-            "atualizar_weni.bat",
-            "atualizar_weni_dry_run.bat",
-            "atualizar_weni_carga_completa.bat",
-            "testar_update_weni.bat",
-            "run_update_weni.py",
-            "weni_update.py",
-            "contact_enrichment.py",
+            "comandos/atualizar_weni.bat",
+            "comandos/atualizar_weni_dry_run.bat",
+            "comandos/atualizar_weni_carga_completa.bat",
+            "comandos/testar_update_weni.bat",
+            "app/run_update_weni.py",
+            "app/weni_update.py",
+            "app/contact_enrichment.py",
         ):
             self.assertTrue((root / name).exists(), name)
 
@@ -1002,20 +1021,30 @@ class CurrentIntegrationTests(unittest.TestCase):
 
     def test_update_weni_safe_batch_has_mandatory_audit_before_apply(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        text = (root / "atualizar_weni.bat").read_text(encoding="utf-8")
-        self.assertIn("check-up.bat", text)
-        self.assertIn("testar_update_weni.bat", text)
-        self.assertIn("run_update_weni.py --dry-run", text)
-        self.assertIn("run_update_weni.py --apply", text)
+        text = (
+            (root / "comandos/atualizar_weni.bat")
+            .read_text(encoding="utf-8")
+            .replace("comandos\\", "comandos/")
+            .replace("app\\", "app/")
+        )
+        self.assertIn("comandos/check-up.bat", text)
+        self.assertIn("comandos/testar_update_weni.bat", text)
+        self.assertIn("app/run_update_weni.py --dry-run", text)
+        self.assertIn("app/run_update_weni.py --apply", text)
         self.assertIn("Digite ATUALIZAR", text)
         self.assertLess(
-            text.index("run_update_weni.py --dry-run"),
-            text.index("run_update_weni.py --apply"),
+            text.index("app/run_update_weni.py --dry-run"),
+            text.index("app/run_update_weni.py --apply"),
         )
 
     def test_full_update_requires_human_review_snapshot(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        text = (root / "atualizar_weni_carga_completa.bat").read_text(encoding="utf-8")
+        text = (
+            (root / "comandos/atualizar_weni_carga_completa.bat")
+            .read_text(encoding="utf-8")
+            .replace("comandos\\", "comandos/")
+            .replace("app\\", "app/")
+        )
         self.assertIn("--review-out", text)
         self.assertIn("weni_update_review_full.txt", text)
         self.assertIn("notepad.exe", text)
@@ -1028,9 +1057,9 @@ class CurrentIntegrationTests(unittest.TestCase):
     ) -> None:
         root = Path(__file__).resolve().parents[1]
         terminal = (root / "NexoFlow Terminal.exe").read_bytes()
-        runner = (root / "run_terminal.py").read_text(encoding="utf-8")
+        runner = (root / "app/run_terminal.py").read_text(encoding="utf-8")
         self.assertTrue(terminal.startswith(b"MZ"))
-        self.assertIn(b"run_terminal.py", terminal)
+        self.assertIn(b"app/run_terminal.py", terminal)
         self.assertIn(b"NexoFlowTerminalIconRevision=1.0", terminal)
         self.assertIn(b'requestedExecutionLevel level="asInvoker"', terminal)
         self.assertIn("configure_proxy()", runner)
@@ -1044,7 +1073,12 @@ class CurrentIntegrationTests(unittest.TestCase):
 
     def test_distribution_hardening_avoids_unnecessary_shell_patterns(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        shortcut = (root / "criar_atalho_desktop.bat").read_text(encoding="utf-8")
+        shortcut = (
+            (root / "comandos/criar_atalho_desktop.bat")
+            .read_text(encoding="utf-8")
+            .replace("comandos\\", "comandos/")
+            .replace("app\\", "app/")
+        )
         uninstall = (root / "installer" / "uninstall.ps1").read_text(encoding="utf-8")
         install = (root / "installer" / "install.ps1").read_text(encoding="utf-8")
         self.assertNotIn("-ExecutionPolicy Bypass -Command", shortcut)
@@ -1097,9 +1131,14 @@ class CurrentIntegrationTests(unittest.TestCase):
         self,
     ) -> None:
         root = Path(__file__).resolve().parents[1]
-        batch = (root / "check-up.bat").read_text(encoding="utf-8")
-        runner = (root / "run_checkup_tests.py").read_text(encoding="utf-8")
-        self.assertIn("run_checkup_tests.py", batch)
+        batch = (
+            (root / "comandos/check-up.bat")
+            .read_text(encoding="utf-8")
+            .replace("comandos\\", "comandos/")
+            .replace("app\\", "app/")
+        )
+        runner = (root / "app/run_checkup_tests.py").read_text(encoding="utf-8")
+        self.assertIn("app/run_checkup_tests.py", batch)
         self.assertIn("logging.disable(logging.CRITICAL)", runner)
         self.assertIn('warnings.simplefilter("ignore")', runner)
         self.assertIn("TextTestRunner(verbosity=0)", runner)
@@ -1121,7 +1160,12 @@ class CurrentIntegrationTests(unittest.TestCase):
         command = root / "nexo.cmd"
         self.assertTrue(command.exists())
         self.assertFalse(command.read_bytes().startswith(b"\xef\xbb\xbf"))
-        self.assertIn("nexo_cli.py", command.read_text(encoding="utf-8"))
+        self.assertIn(
+            "app/nexo_cli.py",
+            command.read_text(encoding="utf-8")
+            .replace("comandos\\", "comandos/")
+            .replace("app\\", "app/"),
+        )
 
 
 if __name__ == "__main__":

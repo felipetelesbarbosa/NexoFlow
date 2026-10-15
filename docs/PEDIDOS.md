@@ -261,6 +261,6 @@ O NexoFlow valida:
 
 Respostas inconsistentes não alimentam métricas como venda confirmada.
 
-Leia também [FarmaLíder API](FARMALIDER%20API.md), [NexoFlow Weni](../README%20WENI.md) e [Looker Studio](LOOKER%20STUDIO.md).
+Leia também [FarmaLíder API](FARMALIDER%20API.md), [NexoFlow Weni](README%20WENI.md) e [Looker Studio](LOOKER%20STUDIO.md).
 
 <!-- NexoFlow 1.0 -->

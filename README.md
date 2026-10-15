@@ -1,10 +1,20 @@
 # NexoFlow 1.0
 
-**Carga por exports do Delivery:** coloque `Conversas_Delivery.xlsx` e `Contatos_Delivery.xlsx` em `C:\NexoFlow\importacoes` e execute `nexo weni planilhas` ou `nexo analytics planilhas`. Os destinos são separados e exigem revisão antes da aplicação. Consulte [Delivery e carga por planilhas](README%20DELIVERY.md).
+Os executáveis permanecem na raiz para acesso direto. Os demais arquivos estão organizados em:
+
+- `app/`: módulos Python do NexoFlow.
+- `comandos/`: rotinas BAT, incluindo cargas completas e o fluxo `atualizar_tudo.bat`.
+- `docs/`: manuais e documentação.
+- `configuracao/`: exemplos para configurar suas próprias credenciais.
+- `installer/`, `scripts/` e `tests/`: instalação, manutenção e testes.
+
+`instalar.bat`, `nexo.cmd` e `desinstalar_nexoflow.cmd` continuam na raiz. A atualização pelo Setup substitui a estrutura antiga e preserva `secrets_config.py`, `credentials/`, `logs/` e `importacoes/`.
+
+**Carga por exports do Delivery:** coloque `Conversas_Delivery.xlsx` e `Contatos_Delivery.xlsx` em `C:\NexoFlow\importacoes` e execute `nexo weni planilhas` ou `nexo analytics planilhas`. Os destinos são separados e exigem revisão antes da aplicação. Consulte [Delivery e carga por planilhas](docs/README%20DELIVERY.md).
 
 ## Arquivos Google Sheets separados
 
-O NexoFlow pode manter operação, histórico de alterações e dashboard em três arquivos. As abas `BI_*` permanecem na planilha original, preservando os IDs das fontes do Looker. Execute `dividir_planilhas.bat` com todas as rotinas encerradas e os dois destinos compartilhados como Editor com sua conta de serviço. A cópia é conferida antes da ativação e da retirada das abas originais. Consulte [Divisão dos arquivos](docs/planilhas_separadas.md).
+O NexoFlow pode manter operação, histórico de alterações e dashboard em três arquivos. As abas `BI_*` permanecem na planilha original, preservando os IDs das fontes do Looker. Execute `comandos/dividir_planilhas.bat` com todas as rotinas encerradas e os dois destinos compartilhados como Editor com sua conta de serviço. A cópia é conferida antes da ativação e da retirada das abas originais. Consulte [Divisão dos arquivos](docs/planilhas_separadas.md).
 
 ## Padronização do endereço
 
@@ -666,7 +676,7 @@ Proteções principais:
 
 ### Atualizar tudo em ordem
 
-Execute `atualizar_tudo.bat` na pasta instalada do NexoFlow, após colocar `Conversas_Delivery.xlsx` e `Contatos_Delivery.xlsx` em `importacoes`.
+Execute `comandos/atualizar_tudo.bat` na pasta instalada do NexoFlow, após colocar `Conversas_Delivery.xlsx` e `Contatos_Delivery.xlsx` em `importacoes`.
 
 O fluxo executa Weni completa (100%), Planilhas → Weni, Planilhas → Analytics/Google Sheets, Analytics completo (100%), Recompra e Analytics incremental, nessa ordem. Revise os relatórios e confirme cada aplicação quando solicitado. A Recompra ocorre somente na quarta etapa, mesmo quando habilitada para execução após a carga Weni individual.
 
@@ -674,7 +684,7 @@ Erro, cancelamento, conflito ou consulta parcial interrompe a sequência. Confir
 
 ### Carga completa fragmentada em 25%
 
-Para reduzir o tempo e o risco operacional de uma carga integral longa, `atualizar_weni_carga_completa.bat` e `executar_carga_completa.bat` permitem escolher **100%** ou uma das quatro partes de **25%**.
+Para reduzir o tempo e o risco operacional de uma carga integral longa, `comandos/atualizar_weni_carga_completa.bat` e `comandos/executar_carga_completa.bat` permitem escolher **100%** ou uma das quatro partes de **25%**.
 
 As partes 1/4 a 4/4 usam um manifesto compartilhado em `logs\full_load_25_manifest.json`. A base é congelada na primeira parte, ordenada por UUID e dividida por limites inteiros determinísticos. Assim, as quatro partes cobrem a base uma única vez, sem sobreposição. Novos contatos após o corte não entram no meio da campanha e permanecem elegíveis para a incremental posterior.
 
@@ -684,8 +694,8 @@ Cada componente mantém sua própria sequência de conclusão: Weni 1→2→3→
 
 ```text
 1. Instalar NexoFlow 1.0
-2. testar_conexoes.bat
-3. atualizar_weni_carga_completa.bat
+2. comandos/testar_conexoes.bat
+3. comandos/atualizar_weni_carga_completa.bat
 4. revisar logs\weni_update_review_full.txt
 5. confirmar CARGA COMPLETA REVISADA
 6. executar carga completa do Analytics
@@ -702,22 +712,22 @@ Após atualizar ou reinstalar, essa sequência gera um novo dry-run com o de-par
 
 ## Documentação
 
-- [NexoFlow Weni](README%20WENI.md)
-- [NexoFlow Recompra](README%20RECOMPRA.md)
-- [NexoFlow Planilha](README%20DELIVERY.md)
-- [Reconciliação dos atendimentos Delivery com tags de pedido](README%20DELIVERY.md)
-- [NexoFlow Terminal](README%20TERMINAL.md) — arquivo `README TERMINAL.md`
-- [Instalação](README%20INSTALACAO.md)
+- [NexoFlow Weni](docs/README%20WENI.md)
+- [NexoFlow Recompra](docs/README%20RECOMPRA.md)
+- [NexoFlow Planilha](docs/README%20DELIVERY.md)
+- [Reconciliação dos atendimentos Delivery com tags de pedido](docs/README%20DELIVERY.md)
+- [NexoFlow Terminal](docs/README%20TERMINAL.md) — arquivo `docs/README TERMINAL.md`
+- [Instalação](docs/README%20INSTALACAO.md)
 - [Pedidos](docs/PEDIDOS.md)
 - [FarmaLíder API](docs/FARMALIDER%20API.md)
 - [Google Ads](docs/GOOGLE%20ADS.md)
 - [Google Sheets / Service Account](docs/GOOGLE%20SETUP.md)
 - [Looker Studio](docs/LOOKER%20STUDIO.md)
-- [Proxy e rede](README%20PROXY.md)
-- [VS Code](README%20VSCODE.md)
+- [Proxy e rede](docs/README%20PROXY.md)
+- [VS Code](docs/README%20VSCODE.md)
 - [Antivírus e confiança](docs/ANTIVIRUS%20E%20CONFIANCA.md)
 - [Histórico de mudanças](CHANGELOG.md)
-- [Processo de mudanças](PROCESSO%20DE%20MUDANCAS.md)
+- [Processo de mudanças](docs/PROCESSO%20DE%20MUDANCAS.md)
 
 ## NexoFlow 1.0
 
@@ -745,7 +755,7 @@ No Looker Studio, atualize os campos das fontes `Base_Contatos` e `BI_Pedidos` u
 
 A campanha é destinada a produtos para humanos. Itens identificados como pet, de uso animal ou veterinário pelo nome, categoria ou código de referência do catálogo pet ficam fora da mensagem. Pedidos somente animais não entram no grupo; pedidos mistos mantêm apenas os produtos humanos. As revisões anteriores a esse filtro precisam ser geradas novamente. Remover um agendamento mantém a proteção contra repetir a admissão do mesmo pedido.
 
-Grupo sincronizado com a última compra confirmada entre 0 e 25 dias, remoção depois de 25 dias e por recusa. O envio continua somente no D+25 pela campanha Weni. Execute `nexo weni recompra auditoria`, `dry-run` e `aplicar` com revisão, ou `nexo weni recompra atualizar`. Confira [implementação, configuração e limites da recompra](README%20RECOMPRA.md). A rotina não altera marketing_opt_in, não dispara WhatsApp e não modifica a campanha.
+Grupo sincronizado com a última compra confirmada entre 0 e 25 dias, remoção depois de 25 dias e por recusa. O envio continua somente no D+25 pela campanha Weni. Execute `nexo weni recompra auditoria`, `dry-run` e `aplicar` com revisão, ou `nexo weni recompra atualizar`. Confira [implementação, configuração e limites da recompra](docs/README%20RECOMPRA.md). A rotina não altera marketing_opt_in, não dispara WhatsApp e não modifica a campanha.
 
 ## NexoFlow Planilha
 

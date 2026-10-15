@@ -9,8 +9,8 @@ import nexo_cli
 class NexoCliTests(unittest.TestCase):
     def test_spreadsheet_load_commands_route_to_separate_targets(self):
         for args, expected in [
-            (["weni", "planilhas"], "atualizar_weni_planilhas.bat"),
-            (["analytics", "planilhas"], "executar_analytics_planilhas.bat"),
+            (["weni", "planilhas"], "comandos/atualizar_weni_planilhas.bat"),
+            (["analytics", "planilhas"], "comandos/executar_analytics_planilhas.bat"),
             (["analytics"], "NexoFlow Analytics.exe"),
         ]:
             with (

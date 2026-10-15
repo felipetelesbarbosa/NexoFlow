@@ -12,7 +12,7 @@ O histórico de alterações é uma trilha de auditoria de contatos. As compras 
 
 1. Atualize o NexoFlow e encerre todas as rotinas de Weni, Analytics, Planilhas e Recompra.
 2. Crie dois arquivos vazios, Operação e Histórico. Compartilhe ambos como **Editor** com o `client_email` da sua conta de serviço Google.
-3. Execute `dividir_planilhas.bat`, informe os links e confira o plano. Confirme apenas com as rotinas encerradas.
+3. Execute `comandos/dividir_planilhas.bat`, informe os links e confira o plano. Confirme apenas com as rotinas encerradas.
 4. Aguarde a cópia nativa e a conferência de todas as células. Valores, fórmulas e posições de linhas são comparados em blocos limitados. Estruturas nativas são copiadas pelo Google e o cabeçalho e metadados são conferidos. Se a cópia integral falhar sem criar uma aba, abas simples podem ser transferidas em blocos nativos com valores tipados, formatos, notas, validações e dimensões. A retomada escreve intervalos fixos, sem acrescentar linhas duplicadas. Abas com estruturas vinculadas que não possam ser preservadas interrompem a migração para revisão.
 5. A configuração é ativada na aba `NexoFlow_Arquivos` do arquivo original. O ID em `secrets_config.py` permanece igual. Todos os computadores que executam o NexoFlow devem usar a atualização com suporte a essa configuração.
 6. Somente depois da ativação e de nova conferência as abas operacionais originais são retiradas. Dependências de fórmulas ou intervalos nomeados interrompem a limpeza para revisão.

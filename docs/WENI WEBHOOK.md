@@ -4,7 +4,7 @@ A rotina diária mantém corretamente o primeiro anúncio e o anúncio mais rece
 
 Para responder com precisão **quantas conversas cada anúncio gerou**, o referral precisa ser registrado no momento em que chega à Weni.
 
-O projeto já inclui `webhook_eventos.py` com o endpoint:
+O projeto já inclui `app/webhook_eventos.py` com o endpoint:
 
 `POST /weni/meta-event`
 

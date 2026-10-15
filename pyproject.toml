@@ -10,6 +10,7 @@ requires-python = ">=3.11"
 dynamic = ["dependencies", "optional-dependencies"]
 
 [tool.setuptools]
+package-dir = {"" = "app"}
 # Módulos públicos explícitos: configuração privada e pastas de dados ficam fora.
 py-modules = [
   "ad_attribution",
@@ -40,6 +41,7 @@ py-modules = [
   "pedido_utils",
   "private_diagnostics",
   "proxy_config",
+  "project_paths",
   "recompra",
   "run_checkup_tests",
   "run_delivery_tickets",

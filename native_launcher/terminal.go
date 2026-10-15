@@ -55,7 +55,7 @@ func main() {
         os.Exit(1)
     }
 
-    runner := filepath.Join(installDir, "run_terminal.py")
+    runner := filepath.Join(installDir, "app/run_terminal.py")
     if !requireFile(runner) {
         os.Exit(2)
     }

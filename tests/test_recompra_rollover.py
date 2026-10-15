@@ -9,12 +9,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-import requests
-
 import recompra
+import requests
 from run_recompra import main as run_recompra
-from tests.test_recompra import STRUCTURE, fixture
 from weni_client import WeniClient, WeniError
+
+from tests.test_recompra import STRUCTURE, fixture
 
 BEFORE = datetime(2026, 10, 9, 23, 59, 59, tzinfo=recompra.TZ)
 AFTER = datetime(2026, 10, 10, 0, 0, 1, tzinfo=recompra.TZ)
@@ -527,7 +527,7 @@ class RecompraRunnerRolloverTests(unittest.TestCase):
         import run_update_weni
 
         argv = [
-            "run_update_weni.py",
+            "app/run_update_weni.py",
             "--recompra",
             "--dry-run",
             "--full",
@@ -546,19 +546,25 @@ class RecompraRunnerRolloverTests(unittest.TestCase):
 
 class RecompraBatchRolloverContractTests(unittest.TestCase):
     def setUp(self):
-        self.path = Path(__file__).resolve().parents[1] / "atualizar_recompra.bat"
-        self.batch = self.path.read_text(encoding="utf-8")
+        self.path = (
+            Path(__file__).resolve().parents[1] / "comandos/atualizar_recompra.bat"
+        )
+        self.batch = (
+            self.path.read_text(encoding="utf-8")
+            .replace("comandos\\", "comandos/")
+            .replace("app\\", "app/")
+        )
         self.lines = [line.strip() for line in self.batch.splitlines()]
 
     def test_review_refresh_returns_to_dry_run_before_reopening_and_reconfirmation(
         self,
     ):
         regeneration = self.batch.index(":gerar_revisao\n")
-        dry_run = self.batch.index("run_recompra.py --dry-run")
-        check = self.batch.index("run_recompra.py --check-review")
+        dry_run = self.batch.index("app/run_recompra.py --dry-run")
+        check = self.batch.index("app/run_recompra.py --check-review")
         report = self.batch.index('start "" notepad.exe')
         confirm = self.batch.index(' -Expected "RECOMPRA REVISADA"')
-        apply = self.batch.index("run_recompra.py --apply")
+        apply = self.batch.index("app/run_recompra.py --apply")
         self.assertEqual(
             sorted((regeneration, dry_run, check, report, confirm, apply)),
             [regeneration, dry_run, check, report, confirm, apply],
@@ -588,7 +594,7 @@ class RecompraBatchRolloverContractTests(unittest.TestCase):
         apply = next(
             index
             for index, line in enumerate(self.lines)
-            if "run_recompra.py --apply" in line
+            if "app/run_recompra.py --apply" in line
         )
         between = self.lines[confirm + 1 : apply]
         self.assertIn('set "RC=%ERRORLEVEL%"', between)

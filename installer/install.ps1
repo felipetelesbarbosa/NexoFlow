@@ -1085,7 +1085,7 @@ try {
     if ($installRc -ne 0) { throw "A preparação do ambiente Python falhou (código $installRc). Os arquivos e dados privados foram preservados." }
 
     Write-Step 'Validando componentes instalados'
-    foreach ($requiredFile in @('looker_bi.py','run_looker.py','NexoFlow Analytics.exe','NexoFlow Weni.exe','NexoFlow Recompra.exe','NexoFlow Terminal.exe','NexoFlow Planilha.exe','executar_planilha.bat','assets\NexoFlow_Planilha.ico','assets\NexoFlow_Recompra.ico','installer\uninstall.ps1','desinstalar_nexoflow.cmd','scripts\confirmar_revisao_weni.ps1','scripts\resultado_carga_weni.ps1')) {
+    foreach ($requiredFile in @('app/looker_bi.py','app/run_looker.py','NexoFlow Analytics.exe','NexoFlow Weni.exe','NexoFlow Recompra.exe','NexoFlow Terminal.exe','NexoFlow Planilha.exe','comandos/executar_planilha.bat','assets\NexoFlow_Planilha.ico','assets\NexoFlow_Recompra.ico','installer\uninstall.ps1','desinstalar_nexoflow.cmd','scripts\confirmar_revisao_weni.ps1','scripts\resultado_carga_weni.ps1')) {
         Ensure-InstalledPayloadFile -RelativePath $requiredFile
     }
 
@@ -1144,7 +1144,7 @@ try {
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Planilha.lnk') -TargetPath $planilhaExe -WorkingDirectory $InstallDir -Description 'Cargas por planilhas para Weni e Analytics, com revisão humana' -IconPath $planilhaIcon
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Terminal.lnk') -TargetPath $terminalExe -WorkingDirectory $InstallDir -Description 'Terminal NexoFlow com ambiente e proxy preparados para a sessao' -IconPath $terminalIcon
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'Desinstalar NexoFlow.lnk') -TargetPath $uninstallCmd -WorkingDirectory $InstallDir -Description 'Desinstala o NexoFlow' -IconPath (Join-Path $InstallDir 'assets\uninstaller.ico')
-    $documentation = Join-Path $InstallDir 'Documentacao NexoFlow.html'
+    $documentation = Join-Path $InstallDir 'docs/Documentacao NexoFlow.html'
     if (Test-Path -LiteralPath $documentation -PathType Leaf) {
         Create-Shortcut -ShortcutPath (Join-Path $startMenu 'Documentacao NexoFlow.lnk') -TargetPath $documentation -WorkingDirectory $InstallDir -Description 'Abre a documentação operacional do NexoFlow' -IconPath $appIcon
     }

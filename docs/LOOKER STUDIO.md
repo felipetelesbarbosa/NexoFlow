@@ -191,10 +191,10 @@ Execute uma carga completa do Analytics uma única vez:
 
 ```powershell
 cd C:\NexoFlow
-.\executar_carga_completa.bat
+.\comandos/executar_carga_completa.bat
 ```
 
-Isso cria/migra as sete abas BI, incluindo `BI_Pedidos`, completa a Base_Contatos com os contatos historicamente excluídos e inicializa o dashboard. Depois, volte ao fluxo incremental normal com `executar_manual.bat` ou `nexo analytics`.
+Isso cria/migra as sete abas BI, incluindo `BI_Pedidos`, completa a Base_Contatos com os contatos historicamente excluídos e inicializa o dashboard. Depois, volte ao fluxo incremental normal com `comandos/executar_manual.bat` ou `nexo analytics`.
 
 ## Localização e idade dos clientes
 

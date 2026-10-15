@@ -17,7 +17,9 @@ class SpreadsheetReviewWindowsTests(unittest.TestCase):
     def run_case(self, target, decision, dry_failure=False, closed_stdin=False):
         with tempfile.TemporaryDirectory(prefix="nexo planilhas ") as temp:
             root = Path(temp)
-            (root / "run_delivery_tickets.py").write_text(
+            (root / "app").mkdir()
+            (root / "comandos").mkdir()
+            (root / "app/run_delivery_tickets.py").write_text(
                 """import json,sys
 from pathlib import Path
 args=sys.argv[1:]
@@ -38,7 +40,7 @@ else:
             )
             if dry_failure:
                 (root / "fail_dry").touch()
-            batch = (ROOT / "carga_planilhas.bat").read_text(encoding="utf-8")
+            batch = (ROOT / "comandos/carga_planilhas.bat").read_text(encoding="utf-8")
             batch = batch.replace('".venv\\Scripts\\python.exe"', f'"{sys.executable}"')
             # A GUI editor does not share CMD's blocked stdin. A /b console
             # Python child can block during startup while SET /P reads the pipe.
@@ -64,7 +66,7 @@ else:
                 "exit (Confirm-WeniReview -Expected $Expected -Title $Title)\n",
                 encoding="utf-8-sig",
             )
-            (root / "carga_planilhas.bat").write_text(batch, encoding="utf-8")
+            (root / "comandos/carga_planilhas.bat").write_text(batch, encoding="utf-8")
             env = {**os.environ, "NEXOFLOW_LAUNCHER": "1"}
             output = root / "console.log"
             with output.open("wb") as handle:
@@ -73,7 +75,7 @@ else:
                         os.environ.get("COMSPEC", "cmd.exe"),
                         "/d",
                         "/c",
-                        "carga_planilhas.bat",
+                        "comandos/carga_planilhas.bat".replace("/", "\\"),
                         target,
                     ],
                     cwd=root,

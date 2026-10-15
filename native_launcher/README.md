@@ -15,7 +15,7 @@ Objetivos:
 - não embutir tokens, senhas ou credenciais;
 - manter código-fonte auditável, sem packer ou ofuscação.
 
-O `NexoFlow Terminal.exe` inicia diretamente `run_terminal.py` com o Python da `.venv` quando disponível e utiliza `assets/NexoFlow_Terminal.ico`.
+O `NexoFlow Terminal.exe` inicia diretamente `app/run_terminal.py` com o Python da `.venv` quando disponível e utiliza `assets/NexoFlow_Terminal.ico`.
 
 ### Ícones incorporados nos executáveis
 
@@ -48,4 +48,4 @@ O Setup instala **NexoFlow Planilha.exe** com ícone próprio e atalho na Área 
 
 ## Executável Recompra
 
-`NexoFlow Recompra.exe` foi adicionado como lançador dedicado para `atualizar_recompra.bat`. Não altera nem ignora os passos do BAT: check-only, dry-run, revisão humana e confirmação antes do apply. O workflow Windows executa o EXE compilado em uma pasta temporária com BAT sintético e verifica retorno 0 e propagação de falha; a validação de POST/GET para grupo Weni usa API simulada nos testes Python, sem atualizar contatos reais.
+`NexoFlow Recompra.exe` foi adicionado como lançador dedicado para `comandos/atualizar_recompra.bat`. Não altera nem ignora os passos do BAT: check-only, dry-run, revisão humana e confirmação antes do apply. O workflow Windows executa o EXE compilado em uma pasta temporária com BAT sintético e verifica retorno 0 e propagação de falha; a validação de POST/GET para grupo Weni usa API simulada nos testes Python, sem atualizar contatos reais.

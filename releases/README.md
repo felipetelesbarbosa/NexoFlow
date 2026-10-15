@@ -20,7 +20,7 @@ O Setup 1.0 é validado automaticamente em Windows antes da publicação. A vali
 - primeira instalação;
 - atualização sobre uma instalação existente;
 - preservação de `secrets_config.py`, `credentials` e `logs`;
-- execução do `check-up.bat` após a instalação;
+- execução do `comandos/check-up.bat` após a instalação;
 - cenário em que antivírus/EDR remove `NexoFlow Uninstall.exe` do pacote extraído.
 
 O `NexoFlow Uninstall.exe` é opcional. Se for bloqueado ou removido, o Setup continua funcionando e a desinstalação permanece disponível por `installer\uninstall.ps1` e `desinstalar_nexoflow.cmd`.
@@ -29,6 +29,6 @@ Atualizações preservam temporariamente a instalação existente. Se a nova ins
 
 O Setup também solicita elevação UAC automaticamente quando necessário.
 
-Após instalar, atualizar ou reinstalar, faça os testes de conexão e a revalidação completa descritos em [Instalação](../README%20INSTALACAO.md). A carga Weni exige dry-run, auditoria e revisão humana antes da aplicação; depois execute a carga completa do Analytics para recalcular os dados sob as regras atuais.
+Após instalar, atualizar ou reinstalar, faça os testes de conexão e a revalidação completa descritos em [Instalação](../docs/README%20INSTALACAO.md). A carga Weni exige dry-run, auditoria e revisão humana antes da aplicação; depois execute a carga completa do Analytics para recalcular os dados sob as regras atuais.
 
 Os pacotes são gerados automaticamente a partir da `main` somente depois de testes, auditoria e smoke test do instalador. Credenciais reais não entram nos artefatos.

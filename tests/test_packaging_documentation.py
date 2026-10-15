@@ -21,6 +21,7 @@ class DocumentationTests(unittest.TestCase):
         self.root = Path(temporary.name)
         self.source = self.root / documentation.SOURCE_NAME
         self.output = self.root / documentation.OUTPUT_NAME
+        self.source.parent.mkdir(parents=True, exist_ok=True)
         self.source.write_text(
             "# Operação\n\nRevisão antes da aplicação.\n", encoding="utf-8"
         )
@@ -123,7 +124,7 @@ class DocumentationTests(unittest.TestCase):
             )
         )
         for name in (documentation.SOURCE_NAME, documentation.OUTPUT_NAME):
-            self.assertFalse((ROOT / "docs" / name).exists())
+            self.assertFalse((ROOT / Path(name).name).exists())
 
 
 class PackagingMetadataTests(unittest.TestCase):

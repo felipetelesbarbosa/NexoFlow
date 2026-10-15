@@ -1,5 +1,7 @@
 # NexoFlow 1.0 — Changelog
 
+- Arquivos organizados em `app`, `comandos`, `docs` e `configuracao`, com caminhos dos executáveis e atualização de instalações anteriores adaptados.
+
 - Antes de classificar um CPF curto como inválido, restaurar zeros à esquerda somente quando o resultado de 11 dígitos passar nos verificadores. Valores como 0 e identificadores errados permanecem em validação por identidade.
 - CPF válido dispensa comparação de nome, telefone e e-mail. CPF inválido pode ser validado pelo primeiro nome, normalizando acentos e símbolos, ou pelo número local do telefone, ignorando +55 e DDD. E-mail não é obrigatório; cache não compartilha identidade entre contatos e respostas ambíguas continuam pendentes.
 - Analytics/Looker contabilizam pedidos API validados em estados documentados não cancelados, incluindo Em processamento; regra alinhada com Weni e Recompra e reconsulta em cada nova carga no escopo selecionado.
@@ -33,7 +35,7 @@
 
 - Analytics informa barra, velocidade e tempo restante por etapa nas consultas de CPF, validação de pedidos e gravações do Sheets. O indicador continua ativo durante respostas lentas e retries; apenas linhas confirmadas avançam a gravação, e falhas não exibem conclusão de 100%.
 
-- `atualizar_tudo.bat` executa as cargas completas, Planilhas, Recompra e sincronização incremental em ordem, mantendo as revisões humanas e interrompendo o fluxo diante de erros, conflitos ou consultas parciais. Looker Studio recebe orientação para atualização manual ao final.
+- `comandos/atualizar_tudo.bat` executa as cargas completas, Planilhas, Recompra e sincronização incremental em ordem, mantendo as revisões humanas e interrompendo o fluxo diante de erros, conflitos ou consultas parciais. Looker Studio recebe orientação para atualização manual ao final.
 
 - Compra posterior ainda não confirmada pela API pode ser sinalizada na Weni e no Sheets, com bloqueio da referência antiga de recompra e indicadores de pendência no BI.
 

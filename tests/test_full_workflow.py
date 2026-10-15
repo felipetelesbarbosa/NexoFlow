@@ -43,7 +43,7 @@ class CompleteQueriesTests(unittest.TestCase):
                         patch(
                             "sys.argv",
                             [
-                                "run_update_weni.py",
+                                "app/run_update_weni.py",
                                 "--dry-run",
                                 *(["--require-complete"] if strict else []),
                             ],
@@ -73,7 +73,7 @@ class CompleteQueriesTests(unittest.TestCase):
                     patch(
                         "sys.argv",
                         [
-                            "run_delivery_tickets.py",
+                            "app/run_delivery_tickets.py",
                             "--dry-run",
                             "--planilhas",
                             "--require-complete",
@@ -174,20 +174,20 @@ class CompleteQueriesTests(unittest.TestCase):
 @unittest.skipUnless(os.name == "nt", "Requires Windows CMD")
 class FullWorkflowWindowsTests(unittest.TestCase):
     children = (
-        "atualizar_weni_carga_completa.bat",
-        "atualizar_weni_planilhas.bat",
-        "executar_analytics_planilhas.bat",
-        "executar_carga_completa.bat",
-        "atualizar_recompra.bat",
-        "executar_manual.bat",
+        "comandos/atualizar_weni_carga_completa.bat",
+        "comandos/atualizar_weni_planilhas.bat",
+        "comandos/executar_analytics_planilhas.bat",
+        "comandos/executar_carga_completa.bat",
+        "comandos/atualizar_recompra.bat",
+        "comandos/executar_manual.bat",
     )
 
     def invoke(self, *, failing_stage=None, result_code=0, missing_import=False):
         with tempfile.TemporaryDirectory(prefix="NexoFlow workflow ") as temporary:
             root = Path(temporary)
             shutil.copyfile(
-                Path(__file__).resolve().parents[1] / "atualizar_tudo.bat",
-                root / "atualizar_tudo.bat",
+                Path(__file__).resolve().parents[1] / "comandos/atualizar_tudo.bat",
+                root / "comandos/atualizar_tudo.bat",
             )
             python = root / ".venv/Scripts/python.exe"
             python.parent.mkdir(parents=True)
@@ -204,7 +204,7 @@ class FullWorkflowWindowsTests(unittest.TestCase):
                 )
             env = {**os.environ, "FORCE_FULL_SYNC": "1", "FULL_SYNC_QUARTER": "2"}
             result = subprocess.run(
-                ["cmd.exe", "/d", "/c", "atualizar_tudo.bat"],
+                ["cmd.exe", "/d", "/c", "comandos/atualizar_tudo.bat"],
                 cwd=root,
                 env=env,
                 input="\n",

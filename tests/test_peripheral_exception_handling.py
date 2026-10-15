@@ -83,7 +83,7 @@ class PeripheralExceptionHandlingTests(unittest.TestCase):
         ):
             with self.subTest(error=type(error).__name__):
                 with (
-                    patch.object(run_pip.sys, "argv", ["run_pip.py", "--version"]),
+                    patch.object(run_pip.sys, "argv", ["app/run_pip.py", "--version"]),
                     patch.object(run_pip, "_configure_proxy", side_effect=error),
                     patch.object(run_pip.subprocess, "run") as runner,
                     redirect_stdout(io.StringIO()) as output,

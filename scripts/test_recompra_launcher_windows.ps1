@@ -10,15 +10,16 @@ $testDir = Join-Path $env:TEMP ("nexoflow-recompra-launcher-" + [Guid]::NewGuid(
 New-Item -ItemType Directory -Force -Path $testDir | Out-Null
 try {
     $exe = Join-Path $testDir "NexoFlow Recompra.exe"
-    $bat = Join-Path $testDir "atualizar_recompra.bat"
+    $bat = Join-Path $testDir "comandos/atualizar_recompra.bat"
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $bat) | Out-Null
     $signal = Join-Path $testDir "recompra-launcher-sinal.txt"
     Copy-Item -LiteralPath $source -Destination $exe -Force
 
     # Somente um BAT sintetico isolado. NAO acessa a Weni e NAO importa clientes.
-    [IO.File]::WriteAllText($bat, "@echo off`r`necho BAT_RECOMPRA_CHAMADO> `"%~dp0recompra-launcher-sinal.txt`"`r`nexit /b 0`r`n", [Text.Encoding]::ASCII)
+    [IO.File]::WriteAllText($bat, "@echo off`r`necho BAT_RECOMPRA_CHAMADO> `"%~dp0..\recompra-launcher-sinal.txt`"`r`nexit /b 0`r`n", [Text.Encoding]::ASCII)
     $proc = Start-Process -FilePath $exe -WorkingDirectory $testDir -NoNewWindow -PassThru -Wait
     if ($proc.ExitCode -ne 0) { throw "Launcher sucesso: exit inesperado $($proc.ExitCode)" }
-    if (-not (Test-Path -LiteralPath $signal -PathType Leaf)) { throw "O executavel NAO chamou atualizar_recompra.bat" }
+    if (-not (Test-Path -LiteralPath $signal -PathType Leaf)) { throw "O executavel NAO chamou comandos/atualizar_recompra.bat" }
     if (-not ((Get-Content -LiteralPath $signal -Raw) -match "BAT_RECOMPRA_CHAMADO")) { throw "BAT nao executado" }
 
     [IO.File]::WriteAllText($bat, "@echo off`r`nexit /b 7`r`n", [Text.Encoding]::ASCII)

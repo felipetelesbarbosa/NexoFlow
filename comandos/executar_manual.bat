@@ -1,0 +1,21 @@
+@echo off
+chcp 65001 >nul
+setlocal
+for %%I in ("%~dp0..") do set "NEXOFLOW_HOME=%%~fI"
+set "PYTHONPATH=%NEXOFLOW_HOME%;%NEXOFLOW_HOME%\app;%PYTHONPATH%"
+set "PYTHONIOENCODING=utf-8"
+cd /d "%NEXOFLOW_HOME%\"
+
+if not exist ".venv\Scripts\python.exe" (
+    echo Ambiente virtual não encontrado. Execute instalar.bat primeiro.
+    if not defined NEXOFLOW_LAUNCHER pause
+    exit /b 1
+)
+
+".venv\Scripts\python.exe" app\run_main.py
+set "EXIT_CODE=%ERRORLEVEL%"
+echo.
+echo Código de saída: %EXIT_CODE%
+if "%EXIT_CODE%"=="3" echo [AVISO] Sincronização parcial; consulte logs\nexoflow.log.
+if not defined NEXOFLOW_LAUNCHER pause
+exit /b %EXIT_CODE%

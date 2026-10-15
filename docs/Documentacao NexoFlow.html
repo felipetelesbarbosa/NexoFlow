@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="pt-BR" xml:lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>NexoFlow 1.0 - Documentação</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">NexoFlow 1.0 - Documentação</h1>
+</header>
+<h1 id="nexoflow-10--documentação">NexoFlow 1.0 — Documentação</h1>
+<h2 id="consulta-de-cpfs-válidos-e-inválidos">Consulta de CPFs válidos e
+inválidos</h2>
+<p>Nas cargas Weni e Analytics, o NexoFlow consulta primeiro os CPFs
+matematicamente válidos e aguarda essa etapa terminar antes de consultar
+os inválidos preenchidos. Antes de classificar um CPF curto, o NexoFlow
+testa a reposição de zeros à esquerda até 11 dígitos; aceita essa forma
+somente quando os dois dígitos verificadores são válidos. A
+classificação rejeita sequências repetidas e dígitos incorretos.
+Identificadores que continuam inválidos após essa verificação e valores
+como <code>0</code> ou <code>00000000000</code> também são consultados,
+na segunda etapa. Valores sem dígitos não geram GET. O CPF original
+permanece no cadastro; a consulta remove a formatação e usa zeros à
+esquerda somente quando a validação matemática comprova a forma de 11
+dígitos. Não troca dígitos existentes.</p>
+<p>O Analytics deduplica os identificadores por execução e separa os
+lotes das duas etapas. As cargas Weni em partes seguem essa prioridade
+dentro da parte selecionada, preservando o manifesto e a revisão humana.
+Evidência válida de CPF em mensagens entra na primeira etapa quando for
+o valor efetivo do plano. Toda nova carga reconsulta os identificadores
+no escopo selecionado; respostas duplicadas só são compartilhadas dentro
+da mesma execução. CPFs válidos dispensam comparação de nome, telefone e
+e-mail. CPFs inválidos exigem nome ou telefone correspondente.</p>
+<p><code>CPF_CONFIRMADO</code> identifica um CPF matematicamente válido
+encontrado na API; <code>CPF_INVALIDO_ENCONTRADO</code> identifica um
+CPF inválido cujo cliente foi confirmado também pelo primeiro nome ou
+pelo número local do telefone. Ambos alimentam o total de clientes
+encontrados, mas somente CPFs matematicamente válidos entram em
+<code>cpfs_validos</code>. HTTP 400 registra
+<code>CPF_REJEITADO_API</code>, sem retry e sem contar como falha 500;
+HTTP 404 registra <code>CPF_NAO_ENCONTRADO</code>; falhas de
+servidor/rede registram <code>ERRO_API</code>, sem autorizar um vínculo
+de cliente por CPF inválido. Os logs públicos mostram etapas e
+contagens, sem CPF. O diagnóstico privado de falhas 5xx aceita também
+identificadores curtos e zeros.</p>
+<p>Para CPF inválido, a coincidência do CPF não confirma a pessoa. É
+obrigatório comparar <strong>primeiro nome correspondente ou número
+local do telefone correspondente</strong>. A comparação de nome usa
+somente o primeiro nome, desconsiderando acentos, maiúsculas e símbolos;
+sobrenomes não precisam coincidir. O e-mail não é obrigatório para essa
+validação. O telefone compara apenas o número local, ignorando o prefixo
+brasileiro +55 e o DDD, sem completar dígitos nem inserir o nono dígito.
+Números nativos da Weni têm precedência sobre campos antigos de
+telefone/WhatsApp.</p>
+<p>A resposta pode conter um cliente, uma lista de clientes ou listas em
+<code>cliente</code>/<code>clientes</code>. A seleção e a validação
+acontecem <strong>por contato Weni</strong>, mesmo quando a resposta GET
+é compartilhada por CPF. Somente uma correspondência é aceita; dados
+insuficientes geram <code>CPF_IDENTIDADE_INSUFICIENTE</code>, nenhuma
+correspondência gera <code>CPF_IDENTIDADE_DIVERGENTE</code> e múltiplas
+correspondências geram <code>CPF_IDENTIDADE_AMBIGUA</code>. Nesses
+casos, nenhuma atualização de pedido é autorizada. Um pedido de outro
+candidato nunca é aproveitado; a capa e os itens continuam sujeitos ao
+mesmo ID do cliente. Se a API devolver apenas um cadastro diferente, o
+NexoFlow bloqueia o vínculo: não presume que outros cadastros existam
+nem inventa uma consulta alternativa.</p>
+<p>O cache persistente de vínculos por CPF inválido não é reutilizado,
+incluindo vínculos antigos que usavam somente o CPF. Falha na
+identificação também não pode ser contornada por <code>pedido_id</code>
+ou <code>ultimo_pedido</code>. A revisão humana guarda a identidade
+usada na validação; alterações relevantes de nome, e-mail ou
+telefone/URN após a revisão bloqueiam o apply daquele contato. Snapshots
+antigos de pedidos com CPF inválido exigem novo dry-run.</p>
+<p>Pedidos antigos com CPF inválido permanecem preservados nas tabelas
+de origem, mas não entram nas vendas, na atribuição de anúncios nem em
+<code>BI_Pedidos</code> até serem revalidados pela nova regra. A origem
+de um novo pedido validado com CPF inválido recebe o marcador técnico
+<code>_IDENTIDADE_VALIDADA</code>, usado para distinguir esses
+registros. Após reinstalar, execute <strong>carga completa da Weni, com
+revisão humana, e depois carga completa do Analytics</strong> para
+revalidar a base e atualizar os indicadores.</p>
+<p>Para aproveitar um pedido, o CPF retornado precisa corresponder ao
+identificador consultado, o cliente deve ter ID positivo e o pedido deve
+pertencer ao mesmo cliente. CPF numérico no JSON pode perder zeros à
+esquerda: somente essa representação numérica equivalente é aceita, sem
+mudar a classificação nem o CPF na Weni. A consulta não comprova emissão
+oficial do CPF ou titularidade da pessoa; identificadores genéricos como
+zero exigem atenção na revisão humana. A extração de mensagens e a
+gravação de um novo CPF na Weni continuam exigindo validade matemática e
+contexto explícito.</p>
+<p>Software interno de integração, atualização de contatos e analytics
+da FarmaLíder.</p>
+<h3 id="arquitetura-atual-de-pedidos-fallback-e-frete">Arquitetura atual
+de pedidos, fallback e frete</h3>
+<p>A FarmaLíder API é a fonte de verdade. O fluxo normal usa
+<code>CPF -&gt; GET cliente/cpf -&gt; ultimoPedido -&gt; GET pedido/{id}</code>.
+Se o GET por CPF não puder ser usado, <code>pedido_id</code> da Weni é o
+primeiro localizador de recuperação; <code>ultimo_pedido</code>,
+alimentado por outra integração, é o último localizador de ID. Nenhum
+desses campos substitui os detalhes oficiais: produtos, valores,
+emissão, status e pagamento só são atualizados após validação em
+<code>GET pedido/{id}</code>.</p>
+<p><code>pedido_produtos</code> usa exclusivamente
+<code>itens[].descricao</code>; <code>codProduto</code> permanece apenas
+como código técnico. Na Weni, <code>pedido_valor</code> continua sendo o
+total dos produtos. No Google Sheets o NexoFlow mantém
+<code>farmalider_frete</code> separado e calcula
+<code>valor_total_faturamento = produtos + frete</code>. O Looker Studio
+recebe, em <code>BI_Pedidos</code>, <code>pedido_valor</code>,
+<code>pedido_frete</code> e <code>pedido_faturamento_total</code>, além
+da separação equivalente em <code>BI_Vendas</code> e
+<code>BI_Resumo_Diario</code>.</p>
+<p>Os oito campos <code>pedido_*</code> do contrato são obrigatórios na
+Weni; o preflight bloqueia o apply se algum estiver ausente, evitando
+atualização parcial do snapshot.</p>
+<h3 id="camada-bi-para-looker-studio">Camada BI para Looker Studio</h3>
+<p>O NexoFlow 1.0 transforma o NexoFlow Analytics em uma camada
+analítica pronta para o Looker Studio. O projeto passa a criar/manter
+automaticamente <code>BI_Resumo_Diario</code>, <code>BI_Canais</code>,
+<code>BI_Conversao</code>, <code>BI_Vendas</code>, <code>BI_Ads</code>,
+<code>BI_Pedidos</code> e <code>BI_Status</code>. O resumo diário usa
+uma linha por dia; canais e conversão mantêm snapshots diários; vendas
+são uma série por data; Ads mantém medidas vazias até existir
+atribuição; Status registra a saúde da última execução.</p>
+<p>Para que os totais do dashboard representem a base Weni completa,
+<code>Base_Contatos</code> passa a preservar todos os contatos
+retornados pela Weni, mesmo sem CPF, pedido ou anúncio. Também entram no
+schema analítico <code>idade</code>, <code>maior_de_18_anos</code> e
+<code>opt_in_lgpd</code>. Após instalar o NexoFlow 1.0, recomenda-se uma
+única carga completa para preencher contatos históricos antes excluídos
+e inicializar a camada BI; depois, o incremental mantém tudo
+atualizado.</p>
+<h3 id="otimização-de-carga-analytics--weni">Otimização de carga
+Analytics + Weni</h3>
+<p>O NexoFlow 1.0 reduz chamadas externas sem relaxar segurança. O
+Analytics lê <code>Base_Contatos</code> uma única vez por execução e
+reutiliza o snapshot para comparação, histórico e métricas. Upserts só
+gravam linhas com mudança real; <code>sincronizado_em</code>,
+<code>farmalider_cliente_consultado_em</code>, <code>capturado_em</code>
+e <code>farmalider_confirmado_em</code> não forçam escrita quando são a
+única diferença. Os batches do Sheets passam a ser adaptativos por
+quantidade e tamanho estimado do payload, com teto conservador de
+aproximadamente 1,5 MB. No incremental, resultados FarmaLíder recentes
+podem ser reutilizados quando o CPF permanece igual; a carga completa
+continua revalidando tudo. No Update Weni, grupos operacionais são
+resolvidos em uma única listagem, URNs sem UUID usam cache local e a
+auditoria JSONL reutiliza um handle durante a execução. O snapshot
+congelado, a revisão humana e a validação de conflito por contato
+permanecem iguais.</p>
+<h3 id="schema-reutilizado-no-google-sheets">Schema reutilizado no
+Google Sheets</h3>
+<p>Após uma carga real em que <code>Historico_Alteracoes</code> sofreu
+seis <code>ReadTimeout</code> consecutivos ao executar
+<code>row_values(1)</code>, o Analytics deixou de fazer essa leitura
+redundante no caminho crítico. O cabeçalho de
+<code>Historico_Alteracoes</code> e a posição de
+<code>contact_uuid</code> em <code>Base_Contatos</code> passam a
+reutilizar o schema já validado pelo fingerprint no início da execução.
+Leituras de cabeçalho usadas em diagnóstico/migração são limitadas a uma
+faixa A1 explícita, evitando solicitar a linha inteira
+<code>A1:1</code>. Timeout/retry e os logs de progresso do NexoFlow 1.0
+permanecem ativos.</p>
+<h3 id="progresso-visível-no-google-sheets">Progresso visível no Google
+Sheets</h3>
+<p>Durante cargas grandes, o Analytics agora informa claramente em qual
+etapa está trabalhando. <code>Base_Contatos</code> mostra leitura, plano
+de upsert e progresso a cada 5.000 registros;
+<code>Historico_Alteracoes</code> mostra leitura do cabeçalho,
+quantidade de lotes e progresso a cada 5.000 linhas. O fluxo principal
+identifica as etapas 1/4 a 4/4. Quando uma leitura sofre timeout ou erro
+transitório, o log informa quanto tempo a tentativa aguardou e registra
+quando o retry se recupera. As escritas também repetem falhas de
+rede/timeout, além dos HTTP 429 e 5xx já protegidos.</p>
+<h3 id="resiliência-do-google-sheets">Resiliência do Google Sheets</h3>
+<p>O NexoFlow Analytics passa a configurar timeout explícito no cliente
+gspread (10 s para conexão e 60 s para leitura) e a repetir leituras
+transitórias com backoff. HTTP 429, erros 5xx e falhas de rede/timeout
+são tentados novamente antes de abortar. Cabeçalhos, UUIDs, Controle,
+Base_Contatos, pedidos, métricas e eventos usam a mesma proteção. O
+preload de UUIDs também registra início, quantidade e duração, evitando
+períodos silenciosos durante cargas grandes. Erros não transitórios
+continuam encerrando a execução normalmente.</p>
+<h3 id="check-up-limpo">Check-up limpo</h3>
+<p>O <code>comandos/check-up.bat</code> passa a executar os testes por
+<code>app/run_checkup_tests.py</code>. Durante a suíte, logs e warnings
+esperados dos mocks são suprimidos e o <code>unittest</code> usa saída
+enxuta. Falhas reais, erros e tracebacks continuam visíveis e fazem o
+check-up retornar erro. A alteração afeta somente a apresentação dos
+testes: warnings e logs das rotinas reais do NexoFlow continuam
+funcionando normalmente.</p>
+<h3 id="check-up-isolado-do-estado-operacional">Check-up isolado do
+estado operacional</h3>
+<p>O <code>comandos/check-up.bat</code> mantém sintaxe, testes e
+auditoria, mas a suíte do NexoFlow Weni agora isola
+<code>_load_state</code> durante os testes unitários. Assim,
+<code>logs\weni_update_state.json</code> da instalação real — incluindo
+<code>pending_conflict_uuids</code> gerados por cargas completas — não
+interfere nos mocks nem provoca falsos erros de
+<code>contact_uuid duplicado no plano</code>. O estado real permanece
+preservado para a próxima execução incremental.</p>
+<h3 id="terminal-amigável-e-consultas-de-api">Terminal amigável e
+consultas de API</h3>
+<p>O NexoFlow Terminal passa a expor o comando <code>nexo</code>,
+voltado a operadores que não precisam conhecer Python ou PowerShell.
+<code>nexo</code> abre um menu simples e <code>nexo ajuda</code> lista
+todos os comandos. A CLI inclui status, diagnóstico, Weni, Analytics,
+logs e consultas GET amigáveis da Weni/FarmaLíder. A família
+<code>nexo api</code> é somente leitura: não oferece POST/PATCH/DELETE e
+não exibe tokens.</p>
+<p>Exemplos: <code>nexo api weni contato --uuid &lt;UUID&gt;</code>,
+<code>nexo api weni mensagens --uuid &lt;UUID&gt; --limite 10</code>,
+<code>nexo api farmalider cliente --cpf &lt;CPF&gt;</code> e
+<code>nexo api farmalider pedido &lt;CODIGO&gt;</code>. A referência
+completa está em <code>docs/README TERMINAL.md</code>.</p>
+<h3 id="atendimento-24h--snapshot-congelado">Atendimento 24h — snapshot
+congelado</h3>
+<p>A carga completa não recalcula mais todo o histórico depois da
+revisão humana. O dry-run gera um snapshot schema 6 com SHA-256 e corte
+temporal. Após <code>CARGA COMPLETA REVISADA</code>, o apply usa
+exatamente esse conjunto de planos. Novas mensagens e novos contatos
+continuam entrando normalmente, mas ficam para a próxima incremental.
+Antes de cada gravação, o contato é relido na Weni; se os dados
+relevantes mudaram, somente esse contato é ignorado como conflito. O
+checkpoint final usa o corte do dry-run, evitando perder alterações que
+ocorreram enquanto a carga estava sendo revisada ou aplicada.</p>
+<h3 id="google-ads-multicanal">Google Ads multicanal</h3>
+<p>Quando a Weni recebe evidência explícita do clique, o NexoFlow pode
+atribuir o contato a <strong>Google Ads</strong> e manter separado o
+canal em que a conversa efetivamente ocorreu. São aceitos
+<code>gclid</code>, <code>gbraid</code>, <code>wbraid</code>, UTM paga
+do Google e metadados equivalentes quando chegam em campos/metadados
+estruturados da Weni. Links colados pelo cliente no texto livre não são
+usados como prova de origem. Performance Max, Search, Display/Banner,
+YouTube, Demand Gen e Shopping só são classificados quando há evidência
+suficiente. O primeiro anúncio válido é preservado e o último só muda
+quando a evidência é mais recente.</p>
+<p>O canal de destino é derivado da URN da mensagem
+(<code>whatsapp</code>, <code>instagram</code>,
+<code>facebook</code>/Messenger ou <code>outro</code>). O anúncio nunca
+fabrica uma URN. Se a informação de clique for perdida ao abrir
+diretamente o aplicativo de mensagens, a origem Google Ads permanece
+desconhecida.</p>
+<h3 id="identificação-multicanal">Identificação multicanal</h3>
+<p>A Weni é a fonte de verdade das URNs. O NexoFlow agora separa
+<code>contact_urn_whatsapp</code>, <code>contact_urn_instagram</code> e
+<code>contact_urn_facebook</code>, mantém <code>contact_urn</code> como
+principal e registra <code>contact_canal_principal</code>. A prioridade
+do principal é WhatsApp, depois Instagram, Facebook/Messenger e, por
+último, outra URN nativa. Origem de anúncio continua separada e nunca é
+usada para fabricar uma URN.</p>
+<p>Como proteção operacional, os quatro campos multicanal precisam
+existir previamente na Weni como campos de <strong>Texto</strong>. O
+teste de conexões consulta a API de fields da Weni e, se algum estiver
+ausente, o NexoFlow Weni bloqueia a execução antes de qualquer
+escrita.</p>
+<h3 id="compatibilidade-dos-bats-com-cmd">Compatibilidade dos BATs com
+CMD</h3>
+<p>Os arquivos <code>.bat</code> operacionais são distribuídos sem UTF-8
+BOM inicial. Em algumas instalações do Windows, o BOM era exibido pelo
+<code>cmd.exe</code> como <code>´╗┐</code> e fazia a primeira diretiva
+<code>@echo off</code> ser tratada como comando inválido. Testes e
+auditoria bloqueiam a publicação do NexoFlow 1.0 se houver BOM em
+BATs.</p>
+<h2 id="versão-atual">Versão atual</h2>
+<p>A versão atual é a <strong>NexoFlow 1.0</strong>.</p>
+<p>Ela mantém o <strong>NexoFlow Analytics</strong>, o <strong>NexoFlow
+Weni</strong>, o fluxo 24h com snapshot congelado, a resolução
+multicanal de URNs, a atribuição conservadora de Google Ads e a CLI
+amigável do <strong>NexoFlow Terminal</strong>. O NexoFlow 1.0 adiciona
+a camada BI/Looker Studio com as otimizações de eficiência consolidadas,
+mantendo carga incremental, batches adaptativos e as proteções do Update
+Weni.</p>
+<h2 id="visão-geral">Visão geral</h2>
+<pre class="text"><code>Weni -&gt; NexoFlow Analytics -&gt; FarmaLíder API -&gt; Google Sheets -&gt; Looker Studio
+Weni -&gt; NexoFlow Weni -&gt; Weni</code></pre>
+<p>O Analytics e o NexoFlow Weni possuem responsabilidades separadas. O
+NexoFlow Weni atualiza dados autorizados diretamente na Weni; o
+Analytics mantém a camada analítica e a sincronização para Google
+Sheets/Looker Studio.</p>
+<h2 id="componentes-principais">Componentes principais</h2>
+<ul>
+<li><code>app/main.py</code>: sincronização analítica;</li>
+<li><code>app/weni_client.py</code>: leitura e escrita controlada na API
+da Weni;</li>
+<li><code>app/contact_enrichment.py</code>: interpretação conservadora
+de idade, maioridade e LGPD;</li>
+<li><code>app/ad_attribution.py</code>: detecção conservadora de Google
+Ads a partir de gclid/gbraid/wbraid, UTM e metadados explícitos;</li>
+<li><code>app/urn_utils.py</code>: resolução determinística de URNs e
+classificação de WhatsApp/Instagram/Facebook;</li>
+<li><code>app/weni_update.py</code>: planejamento, auditoria,
+confirmação de pedidos, grupos e write-back;</li>
+<li><code>app/run_update_weni.py</code>: CLI do NexoFlow Weni;</li>
+<li><code>app/farmalider_client.py</code>: acesso à API FarmaLíder;</li>
+<li><code>app/farmalider_integration.py</code>:
+confirmação/enriquecimento de pedidos;</li>
+<li><code>app/google_sheets.py</code>: camada analítica;</li>
+<li><code>app/auditar_consistencia.py</code>: auditoria técnica
+obrigatória da publicação;</li>
+<li><code>app/run_checkup_tests.py</code>: executa a suíte do check-up
+em modo enxuto, suprimindo somente ruído esperado dos testes.</li>
+</ul>
+<h2 id="executáveis-windows">Executáveis Windows</h2>
+<pre class="text"><code>NexoFlow Analytics.exe
+NexoFlow Weni.exe
+NexoFlow Recompra.exe
+NexoFlow Planilha.exe
+NexoFlow Uninstall.exe (opcional)
+desinstalar_nexoflow.cmd / installer\uninstall.ps1
+NexoFlow Terminal.exe</code></pre>
+<p>O mutex <code>Local\NexoFlowOperationLock</code> é compartilhado
+entre os launchers para impedir instalação, desinstalação, Analytics e
+NexoFlow Weni concorrentes.</p>
+<h3 id="analytics">Analytics</h3>
+<pre class="text"><code>check-up -&gt; conexões -&gt; sincronização incremental</code></pre>
+<h3 id="nexoflow-weni">NexoFlow Weni</h3>
+<pre class="text"><code>check-up -&gt; teste de acesso -&gt; dry-run -&gt; auditoria -&gt; confirmação -&gt; apply</code></pre>
+<p>O apply reconsulta os dados e executa novamente a auditoria
+obrigatória antes do primeiro POST.</p>
+<h2 id="nexoflow-terminal--comandos-amigáveis">NexoFlow Terminal —
+comandos amigáveis</h2>
+<p>Ao abrir <code>NexoFlow Terminal.exe</code>, a pasta do projeto e a
+<code>.venv</code> entram no <code>PATH</code> da sessão e o comando
+<code>nexo</code> fica disponível diretamente.</p>
+<pre class="text"><code>nexo                         -&gt; menu simples
+nexo ajuda                   -&gt; lista de comandos
+nexo status                  -&gt; ambiente + conexões
+nexo diagnostico             -&gt; check-up + teste de conexões
+nexo weni testar             -&gt; teste sem escrita
+nexo weni dry-run            -&gt; simulação sem escrita
+nexo weni atualizar          -&gt; incremental auditada
+nexo weni carga-completa     -&gt; carga completa revisada
+nexo analytics               -&gt; Analytics
+nexo logs weni --seguir      -&gt; log Weni ao vivo</code></pre>
+<p>Consultas GET amigáveis:</p>
+<pre class="text"><code>nexo api weni status
+nexo api weni contato --uuid &lt;UUID&gt;
+nexo api weni contato --urn &lt;URN&gt;
+nexo api weni mensagens --uuid &lt;UUID&gt; --limite 10
+nexo api weni grupos
+nexo api weni campos
+nexo api farmalider status
+nexo api farmalider cliente --cpf &lt;CPF&gt;
+nexo api farmalider pedido &lt;CODIGO&gt;</code></pre>
+<p><code>--json</code>/<code>--raw</code> mostra a resposta completa e
+<code>--salvar arquivo.json</code> grava o JSON. Tokens permanecem
+ocultos. Não existe comando genérico de escrita em
+<code>nexo api</code>; mudanças na Weni continuam obrigatoriamente
+usando o fluxo auditado do NexoFlow Weni.</p>
+<p>Consulte <code>docs/README TERMINAL.md</code> para explicações,
+exemplos e referência rápida.</p>
+<h2 id="campos-do-nexoflow-weni">Campos do NexoFlow Weni</h2>
+<p>A escrita é limitada a uma allowlist explícita:</p>
+<pre class="text"><code>contact_urn
+contact_urn_whatsapp
+contact_urn_instagram
+contact_urn_facebook
+contact_canal_principal
+cpf
+idade
+maior_de_18_anos
+opt_in_lgpd
+pedido_id
+pedido_data
+pedido_produtos
+pedido_quantidade_itens
+pedido_valor
+ultima_compra
+primeiro_anuncio_*
+ultimo_anuncio_*</code></pre>
+<p><code>opt_in_lgpd_status</code> continua controlado pelos
+flows/agentes da Weni. <code>ultimo_pedido</code> é preservado apenas
+para compatibilidade; com a FarmaLíder API disponível, os campos
+<code>pedido_*</code> são alimentados pelo GET oficial por
+CPF/pedido.</p>
+<h2 id="urns-e-canais">URNs e canais</h2>
+<p>A resolução de identidade usa somente URNs retornadas pela Weni. A
+prioridade da URN principal é:</p>
+<pre class="text"><code>WhatsApp &gt; Instagram &gt; Facebook/Messenger &gt; outra URN nativa</code></pre>
+<p><code>contact_urn</code> guarda a principal. Os campos
+<code>contact_urn_whatsapp</code>, <code>contact_urn_instagram</code> e
+<code>contact_urn_facebook</code> preservam cada canal separadamente.
+<code>contact_canal_principal</code> registra <code>whatsapp</code>,
+<code>instagram</code>, <code>facebook</code> ou <code>outro</code>. O
+NexoFlow não transforma origem de Meta Ads ou Google Ads em URN: os
+campos de anúncio continuam independentes. No NexoFlow 1.0,
+<code>primeiro_anuncio_tipo_campanha</code>,
+<code>primeiro_anuncio_canal_destino</code>,
+<code>ultimo_anuncio_tipo_campanha</code> e
+<code>ultimo_anuncio_canal_destino</code> podem registrar o contexto do
+Google Ads quando os campos existirem na Weni.</p>
+<p>O Analytics expõe esses quatro campos de identificação na base de
+contatos. IDs de Instagram/Facebook não são colocados na coluna
+<code>telefone</code>; telefone é obtido apenas de URN <code>tel:</code>
+ou WhatsApp.</p>
+<h2 id="lgpd-e-idade">LGPD e idade</h2>
+<p>A rotina não trata qualquer <code>Sim</code>, <code>Não</code> ou
+número isolado como dado cadastral. Respostas curtas só são aceitas
+quando existe contexto explícito imediatamente anterior. Declarações
+diretas como <code>Tenho 27 anos</code> podem preencher idade e
+maioridade.</p>
+<p>O valor de <code>opt_in_lgpd</code> é a fonte de verdade para os
+grupos. Com <code>ativo</code>, o contato deve estar em <strong>Opt-In
+LGPD</strong> e fora de <strong>Opt-Out LGPD</strong>. Com
+<code>recusado</code>, deve estar em <strong>Opt-Out LGPD</strong> e
+fora de <strong>Opt-In LGPD</strong>. O NexoFlow Weni corrige
+associações incompatíveis mesmo quando o campo já estava preenchido
+antes da execução.</p>
+<h2 id="pedidos-e-última-compra">Pedidos e última compra</h2>
+<p>A rotina usa a FarmaLíder API como fonte de verdade: consulta o
+cliente por CPF, obtém <code>ultimoPedido</code> e <code>itens</code>,
+confirma o mesmo pedido por código e então escreve os campos
+<code>pedido_*</code>. <code>pedido_produtos</code> usa
+<code>descricao</code>; quantidades e valores unitários são listas
+posicionais separadas por vírgula; <code>pedido_valor</code> é a soma de
+<code>itens[].total</code>. No Analytics/Looker, todos os estados
+documentados não cancelados de pedidos validados pela API contam como
+venda, incluindo Em processamento (0). A mesma regra vale para
+<code>ultima_compra</code> e Recompra, mantendo as demais validações.
+Cada nova carga consulta os CPFs no escopo selecionado, mesmo sem
+alteração do contato na Weni. No Analytics, a reconsulta de status dos
+pedidos já registrados abrange somente os últimos 20 dias; os mais
+antigos permanecem preservados. Pagamento 0 grava
+<code>pedido_forma_pagamento=Cancelado</code> e força status efetivo 3
+na Weni/BI; <code>Pedidos_FarmaLider</code> mantém o status e o
+pagamento brutos da API. Os estados -2, Em aberto, -1, Pendente de
+pagamento, 0, Em processamento, 4, Pronto para rota, e 1, Em trânsito,
+permanecem em rechecagem até Concluído ou Cancelado; a rechecagem
+permanece ativa mesmo quando o pedido já conta como venda no
+dashboard.</p>
+<h2 id="auditoria-idempotência-e-checkpoint">Auditoria, idempotência e
+checkpoint</h2>
+<p>Antes de qualquer escrita, <code>audit_plans</code> valida todos os
+planos. A execução é bloqueada se houver campo não autorizado, vazio
+inválido, inconsistência entre idade/maioridade, campos de pedido sem
+confirmação oficial ou ação de grupo LGPD sem o grupo necessário
+disponível.</p>
+<p>Arquivos operacionais:</p>
+<pre class="text"><code>logs\nexoflow_update_weni.log
+logs\weni_update_audit.jsonl
+logs\weni_update_state.json</code></pre>
+<p>O checkpoint só é gravado após todas as alterações terminarem com
+sucesso. Falhas deixam a janela pendente para reprocessamento. Valores
+iguais não são regravados.</p>
+<h2 id="bats-operacionais">BATs operacionais</h2>
+<pre class="text"><code>comandos/testar_update_weni.bat
+comandos/atualizar_weni_dry_run.bat
+comandos/atualizar_weni.bat
+comandos/atualizar_weni_carga_completa.bat</code></pre>
+<p>Na primeira implantação/backfill, use
+<code>comandos/atualizar_weni_carga_completa.bat</code>. No uso
+rotineiro, use o atalho <strong>NexoFlow Weni</strong> antes do
+<strong>NexoFlow Analytics</strong>.</p>
+<h3 id="correção-do-parsererror-do-setup">Correção do ParserError do
+Setup</h3>
+<p>O <code>installer\install.ps1</code> passa a delimitar
+<code>${exePath}</code> quando o texto imediatamente seguinte contém
+<code>:</code>. Isso evita que o PowerShell interprete
+<code>$exePath:</code> como uma referência de variável com escopo/drive
+e bloqueie o script durante o parsing. O Setup mantém log persistente e
+janela aberta quando ocorre uma falha.</p>
+<h3 id="confiabilidade-do-setup">Confiabilidade do Setup</h3>
+<p>O <code>NexoFlow Setup.exe</code> não encerra mais silenciosamente
+quando a etapa PowerShell retorna erro: a janela permanece aberta, o
+código de saída é mostrado e a execução também é registrada em
+<code>%TEMP%\NexoFlow-Setup.log</code>. Em atualizações, o instalador
+encerra somente processos executados a partir de
+<code>C:\NexoFlow</code> antes de substituir a pasta e utiliza retry
+para aguardar a liberação de arquivos pelo Windows.</p>
+<h3 id="nomes-e-ícone-do-terminal">Nomes e ícone do Terminal</h3>
+<p>A interface Windows usa os nomes <strong>NexoFlow Weni</strong> e
+<strong>NexoFlow Terminal</strong>. O Terminal é distribuído como
+<code>NexoFlow Terminal.exe</code>, inicia diretamente
+<code>app/run_terminal.py</code> com o Python da <code>.venv</code>
+quando disponível e incorpora <code>assets\NexoFlow_Terminal.ico</code>.
+Os atalhos de Área de Trabalho e Menu Iniciar usam o mesmo ícone.
+Durante atualização, o Setup remove atalhos com os nomes anteriores e
+solicita ao Explorer a releitura dos ícones.</p>
+<h3 id="hardening-de-distribuição-e-nexoflow-terminal">Hardening de
+distribuição e NexoFlow Terminal</h3>
+<p>Os launchers Windows deixam de usar <code>system()</code> e iniciam
+processos filhos por API nativa do Windows através de
+<code>CreateProcessW</code>. Os PE também passam a conter informações de
+versão/produto. O <code>NexoFlow Uninstall.exe</code> é distribuído como
+launcher nativo opcional, enquanto o registro de desinstalação do
+Windows continua apontando diretamente para
+<code>installer\uninstall.ps1</code>. Assim, a remoção segue funcional
+mesmo se um antivírus/EDR bloquear o EXE opcional. O Stage2 não é
+ocultado e o desinstalador restringe o encerramento de processos
+externos a Python/PythonW que referenciem explicitamente arquivos do
+NexoFlow.</p>
+<p><code>NexoFlow Terminal.exe</code> abre uma PowerShell em
+<code>C:\NexoFlow</code> com a <code>.venv</code> priorizada. A mesma
+lógica de <code>app/proxy_config.py</code> é executada antes do terminal
+e a configuração de proxy é herdada apenas por aquela sessão. A senha
+não é exibida. Tokens Weni/FarmaLíder e credenciais Google continuam nos
+arquivos locais e não são exportados para o ambiente.</p>
+<h3 id="atualização-do-ícone-no-explorer">Atualização do ícone no
+Explorer</h3>
+<p>O executável <code>NexoFlow Weni.exe</code> incorpora o ícone
+dedicado <code>assets\NexoFlow_Weni.ico</code>. Durante uma atualização,
+o instalador também atualiza o timestamp do executável, notifica o Shell
+com <code>SHChangeNotify</code> e solicita a recarga do cache de ícones
+do Windows. Isso evita que o Explorer continue exibindo o ícone antigo
+do Analytics para o mesmo caminho.</p>
+<h3 id="sincronização-dos-grupos-lgpd">Sincronização dos grupos
+LGPD</h3>
+<p>O campo <code>@fields.opt_in_lgpd</code> controla de forma
+determinística os grupos de consentimento:</p>
+<pre class="text"><code>ativo    -&gt; adicionar Opt-In LGPD; remover Opt-Out LGPD
+recusado -&gt; adicionar Opt-Out LGPD; remover Opt-In LGPD</code></pre>
+<p>A regra também funciona como reconciliação: se um contato já estiver
+em grupo incompatível com o campo, o NexoFlow Weni cria as ações
+necessárias mesmo sem uma nova mensagem de LGPD. Quando há troca, o
+grupo correto é adicionado antes da remoção do incompatível. O teste de
+acesso e a auditoria exigem a disponibilidade dos grupos necessários
+antes de qualquer escrita.</p>
+<h3 id="captura-de-cpf-pelas-mensagens">Captura de CPF pelas
+mensagens</h3>
+<p>O NexoFlow Weni pode preencher ou corrigir <code>@fields.cpf</code> a
+partir de mensagens recebidas do próprio cliente. O documento é
+normalizado para 11 dígitos e validado pelos dígitos verificadores antes
+de entrar no plano.</p>
+<p>São aceitos dois cenários seguros:</p>
+<pre class="text"><code>Meu CPF é 529.982.247-25
+
+ou
+
+NexoFlow/flow: Informe seu CPF
+Cliente: 52998224725</code></pre>
+<p>Se o campo estiver vazio, ele pode ser preenchido. Se existir um CPF
+diferente e o cliente informar posteriormente outro CPF válido,
+prevalece a evidência válida mais recente. Um mesmo CPF com pontuação
+diferente não gera regravação. Mensagens ambíguas, CPF inválido ou um
+número isolado sem contexto de CPF são ignorados. A evidência
+(ID/data/motivo) aparece na auditoria e no relatório da carga
+completa.</p>
+<h3 id="revisão-humana-obrigatória-da-carga-completa">Revisão humana
+obrigatória da carga completa</h3>
+<p>O dry-run completo gera dois artefatos locais:</p>
+<pre class="text"><code>logs\weni_update_review_full.txt
+logs\weni_update_review_full.json</code></pre>
+<p>O TXT é aberto automaticamente e apresenta resumo e detalhes por
+contato: UUID/URN, valor anterior, valor proposto, evidência técnica,
+ações nos grupos Opt-In/Opt-Out LGPD e confirmação de pedido. O operador
+só deve prosseguir após revisar o arquivo e digitar
+<code>CARGA COMPLETA REVISADA</code>.</p>
+<p>O JSON é um snapshot verificável e congelado (schema 6). O SHA-256
+protege a integridade do plano revisado e o arquivo registra o corte
+temporal do dry-run. No apply, o NexoFlow não recalcula todo o
+histórico. Ele carrega exatamente os planos revisados e relê cada
+contato imediatamente antes da gravação. Se os valores relevantes
+daquele contato mudaram, somente ele é marcado como
+<code>conflict_skipped</code>; se o resultado já foi aplicado por outra
+automação, fica como <code>already_satisfied</code>. Os demais contatos
+continuam. Ao final, o checkpoint usa o corte do dry-run, garantindo que
+mudanças posteriores sejam elegíveis para a próxima incremental.</p>
+<h2 id="instalação">Instalação</h2>
+<p><code>NexoFlow Setup.exe</code> instala em <code>C:\NexoFlow</code>,
+valida o payload por SHA-256, aceita Python 3.11+ x64, oferece o Python
+3.14.8 x64 incluído quando necessário, cria <code>.venv</code>, preserva
+dados privados de uma instalação anterior e cria os atalhos
+<strong>NexoFlow Analytics</strong>, <strong>NexoFlow Weni</strong>,
+<strong>NexoFlow Recompra</strong>, <strong>NexoFlow Planilha</strong> e
+<strong>NexoFlow Terminal</strong> na Área de Trabalho e no Menu
+Iniciar.</p>
+<p>Consulte <code>docs/README INSTALACAO.md</code> para o procedimento
+detalhado.</p>
+<h2 id="desinstalação-resiliente">Desinstalação resiliente</h2>
+<p>O <code>NexoFlow Uninstall.exe</code>, quando disponível, apenas
+inicia o mesmo fluxo de <code>installer\uninstall.ps1</code>. O
+<code>desinstalar_nexoflow.cmd / installer\uninstall.ps1</code>
+permanece o mecanismo independente de remoção de Analytics, NexoFlow
+Weni, NexoFlow Terminal, BATs, módulos, atalhos, registro do aplicativo
+e demais componentes instalados.</p>
+<p>A presença do <code>NexoFlow Uninstall.exe</code> <strong>não é
+requisito do Setup nem do check-up</strong>. O Setup tenta copiá-lo e
+apenas avisa quando um antivírus/EDR corporativo bloqueia ou remove o
+arquivo.</p>
+<p>Para impedir que o próprio desinstalador mantenha
+<code>C:\NexoFlow</code> bloqueado, a remoção final funciona em duas
+etapas:</p>
+<ol type="1">
+<li>o primeiro estágio coleta a opção de preservação e prepara a
+remoção;</li>
+<li>o Stage2 é copiado para <code>%TEMP%</code>;</li>
+<li>o Stage2 é iniciado com <code>WorkingDirectory=%TEMP%</code> e
+executa <code>Set-Location</code> para <code>%TEMP%</code>;</li>
+<li>processos relacionados ao NexoFlow que ainda usem arquivos da
+instalação são encerrados de forma controlada;</li>
+<li>atributos <code>ReadOnly</code>, <code>System</code> e
+<code>Hidden</code> são limpos quando necessário;</li>
+<li>a exclusão de <code>C:\NexoFlow</code> é repetida por até <strong>60
+ciclos</strong> enquanto o Windows libera handles;</li>
+<li>atalhos e chaves de registro do NexoFlow são removidos.</li>
+</ol>
+<p>O registro de desinstalação do Windows não usa mais
+<code>cd /d C:\NexoFlow</code>, evitando que a própria pasta instalada
+permaneça como diretório de trabalho do processo pai.</p>
+<p>Se o usuário escolher preservar dados, os seguintes itens podem ser
+mantidos:</p>
+<pre class="text"><code>secrets_config.py
+credentials\
+logs\</code></pre>
+<p>Eles são armazenados em:</p>
+<pre class="text"><code>C:\NexoFlow Data</code></pre>
+<p>O desinstalador <strong>não remove o Python global do
+Windows</strong>. Ele remove somente componentes pertencentes ao
+NexoFlow.</p>
+<h2 id="segurança">Segurança</h2>
+<p>Nunca distribuir credenciais reais:</p>
+<pre class="text"><code>secrets_config.py
+credentials\google_credentials.json
+tokens
+senhas do proxy</code></pre>
+<p>Os pacotes oficiais não devem conter <code>__pycache__</code>,
+<code>.pyc</code> ou credenciais reais.</p>
+<h2 id="validação-do-nexoflow-10">Validação do NexoFlow 1.0</h2>
+<p>Toda mudança relevante deve executar:</p>
+<pre class="text"><code>1. compilação/sintaxe
+2. suíte de testes automatizados
+3. app/auditar_consistencia.py
+4. auditoria dos executáveis/launchers
+5. validação do payload manifest
+6. validação dos checksums externos do Setup
+7. teste de integridade dos ZIPs finais
+8. verificação de ausência de caches e credenciais reais</code></pre>
+<p>Consulte também <code>README.md</code>,
+<code>docs/README INSTALACAO.md</code>, <code>docs/README WENI.md</code>
+e <code>CHANGELOG.md</code>.</p>
+<h2 id="recompra-farmalíder-d25">Recompra FarmaLíder D+25</h2>
+<p><code>NexoFlow Recompra.exe</code> inicia
+<code>comandos/atualizar_recompra.bat</code>, com diagnóstico, dry-run,
+revisão humana e aplicação. Grupo sincronizado com a última compra
+confirmada entre 0 e 25 dias, remoção depois de 25 dias e por recusa. O
+envio continua somente no D+25 pela campanha Weni. Execute
+<code>nexo weni recompra auditoria</code>, <code>dry-run</code> e
+<code>aplicar</code> com revisão, ou
+<code>nexo weni recompra atualizar</code>. Confira <a
+href="README%20RECOMPRA.md">implementação, configuração e limites da
+recompra</a>. A rotina não altera marketing_opt_in, não dispara WhatsApp
+e não modifica a campanha.</p>
+<h2 id="nexoflow-planilha">NexoFlow Planilha</h2>
+<p><code>NexoFlow Planilha.exe</code> abre o menu das cargas por
+planilha para Weni e Analytics e da pasta <code>importacoes</code>. Use
+<code>Conversas_Delivery.xlsx</code> e
+<code>Contatos_Delivery.xlsx</code>; cada destino exige revisão humana
+antes da aplicação. Consulte <a href="README%20DELIVERY.md">Delivery e
+carga por planilhas</a>.</p>
+<h3 id="dados-comerciais-e-histórico-observado">Dados comerciais e
+histórico observado</h3>
+<p>O Analytics preserva os pedidos e itens já identificados no Google
+Sheets; cada chave de pedido é atualizada sem duplicar a compra nem
+apagar os pedidos anteriores. A API fornece apenas o último pedido por
+cliente. Coletas regulares acumulam histórico observado, mas não
+recuperam compras antigas nunca capturadas nem garantem que todas as
+compras entre duas coletas tenham sido registradas.</p>
+<p>Cada carga do Analytics também reconsulta por código os pedidos
+oficiais já observados dos contatos selecionados com até 20 dias, pela
+data do pedido em America/Belem (dias 0 a 20, inclusive), incluindo
+concluídos e cancelados. Os mais antigos permanecem no histórico e nos
+indicadores sem reconsulta automática de status. A consulta por CPF
+continua identificando novas compras; pedidos ainda não registrados
+exigem validação inicial, inclusive antigos. O vínculo com o cliente
+precisa ter sido comprovado; registros legados sem essa comprovação
+continuam pendentes. Falhas preservam o snapshot anterior e deixam a
+carga parcial, sem avançar o checkpoint.</p>
+<p>As fontes comerciais <code>BI_Publico</code>,
+<code>BI_Clientes</code>, <code>BI_Clientes_Vendas</code>,
+<code>BI_Itens</code>, <code>BI_Produtos_ABC</code>,
+<code>BI_Produtos_Juntos</code>, <code>BI_KPIs_Periodo</code> e
+<code>BI_Qualidade</code> agrupam pessoas por chave estável e fornecem
+medidas numéricas, datas, rankings de produtos e combinações por pedido.
+As fontes novas não expõem CPF, telefone, e-mail, número original de
+pedido, status ou pagamento. Gênero e categoria ficam vazios quando
+ausentes; não são deduzidos.</p>
+<p><code>BI_Clientes_Vendas</code> e <code>BI_Itens</code> aceitam
+filtros livres por data no Looker. ABC, combinações e KPIs consolidados
+usam um período explícito de 30 dias por padrão; outro período pode ser
+recalculado com
+<code>nexo looker --inicio AAAA-MM-DD --fim AAAA-MM-DD</code>, usando
+apenas o histórico do Sheets. Recompra completa e comparações ficam
+indisponíveis enquanto não houver cobertura comprovada. Confira as <a
+href="../README.md#dados-comerciais-para-o-looker-studio">fontes,
+fórmulas e orientações do Looker</a>.</p>
+<p>As tabelas comerciais e as tabelas BI anteriores preservam números,
+datas e identificadores como texto literal. A migração financeira aplica
+valores e formatos em uma única transação. A Curva ABC exige cobertura
+dos itens do período e sinaliza ausência ou divergência em
+<code>BI_Qualidade</code>; a rotina Delivery também atualiza as fontes
+comerciais.</p>
+</body>
+</html>
+<!-- NexoFlow documentation: source-sha256=ea139eccf40f88da4bd5d23593a62147f3889407808ef0e9672bf992107809cc content-sha256=7b7563f5596773a8456d5b6c88bd90935a7f94b5b43f669167db4a30c1322065 -->

@@ -28,8 +28,8 @@ Health check:
 
 Arquivos:
 
-- `webhook_pedidos.py`
-- `run_webhook_pedidos.py`
+- `app/webhook_pedidos.py`
+- `app/run_webhook_pedidos.py`
 - `requirements-webhook.txt`
 
 O webhook reutiliza o mesmo parser de `ultimo_pedido` usado pela
@@ -93,6 +93,6 @@ A ativação futura exigirá, nessa ordem:
 
 ## Importante
 
-Não execute `run_webhook_pedidos.py` agora.
+Não execute `app/run_webhook_pedidos.py` agora.
 
 A sincronização periódica continua sendo o processo oficial nesta fase.

@@ -1,7 +1,6 @@
 {
   "include": [
-    "*.py",
-    "*.pyi"
+    "app"
   ],
   "exclude": [
     ".venv",
@@ -12,5 +11,8 @@
   "venvPath": ".",
   "venv": ".venv",
   "typeCheckingMode": "basic",
-  "reportMissingTypeStubs": "none"
+  "reportMissingTypeStubs": "none",
+  "extraPaths": [
+    "app"
+  ]
 }

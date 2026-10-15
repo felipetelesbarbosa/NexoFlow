@@ -83,7 +83,7 @@ function Assert-Installed {
         "NexoFlow Recompra.exe",
         "NexoFlow Terminal.exe",
         "NexoFlow Planilha.exe",
-        "executar_planilha.bat",
+        "comandos/executar_planilha.bat",
         "assets\NexoFlow_Planilha.ico",
         "assets\NexoFlow_Recompra.ico",
         "installer\install.ps1",
@@ -174,7 +174,15 @@ PROXY_DETECTION_TIMEOUT = 1.0
     [IO.File]::WriteAllText((Join-Path $InstallDir "logs\setup-smoke-marker.txt"), "preservar", (New-Object Text.UTF8Encoding($false)))
     [IO.File]::WriteAllText((Join-Path $InstallDir 'importacoes\planilha-teste.txt'), 'export privado sintético', (New-Object Text.UTF8Encoding($false)))
 
+    # Simular sobras da estrutura anterior; a atualização deve substituí-las.
+    [IO.File]::WriteAllText((Join-Path $InstallDir 'main.py'), '# código antigo sintético', [Text.Encoding]::UTF8)
+    [IO.File]::WriteAllText((Join-Path $InstallDir 'executar_manual.bat'), '@echo off', [Text.Encoding]::ASCII)
     Invoke-Setup "Atualização sobre instalação existente"
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $InstallDir 'main.py'))) 'Módulo antigo permaneceu na raiz.'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $InstallDir 'executar_manual.bat'))) 'Comando antigo permaneceu na raiz.'
+    Assert-True (Test-Path -LiteralPath (Join-Path $InstallDir 'app\main.py')) 'Módulo organizado ausente.'
+    Assert-True (Test-Path -LiteralPath (Join-Path $InstallDir 'comandos\executar_manual.bat')) 'Comando organizado ausente.'
+
     Assert-Installed
     Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir "logs\setup-smoke-marker.txt") -Raw).Trim() -eq "preservar") "Logs não foram preservados na atualização."
     Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir "credentials\google_credentials.json") -Raw) -match "smoke_test") "Credenciais não foram preservadas na atualização."
@@ -196,7 +204,7 @@ PROXY_DETECTION_TIMEOUT = 1.0
     try {
         $checkOutput = Join-Path $TempRoot "checkup-stdout.txt"
         $checkError = Join-Path $TempRoot "checkup-stderr.txt"
-        $check = Start-Process -FilePath (Join-Path $env:SystemRoot "System32\cmd.exe") -ArgumentList '/d','/c','check-up.bat' -WorkingDirectory $InstallDir -RedirectStandardOutput $checkOutput -RedirectStandardError $checkError -PassThru
+        $check = Start-Process -FilePath (Join-Path $env:SystemRoot "System32\cmd.exe") -ArgumentList '/d','/c','comandos\check-up.bat' -WorkingDirectory $InstallDir -RedirectStandardOutput $checkOutput -RedirectStandardError $checkError -PassThru
         if (-not $check.WaitForExit(120000)) {
             & taskkill.exe /PID $check.Id /T /F | Out-Null
             Get-Content -LiteralPath $checkOutput -Encoding UTF8 -Tail 150
@@ -207,7 +215,7 @@ PROXY_DETECTION_TIMEOUT = 1.0
             Get-Content -LiteralPath $checkOutput -Encoding UTF8 -Tail 150
             Get-Content -LiteralPath $checkError -Encoding UTF8 -Tail 150
         }
-        Assert-True ($check.ExitCode -eq 0) "check-up.bat instalado falhou com código $($check.ExitCode)."
+        Assert-True ($check.ExitCode -eq 0) "comandos/check-up.bat instalado falhou com código $($check.ExitCode)."
     }
     finally {
         if ($null -eq $oldLauncher) {

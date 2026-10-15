@@ -23,9 +23,9 @@ function Assert-PublicTrackedFiles {
     # A lista do Git pode conter arquivos adicionados com --force. Falhe antes
     # de copiar qualquer arquivo privado; nunca leia seu conteúdo no build.
     $publicPlaceholders = @(
-        "secrets_config.example.py",
-        "secrets_config.example_webhook.txt",
-        "secrets_config.pyi",
+        "configuracao/secrets_config.example.py",
+        "configuracao/secrets_config.example_webhook.txt",
+        "app/secrets_config.pyi",
         "credentials/coloque_a_credencial_google_aqui.txt",
         "logs/.gitkeep"
     )
@@ -216,7 +216,7 @@ foreach ($folder in @($ProjectRoot, $PayloadDir)) {
 Write-Host "==> Auditando os executáveis recompilados no projeto completo"
 Push-Location $ProjectRoot
 try {
-    & python auditar_consistencia.py
+    & python app/auditar_consistencia.py
     if ($LASTEXITCODE -ne 0) { throw "A auditoria dos arquivos empacotados falhou." }
 }
 finally { Pop-Location }
@@ -312,15 +312,15 @@ Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/NexoFlow Setup.exe
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/payload manifest.json"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/NexoFlow Recompra.exe"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/NexoFlow Recompra.exe"
-Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/weni_update.py"
-Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/task_progress.py"
-Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/task_progress.py"
-Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/observed_orders.py"
-Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/observed_orders.py"
-Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/analytics.py"
-Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/looker_bi.py"
-Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/run_looker.py"
-Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/looker_bi.py"
+Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/weni_update.py"
+Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/task_progress.py"
+Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/app/task_progress.py"
+Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/observed_orders.py"
+Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/app/observed_orders.py"
+Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/analytics.py"
+Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/looker_bi.py"
+Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/run_looker.py"
+Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/app/looker_bi.py"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/confirmar_revisao_weni.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/confirmar_revisao_weni.ps1"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/resultado_carga_weni.ps1"
@@ -357,7 +357,7 @@ Melhorias desta distribuição do NexoFlow 1.0:
 - recompra processa contatos durante a paginação, consulta a FarmaLíder com até quatro workers e cache limitado por execução, reduzindo leituras e gravações redundantes sem alterar a validação de identidade;
 - revisão de recompra expirada na virada do dia gera um novo dry-run uma vez no launcher e exige nova confirmação; se a aplicação já iniciou, interrompe e preserva o estado;
 - POSTs da recompra usam tentativa única para evitar repetição de inclusões com resposta incerta; GETs mantêm retentativas e o controle persistente continua protegendo os contatos;
-- recompra com grupo de 0 a 25 dias, revisão, controle persistente e proteção de referências; envio D+25 permanece na campanha Weni; confira README RECOMPRA.md antes de habilitar;
+- recompra com grupo de 0 a 25 dias, revisão, controle persistente e proteção de referências; envio D+25 permanece na campanha Weni; confira docs/README RECOMPRA.md antes de habilitar;
 - cidade, estado, CEP, bairro e idade dos clientes da Weni na base e BI_Pedidos; CEP preservado como texto e datas de pedido mantidas;
 - interface e documentação em português brasileiro, com acentos e cedilha; CMD em UTF-8, PowerShell com BOM e executáveis recompilados com metadados pt-BR;
 - carga completa Weni 100% ou em partes mantém o CMD aguardando a revisão humana; cancelar ou falhar não aplica o snapshot e preserva o diagnóstico;

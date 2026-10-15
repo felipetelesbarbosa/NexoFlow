@@ -14,7 +14,7 @@ func main() {
     installDir, cleanup, rc := prepareLauncher()
     if rc != 0 { os.Exit(rc) }
     defer cleanup()
-    batch := filepath.Join(installDir, "atualizar_recompra.bat")
+    batch := filepath.Join(installDir, "comandos/atualizar_recompra.bat")
     if !requireFile(batch) { os.Exit(2) }
     fmt.Println("NexoFlow Recompra FarmaLider D+25: auditoria e confirmacao obrigatorias.")
     os.Exit(runChild(cmdPath(), "/d", "/c", batch))
