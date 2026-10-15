@@ -210,6 +210,47 @@ class InvalidCpfIdentityTests(unittest.TestCase):
         self.assertEqual(result[0], "CPF_IDENTIDADE_AMBIGUA")
         self.assertIsNone(selected)
 
+    def test_first_name_matching_removes_internal_symbols_without_resolving_ambiguity(
+        self,
+    ):
+        candidates = [
+            customer_payload(name="Felipe Um", phone=""),
+            customer_payload(102, name="Felipe Dois", phone=""),
+        ]
+        for name in ("Felipe", "F.e.l.i.p.e", "F💙elipe", "💫 *FÉLIPE* 💫"):
+            with self.subTest(name=name):
+                local = identity(name=name, email="", phone="")
+                self.assertEqual(
+                    cliente_link_status("0", candidates[0], weni_identity=local)[0],
+                    "CPF_INVALIDO_ENCONTRADO",
+                )
+                result, selected = select_cliente_response(
+                    "0", candidates, weni_identity=local
+                )
+                self.assertEqual(result[0], "CPF_IDENTIDADE_AMBIGUA")
+                self.assertIsNone(selected)
+
+    def test_first_name_matching_preserves_space_and_hyphen_boundaries(self):
+        for name in ("💫 *ANA*-Maria", "✨ Ana Maria", "💫 123 Ana-Maria"):
+            with self.subTest(name=name):
+                local = identity(name=name, email="", phone="")
+                self.assertEqual(
+                    cliente_link_status(
+                        "0",
+                        customer_payload(name="Ana Balcão", phone=""),
+                        weni_identity=local,
+                    )[0],
+                    "CPF_INVALIDO_ENCONTRADO",
+                )
+                self.assertEqual(
+                    cliente_link_status(
+                        "0",
+                        customer_payload(name="Anamaria Balcão", phone=""),
+                        weni_identity=local,
+                    )[0],
+                    "CPF_IDENTIDADE_DIVERGENTE",
+                )
+
     def test_email_or_phone_each_suffices_with_the_same_name(self):
         for weni_identity in [identity(phone=""), identity(email="")]:
             with self.subTest(identity=weni_identity):

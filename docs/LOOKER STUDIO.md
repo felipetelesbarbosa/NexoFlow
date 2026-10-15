@@ -54,7 +54,7 @@ Principais campos:
 
 Use esta aba para a página **Visão Geral** e para séries de evolução diária da base.
 
-Os indicadores de compradores, pedidos e faturamento consideram pedidos validados pela API com status efetivo 4 (Pronto para rota), 1 (Em trânsito) ou 2 (Concluído), sem cancelamento. Pagamento 0 força Cancelado e fica fora das vendas; -2 (Em aberto), -1 (Pendente de pagamento) e 0 (Em processamento) também ficam fora enquanto permanecerem nesses estados.
+Os indicadores de compradores, pedidos e faturamento consideram pedidos validados pela API com status efetivo -2 (Em aberto), -1 (Pendente de pagamento), 0 (Em processamento), 4 (Pronto para rota), 1 (Em trânsito) ou 2 (Concluído). Entre os estados documentados, somente o status efetivo 3 (Cancelado) exclui a venda; pagamento 0 ou cancelamento explícito força esse status. Estados desconhecidos continuam pendentes de validação.
 
 ### BI_Canais
 
@@ -159,7 +159,9 @@ Pagamento 5 aparece como **Pix por Link de Pagamento** e pagamento 6 como **Pix 
 
 Para pagamento Int32 não negativo sem de-para a partir de 7, `pedido_forma_pagamento_nome` exibe `Não identificado (código X)` e o código é preservado. Pagamentos ausentes ou inválidos mantêm a descrição vazia.
 
-`BI_Pedidos` mantém os pedidos para consulta, inclusive pendentes e cancelados. Páginas de compradores e vendas devem filtrar status efetivo 4 (Pronto para rota), 1 (Em trânsito) e 2 (Concluído); os estados -2, Em aberto, -1, Pendente de pagamento, 0, Em processamento, 4, Pronto para rota, e 1, Em trânsito, permanecem em rechecagem; -2, -1 e 0 ficam fora das vendas, e 4 e 1 já são vendas realizadas. Nomes oficiais do enum de status, como `PendenteDePagamento` e `Concluido`, são normalizados para os códigos -2 a 4.
+`BI_Pedidos` mantém os pedidos para consulta, inclusive pendentes e cancelados. Páginas de compradores e vendas que usam essa fonte devem filtrar `venda_valida = 1`, indicador calculado pelo NexoFlow com as validações de identidade, pedido, cancelamento e escopo da farmácia. Na fonte opcional `BI_Delivery_Pedidos`, use `venda_realizada = 1`. As fontes comerciais `BI_Vendas`, `BI_Clientes_Vendas` e `BI_Itens` já recebem somente vendas válidas. Substitua filtros antigos que aceitavam apenas os status 4, 1 e 2 para incluir também -2, -1 e 0.
+
+Todos os estados documentados não cancelados (-2, -1, 0, 4, 1 e 2) contam como venda. Os estados -2, -1, 0, 4 e 1 permanecem em rechecagem até Concluído ou Cancelado, e o Analytics reconsulta o status dos pedidos já registrados apenas nos últimos 20 dias, pela data do pedido no fuso de Belém. Pedidos mais antigos permanecem no histórico e nos indicadores; a consulta por CPF continua descobrindo novas compras. Nomes oficiais do enum de status, como `PendenteDePagamento` e `Concluido`, são normalizados para os códigos -2 a 4.
 
 ### BI_Status
 
@@ -210,4 +212,4 @@ A localização e a idade correspondem ao **cadastro atual na Weni**, inclusive 
 
 Depois de instalar a distribuição atualizada, execute uma **carga completa do Analytics** para preencher esses campos nos contatos já existentes. A carga Analytics por planilhas também exporta os campos dos contatos selecionados e relidos na Weni, após revisão humana. As colunas novas são acrescentadas sem deslocar os cabeçalhos existentes.
 
-No Looker Studio, atualize os campos das fontes `Base_Contatos` e `BI_Pedidos` uma vez após a migração. Use cidade, bairro, CEP e faixa etária como dimensões e filtros; para pedidos e faturamento por região, use `BI_Pedidos`, filtre vendas nos status 4, 1 e 2 e utilize `data` como dimensão de período. Não some snapshots da base ou idades. Para contagem de clientes, use pessoas únicas no contexto da fonte, não a quantidade de linhas de pedidos. O relatório não recebe automaticamente componentes novos apenas porque as colunas foram adicionadas.
+No Looker Studio, atualize os campos das fontes `Base_Contatos` e `BI_Pedidos` uma vez após a migração. Use cidade, bairro, CEP e faixa etária como dimensões e filtros; para pedidos e faturamento por região, use `BI_Pedidos`, filtre `venda_valida = 1` e utilize `data` como dimensão de período. Não some snapshots da base ou idades. Para contagem de clientes, use pessoas únicas no contexto da fonte, não a quantidade de linhas de pedidos. O relatório não recebe automaticamente componentes novos apenas porque as colunas foram adicionadas.

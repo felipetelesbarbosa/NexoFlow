@@ -56,6 +56,12 @@ from farmalider_integration import (
 from google_sheets import GoogleSheetsStore
 from logging_config import configure_logging
 from looker_bi import build_looker_tables, reporting_period
+from observed_orders import (
+    observed_orders_by_contact,
+    observed_orders_by_identity,
+    preserve_old_latest_order,
+    revalidate_observed_orders,
+)
 from product_scope import PHARMACY_SCOPE_VERSION
 from task_progress import TaskProgress, request_progress
 from weni_client import WeniClient
@@ -69,6 +75,23 @@ FARMALIDER_TOKEN_PLACEHOLDER = "COLE_SEU_TOKEN_FARMALIDER_AQUI"
 SHEET_PLACEHOLDER = "COLE_O_ID_DA_PLANILHA_GOOGLE_AQUI"
 APP_VERSION = "1.0"
 PARTIAL_SYNC_EXIT_CODE = 3
+ORDER_API_FAILURES = frozenset(
+    {
+        "ERRO_API",
+        "ERRO_RESPOSTA_CLIENTE_API",
+        "CLIENTE_ID_INVALIDO_API",
+        "CLIENTE_ID_DIVERGENTE_API",
+        "PEDIDO_NAO_ENCONTRADO_API",
+        "ERRO_RESPOSTA_PEDIDO_API",
+        "PEDIDO_ID_INVALIDO_API",
+        "PEDIDO_ID_DIVERGENTE_API",
+        "PEDIDO_CLIENTE_NAO_VERIFICADO_API",
+        "PEDIDO_CLIENTE_DIVERGENTE_API",
+        "PEDIDO_DATA_INVALIDA_API",
+        "ERRO_ITENS_PEDIDO_API",
+        "ITEM_PEDIDO_DIVERGENTE_API",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -184,7 +207,7 @@ def _completion_controls(
     *,
     api_errors: int,
 ) -> tuple[str, dict[str, str]]:
-    """Do not advance the incremental cursor while CPF lookups need a retry."""
+    """Preserve the cursor while customer or observed-order lookups need retry."""
     if api_errors:
         return "parcial", {"ultima_execucao_status": "parcial"}
     return "sucesso", {
@@ -671,11 +694,17 @@ def build_orders(
     cliente_responses_by_cpf: dict[str, dict[str, Any] | list[dict[str, Any]] | None]
     | None = None,
     cliente_lookup_status_by_cpf: dict[str, str] | None = None,
+    pedido_responses_by_id: dict[str, dict[str, Any] | list[dict[str, Any]] | None]
+    | None = None,
+    existing_orders: list[Row] | None = None,
 ) -> tuple[list[Row], list[Row], OrderStats]:
     snapshots: dict[str, tuple[Row, list[Row]]] = {}
     contacts_by_order: dict[str, set[str]] = {}
-    pedido_responses_by_id: dict[str, dict[str, Any] | list[dict[str, Any]] | None] = {}
+    if pedido_responses_by_id is None:
+        pedido_responses_by_id = {}
     stats = OrderStats()
+    prior_by_contact = observed_orders_by_contact(existing_orders or [])
+    prior_by_identity = observed_orders_by_identity(existing_orders or [])
 
     # CPF duplicates can point to the same official order. Select a complete
     # order/items snapshot consistently, regardless of Weni pagination order.
@@ -694,6 +723,16 @@ def build_orders(
             contact_uuid = str(contact.get("uuid") or "")
             contact_row = rows_by_uuid.get(contact_uuid, {})
             cpf = normalize_cpf(fields.get("cpf"))
+            if preserve_old_latest_order(
+                contact,
+                existing_by_contact=prior_by_contact,
+                existing_by_identity=prior_by_identity,
+                cliente_response=(cliente_responses_by_cpf or {}).get(cpf),
+                captured_at=sync_time,
+            ):
+                # Keep the paired observed snapshot through the ordinary
+                # upsert; the fresh CPF lookup already checked for a new ID.
+                continue
             try:
                 with request_progress("FarmaLíder: consulta de pedido e itens"):
                     order, items = resolve_contact_order(
@@ -717,7 +756,7 @@ def build_orders(
             if order is None:
                 continue
 
-            if order.get("status_confirmacao") == "ERRO_API":
+            if order.get("status_confirmacao") in ORDER_API_FAILURES:
                 stats.api_errors += 1
 
             contact_uuid = order.get("contact_uuid", "")
@@ -1049,6 +1088,11 @@ def main() -> int:
         rows_by_uuid = {
             row["contact_uuid"]: row for row in normalized if row.get("contact_uuid")
         }
+        existing_orders = sheets.load_order_records()
+        existing_order_items = sheets.load_order_item_records() if farm_client else []
+        pedido_responses_by_id: dict[
+            str, dict[str, Any] | list[dict[str, Any]] | None
+        ] = {}
         order_rows, item_rows, order_stats = build_orders(
             [
                 contact
@@ -1061,7 +1105,21 @@ def main() -> int:
             sync_time=sync_time,
             cliente_responses_by_cpf=cliente_responses_by_cpf,
             cliente_lookup_status_by_cpf=cliente_lookup_status_by_cpf,
+            pedido_responses_by_id=pedido_responses_by_id,
+            existing_orders=existing_orders,
         )
+        observed = revalidate_observed_orders(
+            existing_orders,
+            scoped_contact_uuids=set(rows_by_uuid),
+            current_orders=order_rows,
+            current_items=item_rows,
+            existing_items=existing_order_items,
+            farm_client=farm_client,
+            captured_at=sync_time,
+            pedido_responses_by_id=pedido_responses_by_id,
+        )
+        order_rows, item_rows = observed.orders, observed.items
+        order_stats.api_errors += observed.api_errors
         if farm_client is not None:
             # Include order lookups in the final HTTP diagnostics, not only CPF validation.
             _apply_request_metrics(cliente_stats, farm_client.metrics_snapshot())

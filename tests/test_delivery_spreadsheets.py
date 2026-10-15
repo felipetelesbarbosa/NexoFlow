@@ -101,7 +101,7 @@ class DeliverySpreadsheetsTests(unittest.TestCase):
             self.directory, cutoff=datetime.fromisoformat(NOW)
         )
 
-    def test_internal_uuid_maps_to_unique_weni_urn_and_full_name(self):
+    def test_internal_uuid_maps_to_unique_weni_native_urn(self):
         tickets, contacts, report = self.read()
         self.assertEqual(tickets[0]["contact_uuid"], contact()["uuid"])
         self.assertEqual(tickets[0]["chat_contact_uuid"], CHAT)
@@ -148,12 +148,65 @@ class DeliverySpreadsheetsTests(unittest.TestCase):
         self.assertEqual(tickets, [])
         self.assertEqual(report["summary"]["URN_AMBIGUA"], 1)
 
-    def test_name_mismatch_and_non_native_field_urn_cannot_map(self):
-        self.room_rows[0][1] = "Outra Pessoa"
-        self.assertFalse(self.read()[0])
-        self.room_rows[0][1] = "Cliente Árvore"
+    def test_display_names_do_not_block_technical_link_for_valid_or_invalid_cpf(self):
+        for cpf in ("52998224725", "0"):
+            for display_name in ("🌻", "Outra Pessoa"):
+                with self.subTest(cpf=cpf, display_name=display_name):
+                    self.contact_rows[0][4] = cpf
+                    self.room_rows[0][1] = display_name
+                    tickets, exported, _ = self.read()
+                    self.assertEqual(len(tickets), 1)
+                    self.assertEqual(exported[0]["fields"]["cpf"], cpf)
+                    current = contact(
+                        name="🌺 Nome Atualizado",
+                        fields={"cpf": cpf, "nome": "Outro Cadastro"},
+                        urns=[URN],
+                    )
+                    accepted, contacts, rejected = validate_current_contacts(
+                        tickets, [current]
+                    )
+                    self.assertEqual(len(accepted), 1)
+                    self.assertEqual(contacts, [current])
+                    self.assertEqual(rejected, {})
+
+    def test_unmatched_native_urn_and_invalid_chat_uuid_cannot_map(self):
         self.room_rows[0][2] = "whatsapp:5591222222222"
         self.assertFalse(self.read()[0])
+        self.room_rows[0][2] = URN
+        self.room_rows[0][0] = "not-a-uuid"
+        self.assertFalse(self.read()[0])
+
+    def test_export_name_mismatch_still_requires_api_identity_for_invalid_cpf(self):
+        self.room_rows[0][1] = "Nome Antigo do Canal"
+        tickets, _, _ = self.read()
+        current = contact(
+            name="🌻",
+            fields={"cpf": "0", "nome": "Outra Pessoa"},
+            urns=[URN],
+        )
+        accepted, contacts, rejected = validate_current_contacts(tickets, [current])
+        self.assertEqual(len(accepted), 1)
+        self.assertEqual(rejected, {})
+        fixture = fixtures.DeliveryTicketsTests()
+        client = fixtures.farm()
+        payload = client.get_cliente_by_cpf.return_value
+        # A different DDD still identifies the same local phone number.
+        payload["cliente"]["telefone"] = "92987654321"
+        _, confirmed = fixture.reconcile(
+            tickets=accepted, contacts=contacts, client=client
+        )
+        self.assertEqual(len(confirmed["orders"]), 1)
+        self.assertEqual(
+            confirmed["tickets"][0]["resultado_validacao"], "CONFIRMADO_API"
+        )
+        payload["cliente"]["telefone"] = "92911112222"
+        _, blocked = fixture.reconcile(
+            tickets=accepted, contacts=contacts, client=client
+        )
+        self.assertEqual(blocked["orders"], [])
+        self.assertEqual(
+            blocked["tickets"][0]["resultado_validacao"], "CPF_IDENTIDADE_DIVERGENTE"
+        )
 
     def test_closed_tagged_human_delivery_only_and_time_cutoff(self):
         for index, value in [
@@ -277,7 +330,7 @@ class DeliverySpreadsheetsTests(unittest.TestCase):
                 refresh_contact=Mock(return_value={**current, "uuid": OTHER}),
             )
 
-    def test_current_contact_uuid_native_urn_and_name_must_still_match(self):
+    def test_current_contact_uuid_and_native_urn_must_still_match(self):
         tickets, _, _ = self.read()
         current = contact(urns=[URN])
         selected, contacts, rejected = validate_current_contacts(tickets, [current])
@@ -290,8 +343,9 @@ class DeliverySpreadsheetsTests(unittest.TestCase):
         self.assertFalse(validate_current_contacts(tickets, [current, duplicate])[0])
         current["name"] = "Outra Pessoa"
         current["fields"]["nome"] = "Outra Pessoa"
-        self.assertFalse(validate_current_contacts(tickets, [current])[0])
+        self.assertEqual(len(validate_current_contacts(tickets, [current])[0]), 1)
         self.assertFalse(validate_current_contacts(tickets, [])[0])
+        self.assertFalse(validate_current_contacts(tickets, [duplicate])[0])
 
     def test_targets_are_frozen_weni_has_no_sheet_writes_analytics_has_no_weni_writes(
         self,

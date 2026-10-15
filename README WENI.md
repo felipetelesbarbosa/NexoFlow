@@ -397,7 +397,7 @@ Grupo sincronizado com a última compra confirmada entre 0 e 25 dias, remoção 
 
 O Setup instala **NexoFlow Planilha.exe** com ícone próprio e atalho na Área de Trabalho. O menu permite executar as cargas por planilha para Weni ou Analytics/Google Sheets e abrir `importacoes`. Use `Conversas_Delivery.xlsx` e `Contatos_Delivery.xlsx`; cada carga mantém a revisão humana antes de aplicar.
 
-Na carga por planilha, UUIDs idênticos repetidos pela paginação são consolidados. Versões diferentes exigem GET individual por UUID; telefone/URN e nome continuam validados, e falha da releitura não autoriza gravação. O log mostra contagens agregadas, sem CPF.
+Na carga por planilha, UUIDs idênticos repetidos pela paginação são consolidados. Versões diferentes exigem GET individual por UUID; o vínculo UUID/URN é revalidado e falha da releitura não autoriza gravação. Mudanças no nome exibido não impedem esse vínculo; a validação do cliente na API segue a regra de CPF válido ou inválido. O log mostra contagens agregadas, sem CPF.
 
 ### Retomar uma aplicação por planilha
 

@@ -143,9 +143,11 @@ def _identity_first_names(identity: dict[str, Any]) -> set[str]:
 
     names = set()
     for key in ("nome", "weni_name"):
-        match = re.search(r"[^\W\d_]+", _identity_name(identity.get(key)))
-        if match:
-            names.add(match.group())
+        for token in re.split(r"[\s-]+", _identity_name(identity.get(key))):
+            first_name = "".join(char for char in token if char.isalpha())
+            if first_name:
+                names.add(first_name)
+                break
     return names
 
 

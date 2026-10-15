@@ -580,8 +580,10 @@ posicionais separadas por vírgula; <code>pedido_valor</code> é a soma de
 documentados não cancelados de pedidos validados pela API contam como
 venda, incluindo Em processamento (0). A mesma regra vale para
 <code>ultima_compra</code> e Recompra, mantendo as demais validações.
-Cada nova carga reconsulta os pedidos no escopo selecionado, mesmo sem
-alteração do contato na Weni. Pagamento 0 grava
+Cada nova carga consulta os CPFs no escopo selecionado, mesmo sem
+alteração do contato na Weni. No Analytics, a reconsulta de status dos
+pedidos já registrados abrange somente os últimos 20 dias; os mais
+antigos permanecem preservados. Pagamento 0 grava
 <code>pedido_forma_pagamento=Cancelado</code> e força status efetivo 3
 na Weni/BI; <code>Pedidos_FarmaLider</code> mantém o status e o
 pagamento brutos da API. Os estados -2, Em aberto, -1, Pendente de
@@ -816,6 +818,16 @@ apagar os pedidos anteriores. A API fornece apenas o último pedido por
 cliente. Coletas regulares acumulam histórico observado, mas não
 recuperam compras antigas nunca capturadas nem garantem que todas as
 compras entre duas coletas tenham sido registradas.</p>
+<p>Cada carga do Analytics também reconsulta por código os pedidos
+oficiais já observados dos contatos selecionados com até 20 dias, pela
+data do pedido em America/Belem (dias 0 a 20, inclusive), incluindo
+concluídos e cancelados. Os mais antigos permanecem no histórico e nos
+indicadores sem reconsulta automática de status. A consulta por CPF
+continua identificando novas compras; pedidos ainda não registrados
+exigem validação inicial, inclusive antigos. O vínculo com o cliente
+precisa ter sido comprovado; registros legados sem essa comprovação
+continuam pendentes. Falhas preservam o snapshot anterior e deixam a
+carga parcial, sem avançar o checkpoint.</p>
 <p>As fontes comerciais <code>BI_Publico</code>,
 <code>BI_Clientes</code>, <code>BI_Clientes_Vendas</code>,
 <code>BI_Itens</code>, <code>BI_Produtos_ABC</code>,
@@ -842,4 +854,4 @@ dos itens do período e sinaliza ausência ou divergência em
 comerciais.</p>
 </body>
 </html>
-<!-- NexoFlow documentation: source-sha256=24c2c00e8a350d72727ca2fa3637e74c1481d08143434c8dc9f32675a93e295b content-sha256=67a5fe201bbbc097633d5033c6b661a5bd28a86efb28489ad41b8d0e2c1028e1 -->
+<!-- NexoFlow documentation: source-sha256=97f7b56f0625016815d96a3b29208b9c5792866fc08661831afddfb0ce450033 content-sha256=7390c86f5bcb69b2e43b6aa717a5e1f2271c2e810d9bbdba015a47c13d668444 -->

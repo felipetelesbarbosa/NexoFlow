@@ -12,7 +12,6 @@ from pathlib import Path
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from analytics import get_fields
 from delivery_tickets import delivery_ticket_key, is_order_tag
 from farmalider_integration import _identity_name
 from urn_utils import native_contact_urns
@@ -116,15 +115,8 @@ def _tags(value):
     )
 
 
-def _names(contact):
-    return {
-        _identity_name(contact.get("name")),
-        _identity_name(get_fields(contact).get("nome")),
-    } - {""}
-
-
 def read_delivery_spreadsheets(directory, *, cutoff):
-    """Map Chats UUIDs to Flows UUIDs via unique native URN and full name."""
+    """Map Chats UUIDs to Flows UUIDs via the existing UUID/native URN link."""
     directory = Path(directory)
     contacts, urn_index, summary, rejected = {}, defaultdict(set), Counter(), []
     contact_path, room_path = (
@@ -214,10 +206,6 @@ def read_delivery_spreadsheets(directory, *, cutoff):
                 "URN_AMBIGUA" if len(ids) > 1 else "VINCULO_WENI_NAO_LOCALIZADO"
             )
         uid = next(iter(ids)) if len(ids) == 1 else ""
-        if uid and _identity_name(row.get("contact__name")) not in _names(
-            contacts[uid]
-        ):
-            reason = reason or "NOME_DIVERGENTE_NO_EXPORT"
         if reason or opened is None or ended is None:
             summary[reason] += 1
             rejected.append(
@@ -263,7 +251,7 @@ def read_delivery_spreadsheets(directory, *, cutoff):
 
 
 def validate_current_contacts(tickets, current_contacts, *, refresh_contact=None):
-    """Require the exported UUID/URN/name link to still identify one live contact."""
+    """Require the exported UUID/native URN link to identify one live contact."""
     by_uuid, index = {}, defaultdict(set)
     duplicates, conflicts = 0, set()
     for contact in current_contacts:
@@ -313,8 +301,6 @@ def validate_current_contacts(tickets, current_contacts, *, refresh_contact=None
             urn not in native_contact_urns(current) or index.get(urn, set()) != {uid}
         ):
             rejected["URN_ALTERADA_OU_AMBIGUA_NA_WENI_ATUAL"] += 1
-        elif _identity_name(ticket.get("export_contact_name")) not in _names(current):
-            rejected["NOME_ALTERADO_NA_WENI_ATUAL"] += 1
         else:
             accepted.append(ticket)
     selected_ids = {ticket["contact_uuid"] for ticket in accepted}

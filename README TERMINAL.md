@@ -44,7 +44,7 @@ nexo weni planilhas
 nexo analytics planilhas
 ```
 
-Weni atualiza somente os campos de pedido dos clientes identificados. Analytics atualiza o Google Sheets com os pedidos confirmados e sua data real, sem gravar na Weni. Os comandos consultam primeiro CPFs válidos e depois inválidos, com nome + e-mail ou nome + telefone exigidos para estes últimos. Cada comando gera uma revisão privada e aguarda `PLANILHAS REVISADAS` antes de aplicar. Não exigem o token de integração do Chats. Veja [Carga por planilhas](README%20DELIVERY.md) para a seleção de tags, validações, configuração e limitações de atribuição.
+Weni atualiza somente os campos de pedido dos clientes identificados. Analytics atualiza o Google Sheets com os pedidos confirmados e sua data real, sem gravar na Weni. Os comandos consultam primeiro CPFs válidos e depois inválidos. CPFs válidos dispensam comparação de nome, telefone ou e-mail; inválidos exigem primeiro nome correspondente ou número local do telefone correspondente do mesmo cliente, ignorando +55 e DDD, sem ambiguidade. Zeros à esquerda são repostos até 11 dígitos somente quando tornam o CPF matematicamente válido, sem alterar os dígitos existentes. Cada comando gera uma revisão privada e aguarda `PLANILHAS REVISADAS` antes de aplicar. Não exigem o token de integração do Chats. Veja [Carga por planilhas](README%20DELIVERY.md) para a seleção de tags, validações, configuração e limitações de atribuição.
 
 ### Status
 
@@ -117,7 +117,7 @@ Executa o backfill completo com relatório para revisão humana e snapshot conge
 
 Depois de atualizar ou reinstalar o NexoFlow 1.0, execute essa rotina para gerar um novo dry-run completo com a política atual. Revise o relatório antes de confirmar `CARGA COMPLETA REVISADA`; não reutilize o snapshot da instalação anterior. Em seguida, execute `executar_carga_completa.bat` em `C:\NexoFlow` para recalcular o Analytics/BI e retome o incremental.
 
-Na revisão, pedidos com status efetivo 4 (Pronto para rota), 1 (Em trânsito) ou 2 (Concluído), entram em vendas e `ultima_compra`. Em aberto (-2), Pendente de pagamento (-1), Em processamento (0), Pronto para rota (4) e Em trânsito (1) permanecem em rechecagem; pagamento 0 ou `_` grava `Cancelado` e força status 3. Consulte [README PEDIDOS.md](README%20PEDIDOS.md) para o contrato completo.
+Na revisão, pedidos validados pela API com status efetivo -2 (Em aberto), -1 (Pendente de pagamento), 0 (Em processamento), 4 (Pronto para rota), 1 (Em trânsito) ou 2 (Concluído) entram em vendas e `ultima_compra`. Entre os estados documentados, somente o status efetivo 3 (Cancelado) exclui a venda; pagamento 0 ou `_` e cancelamento explícito forçam esse status. Os estados -2, -1, 0, 4 e 1 permanecem em rechecagem, e cada nova carga reconsulta os pedidos atuais no seu escopo. Consulte [README PEDIDOS.md](README%20PEDIDOS.md) para o contrato completo.
 
 ## Analytics
 

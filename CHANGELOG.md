@@ -4,6 +4,9 @@
 - CPF válido dispensa comparação de nome, telefone e e-mail. CPF inválido pode ser validado pelo primeiro nome, normalizando acentos e símbolos, ou pelo número local do telefone, ignorando +55 e DDD. E-mail não é obrigatório; cache não compartilha identidade entre contatos e respostas ambíguas continuam pendentes.
 - Analytics/Looker contabilizam pedidos API validados em estados documentados não cancelados, incluindo Em processamento; regra alinhada com Weni e Recompra e reconsulta em cada nova carga no escopo selecionado.
 - Inserções no Sheets delimitam a tabela desde a coluna A para evitar deslocamento de pedidos e histórico.
+- Analytics reconsulta por código os pedidos oficiais já observados no escopo da carga somente nos últimos 20 dias, incluindo concluídos e cancelados. Pedidos mais antigos permanecem preservados; a consulta por CPF continua descobrindo compras novas. Mudanças de status e itens atualizam o histórico; falhas preservam o snapshot anterior e o checkpoint.
+- Orientações do Looker usam os indicadores de venda validada, incluindo os estados -2, -1 e 0; validação do primeiro nome também aceita símbolos internos sem resolver identidades ambíguas.
+- Planilhas vincula conversas por UUID/URN, sem exigir igualdade do nome completo do canal. A validação do CPF e do pedido na API permanece obrigatória.
 
 ## NexoFlow 1.0
 

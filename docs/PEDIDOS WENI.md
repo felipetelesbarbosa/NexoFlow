@@ -48,7 +48,7 @@ Pagamento 5 é **Pix por Link de Pagamento** e pagamento 6 é **Pix no POS**. Pa
 
 Pagamentos válidos sem de-para a partir de 7 mantêm seu código na Weni e recebem a descrição `Não identificado (código X)` no Google Sheets/BI. Pagamento ausente ou inválido mantém a descrição vazia.
 
-Pedidos validados pela API com status efetivo 4 (Pronto para rota), 1 (Em trânsito) ou 2 (Concluído), sem cancelamento, contam como venda e atualizam `ultima_compra`. Os estados -2, -1, 0, 4 e 1 permanecem em rechecagem até Concluído ou Cancelado. Estados -2, -1 e 0 ficam fora das vendas; 4 e 1 já contam como venda.
+Pedidos validados pela API com status efetivo -2 (Em aberto), -1 (Pendente de pagamento), 0 (Em processamento), 4 (Pronto para rota), 1 (Em trânsito) ou 2 (Concluído) contam como venda e atualizam `ultima_compra`. Entre os estados documentados, somente o status efetivo 3 (Cancelado) exclui a venda; cancelamento explícito ou pagamento 0 força esse status. Os estados -2, -1, 0, 4 e 1 permanecem em rechecagem até Concluído ou Cancelado. Cada nova carga reconsulta os pedidos atuais no seu escopo, mesmo sem modificação do contato na Weni. Estados desconhecidos continuam pendentes de validação.
 
 Exemplo:
 

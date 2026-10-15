@@ -36,6 +36,7 @@ py-modules = [
   "main",
   "network_diagnostics",
   "nexo_cli",
+  "observed_orders",
   "pedido_utils",
   "private_diagnostics",
   "proxy_config",
