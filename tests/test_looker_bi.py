@@ -472,8 +472,8 @@ class TypedSheetTests(unittest.TestCase):
         values = [headers, ["FARMALIDER:1", "u1", "10"]]
         ws = Mock(title="Pedidos_FarmaLider", row_count=1000)
         ws.get_all_values.side_effect = lambda: copy.deepcopy(values)
-        ws.append_rows.side_effect = lambda rows, **kwargs: values.extend(
-            copy.deepcopy(rows)
+        ws.update.side_effect = lambda **kwargs: values.extend(
+            copy.deepcopy(kwargs["values"])
         )
         store = GoogleSheetsStore.__new__(GoogleSheetsStore)
         store._read_with_retry = Mock(

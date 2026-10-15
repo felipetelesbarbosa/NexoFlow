@@ -1,5 +1,7 @@
 # NexoFlow 1.0 — Changelog
 
+- Google Sheets: novas linhas gravadas em posições explícitas, sem deslocamento de colunas ou expansão automática de tabelas, com retentativas idempotentes e bloqueio de dados fora do cabeçalho.
+
 - Analytics: pedidos oficiais sem itens ficam pendentes sem bloquear a carga, fora das vendas e da Recompra, com reconsulta até 20 dias e recuperação do mesmo registro.
 
 - Analytics: cancelamentos oficialmente verificados não bloqueiam a carga por falta de itens; diagnóstico de pedidos por motivo e verificação antecipada da sequência das partes.

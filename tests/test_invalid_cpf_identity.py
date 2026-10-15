@@ -135,6 +135,16 @@ class MemoryWorksheet:
     def get_all_values(self):
         return [row[:] for row in self.values]
 
+    def col_values(self, column):
+        return [row[column - 1] if len(row) >= column else "" for row in self.values]
+
+    def update(self, *, range_name, values, **kwargs):
+        start = int(range_name.split(":", 1)[0].lstrip("A")) - 1
+        while len(self.values) < start + len(values):
+            self.values.append([])
+        for offset, row in enumerate(values):
+            self.values[start + offset] = list(row)
+
     def append_rows(self, rows, **kwargs):
         self.values.extend([row[:] for row in rows])
 

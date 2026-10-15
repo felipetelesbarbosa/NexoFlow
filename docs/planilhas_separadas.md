@@ -27,3 +27,11 @@ A conta de serviço precisa de edição nos três arquivos. A conta Google propr
 A migração não torna arquivos públicos nem altera os usuários que já têm acesso. Fontes do Looker que apontem diretamente para abas operacionais precisam ser substituídas pelas tabelas `BI_*` correspondentes antes da retirada dessas abas; a preservação automática cobre as fontes BI.
 
 Cada arquivo continua sujeito ao limite de células do Google Sheets. A divisão libera capacidade, mas não cria armazenamento ilimitado. Arquivamento por período e troca do destino de histórico exigem uma migração própria; não remova arquivos anteriores para liberar espaço.
+
+### Gravação e capacidade
+
+Novos registros são escritos em intervalos explícitos, sempre a partir da coluna A, depois de reservar somente as linhas necessárias. O NexoFlow não usa a detecção automática de tabelas do `values.append`, que pode interpretar trechos separados por colunas vazias como tabelas diferentes e deslocar a escrita para a direita.
+
+Retentativas repetem o mesmo intervalo sem duplicar registros. Se o cabeçalho ou a chave do destino mudar durante uma retentativa, a gravação é interrompida. Colunas vazias acrescentadas pela leitura retangular da API não são consideradas novos campos; valores preenchidos fora do cabeçalho bloqueiam a carga até a correção da tabela.
+
+O limite de células considera todas as linhas e colunas alocadas em todas as abas de cada arquivo, incluindo células vazias. A separação entre Operação, Histórico e Dashboard permanece ativa.

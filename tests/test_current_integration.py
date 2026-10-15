@@ -491,7 +491,8 @@ class CurrentIntegrationTests(unittest.TestCase):
         self,
     ) -> None:
         store = GoogleSheetsStore.__new__(GoogleSheetsStore)
-        store.history = Mock()
+        store.history = Mock(row_count=100)
+        store.history.col_values.return_value = ["acao"]
         store._headers_cache = {
             "Historico_Alteracoes": ["acao", "sincronizado_em", "contact_uuid"]
         }
@@ -506,8 +507,8 @@ class CurrentIntegrationTests(unittest.TestCase):
             )
 
         store.history.row_values.assert_not_called()
-        store.history.append_rows.assert_called_once()
-        rows = store.history.append_rows.call_args.args[0]
+        store.history.update.assert_called_once()
+        rows = store.history.update.call_args.kwargs["values"]
         self.assertEqual(rows[0][0], "Inserido")
         self.assertEqual(rows[0][2], "u1")
 

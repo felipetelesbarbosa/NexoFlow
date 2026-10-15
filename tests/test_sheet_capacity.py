@@ -18,11 +18,16 @@ class SheetCapacityTests(unittest.TestCase):
     def test_exact_growth_precedes_existing_updates_and_appends(self):
         store, ws = self.fixture(2)
         operations = []
-        ws.resize.side_effect = lambda **kwargs: operations.append(("resize", kwargs))
+
+        def resize(**kwargs):
+            ws.row_count = kwargs["rows"]
+            operations.append(("resize", kwargs))
+
+        ws.resize.side_effect = resize
         ws.batch_update.side_effect = lambda *args, **kwargs: operations.append(
             ("update", None)
         )
-        ws.append_rows.side_effect = lambda *args, **kwargs: operations.append(
+        ws.update.side_effect = lambda *args, **kwargs: operations.append(
             ("append", None)
         )
         result = store._upsert_records_detailed(
@@ -42,7 +47,7 @@ class SheetCapacityTests(unittest.TestCase):
         store, ws = self.fixture(100)
         store._upsert_records_detailed(ws, [{"pedido_chave": "new"}], "pedido_chave")
         ws.resize.assert_not_called()
-        ws.append_rows.assert_called_once()
+        ws.update.assert_called_once()
 
     def test_capacity_failure_does_not_partially_update_existing_orders(self):
         store, ws = self.fixture(2)

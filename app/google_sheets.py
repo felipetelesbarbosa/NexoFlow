@@ -6,7 +6,6 @@ import json
 import logging
 import math
 import time
-from collections import Counter
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
@@ -884,88 +883,106 @@ class GoogleSheetsStore:
                 return True
         return False
 
-    def _append_keyed_batch(self, ws, batch, headers, key_name, value_input_option):
-        attempted = False
+    @staticmethod
+    def _validated_table_values(values, title):
+        """Remove só padding vazio; dados sem cabeçalho exigem reparação."""
+        if not values:
+            return []
+        headers = list(values[0])
+        while headers and headers[-1] in ("", None):
+            headers.pop()
+        if not headers or any(not str(name).strip() for name in headers):
+            raise RuntimeError(f"Google Sheets: cabeçalho inválido em {title}.")
+        if len(set(headers)) != len(headers):
+            raise RuntimeError(f"Google Sheets: cabeçalho duplicado em {title}.")
+        width = len(headers)
+        if any(
+            any(cell not in ("", None) for cell in row[width:]) for row in values[1:]
+        ):
+            raise RuntimeError(
+                f"Google Sheets: {title} contém dados fora das colunas do cabeçalho. "
+                "A gravação foi bloqueada para evitar deslocamentos e duplicatas; "
+                "repare a tabela antes de repetir a carga."
+            )
+        return [headers, *[list(row[:width]) for row in values[1:]]]
+
+    def _append_keyed_batch(
+        self, ws, batch, headers, key_name, value_input_option, *, start_row=None
+    ):
+        if not batch:
+            return None
         key_index = headers.index(key_name)
+        if start_row is None:
+            values = self._validated_table_values(
+                self._read_with_retry(
+                    f"localizar novas linhas em {ws.title}", ws.get_all_values
+                ),
+                ws.title,
+            )
+            if values and values[0] != headers:
+                raise RuntimeError("Schema mudou antes da escrita; reexecute a carga.")
+            start_row = max(2, len(values) + 1)
+        if start_row < 2:
+            raise ValueError("Novos registros não podem sobrescrever o cabeçalho.")
+        self._reserve_table_rows(ws, start_row + len(batch) - 1)
+        cell_range = (
+            f"A{start_row}:{column_letter(len(headers))}{start_row + len(batch) - 1}"
+        )
+        attempted = False
 
         def write():
             nonlocal attempted
-            pending = batch
             if attempted:
-                # Timeout pode ocorrer depois de o servidor incluir as linhas.
-                # Antes de repetir, reler as chaves e atualizar posições já
-                # persistidas em vez de incluir a mesma linha novamente.
-                values = self._read_with_retry(
-                    f"confirmar inserções em {ws.title}", ws.get_all_values
+                values = self._validated_table_values(
+                    self._read_with_retry(
+                        f"confirmar inserções em {ws.title}", ws.get_all_values
+                    ),
+                    ws.title,
                 )
                 if not values or values[0] != headers:
                     raise RuntimeError(
                         "Schema mudou durante a confirmação de escrita; reexecute a carga."
                     )
-                positions = {
-                    str(row[key_index]): i + 2
-                    for i, row in enumerate(values[1:])
-                    if len(row) > key_index and row[key_index] != ""
-                }
-                pending, updates = [], []
-                for row in batch:
-                    position = positions.get(str(row[key_index]))
-                    if position is None:
-                        pending.append(row)
-                    else:
-                        updates.append(
-                            {
-                                "range": f"A{position}:{column_letter(len(headers))}{position}",
-                                "values": [row],
-                            }
+                for position, row in enumerate(batch, start=start_row - 1):
+                    current = values[position] if position < len(values) else []
+                    if len(current) > key_index and str(current[key_index]) not in (
+                        "",
+                        str(row[key_index]),
+                    ):
+                        raise RuntimeError(
+                            "Destino das novas linhas mudou; interrompido para preservar outros registros."
                         )
-                if updates:
-                    ws.batch_update(
-                        copy.deepcopy(updates), value_input_option=value_input_option
-                    )
             attempted = True
-            if pending:
-                return ws.append_rows(
-                    copy.deepcopy(pending),
-                    value_input_option=value_input_option,
-                    table_range=f"A1:{column_letter(len(headers))}",
-                )
+            # values.append chooses its own logical table and can start to the
+            # right when empty columns split old rows. Fixed coordinates are
+            # deterministic, fit the reserved grid, and are safe after timeout.
+            return ws.update(
+                range_name=cell_range,
+                values=copy.deepcopy(batch),
+                value_input_option=value_input_option,
+            )
+
+        return self._write_with_retry(f"gravar novas linhas em {ws.title}", write)
+
+    def _append_history_batch(self, batch, *, start_row=None):
+        if not batch:
             return None
-
-        return self._write_with_retry(f"append_rows em {ws.title}", write)
-
-    def _append_history_batch(self, batch):
-        attempted = False
-
-        def write():
-            nonlocal attempted
-            pending = batch
-            if attempted:
-                values = self._read_with_retry(
-                    "confirmar histórico incluído", self.history.get_all_values
-                )
-                # Linhas de histórico têm corte temporal e ação próprios.
-                # Comparar a linha completa, não apenas o UUID do contato.
-                committed = Counter(
-                    tuple(str(cell) for cell in row) for row in values[1:]
-                )
-                pending = []
-                for row in batch:
-                    identity = tuple(str(cell) for cell in row)
-                    if committed[identity]:
-                        committed[identity] -= 1
-                    else:
-                        pending.append(row)
-            attempted = True
-            if pending:
-                return self.history.append_rows(
-                    copy.deepcopy(pending),
-                    value_input_option=ValueInputOption.raw,
-                    table_range=f"A1:{column_letter(len(HISTORY_COLUMNS))}",
-                )
-            return None
-
-        return self._write_with_retry("append_rows em Historico_Alteracoes", write)
+        if start_row is None:
+            values = self._read_with_retry(
+                "localizar novas linhas do histórico", self.history.get_all_values
+            )
+            start_row = max(2, len(values) + 1)
+        self._reserve_table_rows(self.history, start_row + len(batch) - 1)
+        width = max(map(len, batch))
+        cell_range = f"A{start_row}:{column_letter(width)}{start_row + len(batch) - 1}"
+        return self._write_with_retry(
+            "gravar novas linhas em Historico_Alteracoes",
+            lambda: self.history.update(
+                range_name=cell_range,
+                values=copy.deepcopy(batch),
+                value_input_option=ValueInputOption.raw,
+            ),
+        )
 
     def _reserve_table_rows(self, ws, required_rows: int) -> None:
         """Reserve only the rows needed, before changing existing records."""
@@ -1051,6 +1068,8 @@ class GoogleSheetsStore:
         if key_name not in headers:
             raise RuntimeError(f"A aba {ws.title} não possui a chave {key_name!r}.")
 
+        values = self._validated_table_values(values, ws.title)
+        headers = list(values[0])
         stage_started = time.monotonic()
         key_col = headers.index(key_name)
         existing: dict[str, tuple[int, list[str]]] = {}
@@ -1173,10 +1192,12 @@ class GoogleSheetsStore:
                     ws.title,
                     len(appends),
                 )
+            next_row = len(values) + 1
             for batch in append_batches:
                 self._append_keyed_batch(
-                    ws, batch, headers, key_name, value_input_option
+                    ws, batch, headers, key_name, value_input_option, start_row=next_row
                 )
+                next_row += len(batch)
                 progress.advance(len(batch))
 
         logging.info(
@@ -1363,13 +1384,19 @@ class GoogleSheetsStore:
             len(rows),
             len(batches),
         )
+        first_column = self._read_with_retry(
+            "localizar fim do histórico", lambda: self.history.col_values(1)
+        )
+        next_row = max(2, len(first_column) + 1)
+        self._reserve_table_rows(self.history, next_row + len(rows) - 1)
         with TaskProgress(
             "Google Sheets: Historico_Alteracoes - gravação confirmada",
             len(rows),
             unit="linhas",
         ) as progress:
             for batch in progress.track(batches, weight=len):
-                self._append_history_batch(batch)
+                self._append_history_batch(batch, start_row=next_row)
+                next_row += len(batch)
         logging.info(
             "Google Sheets: Historico_Alteracoes concluída em %.2fs.",
             time.monotonic() - stage_started,
@@ -1822,7 +1849,12 @@ class GoogleSheetsStore:
 
         if appends:
             self._append_keyed_batch(
-                self.control, appends, CONTROL_COLUMNS, "chave", ValueInputOption.raw
+                self.control,
+                appends,
+                CONTROL_COLUMNS,
+                "chave",
+                ValueInputOption.raw,
+                start_row=len(values) + 1,
             )
 
         # Atualiza o cache local sem nova leitura da API.

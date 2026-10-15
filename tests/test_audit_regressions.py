@@ -41,64 +41,76 @@ class SheetAuditTests(unittest.TestCase):
                 batch = [["a", "Ágata"], ["b", "João"]]
                 calls = 0
 
-                def append(
-                    rows, stored=stored, committed_count=committed_count, **kwargs
+                def write(
+                    *,
+                    range_name,
+                    values,
+                    committed=committed_count,
+                    stored=stored,
+                    **kwargs,
                 ):
                     nonlocal calls
                     calls += 1
+                    start = int(range_name.split(":")[0][1:]) - 1
+                    rows = values[:committed] if calls == 1 else values
+                    while len(stored) < start + len(rows):
+                        stored.append([])
+                    for index, row in enumerate(rows, start):
+                        stored[index] = copy.deepcopy(row)
                     if calls == 1:
-                        stored.extend(copy.deepcopy(rows[:committed_count]))
-                        raise Timeout("Resposta perdida depois da inclusão")
-                    stored.extend(copy.deepcopy(rows))
+                        raise Timeout("Resposta perdida depois da escrita")
 
-                def update(updates, stored=stored, **kwargs):
-                    for change in updates:
-                        position = int(change["range"].split(":")[0][1:])
-                        stored[position - 1] = change["values"][0]
-
-                ws.append_rows.side_effect = append
-                ws.batch_update.side_effect = update
+                ws.update.side_effect = write
                 with (
                     patch("google_sheets.time.sleep"),
                     patch("google_sheets.refresh_network_route"),
                 ):
                     store._append_keyed_batch(ws, batch, ["id", "nome"], "id", "RAW")
                 self.assertEqual(stored, [["id", "nome"], *batch])
-                self.assertEqual(ws.append_rows.call_args.kwargs["table_range"], "A1:B")
-                self.assertEqual(
-                    ws.append_rows.call_count, 1 if committed_count == 2 else 2
-                )
+                self.assertEqual(ws.update.call_args.kwargs["range_name"], "A2:B3")
+                self.assertEqual(ws.update.call_count, 2)
+                ws.append_rows.assert_not_called()
 
     def test_history_append_timeout_preserves_distinct_actions_without_duplicates(self):
         headers = ["acao", "sincronizado_em", "contact_uuid"]
         store, ws, stored = store_and_sheet([headers])
         store.history = ws
         batch = [["Inserido", "2026-10-11", "a"], ["Atualizado", "2026-10-11", "a"]]
+        calls = 0
 
-        def append(rows, **kwargs):
-            stored.extend(copy.deepcopy(rows))
-            raise Timeout("Resposta perdida")
+        def write(*, range_name, values, **kwargs):
+            nonlocal calls
+            calls += 1
+            stored[1:] = copy.deepcopy(values)
+            if calls == 1:
+                raise Timeout("Resposta perdida")
 
-        ws.append_rows.side_effect = append
+        ws.update.side_effect = write
         with (
             patch("google_sheets.time.sleep"),
             patch("google_sheets.refresh_network_route"),
         ):
             store._append_history_batch(batch)
         self.assertEqual(stored, [headers, *batch])
-        ws.append_rows.assert_called_once()
-        self.assertEqual(ws.append_rows.call_args.kwargs["table_range"], "A1:BF")
+        self.assertEqual(ws.update.call_args.kwargs["range_name"], "A2:C3")
+        ws.append_rows.assert_not_called()
 
     def test_schema_change_during_append_retry_blocks_further_inclusion(self):
-        store, ws, stored = store_and_sheet([["outra_coluna"]])
-        ws.append_rows.side_effect = Timeout("Resposta perdida")
+        store, ws, stored = store_and_sheet([["id"]])
+
+        def write(**kwargs):
+            stored[0] = ["outra_coluna"]
+            raise Timeout("Resposta perdida")
+
+        ws.update.side_effect = write
         with (
             patch("google_sheets.time.sleep"),
             patch("google_sheets.refresh_network_route"),
         ):
             with self.assertRaisesRegex(RuntimeError, "Schema mudou"):
                 store._append_keyed_batch(ws, [["a"]], ["id"], "id", "RAW")
-        ws.append_rows.assert_called_once()
+        ws.update.assert_called_once()
+        ws.append_rows.assert_not_called()
         self.assertEqual(stored, [["outra_coluna"]])
 
     def test_initial_replacement_failure_keeps_previous_table(self):

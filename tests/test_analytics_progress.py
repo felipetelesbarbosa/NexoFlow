@@ -132,6 +132,8 @@ class AnalyticsProgressTests(unittest.TestCase):
         self.assertTrue(
             any("100%" in line and "2/2 linhas" in line for line in self.logs)
         )
+        store.history = Mock(row_count=1000)
+        store.history.col_values.return_value = ["acao"]
         store._append_history_batch = Mock(side_effect=waiting)
         store.append_history(result.changed_records, {"one", "two"})
         self.assertEqual(self.progress[-1].completed, 2)
