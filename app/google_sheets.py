@@ -16,6 +16,10 @@ from google.auth.exceptions import TransportError as GoogleAuthTransportError
 
 if TYPE_CHECKING:
     from gspread.worksheet import Worksheet
+from gspread.exceptions import APIError, SpreadsheetNotFound, WorksheetNotFound
+from gspread.utils import ValueInputOption
+from requests.exceptions import RequestException
+
 from analytics import (
     BASE_COLUMNS,
     BI_ADS_COLUMNS,
@@ -63,8 +67,6 @@ from config import (
     SHEET_PEDIDOS,
 )
 from geography import normalize_geography
-from gspread.exceptions import APIError, SpreadsheetNotFound, WorksheetNotFound
-from gspread.utils import ValueInputOption
 from looker_bi import DATE_COLUMNS, TEXT_COLUMNS
 from looker_bi import SCHEMAS as LOOKER_SCHEMAS
 from network_diagnostics import classify_network_failure
@@ -79,7 +81,6 @@ from pharmacy_scope import (
 )
 from product_scope import pharmacy_items
 from proxy_config import refresh_network_route
-from requests.exceptions import RequestException
 from sheets_storage import STORAGE_SHEET, SheetsStorage
 from task_progress import TaskProgress, request_progress
 

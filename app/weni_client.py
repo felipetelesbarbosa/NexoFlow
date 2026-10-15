@@ -8,6 +8,7 @@ from typing import Any
 from urllib.parse import urljoin, urlsplit
 
 import requests
+
 from config import (
     MAX_RETRIES,
     PAGE_LIMIT,

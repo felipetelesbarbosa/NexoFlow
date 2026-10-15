@@ -48,12 +48,11 @@ def run(argv: list[str] | None = None) -> int:
         )
     if args.retirar_originais and not args.aplicar:
         parser.error("A retirada dos originais exige --aplicar.")
+    import secrets_config as secrets
     from google_sheets import GoogleSheetsStore
     from logging_config import configure_logging
     from proxy_config import configure_proxy
     from task_progress import TaskProgress
-
-    import secrets_config as secrets
 
     layout = SheetsStorage(
         spreadsheet_id(str(getattr(secrets, "GOOGLE_SPREADSHEET_ID", ""))),

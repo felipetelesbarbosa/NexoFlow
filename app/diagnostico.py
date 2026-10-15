@@ -4,6 +4,7 @@ import sys
 from urllib.parse import urlsplit
 
 import requests
+
 from config import (
     FARMALIDER_BATCH_SIZE,
     FARMALIDER_MAX_ADAPTIVE_DELAY_SECONDS,

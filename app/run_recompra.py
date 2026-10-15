@@ -114,6 +114,7 @@ def main(argv=None):
     from logging_config import configure_logging
 
     configure_logging(Path("logs/nexoflow_recompra.log"))
+    import secrets_config as secrets
     from recompra import (
         STATE,
         apply_review,
@@ -127,8 +128,6 @@ def main(argv=None):
     )
     from weni_client import WeniClient
     from weni_update import _open_farmalider
-
-    import secrets_config as secrets
 
     weni = None
     farm = None

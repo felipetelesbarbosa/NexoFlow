@@ -23,10 +23,9 @@ def run(argv: list[str] | None = None) -> int:
     from proxy_config import configure_proxy
 
     configure_proxy()
+    import secrets_config as secrets
     from google_sheets import GoogleSheetsStore
     from logging_config import configure_logging
-
-    import secrets_config as secrets
 
     configure_logging()
     spreadsheet_id = str(getattr(secrets, "GOOGLE_SPREADSHEET_ID", "") or "").strip()

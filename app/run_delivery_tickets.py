@@ -58,6 +58,7 @@ def main():
         from proxy_config import configure_proxy
 
         configure_proxy()
+    import secrets_config as secrets
     from delivery_tickets import (
         apply_delivery_review,
         reconcile_tickets,
@@ -69,8 +70,6 @@ def main():
     from weni_chats_client import WeniChatsClient
     from weni_client import WeniClient
     from weni_update import _available_weni_fields, _open_farmalider
-
-    import secrets_config as secrets
 
     configure_logging(Path("logs/nexoflow_delivery.log"))
     weni, chats, farm = None, None, None

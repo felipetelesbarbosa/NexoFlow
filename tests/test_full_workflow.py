@@ -185,6 +185,7 @@ class FullWorkflowWindowsTests(unittest.TestCase):
     def invoke(self, *, failing_stage=None, result_code=0, missing_import=False):
         with tempfile.TemporaryDirectory(prefix="NexoFlow workflow ") as temporary:
             root = Path(temporary)
+            (root / "comandos").mkdir()
             shutil.copyfile(
                 Path(__file__).resolve().parents[1] / "comandos/atualizar_tudo.bat",
                 root / "comandos/atualizar_tudo.bat",
@@ -199,12 +200,12 @@ class FullWorkflowWindowsTests(unittest.TestCase):
             for index, name in enumerate(self.children):
                 code = result_code if index == failing_stage else 0
                 (root / name).write_text(
-                    f'@echo off\necho {index}:%*:%NEXOFLOW_FULL_WORKFLOW%:%FORCE_FULL_SYNC%:%FULL_SYNC_QUARTER%>>"%~dp0calls.txt"\nexit /b {code}\n',
+                    f'@echo off\necho {index}:%*:%NEXOFLOW_FULL_WORKFLOW%:%FORCE_FULL_SYNC%:%FULL_SYNC_QUARTER%>>"%~dp0..\\calls.txt"\nexit /b {code}\n',
                     encoding="utf-8",
                 )
             env = {**os.environ, "FORCE_FULL_SYNC": "1", "FULL_SYNC_QUARTER": "2"}
             result = subprocess.run(
-                ["cmd.exe", "/d", "/c", "comandos/atualizar_tudo.bat"],
+                ["cmd.exe", "/d", "/c", "comandos\\atualizar_tudo.bat"],
                 cwd=root,
                 env=env,
                 input="\n",

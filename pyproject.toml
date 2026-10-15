@@ -73,6 +73,7 @@ dependencies = {file = ["requirements.txt"]}
 webhook = {file = ["requirements-webhook.txt"]}
 
 [tool.ruff]
+src = ["app", "."]
 target-version = "py311"
 line-length = 88
 extend-exclude = [

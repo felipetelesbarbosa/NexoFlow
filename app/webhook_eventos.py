@@ -11,11 +11,12 @@ from __future__ import annotations
 import hashlib
 from datetime import UTC, datetime
 
-from analytics import EVENT_COLUMNS
 from fastapi import FastAPI, Header, HTTPException
+from pydantic import BaseModel
+
+from analytics import EVENT_COLUMNS
 from google_sheets import GoogleSheetsStore
 from project_paths import load_private_settings
-from pydantic import BaseModel
 from webhook_runtime import WEBHOOK_WRITE_LOCK, shared_secret_matches
 
 _settings = load_private_settings()

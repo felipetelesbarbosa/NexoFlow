@@ -9,12 +9,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-import recompra
 import requests
-from run_recompra import main as run_recompra
-from weni_client import WeniClient, WeniError
 
+import recompra
+from run_recompra import main as run_recompra
 from tests.test_recompra import STRUCTURE, fixture
+from weni_client import WeniClient, WeniError
 
 BEFORE = datetime(2026, 10, 9, 23, 59, 59, tzinfo=recompra.TZ)
 AFTER = datetime(2026, 10, 10, 0, 0, 1, tzinfo=recompra.TZ)

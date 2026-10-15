@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from requests.exceptions import ReadTimeout, RequestException
+
 import analytics
 import config
 from analytics import (
@@ -21,7 +23,6 @@ from main import (
     split_contacts,
     validate_contacts,
 )
-from requests.exceptions import ReadTimeout, RequestException
 from weni_client import WeniClient
 
 

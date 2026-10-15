@@ -4,12 +4,13 @@ import json
 from datetime import UTC, datetime
 from typing import Any
 
-from analytics import build_sales_metrics, parse_ultimo_pedido_raw
 from fastapi import FastAPI, Header, HTTPException
+from pydantic import BaseModel
+
+from analytics import build_sales_metrics, parse_ultimo_pedido_raw
 from google_sheets import GoogleSheetsStore
 from pharmacy_scope import plan_pharmacy_scope
 from project_paths import load_private_settings
-from pydantic import BaseModel
 from webhook_runtime import WEBHOOK_WRITE_LOCK, shared_secret_matches
 
 secrets = load_private_settings()

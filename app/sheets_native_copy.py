@@ -11,8 +11,9 @@ from contextlib import nullcontext
 from google.auth.exceptions import TransportError as GoogleAuthTransportError
 from gspread.exceptions import APIError
 from gspread.utils import absolute_range_name, rowcol_to_a1
-from network_diagnostics import classify_network_failure
 from requests.exceptions import RequestException
+
+from network_diagnostics import classify_network_failure
 
 CELL_FIELDS = (
     "userEnteredValue,userEnteredFormat,note,dataValidation,textFormatRuns,chipRuns"
