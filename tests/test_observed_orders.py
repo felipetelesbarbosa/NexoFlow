@@ -782,9 +782,15 @@ class ObservedOrdersTests(unittest.TestCase):
         old["cliente"] = "cliente-confidencial-ficticio"
         farm = Mock()
         farm.get_pedido.return_value = response(status=2)
-        with self.assertLogs(level="INFO") as logs:
+        # O check-up desabilita os handlers; capture as mensagens na origem
+        # para verificar o progresso e a privacidade também nesse modo.
+        from unittest.mock import patch
+
+        with patch("logging.info") as log_info:
             self.run_refresh([old], farm)
-        rendered = "\n".join(logs.output)
+        rendered = "\n".join(
+            call.args[0] % call.args[1:] for call in log_info.call_args_list
+        )
         self.assertIn("pedidos/s", rendered)
         self.assertIn("restante estimado=", rendered)
         self.assertIn("100%", rendered)
