@@ -1,5 +1,7 @@
 # NexoFlow 1.0 — Changelog
 
+- Analytics: cancelamentos oficialmente verificados não bloqueiam a carga por falta de itens; diagnóstico de pedidos por motivo e verificação antecipada da sequência das partes.
+
 - Arquivos organizados em `app`, `comandos`, `docs` e `configuracao`, com caminhos dos executáveis e atualização de instalações anteriores adaptados.
 
 - Antes de classificar um CPF curto como inválido, restaurar zeros à esquerda somente quando o resultado de 11 dígitos passar nos verificadores. Valores como 0 e identificadores errados permanecem em validação por identidade.

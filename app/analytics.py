@@ -10,7 +10,7 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, cast
 
-from config import TIPO_PRIMEIRO_ANUNCIO, TIPO_ULTIMO_ANUNCIO
+from config import LOG_DIR, TIPO_PRIMEIRO_ANUNCIO, TIPO_ULTIMO_ANUNCIO
 from geography import normalize_geography
 from pedido_utils import (
     business_order_datetime,
@@ -48,7 +48,7 @@ META_FIELDS = AD_FIELDS
 
 
 FULL_LOAD_25_PARTS = 4
-FULL_LOAD_25_MANIFEST = Path("logs/full_load_25_manifest.json")
+FULL_LOAD_25_MANIFEST = LOG_DIR / "full_load_25_manifest.json"
 _FULL_LOAD_25_COMPONENTS = {"weni", "analytics"}
 
 
@@ -149,6 +149,30 @@ def _full_load_25_new_manifest(
         "contact_uuids": uuids,
         "completed": {"weni": [], "analytics": []},
     }
+
+
+def validate_full_load_quarter(*, part: int, component: str) -> None:
+    """Valida pré-requisitos locais sem consultar APIs nem alterar o manifesto."""
+    if component not in _FULL_LOAD_25_COMPONENTS:
+        raise ValueError(f"Componente inválido na carga 25%: {component}")
+    if part not in range(1, FULL_LOAD_25_PARTS + 1):
+        raise ValueError("A parte da carga completa 25% deve ser 1, 2, 3 ou 4.")
+    if not FULL_LOAD_25_MANIFEST.exists():
+        if part != 1:
+            raise RuntimeError(
+                "A carga completa 25% ainda não foi iniciada. "
+                "Execute primeiro a Parte 1 do " + component + "."
+            )
+        return
+    completed = _full_load_25_completed(_full_load_25_load(), component)
+    missing = sorted(set(range(1, part)) - completed)
+    if missing:
+        raise RuntimeError(
+            f"Carga completa 25% ({component}): antes da Parte {part}, "
+            f"conclua: {', '.join(map(str, missing))}. "
+            "Uma execução parcial não libera a próxima parte. "
+            "Confira o resumo da execução anterior e repita a parte pendente."
+        )
 
 
 def prepare_full_load_quarter(

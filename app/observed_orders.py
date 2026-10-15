@@ -39,6 +39,20 @@ PedidoResponse = dict[str, Any] | list[dict[str, Any]] | None
 STATUS_RECHECK_DAYS = 20
 
 
+def verified_order_cancellation(order: Row) -> bool:
+    """A confirmação de cancelamento exige o cabeçalho oficial do mesmo cliente."""
+    return order.get("_farmalider_cabecalho_verificado") == "1" and is_order_cancelled(
+        {
+            key: order.get(key, "")
+            for key in (
+                "farmalider_status_pedido",
+                "farmalider_forma_pagamento",
+                "farmalider_cancelamento",
+            )
+        }
+    )
+
+
 def _verified_observed_order(order: Row) -> bool:
     return bool(
         _positive_id(order.get("pedido_id"))
@@ -149,7 +163,7 @@ def revalidate_observed_orders(
 
     Failed positive snapshots are absent from the returned updates. A verified
     negative header withdraws a sale while retaining its previous amounts and
-    items; the incomplete response still marks the load partial. Only raw GET
+    items; a proven cancellation does not require items to exclude the sale. Only raw GET
     responses are shared; every stored customer ownership is validated again.
     Current-load snapshots take precedence over historical attribution.
     """
@@ -241,10 +255,8 @@ def revalidate_observed_orders(
             result.checked += 1
             complete = order.get("status_validacao") == "OK" and bool(items)
             if not complete:
-                result.api_errors += 1
-                if order.get(
-                    "_farmalider_cabecalho_verificado"
-                ) != "1" or not is_order_cancelled(order):
+                if not verified_order_cancellation(order):
+                    result.api_errors += 1
                     continue
                 # Identity and owner were verified before the negative header
                 # became actionable. Missing items/date must never keep a

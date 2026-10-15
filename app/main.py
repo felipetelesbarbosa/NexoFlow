@@ -6,7 +6,7 @@ import os
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -28,6 +28,7 @@ from analytics import (
     normalize_contact,
     normalize_cpf,
     prepare_full_load_quarter,
+    validate_full_load_quarter,
 )
 from config import (
     FARMALIDER_BATCH_ERROR_ABORT_MIN_ERRORS,
@@ -60,6 +61,7 @@ from observed_orders import (
     observed_orders_by_identity,
     preserve_old_latest_order,
     revalidate_observed_orders,
+    verified_order_cancellation,
 )
 from product_scope import PHARMACY_SCOPE_VERSION
 from project_paths import load_private_settings
@@ -136,6 +138,8 @@ class OrderStats:
     parse_errors: int = 0
     confirmed_api: int = 0
     api_errors: int = 0
+    cancellations_without_items: int = 0
+    failure_reasons: dict[str, int] = field(default_factory=dict)
 
 
 def _apply_request_metrics(
@@ -754,12 +758,23 @@ def build_orders(
                 raise
             except FarmaliderError:
                 stats.api_errors += 1
+                stats.failure_reasons["FALHA_CONSULTA_PEDIDO"] = (
+                    stats.failure_reasons.get("FALHA_CONSULTA_PEDIDO", 0) + 1
+                )
                 continue
             if order is None:
                 continue
 
-            if order.get("status_confirmacao") in ORDER_API_FAILURES:
+            diagnostic = order.get("status_confirmacao", "")
+            if verified_order_cancellation(order) and not items:
+                # The official negative header is sufficient to exclude this
+                # order. Do not wait for products that will not count as sales.
+                stats.cancellations_without_items += 1
+            elif diagnostic in ORDER_API_FAILURES:
                 stats.api_errors += 1
+                stats.failure_reasons[diagnostic] = (
+                    stats.failure_reasons.get(diagnostic, 0) + 1
+                )
 
             contact_uuid = order.get("contact_uuid", "")
             contact_row = rows_by_uuid.get(contact_uuid, {})
@@ -852,6 +867,24 @@ def main() -> int:
 
     try:
         validate_configuration()
+        force_full = os.getenv("FORCE_FULL_SYNC", "").strip() == "1"
+        full_quarter: int | None = None
+        raw_quarter = os.getenv("FULL_SYNC_QUARTER", "").strip()
+        if raw_quarter:
+            if not force_full:
+                raise RuntimeError(
+                    "FULL_SYNC_QUARTER só pode ser usado junto com FORCE_FULL_SYNC=1."
+                )
+            try:
+                full_quarter = int(raw_quarter)
+            except ValueError as exc:
+                raise RuntimeError("FULL_SYNC_QUARTER deve ser 1, 2, 3 ou 4.") from exc
+            if full_quarter not in {1, 2, 3, 4}:
+                raise RuntimeError("FULL_SYNC_QUARTER deve ser 1, 2, 3 ou 4.")
+
+        if full_quarter is not None:
+            validate_full_load_quarter(part=full_quarter, component="analytics")
+
         total_started_monotonic = time.monotonic()
         sync_started = datetime.now(UTC)
         sync_time = utc_iso(sync_started)
@@ -874,21 +907,6 @@ def main() -> int:
             "Google Sheets inicializado em %.2fs.",
             time.monotonic() - sheets_started,
         )
-
-        force_full = os.getenv("FORCE_FULL_SYNC", "").strip() == "1"
-        full_quarter: int | None = None
-        raw_quarter = os.getenv("FULL_SYNC_QUARTER", "").strip()
-        if raw_quarter:
-            if not force_full:
-                raise RuntimeError(
-                    "FULL_SYNC_QUARTER só pode ser usado junto com FORCE_FULL_SYNC=1."
-                )
-            try:
-                full_quarter = int(raw_quarter)
-            except ValueError as exc:
-                raise RuntimeError("FULL_SYNC_QUARTER deve ser 1, 2, 3 ou 4.") from exc
-            if full_quarter not in {1, 2, 3, 4}:
-                raise RuntimeError("FULL_SYNC_QUARTER deve ser 1, 2, 3 ou 4.")
 
         last_success = None
         if not force_full:
@@ -1122,6 +1140,13 @@ def main() -> int:
         )
         order_rows, item_rows = observed.orders, observed.items
         order_stats.api_errors += observed.api_errors
+        if observed.api_errors:
+            order_stats.failure_reasons["REVALIDACAO_HISTORICO"] = observed.api_errors
+        logging.info(
+            "Pedidos: cancelados confirmados sem itens=%s; falhas por motivo=%s.",
+            order_stats.cancellations_without_items + observed.negative_headers,
+            dict(sorted(order_stats.failure_reasons.items())),
+        )
         if farm_client is not None:
             # Include order lookups in the final HTTP diagnostics, not only CPF validation.
             _apply_request_metrics(cliente_stats, farm_client.metrics_snapshot())
@@ -1382,6 +1407,9 @@ def main() -> int:
                 "ultima_execucao_itens_atualizados": str(items_updated),
                 "ultima_execucao_erros_ultimo_pedido": str(order_stats.parse_errors),
                 "ultima_execucao_erros_pedido_farmalider": str(order_stats.api_errors),
+                "ultima_execucao_cancelados_sem_itens": str(
+                    order_stats.cancellations_without_items + observed.negative_headers
+                ),
                 "ultima_execucao_metricas_ads": str(len(ad_metrics)),
                 "ultima_execucao_metricas_vendas": str(sales_metrics_count),
                 **(

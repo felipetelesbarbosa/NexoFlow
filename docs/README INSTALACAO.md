@@ -216,3 +216,11 @@ A confirmação exigida é `CARGA COMPLETA REVISADA`. No NexoFlow 1.0, depois de
 ## Ícone do NexoFlow Weni
 
 No NexoFlow 1.0, a atualização força o Windows Explorer a invalidar/recarregar o cache de ícones após instalar `NexoFlow Weni.exe`. O executável usa internamente `assets\NexoFlow_Weni.ico`, e o instalador também atualiza o timestamp do arquivo para impedir reaproveitamento visual de um ícone antigo.
+
+### Carga fracionada: cancelamentos e execução parcial
+
+O Analytics verifica o manifesto local antes de consultar Weni, FarmaLíder ou Sheets. Uma execução parcial não libera a parte seguinte. O manifesto permanece em `logs/full_load_25_manifest.json` da instalação, independentemente da pasta de onde o comando for iniciado.
+
+Pedidos com cancelamento confirmado no cabeçalho oficial e vínculo do cliente verificado ficam fora das vendas mesmo quando não têm itens. Esses cancelamentos não bloqueiam a conclusão da carga. Valores e itens anteriores não são recriados a partir de uma resposta incompleta.
+
+O resumo informa cancelamentos confirmados sem itens e falhas agrupadas por motivo. Falhas reais de consulta, resposta inválida ou divergência do proprietário continuam impedindo a conclusão. Pedidos não cancelados sem itens permanecem pendentes de validação.
