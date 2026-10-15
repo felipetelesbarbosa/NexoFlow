@@ -233,5 +233,17 @@ foreach ($directory in @(
     Assert-True ($actual -contains $directory) "Pasta de atalhos nao encontrada: $directory"
 }
 Assert-True ($actual.Count -eq @($actual | Select-Object -Unique).Count) 'Pastas de atalhos duplicadas.'
+# O mesmo transporte deve preservar arrays JSON com uma unica pasta.
+$json = ConvertTo-Json -InputObject @($originalRoots[0]) -Compress
+$ShortcutRootsBase64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($json))
+$single = @(Get-ShortcutDirectories)
+Assert-True ($single -contains $originalRoots[0]) 'Array com uma pasta nao foi restaurado.'
+# A correcao da enumeracao nao pode aceitar valores que nao sejam caminhos.
+foreach ($invalidJson in @('[null]', '[7]', '["pasta relativa"]', '[["C:\\pasta"]]')) {
+    $ShortcutRootsBase64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($invalidJson))
+    $blocked = $false
+    try { Get-ShortcutDirectories | Out-Null } catch { $blocked = $true }
+    Assert-True $blocked "Lista de pastas invalida aceita: $invalidJson"
+}
 """,
         )

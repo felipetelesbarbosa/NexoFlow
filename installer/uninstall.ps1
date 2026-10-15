@@ -79,7 +79,13 @@ function Get-ShortcutDirectories {
         # A elevação pode usar outra conta. Conservar as pastas identificadas
         # antes do UAC e do Stage2, sem depender do destino atual dos atalhos.
         $json = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($ShortcutRootsBase64))
-        foreach ($path in @($json | ConvertFrom-Json)) {
+        # No Windows PowerShell 5.1, o pipeline preserva o array JSON como
+        # um objeto. Atribuir primeiro permite iterar cada pasta separadamente.
+        $decodedRoots = ConvertFrom-Json -InputObject $json
+        if ($null -eq $decodedRoots) {
+            throw 'A lista de pastas de atalhos da desinstalação é inválida.'
+        }
+        foreach ($path in $decodedRoots) {
             if ($path -isnot [string] -or -not [IO.Path]::IsPathRooted($path)) {
                 throw 'A lista de pastas de atalhos da desinstalação é inválida.'
             }
