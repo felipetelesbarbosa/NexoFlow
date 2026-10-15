@@ -116,7 +116,7 @@ class ObservedOrdersTests(unittest.TestCase):
         arguments.update(overrides)
         return revalidate_observed_orders(orders, **arguments)
 
-    def test_empty_items_block_active_orders_but_not_verified_cancellations(self):
+    def test_empty_items_become_pending_without_blocking_checkpoint(self):
         contact = {"uuid": "u1", "fields": {"cpf": "52998224725"}}
         for status in (0, 3):
             with self.subTest(status=status):
@@ -138,18 +138,17 @@ class ObservedOrdersTests(unittest.TestCase):
                     },
                 )
                 self.assertEqual(
-                    orders[0]["status_confirmacao"], "ERRO_ITENS_PEDIDO_API"
+                    orders[0]["status_confirmacao"],
+                    "ERRO_ITENS_PEDIDO_API" if status == 3 else "PENDENTE_ITENS_API",
                 )
                 self.assertEqual(items, [])
-                self.assertEqual(stats.api_errors, int(status != 3))
+                self.assertEqual(stats.api_errors, 0)
                 self.assertEqual(stats.cancellations_without_items, int(status == 3))
                 result, controls = _completion_controls(
                     datetime.now(UTC), api_errors=stats.api_errors
                 )
-                self.assertEqual(result, "sucesso" if status == 3 else "parcial")
-                self.assertEqual(
-                    "ultima_sincronizacao_sucesso_utc" in controls, status == 3
-                )
+                self.assertEqual(result, "sucesso")
+                self.assertEqual("ultima_sincronizacao_sucesso_utc" in controls, True)
 
     def test_normal_identity_and_cpf_blocks_do_not_become_api_failures(self):
         from unittest.mock import patch
@@ -243,7 +242,7 @@ class ObservedOrdersTests(unittest.TestCase):
 
     def test_api_errors_404_and_malformed_items_preserve_old_pairs(self):
         malformed = response()
-        malformed["itens"] = []
+        malformed["itens"] = {"objeto": "inválido"}
         for error in (FarmaliderError("falha fictícia"), None, malformed):
             with self.subTest(error=type(error).__name__):
                 old, old_items = observed()
@@ -324,8 +323,10 @@ class ObservedOrdersTests(unittest.TestCase):
         farm = Mock()
         farm.get_pedido.return_value = payload
         result = self.run_refresh([old], farm, existing_items=old_items)
-        self.assertEqual((result.orders, result.items), ([], []))
-        self.assertEqual(result.api_errors, 1)
+        self.assertEqual(result.orders[0]["status_confirmacao"], "PENDENTE_ITENS_API")
+        self.assertFalse(_sales_order_is_valid(result.orders[0]))
+        self.assertEqual(result.items, old_items)
+        self.assertEqual(result.api_errors, 0)
         self.assertEqual(result.negative_headers, 0)
 
     def test_failed_current_snapshot_cannot_overwrite_preserved_old_pair_or_cancellation(
@@ -367,10 +368,8 @@ class ObservedOrdersTests(unittest.TestCase):
                 self.assertEqual(len(orders.final_records), 1)
                 self.assertEqual(orders.final_records[0]["valor_total_compra"], "18.00")
                 self.assertEqual(items.final_records, old_items)
-                self.assertEqual(
-                    _sales_order_is_valid(orders.final_records[0]), status == 0
-                )
-                self.assertEqual(stats.api_errors + result.api_errors > 0, status != 3)
+                self.assertEqual(_sales_order_is_valid(orders.final_records[0]), False)
+                self.assertEqual(stats.api_errors + result.api_errors, 0)
                 farm.get_pedido.assert_called_once_with("499")
 
     def test_negative_header_from_wrong_customer_never_changes_old_sale(self):

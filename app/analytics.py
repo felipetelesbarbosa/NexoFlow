@@ -13,6 +13,7 @@ from typing import Any, cast
 from config import LOG_DIR, TIPO_PRIMEIRO_ANUNCIO, TIPO_ULTIMO_ANUNCIO
 from geography import normalize_geography
 from pedido_utils import (
+    PENDING_ITEMS_STATUS,
     business_order_datetime,
     effective_order_status_code,
     farmalider_order_status_name,
@@ -1994,6 +1995,8 @@ def build_bi_order_rows(
         ),
         reverse=True,
     ):
+        if order.get("status_confirmacao") == PENDING_ITEMS_STATUS:
+            continue
         if not _order_customer_identity_verified(order):
             continue
         key = (order.get("pedido_chave") or "").strip()

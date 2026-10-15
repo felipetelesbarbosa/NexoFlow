@@ -20,7 +20,7 @@ from analytics import (
     bi_customer_key,
 )
 from geography import normalize_geography
-from pedido_utils import business_order_datetime
+from pedido_utils import PENDING_ITEMS_STATUS, business_order_datetime
 from purchase_checks import (
     contact_pending_purchase_check,
     official_order_resolves_check,
@@ -383,6 +383,11 @@ def build_looker_tables(
             and emitted.date().isoformat() <= snapshot_date
         ):
             official_by_contact[record.get("contact_uuid", "")].append(record)
+    pending_items_contacts = {
+        row.get("contact_uuid", "")
+        for row in all_orders
+        if row.get("status_confirmacao") == PENDING_ITEMS_STATUS
+    }
     pending_by_contact = {}
     invalid_checks = 0
     for uuid, base in base_by_uuid.items():
@@ -404,10 +409,13 @@ def build_looker_tables(
             invalid_checks += 1
         else:
             pending_by_contact[uuid] = int(
-                bool(check)
-                and not any(
-                    official_order_resolves_check(check, record)
-                    for record in official_by_contact.get(uuid, [])
+                uuid in pending_items_contacts
+                or (
+                    bool(check)
+                    and not any(
+                        official_order_resolves_check(check, record)
+                        for record in official_by_contact.get(uuid, [])
+                    )
                 )
             )
     if invalid_checks:

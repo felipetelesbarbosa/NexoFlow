@@ -12,6 +12,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 BUSINESS_TIMEZONE = ZoneInfo("America/Belem")
+PENDING_ITEMS_STATUS = "PENDENTE_ITENS_API"
 FARMALIDER_ORDER_STATUS_NAMES = {
     -2: "Em aberto",
     -1: "Pendente de pagamento",

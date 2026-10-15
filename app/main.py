@@ -57,12 +57,15 @@ from google_sheets import GoogleSheetsStore
 from logging_config import configure_logging
 from looker_bi import build_looker_tables, reporting_period
 from observed_orders import (
+    mark_order_items_pending,
     observed_orders_by_contact,
     observed_orders_by_identity,
     preserve_old_latest_order,
     revalidate_observed_orders,
+    verified_missing_order_items,
     verified_order_cancellation,
 )
+from pedido_utils import PENDING_ITEMS_STATUS
 from product_scope import PHARMACY_SCOPE_VERSION
 from project_paths import load_private_settings
 from task_progress import TaskProgress, request_progress
@@ -139,6 +142,7 @@ class OrderStats:
     confirmed_api: int = 0
     api_errors: int = 0
     cancellations_without_items: int = 0
+    pending_without_items: int = 0
     failure_reasons: dict[str, int] = field(default_factory=dict)
 
 
@@ -770,6 +774,9 @@ def build_orders(
                 # The official negative header is sufficient to exclude this
                 # order. Do not wait for products that will not count as sales.
                 stats.cancellations_without_items += 1
+            elif verified_missing_order_items(order):
+                order = mark_order_items_pending(order)
+                stats.pending_without_items += 1
             elif diagnostic in ORDER_API_FAILURES:
                 stats.api_errors += 1
                 stats.failure_reasons[diagnostic] = (
@@ -1140,6 +1147,13 @@ def main() -> int:
         )
         order_rows, item_rows = observed.orders, observed.items
         order_stats.api_errors += observed.api_errors
+        order_stats.pending_without_items = len(
+            {
+                (row.get("pedido_id"), row.get("farmalider_cliente_id"))
+                for row in order_rows
+                if row.get("status_confirmacao") == PENDING_ITEMS_STATUS
+            }
+        )
         if observed.api_errors:
             order_stats.failure_reasons["REVALIDACAO_HISTORICO"] = observed.api_errors
         logging.info(
@@ -1407,6 +1421,9 @@ def main() -> int:
                 "ultima_execucao_itens_atualizados": str(items_updated),
                 "ultima_execucao_erros_ultimo_pedido": str(order_stats.parse_errors),
                 "ultima_execucao_erros_pedido_farmalider": str(order_stats.api_errors),
+                "ultima_execucao_pedidos_pendentes_sem_itens": str(
+                    order_stats.pending_without_items
+                ),
                 "ultima_execucao_cancelados_sem_itens": str(
                     order_stats.cancellations_without_items + observed.negative_headers
                 ),
@@ -1494,6 +1511,13 @@ def main() -> int:
             order_stats.confirmed_api,
             order_stats.parse_errors,
         )
+        if order_stats.pending_without_items:
+            logging.warning(
+                "Pedidos pendentes sem itens=%s: excluídos das vendas e dos "
+                "produtos do dashboard. Reconsulta nas próximas cargas até "
+                "20 dias da data do pedido. A pendência não bloqueia esta parte.",
+                order_stats.pending_without_items,
+            )
         if completion_status == "parcial":
             logging.warning(
                 "Sincronização parcial em %.2fs: %s erro(s) em consulta de "

@@ -408,6 +408,8 @@ def apply_pedido_api_confirmation(
 
     order = dict(order)
     order.pop("_farmalider_cabecalho_verificado", None)
+    order.pop("_farmalider_itens_pendentes", None)
+    order.pop("_farmalider_erro_consulta_pedido", None)
     if pedido_api is None:
         return _failure(
             order, [], "PEDIDO_NAO_ENCONTRADO_API", "Pedido não encontrado na API."
@@ -485,6 +487,21 @@ def apply_pedido_api_confirmation(
 
     api_items = pedido_api.get("itens")
     if not isinstance(api_items, list) or not api_items:
+        if ownership_verified and (api_items is None or api_items == []):
+            # Only an identified official header with a valid date can become
+            # an Analytics pending record. No item or amount is inferred.
+            order.update(
+                _farmalider_itens_pendentes="1",
+                pedido_id=api_id,
+                pedido_chave=f"FARMALIDER:{api_id}",
+                farmalider_cliente_id=linked_id,
+                farmalider_cod_cliente=api_cliente_id,
+                data_hora=emitted.isoformat(timespec="seconds"),
+                data=emitted.date().isoformat(),
+                hora=emitted.strftime("%H:%M:%S"),
+                farmalider_emissao=_text(capa.get("emissao")),
+                farmalider_confirmado_em=confirmed_at,
+            )
         return _failure(
             order, [], "ERRO_ITENS_PEDIDO_API", "Lista de itens ausente ou vazia."
         )
@@ -1009,6 +1026,8 @@ def resolve_contact_order(
     except (FarmaliderAuthError, FarmaliderUnavailableError):
         raise
     except FarmaliderError:
+        if not fallback_items:
+            fallback_order["_farmalider_erro_consulta_pedido"] = "1"
         return fallback_order, fallback_items
 
     if isinstance(response, dict):
@@ -1030,6 +1049,8 @@ def resolve_contact_order(
         # Resposta concreta inconsistente do endpoint de pedido é falha dura.
         return confirmed_order, confirmed_items
 
+    if not fallback_items:
+        fallback_order["_farmalider_erro_consulta_pedido"] = "1"
     return fallback_order, fallback_items
 
 
