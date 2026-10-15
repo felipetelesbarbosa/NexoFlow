@@ -55,6 +55,8 @@ class WeniCancelledHeaderTests(unittest.TestCase):
 
     def test_verified_cancelled_incomplete_order_removes_only_old_agenda(self):
         for signal in (
+            {"status": 0},
+            {"status": 2},
             {"status": 3},
             {"formaPagamento": 0},
             {"cancelamento": "2026-10-06T10:31:00"},
@@ -64,7 +66,7 @@ class WeniCancelledHeaderTests(unittest.TestCase):
                 self.pedido["capa"].update(signal)
                 plan = self.build()
                 self.assertEqual(plan.purchase_confirmation, "CANCELADO_API")
-                self.assertEqual(plan.order_resolution_status, "ERRO_ITENS_PEDIDO_API")
+                self.assertEqual(plan.order_resolution_status, "CANCELADO_API")
                 self.assertFalse(plan.order_validated)
                 self.assertFalse(plan.purchase_confirmed)
                 self.assertFalse(set(plan.fields) & PURCHASE_FIELDS)

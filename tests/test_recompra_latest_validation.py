@@ -38,10 +38,10 @@ class LatestOrderValidationTests(unittest.TestCase):
             self.contact, self.farm, NOW.isoformat(), saved=self.saved
         )
 
-    def assert_no_old_campaign(self, order, items):
+    def assert_no_old_campaign(self, order, items, *, validation="CANCELADO_SEM_ITENS"):
         self.farm.get_pedido.assert_called_once_with("456")
         self.assertEqual(order["pedido_id"], "456")
-        self.assertEqual(order["status_validacao"], "ERRO")
+        self.assertEqual(order["status_validacao"], validation)
         self.assertEqual(items, [])
         plan = propose(self.contact, order, items, STRUCTURE, self.saved, now=NOW)
         self.assertEqual(plan["action"], "remove")
@@ -51,7 +51,7 @@ class LatestOrderValidationTests(unittest.TestCase):
 
     def test_new_order_without_items_does_not_recover_saved_old_order(self):
         order, items = self.resolve()
-        self.assertEqual(order["status_confirmacao"], "ERRO_ITENS_PEDIDO_API")
+        self.assertEqual(order["status_confirmacao"], "CANCELADO_API")
         self.assert_no_old_campaign(order, items)
 
     def test_new_order_not_found_preserves_structured_item_failure(self):
@@ -59,13 +59,13 @@ class LatestOrderValidationTests(unittest.TestCase):
         self.farm.get_pedido.return_value = None
         order, items = self.resolve()
         self.assertEqual(order["status_confirmacao"], "ERRO_ITENS_PEDIDO_API")
-        self.assert_no_old_campaign(order, items)
+        self.assert_no_old_campaign(order, items, validation="ERRO")
 
     def test_new_order_api_error_does_not_recover_saved_old_order(self):
         self.farm.get_pedido.side_effect = FarmaliderError("Falha sintética")
         order, items = self.resolve()
         self.assertEqual(order["status_confirmacao"], "ERRO_ITENS_PEDIDO_API")
-        self.assert_no_old_campaign(order, items)
+        self.assert_no_old_campaign(order, items, validation="ERRO")
 
     def test_cancelled_header_without_items_blocks_old_purchase(self):
         for signal, reason in (
@@ -85,7 +85,7 @@ class LatestOrderValidationTests(unittest.TestCase):
         self.customer["ultimoPedido"]["status"] = 3
         self.farm.get_pedido.side_effect = FarmaliderError("Falha sintética")
         order, items = self.resolve()
-        plan = self.assert_no_old_campaign(order, items)
+        plan = self.assert_no_old_campaign(order, items, validation="ERRO")
         self.assertEqual(plan["reason"], "PEDIDO_STATUS_3_CANCELADO")
 
     def test_new_order_items_can_be_recovered_from_same_official_id(self):

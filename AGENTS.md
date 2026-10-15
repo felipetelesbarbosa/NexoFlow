@@ -11,6 +11,8 @@ Ao atualizar este repositório, mantenha a identificação pública **NexoFlow 1
 - Horários operacionais usam `America/Belem` (UTC-3).
 - Status de pedido: EmAberto=-2, PendenteDePagamento=-1, EmProcessamento=0, ProntoParaRota=4, EmTransito=1, Concluido=2, Cancelado=3. Estados abertos permanecem em rechecagem. Todos os estados documentados não cancelados (-2, -1, 0, 4, 1, 2) contam como venda validada; status 3 ou pagamento 0 exclui a venda. Weni, Analytics e Recompra usam a mesma regra. No Analytics, reconsultar status dos pedidos já registrados somente quando a data do pedido estiver entre hoje e 20 dias atrás (inclusive), em America/Belem. Preservar pedidos mais antigos sem reconsulta automática, mantendo a consulta por CPF para descobrir novas compras e a validação inicial de pedidos ainda não registrados.
 
+- Pedidos cuja resposta oficial, com identidade, proprietário e data verificados, não contém itens são tratados como cancelados e ignorados em vendas, produtos do dashboard e Recompra, sem bloquear a carga. Falhas de consulta e respostas malformadas continuam sendo erros.
+
 - Textos apresentados ao usuário devem usar português brasileiro (pt-BR), com acentos e cedilha. Preserve identificadores técnicos. BAT/CMD em UTF-8 sem BOM com `chcp 65001`; PowerShell em UTF-8 com BOM; HTML com `lang="pt-BR"`; metadados dos executáveis em pt-BR.
 
 - Consultar primeiro CPFs válidos; depois inválidos preenchidos, incluindo zeros. Repor zeros à esquerda até 11 dígitos somente se os dígitos verificadores forem válidos. Não alterar dígitos existentes nem confundir presença na API com validade matemática.

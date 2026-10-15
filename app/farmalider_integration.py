@@ -11,6 +11,7 @@ from pedido_utils import (
     farmalider_order_status_name,
     farmalider_payment_method_display,
     is_order_cancelled,
+    is_order_sale,
     serialize_pedido_products,
 )
 
@@ -488,10 +489,8 @@ def apply_pedido_api_confirmation(
     api_items = pedido_api.get("itens")
     if not isinstance(api_items, list) or not api_items:
         if ownership_verified and (api_items is None or api_items == []):
-            # Only an identified official header with a valid date can become
-            # an Analytics pending record. No item or amount is inferred.
+            # Preserve the verified identity/date; never infer products or amounts.
             order.update(
-                _farmalider_itens_pendentes="1",
                 pedido_id=api_id,
                 pedido_chave=f"FARMALIDER:{api_id}",
                 farmalider_cliente_id=linked_id,
@@ -502,6 +501,20 @@ def apply_pedido_api_confirmation(
                 farmalider_emissao=_text(capa.get("emissao")),
                 farmalider_confirmado_em=confirmed_at,
             )
+        current_header = dict(order, status_confirmacao="")
+        if (
+            ownership_verified
+            and (api_items is None or api_items == [])
+            and (is_order_sale(current_header) or is_order_cancelled(current_header))
+        ):
+            order.update(
+                status_confirmacao="CANCELADO_API",
+                status_validacao="CANCELADO_SEM_ITENS",
+                farmalider_status_pedido_nome="Cancelado",
+                farmalider_erro="Pedido sem itens: tratado como cancelado pela regra operacional.",
+                ultimo_pedido_raw="",
+            )
+            return order, []
         return _failure(
             order, [], "ERRO_ITENS_PEDIDO_API", "Lista de itens ausente ou vazia."
         )
@@ -1028,6 +1041,13 @@ def resolve_contact_order(
     except FarmaliderError:
         if not fallback_items:
             fallback_order["_farmalider_erro_consulta_pedido"] = "1"
+            if fallback_order.get("status_validacao") == "CANCELADO_SEM_ITENS":
+                return _failure(
+                    fallback_order,
+                    [],
+                    "ERRO_ITENS_PEDIDO_API",
+                    "Falha ao consultar pedido; ausência de itens não confirmada.",
+                )
         return fallback_order, fallback_items
 
     if isinstance(response, dict):
@@ -1051,6 +1071,13 @@ def resolve_contact_order(
 
     if not fallback_items:
         fallback_order["_farmalider_erro_consulta_pedido"] = "1"
+        if fallback_order.get("status_validacao") == "CANCELADO_SEM_ITENS":
+            return _failure(
+                fallback_order,
+                [],
+                "ERRO_ITENS_PEDIDO_API",
+                "Pedido não retornado; ausência de itens não confirmada.",
+            )
     return fallback_order, fallback_items
 
 

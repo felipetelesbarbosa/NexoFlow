@@ -10,7 +10,7 @@ from farmalider_client import FarmaliderError
 from looker_bi import SCHEMAS, build_looker_tables
 from main import _completion_controls, build_orders
 from observed_orders import revalidate_observed_orders
-from pedido_utils import PENDING_ITEMS_STATUS
+from pedido_utils import PENDING_ITEMS_STATUS, is_order_cancelled
 from recompra import propose
 from tests.test_observed_orders import CAPTURED, memory_store, observed, response
 from tests.test_recompra import NOW, STRUCTURE, fixture
@@ -59,18 +59,21 @@ class PendingOrderItemsTests(unittest.TestCase):
         )
         return result, farm
 
-    def test_pending_header_is_persisted_without_items_or_made_up_amounts(self):
+    def test_empty_header_is_cancelled_without_items_or_made_up_amounts(self):
         pending, items, stats = self.pending()
         store = memory_store([], [])
         written, _ = store.upsert_pharmacy_orders([pending], items)
         persisted = written.final_records[0]
-        self.assertEqual(persisted["status_confirmacao"], PENDING_ITEMS_STATUS)
+        self.assertEqual(persisted["status_confirmacao"], "CANCELADO_API")
+        self.assertEqual(persisted["status_validacao"], "CANCELADO_SEM_ITENS")
+        self.assertTrue(is_order_cancelled(persisted))
+        self.assertEqual(persisted["farmalider_status_pedido"], "0")
         self.assertEqual(persisted["pedido_chave"], "FARMALIDER:499")
         self.assertEqual(persisted["data_hora"], "2026-10-14T10:00:00-03:00")
         self.assertEqual(persisted["farmalider_cliente_id"], "99")
         self.assertEqual(persisted["valor_total_compra"], "")
         self.assertEqual(items, [])
-        self.assertEqual((stats.api_errors, stats.pending_without_items), (0, 1))
+        self.assertEqual((stats.api_errors, stats.pending_without_items), (0, 0))
         self.assertEqual(
             _completion_controls(datetime.fromisoformat(CAPTURED), api_errors=0)[0],
             "sucesso",
@@ -97,17 +100,15 @@ class PendingOrderItemsTests(unittest.TestCase):
         self.assertTrue(_sales_order_is_valid(updated.final_records[0]))
         self.assertEqual(len(items.final_records), 1)
 
-    def test_repeat_empty_response_keeps_one_pending_record_and_does_not_block(self):
+    def test_repeat_empty_response_stays_cancelled_and_does_not_block(self):
         pending, _, _ = self.pending()
         payload = response()
         payload["itens"] = []
         refreshed, _ = self.refresh(pending, payload)
         self.assertEqual(
-            (refreshed.api_errors, refreshed.pending_without_items), (0, 1)
+            (refreshed.api_errors, refreshed.pending_without_items), (0, 0)
         )
-        self.assertEqual(
-            refreshed.orders[0]["status_confirmacao"], PENDING_ITEMS_STATUS
-        )
+        self.assertEqual(refreshed.orders[0]["status_confirmacao"], "CANCELADO_API")
         self.assertFalse(_sales_order_is_valid(refreshed.orders[0]))
 
     def test_requeries_only_through_day_twenty_including_completed_pending_orders(self):
@@ -135,6 +136,28 @@ class PendingOrderItemsTests(unittest.TestCase):
         payload["itens"] = []
         self.assertEqual(self.build(payload=payload)[2].api_errors, 1)
 
+    def test_legacy_pending_becomes_cancelled_on_empty_recheck(self):
+        old, _, _ = self.pending()
+        old["status_confirmacao"] = PENDING_ITEMS_STATUS
+        old["status_validacao"] = "PENDENTE_ITENS"
+        payload = response()
+        payload["itens"] = []
+        result, _ = self.refresh(old, payload)
+        self.assertEqual(result.api_errors, 0)
+        self.assertEqual(result.orders[0]["status_confirmacao"], "CANCELADO_API")
+        self.assertEqual(result.orders[0]["status_validacao"], "CANCELADO_SEM_ITENS")
+
+    def test_all_documented_states_without_items_are_cancelled(self):
+        for status in (-2, -1, 0, 4, 1, 2, 3):
+            for empty in ([], None):
+                with self.subTest(status=status, empty=empty):
+                    payload = response(status=status)
+                    payload["itens"] = empty
+                    orders, items, stats = self.build(payload=payload)
+                    self.assertEqual(orders[0]["status_confirmacao"], "CANCELADO_API")
+                    self.assertEqual(stats.api_errors, 0)
+                    self.assertEqual(items, [])
+
     def test_wrong_owner_never_becomes_a_pending_authorized_order(self):
         pending, _, _ = self.pending()
         payload = response(owner=999)
@@ -143,7 +166,7 @@ class PendingOrderItemsTests(unittest.TestCase):
         self.assertEqual(result.api_errors, 1)
         self.assertEqual(result.orders, [])
 
-    def test_pending_history_preserves_old_amounts_but_is_excluded_from_all_bi_sales(
+    def test_empty_history_preserves_audit_but_is_excluded_from_all_bi_sales(
         self,
     ):
         old, old_items = observed()
@@ -171,7 +194,7 @@ class PendingOrderItemsTests(unittest.TestCase):
             tables["BI_Publico"][0][
                 SCHEMAS["BI_Publico"].index("compra_pendente_validacao")
             ],
-            1,
+            0,
         )
 
     def test_pending_order_cannot_schedule_recompra_even_with_old_items(self):

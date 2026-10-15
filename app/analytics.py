@@ -1995,7 +1995,10 @@ def build_bi_order_rows(
         ),
         reverse=True,
     ):
-        if order.get("status_confirmacao") == PENDING_ITEMS_STATUS:
+        if (
+            order.get("status_confirmacao") == PENDING_ITEMS_STATUS
+            or order.get("status_validacao") == "CANCELADO_SEM_ITENS"
+        ):
             continue
         if not _order_customer_identity_verified(order):
             continue

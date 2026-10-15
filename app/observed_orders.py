@@ -31,7 +31,6 @@ from pedido_utils import (
     business_order_datetime,
     farmalider_payment_method_display,
     is_order_cancelled,
-    is_order_sale,
     serialize_pedido_products,
 )
 from task_progress import TaskProgress
@@ -43,6 +42,13 @@ STATUS_RECHECK_DAYS = 20
 
 def verified_order_cancellation(order: Row) -> bool:
     """A confirmação de cancelamento exige o cabeçalho oficial do mesmo cliente."""
+    if (
+        order.get("_farmalider_cabecalho_verificado") == "1"
+        and order.get("status_validacao") == "CANCELADO_SEM_ITENS"
+        and order.get("status_confirmacao") == "CANCELADO_API"
+        and order.get("_farmalider_erro_consulta_pedido") != "1"
+    ):
+        return True
     return order.get("_farmalider_cabecalho_verificado") == "1" and is_order_cancelled(
         {
             key: order.get(key, "")
@@ -53,33 +59,6 @@ def verified_order_cancellation(order: Row) -> bool:
             )
         }
     )
-
-
-def verified_missing_order_items(order: Row) -> bool:
-    """Ausência de itens não confunde falha HTTP, vínculo ou resposta malformada."""
-    return bool(
-        order.get("_farmalider_cabecalho_verificado") == "1"
-        and order.get("_farmalider_itens_pendentes") == "1"
-        and order.get("_farmalider_erro_consulta_pedido") != "1"
-        and order.get("status_confirmacao") == "ERRO_ITENS_PEDIDO_API"
-        and _positive_id(order.get("pedido_id"))
-        and _positive_id(order.get("farmalider_cliente_id"))
-        and business_order_datetime(order.get("data_hora")) is not None
-        and _order_customer_identity_verified(order)
-        and is_order_sale(order)
-    )
-
-
-def mark_order_items_pending(order: Row) -> Row:
-    """Registra a pendência sem confirmar venda nem reutilizar produtos antigos."""
-    pending = dict(order)
-    pending.update(
-        status_confirmacao=PENDING_ITEMS_STATUS,
-        status_validacao="PENDENTE_ITENS",
-        farmalider_erro="Pedido oficial sem itens: pendente de validação.",
-        ultimo_pedido_raw="",
-    )
-    return pending
 
 
 def _verified_observed_order(order: Row) -> bool:
@@ -284,24 +263,7 @@ def revalidate_observed_orders(
             )
             result.checked += 1
             complete = order.get("status_validacao") == "OK" and bool(items)
-            if not complete and verified_missing_order_items(order):
-                order = mark_order_items_pending(order)
-                # Keep an already observed financial/item pair for audit;
-                # the explicit pending status excludes it from all sales/BI.
-                for field in (
-                    "valor_total_compra",
-                    "valor_total_faturamento",
-                    "valor_total_itens",
-                    "valor_total_api_itens",
-                    "total_api",
-                    "quantidade_itens",
-                    "quantidade_produtos",
-                    "farmalider_frete",
-                ):
-                    order[field] = old.get(field, "")
-                items = deepcopy(prior_items_by_key.get(old["pedido_chave"], []))
-                result.pending_without_items += 1
-            elif not complete:
+            if not complete:
                 if not verified_order_cancellation(order):
                     result.api_errors += 1
                     continue
@@ -318,7 +280,11 @@ def revalidate_observed_orders(
                     partial[field] = order.get(field, "")
                 partial.update(
                     status_confirmacao="CANCELADO_API",
-                    status_validacao="ERRO",
+                    status_validacao=(
+                        "CANCELADO_SEM_ITENS"
+                        if order.get("status_validacao") == "CANCELADO_SEM_ITENS"
+                        else "ERRO"
+                    ),
                     farmalider_status_pedido_nome="Cancelado",
                     farmalider_forma_pagamento_nome=farmalider_payment_method_display(
                         order.get("farmalider_forma_pagamento")

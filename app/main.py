@@ -57,12 +57,10 @@ from google_sheets import GoogleSheetsStore
 from logging_config import configure_logging
 from looker_bi import build_looker_tables, reporting_period
 from observed_orders import (
-    mark_order_items_pending,
     observed_orders_by_contact,
     observed_orders_by_identity,
     preserve_old_latest_order,
     revalidate_observed_orders,
-    verified_missing_order_items,
     verified_order_cancellation,
 )
 from pedido_utils import PENDING_ITEMS_STATUS
@@ -774,9 +772,6 @@ def build_orders(
                 # The official negative header is sufficient to exclude this
                 # order. Do not wait for products that will not count as sales.
                 stats.cancellations_without_items += 1
-            elif verified_missing_order_items(order):
-                order = mark_order_items_pending(order)
-                stats.pending_without_items += 1
             elif diagnostic in ORDER_API_FAILURES:
                 stats.api_errors += 1
                 stats.failure_reasons[diagnostic] = (
