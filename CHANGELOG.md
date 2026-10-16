@@ -1,5 +1,9 @@
 # NexoFlow 1.0 — Changelog
 
+- Weni: falhas isoladas não cancelam a carga; pendências de contatos e limpeza ficam para nova conferência na próxima incremental, com recuperação das mensagens anteriores quando necessário.
+
+- Weni: deduplicação integrada à revisão e aplicação das cargas, com validação de CPF, telefone nativo único e propriedade dos pedidos; preservação de recusas, pedidos e valores, limpeza das fontes do Sheets/BI e comprovantes de retomada sem repetir exclusões incertas.
+
 - Frete lançado como item de código 0 e descrição vazia é separado dos produtos quando corresponde ao frete oficial do cabeçalho, sem duplicar o faturamento ou bloquear pedidos válidos.
 
 - Google Sheets: novas linhas gravadas em posições explícitas, sem deslocamento de colunas ou expansão automática de tabelas, com retentativas idempotentes e bloqueio de dados fora do cabeçalho.

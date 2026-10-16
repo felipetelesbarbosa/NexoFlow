@@ -313,6 +313,10 @@ Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/payload ma
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/NexoFlow Recompra.exe"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/NexoFlow Recompra.exe"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/weni_update.py"
+foreach ($module in @("weni_dedup", "contact_dedup_guard", "dedup_io", "dedup_sheets", "dedup_bi")) {
+    Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/$module.py"
+    Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/app/$module.py"
+}
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/task_progress.py"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/app/task_progress.py"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/observed_orders.py"
