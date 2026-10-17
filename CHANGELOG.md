@@ -1,5 +1,7 @@
 # NexoFlow 1.0 — Changelog
 
+- Looker: conector privado opcional para recalcular a Curva ABC, o resumo e os produtos comprados juntos no período solicitado pelo relatório, com leitura das bases BI e validação de consistência.
+
 - Planilhas: leitura das constantes booleanas `=FALSE()` e `=TRUE()` usadas pelo export original de conversas no campo `is_active`, preservando o filtro de atendimentos encerrados e o bloqueio de outras fórmulas.
 
 - Weni: falhas isoladas não cancelam a carga; pendências de contatos e limpeza ficam para nova conferência na próxima incremental, com recuperação das mensagens anteriores quando necessário.
