@@ -2,15 +2,17 @@
 
 ## Estado
 
-Conector preparado e testado localmente, publicado e autorizado em projeto privado Google Apps Script. **A integração ao relatório e a validação com dados reais ainda estão pendentes.** As abas existentes e a rotina Python continuam intactas. Uma carga Python com `--inicio/--fim` recalcula um único período compartilhado; ela não responde às datas de cada leitor do Looker.
+Conector privado ativo na página Curva ABC. As tabelas de produtos, resumo e compras conjuntas e os seis cartões usam o período recebido do Looker. As abas existentes e a rotina Python continuam intactas.
 
 ## Registro de validação e pendências (17/10/2026)
 
-- 10 testes do cálculo JavaScript aprovados, além da verificação de sintaxe do adaptador.
-- 29 testes existentes de `test_looker_bi.py` aprovados com configuração fictícia isolada, sem credenciais reais ou consultas de rede.
-- Código e manifesto salvos em projeto privado Apps Script. Autorização Google concluída pelo titular; primeira fonte reutilizável criada e adicionada ao relatório.
-- Pendente: validar a consulta com a base real, concluir a substituição das fontes somente na página Curva ABC, comparar períodos e exportar/validar o PDF. A primeira troca revelou filtro associado à fonte antiga; precisa ser recriado. A conexão do navegador parou de responder durante esse ajuste.
-- Código publicado na `main` após autorização explícita, no commit `70b66899adc228227383a1632ffce44f9f54c124`. A publicação anterior foi bloqueada pela revisão automática; a pendência foi resolvida.
+- 11 testes do cálculo JavaScript aprovados, incluindo limites inclusivos, empates, reconciliação, pares, intervalos vazios e campos nativos dos cartões.
+- 29 testes existentes de `test_looker_bi.py` aprovados com configuração fictícia isolada.
+- Autorização Google concluída pelo titular. Adaptador usa o serviço avançado Sheets v4 com escopo somente leitura.
+- Funcionamento validado no relatório real em dois intervalos, um único dia e um intervalo sem dados. Classes, receita, produtos, Top 5 e pares respondem às datas escolhidas.
+- Componentes legados com referências calculadas incompatíveis foram substituídos por campos nativos. Período padrão restaurado após os testes.
+- Manutenção: acompanhar o limite explícito de linhas e revalidar depois de mudanças de esquema ou carga BI. Não há amostragem silenciosa.
+- O PDF é uma fotografia do período de exportação. Filtros interativos permanecem no relatório online.
 
 ## Como funciona
 
@@ -26,9 +28,11 @@ Não retorna CPF, cliente, contato ou número original de pedido. Não usa servi
 2. Copie `AbcCore.js` e `Code.js` para arquivos de script com os mesmos nomes (o editor pode mostrá-los como `.gs`). Habilite a exibição de `appsscript.json` e copie o manifesto.
 3. Salve. Em **Implantar > Testar implantações**, selecione o tipo conector do Looker/Data Studio. Use o ID de implantação fornecido pelo Google, sem tornar o projeto público.
 4. Autorize a leitura no Google e crie três fontes privadas a partir da mesma implantação. Informe o ID da planilha BI e escolha `abc`, `resumo` e `juntos`, respectivamente. Mantenha o ID fora do repositório.
-5. Somente após testar a resposta do conector, substitua **nesta página** as fontes da tabela detalhada e dos seis cards ABC por `abc`; o resumo por `resumo`; e compras conjuntas por `juntos`. Preserve estilos e fórmulas compatíveis. Não substitua fontes do relatório inteiro.
-6. Use `periodo_fim` como dimensão de período e intervalo automático nos componentes. O conector já recebe o intervalo completo e devolve a data final selecionada em cada linha. Remova intervalos personalizados dos componentes. Preserve o filtro `abc_disponivel = 1` somente nos componentes de classificação, sem ocultar o resumo de disponibilidade.
-7. A coluna `periodo_inicio`/`periodo_fim` deve compor o período exibido. Os campos `*_pct` continuam em escala 0 a 100, como na origem antiga; cards existentes que dividem por 100 podem ser preservados. Não formatar o número 80 como 8.000%.
+5. Somente após testar a resposta do conector, use `abc` na tabela detalhada, `resumo` no resumo e nos seis cartões, e `juntos` na tabela de compras conjuntas. Mantenha o intervalo automático dos componentes. Não substitua fontes do relatório inteiro.
+6. Prefira componentes novos com campos nativos: referências calculadas de fontes antigas podem permanecer inválidas mesmo após trocar a fonte. Preserve o estilo e os limites dos componentes ao substituí-los.
+7. Use `periodo_rotulo` para o período exibido. Os campos `*_pct` continuam em escala 0 a 100; os novos campos `participacao_receita`, `participacao_acumulada`, `participacao_top5_receita` e `receita_classe_*` usam frações 0 a 1 com tipo percentual. Não formatar o número 80 como 8.000%.
+8. Os cartões usam `produtos_classe_a/b/c` e `receita_classe_a/b/c`. Sem dados completos, as classes e percentuais ficam indisponíveis. Não aplique um filtro de classe ao resumo global nem reduza a tabela antes de calcular o acumulado.
+9. Ative o serviço avançado **Google Sheets API v4** com símbolo `Sheets`, conforme o manifesto. `SpreadsheetApp.openById` exige escopo mais amplo e não deve substituir essa leitura.
 
 ## Critérios de validação antes de considerar concluído
 

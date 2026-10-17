@@ -40,6 +40,7 @@ var NexoAbc = (function () {
   function calculate(itemsMatrix, ordersMatrix, begin, finish) {
     begin = day(begin); finish = day(finish);
     if (begin > finish) fail('O início do período deve ser anterior ou igual ao fim.');
+    var periodoRotulo = begin.split('-').reverse().join('/') + ' a ' + finish.split('-').reverse().join('/');
     var itemFields = ['item_chave', 'venda_chave', 'data', 'produto_codigo', 'produto_nome', 'categoria', 'quantidade', 'receita_item', 'atualizado_em'];
     var orderFields = ['venda_chave', 'data', 'faturamento_produtos', 'atualizado_em'];
     var items = unique(rows(itemsMatrix, itemFields), 'item_chave');
@@ -93,10 +94,11 @@ var NexoAbc = (function () {
         klass = available ? (cumulative * 100 < total * 80 ? 'A' : cumulative * 100 < total * 95 ? 'B' : 'C') : '';
       }
       cumulative += p.revenue; lastRevenue = p.revenue;
-      return {periodo_inicio: begin, periodo_fim: finish, produto_chave: p.key, produto_codigo: p.sku, produto_nome: p.name, categoria: p.category,
+      return {periodo_inicio: begin, periodo_fim: finish, periodo_rotulo: periodoRotulo, produto_chave: p.key, produto_codigo: p.sku, produto_nome: p.name, categoria: p.category,
         unidades: p.units, receita_produtos: p.revenue / 100, pedidos: p.orders.size, ranking_receita: rank, ranking_unidades: unitsRank.get(p.key),
         participacao_receita_pct: total > 0 ? p.revenue / total * 100 : null,
         participacao_acumulada_pct: total > 0 ? cumulative / total * 100 : null,
+        participacao_receita: total > 0 ? p.revenue / total : null, participacao_acumulada: total > 0 ? cumulative / total : null,
         classe_abc: klass, abc_disponivel: available ? 1 : 0, atualizado_em: updated};
     });
     var pairCounts = new Map();
@@ -109,13 +111,19 @@ var NexoAbc = (function () {
     });
     var pairs = Array.from(pairCounts.entries()).sort(function (a, b) { return b[1] - a[1] || (a[0] < b[0] ? -1 : 1); }).map(function (entry) {
       var pair = JSON.parse(entry[0]);
-      return {periodo_inicio: begin, periodo_fim: finish, produto_a_codigo: pair[0], produto_a_nome: names.get(pair[0]).name,
+      return {periodo_inicio: begin, periodo_fim: finish, periodo_rotulo: periodoRotulo, produto_a_codigo: pair[0], produto_a_nome: names.get(pair[0]).name,
         produto_b_codigo: pair[1], produto_b_nome: names.get(pair[1]).name, pedidos_juntos: entry[1], atualizado_em: updated};
     });
-    var summary = [{periodo_inicio: begin, periodo_fim: finish,
+    var summary = [{periodo_inicio: begin, periodo_fim: finish, periodo_rotulo: periodoRotulo,
       skus_distintos: ranked.filter(function (p) { return !!p.sku; }).length, faturamento_produtos: total / 100,
       participacao_top5_receita_pct: complete && total > 0 ? ranked.slice(0, 5).reduce(function (n, p) { return n + p.revenue; }, 0) / total * 100 : null,
       abc_disponivel: available ? 1 : 0, atualizado_em: updated}];
+    ['A','B','C'].forEach(function (c) {
+      var produtos = abc.filter(function (p) { return p.classe_abc === c; });
+      summary[0]['produtos_classe_' + c.toLowerCase()] = available ? produtos.length : null;
+      summary[0]['receita_classe_' + c.toLowerCase()] = available ? produtos.reduce(function (n, p) { return n + p.receita_produtos; }, 0) / (total / 100) : null;
+    });
+    summary[0].participacao_top5_receita = summary[0].participacao_top5_receita_pct === null ? null : summary[0].participacao_top5_receita_pct / 100;
     return {abc: abc, resumo: summary, juntos: pairs, diagnostics: {orders: selectedOrders.size, items: selectedItems, complete: complete, available: available}};
   }
   return {calculate: calculate, day: day};

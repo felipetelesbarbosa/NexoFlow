@@ -63,3 +63,11 @@ test('datas, intervalo, cabeçalhos e valores inválidos são rejeitados',()=>{
 test('sem dados: classes vazias e percentuais indisponíveis, não NaN',()=>{
  const r=calc([],[]);assert.deepEqual(r.abc,[]);assert.equal(r.resumo[0].participacao_top5_receita_pct,null);assert.equal(r.resumo[0].abc_disponivel,0);
 });
+test('campos nativos dos cards e percentuais usam o mesmo período',()=>{
+ const ns=[80,15,5];const r=calc(ns.map((n,i)=>item('i'+i,'o'+i,'S'+i,'2026-10-01',n)),ns.map((n,i)=>order('o'+i,'2026-10-01',n)));
+ const s=r.resumo[0];assert.deepEqual([s.produtos_classe_a,s.produtos_classe_b,s.produtos_classe_c],[1,1,1]);
+ assert.equal(s.receita_classe_a+s.receita_classe_b+s.receita_classe_c,1);
+ assert.equal(r.abc[0].participacao_receita,0.8);assert.equal(r.abc[2].participacao_acumulada,1);
+ assert.equal(s.periodo_rotulo,'01/10/2026 a 17/10/2026');
+ assert.equal(calc([],[]).resumo[0].produtos_classe_a,null);
+});

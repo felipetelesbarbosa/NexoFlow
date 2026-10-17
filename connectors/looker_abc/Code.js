@@ -15,14 +15,14 @@ function getConfig() {
   return c.build();
 }
 function fieldSpecs_(mode) {
-  var common = [['periodo_inicio', 'date'], ['periodo_fim', 'date']];
+  var common = [['periodo_inicio', 'date'], ['periodo_fim', 'date'], ['periodo_rotulo','text']];
   if (mode === 'abc') return common.concat([
     ['produto_chave','text'], ['produto_codigo','text'], ['produto_nome','text'], ['categoria','text'],
     ['unidades','sum'], ['receita_produtos','money'], ['pedidos','sum'], ['ranking_receita','number'], ['ranking_unidades','number'],
-    ['participacao_receita_pct','sum'], ['participacao_acumulada_pct','number'], ['classe_abc','text'], ['abc_disponivel','number'], ['atualizado_em','text']
+    ['participacao_receita','percent'], ['participacao_acumulada','percent'], ['participacao_receita_pct','sum'], ['participacao_acumulada_pct','number'], ['classe_abc','text'], ['abc_disponivel','number'], ['atualizado_em','text']
   ]);
   if (mode === 'resumo') return common.concat([
-    ['skus_distintos','sum'], ['faturamento_produtos','money'], ['participacao_top5_receita_pct','number'], ['abc_disponivel','number'], ['atualizado_em','text']
+    ['produtos_classe_a','sum'], ['produtos_classe_b','sum'], ['produtos_classe_c','sum'], ['receita_classe_a','percent'], ['receita_classe_b','percent'], ['receita_classe_c','percent'], ['participacao_top5_receita','percent'], ['skus_distintos','sum'], ['faturamento_produtos','money'], ['participacao_top5_receita_pct','number'], ['abc_disponivel','number'], ['atualizado_em','text']
   ]);
   if (mode === 'juntos') return common.concat([
     ['produto_a_codigo','text'], ['produto_a_nome','text'], ['produto_b_codigo','text'], ['produto_b_nome','text'], ['pedidos_juntos','sum'], ['atualizado_em','text']
@@ -33,28 +33,31 @@ function fields_(mode) {
   var cc = DataStudioApp.createCommunityConnector(), f = cc.getFields();
   fieldSpecs_(mode).forEach(function (s) {
     var field = (s[1] === 'text' || s[1] === 'date') ? f.newDimension() : f.newMetric();
-    field.setId(s[0]).setName(s[0]);
+    var labels = {periodo_rotulo:'Período', produto_nome:'Produto', classe_abc:'Classe', unidades:'Unidades', receita_produtos:'Receita de produtos', participacao_receita:'Participação (%)', participacao_acumulada:'Acumulada (%)', skus_distintos:'Produtos diferentes', faturamento_produtos:'Receita de produtos', participacao_top5_receita:'Top 5 na receita (%)', produtos_classe_a:'Produtos na classe A', produtos_classe_b:'Produtos na classe B', produtos_classe_c:'Produtos na classe C', receita_classe_a:'Receita classe A (%)', receita_classe_b:'Receita classe B (%)', receita_classe_c:'Receita classe C (%)', produto_a_nome:'Produto A', produto_b_nome:'Produto B', pedidos_juntos:'Pedidos juntos'};
+    field.setId(s[0]).setName(labels[s[0]] || s[0]);
     if (s[1] === 'date') field.setType(cc.FieldType.YEAR_MONTH_DAY);
     else if (s[1] === 'text') field.setType(cc.FieldType.TEXT);
     else {
-      field.setType(s[1] === 'money' ? cc.FieldType.CURRENCY_BRL : cc.FieldType.NUMBER);
+      field.setType(s[1] === 'money' ? cc.FieldType.CURRENCY_BRL : s[1] === 'percent' ? cc.FieldType.PERCENT : cc.FieldType.NUMBER);
       field.setAggregation((s[1] === 'sum' || s[1] === 'money') ? cc.AggregationType.SUM : cc.AggregationType.MAX);
     }
   });
   return f;
 }
 function getSchema(request) { return {schema: fields_(request.configParams.tabela).build()}; }
-function readTable_(ss, name, requiredMaxColumn) {
-  var sheet = ss.getSheetByName(name);
-  if (!sheet || sheet.getLastRow() < 1) throw new Error('Aba BI obrigatória ausente.');
-  // Limite explícito: falhar em vez de entregar uma amostra como se fosse toda a base.
-  if (sheet.getLastRow() > 150000 || sheet.getLastColumn() > requiredMaxColumn) throw new Error('A origem excede o limite de leitura desta versão do conector.');
-  var values = sheet.getRange(1, 1, sheet.getLastRow(), sheet.getLastColumn()).getValues(), zone = ss.getSpreadsheetTimeZone();
-  return values.map(function (r, i) {
-    return r.map(function (v, j) {
-      if (!(v instanceof Date)) return v;
-      return Utilities.formatDate(v, zone, i > 0 && values[0][j] === 'atualizado_em' ? "yyyy-MM-dd'T'HH:mm:ssXXX" : 'yyyy-MM-dd');
-    });
+function readTables_(id) {
+  // API Sheets v4 aceita o escopo somente leitura; SpreadsheetApp.openById não aceita.
+  var response = Sheets.Spreadsheets.Values.batchGet(id, {
+    ranges: ["'BI_Itens'!A:L", "'BI_Clientes_Vendas'!A:I"],
+    valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'FORMATTED_STRING', majorDimension: 'ROWS'
+  });
+  var ranges = response.valueRanges || [];
+  if (ranges.length !== 2) throw new Error('Aba BI obrigatória ausente.');
+  return ranges.map(function (range) {
+    var values = range.values || [];
+    if (!values.length) throw new Error('Aba BI obrigatória ausente.');
+    if (values.length > 150000) throw new Error('A origem excede o limite de leitura desta versão do conector.');
+    return values;
   });
 }
 function getData(request) {
@@ -68,8 +71,8 @@ function getData(request) {
     if (names.some(function (name) { return !valid.has(name); })) throw new Error('O relatório solicitou um campo desconhecido.');
     var requestedFields = fields.forIds(names);
     names = requestedFields.asArray().map(function (f) { return f.getId(); });
-    var ss = SpreadsheetApp.openById(id);
-    var result = NexoAbc.calculate(readTable_(ss, 'BI_Itens', 12), readTable_(ss, 'BI_Clientes_Vendas', 9), request.dateRange.startDate, request.dateRange.endDate);
+    var tables = readTables_(id);
+    var result = NexoAbc.calculate(tables[0], tables[1], request.dateRange.startDate, request.dateRange.endDate);
     return {
       schema: requestedFields.build(),
       rows: result[mode].map(function (r) { return {values: names.map(function (name) {
