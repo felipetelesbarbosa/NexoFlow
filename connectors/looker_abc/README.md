@@ -2,15 +2,15 @@
 
 ## Estado
 
-Conector preparado e testado localmente. **Não está ativo no relatório até ser instalado, autorizado e conectado.** As abas existentes e a rotina Python continuam intactas. Uma carga Python com `--inicio/--fim` recalcula um único período compartilhado; ela não responde às datas de cada leitor do Looker.
+Conector preparado e testado localmente, publicado e autorizado em projeto privado Google Apps Script. **A integração ao relatório e a validação com dados reais ainda estão pendentes.** As abas existentes e a rotina Python continuam intactas. Uma carga Python com `--inicio/--fim` recalcula um único período compartilhado; ela não responde às datas de cada leitor do Looker.
 
 ## Registro de validação e pendências (17/10/2026)
 
 - 10 testes do cálculo JavaScript aprovados, além da verificação de sintaxe do adaptador.
 - 29 testes existentes de `test_looker_bi.py` aprovados com configuração fictícia isolada, sem credenciais reais ou consultas de rede.
-- Código e manifesto preparados em projeto privado Apps Script. O fluxo de conexão chegou ao aviso Google de aplicativo não verificado; nenhuma permissão foi concedida pelo agente.
-- Pendente: autorização Google pelo titular, execução com a base real, substituição das fontes somente na página Curva ABC, comparação de períodos e exportação/validação do PDF.
-- Pendente: publicação deste código na `main`, bloqueada pela revisão automática por falta de autorização explícita para publicar no GitHub. Os links novos do manifesto dependem dessa publicação.
+- Código e manifesto salvos em projeto privado Apps Script. Autorização Google concluída pelo titular; primeira fonte reutilizável criada e adicionada ao relatório.
+- Pendente: validar a consulta com a base real, concluir a substituição das fontes somente na página Curva ABC, comparar períodos e exportar/validar o PDF. A primeira troca revelou filtro associado à fonte antiga; precisa ser recriado. A conexão do navegador parou de responder durante esse ajuste.
+- Código publicado na `main` após autorização explícita, no commit `70b66899adc228227383a1632ffce44f9f54c124`. A publicação anterior foi bloqueada pela revisão automática; a pendência foi resolvida.
 
 ## Como funciona
 
