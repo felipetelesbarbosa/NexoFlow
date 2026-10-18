@@ -402,10 +402,34 @@ def atomic_json(path, value):
             json.dump(value, handle, ensure_ascii=False, indent=2)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(filename, path)
+        # Antivirus/indexers can briefly hold the destination open on Windows.
+        # Retry only the local atomic replacement of the already flushed file;
+        # never replay Weni writes or remove/truncate the previous state.
+        for attempt in range(6):
+            try:
+                os.replace(filename, path)
+                break
+            except PermissionError:
+                if attempt == 5:
+                    raise
+                logging.warning(
+                    "Recompra: arquivo local temporariamente bloqueado; "
+                    "nova tentativa de gravação %s/5, sem repetir ações na Weni.",
+                    attempt + 1,
+                )
+                sleep(min(2.0, 0.2 * 2**attempt))
     finally:
-        if os.path.exists(filename):
+        try:
             os.unlink(filename)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            # Cleanup must not conceal the actual failure or turn a confirmed
+            # replacement into an apparent failure that might prompt a replay.
+            logging.warning(
+                "Recompra: não foi possível remover um arquivo temporário local. "
+                "Preserve o estado e a auditoria."
+            )
 
 
 def load_state(path=STATE, *, purchase_checks_path=None):
@@ -1397,11 +1421,14 @@ def apply_review(
             except Exception as exc:
                 frames = safe_error_frames(exc)
                 logging.error(
-                    "Recompra falhou: contato=%s; pedido=%s; etapa=%s; tipo=%s; origem=%s.",
+                    "Recompra falhou: contato=%s; pedido=%s; etapa=%s; tipo=%s; "
+                    "errno=%s; winerror=%s; origem=%s.",
                     uid,
                     fresh["order_id"],
                     stage,
                     type(exc).__name__,
+                    getattr(exc, "errno", None),
+                    getattr(exc, "winerror", None),
                     " > ".join(frames),
                 )
                 if contact_state != persisted_state:

@@ -148,6 +148,12 @@ Não há confirmação de entrega do WhatsApp nesta rotina. A proteção local i
 
 ## Falhas e diagnóstico seguro (10/10/2026)
 
+Bloqueios temporários de arquivo recebem até cinco novas tentativas da substituição atômica local, em cerca de cinco segundos. Essas tentativas não repetem ações na Weni e não apagam nem truncam o estado anterior. Se o bloqueio persistir, a rotina interrompe a aplicação e informa o erro local; confira permissões da pasta `logs`, outras instâncias e o antivírus, sem desativar a proteção. Preserve o estado e a auditoria e gere uma nova revisão após conferir as pendências.
+
+O filtro farmacêutico reconhece também os nomes abreviados de MacroGard e Becordil como veterinários. A estampa Patrulha Canina dos curativos Topz não caracteriza uso animal; outras evidências, como código do catálogo pet ou categoria veterinária, continuam prevalecendo. Revisões geradas com a política anterior devem ser substituídas por um novo dry-run.
+
+Referências de produto: [MacroGard — Avert](https://avertsaudeanimal.com.br/linhas/especialidades/macrogard-pet), [Becordil — Biolab](https://www.biolabeco.com.br/produto/becordil-5-mg-com/) e [curativos Topz — catálogo Cremer](https://cremer.net.br/wp-content/uploads/2023/05/catalogo_Topz_2023-topz.pdf).
+
 Após interrupção do apply, **não repita o snapshot** nem apague `logs/recompra_state.json`, `logs/recompra_audit.jsonl` ou `logs/recompra_state.lock` sem investigar. O log anterior, com apenas `RuntimeError`, não prova se o problema foi Weni, checagem local ou rede FarmaLíder; a resposta HTTP 200 da FarmaLíder não confirma POSTs à Weni.
 
 Para inspecionar **somente os arquivos locais**, sem rede ou gravação:

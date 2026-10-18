@@ -1,5 +1,8 @@
 # NexoFlow 1.0 — Changelog
 
+- Filtro farmacêutico: MacroGard e Becordil excluídos também por nomes abreviados; curativos Topz com estampa Patrulha Canina deixam de ser confundidos com produtos animais. A nova política exige nova revisão da Recompra e reconciliação do escopo nas próximas cargas do Analytics/Planilhas.
+- Recompra: bloqueios temporários ao substituir o estado local recebem tentativas limitadas, sem repetir escritas na Weni; bloqueios persistentes preservam o estado anterior e são identificados como falhas locais, com diagnóstico de permissão.
+
 - Looker: conector privado opcional para recalcular a Curva ABC, o resumo e os produtos comprados juntos no período solicitado pelo relatório, com leitura das bases BI e validação de consistência.
 
 - Planilhas: leitura das constantes booleanas `=FALSE()` e `=TRUE()` usadas pelo export original de conversas no campo `is_active`, preservando o filtro de atendimentos encerrados e o bloqueio de outras fórmulas.

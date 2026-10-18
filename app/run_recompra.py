@@ -5,6 +5,8 @@ import json
 import logging
 from pathlib import Path
 
+from requests import RequestException
+
 
 def build_parser():
     from config import FARMALIDER_MAX_WORKERS
@@ -198,14 +200,23 @@ def main(argv=None):
         return REVIEW_EXPIRED_EXIT_CODE if exc.allow_refresh else 1
     except Exception as exc:
         logging.error(
-            "Recompra falhou: tipo=%s; origem=%s.",
+            "Recompra falhou: tipo=%s; errno=%s; winerror=%s; origem=%s.",
             type(exc).__name__,
+            getattr(exc, "errno", None),
+            getattr(exc, "winerror", None),
             " > ".join(safe_error_frames(exc)),
         )
         print(
             "[ERRO] "
             + (
-                str(exc)
+                "Falha ao acessar um arquivo local da Recompra "
+                f"({type(exc).__name__}, errno={getattr(exc, 'errno', None)}, "
+                f"winerror={getattr(exc, 'winerror', None)}). "
+                "Verifique as permissões da pasta logs e se há bloqueio por outro processo "
+                "ou antivírus. Preserve o estado e a auditoria; gere uma nova revisão "
+                "antes de retomar."
+                if isinstance(exc, OSError) and not isinstance(exc, RequestException)
+                else str(exc)
                 if isinstance(exc, (RuntimeError, ValueError))
                 else "Falha de API. Consulte o diagnóstico seguro."
             )
