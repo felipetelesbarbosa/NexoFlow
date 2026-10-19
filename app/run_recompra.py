@@ -75,6 +75,7 @@ def main(argv=None):
         ReviewExpiredError,
         diagnose_state,
         ensure_review_current,
+        finalize_review,
         now_local,
         read_review,
         safe_error_frames,
@@ -168,13 +169,22 @@ def main(argv=None):
             # Uma varredura de contatos é necessária para detectar D+26, novas
             # compras e recusas em todos os membros, mesmo no incremental.
             contacts = weni.iter_contacts()
+        pagination = {}
         plans = build_plans(
-            contacts, farm, structure, state, now=now, workers=args.workers
+            contacts,
+            farm,
+            structure,
+            state,
+            now=now,
+            workers=args.workers,
+            pagination_stats=pagination,
         )
         review = make_review(plans, structure, now=now, state=state)
+        review["pagination"] = pagination
         # Os planos usam o relógio capturado antes da varredura. Não publicar
         # esses planos sob a data nova se a geração atravessou a meia-noite.
         ensure_review_current(review, now_local())
+        finalize_review(review, now_local())
         write_review(review, args.review_out)
         ensure_review_current(review, now_local())
         if args.require_complete and any(

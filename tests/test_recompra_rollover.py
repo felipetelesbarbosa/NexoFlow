@@ -623,7 +623,7 @@ class RecompraRunnerRolloverTests(unittest.TestCase):
         )
         captured_days = []
 
-        def build(contacts, farm, structure, state, *, now, workers):
+        def build(contacts, farm, structure, state, *, now, workers, pagination_stats):
             captured_days.append(now.date().isoformat())
             plans = [
                 recompra.propose(current, order, items, structure, now=now)

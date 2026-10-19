@@ -1,5 +1,9 @@
 # NexoFlow 1.0 — Changelog
 
+- Recompra: bloqueio entre processos mantido pelo sistema operacional, com PID/início/identificação da execução, liberação segura e recuperação conservadora de execuções encerradas. O arquivo de lock permanece no disco; não precisa ser apagado para iniciar a rotina atualizada.
+- Recompra: consolidação por UUID antes das consultas, isolamento de cadastros divergentes e revalidação do horário ao concluir a revisão e antes de novas inclusões; relatório resumido com contagens de ações, divergências e cadastros pendentes em arquivo privado separado.
+- Cadastro: CPF ausente, zerado ou malformado é distinguido de rejeição HTTP, sem consulta por CPF nem substituição automática; preservada a reposição validada de zeros à esquerda e a confirmação de identificadores não zerados por primeiro nome ou telefone. Recusas de marketing dispensam consultas de pedidos na Recompra e continuam prevalecendo sobre valores afirmativos.
+
 - Rede corporativa: um timeout não desativa o proxy já ativo apenas porque um site público responde. A redetecção repete sondagens e exige resposta HTTPS da URL externa da FarmaLíder antes de migrar para conexão direta, preservando as escolhas explícitas de proxy e sem enviar credenciais na sondagem.
 
 - Filtro farmacêutico: MacroGard e Becordil excluídos também por nomes abreviados; curativos Topz com estampa Patrulha Canina deixam de ser confundidos com produtos animais. A nova política exige nova revisão da Recompra e reconciliação do escopo nas próximas cargas do Analytics/Planilhas.

@@ -313,7 +313,7 @@ Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/payload ma
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/NexoFlow Recompra.exe"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/NexoFlow Recompra.exe"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/weni_update.py"
-foreach ($module in @("weni_dedup", "contact_dedup_guard", "dedup_io", "dedup_sheets", "dedup_bi")) {
+foreach ($module in @("weni_dedup", "contact_dedup_guard", "dedup_io", "dedup_sheets", "dedup_bi", "recompra_lock", "recompra_review_audit")) {
     Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/$module.py"
     Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/app/$module.py"
 }
@@ -349,6 +349,7 @@ Distribuição oficial do **NexoFlow 1.0**.
 O arquivo `NexoFlow-Setup-$Version.zip` contém o instalador do NexoFlow 1.0 e foi validado automaticamente em Windows para primeira instalação e atualização de uma instalação existente.
 
 Melhorias desta distribuição do NexoFlow 1.0:
+- Recompra: lock do sistema operacional com identificação da execução e recuperação segura após encerramento, consolidação por UUID, prazo revalidado antes da inclusão e revisão resumida; CPF zerado é pendência cadastral, sem consulta à API; recusas continuam bloqueando sem alterar consentimento;
 - rede corporativa: timeout não abandona um proxy já ativo somente porque um site público responde; a troca para conexão direta exige sondagens repetidas e confirmação da URL externa FarmaLíder, sem credenciais na sondagem;
 - filtro de produtos atualizado: MacroGard e Becordil são veterinários; curativos Topz Patrulha Canina não são excluídos somente pela estampa; gere uma nova revisão da Recompra;
 - Recompra repete apenas a gravação local quando um arquivo fica temporariamente bloqueado, preservando o estado anterior sem repetir ações na Weni; falhas locais recebem diagnóstico próprio;

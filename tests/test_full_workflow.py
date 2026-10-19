@@ -161,6 +161,7 @@ class CompleteQueriesTests(unittest.TestCase):
                 )
                 stack.enter_context(patch("recompra.make_review", return_value={}))
                 stack.enter_context(patch("recompra.ensure_review_current"))
+                stack.enter_context(patch("recompra.finalize_review"))
                 writer = stack.enter_context(patch("recompra.write_review"))
                 apply = stack.enter_context(patch("recompra.apply_review"))
                 stack.enter_context(patch("logging_config.configure_logging"))

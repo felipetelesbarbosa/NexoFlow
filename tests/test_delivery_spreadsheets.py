@@ -63,7 +63,7 @@ class DeliverySpreadsheetsTests(unittest.TestCase):
                 "Cliente Árvore",
                 "5591987654321",
                 "",
-                "0",
+                "123",
                 "arvore@example.test",
                 "Cliente Árvore",
                 "Produto",
@@ -107,12 +107,17 @@ class DeliverySpreadsheetsTests(unittest.TestCase):
         tickets, contacts, report = self.read()
         self.assertEqual(tickets[0]["contact_uuid"], contact()["uuid"])
         self.assertEqual(tickets[0]["chat_contact_uuid"], CHAT)
-        self.assertEqual(contacts[0]["fields"]["cpf"], "0")
+        self.assertEqual(contacts[0]["fields"]["cpf"], "123")
         self.assertEqual(contacts[0]["fields"]["email"], "arvore@example.test")
         self.assertEqual(contacts[0]["fields"]["pedido_produtos"], "Produto")
         self.assertEqual(report["summary"]["clientes_vinculados"], 1)
         self.assertEqual(tickets[0]["custom_fields"], {})
         self.assertEqual(len(report["sources"][0]["sha256"]), 64)
+
+    def test_placeholder_cpf_remains_original_for_cadastro_correction(self):
+        self.contact_rows[0][4] = "0"
+        _, contacts, _ = self.read()
+        self.assertEqual(contacts[0]["fields"]["cpf"], "0")
 
     def test_deleted_order_tag_imports_only_exact_legacy_alias(self):
         for tag, expected in [
@@ -140,7 +145,7 @@ class DeliverySpreadsheetsTests(unittest.TestCase):
                 "Cliente Árvore",
                 "5591987654321",
                 "",
-                "0",
+                "123",
                 "arvore@example.test",
                 "",
                 "",
@@ -151,7 +156,7 @@ class DeliverySpreadsheetsTests(unittest.TestCase):
         self.assertEqual(report["summary"]["URN_AMBIGUA"], 1)
 
     def test_display_names_do_not_block_technical_link_for_valid_or_invalid_cpf(self):
-        for cpf in ("52998224725", "0"):
+        for cpf in ("52998224725", "123"):
             for display_name in ("🌻", "Outra Pessoa"):
                 with self.subTest(cpf=cpf, display_name=display_name):
                     self.contact_rows[0][4] = cpf
@@ -183,7 +188,7 @@ class DeliverySpreadsheetsTests(unittest.TestCase):
         tickets, _, _ = self.read()
         current = contact(
             name="🌻",
-            fields={"cpf": "0", "nome": "Outra Pessoa"},
+            fields={"cpf": "123", "nome": "Outra Pessoa"},
             urns=[URN],
         )
         accepted, contacts, rejected = validate_current_contacts(tickets, [current])
@@ -245,7 +250,7 @@ class DeliverySpreadsheetsTests(unittest.TestCase):
 
     def test_duplicate_uuid_different_data_and_formulas_fail_closed(self):
         self.contact_rows.append(
-            [contact()["uuid"], "Outra Pessoa", "", "", "0", "", "", ""]
+            [contact()["uuid"], "Outra Pessoa", "", "", "123", "", "", ""]
         )
         with self.assertRaises(DeliverySpreadsheetError):
             self.read()
@@ -263,7 +268,7 @@ class DeliverySpreadsheetsTests(unittest.TestCase):
 
     def test_export_boolean_formula_uses_constant_not_cached_value(self):
         namespace = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
-        for formula, cache, expected in [("=FALSE()", "1", 1), ("=TRUE()", "0", 0)]:
+        for formula, cache, expected in [("=FALSE()", "1", 1), ("=TRUE()", "123", 0)]:
             with self.subTest(formula=formula):
                 self.room_rows[0][5] = formula
                 self.exports()

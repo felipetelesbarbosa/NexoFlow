@@ -69,6 +69,8 @@ py-modules = [
   "dedup_io",
   "dedup_sheets",
   "dedup_bi",
+  "recompra_lock",
+  "recompra_review_audit",
 ]
 
 [tool.setuptools.dynamic]
