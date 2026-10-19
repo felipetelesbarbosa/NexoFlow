@@ -1,5 +1,7 @@
 # NexoFlow 1.0 — Changelog
 
+- Delivery/Planilhas: conflitos passam a registrar referência anônima, motivo e campos no log, com UUID e comparação protegida em relatório privado; retomada explícita do snapshot preserva gravações concluídas e revisões anteriores. Carga parcial gera aviso, mantendo a revisão necessária antes das próximas etapas.
+
 - Recompra: bloqueio entre processos mantido pelo sistema operacional, com PID/início/identificação da execução, liberação segura e recuperação conservadora de execuções encerradas. O arquivo de lock permanece no disco; não precisa ser apagado para iniciar a rotina atualizada.
 - Recompra: consolidação por UUID antes das consultas, isolamento de cadastros divergentes e revalidação do horário ao concluir a revisão e antes de novas inclusões; relatório resumido com contagens de ações, divergências e cadastros pendentes em arquivo privado separado.
 - Cadastro: CPF ausente, zerado ou malformado é distinguido de rejeição HTTP, sem consulta por CPF nem substituição automática; preservada a reposição validada de zeros à esquerda e a confirmação de identificadores não zerados por primeiro nome ou telefone. Recusas de marketing dispensam consultas de pedidos na Recompra e continuam prevalecendo sobre valores afirmativos.
