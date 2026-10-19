@@ -1,5 +1,7 @@
 # NexoFlow 1.0 — Changelog
 
+- Rede corporativa: um timeout não desativa o proxy já ativo apenas porque um site público responde. A redetecção repete sondagens e exige resposta HTTPS da URL externa da FarmaLíder antes de migrar para conexão direta, preservando as escolhas explícitas de proxy e sem enviar credenciais na sondagem.
+
 - Filtro farmacêutico: MacroGard e Becordil excluídos também por nomes abreviados; curativos Topz com estampa Patrulha Canina deixam de ser confundidos com produtos animais. A nova política exige nova revisão da Recompra e reconciliação do escopo nas próximas cargas do Analytics/Planilhas.
 - Recompra: bloqueios temporários ao substituir o estado local recebem tentativas limitadas, sem repetir escritas na Weni; bloqueios persistentes preservam o estado anterior e são identificados como falhas locais, com diagnóstico de permissão.
 

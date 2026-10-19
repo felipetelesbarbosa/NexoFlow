@@ -349,6 +349,7 @@ Distribuição oficial do **NexoFlow 1.0**.
 O arquivo `NexoFlow-Setup-$Version.zip` contém o instalador do NexoFlow 1.0 e foi validado automaticamente em Windows para primeira instalação e atualização de uma instalação existente.
 
 Melhorias desta distribuição do NexoFlow 1.0:
+- rede corporativa: timeout não abandona um proxy já ativo somente porque um site público responde; a troca para conexão direta exige sondagens repetidas e confirmação da URL externa FarmaLíder, sem credenciais na sondagem;
 - filtro de produtos atualizado: MacroGard e Becordil são veterinários; curativos Topz Patrulha Canina não são excluídos somente pela estampa; gere uma nova revisão da Recompra;
 - Recompra repete apenas a gravação local quando um arquivo fica temporariamente bloqueado, preservando o estado anterior sem repetir ações na Weni; falhas locais recebem diagnóstico próprio;
 - Planilha aceita as constantes booleanas originais do export de conversas no campo is_active, mantendo o filtro de atendimentos encerrados e o bloqueio de outras fórmulas;
