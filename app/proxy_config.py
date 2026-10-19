@@ -6,6 +6,7 @@ import socket
 import threading
 import time
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass
 from http.client import HTTPException
 from urllib.error import HTTPError
@@ -23,6 +24,27 @@ PROXY_RETRY_DELAY_SECONDS = 0.35
 # Uma troca de rede pode ser percebida simultaneamente por vários workers.
 # Serializamos a redetecção para evitar múltiplas sondagens/proxy flips concorrentes.
 _ROUTE_REFRESH_LOCK = threading.Lock()
+
+
+def snapshot_request_route(
+    url_factory: Callable[[], str],
+) -> tuple[str, dict[str, str]]:
+    """Captura destino e proxies juntos, sem serializar requisições HTTP.
+
+    A URL deve ser escolhida depois da admissão na fila. Proxies explícitos
+    impedem que requests misture esse destino com uma redetecção posterior.
+    Valores vazios também fixam a rota direta contra proxies herdados depois.
+    """
+    from requests.utils import get_environ_proxies
+
+    with _ROUTE_REFRESH_LOCK:
+        url = url_factory()
+        inherited = (
+            {} if _proxy_active_from_env() is False else get_environ_proxies(url)
+        )
+        return url, {
+            name: inherited.get(name) or "" for name in ("http", "https", "all")
+        }
 
 
 @dataclass(frozen=True)

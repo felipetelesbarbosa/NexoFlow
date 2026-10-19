@@ -1,5 +1,7 @@
 # NexoFlow 1.0 — Changelog
 
+- Rede FarmaLíder: destino e proxy capturados juntos após a espera na fila, evitando usar a porta da conexão direta com o proxy após uma troca de rota entre workers. Diagnóstico de falhas mostra somente domínio, porta e tipo de rota.
+
 - Check-up: testes de diagnóstico compatíveis com o modo silencioso e validação do PID real do Python em ambientes virtuais do Windows; check-up operacional conferido antes do empacotamento, além do teste da instalação completa.
 
 - Delivery/Planilhas: conflitos passam a registrar referência anônima, motivo e campos no log, com UUID e comparação protegida em relatório privado; retomada explícita do snapshot preserva gravações concluídas e revisões anteriores. Carga parcial gera aviso, mantendo a revisão necessária antes das próximas etapas.

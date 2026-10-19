@@ -13,6 +13,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from email.utils import parsedate_to_datetime
 from typing import Any, cast
+from urllib.parse import urlsplit
 
 import requests
 
@@ -178,6 +179,25 @@ class FarmaliderClient:
                 "rota com proxy" if result.current_active else "rota direta",
             )
         return changed
+
+    def _request_route(self, path: str) -> tuple[str, dict[str, str]]:
+        from proxy_config import snapshot_request_route
+
+        def current_url() -> str:
+            self._sync_base_url_from_environment()
+            # Não reutilize o atributo compartilhado para escolher o destino:
+            # outro worker pode sincronizá-lo durante uma redetecção.
+            return f"{farmalider_api_base_url().rstrip('/')}{path}"
+
+        return snapshot_request_route(current_url)
+
+    @staticmethod
+    def _route_summary(url: str, proxies: dict[str, str]) -> str:
+        destination = urlsplit(url)
+        port = destination.port or (443 if destination.scheme == "https" else 80)
+        route = "proxy" if proxies.get("https") or proxies.get("all") else "direta"
+        # Somente autoridade pública, sem caminho/CPF/token ou URL do proxy.
+        return f"Destino={destination.hostname}:{port}; rota={route}."
 
     def close(self) -> None:
         with self._request_gate:
@@ -657,8 +677,6 @@ class FarmaliderClient:
 
         for attempt in range(1, FARMALIDER_MAX_RETRIES + 1):
             response: requests.Response | None = None
-            self._sync_base_url_from_environment()
-            url = f"{self.base_url}{path}"
             with self._private_request_slot(
                 endpoint_label,
                 private_cpf,
@@ -666,6 +684,7 @@ class FarmaliderClient:
                 last_server_response,
                 attempt,
             ) as permit:
+                url, proxies = self._request_route(path)
                 started = time.monotonic()
                 try:
                     response = self._get_session().get(
@@ -673,6 +692,7 @@ class FarmaliderClient:
                         params={"token": self.token},
                         timeout=FARMALIDER_REQUEST_TIMEOUT_SECONDS,
                         allow_redirects=False,
+                        proxies=proxies,
                     )
                 except requests.RequestException as exc:
                     self._record_request(
@@ -686,6 +706,8 @@ class FarmaliderClient:
                         raise FarmaliderError(
                             "Falha de rede não recuperável na FarmaLíder: "
                             + failure.summary
+                            + " "
+                            + self._route_summary(url, proxies)
                         ) from None
                     self._protect_after_failure(
                         endpoint_label=endpoint_label,
@@ -921,10 +943,9 @@ class FarmaliderClient:
 
         for attempt in range(1, FARMALIDER_MAX_RETRIES + 1):
             response: requests.Response | None = None
-            self._sync_base_url_from_environment()
-            url = f"{self.base_url}{path}"
 
             with self._request_slot(endpoint_label) as permit:
+                url, proxies = self._request_route(path)
                 started = time.monotonic()
                 try:
                     response = self._get_session().get(
@@ -932,6 +953,7 @@ class FarmaliderClient:
                         params={"token": self.token},
                         timeout=FARMALIDER_REQUEST_TIMEOUT_SECONDS,
                         allow_redirects=False,
+                        proxies=proxies,
                     )
                 except requests.RequestException as exc:
                     elapsed = time.monotonic() - started
@@ -950,6 +972,8 @@ class FarmaliderClient:
                         raise FarmaliderError(
                             "Falha de rede no preflight da FarmaLíder: "
                             + failure.summary
+                            + " "
+                            + self._route_summary(url, proxies)
                         ) from None
 
                     self._protect_after_failure(
