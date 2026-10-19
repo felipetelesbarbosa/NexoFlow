@@ -2,6 +2,7 @@
 
 import json
 import os
+import signal
 import subprocess
 import sys
 import tempfile
@@ -24,8 +25,8 @@ import sys
 sys.path.insert(0, sys.argv[1])
 from recompra_lock import RecompraLockError, state_lock
 try:
-    with state_lock(sys.argv[2]):
-        print('LOCKED', flush=True)
+    with state_lock(sys.argv[2]) as record:
+        print('LOCKED', record['pid'], flush=True)
         if sys.argv[3] == 'hold':
             sys.stdin.readline()
 except RecompraLockError:
@@ -64,6 +65,18 @@ class RecompraLockTests(unittest.TestCase):
     def read_record(self):
         return json.loads(self.lock.read_text(encoding="utf-8"))
 
+    def assert_child_locked(self, process):
+        # No Windows, o launcher de uma venv pode ter um PID diferente do
+        # interpretador que realmente adquiriu o lock. Use o PID informado
+        # pelo proprietário, conferindo também os metadados persistidos.
+        marker, pid_text = process.stdout.readline().strip().split()
+        self.assertEqual(marker, "LOCKED")
+        pid = int(pid_text)
+        self.assertGreater(pid, 0)
+        self.assertNotEqual(pid, os.getpid())
+        self.assertEqual(self.read_record()["pid"], pid)
+        return pid
+
     def test_metadata_is_persistent_and_state_is_untouched(self):
         with state_lock(self.state) as record:
             self.assertEqual(record["protocol"], PROTOCOL)
@@ -97,8 +110,8 @@ class RecompraLockTests(unittest.TestCase):
 
     def test_live_process_blocks_parent_and_another_process(self):
         owner = self.child()
-        self.assertEqual(owner.stdout.readline().strip(), "LOCKED")
-        with self.assertRaisesRegex(RecompraLockError, f"PID {owner.pid}"):
+        owner_pid = self.assert_child_locked(owner)
+        with self.assertRaisesRegex(RecompraLockError, f"PID {owner_pid}"):
             with state_lock(self.state):
                 self.fail("O proprietário ainda está ativo.")
         contender = self.child("once")
@@ -131,9 +144,10 @@ class RecompraLockTests(unittest.TestCase):
 
     def test_kernel_recovers_crashed_owner_without_unlink(self):
         owner = self.child()
-        self.assertEqual(owner.stdout.readline().strip(), "LOCKED")
+        owner_pid = self.assert_child_locked(owner)
         inode = self.lock.stat().st_ino
-        owner.kill()
+        # Encerre o proprietário real, inclusive quando há launcher da venv.
+        os.kill(owner_pid, signal.SIGTERM)
         owner.communicate(timeout=10)
         stale = self.read_record()
         self.assertEqual(stale["status"], "active")

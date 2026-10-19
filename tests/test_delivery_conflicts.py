@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from copy import deepcopy
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from delivery_tickets import (
     apply_delivery_review,
@@ -74,7 +74,7 @@ class DeliveryConflictTests(unittest.TestCase):
     def test_field_conflict_reports_private_uuid_and_redacted_comparison(self):
         self.review()
         self.current["fields"]["pedido_produtos"] = "Produto particular posterior"
-        with self.assertLogs(level="WARNING") as captured:
+        with patch("delivery_tickets.logging.warning") as captured:
             result = self.apply()
         conflict = self.assert_conflict(result, "CAMPO_ALTERADO", "pedido_produtos")
         comparison = next(
@@ -87,7 +87,10 @@ class DeliveryConflictTests(unittest.TestCase):
             comparison["encontrado"]["assinatura"],
         )
         private = Path(result["conflict_report"]).read_text(encoding="utf-8")
-        logs = "\n".join(captured.output)
+        captured.assert_called()
+        logs = "\n".join(
+            call.args[0] % call.args[1:] for call in captured.call_args_list
+        )
         self.assertIn(hashlib.sha256(CONTACT.encode()).hexdigest()[:12], logs)
         self.assertNotIn(CONTACT, logs)
         for text in (logs, private):
