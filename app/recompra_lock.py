@@ -1,4 +1,4 @@
-"""Exclusão mútua local da Recompra, mantida pelo sistema operacional.
+"""Exclusão mútua local da Recompra e Weni, mantida pelo sistema operacional.
 
 O arquivo permanece no disco: removê-lo criaria uma corrida entre processos
 com descritores apontando para arquivos diferentes. O kernel libera o bloqueio
@@ -121,16 +121,23 @@ def _owner_description(fd: int) -> str:
     return f" PID {pid}." if pid is not None else ""
 
 
-def _validate_existing(fd: int, path: Path) -> None:
+def _validate_existing(
+    fd: int,
+    path: Path,
+    *,
+    protocol: str = PROTOCOL,
+    operation: str = "Recompra",
+    error_type: type[RuntimeError] = RecompraLockError,
+) -> None:
     try:
         record = _read_metadata(fd)
     except (ValueError, UnicodeError) as exc:
-        raise RecompraLockError(
-            f"Bloqueio de recompra sem identificação válida em {path}. "
+        raise error_type(
+            f"Bloqueio de {operation} sem identificação válida em {path}. "
             "Não foi possível comprovar o encerramento do proprietário; "
             "preserve o arquivo para diagnóstico."
         ) from exc
-    if isinstance(record, dict) and record.get("protocol") == PROTOCOL:
+    if isinstance(record, dict) and record.get("protocol") == protocol:
         if (
             record.get("schema") == 1
             and _positive_pid(record.get("pid")) is not None
@@ -144,7 +151,7 @@ def _validate_existing(fd: int, path: Path) -> None:
             # sido reutilizado ou pertencer a outra carga: não é o proprietário
             # deste lock. A aquisição pelo SO é a prova de liberação.
             return
-        raise RecompraLockError(
+        raise error_type(
             f"Metadados de bloqueio inválidos em {path}; preserve o arquivo."
         )
     legacy_pid = _positive_pid(record)
@@ -154,19 +161,20 @@ def _validate_existing(fd: int, path: Path) -> None:
         if host and host != socket.gethostname():
             legacy_pid = None
     if legacy_pid is None:
-        raise RecompraLockError(
-            f"Bloqueio de recompra desconhecido em {path}. "
+        raise error_type(
+            f"Bloqueio de {operation} desconhecido em {path}. "
             "Preserve o arquivo; não há comprovação segura de encerramento."
         )
     if _pid_is_alive(legacy_pid) is not False:
-        raise RecompraLockError(
-            f"A carga de recompra do PID {legacy_pid} está ativa ou seu "
+        raise error_type(
+            f"A execução de {operation} do PID {legacy_pid} está ativa ou seu "
             f"encerramento não pôde ser confirmado ({path}). "
             "Não remova o bloqueio enquanto essa execução puder estar ativa."
         )
     logging.warning(
-        "Recompra: bloqueio legado recuperado após o sistema operacional "
+        "%s: bloqueio legado recuperado após o sistema operacional "
         "confirmar o encerramento do PID %s.",
+        operation,
         legacy_pid,
     )
 
@@ -187,16 +195,21 @@ def _write_metadata(fd: int, record: dict) -> None:
 
 
 @contextmanager
-def state_lock(path: Path | str = DEFAULT_STATE):
-    """Bloqueia uma aplicação e preserva estado/auditoria existentes.
+def execution_file_lock(
+    path: Path | str,
+    *,
+    protocol: str,
+    operation: str,
+    error_type: type[RuntimeError] = RecompraLockError,
+):
+    """Bloqueia uma execução sem apagar/recriar o arquivo compartilhado.
 
     Arquivos legados (PID simples) só são adotados após confirmação de que seu
     proprietário encerrou. Arquivos vazios ou corrompidos permanecem bloqueados
     para diagnóstico: idade ou falha ao consultar o processo não bastam.
     """
-    state_path = Path(path)
-    state_path.parent.mkdir(parents=True, exist_ok=True)
-    lock_path = state_path.with_suffix(".lock")
+    lock_path = Path(path)
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
     flags = os.O_RDWR | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
     try:
         fd = os.open(lock_path, flags | os.O_CREAT | os.O_EXCL, 0o600)
@@ -208,23 +221,30 @@ def state_lock(path: Path | str = DEFAULT_STATE):
     record = None
     try:
         if not stat.S_ISREG(os.fstat(fd).st_mode):
-            raise RecompraLockError("O bloqueio de recompra não é um arquivo regular.")
+            raise error_type(f"O bloqueio de {operation} não é um arquivo regular.")
         try:
             _acquire_os_lock(fd)
         except OSError as exc:
             if exc.errno not in {errno.EACCES, errno.EAGAIN, errno.EDEADLK}:
                 raise
-            raise RecompraLockError(
-                f"Outra aplicação da Recompra está em execução ({lock_path}). "
+            raise error_type(
+                f"Outra aplicação está em execução: {operation} ({lock_path}). "
                 f"{_owner_description(fd)} "
                 "Aguarde sua conclusão; não remova o arquivo de bloqueio."
             ) from exc
         acquired = True
         if not created:
-            _validate_existing(fd, lock_path)
+            _validate_existing(
+                fd,
+                lock_path,
+                protocol=protocol,
+                operation=operation,
+                error_type=error_type,
+            )
         record = {
             "schema": 1,
-            "protocol": PROTOCOL,
+            "protocol": protocol,
+            "operation": operation,
             "pid": os.getpid(),
             "execution_id": uuid4().hex,
             "started_utc": datetime.now(UTC).isoformat(),
@@ -253,9 +273,10 @@ def state_lock(path: Path | str = DEFAULT_STATE):
                             )
                     except (OSError, ValueError, UnicodeError):
                         logging.warning(
-                            "Recompra: metadados finais do bloqueio não foram "
+                            "%s: metadados finais do bloqueio não foram "
                             "gravados. O bloqueio do sistema operacional será "
-                            "liberado; preserve o arquivo para diagnóstico."
+                            "liberado; preserve o arquivo para diagnóstico.",
+                            operation,
                         )
                 try:
                     _release_os_lock(fd)
@@ -264,8 +285,20 @@ def state_lock(path: Path | str = DEFAULT_STATE):
                     # Uma falha de limpeza não pode sugerir repetir ações já
                     # confirmadas na Weni, nem ocultar a exceção original.
                     logging.warning(
-                        "Recompra: a liberação explícita do bloqueio falhou; "
-                        "o descritor da execução será fechado."
+                        "%s: a liberação explícita do bloqueio falhou; "
+                        "o descritor da execução será fechado.",
+                        operation,
                     )
         finally:
             os.close(fd)
+
+
+@contextmanager
+def state_lock(path: Path | str = DEFAULT_STATE):
+    """Mantém o contrato e o caminho de bloqueio da Recompra."""
+    with execution_file_lock(
+        Path(path).with_suffix(".lock"),
+        protocol=PROTOCOL,
+        operation="Recompra",
+    ) as record:
+        yield record

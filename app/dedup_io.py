@@ -14,6 +14,14 @@ import requests
 from gspread.exceptions import APIError
 from gspread.http_client import HTTPClient
 
+from recompra_lock import execution_file_lock
+
+DEDUP_LOCK_PROTOCOL = "nexoflow-weni-dedup-os-lock-v1"
+
+
+class DedupExecutionLockError(RuntimeError):
+    """Uma carga Weni está ativa ou o proprietário não pôde ser verificado."""
+
 
 def digest(value):
     return hashlib.sha256(
@@ -41,19 +49,13 @@ def save_private(path, value):
 def execution_lock(directory):
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
-    lock = directory / "execucao.lock"
-    try:
-        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-    except FileExistsError as exc:
-        raise RuntimeError(
-            "Outra deduplicação está em execução ou foi interrompida. Confira o processo antes de remover logs/duplicados/execucao.lock."
-        ) from exc
-    try:
-        with os.fdopen(fd, "w") as stream:
-            stream.write(str(os.getpid()))
-        yield
-    finally:
-        lock.unlink(missing_ok=True)
+    with execution_file_lock(
+        directory / "execucao.lock",
+        protocol=DEDUP_LOCK_PROTOCOL,
+        operation="NexoFlow Weni (deduplicação)",
+        error_type=DedupExecutionLockError,
+    ) as record:
+        yield record
 
 
 class DedupHTTPClient(HTTPClient):

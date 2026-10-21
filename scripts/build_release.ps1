@@ -349,6 +349,7 @@ Distribuição oficial do **NexoFlow 1.0**.
 O arquivo `NexoFlow-Setup-$Version.zip` contém o instalador do NexoFlow 1.0 e foi validado automaticamente em Windows para primeira instalação e atualização de uma instalação existente.
 
 Melhorias desta distribuição do NexoFlow 1.0:
+- Weni: recuperação automática de bloqueios de execuções interrompidas, com verificação do processo anterior e proteção contra cargas simultâneas, sem apagar a auditoria da deduplicação;
 - listagem FARMA com último pedido e itens reaproveitados em memória após validação; endereço cadastral conferido com o último pedido e fallback individual quando necessário;
 - instalador: atualização com a pasta principal aberta no Windows, preservação completa para rollback e reconhecimento correto dos processos instalados;
 - cadastro FARMA nos quatro fluxos, preenchimento auditado de campos ausentes, conferência dos candidatos por CPF/ID e reaproveitamento de leituras por execução; o apply usa leituras novas;

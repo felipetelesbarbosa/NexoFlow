@@ -1,5 +1,7 @@
 # NexoFlow 1.0 — Changelog
 
+- Weni: bloqueio da carga mantido pelo sistema operacional, liberado também após encerramento forçado. Arquivos de bloqueio antigos são recuperados automaticamente quando o processo anterior está comprovadamente encerrado, preservando a proteção contra cargas simultâneas e os registros da deduplicação.
+
 - Listagem FARMA: suporte ao retorno com `cliente`, `ultimoPedido` e `itens`, snapshots verificados em memória por CPF/ID e consulta individual de fallback. Endereço cadastral conferido com o último pedido, incluindo endereços secundários; divergências e dados incompletos não preenchem a localização. Origem da listagem registrada nos pedidos, sem reutilizar leituras da simulação no apply.
 
 - Instalador: identificação correta dos processos da instalação e atualização com rollback sem renomear a pasta principal quando um handle do Windows impede a movimentação. Arquivos ainda bloqueados interrompem a preparação e os arquivos já movidos retornam ao destino original. Testes Windows cobrem bloqueio real da pasta, arquivo em uso e recuperação.
