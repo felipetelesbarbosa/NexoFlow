@@ -18,6 +18,8 @@ from config import (
     WENI_FIELDS_API_URL,
     WENI_GROUPS_API_URL,
     WENI_MESSAGES_API_URL,
+    WENI_PROGRESS_BATCH_SIZE,
+    WENI_PROGRESS_INTERVAL_SECONDS,
 )
 from network_diagnostics import classify_network_failure
 from proxy_config import refresh_network_route
@@ -233,7 +235,7 @@ class WeniClient:
             )
             first_request = False
             page_results, next_url = self.extract_results(payload)
-            logging.info(
+            logging.debug(
                 "Weni %s página %s: %s registro(s).",
                 item_label,
                 page,
@@ -256,7 +258,11 @@ class WeniClient:
         max_results: int | None = None,
     ) -> list[dict[str, Any]]:
         with TaskProgress(
-            f"Consulta Weni: {item_label}", None, unit="registros"
+            f"Consulta Weni: {item_label}",
+            None,
+            unit="registros",
+            batch_size=WENI_PROGRESS_BATCH_SIZE,
+            interval=WENI_PROGRESS_INTERVAL_SECONDS,
         ) as progress:
             return list(
                 progress.track(
@@ -294,7 +300,11 @@ class WeniClient:
         limit: int = PAGE_LIMIT,
     ) -> list[dict[str, Any]]:
         with TaskProgress(
-            "Consulta Weni: contatos", None, unit="registros"
+            "Consulta Weni: contatos",
+            None,
+            unit="registros",
+            batch_size=WENI_PROGRESS_BATCH_SIZE,
+            interval=WENI_PROGRESS_INTERVAL_SECONDS,
         ) as progress:
             return list(progress.track(self.iter_contacts(after=after, limit=limit)))
 

@@ -1,5 +1,7 @@
 # NexoFlow 1.0 — Changelog
 
+- Weni: avanço consolidado por lotes de 1.000 contatos, com percentual, velocidade, tempo restante e atualização durante esperas. Bloqueios repetidos de identidade viram contagens no progresso e no resumo; UUID e motivo permanecem na revisão privada, inclusive para contatos sem alteração proposta.
+
 - Weni: bloqueio da carga mantido pelo sistema operacional, liberado também após encerramento forçado. Arquivos de bloqueio antigos são recuperados automaticamente quando o processo anterior está comprovadamente encerrado, preservando a proteção contra cargas simultâneas e os registros da deduplicação.
 
 - Listagem FARMA: suporte ao retorno com `cliente`, `ultimoPedido` e `itens`, snapshots verificados em memória por CPF/ID e consulta individual de fallback. Endereço cadastral conferido com o último pedido, incluindo endereços secundários; divergências e dados incompletos não preenchem a localização. Origem da listagem registrada nos pedidos, sem reutilizar leituras da simulação no apply.

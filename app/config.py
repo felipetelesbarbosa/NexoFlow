@@ -20,6 +20,9 @@ WENI_API_URL: Final = WENI_CONTACTS_API_URL
 GOOGLE_CREDENTIALS_FILE: Final = CREDENTIALS_DIR / "google_credentials.json"
 
 PAGE_LIMIT: Final = 100
+# Agrupamento de exibição; não altera paginação nem tamanho de chamadas à API.
+WENI_PROGRESS_BATCH_SIZE: Final = 1000
+WENI_PROGRESS_INTERVAL_SECONDS: Final = 15.0
 REQUEST_TIMEOUT_SECONDS: Final = 60
 SYNC_OVERLAP_MINUTES: Final = 5
 MAX_RETRIES: Final = 4

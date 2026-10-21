@@ -34,6 +34,8 @@ class TaskProgress:
     A velocidade usa uma janela de dez segundos. O ETA usa a média desde
     o início da etapa; não há porcentagem/ETA quando o total é desconhecido.
     A thread só observa contadores: nunca faz chamadas de API ou grava dados.
+    Com batch_size, informa lotes concluídos e consolida as linhas entre lotes;
+    interval mantém atualizações durante esperas sem avanço.
     """
 
     def __init__(
@@ -47,12 +49,17 @@ class TaskProgress:
         interval: float = 2.0,
         clock: Callable[[], float] = time.monotonic,
         initial_completed: int = 0,
+        batch_size: int | None = None,
     ) -> None:
         if initial_completed < 0 or (total is not None and initial_completed > total):
             raise ValueError("Progresso inicial fora dos limites da tarefa.")
+        if batch_size is not None and (type(batch_size) is not int or batch_size <= 0):
+            raise ValueError("O tamanho do lote deve ser um inteiro positivo.")
         self.label, self.total, self.unit = label, total, unit
         self.byte_count, self.detail = byte_count, detail
         self.interval, self.clock = interval, clock
+        self.batch_size = batch_size
+        self._last_report: tuple[float, int] | None = None
         self.completed = initial_completed
         self._initial_completed = initial_completed
         self.activity = ""
@@ -80,12 +87,29 @@ class TaskProgress:
         return self
 
     def _heartbeat(self) -> None:
-        while not self._stop.wait(self.interval):
+        while True:
+            delay = self.interval
+            if self.batch_size is not None:
+                with self._lock:
+                    if self._last_report is not None:
+                        delay = max(
+                            0.01,
+                            self.interval - (self.clock() - self._last_report[0]),
+                        )
+            if self._stop.wait(delay):
+                return
             self.report()
 
     def advance(self, count: int = 1) -> None:
         with self._lock:
+            previous = self.completed
             self.completed += count
+            batch_finished = self.batch_size is not None and (
+                self.completed // self.batch_size > previous // self.batch_size
+                and self.completed != self.total
+            )
+        if batch_finished:
+            self.report()
 
     def track(
         self, items: Iterable[T], *, weight: Callable[[T], int] | None = None
@@ -107,6 +131,14 @@ class TaskProgress:
             now = self.clock()
             elapsed = max(0.0, now - self._started)
             done = self.completed
+            if self.batch_size is not None and not finished and self._last_report:
+                last_time, last_done = self._last_report
+                if (
+                    done // self.batch_size == last_done // self.batch_size
+                    and now - last_time < self.interval
+                ):
+                    return
+            self._last_report = now, done
             size = (
                 max(0, self.byte_count() - self._initial_bytes)
                 if self.byte_count
@@ -135,6 +167,15 @@ class TaskProgress:
                 filled = 20 if success else min(19, int(fraction * 20))
                 bar = f"[{'#' * filled}{'-' * (20 - filled)}] {percent:3d}%"
                 count = f"{done}/{self.total} {self.unit}"
+            if self.batch_size is not None:
+                completed_batches = done // self.batch_size
+                if self.total is None:
+                    count += f" | lotes concluídos={completed_batches}"
+                else:
+                    total_batches = math.ceil(self.total / self.batch_size)
+                    if success:
+                        completed_batches = total_batches
+                    count += f" | lotes={completed_batches}/{total_batches}"
             if success:
                 eta = "00:00:00"
             elif self.total is not None and done == self.total and done > 0:

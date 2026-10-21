@@ -27,6 +27,8 @@ from analytics import (
 )
 from config import (
     FARMALIDER_BATCH_SIZE,
+    WENI_PROGRESS_BATCH_SIZE,
+    WENI_PROGRESS_INTERVAL_SECONDS,
     WENI_UPDATE_AUDIT_FILE,
     WENI_UPDATE_CONTEXT_LOOKBACK_HOURS,
     WENI_UPDATE_INITIAL_LOOKBACK_DAYS,
@@ -230,6 +232,8 @@ class UpdateStats:
     invalid_cpf_orders_found: int = 0
     invalid_cpf_orders_validated: int = 0
     invalid_cpf_outcomes: dict[str, int] = field(default_factory=dict)
+    order_resolution_counts: dict[str, int] = field(default_factory=dict)
+    order_diagnostics: list[dict[str, str]] = field(default_factory=list)
     pending_retry_uuids: list[str] = field(default_factory=list)
 
 
@@ -307,6 +311,14 @@ class _InvalidCpfBatch:
 
 def _record_validated_order(stats: UpdateStats, plan: ContactUpdatePlan) -> None:
     """Count validated orders and incomplete queries, including unchanged contacts."""
+    outcome = plan.order_resolution_status or "SEM_PEDIDO_VALIDADO"
+    stats.order_resolution_counts[outcome] = (
+        stats.order_resolution_counts.get(outcome, 0) + 1
+    )
+    if outcome.startswith(("CPF_IDENTIDADE_", "ERRO_")):
+        stats.order_diagnostics.append(
+            {"contact_uuid": plan.contact_uuid, "reason": outcome}
+        )
     if (
         plan.order_resolution_status.startswith("ERRO_")
         or plan.order_resolution_status == "API_DESABILITADA"
@@ -1093,11 +1105,7 @@ def _apply_purchase_candidate(
     if order is not None and str(order.get("status_confirmacao") or "").startswith(
         "CPF_IDENTIDADE_"
     ):
-        identity_level = (
-            logging.DEBUG
-            if cpf_query_priority(candidate["fields"].get("cpf")) == 1
-            else logging.WARNING
-        )
+        identity_level = logging.DEBUG
         if logging.getLogger().isEnabledFor(identity_level):
             reference = (
                 farm_client.weni_contact_diagnostic_ref(str(contact.get("uuid") or ""))
@@ -1947,6 +1955,7 @@ def _review_summary(
         "invalid_cpf_orders_found": stats.invalid_cpf_orders_found,
         "invalid_cpf_orders_validated": stats.invalid_cpf_orders_validated,
         "invalid_cpf_outcomes": dict(sorted(stats.invalid_cpf_outcomes.items())),
+        "order_resolution_counts": dict(sorted(stats.order_resolution_counts.items())),
         "field_counts": dict(sorted(field_counts.items())),
         "lgpd_contacts": lgpd_contacts,
         "cpf_contacts": cpf_contacts,
@@ -1991,6 +2000,7 @@ def write_review_snapshot(
         "plan_sha256": digest,
         "summary": summary,
         "pending_retry_uuids": sorted(set(stats.pending_retry_uuids)),
+        "order_diagnostics": stats.order_diagnostics,
         "plans": [
             {
                 "display": {
@@ -2070,6 +2080,7 @@ def write_review_snapshot(
         f"Contatos com pedido pendente de pagamento: {summary['orders_pending_payment']}",
         "CPFs inválidos (contagens por contato; não são pedidos únicos nem gravações):",
         _invalid_cpf_summary(stats),
+        f"Resultados da consulta de pedidos por contato: {summary['order_resolution_counts']}",
         "",
         "ALTERAÇÕES POR CAMPO",
         "----------------------------------------------------------",
@@ -2079,6 +2090,19 @@ def write_review_snapshot(
             lines.append(f"{field_name}: {count}")
     else:
         lines.append("Nenhuma alteração de campo proposta.")
+
+    if stats.order_diagnostics:
+        lines.extend(
+            [
+                "",
+                "PENDÊNCIAS DE PEDIDOS POR CONTATO (somente diagnóstico)",
+                "----------------------------------------------------------",
+            ]
+        )
+        lines.extend(
+            f"UUID: {item['contact_uuid']} | motivo: {item['reason']}"
+            for item in stats.order_diagnostics
+        )
 
     lines.extend(
         [
@@ -2793,6 +2817,9 @@ def run_update(
                 summary.get("invalid_cpf_orders_validated") or 0
             )
             stats.invalid_cpf_outcomes = dict(summary.get("invalid_cpf_outcomes") or {})
+            stats.order_resolution_counts = dict(
+                summary.get("order_resolution_counts") or {}
+            )
             unmapped = summary.get("payment_unmapped_codes")
             if isinstance(unmapped, dict):
                 stats.payment_unmapped_codes = {
@@ -2829,6 +2856,8 @@ def run_update(
             with TaskProgress(
                 "Aplicação do snapshot",
                 len(plans),
+                batch_size=WENI_PROGRESS_BATCH_SIZE,
+                interval=WENI_PROGRESS_INTERVAL_SECONDS,
                 detail=lambda: (
                     f"aplicados={stats.contacts_updated}; conflitos={stats.contacts_conflicted}; já corretos={stats.contacts_already_satisfied}; falhas={stats.contacts_failed}"
                 ),
@@ -3191,7 +3220,10 @@ def run_update(
 
         prepared_contacts = []
         with TaskProgress(
-            "Preparação da fila Weni", len(all_contact_uuids)
+            "Preparação da fila Weni",
+            len(all_contact_uuids),
+            batch_size=WENI_PROGRESS_BATCH_SIZE,
+            interval=WENI_PROGRESS_INTERVAL_SECONDS,
         ) as progress:
             for _preparation_index, contact_uuid in progress.track(
                 enumerate(sorted(all_contact_uuids), start=1)
@@ -3269,12 +3301,16 @@ def run_update(
 
         prepare_customers(farm, len(prepared_contacts))
         previous_phase = None
-        invalid_batch = _InvalidCpfBatch()
+        invalid_batch = _InvalidCpfBatch(size=WENI_PROGRESS_BATCH_SIZE)
         with TaskProgress(
             "Preparação Weni",
             len(prepared_contacts),
+            batch_size=WENI_PROGRESS_BATCH_SIZE,
+            interval=WENI_PROGRESS_INTERVAL_SECONDS,
             detail=lambda: (
-                f"pedidos validados={stats.orders_validated}; alterações propostas={stats.plans_with_changes}; nenhuma gravação na Weni"
+                f"pedidos validados={stats.orders_validated}; alterações propostas={stats.plans_with_changes}; "
+                f"identidade bloqueada={sum(stats.order_resolution_counts.get(key, 0) for key in ('CPF_IDENTIDADE_AMBIGUA', 'CPF_IDENTIDADE_DIVERGENTE', 'CPF_IDENTIDADE_INSUFICIENTE'))}; "
+                f"falhas API={stats.orders_api_failed}; nenhuma gravação na Weni"
             ),
         ) as progress:
             for _index, (
@@ -3349,6 +3385,10 @@ def run_update(
                 stats.plans_with_changes = len(plans)
 
         invalid_batch.flush()
+        logging.info(
+            "Weni: resultados da consulta de pedidos por contato: %s.",
+            dict(sorted(stats.order_resolution_counts.items())),
+        )
         if stats.invalid_cpf_checked:
             logging.info(
                 "Weni CPFs inválidos | total da preparação | %s. "
@@ -3436,6 +3476,8 @@ def run_update(
             with TaskProgress(
                 "Gravação da auditoria JSONL (dry-run)",
                 len(plans),
+                batch_size=WENI_PROGRESS_BATCH_SIZE,
+                interval=WENI_PROGRESS_INTERVAL_SECONDS,
                 unit="registros",
                 byte_count=lambda: _AUDIT_BYTES_WRITTEN,
             ) as progress:
@@ -3448,6 +3490,8 @@ def run_update(
         with TaskProgress(
             "Aplicação Weni",
             len(plans),
+            batch_size=WENI_PROGRESS_BATCH_SIZE,
+            interval=WENI_PROGRESS_INTERVAL_SECONDS,
             detail=lambda: (
                 f"aplicados={stats.contacts_updated}; conflitos={stats.contacts_conflicted}; já corretos={stats.contacts_already_satisfied}; falhas={stats.contacts_failed}"
             ),

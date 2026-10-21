@@ -72,6 +72,8 @@ Na carga de 100% ou em partes de 25%, o Bloco de Notas abre o relatório e o CMD
 
 O bloqueio `logs/duplicados/execucao.lock` impede cargas Weni simultâneas. Na rotina atualizada, a presença desse arquivo não impede uma nova execução: o sistema operacional libera o bloqueio quando a anterior termina, inclusive após encerramento forçado. Bloqueios do formato antigo são recuperados quando o processo anterior está comprovadamente encerrado. Não apague o arquivo durante uma carga; se não for possível verificar seu proprietário, preserve-o para diagnóstico.
 
+O andamento da preparação, auditoria e aplicação é consolidado em lotes de 1.000 contatos ou registros, com percentual, lotes concluídos, velocidade e tempo restante. Durante esperas, há uma atualização a cada 15 segundos. Bloqueios repetidos de identidade aparecem como contagens no progresso e no resumo; o relatório privado de revisão contém UUID e motivo de cada pendência, inclusive dos contatos sem alteração proposta. A conclusão de um lote indica contatos processados, incluindo os ignorados ou pendentes; a quantidade efetivamente aplicada aparece separadamente.
+
 O componente `scripts\confirmar_revisao_weni.ps1` faz parte do projeto completo e do Setup. Se ele estiver ausente, a rotina interrompe a carga antes da revisão e solicita a reinstalação do Setup atualizado.
 
 Depois de atualizar ou reinstalar o NexoFlow 1.0, gere um novo dry-run completo com a política atual de pagamento/status e revise o novo relatório. Em seguida, execute a carga completa do Analytics para atualizar Google Sheets e BI. Snapshots anteriores à nova política de cancelamento por pagamento 0 devem ser regenerados.

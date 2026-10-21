@@ -147,7 +147,9 @@ class InvalidCpfBatchSummaryTests(unittest.TestCase):
         self.assertEqual(stats.invalid_cpf_orders_found, 1)
         self.assertEqual(stats.invalid_cpf_orders_validated, 0)
 
-    def test_valid_cpf_identity_ambiguity_keeps_visible_warning(self):
+    def test_valid_cpf_identity_ambiguity_is_consolidated_without_warning_per_contact(
+        self,
+    ):
         import logging
 
         plan = ContactUpdatePlan("synthetic")
@@ -169,7 +171,7 @@ class InvalidCpfBatchSummaryTests(unittest.TestCase):
                 farm_client=Mock(),
                 captured_at="2026-10-08T10:00:00Z",
             )
-        self.assertEqual(log.call_args.args[0], logging.WARNING)
+        self.assertEqual(log.call_args.args[0], logging.DEBUG)
         self.assertFalse(plan.order_validated)
 
     def test_quiet_checkup_does_not_force_identity_warning(self):

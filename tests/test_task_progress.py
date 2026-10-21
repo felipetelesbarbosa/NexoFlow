@@ -198,6 +198,60 @@ class TaskProgressTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.progress(100, initial_completed=count)
 
+    def test_batch_progress_emits_only_completed_lots_and_final_partial(self):
+        with self.progress(2501, batch_size=1000) as progress:
+            for _item in progress.track(range(2501)):
+                self.now += 0.001
+        self.assertEqual(len(self.logs), 4)
+        self.assertIn("0/2501", self.logs[0])
+        self.assertIn("lotes=0/3", self.logs[0])
+        self.assertIn("1000/2501", self.logs[1])
+        self.assertIn("lotes=1/3", self.logs[1])
+        self.assertIn("2000/2501", self.logs[2])
+        self.assertIn("lotes=2/3", self.logs[2])
+        self.assertIn("100%", self.logs[-1])
+        self.assertIn("2501/2501", self.logs[-1])
+        self.assertIn("lotes=3/3", self.logs[-1])
+
+    def test_batch_heartbeat_is_throttled_and_reports_stalled_api(self):
+        with TaskProgress(
+            "Teste", 3000, batch_size=1000, interval=15, clock=lambda: self.now
+        ) as progress:
+            progress.advance(1000)
+            self.now = 2
+            progress.report()
+            self.assertEqual(len(self.logs), 2)
+            self.now = 15
+            progress.set_activity("aguardando API: Weni")
+            progress.report()
+            self.assertEqual(len(self.logs), 3)
+            self.assertIn("1000/3000", self.logs[-1])
+            self.assertIn("aguardando API: Weni", self.logs[-1])
+            self.assertNotIn("100%", self.logs[-1])
+            self.assertIn("0.0 contatos/s", self.logs[-1])
+
+    def test_interrupted_batch_never_reports_partial_lot_as_completed(self):
+        with self.assertRaises(RuntimeError):
+            with self.progress(2500, batch_size=1000) as progress:
+                progress.advance(1200)
+                raise RuntimeError("API falhou")
+        self.assertIn("1200/2500", self.logs[-1])
+        self.assertIn("lotes=1/3", self.logs[-1])
+        self.assertIn("interrompido", self.logs[-1])
+        self.assertFalse(any("100%" in line for line in self.logs))
+
+    def test_unknown_total_never_invents_batch_total_or_percent(self):
+        with self.progress(None, batch_size=1000) as progress:
+            progress.advance(1000)
+        self.assertIn("lotes concluídos=1", self.logs[-1])
+        self.assertNotIn("%", self.logs[-1])
+        self.assertNotIn("lotes=", self.logs[-1])
+
+    def test_invalid_batch_size_is_rejected(self):
+        for size in (0, -1, 1.5, True):
+            with self.subTest(size=size), self.assertRaises(ValueError):
+                self.progress(100, batch_size=size)
+
 
 if __name__ == "__main__":
     unittest.main()

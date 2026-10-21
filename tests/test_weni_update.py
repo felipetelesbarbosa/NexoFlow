@@ -191,6 +191,74 @@ class WeniUpdateTests(unittest.TestCase):
         client.list_messages.return_value = []
         return client
 
+    def test_repeated_identity_blocks_use_batches_and_preserve_private_details(self):
+        from task_progress import TaskProgress
+        from weni_update import _apply_purchase_candidate
+
+        contacts = [
+            {"uuid": f"private-synthetic-{i}", "fields": {"cpf": "52998224725"}}
+            for i in range(1001)
+        ]
+        client = self._incremental_purchase_client(contacts[0])
+        client.list_contacts.return_value = contacts
+        farm = Mock()
+
+        def build(contact, **kwargs):
+            plan = ContactUpdatePlan(contact["uuid"])
+            _apply_purchase_candidate(
+                plan, contact, farm_client=farm, captured_at=kwargs["captured_at"]
+            )
+            return plan
+
+        with tempfile.TemporaryDirectory() as folder:
+            review = Path(folder) / "review.json"
+            with (
+                patch("weni_update.WeniClient", return_value=client),
+                patch("weni_update._open_farmalider", return_value=farm),
+                patch("weni_update.prepare_customers"),
+                patch(
+                    "weni_update.TaskProgress",
+                    side_effect=lambda *args, **kwargs: TaskProgress(
+                        *args, **kwargs, clock=lambda: 0.0
+                    ),
+                ),
+                patch("weni_update._build_contact_plan", side_effect=build),
+                patch(
+                    "weni_update.resolve_contact_order",
+                    return_value=({"status_confirmacao": "CPF_IDENTIDADE_AMBIGUA"}, []),
+                ),
+                patch("weni_update.logging.info") as info,
+                patch("weni_update.logging.warning") as warning,
+                patch("weni_update._append_audit"),
+            ):
+                stats = run_update(apply=False, full=True, review_out=review)
+            payload = json.loads(review.read_text(encoding="utf-8"))
+            report = review.with_suffix(".txt").read_text(encoding="utf-8-sig")
+            loaded, _, _ = load_review_snapshot(full=True, json_path=review)
+        lines = [call.args[0] % call.args[1:] for call in info.call_args_list]
+        progress = [line for line in lines if line.startswith("Preparação Weni [")]
+        self.assertEqual(len(progress), 3)
+        self.assertIn("lotes=1/2", progress[1])
+        self.assertIn("1000/1001", progress[1])
+        self.assertIn("identidade bloqueada=1000", progress[1])
+        self.assertIn("100%", progress[-1])
+        self.assertIn("lotes=2/2", progress[-1])
+        self.assertIn("identidade bloqueada=1001", progress[-1])
+        self.assertEqual(stats.contacts_considered, 1001)
+        self.assertEqual(
+            stats.order_resolution_counts, {"CPF_IDENTIDADE_AMBIGUA": 1001}
+        )
+        self.assertEqual(len(payload["order_diagnostics"]), 1001)
+        self.assertIn("private-synthetic-1000", report)
+        self.assertIn("CPF_IDENTIDADE_AMBIGUA", report)
+        self.assertEqual(loaded, [])
+        self.assertFalse(any("private-synthetic-" in line for line in lines))
+        self.assertFalse(
+            any("pedido bloqueado" in str(call) for call in warning.call_args_list)
+        )
+        client.update_contact_fields.assert_not_called()
+        client.contact_group_action.assert_not_called()
+
     def test_open_order_tracking_keeps_only_non_terminal_statuses(self) -> None:
         tracked: set[str] = set()
         _track_open_order(tracked, "u1", "Pendente de pagamento")
