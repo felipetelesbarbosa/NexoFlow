@@ -349,8 +349,9 @@ Distribuição oficial do **NexoFlow 1.0**.
 O arquivo `NexoFlow-Setup-$Version.zip` contém o instalador do NexoFlow 1.0 e foi validado automaticamente em Windows para primeira instalação e atualização de uma instalação existente.
 
 Melhorias desta distribuição do NexoFlow 1.0:
+- listagem FARMA com último pedido e itens reaproveitados em memória após validação; endereço cadastral conferido com o último pedido e fallback individual quando necessário;
 - instalador: atualização com a pasta principal aberta no Windows, preservação completa para rollback e reconhecimento correto dos processos instalados;
-- cadastro FARMA nos quatro fluxos, preenchimento auditado de campos ausentes, conferência dos candidatos por CPF/ID e reaproveitamento de leituras por execução; pedidos continuam sendo confirmados separadamente e o apply usa consultas novas;
+- cadastro FARMA nos quatro fluxos, preenchimento auditado de campos ausentes, conferência dos candidatos por CPF/ID e reaproveitamento de leituras por execução; o apply usa leituras novas;
 - rede FarmaLíder: consultas aguardando na fila acompanham a rota atual, mantendo URL e proxy coerentes mesmo após uma troca de conexão; diagnóstico de destino sem CPF ou token;
 - Delivery/Planilhas: diagnóstico individual privado de conflitos, retomada explícita da revisão existente sem repetir operações concluídas e histórico preservado antes de gerar outra revisão; cadastro ausente é separado de ausência de pedido;
 - Recompra: lock do sistema operacional com identificação da execução e recuperação segura após encerramento, consolidação por UUID, prazo revalidado antes da inclusão e revisão resumida; CPF zerado é pendência cadastral, sem consulta à API; recusas continuam bloqueando sem alterar consentimento;

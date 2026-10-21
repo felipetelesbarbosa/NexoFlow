@@ -1111,11 +1111,14 @@ def resolve_contact_order(
             "Último pedido pertence a outro cliente.",
         )
 
-    # O GET por CPF já é suficiente para montar o snapshot completo.
+    # CPF individual ou listagem oficial com cliente + pedido + itens.
     fallback_order = _empty_order(contact, captured_at)
     fallback_order["pedido_id"] = pedido_id
     fallback_order["farmalider_cliente_id"] = linked_id
-    fallback_order["origem_pedido"] = "FARMALIDER_CLIENTE_CPF" + (
+    source = "FARMALIDER_CLIENTE_CPF"
+    if payload and payload.get("_nexoflow_source") == "FARMALIDER_CLIENTES_FARMA":
+        source = "FARMALIDER_CLIENTES_FARMA"
+    fallback_order["origem_pedido"] = source + (
         "_IDENTIDADE_VALIDADA" if invalid_cpf else ""
     )
     fallback_response = _pedido_from_cliente_payload(payload)
@@ -1151,7 +1154,10 @@ def resolve_contact_order(
         order = _empty_order(contact, captured_at)
         order["pedido_id"] = pedido_id
         order["farmalider_cliente_id"] = linked_id
-        order["origem_pedido"] = "FARMALIDER_PEDIDO_API" + (
+        source = "FARMALIDER_PEDIDO_API"
+        if response.get("_nexoflow_source") == "FARMALIDER_CLIENTES_FARMA":
+            source = "FARMALIDER_CLIENTES_FARMA"
+        order["origem_pedido"] = source + (
             "_IDENTIDADE_VALIDADA" if invalid_cpf else ""
         )
         confirmed_order, confirmed_items = apply_pedido_api_confirmation(

@@ -50,9 +50,9 @@ https://api.farmalider.net.br:3200/farmalider
 GET /api/Delivery/clientes/FARMA?token=...
 ```
 
-Retorna uma lista de cadastros com ID, CPF, nome, celular, e-mail, sexo, nascimento, data de cadastro e endereços. **Não retorna pedidos.** O NexoFlow usa o segmento FARMA; a presença de um cliente em outro segmento não autoriza exclusões nem substitui o filtro de produtos. O segmento PET permanece disponível no cliente técnico, sem carga automática na operação FarmaLíder.
+Pode retornar uma lista de objetos com `cliente`, `ultimoPedido` e `itens`. O objeto `cliente` contém ID, CPF, nome, celular, e-mail, sexo, nascimento, data de cadastro e endereços. O NexoFlow usa o segmento FARMA; a presença de um cliente em outro segmento não autoriza exclusões nem substitui o filtro de produtos. O segmento PET permanece disponível no cliente técnico, sem carga automática na operação FarmaLíder.
 
-O índice preserva todos os candidatos de um CPF, bloqueia IDs repetidos com dados divergentes e mantém a seleção única conforme as regras abaixo. A consulta individual de CPF continua descobrindo o último pedido; as respostas cadastrais não entram no cache de descoberta de compras. Consulte [Cadastro FARMA](CADASTRO%20FARMA.md).
+O índice preserva todos os candidatos de um CPF, bloqueia IDs repetidos com dados divergentes e mantém a seleção única conforme as regras abaixo. Snapshots completos e coerentes atendem às consultas de CPF e pedido em memória durante a execução. Dados apenas cadastrais, ausentes ou incompletos usam as consultas individuais. O endereço cadastral usado para preencher localização precisa corresponder ao último pedido. Consulte [Cadastro FARMA](CADASTRO%20FARMA.md).
 
 ## Cliente por CPF
 

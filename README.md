@@ -24,7 +24,7 @@ As [referências e regras de endereço](docs/geografia.md) acompanham os pacotes
 
 ## Cadastro FARMA por segmento
 
-Weni, Analytics, Recompra e Planilhas aproveitam a listagem oficial `clientes/FARMA` para conferir candidatos e preencher dados ausentes. O modo automático usa a listagem nas cargas maiores; cargas pequenas continuam com consultas individuais. A confirmação da última compra permanece separada. Veja [Cadastro FARMA](docs/CADASTRO%20FARMA.md).
+Weni, Analytics, Recompra e Planilhas aproveitam a listagem oficial `clientes/FARMA`, incluindo `cliente`, `ultimoPedido` e `itens`. Snapshots completos e verificados ficam em memória por CPF/ID durante a execução, evitando consultas repetidas de cliente e pedido. Respostas incompletas usam as consultas individuais. O preenchimento de localização exige endereço cadastral correspondente ao último pedido, sem substituir campos já preenchidos. O modo automático usa a listagem nas cargas maiores. Veja [Cadastro FARMA](docs/CADASTRO%20FARMA.md).
 
 ## Consulta de CPFs válidos e inválidos
 

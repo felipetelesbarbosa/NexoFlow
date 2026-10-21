@@ -282,12 +282,13 @@ def _query_cliente(
     try:
         directory = directory_for(farm_client)
         local = bool(directory is not None and directory.candidates(cpf))
+        complete = bool(directory is not None and directory.has_latest_snapshot(cpf))
         api_cliente = (
             farm_client.get_cliente_cadastro_by_cpf(cpf)
-            if local
+            if local and not complete
             else farm_client.get_cliente_by_cpf(cpf)
         )
-        if local:
+        if local and not complete:
             if cadastro_responses is not None:
                 cadastro_responses[cpf] = api_cliente
         elif response_cache is not None:

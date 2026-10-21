@@ -56,6 +56,20 @@ class CustomerDirectoryFlowTests(unittest.TestCase):
         mock = farm()
         self.full_payload = deepcopy(mock.get_cliente_by_cpf.return_value)
         self.full_payload["cliente"] = deepcopy(self.api_customer)
+        self.full_payload["ultimoPedido"].update(
+            {
+                key: self.api_customer["enderecos"][0].get(key)
+                for key in (
+                    "cep",
+                    "uf",
+                    "cidade",
+                    "bairro",
+                    "logradouro",
+                    "numero",
+                    "complemento",
+                )
+            }
+        )
         self.pedido = {
             "capa": self.full_payload["ultimoPedido"],
             "itens": self.full_payload["itens"],
@@ -71,7 +85,9 @@ class CustomerDirectoryFlowTests(unittest.TestCase):
         raise AssertionError("Consulta inesperada")
 
     def metadata_plan(self):
-        self.client.customer_directory = CustomerDirectory([self.api_customer])
+        self.client.customer_directory = CustomerDirectory(
+            [{**self.full_payload, "cliente": self.api_customer}]
+        )
         plan = ContactUpdatePlan(contact_uuid=self.contact["uuid"])
         _apply_customer_enrichment(plan, self.contact, self.client, NOW, AVAILABLE)
         return plan

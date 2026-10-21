@@ -1,5 +1,7 @@
 # NexoFlow 1.0 — Changelog
 
+- Listagem FARMA: suporte ao retorno com `cliente`, `ultimoPedido` e `itens`, snapshots verificados em memória por CPF/ID e consulta individual de fallback. Endereço cadastral conferido com o último pedido, incluindo endereços secundários; divergências e dados incompletos não preenchem a localização. Origem da listagem registrada nos pedidos, sem reutilizar leituras da simulação no apply.
+
 - Instalador: identificação correta dos processos da instalação e atualização com rollback sem renomear a pasta principal quando um handle do Windows impede a movimentação. Arquivos ainda bloqueados interrompem a preparação e os arquivos já movidos retornam ao destino original. Testes Windows cobrem bloqueio real da pasta, arquivo em uso e recuperação.
 
 - Cadastro FARMA integrado a Weni, Analytics, Recompra e Planilhas: índice por CPF/ID, candidatos ambíguos preservados, confronto do ID da consulta individual com o cadastro FARMA e fallback quando a listagem não fornece um vínculo. Campos cadastrais ausentes são preenchidos com evidência na revisão, sem mudar CPF, contato nativo, consentimento ou pedidos.

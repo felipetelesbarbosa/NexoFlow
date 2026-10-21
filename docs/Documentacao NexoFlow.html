@@ -542,8 +542,8 @@ ultimo_anuncio_*</code></pre>
 <p><code>opt_in_lgpd_status</code> continua controlado pelos
 flows/agentes da Weni. <code>ultimo_pedido</code> é preservado apenas
 para compatibilidade; com a FarmaLíder API disponível, os campos
-<code>pedido_*</code> são alimentados pelo GET oficial por
-CPF/pedido.</p>
+<code>pedido_*</code> são alimentados pelos snapshots oficiais da
+listagem FARMA ou pelas consultas individuais de CPF/pedido.</p>
 <h2 id="urns-e-canais">URNs e canais</h2>
 <p>A resolução de identidade usa somente URNs retornadas pela Weni. A
 prioridade da URN principal é:</p>
@@ -578,11 +578,12 @@ fora de <strong>Opt-In LGPD</strong>. O NexoFlow Weni corrige
 associações incompatíveis mesmo quando o campo já estava preenchido
 antes da execução.</p>
 <h2 id="pedidos-e-última-compra">Pedidos e última compra</h2>
-<p>A rotina usa a FarmaLíder API como fonte de verdade: consulta o
-cliente por CPF, obtém <code>ultimoPedido</code> e <code>itens</code>,
-confirma o mesmo pedido por código e então escreve os campos
-<code>pedido_*</code>. <code>pedido_produtos</code> usa
-<code>descricao</code>; quantidades e valores unitários são listas
+<p>A rotina usa a FarmaLíder API como fonte de verdade: obtém
+<code>cliente</code>, <code>ultimoPedido</code> e <code>itens</code> da
+listagem FARMA quando completos, ou consulta os endpoints individuais de
+CPF/pedido quando necessário. Os snapshots são conferidos antes de
+escrever os campos <code>pedido_*</code>. <code>pedido_produtos</code>
+usa <code>descricao</code>; quantidades e valores unitários são listas
 posicionais separadas por vírgula; <code>pedido_valor</code> é a soma de
 <code>itens[].total</code>. No Analytics/Looker, todos os estados
 documentados não cancelados de pedidos validados pela API contam como
@@ -875,12 +876,16 @@ dos itens do período e sinaliza ausência ou divergência em
 <code>BI_Qualidade</code>; a rotina Delivery também atualiza as fontes
 comerciais.</p>
 <h2 id="cadastro-oficial-farma">Cadastro oficial FARMA</h2>
-<p>Os quatro componentes compartilham o índice cadastral por segmento e
-o reaproveitamento de leituras da mesma execução. A ausência de
-<code>ultimoPedido</code> nessa listagem não indica ausência de compra.
-Gênero, idade/maioridade e localização são preenchidos somente quando
-ausentes e com vínculo de cliente único confirmado. Consulte <a
-href="CADASTRO%20FARMA.md">Cadastro FARMA</a>.</p>
+<p>Os quatro componentes compartilham o índice por segmento e os
+snapshots completos de <code>cliente</code>, <code>ultimoPedido</code> e
+<code>itens</code>, mantidos em memória por CPF e ID de pedido durante a
+execução. Cliente, proprietário, emissão, itens, valores e segmento são
+conferidos antes do reaproveitamento; dados ausentes ou incompletos usam
+a consulta individual. Gênero e idade/maioridade preenchem lacunas com
+vínculo único. A localização exige endereço cadastral correspondente ao
+último pedido, inclusive se for um endereço secundário; divergência,
+ambiguidade e dados incompletos impedem o preenchimento automático.
+Consulte <a href="CADASTRO%20FARMA.md">Cadastro FARMA</a>.</p>
 </body>
 </html>
-<!-- NexoFlow documentation: source-sha256=4e89d91dcf7c3c93b272e917e20db1e5326eaa363ce182283d4f151ffd4781f2 content-sha256=b05575d1c0c3d966f8731d2bd84bcc0846853fe447fcd747f7b69019538b2c7c -->
+<!-- NexoFlow documentation: source-sha256=9972aee9ad6e0b10ff5028fb43db1c969d3bb1b78c9aa0e8988c5dcf9709898f content-sha256=018ccafdd07cb922ebfe1dc9074b1c22963c7d9917a94c329cc983dc6ce97f23 -->

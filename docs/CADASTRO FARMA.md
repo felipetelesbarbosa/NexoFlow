@@ -2,7 +2,9 @@
 
 Os componentes Weni, Analytics, Recompra e Planilhas compartilham a listagem `GET /api/Delivery/clientes/FARMA`. O NexoFlow usa a mesma autenticação e seleção de URL/proxy das outras consultas.
 
-A lista contém **cadastro**, sem último pedido ou itens. A descoberta da última compra continua pelo endpoint de CPF, e o pedido por código continua sendo conferido. A data `cadastro` não é data de compra nem indicação de alteração recente. A regra de reconsultar pedidos já observados somente até 20 dias permanece vigente no Analytics.
+A lista pode conter objetos com **`cliente`, `ultimoPedido` e `itens`**. O NexoFlow aceita também o formato anterior, com apenas cadastro. Snapshots completos ficam em memória por CPF e ID de pedido durante a execução, após conferir proprietário, emissão, itens, valores e segmento. Eles atendem às consultas locais de cliente e pedido sem repetir HTTP. A data `cadastro` não é data de compra nem indicação de alteração recente. A regra de reconsultar pedidos já observados somente até 20 dias permanece vigente no Analytics.
+
+Quando faltam pedido, itens ou dados consistentes, a consulta individual de CPF/pedido permanece disponível. Ausência ou `ultimoPedido` nulo na listagem não prova ausência de compra. Um snapshot de um cliente nunca fornece itens ou pedido a outro cliente. Duplicatas com respostas divergentes não são resolvidas escolhendo a primeira ocorrência.
 
 ## Seleção e dados preservados
 
@@ -16,7 +18,9 @@ A lista contém **cadastro**, sem último pedido ou itens. A descoberta da últi
 
 Com cliente identificado, gênero, idade/maioridade e localização podem ser preenchidos. Valores existentes são preservados. Datas de nascimento inválidas, futuras ou fora da faixa operacional não geram idade. Valores de sexo não reconhecidos não geram gênero.
 
-O endereço só é usado quando existe um único endereço principal, pertence ao mesmo ID de cliente e não conflita com a localização já informada. Cidade, estado e bairro passam pela padronização atual. O endereço cadastral não substitui o endereço histórico dos pedidos.
+O endereço só é usado quando pertence ao mesmo ID de cliente e corresponde de forma única ao endereço do último pedido. São conferidos CEP, cidade/estado, logradouro, número, complemento e bairro quando disponível; acentos, pontuação e abreviações usuais de logradouro são normalizados. Coincidência apenas de CEP não é suficiente. O endereço correspondente pode ser secundário. Dados incompletos, divergentes ou ambíguos ficam sem preenchimento automático de localização.
+
+Cidade, estado e bairro passam pela padronização atual. Campos já preenchidos são preservados. A origem e o endereço usado para conferência acompanham a revisão; o endereço histórico do pedido é mantido.
 
 Weni e Planilhas propõem somente campos já disponíveis na Weni e registram a origem no snapshot revisado. O apply relê os campos relevantes antes de gravar; uma mudança posterior gera conflito, sem sobrescrita. Analytics preenche as colunas existentes do Sheets, sem criar novas fontes no Looker. Nenhuma dessas informações autoriza alterar CPF, URNs, nome do canal, consentimento ou grupos de marketing.
 
@@ -37,4 +41,4 @@ A listagem é obtida uma vez por preparação. Falha de formato ou indisponibili
 
 O reaproveitamento de CPF e pedido existe somente dentro da execução, com armazenamento temporário limitado. Leituras que falharam podem ser tentadas novamente. Recompra e deduplicação descartam as leituras da simulação antes da aplicação e revalidam os dados necessários. A revisão humana, as recusas, o estado local e a proteção contra duplicidade de admissão permanecem obrigatórios.
 
-O ganho varia conforme a repetição de CPFs/pedidos e a necessidade de conferir apenas cadastro. Para descobrir novas compras, as consultas individuais continuam necessárias. A listagem completa não é baixada em cada pequena sincronização do modo automático.
+O ganho varia conforme a cobertura dos snapshots completos e a repetição de CPFs/pedidos. Cada preparação obtém uma listagem nova. Recompra e deduplicação descartam o índice da simulação antes da aplicação. A listagem completa não é baixada em cada pequena sincronização do modo automático. Logs agregados distinguem cadastros locais, últimos pedidos locais e pedidos por ID locais, além de informar o resultado da conferência de endereços.

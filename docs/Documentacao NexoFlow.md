@@ -195,7 +195,7 @@ primeiro_anuncio_*
 ultimo_anuncio_*
 ```
 
-`opt_in_lgpd_status` continua controlado pelos flows/agentes da Weni. `ultimo_pedido` é preservado apenas para compatibilidade; com a FarmaLíder API disponível, os campos `pedido_*` são alimentados pelo GET oficial por CPF/pedido.
+`opt_in_lgpd_status` continua controlado pelos flows/agentes da Weni. `ultimo_pedido` é preservado apenas para compatibilidade; com a FarmaLíder API disponível, os campos `pedido_*` são alimentados pelos snapshots oficiais da listagem FARMA ou pelas consultas individuais de CPF/pedido.
 
 ## URNs e canais
 
@@ -217,7 +217,7 @@ O valor de `opt_in_lgpd` é a fonte de verdade para os grupos. Com `ativo`, o co
 
 ## Pedidos e última compra
 
-A rotina usa a FarmaLíder API como fonte de verdade: consulta o cliente por CPF, obtém `ultimoPedido` e `itens`, confirma o mesmo pedido por código e então escreve os campos `pedido_*`. `pedido_produtos` usa `descricao`; quantidades e valores unitários são listas posicionais separadas por vírgula; `pedido_valor` é a soma de `itens[].total`. No Analytics/Looker, todos os estados documentados não cancelados de pedidos validados pela API contam como venda, incluindo Em processamento (0). A mesma regra vale para `ultima_compra` e Recompra, mantendo as demais validações. Cada nova carga consulta os CPFs no escopo selecionado, mesmo sem alteração do contato na Weni. No Analytics, a reconsulta de status dos pedidos já registrados abrange somente os últimos 20 dias; os mais antigos permanecem preservados. Pagamento 0 grava `pedido_forma_pagamento=Cancelado` e força status efetivo 3 na Weni/BI; `Pedidos_FarmaLider` mantém o status e o pagamento brutos da API. Os estados -2, Em aberto, -1, Pendente de pagamento, 0, Em processamento, 4, Pronto para rota, e 1, Em trânsito, permanecem em rechecagem até Concluído ou Cancelado; a rechecagem permanece ativa mesmo quando o pedido já conta como venda no dashboard.
+A rotina usa a FarmaLíder API como fonte de verdade: obtém `cliente`, `ultimoPedido` e `itens` da listagem FARMA quando completos, ou consulta os endpoints individuais de CPF/pedido quando necessário. Os snapshots são conferidos antes de escrever os campos `pedido_*`. `pedido_produtos` usa `descricao`; quantidades e valores unitários são listas posicionais separadas por vírgula; `pedido_valor` é a soma de `itens[].total`. No Analytics/Looker, todos os estados documentados não cancelados de pedidos validados pela API contam como venda, incluindo Em processamento (0). A mesma regra vale para `ultima_compra` e Recompra, mantendo as demais validações. Cada nova carga consulta os CPFs no escopo selecionado, mesmo sem alteração do contato na Weni. No Analytics, a reconsulta de status dos pedidos já registrados abrange somente os últimos 20 dias; os mais antigos permanecem preservados. Pagamento 0 grava `pedido_forma_pagamento=Cancelado` e força status efetivo 3 na Weni/BI; `Pedidos_FarmaLider` mantém o status e o pagamento brutos da API. Os estados -2, Em aberto, -1, Pendente de pagamento, 0, Em processamento, 4, Pronto para rota, e 1, Em trânsito, permanecem em rechecagem até Concluído ou Cancelado; a rechecagem permanece ativa mesmo quando o pedido já conta como venda no dashboard.
 
 ## Auditoria, idempotência e checkpoint
 
@@ -397,4 +397,4 @@ As tabelas comerciais e as tabelas BI anteriores preservam números, datas e ide
 
 ## Cadastro oficial FARMA
 
-Os quatro componentes compartilham o índice cadastral por segmento e o reaproveitamento de leituras da mesma execução. A ausência de `ultimoPedido` nessa listagem não indica ausência de compra. Gênero, idade/maioridade e localização são preenchidos somente quando ausentes e com vínculo de cliente único confirmado. Consulte [Cadastro FARMA](CADASTRO%20FARMA.md).
+Os quatro componentes compartilham o índice por segmento e os snapshots completos de `cliente`, `ultimoPedido` e `itens`, mantidos em memória por CPF e ID de pedido durante a execução. Cliente, proprietário, emissão, itens, valores e segmento são conferidos antes do reaproveitamento; dados ausentes ou incompletos usam a consulta individual. Gênero e idade/maioridade preenchem lacunas com vínculo único. A localização exige endereço cadastral correspondente ao último pedido, inclusive se for um endereço secundário; divergência, ambiguidade e dados incompletos impedem o preenchimento automático. Consulte [Cadastro FARMA](CADASTRO%20FARMA.md).

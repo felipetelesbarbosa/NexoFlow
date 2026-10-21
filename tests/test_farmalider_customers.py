@@ -37,12 +37,52 @@ def customer(**changes):
                 "uf": "PA",
                 "bairro": "CIDADE VELHA",
                 "cep": "66023170",
-                "logradouro": "NAO-COPIAR",
+                "logradouro": "Rua Sintética",
+                "numero": "10",
+                "complemento": "",
             }
         ],
     }
     result.update(changes)
     return result
+
+
+def customer_snapshot(**changes):
+    person = customer(**changes)
+    return {
+        "cliente": person,
+        "ultimoPedido": {
+            **{
+                k: person["enderecos"][0].get(k)
+                for k in (
+                    "cep",
+                    "uf",
+                    "cidade",
+                    "bairro",
+                    "logradouro",
+                    "numero",
+                    "complemento",
+                )
+            },
+            "id": 8,
+            "codCliente": person["id"],
+            "emissao": "2026-10-07T10:00:00",
+            "status": 2,
+            "formaPagamento": 5,
+            "frete": 9.99,
+            "segmento": "FARMA",
+        },
+        "itens": [
+            {
+                "codPedido": 8,
+                "codProduto": 901,
+                "descricao": "Creme humano sintético",
+                "quantidade": 1,
+                "valor": 20,
+                "total": 20,
+            }
+        ],
+    }
 
 
 class CustomerDirectoryTests(unittest.TestCase):
@@ -57,7 +97,7 @@ class CustomerDirectoryTests(unittest.TestCase):
         payload = json.dumps(directory.candidates(CPF))
         self.assertNotIn("NAO-COPIAR", payload)
         self.assertNotIn('"rg"', payload)
-        self.assertNotIn('"logradouro"', payload)
+        self.assertIn('"logradouro"', payload)
         self.assertEqual(directory.metrics()["cadastros_indexados"], 1)
         self.assertNotIn(CPF, json.dumps(directory.metrics()))
 
@@ -361,7 +401,8 @@ class CustomerClientTests(unittest.TestCase):
 
 class CustomerEnrichmentTests(unittest.TestCase):
     def test_missing_gender_age_and_geography_are_filled(self):
-        values = enrichment({}, customer(), date(2026, 10, 21))
+        person = CustomerDirectory([customer_snapshot()]).by_id["17"]
+        values = enrichment({}, person, date(2026, 10, 21))
         self.assertEqual(
             values,
             {

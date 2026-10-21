@@ -1,11 +1,13 @@
-"""Cadastro FARMA e leituras privadas por execução; não confirma compras."""
+"""Cadastro e snapshots oficiais FARMA mantidos somente durante a execução."""
 
 from __future__ import annotations
 
 import json
 import logging
+import re
 import sqlite3
 import tempfile
+import unicodedata
 from collections import defaultdict
 from concurrent.futures import Future
 from copy import deepcopy
@@ -24,7 +26,56 @@ CUSTOMER_FIELDS = (
     "nascimento",
     "cadastro",
 )
-ADDRESS_FIELDS = ("id", "clienteId", "principal", "cep", "uf", "cidade", "bairro")
+ADDRESS_FIELDS = (
+    "id",
+    "clienteId",
+    "principal",
+    "cep",
+    "uf",
+    "cidade",
+    "bairro",
+    "logradouro",
+    "numero",
+    "complemento",
+)
+ORDER_FIELDS = (
+    "id",
+    "codCliente",
+    "emissao",
+    "status",
+    "formaPagamento",
+    "cancelamento",
+    "frete",
+    "valorTotal",
+    "valorTotalPedido",
+    "valorTotalCompra",
+    "totalPedido",
+    "publicId",
+    "codFilial",
+    "cupom",
+    "pedidoWeb",
+    "entrega",
+    "segmento",
+    "cep",
+    "uf",
+    "cidade",
+    "bairro",
+    "logradouro",
+    "numero",
+    "complemento",
+)
+ITEM_FIELDS = (
+    "id",
+    "codPedido",
+    "codProduto",
+    "descricao",
+    "quantidade",
+    "valor",
+    "total",
+    "desconto",
+    "filialId",
+    "categoria",
+)
 DIRECTORY_SOURCE = "FARMALIDER_CLIENTES_FARMA"
 
 
@@ -45,7 +96,9 @@ def _cpf_key(value: Any) -> str:
 class CustomerDirectory:
     """Índice de candidatos; ausência nunca equivale a ausência de compras."""
 
-    def __init__(self, payload: Any):
+    def __init__(self, payload: Any, *, segment: str = "FARMA"):
+        if segment not in {"FARMA", "PET"}:
+            raise ValueError("Segmento deve ser FARMA ou PET.")
         if not isinstance(payload, list) or any(
             not isinstance(c, dict) for c in payload
         ):
@@ -54,17 +107,27 @@ class CustomerDirectory:
         self.by_numeric_cpf: dict[str, list[dict]] = defaultdict(list)
         self.by_id: dict[str, dict] = {}
         self.conflicted_ids: set[str] = set()
+        self.snapshots: dict[str, dict] = {}
+        self.orders: dict[str, dict] = {}
+        self.conflicted_orders: set[str] = set()
+        self.segment = segment
+        self.source = f"FARMALIDER_CLIENTES_{segment}"
+        self.address_results: dict[str, int] = defaultdict(int)
         self.skipped = 0
         self.received = len(payload)
-        seen: dict[str, dict] = {}
+        seen: dict[str, tuple] = {}
         variants = []
         for raw in payload:
-            cid = positive_id(raw.get("id"))
+            source = raw.get("cliente", raw)
+            if not isinstance(source, dict):
+                self.skipped += 1
+                continue
+            cid = positive_id(source.get("id"))
             if not cid:
                 self.skipped += 1
                 continue
-            record = {key: raw.get(key) for key in CUSTOMER_FIELDS}
-            addresses = raw.get("enderecos")
+            record = {key: source.get(key) for key in CUSTOMER_FIELDS}
+            addresses = source.get("enderecos")
             record["enderecos"] = (
                 [
                     {key: address.get(key) for key in ADDRESS_FIELDS}
@@ -74,14 +137,29 @@ class CustomerDirectory:
                 if isinstance(addresses, list)
                 else []
             )
+            latest = raw.get("ultimoPedido")
+            if isinstance(latest, dict):
+                record["_ultimo_pedido_endereco"] = {
+                    key: latest.get(key)
+                    for key in (
+                        "id",
+                        "codCliente",
+                        "emissao",
+                        "segmento",
+                        *ADDRESS_FIELDS,
+                    )
+                    if key not in {"clienteId", "principal"}
+                }
+            snapshot = self._snapshot(record, raw)
+            signature = (record, snapshot)
             if cid in seen:
-                if seen[cid] == record:
+                if seen[cid] == signature:
                     continue
                 self.conflicted_ids.add(cid)
             else:
-                seen[cid] = record
-            variants.append(record)
-        for record in variants:
+                seen[cid] = signature
+            variants.append((record, snapshot))
+        for record, snapshot in variants:
             cid = positive_id(record["id"])
             key = _cpf_key(record["cpf"])
             if not key:
@@ -92,8 +170,89 @@ class CustomerDirectory:
                 self.by_numeric_cpf[key.lstrip("0")].append(record)
             if cid not in self.conflicted_ids:
                 self.by_id[cid] = record
+                result, _ = matching_order_address(record, segment=self.segment)
+                self.address_results[result] += 1
+                if snapshot is not None:
+                    self.snapshots[cid] = snapshot
+                    oid = positive_id(snapshot["ultimoPedido"]["id"])
+                    order = {
+                        "capa": snapshot["ultimoPedido"],
+                        "itens": snapshot["itens"],
+                        "_nexoflow_source": self.source,
+                    }
+                    if oid in self.orders and self.orders[oid] != order:
+                        self.conflicted_orders.add(oid)
+                    self.orders[oid] = order
+        for oid in self.conflicted_orders:
+            self.orders.pop(oid, None)
 
-    def candidates(self, cpf: str) -> list[dict]:
+    def _snapshot(self, customer: dict, raw: dict) -> dict | None:
+        from farmalider_integration import apply_pedido_api_confirmation
+        from pedido_utils import (
+            business_order_datetime,
+            is_order_cancelled,
+            is_order_sale,
+        )
+
+        latest, items = raw.get("ultimoPedido"), raw.get("itens")
+        if not isinstance(latest, dict) or not isinstance(items, list):
+            return None
+        cid, oid = positive_id(customer["id"]), positive_id(latest.get("id"))
+        if not oid or positive_id(latest.get("codCliente")) != cid:
+            return None
+        segment = str(latest.get("segmento") or "").strip().upper()
+        if segment and segment != self.segment:
+            return None
+        emitted = business_order_datetime(latest.get("emissao"))
+        if emitted is None or any(not isinstance(item, dict) for item in items):
+            return None
+        header = {key: latest[key] for key in ORDER_FIELDS if key in latest}
+        copied_items = [
+            {key: item[key] for key in ITEM_FIELDS if key in item} for item in items
+        ]
+        verified, _ = apply_pedido_api_confirmation(
+            {"pedido_id": oid},
+            [],
+            {"capa": header, "itens": copied_items},
+            linked_cliente_id=cid,
+            confirmed_at=emitted.isoformat(),
+        )
+        if verified.get("status_validacao") not in {"OK", "CANCELADO_SEM_ITENS"}:
+            return None
+        if not (is_order_sale(verified) or is_order_cancelled(verified)):
+            return None
+        return {
+            "cliente": customer,
+            "ultimoPedido": header,
+            "itens": copied_items,
+            "_nexoflow_source": self.source,
+        }
+
+    def _latest_by_cpf(self, cpf: str) -> list[dict] | None:
+        records = self._candidate_records(cpf)
+        if not records:
+            return None
+        ids = {positive_id(record["id"]) for record in records}
+        if ids & self.conflicted_ids or any(cid not in self.snapshots for cid in ids):
+            return None
+        snapshots = [self.snapshots[cid] for cid in sorted(ids)]
+        if any(
+            positive_id(s["ultimoPedido"]["id"]) in self.conflicted_orders
+            for s in snapshots
+        ):
+            return None
+        return snapshots
+
+    def has_latest_snapshot(self, cpf: str) -> bool:
+        return self._latest_by_cpf(cpf) is not None
+
+    def latest_by_cpf(self, cpf: str) -> list[dict] | None:
+        return deepcopy(self._latest_by_cpf(cpf))
+
+    def order_by_id(self, order_id: str) -> dict | None:
+        return deepcopy(self.orders.get(positive_id(order_id)))
+
+    def _candidate_records(self, cpf: str) -> list[dict]:
         key = _cpf_key(cpf)
         if not key:
             return []
@@ -101,11 +260,11 @@ class CustomerDirectory:
             *self.by_cpf.get(key, []),
             *self.by_numeric_cpf.get(key.lstrip("0"), []),
         ]
-        unique = {}
-        for record in records:
-            serialized = json.dumps(record, sort_keys=True, ensure_ascii=False)
-            unique[serialized] = record
-        return deepcopy(list(unique.values()))
+        unique = {id(record): record for record in records}
+        return list(unique.values())
+
+    def candidates(self, cpf: str) -> list[dict]:
+        return deepcopy(self._candidate_records(cpf))
 
     def constrain(self, cpf: str, candidates: list[dict]) -> tuple[list[dict], str]:
         records = self.candidates(cpf)
@@ -124,13 +283,115 @@ class CustomerDirectory:
         ]
         return (matching, "") if matching else ([], "CLIENTE_ID_DIVERGENTE_API")
 
-    def metrics(self) -> dict[str, int]:
+    def metrics(self) -> dict[str, Any]:
         return {
             "cadastros_recebidos": self.received,
             "cadastros_indexados": len(self.by_id),
             "ids_divergentes": len(self.conflicted_ids),
             "cadastros_nao_utilizaveis": self.skipped,
+            "snapshots_com_pedido": len(self.snapshots),
+            "pedidos_em_memoria": len(self.orders),
+            "pedidos_ambiguos": len(self.conflicted_orders),
+            "enderecos": dict(self.address_results),
         }
+
+
+def _address_text(value: Any) -> str:
+    if not isinstance(value, (str, int)) or isinstance(value, bool):
+        return ""
+    value = unicodedata.normalize("NFKD", str(value).casefold())
+    value = "".join(c for c in value if not unicodedata.combining(c))
+    return " ".join(re.findall(r"[a-z0-9]+", value))
+
+
+def _address_values(address: dict) -> dict[str, str]:
+    from geography import normalize_geography
+
+    geo = normalize_geography(
+        {
+            "cidade": address.get("cidade"),
+            "estado": address.get("uf"),
+            "bairro": address.get("bairro"),
+            "cep": address.get("cep"),
+        }
+    )
+    street = _address_text(address.get("logradouro")).split()
+    aliases = {
+        "r": "rua",
+        "av": "avenida",
+        "tv": "travessa",
+        "trav": "travessa",
+        "rod": "rodovia",
+        "est": "estrada",
+        "pca": "praca",
+    }
+    if street:
+        street[0] = aliases.get(street[0], street[0])
+    postcode = re.sub(r"\D", "", str(address.get("cep") or ""))
+    return {
+        "cep": postcode if len(postcode) == 8 and postcode != "00000000" else "",
+        "cidade": _address_text(geo.get("cidade")),
+        "estado": _address_text(geo.get("estado")),
+        "bairro": _address_text(geo.get("bairro")),
+        "logradouro": " ".join(street),
+        "numero": _address_text(address.get("numero")),
+        "complemento": _address_text(address.get("complemento")),
+    }
+
+
+def matching_order_address(
+    customer: dict, *, segment: str = "FARMA"
+) -> tuple[str, dict | None]:
+    """Confere endereço completo; coincidência só de CEP/bairro não comprova vínculo."""
+    from pedido_utils import business_order_datetime
+
+    latest = customer.get("_ultimo_pedido_endereco")
+    if not isinstance(latest, dict):
+        return "SEM_ULTIMO_PEDIDO", None
+    if (
+        not positive_id(latest.get("id"))
+        or not positive_id(customer.get("id"))
+        or positive_id(latest.get("codCliente")) != positive_id(customer.get("id"))
+        or business_order_datetime(latest.get("emissao")) is None
+    ):
+        return "PEDIDO_NAO_VERIFICADO", None
+    order_segment = str(latest.get("segmento") or "").strip().upper()
+    if order_segment and order_segment != segment:
+        return "SEGMENTO_DIVERGENTE", None
+    target = _address_values(latest)
+    required = {"cep", "cidade", "estado", "logradouro", "numero"}
+    if any(not target[key] for key in required):
+        return "ENDERECO_PEDIDO_INCOMPLETO", None
+    addresses = customer.get("enderecos")
+    if not isinstance(addresses, list):
+        return "ENDERECO_CADASTRAL_AUSENTE", None
+    matches = []
+    complete_addresses = 0
+    for address in addresses:
+        if not isinstance(address, dict) or positive_id(
+            address.get("clienteId")
+        ) != positive_id(customer.get("id")):
+            continue
+        current = _address_values(address)
+        if any(not current[key] for key in required):
+            continue
+        complete_addresses += 1
+        if any(current[key] != target[key] for key in required):
+            continue
+        if (
+            current["bairro"]
+            and target["bairro"]
+            and current["bairro"] != target["bairro"]
+        ):
+            continue
+        if current["complemento"] != target["complemento"]:
+            continue
+        matches.append(address)
+    if len(matches) == 1:
+        return "ENDERECO_CONFIRMADO", matches[0]
+    if not complete_addresses:
+        return "ENDERECO_CADASTRAL_INCOMPLETO", None
+    return ("ENDERECO_AMBIGUO" if matches else "ENDERECO_DIVERGENTE"), None
 
 
 class ExecutionReadCache:
@@ -291,17 +552,8 @@ def enrichment(fields: dict, customer: dict, as_of: date) -> dict[str, str]:
                 result["idade"] = str(age)
             if not old_majority:
                 result["maior_de_18_anos"] = majority
-    addresses = customer.get("enderecos") or []
-    principal = [
-        a for a in addresses if isinstance(a, dict) and a.get("principal") == 1
-    ]
-    if (
-        positive_id(customer.get("id"))
-        and len(principal) == 1
-        and positive_id(principal[0].get("clienteId"))
-        == positive_id(customer.get("id"))
-    ):
-        address = principal[0]
+    address_status, address = matching_order_address(customer)
+    if address_status == "ENDERECO_CONFIRMADO" and address is not None:
         candidate = normalize_geography(
             {
                 "cidade": address.get("cidade"),

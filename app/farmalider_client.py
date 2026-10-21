@@ -89,6 +89,8 @@ class FarmaliderClient:
         self._directory_lock = threading.Lock()
         self._execution_cache = None
         self._directory_hits = 0
+        self._directory_cpf_hits = 0
+        self._directory_order_hits = 0
         self._thread_local = threading.local()
         self._sessions: list[requests.Session] = []
         self._sessions_lock = threading.Lock()
@@ -215,10 +217,12 @@ class FarmaliderClient:
         metrics = self.metrics_snapshot()
         if self._directory_attempted or self._execution_cache is not None:
             logging.info(
-                "FarmaLíder: reaproveitamento nesta execução | cadastros locais=%s | leituras HTTP evitadas=%s | cadastros FARMA=%s.",
+                "FarmaLíder: reaproveitamento nesta execução | cadastros locais=%s | leituras HTTP evitadas=%s | cadastros FARMA=%s | últimos pedidos locais=%s | pedidos por ID locais=%s.",
                 metrics["customer_directory_hits"],
                 metrics["execution_read_cache_hits"],
                 metrics["customer_directory_records"],
+                metrics["customer_directory_cpf_hits"],
+                metrics["customer_directory_order_hits"],
             )
         if metrics["total_requests"]:
             logging.info(
@@ -644,6 +648,8 @@ class FarmaliderClient:
                 p95 = 0.0
             return {
                 "customer_directory_hits": self._directory_hits,
+                "customer_directory_cpf_hits": self._directory_cpf_hits,
+                "customer_directory_order_hits": self._directory_order_hits,
                 "execution_read_cache_hits": self._execution_cache.hits
                 if self._execution_cache is not None
                 else 0,
@@ -965,6 +971,12 @@ class FarmaliderClient:
     def get_cliente_by_cpf(
         self, cpf: str
     ) -> dict[str, Any] | list[dict[str, Any]] | None:
+        if self.customer_directory is not None:
+            snapshot = self.customer_directory.latest_by_cpf(cpf)
+            if snapshot is not None:
+                with self._metrics_lock:
+                    self._directory_cpf_hits += 1
+                return snapshot
         return self._cached_read(
             "cpf",
             cpf,
@@ -1044,6 +1056,12 @@ class FarmaliderClient:
             raise
 
     def get_pedido(self, codigo: str | int) -> dict[str, Any] | None:
+        if self.customer_directory is not None:
+            snapshot = self.customer_directory.order_by_id(str(codigo))
+            if snapshot is not None:
+                with self._metrics_lock:
+                    self._directory_order_hits += 1
+                return snapshot
         return cast(
             dict[str, Any] | None,
             self._cached_read(
