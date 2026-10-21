@@ -252,6 +252,73 @@ class TaskProgressTests(unittest.TestCase):
             with self.subTest(size=size), self.assertRaises(ValueError):
                 self.progress(100, batch_size=size)
 
+    def test_explicit_substage_pauses_parent_and_resumes_without_advancing_it(self):
+        with self.progress(1) as parent:
+            with TaskProgress("BI", 8000, show_nested=True, interval=3600) as child:
+                before = len(self.logs)
+                parent.report()
+                self.assertEqual(len(self.logs), before)
+                child.advance(4000)
+                child.report()
+                self.assertIn("50%", self.logs[-1])
+                with request_progress("leitura BI"):
+                    self.assertEqual(child.activity, "aguardando API: leitura BI")
+                    self.assertEqual(parent.activity, "")
+                child.advance(4000)
+            self.assertEqual(parent.completed, 0)
+            self.assertIn("BI", self.logs[-1])
+            self.assertIn("100%", self.logs[-1])
+            parent.report()
+            self.assertIn("0/1", self.logs[-1])
+            parent.advance()
+        self.assertIn("100%", self.logs[-1])
+        self.assertFalse(child._thread.is_alive())
+
+    def test_substage_failure_and_interruption_always_restore_parent(self):
+        for error in (RuntimeError("API sintética"), KeyboardInterrupt()):
+            with self.subTest(error=type(error).__name__), self.progress(1) as parent:
+                with self.assertRaises(type(error)):
+                    with TaskProgress(
+                        "BI", 2, show_nested=True, interval=3600
+                    ) as child:
+                        child.advance()
+                        raise error
+                self.assertIn("interrompido", self.logs[-1])
+                self.assertNotIn("100%", self.logs[-1])
+                parent.report()
+                self.assertIn("0/1", self.logs[-1])
+                self.assertEqual(parent._suspended, 0)
+                self.assertFalse(child._thread.is_alive())
+
+    def test_substage_initialization_failure_does_not_hide_parent(self):
+        def broken_counter():
+            raise OSError("contador indisponível")
+
+        with self.progress(1) as parent:
+            with self.assertRaises(OSError):
+                with TaskProgress("BI", 2, show_nested=True, byte_count=broken_counter):
+                    self.fail("O contador deveria falhar antes de iniciar.")
+            self.assertEqual(parent._suspended, 0)
+            parent.report()
+            self.assertIn("0/1", self.logs[-1])
+
+    def test_three_substage_levels_resume_only_the_immediate_parent(self):
+        with self.progress(1) as root:
+            with TaskProgress("Fontes", 1, show_nested=True, interval=3600) as middle:
+                with TaskProgress("Linhas", 1, show_nested=True, interval=3600) as leaf:
+                    before = len(self.logs)
+                    root.report()
+                    middle.report()
+                    self.assertEqual(len(self.logs), before)
+                    leaf.advance()
+                middle.report()
+                self.assertTrue(self.logs[-1].startswith("Fontes"))
+                before = len(self.logs)
+                root.report()
+                self.assertEqual(len(self.logs), before)
+            root.report()
+            self.assertTrue(self.logs[-1].startswith("Teste"))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -3,12 +3,134 @@
 import json
 import tempfile
 import unittest
+from contextlib import ExitStack
 from copy import deepcopy
 from datetime import date
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 import dedup_bi as repair
+from task_progress import TaskProgress
+
+
+class DedupProgressTests(unittest.TestCase):
+    def setUp(self):
+        self.now = 0.0
+        self.logs = []
+        self.stack = ExitStack()
+        self.addCleanup(self.stack.close)
+        self.stack.enter_context(
+            patch(
+                "task_progress.logging.info",
+                side_effect=lambda fmt, *args: self.logs.append(fmt % args),
+            )
+        )
+        self.stack.enter_context(
+            patch(
+                "dedup_bi.TaskProgress",
+                side_effect=lambda *args, **kwargs: TaskProgress(
+                    *args, **kwargs, clock=lambda: self.now
+                ),
+            )
+        )
+        self.ws = Mock(title="BI_Publico", row_count=9000, col_count=2)
+        self.ws.title = "BI_Publico"
+
+    def test_read_progress_counts_verified_ranges_and_suppresses_outer_zero(self):
+        pages = iter([[["chave", "valor"], ["sintético", 7]], [], [["final", 9]]])
+        with TaskProgress("Limpeza", 1, interval=3600) as parent:
+
+            def read(*args, **kwargs):
+                self.now += 2
+                parent.report()
+                return next(pages)
+
+            self.ws.get.side_effect = read
+            values = repair.read_values(self.ws)
+            self.assertEqual(parent.completed, 0)
+            parent.advance()
+        outer = [line for line in self.logs if line.startswith("Limpeza")]
+        self.assertEqual(len(outer), 2)
+        lines = [line for line in self.logs if line.startswith("BI: leitura")]
+        self.assertEqual(len(lines), 4)
+        self.assertIn("44%", lines[1])
+        self.assertIn("4000/9000 linhas verificadas", lines[1])
+        self.assertIn("2000.0 linhas verificadas/s", lines[1])
+        self.assertIn("restante estimado=00:00:03", lines[1])
+        self.assertIn("lotes=2/3", lines[2])
+        self.assertIn("100%", lines[-1])
+        self.assertIn("lotes=3/3", lines[-1])
+        self.assertEqual(
+            [call.args[0] for call in self.ws.get.call_args_list],
+            ["A1:B4000", "A4001:B8000", "A8001:B9000"],
+        )
+        self.assertEqual(values[1], ["sintético", 7])
+        self.assertEqual(values[8000], ["final", 9])
+        self.assertEqual(len(values), 8001)
+        self.ws.update.assert_not_called()
+
+    def test_failed_read_preserves_count_and_never_reports_completion(self):
+        self.ws.get.side_effect = [[["chave", "valor"]], TimeoutError("API sintética")]
+        with self.assertRaises(TimeoutError):
+            repair.read_values(self.ws, phase="conferência após reparo")
+        self.assertEqual(self.ws.get.call_count, 2)
+        self.assertIn("conferência após reparo", self.logs[-1])
+        self.assertIn("4000/9000", self.logs[-1])
+        self.assertIn("interrompido", self.logs[-1])
+        self.assertFalse(any("100%" in line for line in self.logs))
+        self.ws.update.assert_not_called()
+
+    def test_backup_reports_confirmed_saved_ranges_without_repeating_requests(self):
+        hub = Mock()
+        hub.fetch_sheet_metadata.return_value = {"sheets": []}
+        table = {
+            "before": [["chave"]],
+            "updates": [{"row": i, "column": 1} for i in range(2, 43)],
+            "deletions": [],
+        }
+        with tempfile.TemporaryDirectory() as folder:
+            repair.backup_native(hub, {"BI_Publico": table}, Path(folder))
+            self.assertEqual(len(list(Path(folder).glob("native-*.json"))), 2)
+        self.assertEqual(hub.fetch_sheet_metadata.call_count, 2)
+        self.assertEqual(len(self.logs), 3)
+        self.assertIn("40/41 linhas", self.logs[1])
+        self.assertIn("100%", self.logs[-1])
+        self.assertIn("lotes=2/2", self.logs[-1])
+        hub.batch_update.assert_not_called()
+
+    def test_backup_formula_guard_still_blocks_before_reporting_completion(self):
+        hub = Mock()
+        hub.fetch_sheet_metadata.return_value = {
+            "sheets": [
+                {
+                    "data": [
+                        {
+                            "startRow": 1,
+                            "startColumn": 0,
+                            "rowData": [
+                                {
+                                    "values": [
+                                        {"userEnteredValue": {"formulaValue": "=1"}}
+                                    ]
+                                }
+                            ],
+                        }
+                    ]
+                }
+            ]
+        }
+        table = {
+            "before": [["chave"]],
+            "updates": [{"row": 2, "column": 1}],
+            "deletions": [],
+        }
+        with tempfile.TemporaryDirectory() as folder:
+            with self.assertRaisesRegex(ValueError, "Fórmula"):
+                repair.backup_native(hub, {"BI_Publico": table}, Path(folder))
+            self.assertEqual(len(list(Path(folder).glob("native-*.json"))), 1)
+        self.assertIn("interrompido", self.logs[-1])
+        self.assertFalse(any("100%" in line for line in self.logs))
+        hub.batch_update.assert_not_called()
 
 
 class RefreshGuardTests(unittest.TestCase):

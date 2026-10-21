@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import math
 from copy import deepcopy
 from datetime import UTC, date, datetime, timedelta
@@ -23,10 +24,12 @@ from analytics import (  # noqa: E402
     build_bi_order_rows,
     build_bi_summary_record,
 )
+from config import WENI_PROGRESS_INTERVAL_SECONDS
 from dedup_io import save_private
 from delivery_tickets import DELIVERY_ORDER_COLUMNS, build_delivery_order_records  # noqa: E402
 from google_sheets import GoogleSheetsStore, column_letter  # noqa: E402
 from looker_bi import DATE_COLUMNS, SCHEMAS, build_looker_tables, opaque_key  # noqa: E402
+from task_progress import TaskProgress, request_progress
 
 SOURCE_TITLES = (
     "Base_Contatos",
@@ -419,36 +422,39 @@ def requests_for(plan):
     return requests
 
 
-def read_values(ws, *, formatted=False):
+def read_values(ws, *, formatted=False, phase="leitura"):
     width = column_letter(ws.col_count)
     values = []
-    batches = max(1, (ws.row_count + 3999) // 4000)
-    print(
-        f"BI: leitura {ws.title} | lotes={batches} | linhas_alocadas={ws.row_count}",
-        flush=True,
-    )
-    for batch_number, first in enumerate(range(1, ws.row_count + 1, 4000), 1):
-        last = min(ws.row_count, first + 3999)
-        chunk = ws.get(
-            f"A{first}:{width}{last}",
-            value_render_option="FORMATTED_VALUE" if formatted else "UNFORMATTED_VALUE",
-        )
-        values.extend(
-            [list(row) for row in chunk]
-            + [[] for _ in range(last - first + 1 - len(chunk))]
-        )
-        if batch_number == 1 or batch_number % 3 == 0 or batch_number == batches:
-            print(
-                f"BI: leitura {ws.title} | lote={batch_number}/{batches} | linhas_lidas={last}",
-                flush=True,
+    with TaskProgress(
+        f"BI: {phase} {ws.title}",
+        ws.row_count,
+        unit="linhas verificadas",
+        batch_size=4000,
+        interval=WENI_PROGRESS_INTERVAL_SECONDS,
+        show_nested=True,
+    ) as progress:
+        for first in range(1, ws.row_count + 1, 4000):
+            last = min(ws.row_count, first + 3999)
+            with request_progress(f"leitura de {ws.title}"):
+                chunk = ws.get(
+                    f"A{first}:{width}{last}",
+                    value_render_option="FORMATTED_VALUE"
+                    if formatted
+                    else "UNFORMATTED_VALUE",
+                )
+            values.extend(
+                [list(row) for row in chunk]
+                + [[] for _ in range(last - first + 1 - len(chunk))]
             )
+            progress.advance(last - first + 1)
     return trimmed(values)
 
 
 def read_state(hub, operations, layout):
-    print("BI: conferindo metadados e destinos de armazenamento.", flush=True)
-    hub_sheets = {ws.title: ws for ws in hub.worksheets()}
-    ops_sheets = {ws.title: ws for ws in operations.worksheets()}
+    logging.info("BI: conferindo metadados e destinos de armazenamento.")
+    with request_progress("metadados dos arquivos Dashboard e Operação"):
+        hub_sheets = {ws.title: ws for ws in hub.worksheets()}
+        ops_sheets = {ws.title: ws for ws in operations.worksheets()}
     routing = (
         hub_sheets["NexoFlow_Arquivos"].get("A1:B5")
         if "NexoFlow_Arquivos" in hub_sheets
@@ -465,7 +471,10 @@ def read_state(hub, operations, layout):
     sources = {
         title: read_values(ops_sheets[title], formatted=True) for title in SOURCE_TITLES
     }
-    current = {title: read_values(hub_sheets[title]) for title in TARGET_TITLES}
+    current = {
+        title: read_values(hub_sheets[title], phase="conferência inicial")
+        for title in TARGET_TITLES
+    }
     return sources, current, controls, hub_sheets
 
 
@@ -476,36 +485,42 @@ def backup_native(hub, tables, backup_dir):
             f"'{title}'!A{row}:{column_letter(len(table['before'][0]))}{row}"
             for row in rows
         ]
-        if ranges:
-            print(
-                f"BI: backup nativo {title} | linhas={len(rows)} | lotes={(len(ranges) + 39) // 40}",
-                flush=True,
-            )
-        for start in range(0, len(ranges), 40):
-            response = hub.fetch_sheet_metadata(
-                params={
-                    "ranges": ranges[start : start + 40],
-                    "includeGridData": True,
-                    "fields": "sheets(properties(sheetId,title),data(startRow,startColumn,rowData(values(userEnteredValue,userEnteredFormat,dataValidation))))",
-                }
-            )
-            save(backup_dir / f"native-{title}-{start}.json", response)
-            # A escrita prevista usa valores, nunca substitui fórmulas.
-            formulas = set()
-            for sheet in response.get("sheets", []):
-                for block in sheet.get("data", []):
-                    for ri, row in enumerate(
-                        block.get("rowData", []), block.get("startRow", 0) + 1
-                    ):
-                        for ci, cell in enumerate(
-                            row.get("values", []), block.get("startColumn", 0) + 1
-                        ):
-                            if "formulaValue" in cell.get("userEnteredValue", {}):
-                                formulas.add((ri, ci))
-            if any((u["row"], u["column"]) in formulas for u in table["updates"]):
-                raise ValueError(
-                    f"Fórmula encontrada em célula a editar de {title}; revisão necessária."
+        if not ranges:
+            continue
+        with TaskProgress(
+            f"BI: backup nativo {title}",
+            len(rows),
+            unit="linhas",
+            batch_size=40,
+            interval=WENI_PROGRESS_INTERVAL_SECONDS,
+            show_nested=True,
+        ) as progress:
+            for start in range(0, len(ranges), 40):
+                response = hub.fetch_sheet_metadata(
+                    params={
+                        "ranges": ranges[start : start + 40],
+                        "includeGridData": True,
+                        "fields": "sheets(properties(sheetId,title),data(startRow,startColumn,rowData(values(userEnteredValue,userEnteredFormat,dataValidation))))",
+                    }
                 )
+                save(backup_dir / f"native-{title}-{start}.json", response)
+                # A escrita prevista usa valores, nunca substitui fórmulas.
+                formulas = set()
+                for sheet in response.get("sheets", []):
+                    for block in sheet.get("data", []):
+                        for ri, row in enumerate(
+                            block.get("rowData", []), block.get("startRow", 0) + 1
+                        ):
+                            for ci, cell in enumerate(
+                                row.get("values", []), block.get("startColumn", 0) + 1
+                            ):
+                                if "formulaValue" in cell.get("userEnteredValue", {}):
+                                    formulas.add((ri, ci))
+                if any((u["row"], u["column"]) in formulas for u in table["updates"]):
+                    raise ValueError(
+                        f"Fórmula encontrada em célula a editar de {title}; revisão necessária."
+                    )
+                progress.advance(len(ranges[start : start + 40]))
 
 
 def refresh(store, removed_uuids, delivery_keys, directory):
@@ -603,14 +618,22 @@ def refresh(store, removed_uuids, delivery_keys, directory):
         raise ValueError(
             "Lote BI excede 1,5 MB; preserve os comprovantes para revisão."
         )
-    if digest(read_values(operations.worksheet("Controle"))) != plan["controls_hash"]:
+    if (
+        digest(
+            read_values(
+                operations.worksheet("Controle"), phase="conferência antes do reparo"
+            )
+        )
+        != plan["controls_hash"]
+    ):
         raise ValueError(
             "Controle mudou antes da gravação do BI; carga simultânea bloqueada."
         )
     save(receipt_path, {"state": "sending", "plan_hash": digest(plan)})
     if requests:
         try:
-            hub.batch_update({"requests": requests})
+            with request_progress("gravação do reparo BI"):
+                hub.batch_update({"requests": requests})
         except APIError as exc:
             if (
                 400 <= exc.response.status_code < 500
@@ -621,13 +644,18 @@ def refresh(store, removed_uuids, delivery_keys, directory):
     handles = {w.title: w for w in hub.worksheets()}
     for title in TARGET_TITLES:
         if (
-            digest(trimmed(read_values(handles[title])))
+            digest(
+                trimmed(read_values(handles[title], phase="conferência após reparo"))
+            )
             != plan["tables"][title]["after_hash"]
         ):
             raise RuntimeError(
                 "BI divergiu após a limpeza. Preserve o comprovante; não repita índices."
             )
-    if digest(read_values(operations.worksheet("Controle"))) != plan["controls_hash"]:
+    if (
+        digest(read_values(operations.worksheet("Controle"), phase="conferência final"))
+        != plan["controls_hash"]
+    ):
         raise RuntimeError(
             "Controle mudou durante a limpeza; confira cargas simultâneas."
         )

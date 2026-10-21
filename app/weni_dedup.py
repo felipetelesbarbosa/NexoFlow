@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from analytics import _full_load_25_load, get_fields, is_valid_cpf, normalize_cpf
-from config import LOG_DIR
+from config import LOG_DIR, WENI_PROGRESS_INTERVAL_SECONDS
 from contact_dedup_guard import (
     contact_refusals,
     contact_uuid,
@@ -762,9 +762,19 @@ def run_with_dedup(*, apply, full, quarter, review_path, update):
                     names = group_names(weni)
                     populate_group_names(contacts, names)
                     with TaskProgress(
-                        "Weni: limpeza de duplicados", len(jobs), unit="lotes"
+                        "Weni: limpeza de duplicados",
+                        len(jobs),
+                        unit="lotes processados",
+                        interval=WENI_PROGRESS_INTERVAL_SECONDS,
+                        detail=lambda: f"lotes pendentes={failed_batches}",
                     ) as progress:
-                        for folder, pairs in progress.track(jobs):
+                        for index, (folder, pairs) in enumerate(
+                            progress.track(jobs), 1
+                        ):
+                            progress.set_activity(
+                                f"lote em execução={index}/{len(jobs)}; "
+                                "conferindo Weni, fontes do Sheets e BI"
+                            )
                             try:
                                 deleted, conflicts = apply_batch(
                                     pairs, weni, farm, store, contacts, names, folder

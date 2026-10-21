@@ -36,6 +36,7 @@ class TaskProgress:
     A thread só observa contadores: nunca faz chamadas de API ou grava dados.
     Com batch_size, informa lotes concluídos e consolida as linhas entre lotes;
     interval mantém atualizações durante esperas sem avanço.
+    show_nested permite uma etapa explícita por vez, pausando a barra superior.
     """
 
     def __init__(
@@ -50,6 +51,7 @@ class TaskProgress:
         clock: Callable[[], float] = time.monotonic,
         initial_completed: int = 0,
         batch_size: int | None = None,
+        show_nested: bool = False,
     ) -> None:
         if initial_completed < 0 or (total is not None and initial_completed > total):
             raise ValueError("Progresso inicial fora dos limites da tarefa.")
@@ -59,6 +61,8 @@ class TaskProgress:
         self.byte_count, self.detail = byte_count, detail
         self.interval, self.clock = interval, clock
         self.batch_size = batch_size
+        self.show_nested = show_nested
+        self._suspended = 0
         self._last_report: tuple[float, int] | None = None
         self.completed = initial_completed
         self._initial_completed = initial_completed
@@ -72,26 +76,41 @@ class TaskProgress:
         # Consultas paginadas de um único contato ficam dentro da barra da
         # preparação; evite abrir milhares de barras auxiliares nessa etapa.
         depth = getattr(_ACTIVE, "depth", 0)
-        self._visible = depth == 0
-        self._parent = getattr(_ACTIVE, "current", None)
+        self._visible = depth == 0 or self.show_nested
+        self._parent: TaskProgress | None = getattr(_ACTIVE, "current", None)
+        self._pause_parent = self._visible and self._parent is not None
+        if self._pause_parent and self._parent is not None:
+            with self._parent._lock:
+                self._parent._suspended += 1
         if self._visible:
             _ACTIVE.current = self
         _ACTIVE.depth = depth + 1
-        self._started = self.clock()
-        self._initial_bytes = self.byte_count() if self.byte_count else 0
-        self._samples.append((self._started, self.completed, 0))
-        self.report()
-        if self._visible:
-            self._thread = threading.Thread(target=self._heartbeat, daemon=True)
-            self._thread.start()
-        return self
+        try:
+            self._started = self.clock()
+            self._initial_bytes = self.byte_count() if self.byte_count else 0
+            self._samples.append((self._started, self.completed, 0))
+            self.report()
+            if self._visible:
+                self._thread = threading.Thread(target=self._heartbeat, daemon=True)
+                self._thread.start()
+            return self
+        except BaseException:
+            self._restore_parent()
+            raise
+
+    def _restore_parent(self) -> None:
+        _ACTIVE.depth -= 1
+        _ACTIVE.current = self._parent
+        if self._pause_parent and self._parent is not None:
+            with self._parent._lock:
+                self._parent._suspended -= 1
 
     def _heartbeat(self) -> None:
         while True:
             delay = self.interval
             if self.batch_size is not None:
                 with self._lock:
-                    if self._last_report is not None:
+                    if not self._suspended and self._last_report is not None:
                         delay = max(
                             0.01,
                             self.interval - (self.clock() - self._last_report[0]),
@@ -128,6 +147,8 @@ class TaskProgress:
         if not self._visible:
             return
         with self._lock:
+            if self._suspended and not finished:
+                return
             now = self.clock()
             elapsed = max(0.0, now - self._started)
             done = self.completed
@@ -219,9 +240,10 @@ class TaskProgress:
         self._stop.set()
         if self._thread is not None:
             self._thread.join()
-        _ACTIVE.depth -= 1
-        _ACTIVE.current = self._parent
-        self.report(finished=True, failed=exc_type is not None)
+        try:
+            self.report(finished=True, failed=exc_type is not None)
+        finally:
+            self._restore_parent()
 
 
 @contextmanager

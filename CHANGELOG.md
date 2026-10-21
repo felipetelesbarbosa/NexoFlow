@@ -1,5 +1,7 @@
 # NexoFlow 1.0 — Changelog
 
+- Deduplicação Weni: progresso por aba nas leituras, backups e conferências do BI, com percentual, lotes, linhas verificadas por segundo e tempo restante. A barra geral fica pausada durante essas etapas; esperas são informadas a cada 15 segundos e a conferência após o reparo recebe identificação própria.
+
 - Apresentação reorganizada: README com instalação e sequência de uso, guias resumidos, índice por assunto, política de credenciais e descrição do release mais objetivas.
 
 - Weni: avanço consolidado por lotes de 1.000 contatos, com percentual, velocidade, tempo restante e atualização durante esperas. Bloqueios repetidos de identidade viram contagens no progresso e no resumo; UUID e motivo permanecem na revisão privada, inclusive para contatos sem alteração proposta.

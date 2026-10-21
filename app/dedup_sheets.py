@@ -12,13 +12,13 @@ from gspread.exceptions import APIError
 from gspread.utils import ValueRenderOption
 
 from analytics import is_valid_cpf, normalize_cpf
-from config import GOOGLE_CREDENTIALS_FILE
+from config import GOOGLE_CREDENTIALS_FILE, WENI_PROGRESS_INTERVAL_SECONDS
 from contact_dedup_guard import contact_refusals, customer_phones, native_phones
 from dedup_io import DedupHTTPClient, digest, save_private
 from farmalider_integration import _positive_id
 from google_sheets import column_letter
 from sheets_storage import STORAGE_SHEET, SheetsStorage
-from task_progress import TaskProgress
+from task_progress import TaskProgress, request_progress
 
 SOURCE_TABS = (
     "Base_Contatos",
@@ -305,9 +305,14 @@ class DedupSheets:
         ledger_orders = {}
         item_keys = set()
         with TaskProgress(
-            "Weni: fontes da deduplicação", len(SOURCE_TABS), unit="abas"
+            "Weni: fontes da deduplicação",
+            len(SOURCE_TABS),
+            unit="abas",
+            interval=WENI_PROGRESS_INTERVAL_SECONDS,
+            show_nested=True,
         ) as progress:
             for title in progress.track(SOURCE_TABS):
+                progress.set_activity(f"aba em conferência: {title}")
                 book_id = self.layout.destination(title)
                 ws = self.handles[book_id].get(title)
                 if ws is None:
@@ -469,7 +474,8 @@ class DedupSheets:
             }
             save_private(path, entry)
             try:
-                self.books[book_id].batch_update({"requests": body})
+                with request_progress(f"limpeza das fontes: {role}"):
+                    self.books[book_id].batch_update({"requests": body})
             except Exception as exc:
                 code = exc.response.status_code if isinstance(exc, APIError) else 0
                 entry["state"] = (
