@@ -288,17 +288,6 @@ class WeniClient:
         }
         if after is not None:
             params["after"] = self.format_datetime(after)
-        return self._iter_paginated(
-            WENI_CONTACTS_API_URL,
-            params,
-            item_label="contatos",
-        )
-
-    def list_contacts(
-        self,
-        after: datetime | None = None,
-        limit: int = PAGE_LIMIT,
-    ) -> list[dict[str, Any]]:
         with TaskProgress(
             "Consulta Weni: contatos",
             None,
@@ -306,7 +295,20 @@ class WeniClient:
             batch_size=WENI_PROGRESS_BATCH_SIZE,
             interval=WENI_PROGRESS_INTERVAL_SECONDS,
         ) as progress:
-            return list(progress.track(self.iter_contacts(after=after, limit=limit)))
+            yield from progress.track(
+                self._iter_paginated(
+                    WENI_CONTACTS_API_URL,
+                    params,
+                    item_label="contatos",
+                )
+            )
+
+    def list_contacts(
+        self,
+        after: datetime | None = None,
+        limit: int = PAGE_LIMIT,
+    ) -> list[dict[str, Any]]:
+        return list(self.iter_contacts(after=after, limit=limit))
 
     def get_contact(
         self,

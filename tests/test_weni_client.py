@@ -19,27 +19,33 @@ class WeniClientTests(unittest.TestCase):
             }
             for i in range(11)
         ]
-        with (
-            patch.object(client, "_get_json", side_effect=pages) as get,
-            patch(
-                "weni_client.TaskProgress",
-                side_effect=lambda *args, **kwargs: TaskProgress(
-                    *args, **kwargs, clock=lambda: 0.0
+        for streaming in (False, True):
+            with (
+                self.subTest(streaming=streaming),
+                patch.object(client, "_get_json", side_effect=pages) as get,
+                patch(
+                    "weni_client.TaskProgress",
+                    side_effect=lambda *args, **kwargs: TaskProgress(
+                        *args, **kwargs, clock=lambda: 0.0
+                    ),
                 ),
-            ),
-            patch("weni_client.logging.info") as info,
-            patch("weni_client.logging.debug") as debug,
-        ):
-            contacts = client.list_contacts()
-        lines = [call.args[0] % call.args[1:] for call in info.call_args_list]
-        self.assertEqual(len(contacts), 1100)
-        self.assertEqual(get.call_count, 11)
-        self.assertEqual(debug.call_count, 11)
-        self.assertEqual(len(lines), 3)
-        self.assertIn("1000 registros", lines[1])
-        self.assertIn("lotes concluídos=1", lines[1])
-        self.assertIn("1100 registros", lines[-1])
-        self.assertFalse(any("página" in line or "%" in line for line in lines))
+                patch("weni_client.logging.info") as info,
+                patch("weni_client.logging.debug") as debug,
+            ):
+                contacts = (
+                    list(client.iter_contacts())
+                    if streaming
+                    else client.list_contacts()
+                )
+            lines = [call.args[0] % call.args[1:] for call in info.call_args_list]
+            self.assertEqual(len(contacts), 1100)
+            self.assertEqual(get.call_count, 11)
+            self.assertEqual(debug.call_count, 11)
+            self.assertEqual(len(lines), 3)
+            self.assertIn("1000 registros", lines[1])
+            self.assertIn("lotes concluídos=1", lines[1])
+            self.assertIn("1100 registros", lines[-1])
+            self.assertFalse(any("página" in line or "%" in line for line in lines))
 
     def test_extracts_paginated_results(self) -> None:
         payload = {
