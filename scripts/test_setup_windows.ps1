@@ -177,7 +177,26 @@ PROXY_DETECTION_TIMEOUT = 1.0
     # Simular sobras da estrutura anterior; a atualização deve substituí-las.
     [IO.File]::WriteAllText((Join-Path $InstallDir 'main.py'), '# código antigo sintético', [Text.Encoding]::UTF8)
     [IO.File]::WriteAllText((Join-Path $InstallDir 'executar_manual.bat'), '@echo off', [Text.Encoding]::ASCII)
-    Invoke-Setup "Atualização sobre instalação existente"
+    # Mantém a raiz aberta sem FILE_SHARE_DELETE, como um terminal/Explorer.
+    Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
+public static class NexoFlowSetupRootLock {
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern SafeFileHandle CreateFile(string name, uint access, uint share,
+        IntPtr security, uint creation, uint flags, IntPtr template);
+    public static SafeFileHandle Open(string path) {
+        SafeFileHandle handle = CreateFile(path, 0, 3, IntPtr.Zero, 3, 0x02000000, IntPtr.Zero);
+        if (handle.IsInvalid) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+        return handle;
+    }
+}
+'@
+    $rootLock = [NexoFlowSetupRootLock]::Open($InstallDir)
+    try {
+        Invoke-Setup "Atualização com pasta principal bloqueada por handle aberto"
+    } finally { $rootLock.Dispose() }
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $InstallDir 'main.py'))) 'Módulo antigo permaneceu na raiz.'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $InstallDir 'executar_manual.bat'))) 'Comando antigo permaneceu na raiz.'
     Assert-True (Test-Path -LiteralPath (Join-Path $InstallDir 'app\main.py')) 'Módulo organizado ausente.'

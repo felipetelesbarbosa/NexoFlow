@@ -20,6 +20,7 @@ $UninstallKey = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\NexoF
 $AppKey = 'HKLM:\Software\Grupo Lider\NexoFlow'
 $script:OptionalUninstallerValidated = $true
 $script:RollbackInstallDir = $null
+$script:RollbackUsesExistingRoot = $false
 
 # Caminhos da instalação anterior, usados somente para migração para a marca NexoFlow.
 $LegacyInstallDir = 'C:\Weni\WeniWhatsAppAnalytics'
@@ -837,15 +838,22 @@ function Restore-PrivateData([string]$Backup, [string]$Target) {
     }
 }
 
+function Test-InstalledProcessPath([string]$Path) {
+    if (-not $Path) { return $false }
+    try {
+        $prefix = ([IO.Path]::GetFullPath($InstallDir)).TrimEnd('\') + '\'
+        return ([IO.Path]::GetFullPath($Path)).StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)
+    } catch { return $false }
+}
+
 function Stop-InstalledNexoFlowProcesses {
     if (-not (Test-Path -LiteralPath $InstallDir -PathType Container)) { return }
 
-    $prefix = ([IO.Path]::GetFullPath($InstallDir)).TrimEnd('\\') + '\\'
     $targets = @()
     foreach ($process in (Get-Process -ErrorAction SilentlyContinue)) {
         try {
             $path = [string]$process.Path
-            if ($path -and $path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+            if (Test-InstalledProcessPath $path) {
                 $targets += $process
             }
         } catch { }
@@ -891,24 +899,71 @@ function Remove-DirectoryWithRetry {
     return $false
 }
 
+function Move-InstallEntry([string]$Source, [string]$Destination) {
+    # Origem e rollback são irmãos no mesmo volume: não copiar/remover parcialmente.
+    $entry = Get-Item -LiteralPath $Source -Force -ErrorAction Stop
+    if ($entry.PSIsContainer) {
+        [IO.Directory]::Move($Source, $Destination)
+    } else {
+        [IO.File]::Move($Source, $Destination)
+    }
+}
+
 function Stage-ExistingInstall {
     if (-not (Test-Path -LiteralPath $InstallDir -PathType Container)) { return $null }
 
     $rollback = "$InstallDir.__rollback__.$([guid]::NewGuid().ToString('N'))"
     $lastError = $null
+    $script:RollbackUsesExistingRoot = $false
 
-    for ($attempt = 1; $attempt -le 20; $attempt++) {
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
         try {
-            Move-Item -LiteralPath $InstallDir -Destination $rollback -Force -ErrorAction Stop
+            [IO.Directory]::Move($InstallDir, $rollback)
             Write-Host "[OK] Instalação anterior preservada para rollback seguro." -ForegroundColor Green
             return $rollback
         } catch {
             $lastError = $_.Exception.Message
-            Start-Sleep -Milliseconds 500
+            Start-Sleep -Milliseconds 300
         }
     }
 
-    throw "Não foi possível preparar a atualização segura de $InstallDir. A instalação anterior foi mantida intacta. Feche terminais/Explorer nessa pasta e tente novamente. Detalhe: $lastError"
+    # Um terminal/Explorer pode manter um handle na raiz, sem bloquear os arquivos.
+    # Preservar a raiz evita exigir sua renomeação, mantendo rollback completo.
+    Write-Host '[INFO] A pasta principal não pode ser renomeada. Preparando atualização sem movê-la.' -ForegroundColor DarkYellow
+    $moved = New-Object 'System.Collections.Generic.List[string]'
+    $probe = Join-Path $InstallDir ('.nexoflow-write-probe-' + [guid]::NewGuid().ToString('N'))
+    try {
+        $rootEntry = Get-Item -LiteralPath $InstallDir -Force -ErrorAction Stop
+        if ($rootEntry.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            throw 'A pasta da instalação é um link/junção e não pode ser atualizada por este modo.'
+        }
+        [IO.File]::WriteAllText($probe, '')
+        [IO.File]::Delete($probe)
+        New-Item -ItemType Directory -Path $rollback -ErrorAction Stop | Out-Null
+        foreach ($entry in (Get-ChildItem -LiteralPath $InstallDir -Force | Sort-Object Name)) {
+            Move-InstallEntry -Source $entry.FullName -Destination (Join-Path $rollback $entry.Name)
+            $moved.Add($entry.Name)
+        }
+        $script:RollbackUsesExistingRoot = $true
+        Write-Host '[OK] Conteúdo anterior preservado para rollback; pasta principal mantida.' -ForegroundColor Green
+        return $rollback
+    } catch {
+        $lastError = $_.Exception.Message
+        $restored = $true
+        for ($index = $moved.Count - 1; $index -ge 0; $index--) {
+            $name = $moved[$index]
+            try {
+                Move-InstallEntry -Source (Join-Path $rollback $name) -Destination (Join-Path $InstallDir $name)
+            } catch { $restored = $false }
+        }
+        if ($restored) {
+            if (Test-Path -LiteralPath $rollback) { [IO.Directory]::Delete($rollback) }
+            throw "Não foi possível preparar a atualização segura de $InstallDir. Os arquivos anteriores foram preservados. Feche as rotinas do NexoFlow e tente novamente. Se persistir, verifique o acesso à pasta com o suporte de TI. Detalhe: $lastError"
+        }
+        throw "A atualização não foi iniciada. Alguns arquivos anteriores permanecem preservados em $rollback; mantenha essa pasta para recuperação. Detalhe: $lastError"
+    } finally {
+        if (Test-Path -LiteralPath $probe) { Remove-Item -LiteralPath $probe -Force -ErrorAction SilentlyContinue }
+    }
 }
 
 function Restore-PreviousInstall {
@@ -919,6 +974,25 @@ function Restore-PreviousInstall {
     }
 
     Stop-InstalledNexoFlowProcesses
+
+    if ($script:RollbackUsesExistingRoot) {
+        try {
+            New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+            foreach ($entry in (Get-ChildItem -LiteralPath $InstallDir -Force)) {
+                if (-not (Remove-DirectoryWithRetry -Path $entry.FullName -Attempts 3)) { return $false }
+            }
+            foreach ($entry in (Get-ChildItem -LiteralPath $RollbackPath -Force)) {
+                Move-InstallEntry -Source $entry.FullName -Destination (Join-Path $InstallDir $entry.Name)
+            }
+            [IO.Directory]::Delete($RollbackPath)
+            $script:RollbackUsesExistingRoot = $false
+            Write-Host '[OK] Instalação anterior restaurada; pasta principal mantida.' -ForegroundColor Green
+            return $true
+        } catch {
+            Write-Warning "Não foi possível concluir o rollback. Preserve $RollbackPath para recuperação. Detalhe: $($_.Exception.Message)"
+            return $false
+        }
+    }
 
     if (Test-Path -LiteralPath $InstallDir) {
         if (-not (Remove-DirectoryWithRetry -Path $InstallDir -Attempts 20)) {
