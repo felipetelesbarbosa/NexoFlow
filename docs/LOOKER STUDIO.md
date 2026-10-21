@@ -1,215 +1,84 @@
-# Looker Studio — camada BI do NexoFlow Analytics
+# Looker Studio — dados do NexoFlow
 
-Clientes encontrados podem incluir CPFs inválidos. Portanto, “CPF válido” e “Cliente FarmaLíder” não são etapas aninhadas de um funil: apresente-os como indicadores independentes, mantendo explícita a validade matemática.
+O **NexoFlow Analytics** prepara as tabelas no **Google Sheets**. O **Looker Studio** lê essas fontes para apresentar os indicadores; executar o NexoFlow não cria gráficos nem configura o relatório automaticamente.
 
-## Consulta de CPFs válidos e inválidos
+## Conectar e atualizar
 
-Nas cargas Weni e Analytics, o NexoFlow consulta primeiro os CPFs matematicamente válidos e aguarda essa etapa terminar antes de consultar os inválidos preenchidos. A classificação usa 11 dígitos, rejeição de sequências repetidas e os dois dígitos verificadores. CPFs curtos, dígitos incorretos e valores como `0` ou `00000000000` também são consultados, na segunda etapa. Valores sem dígitos não geram GET. O CPF original permanece no cadastro; a consulta remove a formatação, sem completar, corrigir ou inventar dígitos.
+1. Conclua a carga do Analytics e confira o resultado da execução.
+2. Conecte cada aba necessária como fonte do Google Sheets no Looker Studio.
+3. Se a base usa três arquivos, selecione as abas `BI_*` do arquivo **Dashboard**. Operação e Histórico ficam nos destinos descritos no [guia de divisão](planilhas_separadas.md).
+4. Confira os tipos: datas como datas, medidas como números e identificadores como texto. Formate valores monetários com duas casas decimais.
+5. Atualize os dados do relatório. Quando uma atualização acrescentar colunas, atualize também os campos das fontes.
 
-O Analytics deduplica os identificadores por execução e separa os lotes das duas etapas. As cargas Weni em partes seguem essa prioridade dentro da parte selecionada, preservando o manifesto e a revisão humana. Evidência válida de CPF em mensagens entra na primeira etapa quando for o valor efetivo do plano. Toda nova carga reconsulta os identificadores no escopo selecionado; respostas duplicadas só são compartilhadas dentro da mesma execução. CPFs válidos dispensam comparação de nome, telefone e e-mail. CPFs inválidos exigem nome ou telefone correspondente.
+A conta usada pelo conector do Looker precisa ter acesso à planilha de dashboard. O compartilhamento da conta de serviço do NexoFlow é configurado separadamente em [Google Sheets](GOOGLE%20SETUP.md).
 
-`CPF_CONFIRMADO` identifica um CPF matematicamente válido encontrado na API; `CPF_INVALIDO_ENCONTRADO` identifica um CPF inválido cujo cliente foi confirmado também pelo primeiro nome ou pelo número local do telefone. Ambos alimentam o total de clientes encontrados, mas somente CPFs matematicamente válidos entram em `cpfs_validos`. HTTP 400 registra `CPF_REJEITADO_API`, sem retry e sem contar como falha 500; HTTP 404 registra `CPF_NAO_ENCONTRADO`; falhas de servidor/rede registram `ERRO_API`, sem autorizar um vínculo de cliente por CPF inválido. Os logs públicos mostram etapas e contagens, sem CPF. O diagnóstico privado de falhas 5xx aceita também identificadores curtos e zeros.
+## Escolher a fonte
 
-Para CPF inválido, a coincidência do CPF não confirma a pessoa. É obrigatório comparar **primeiro nome correspondente ou número local do telefone correspondente**. A comparação de nome usa somente o primeiro nome, desconsiderando acentos, maiúsculas e símbolos; sobrenomes não precisam coincidir. O e-mail não é obrigatório para essa validação. O telefone compara apenas o número local, ignorando o prefixo brasileiro +55 e o DDD, sem completar dígitos nem inserir o nono dígito. Números nativos da Weni têm precedência sobre campos antigos de telefone/WhatsApp.
+| Fonte | Uma linha representa | Uso |
+| --- | --- | --- |
+| `BI_Publico` | Um contato atual | Base de contatos, compra identificada, canal e perfil. |
+| `BI_Clientes` | Uma pessoa no histórico disponível | Totais acumulados e última compra identificada; não usar para indicadores filtrados por data de compra. |
+| `BI_Clientes_Vendas` | Uma venda válida | Clientes compradores, pedidos, faturamento, ticket e rankings no período do relatório. |
+| `BI_Itens` | Um item de venda válida | Produtos, quantidades, receita por item e rankings por data. |
+| `BI_Produtos_ABC` | Um produto no período calculado | Receita, participação, ranking e classe ABC. |
+| `BI_Produtos_Juntos` | Um par de SKUs no período calculado | Produtos comprados juntos, contando pedidos distintos. |
+| `BI_KPIs_Periodo` | Os indicadores do período calculado | Clientes, pedidos, faturamento, ticket, SKUs e concentração de receita. |
+| `BI_Vendas` | Um dia de vendas | Evolução diária de pedidos, produtos, frete e faturamento. |
+| `BI_Pedidos` | Um pedido para consulta | Detalhamento e conferência; filtre `venda_valida = 1` para indicadores de vendas. |
+| `BI_Qualidade` | Indicadores de cobertura dos dados | Pendências, cadastro, itens, histórico e disponibilidade dos cálculos. |
+| `BI_Status` | O estado da última execução | Data, resultado e saúde da sincronização. |
 
-A resposta pode conter um cliente, uma lista de clientes ou listas em `cliente`/`clientes`. A seleção e a validação acontecem **por contato Weni**, mesmo quando a resposta GET é compartilhada por CPF. Somente uma correspondência é aceita; dados insuficientes geram `CPF_IDENTIDADE_INSUFICIENTE`, nenhuma correspondência gera `CPF_IDENTIDADE_DIVERGENTE` e múltiplas correspondências geram `CPF_IDENTIDADE_AMBIGUA`. Nesses casos, nenhuma atualização de pedido é autorizada. Um pedido de outro candidato nunca é aproveitado; a capa e os itens continuam sujeitos ao mesmo ID do cliente. Se a API devolver apenas um cadastro diferente, o NexoFlow bloqueia o vínculo: não presume que outros cadastros existam nem inventa uma consulta alternativa.
+`BI_Canais`, `BI_Conversao` e os indicadores de base de `BI_Resumo_Diario` contêm snapshots diários. Não some bases acumuladas de vários dias. CPF válido e cliente encontrado na FarmaLíder são indicadores independentes, pois identificadores inválidos também podem ter identidade confirmada.
 
-O cache persistente de vínculos por CPF inválido não é reutilizado, incluindo vínculos antigos que usavam somente o CPF. Falha na identificação também não pode ser contornada por `pedido_id` ou `ultimo_pedido`. A revisão humana guarda a identidade usada na validação; alterações relevantes de nome, e-mail ou telefone/URN após a revisão bloqueiam o apply daquele contato. Snapshots antigos de pedidos com CPF inválido exigem novo dry-run.
+`BI_Ads` depende de evidência de atribuição. Investimento e atribuição compatíveis são necessários para ROAS e custos; ausência de informação não significa custo zero.
 
-Pedidos antigos com CPF inválido permanecem preservados nas tabelas de origem, mas não entram nas vendas, na atribuição de anúncios nem em `BI_Pedidos` até serem revalidados pela nova regra. A origem de um novo pedido validado com CPF inválido recebe o marcador técnico `_IDENTIDADE_VALIDADA`, usado para distinguir esses registros. Após reinstalar, execute **carga completa da Weni, com revisão humana, e depois carga completa do Analytics** para revalidar a base e atualizar os indicadores.
+## Indicadores de clientes e vendas
 
-Para aproveitar um pedido, o CPF retornado precisa corresponder ao identificador consultado, o cliente deve ter ID positivo e o pedido deve pertencer ao mesmo cliente. CPF numérico no JSON pode perder zeros à esquerda: somente essa representação numérica equivalente é aceita, sem mudar a classificação nem o CPF na Weni. A consulta não comprova emissão oficial do CPF ou titularidade da pessoa; identificadores genéricos como zero exigem atenção na revisão humana. A extração de mensagens e a gravação de um novo CPF na Weni continuam exigindo validade matemática e contexto explícito.
+Em `BI_Clientes_Vendas`, use `cliente_chave` para identificar a pessoa e `cliente` para apresentar seu nome. Para agrupar clientes, não inclua a data nem use somente o nome.
 
-Desde o NexoFlow 1.0, o Google Sheets continua sendo a camada de dados e o Looker Studio fica responsável principalmente pela visualização. Para evitar cálculos pesados e regras espalhadas no relatório, o NexoFlow Analytics mantém sete abas específicas para BI.
+| Indicador | Cálculo |
+| --- | --- |
+| Pedidos | `SUM(pedidos)` |
+| Clientes compradores | `COUNT_DISTINCT(cliente_chave)` |
+| Faturamento | `SUM(faturamento)` |
+| Ticket médio | `SUM(faturamento) / SUM(pedidos)` |
+| Pedidos por cliente | `SUM(pedidos) / COUNT_DISTINCT(cliente_chave)` |
+| Receita média por cliente | `SUM(faturamento) / COUNT_DISTINCT(cliente_chave)` |
+| Última compra no período | `MAX(data)` |
 
-## Fontes recomendadas
+Trate divisões sem denominador no relatório. Não some compradores diários nem faça média de tickets diários para obter o total do período. A última compra em todo o histórico vem de `BI_Clientes`.
 
-### BI_Resumo_Diario
+Nos cards de `BI_Publico`, use contagem de contatos, soma de `compra_identificada`, diferença para os sem compra e percentual sobre a base. Não aplique o período de vendas à base atual. `criado_em` é cadastro na Weni, sem comprovar aquisição por Marketing.
 
-Uma linha por dia. Se o Analytics rodar mais de uma vez no mesmo dia, a linha daquele dia é atualizada em vez de duplicada.
+Para receita por produto, use os valores dos itens de `BI_Itens`. Não repita o faturamento inteiro do pedido em cada linha de produto. Chaves técnicas podem ficar ocultas na apresentação, mantendo o agrupamento.
 
-Principais campos:
+## Períodos e Curva ABC
 
-- data
-- contatos_total
-- novos_contatos
-- contatos_com_cpf
-- cpfs_validos
-- clientes_farmalider
-- whatsapp / instagram / facebook / outro
-- opt_in_lgpd / opt_out_lgpd
-- maiores_18 / menores_18
-- contatos_ads
-- clientes_compradores_total
-- pedidos_total
-- faturamento_produtos_total
-- faturamento_frete_total
-- faturamento_total
-- pedidos_dia
-- faturamento_produtos_dia
-- faturamento_frete_dia
-- faturamento_total_dia
-- faturamento_dia
-- ticket_medio_dia
+`BI_Clientes_Vendas` e `BI_Itens` aceitam filtros de data do relatório. ABC, produtos juntos e `BI_KPIs_Periodo` usam `periodo_inicio` e `periodo_fim`, com os últimos 30 dias, inclusive hoje, como padrão.
 
-Use esta aba para a página **Visão Geral** e para séries de evolução diária da base.
+Para recalcular outro período pelo histórico do Sheets:
 
-Os indicadores de compradores, pedidos e faturamento consideram pedidos validados pela API com status efetivo -2 (Em aberto), -1 (Pendente de pagamento), 0 (Em processamento), 4 (Pronto para rota), 1 (Em trânsito) ou 2 (Concluído). Entre os estados documentados, somente o status efetivo 3 (Cancelado) exclui a venda; pagamento 0 ou cancelamento explícito força esse status. Estados desconhecidos continuam pendentes de validação.
-
-### BI_Canais
-
-Snapshot diário por canal de contato:
-
-- data
-- canal
-- contatos
-- contatos_com_cpf
-- clientes_farmalider
-- contatos_ads
-- opt_in_lgpd
-
-Use para participação por WhatsApp, Instagram, Facebook e outros canais.
-
-### BI_Conversao
-
-Funil diário pronto para o Looker Studio:
-
-1. Contatos
-2. CPF válido
-3. Cliente FarmaLíder
-4. Cliente comprador
-
-Campos adicionais calculam a taxa sobre a base e a taxa em relação à etapa anterior.
-
-### BI_Vendas
-
-Série diária de vendas:
-
-- data
-- pedidos
-- pedidos_confirmados_api
-- clientes_compradores
-- unidades_vendidas
-- faturamento_produtos
-- faturamento_frete
-- faturamento_total
-- faturamento
-- faturamento_confirmado_api
-- ticket_medio
-- taxa_confirmacao_pct
-
-Mesmo antes da primeira venda, o NexoFlow mantém uma linha zero para o dia atual, permitindo que o Looker reconheça o schema.
-
-### BI_Ads
-
-Consolidação atual por modelo de atribuição de primeiro/último anúncio:
-
-- tipo_atribuicao
-- origem
-- tipo_campanha
-- canal_destino
-- anuncio_id
-- anuncio_titulo
-- contatos
-- clientes_farmalider
-- compradores
-- pedidos
-- faturamento
-
-Enquanto ainda não houver conversas atribuídas a anúncios, a aba contém uma linha zero/placeholder para manter o schema disponível no Looker Studio.
-
-### BI_Pedidos
-
-Uma linha por pedido, preparada para páginas de **Pedidos**, **Compradores do dia** e detalhamento de vendas.
-
-Campos principais:
-
-- pedido_id
-- pedido_data, no formato DD/MM/YY HH:MM:SS
-- data
-- hora
-- cliente
-- cpf
-- pedido_produtos
-- pedido_quantidade_itens
-- pedido_valor_produtos
-- pedido_valor, total dos produtos
-- pedido_frete
-- pedido_faturamento_total, produtos + frete
-- pedido_status
-- pedido_status_nome
-- pedido_forma_pagamento
-- pedido_forma_pagamento_nome
-- canal
-- primeiro_anuncio_origem
-- ultimo_anuncio_origem
-
-As listas de produto, quantidade e valor unitário mantêm a mesma ordem posicional. Para cálculos por item, prefira `Itens_Pedidos_FarmaLider`; para exibição de um pedido completo em uma linha, use `BI_Pedidos`.
-
-Para faturamento, use preferencialmente os campos explícitos:
-- **Produtos**: `pedido_valor` / `faturamento_produtos`;
-- **Frete**: `pedido_frete` / `faturamento_frete`;
-- **Total cobrado**: `pedido_faturamento_total` / `faturamento_total`.
-
-O campo legado `faturamento` permanece como alias do faturamento total para não quebrar componentes existentes. O ticket médio também usa o total cobrado, incluindo frete.
-
-O dashboard deve mostrar preferencialmente os nomes amigáveis, como **Cancelado** e **Débito**, mantendo os códigos disponíveis para auditoria e filtros técnicos.
-
-Pagamento 5 aparece como **Pix por Link de Pagamento** e pagamento 6 como **Pix no POS**. Os normalizadores aceitam também nomes oficiais como `PixPorLinkDePagamento` e `PixNoPOS`. Pagamento 0 ou `_` representa **Cancelado**: Weni grava esse texto literal em `pedido_forma_pagamento` e o status efetivo 3, Cancelado. `BI_Pedidos` também usa o status efetivo 3; `Pedidos_FarmaLider` preserva os valores brutos de status e pagamento retornados pela API.
-
-Para pagamento Int32 não negativo sem de-para a partir de 7, `pedido_forma_pagamento_nome` exibe `Não identificado (código X)` e o código é preservado. Pagamentos ausentes ou inválidos mantêm a descrição vazia.
-
-`BI_Pedidos` mantém os pedidos para consulta, inclusive pendentes e cancelados. Páginas de compradores e vendas que usam essa fonte devem filtrar `venda_valida = 1`, indicador calculado pelo NexoFlow com as validações de identidade, pedido, cancelamento e escopo da farmácia. Na fonte opcional `BI_Delivery_Pedidos`, use `venda_realizada = 1`. As fontes comerciais `BI_Vendas`, `BI_Clientes_Vendas` e `BI_Itens` já recebem somente vendas válidas. Substitua filtros antigos que aceitavam apenas os status 4, 1 e 2 para incluir também -2, -1 e 0.
-
-Todos os estados documentados não cancelados (-2, -1, 0, 4, 1 e 2) contam como venda. Os estados -2, -1, 0, 4 e 1 permanecem em rechecagem até Concluído ou Cancelado, e o Analytics reconsulta o status dos pedidos já registrados apenas nos últimos 20 dias, pela data do pedido no fuso de Belém. Pedidos mais antigos permanecem no histórico e nos indicadores; a consulta por CPF continua descobrindo novas compras. Nomes oficiais do enum de status, como `PendenteDePagamento` e `Concluido`, são normalizados para os códigos -2 a 4.
-
-### BI_Status
-
-Uma linha com a saúde da última execução do Analytics:
-
-- versão
-- status
-- modo_execucao
-- duracao_segundos
-- Weni recebidos/processados
-- consultas e retries FarmaLíder
-- leituras/escritas Google Sheets
-- contatos inseridos/atualizados/sem mudança
-- pedidos confirmados pela API
-
-Use apenas em uma página técnica opcional.
-
-## Base_Contatos
-
-Desde o NexoFlow 1.0, a Base_Contatos preserva todos os contatos retornados pela Weni, inclusive os que ainda não possuem CPF, pedido ou anúncio. Também inclui `idade`, `maior_de_18_anos` e `opt_in_lgpd`.
-
-Ela pode ser usada para drill-down e análises detalhadas, mas não é a fonte principal recomendada para os cards e gráficos executivos.
-
-## Primeira carga do NexoFlow 1.0
-
-Execute uma carga completa do Analytics uma única vez:
-
-```powershell
-cd C:\NexoFlow
-.\comandos/executar_carga_completa.bat
+```text
+nexo looker --inicio AAAA-MM-DD --fim AAAA-MM-DD
 ```
 
-Isso cria/migra as sete abas BI, incluindo `BI_Pedidos`, completa a Base_Contatos com os contatos historicamente excluídos e inicializa o dashboard. Depois, volte ao fluxo incremental normal com `comandos/executar_manual.bat` ou `nexo analytics`.
+Substitua as datas pelo intervalo desejado. O comando não consulta Weni nem FarmaLíder. O filtro do Looker não recalcula automaticamente essas tabelas; confira as datas antes de apresentar os resultados. O [conector opcional](../connectors/looker_abc/README.md) permite cálculos por período no próprio relatório quando configurado.
 
-## Localização e idade dos clientes
+A Curva ABC usa a receita de todos os itens, sem frete: A até 80%, B até 95% e C depois. O produto que cruza um limite permanece na classe iniciada antes dele. Empates mantêm ranking e classe iguais, podendo ultrapassar o limite.
 
-O Analytics envia `cidade`, `estado`, `cep`, `bairro` e `idade` dos campos personalizados da Weni para `Base_Contatos` e para a camada `BI_Pedidos`. O histórico de alterações também preserva a localização. Os pedidos recebem o perfil do contato vinculado pelo `contact_uuid`, sem criar novas linhas por produto nem multiplicar os valores da venda.
+Sem cobertura completa, SKU ou receita positiva, ou com divergência entre itens e valor dos produtos acima de R$ 0,01, a ABC fica indisponível e as classes permanecem vazias. A concentração nos cinco produtos também depende da cobertura completa. Confira `pedidos_sem_itens`, `pedidos_com_itens_divergentes`, `abc_disponivel` e `abc_periodo_disponivel` na fonte correspondente. Receita não representa lucro.
 
-| Campo | Campo Weni | Tipo no Looker Studio |
-|---|---|---|
-| `cidade` | `@fields.cidade` | Texto; cidade para mapas quando a localização puder ser identificada |
-| `estado` | `@fields.estado` | Texto; UF para contextualizar a cidade brasileira |
-| `cep` | `@fields.cep` | Texto, preservando zeros iniciais e a formatação recebida |
-| `bairro` | `@fields.bairro` | Texto |
-| `idade` | `@fields.idade` | Número; dimensão, sem somar idades |
+## Regras e limites dos dados
 
-A localização e a idade correspondem ao **cadastro atual na Weni**, inclusive para pedidos antigos. Não representam necessariamente endereço de entrega ou idade na data da compra. Valores ausentes continuam vazios; idade inválida na camada BI também fica vazia, sem virar zero. A idade zero informada é preservada. A data real do pedido continua em `pedido_data` e `data`, separada de `atualizado_em`.
+- **Vendas:** status documentados -2, -1, 0, 4, 1 e 2 contam após validação. Status 3, pagamento cancelado e pedidos oficialmente sem itens ficam fora. Em `BI_Delivery_Pedidos`, use `venda_realizada = 1`.
+- **Farmácia:** pedidos apenas pet ou veterinários são excluídos; pedidos mistos mantêm itens humanos e seu valor, sem o frete do pedido inteiro.
+- **Valores:** produtos e frete são separados. O faturamento total inclui frete quando aplicável; não o some novamente. Quantidades fracionárias devem ser preservadas.
+- **Histórico:** a API retorna o último pedido, não todas as compras. O Analytics acumula o que identifica nas coletas, sem declarar cobertura histórica completa. Compras podem não ser capturadas entre coletas.
+- **Status:** pedidos já registrados são reconsultados de hoje até 20 dias atrás, no fuso `America/Belem`. Os anteriores permanecem preservados; novas compras continuam sendo buscadas.
+- **Cadastro:** localização, gênero e idade refletem o perfil atual disponível, não necessariamente o endereço ou a idade na data da compra. Dados ausentes permanecem vazios; não deduza gênero pelo nome nem some idades.
 
-Depois de instalar a distribuição atualizada, execute uma **carga completa do Analytics** para preencher esses campos nos contatos já existentes. A carga Analytics por planilhas também exporta os campos dos contatos selecionados e relidos na Weni, após revisão humana. As colunas novas são acrescentadas sem deslocar os cabeçalhos existentes.
+O início das novas coletas é registrado em `Controle.historico_observado_desde`. Indicadores de recompra completa e comparações exigem cobertura comprovada. `clientes_com_multiplas_compras_identificadas` descreve somente o histórico identificado.
 
-No Looker Studio, atualize os campos das fontes `Base_Contatos` e `BI_Pedidos` uma vez após a migração. Use cidade, bairro, CEP e faixa etária como dimensões e filtros; para pedidos e faturamento por região, use `BI_Pedidos`, filtre `venda_valida = 1` e utilize `data` como dimensão de período. Não some snapshots da base ou idades. Para contagem de clientes, use pessoas únicas no contexto da fonte, não a quantidade de linhas de pedidos. O relatório não recebe automaticamente componentes novos apenas porque as colunas foram adicionadas.
+## Se o número parecer incorreto
+
+Confira o resultado e a data da última carga, a fonte conectada, o período, os filtros de venda e a cobertura em `BI_Qualidade`. Uma carga parcial pode preservar registros anteriores. Siga o [guia de operação](Documentacao%20NexoFlow.md) antes de apresentar os resultados.

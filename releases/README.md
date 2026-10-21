@@ -1,34 +1,13 @@
-# NexoFlow 1.0
+# NexoFlow 1.0 — Downloads
 
-Distribuição oficial do **NexoFlow 1.0**.
+A [release v1.0](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.0) reúne os pacotes oficiais:
 
+| Arquivo | Uso |
+| --- | --- |
+| [NexoFlow-Setup-1.0.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.0/NexoFlow-Setup-1.0.zip) | Instalador para Windows; recomendado para usar o NexoFlow. |
+| [NexoFlow-1.0.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.0/NexoFlow-1.0.zip) | Projeto completo. |
+| [SHA256SUMS-1.0.txt](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.0/SHA256SUMS-1.0.txt) | Hashes para conferir os dois pacotes baixados. |
 
-## Downloads
+Extraia todo o ZIP do Setup antes de executar **NexoFlow Setup.exe**. Os pacotes não incluem credenciais; configure seus próprios acessos.
 
-Use os links estáveis da [release v1.0 do NexoFlow 1.0](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.0):
-
-- [NexoFlow-Setup-1.0.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.0/NexoFlow-Setup-1.0.zip) — Setup do NexoFlow 1.0;
-- [NexoFlow-1.0.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.0/NexoFlow-1.0.zip) — projeto completo correspondente ao mesmo código;
-- [SHA256SUMS-1.0.txt](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.0/SHA256SUMS-1.0.txt) — hashes SHA-256 dos dois pacotes.
-
-Confira o SHA-256 do pacote baixado com o arquivo de hashes da mesma release antes de instalar.
-
-## Setup
-
-O Setup 1.0 é validado automaticamente em Windows antes da publicação. A validação cobre:
-
-- primeira instalação;
-- atualização sobre uma instalação existente;
-- preservação de `secrets_config.py`, `credentials` e `logs`;
-- execução do `comandos/check-up.bat` após a instalação;
-- cenário em que antivírus/EDR remove `NexoFlow Uninstall.exe` do pacote extraído.
-
-O `NexoFlow Uninstall.exe` é opcional. Se for bloqueado ou removido, o Setup continua funcionando e a desinstalação permanece disponível por `installer\uninstall.ps1` e `desinstalar_nexoflow.cmd`.
-
-Atualizações preservam temporariamente a instalação existente. Se a nova instalação falhar depois de iniciada, o Setup tenta restaurar automaticamente o estado anterior, evitando deixar o NexoFlow parcialmente atualizado.
-
-O Setup também solicita elevação UAC automaticamente quando necessário.
-
-Após instalar, atualizar ou reinstalar, faça os testes de conexão e a revalidação completa descritos em [Instalação](../docs/README%20INSTALACAO.md). A carga Weni exige dry-run, auditoria e revisão humana antes da aplicação; depois execute a carga completa do Analytics para recalcular os dados sob as regras atuais.
-
-Os pacotes são gerados automaticamente a partir da `main` somente depois de testes, auditoria e smoke test do instalador. Credenciais reais não entram nos artefatos.
+[Instalação](../docs/README%20INSTALACAO.md) · [Guia de operação](../docs/Documentacao%20NexoFlow.md) · [Histórico de mudanças](../CHANGELOG.md)

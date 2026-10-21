@@ -1,7 +1,7 @@
-# NexoFlow 1.0 — Segurança
+# Segurança
 
-O NexoFlow não inclui chaves de acesso, tokens de API, senhas ou credenciais.
+O NexoFlow é distribuído sem chaves de acesso, tokens de API, senhas ou credenciais.
 
-Para usar as integrações, configure suas próprias credenciais da Weni, FarmaLíder e Google. Use [secrets_config.example.py](configuracao/secrets_config.example.py) como modelo.
+Configure seus próprios acessos à Weni, FarmaLíder e Google seguindo o [guia de instalação](docs/README%20INSTALACAO.md).
 
 Mantenha suas credenciais privadas. Não as compartilhe nem as publique no GitHub.

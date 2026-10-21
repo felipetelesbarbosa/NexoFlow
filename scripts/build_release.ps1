@@ -344,82 +344,23 @@ $shaLines = @(
 $releaseNotes = @"
 # NexoFlow $Version
 
-Distribuição oficial do **NexoFlow 1.0**.
+Aplicativos Windows para integrar Weni e FarmaLíder, organizar pedidos no Google Sheets e alimentar painéis do Looker Studio.
 
-O arquivo `NexoFlow-Setup-$Version.zip` contém o instalador do NexoFlow 1.0 e foi validado automaticamente em Windows para primeira instalação e atualização de uma instalação existente.
+## Downloads
 
-Melhorias desta distribuição do NexoFlow 1.0:
-- Weni: log consolidado por lotes de 1.000 contatos, com percentual, velocidade, tempo restante e atualização durante esperas; bloqueios de identidade resumidos por motivo, mantendo os detalhes na revisão privada;
-- Weni: recuperação automática de bloqueios de execuções interrompidas, com verificação do processo anterior e proteção contra cargas simultâneas, sem apagar a auditoria da deduplicação;
-- listagem FARMA com último pedido e itens reaproveitados em memória após validação; endereço cadastral conferido com o último pedido e fallback individual quando necessário;
-- instalador: atualização com a pasta principal aberta no Windows, preservação completa para rollback e reconhecimento correto dos processos instalados;
-- cadastro FARMA nos quatro fluxos, preenchimento auditado de campos ausentes, conferência dos candidatos por CPF/ID e reaproveitamento de leituras por execução; o apply usa leituras novas;
-- rede FarmaLíder: consultas aguardando na fila acompanham a rota atual, mantendo URL e proxy coerentes mesmo após uma troca de conexão; diagnóstico de destino sem CPF ou token;
-- Delivery/Planilhas: diagnóstico individual privado de conflitos, retomada explícita da revisão existente sem repetir operações concluídas e histórico preservado antes de gerar outra revisão; cadastro ausente é separado de ausência de pedido;
-- Recompra: lock do sistema operacional com identificação da execução e recuperação segura após encerramento, consolidação por UUID, prazo revalidado antes da inclusão e revisão resumida; CPF zerado é pendência cadastral, sem consulta à API; recusas continuam bloqueando sem alterar consentimento;
-- rede corporativa: timeout não abandona um proxy já ativo somente porque um site público responde; a troca para conexão direta exige sondagens repetidas e confirmação da URL externa FarmaLíder, sem credenciais na sondagem;
-- filtro de produtos atualizado: MacroGard e Becordil são veterinários; curativos Topz Patrulha Canina não são excluídos somente pela estampa; gere uma nova revisão da Recompra;
-- Recompra repete apenas a gravação local quando um arquivo fica temporariamente bloqueado, preservando o estado anterior sem repetir ações na Weni; falhas locais recebem diagnóstico próprio;
-- Planilha aceita as constantes booleanas originais do export de conversas no campo is_active, mantendo o filtro de atendimentos encerrados e o bloqueio de outras fórmulas;
-- deduplicação integrada às cargas Weni, com revisão de exclusões, CPF oficial, telefone nativo único e propriedade dos pedidos; contatos incorretos saem da Weni e das fontes do Sheets/Looker, preservando vendas e recusas;
-- falhas isoladas da Weni geram aviso e pendência, sem cancelar a carga; a próxima incremental revalida os contatos e recupera suas mensagens anteriores quando necessário;
-- tabelas comerciais para Looker Studio com histórico de vendas, KPIs e Curva ABC com cobertura de itens; tipos monetários corrigidos e migração financeira atômica;
-- check-up corrigido para a codificação padrão do Windows; escritas no Sheets reconciliam inclusões após timeout; validação de código, tipos e dependências antes da publicação;
-- Weni com ícone azul e ciano, contato e balão de conversa, seguindo a estética dos outros componentes do NexoFlow;
-- Recompra com ícone próprio de sacola e setas circulares; Planilha com ícone circular azul e ciano, proporção alinhada aos demais componentes, nos executáveis e atalhos;
-- desinstalação remove os atalhos oficiais de todos os componentes, incluindo Recompra, nos locais de instalação e nos desktops e menus atendidos pelo Setup;
-- CMD da Weni permanece aberto após conclusão, erro ou cancelamento, inclusive por outro launcher; fechar o aviso final ou pressionar ENTER não encerra a sessão; use EXIT para fechar;
-- progresso Weni a cada 2 segundos com barra de 0% a 100% por etapa, contatos/registros por segundo, tempo decorrido e previsão de término; auditoria JSONL mede bytes efetivamente gravados por segundo; consultas sem total conhecido mostram quantidade e velocidade;
-- o NexoFlow não inclui chaves, tokens ou credenciais; use suas próprias credenciais nas integrações, conforme SECURITY.md;
-- identificação e documentação padronizadas como NexoFlow 1.0, com os componentes Planilha e Recompra nos índices e instruções de assinatura e desinstalação alinhadas ao Setup;
-- recompra processa contatos durante a paginação, consulta a FarmaLíder com até quatro workers e cache limitado por execução, reduzindo leituras e gravações redundantes sem alterar a validação de identidade;
-- revisão de recompra expirada na virada do dia gera um novo dry-run uma vez no launcher e exige nova confirmação; se a aplicação já iniciou, interrompe e preserva o estado;
-- POSTs da recompra usam tentativa única para evitar repetição de inclusões com resposta incerta; GETs mantêm retentativas e o controle persistente continua protegendo os contatos;
-- recompra com grupo de 0 a 25 dias, revisão, controle persistente e proteção de referências; envio D+25 permanece na campanha Weni; confira docs/README RECOMPRA.md antes de habilitar;
-- cidade, estado, CEP, bairro e idade dos clientes da Weni na base e BI_Pedidos; CEP preservado como texto e datas de pedido mantidas;
-- interface e documentação em português brasileiro, com acentos e cedilha; CMD em UTF-8, PowerShell com BOM e executáveis recompilados com metadados pt-BR;
-- carga completa Weni 100% ou em partes mantém o CMD aguardando a revisão humana; cancelamentos não aplicam o snapshot e falhas isoladas ficam pendentes sem interromper os demais contatos;
-- componente de confirmação incluído e validado no projeto completo e no Setup;
-- de-para de pagamento atualizado: 0 Cancelado; 1 Dinheiro; 2 Débito; 3 Crédito; 4 Ticket; 5 Pix por Link de Pagamento; 6 Pix no POS;
-- pagamento 0 cancela o pedido: forma de pagamento Cancelado e status 3 na Weni e no BI, preservando os códigos brutos da API na tabela de pedidos;
-- de-para de status atualizado: EmAberto=-2; PendenteDePagamento=-1; EmProcessamento=0; ProntoParaRota=4; EmTransito=1; Concluido=2; Cancelado=3;
-- vendas e ultima_compra consideram todos os estados documentados não cancelados (-2, -1, 0, 4, 1 e 2), com validação da API; cada carga do Analytics reconsulta por código os pedidos oficiais já observados somente nos últimos 20 dias, inclusive concluídos e cancelados nesse intervalo; pedidos mais antigos permanecem no histórico, e a consulta por CPF continua identificando compras novas;
-- diagnóstico seguro de proxy identifica autenticação 407, bloqueio de túnel 403, TLS, DNS, timeout e conexão recusada; resposta 400/404 da FarmaLíder não é apresentada como autenticação confirmada;
-- listas de pedido com leitura CSV preservam vírgulas e aspas nos nomes dos produtos, sem desalinhamento artificial na Weni e no Analytics;
-- códigos numéricos de pagamento não documentados são preservados e exibidos como não identificados, com o código recebido, sem inventar a forma de pagamento;
-- pagamento sem de-para aparece em INFO uma vez por código; resumo por código e progresso distinguem contatos com pedido validado de alterações propostas e gravadas;
-- preparação e auditoria continuam antes de qualquer gravação; listas realmente inconsistentes permanecem bloqueadas;
-- cooldown global e recuperação serial após falhas 5xx da FarmaLíder, com retorno gradual da concorrência e redução do intervalo quando a API se recupera;
-- HTTP 404 continua representando cliente não encontrado; HTTP 500 permanece uma falha da API;
-- zeros à esquerda são restaurados antes da validação quando os verificadores do CPF conferem; CPF válido dispensa comparação de identidade, e CPF inválido exige primeiro nome ou telefone local correspondente, ignorando +55 e DDD;
-- consultas por CPF que já falharam não são repetidas na mesma carga; dados previamente confirmados são preservados quando o CPF continua o mesmo;
-- cargas incompletas aparecem como parciais e preservam o marco incremental para uma nova tentativa;
+- **NexoFlow-Setup-$Version.zip** — instalador recomendado para Windows.
+- **NexoFlow-$Version.zip** — projeto completo.
+- **SHA256SUMS-$Version.txt** — hashes dos dois pacotes.
 
-- carga por planilhas de conversas e contatos com comandos nexo weni planilhas e nexo analytics planilhas, validação de identidade e revisão humana por destino;
-- cargas por planilha Weni e Analytics aguardam confirmação gráfica explícita, mesmo sem entrada de console; fechar o Bloco de Notas não encerra a espera;
-- pasta importacoes vazia incluída no Setup e no projeto completo, sem exports XLSX;
-- importacoes e seus arquivos sempre preservados na desinstalação, inclusive ao remover configurações, credenciais e logs;
-- backups anteriores com conteúdo diferente mantidos em historico_preservado, com validação SHA-256 antes de remover a instalação.
+Extraia todo o ZIP do Setup e execute **NexoFlow Setup.exe**. A distribuição inclui Weni, Analytics, Planilha, Recompra e Terminal. Configure suas próprias credenciais; os pacotes não incluem chaves ou tokens.
 
-Principais garantias do Setup:
-- elevação UAC automática quando necessária;
-- rollback automático se uma atualização falhar;
-- NexoFlow Uninstall.exe opcional;
-- integridade SHA-256 dos componentes obrigatórios;
-- preservação de secrets_config.py, credentials e logs em atualizações.
+## Primeira execução
 
-Downloads:
-- NexoFlow-Setup-$Version.zip - instalador do NexoFlow 1.0;
-- NexoFlow-$Version.zip - projeto completo do NexoFlow 1.0;
-- SHA256SUMS-$Version.txt - hashes SHA-256.
+Siga a ordem: Weni completa → Planilha, se houver exports → Analytics completo → Recompra → Analytics incremental. Revise os relatórios e confirme as aplicações solicitadas. Depois atualize o Looker Studio.
 
-Recursos incluídos:
-- NexoFlow Analytics;
-- NexoFlow Weni;
-- NexoFlow Terminal;
-- NexoFlow Planilha, com menu para Weni e Analytics, ícone próprio e atalhos;
-- integração Weni, FarmaLíder, Google Sheets e Looker Studio;
-- tratamento de pedidos, status, LGPD, canais e atribuição de anúncios.
+A publicação é validada por testes no Windows, check-up e testes de instalação e atualização.
+
+[Instalação](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/README%20INSTALACAO.md) · [Guia de operação](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/Documentacao%20NexoFlow.md) · [Histórico de mudanças](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/CHANGELOG.md)
 "@
 [IO.File]::WriteAllText((Join-Path $DistDir "release-notes.md"), $releaseNotes, (New-Object Text.UTF8Encoding($false)))
 

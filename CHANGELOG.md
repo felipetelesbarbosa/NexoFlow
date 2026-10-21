@@ -1,5 +1,7 @@
 # NexoFlow 1.0 — Changelog
 
+- Apresentação reorganizada: README com instalação e sequência de uso, guias resumidos, índice por assunto, política de credenciais e descrição do release mais objetivas.
+
 - Weni: avanço consolidado por lotes de 1.000 contatos, com percentual, velocidade, tempo restante e atualização durante esperas. Bloqueios repetidos de identidade viram contagens no progresso e no resumo; UUID e motivo permanecem na revisão privada, inclusive para contatos sem alteração proposta.
 
 - Weni: bloqueio da carga mantido pelo sistema operacional, liberado também após encerramento forçado. Arquivos de bloqueio antigos são recuperados automaticamente quando o processo anterior está comprovadamente encerrado, preservando a proteção contra cargas simultâneas e os registros da deduplicação.
