@@ -187,7 +187,7 @@ public static class NexoFlowSetupRootLock {
     private static extern SafeFileHandle CreateFile(string name, uint access, uint share,
         IntPtr security, uint creation, uint flags, IntPtr template);
     public static SafeFileHandle Open(string path) {
-        SafeFileHandle handle = CreateFile(path, 0, 3, IntPtr.Zero, 3, 0x02000000, IntPtr.Zero);
+        SafeFileHandle handle = CreateFile(path, 0x80000000, 3, IntPtr.Zero, 3, 0x02000000, IntPtr.Zero);
         if (handle.IsInvalid) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
         return handle;
     }
