@@ -24,6 +24,7 @@ py-modules = [
   "diagnostico",
   "farmalider_client",
   "farmalider_integration",
+  "farmalider_customers",
   "google_sheets",
   "sheets_storage",
   "sheets_migration",

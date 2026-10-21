@@ -84,6 +84,11 @@ class FarmaliderClient:
         self._private_diagnostic_lock = threading.Lock()
         self._private_recorded_refs: set[str] = set()
 
+        self.customer_directory = None
+        self._directory_attempted = False
+        self._directory_lock = threading.Lock()
+        self._execution_cache = None
+        self._directory_hits = 0
         self._thread_local = threading.local()
         self._sessions: list[requests.Session] = []
         self._sessions_lock = threading.Lock()
@@ -208,6 +213,13 @@ class FarmaliderClient:
             while self._in_flight:
                 self._request_gate.wait()
         metrics = self.metrics_snapshot()
+        if self._directory_attempted or self._execution_cache is not None:
+            logging.info(
+                "FarmaLíder: reaproveitamento nesta execução | cadastros locais=%s | leituras HTTP evitadas=%s | cadastros FARMA=%s.",
+                metrics["customer_directory_hits"],
+                metrics["execution_read_cache_hits"],
+                metrics["customer_directory_records"],
+            )
         if metrics["total_requests"]:
             logging.info(
                 "FarmaLíder diagnóstico final: HTTP=%s; 200=%s; 404=%s; 5xx=%s; "
@@ -222,6 +234,10 @@ class FarmaliderClient:
                 metrics["recovery_activations"],
                 metrics["open_circuits"],
             )
+        if self._execution_cache is not None:
+            self._execution_cache.close()
+            self._execution_cache = None
+        self.customer_directory = None
         with self._sessions_lock:
             sessions = list(self._sessions)
             self._sessions.clear()
@@ -435,6 +451,8 @@ class FarmaliderClient:
         # Não registra CPF/código do pedido no log.
         if "/cliente/cpf/" in path:
             return "cliente/cpf"
+        if "/clientes/" in path:
+            return "clientes/segmento"
         if "/pedido/" in path:
             return "pedido"
         return "delivery"
@@ -625,6 +643,13 @@ class FarmaliderClient:
             else:
                 p95 = 0.0
             return {
+                "customer_directory_hits": self._directory_hits,
+                "execution_read_cache_hits": self._execution_cache.hits
+                if self._execution_cache is not None
+                else 0,
+                "customer_directory_records": len(self.customer_directory.by_id)
+                if self.customer_directory is not None
+                else 0,
                 "total_requests": total,
                 "retries": self._total_retries,
                 "rate_limits": self._rate_limit_responses,
@@ -846,15 +871,110 @@ class FarmaliderClient:
 
         raise FarmaliderError("Falha inesperada ao consultar a FarmaLíder API.")
 
+    def prepare_customer_directory(self, *, expected_contacts: int | None) -> bool:
+        import sqlite3
+
+        from farmalider_customers import CustomerDirectory, ExecutionReadCache
+        from project_paths import load_private_settings
+        from task_progress import TaskProgress
+
+        settings = load_private_settings()
+        mode = (
+            str(getattr(settings, "FARMALIDER_CUSTOMER_DIRECTORY_MODE", "auto"))
+            .strip()
+            .lower()
+        )
+        if mode not in {"auto", "on", "off"}:
+            raise ValueError(
+                "FARMALIDER_CUSTOMER_DIRECTORY_MODE deve ser auto, on ou off."
+            )
+        minimum = max(
+            1, int(getattr(settings, "FARMALIDER_CUSTOMER_DIRECTORY_MIN_CONTACTS", 500))
+        )
+        with self._directory_lock:
+            if self._execution_cache is None:
+                try:
+                    self._execution_cache = ExecutionReadCache()
+                except (OSError, ValueError, sqlite3.Error):
+                    logging.warning(
+                        "FarmaLíder: cache privado indisponível; consultas diretas preservadas."
+                    )
+            if mode == "off" or (
+                mode == "auto"
+                and expected_contacts is not None
+                and expected_contacts < minimum
+            ):
+                return False
+            if self._directory_attempted:
+                return self.customer_directory is not None
+            self._directory_attempted = True
+            try:
+                with TaskProgress(
+                    "FarmaLíder: base cadastral FARMA", 1, unit="consultas"
+                ) as progress:
+                    directory = CustomerDirectory(self.get_clientes_segmento("FARMA"))
+                    progress.advance()
+                self.customer_directory = directory
+                logging.info(
+                    "FarmaLíder: índice cadastral FARMA pronto; %s. Ausência no índice não confirma ausência de compra.",
+                    directory.metrics(),
+                )
+            except (FarmaliderAuthError, FarmaliderUnavailableError):
+                raise
+            except (FarmaliderError, ValueError) as exc:
+                logging.warning(
+                    "FarmaLíder: índice FARMA indisponível (%s); consultas individuais continuam.",
+                    type(exc).__name__,
+                )
+            return self.customer_directory is not None
+
+    def reset_execution_reads(self):
+        """Uma aplicação exige consultas novas, mesmo com o mesmo cliente Python."""
+        with self._directory_lock:
+            if self._execution_cache is not None:
+                self._execution_cache.close()
+                self._execution_cache = None
+            self.customer_directory = None
+            self._directory_attempted = False
+
+    def get_clientes_segmento(self, segmento: str = "FARMA"):
+        if segmento not in {"FARMA", "PET"}:
+            raise ValueError("Segmento deve ser FARMA ou PET.")
+        return self._request_json(
+            self._delivery_path(f"clientes/{segmento}"),
+            allow_not_found=True,
+            allow_customer_list=True,
+        )
+
+    def get_cliente_cadastro_by_cpf(self, cpf: str):
+        if self.customer_directory is not None:
+            candidates = self.customer_directory.candidates(cpf)
+            if candidates:
+                with self._metrics_lock:
+                    self._directory_hits += 1
+                return candidates
+        return self.get_cliente_by_cpf(cpf)
+
+    def _cached_read(self, kind: str, key: str, fetch):
+        # Ativado somente para a preparação desta execução, nunca persistido
+        # entre dry-run e apply ou tratado como prova de uma compra posterior.
+        if self._execution_cache is not None:
+            return self._execution_cache.read(kind, key, fetch)
+        return fetch()
+
     def get_cliente_by_cpf(
         self, cpf: str
     ) -> dict[str, Any] | list[dict[str, Any]] | None:
-        return self._request_json(
-            self._delivery_path(f"cliente/cpf/{cpf}"),
-            allow_not_found=True,
-            allow_customer_list=True,
-            diagnostic_ref=self.cpf_diagnostic_ref(cpf),
-            private_cpf=cpf,
+        return self._cached_read(
+            "cpf",
+            cpf,
+            lambda: self._request_json(
+                self._delivery_path(f"cliente/cpf/{cpf}"),
+                allow_not_found=True,
+                allow_customer_list=True,
+                diagnostic_ref=self.cpf_diagnostic_ref(cpf),
+                private_cpf=cpf,
+            ),
         )
 
     def _record_private_failure(
@@ -924,13 +1044,16 @@ class FarmaliderClient:
             raise
 
     def get_pedido(self, codigo: str | int) -> dict[str, Any] | None:
-        # Listas são aceitas somente no GET de cliente; este GET já as rejeita.
         return cast(
             dict[str, Any] | None,
-            self._request_json(
-                self._delivery_path(f"pedido/{codigo}"),
-                allow_not_found=True,
-                diagnostic_ref=self._diagnostic_ref("pedido", codigo),
+            self._cached_read(
+                "pedido",
+                str(codigo),
+                lambda: self._request_json(
+                    self._delivery_path(f"pedido/{codigo}"),
+                    allow_not_found=True,
+                    diagnostic_ref=self._diagnostic_ref("pedido", codigo),
+                ),
             ),
         )
 

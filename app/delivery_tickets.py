@@ -27,6 +27,7 @@ from farmalider_client import (
     FarmaliderError,
     FarmaliderUnavailableError,
 )
+from farmalider_customers import prepare_customers
 from farmalider_integration import (
     apply_pedido_api_confirmation,
     cpf_cadastro_status,
@@ -42,6 +43,7 @@ from weni_update import (
     GroupAction,
     PlanAuditError,
     UpdateStats,
+    _apply_customer_enrichment,
     _apply_purchase_candidate,
     _available_weni_fields,
     _ensure_order_fields,
@@ -257,6 +259,7 @@ def _order_plan(contact, resolved, farm, captured_at, available_fields):
     plan = ContactUpdatePlan(
         contact_uuid=contact["uuid"], contact_name=str(contact.get("name") or "")
     )
+    _apply_customer_enrichment(plan, contact, farm, captured_at, available_fields)
     _apply_purchase_candidate(
         plan,
         contact,
@@ -302,6 +305,7 @@ def reconcile_tickets(
             contact["uuid"],
         )
     )
+    prepare_customers(farm, len(selected_contacts))
     resolved_by_uuid, plans, summary = {}, [], Counter()
     groups = {}
     for index, contact in enumerate(selected_contacts, 1):
@@ -644,7 +648,11 @@ def _delivery_conflict_differences(plan, current):
             differences.append((name, expected, found))
             reasons.add("CAMPO_ALTERADO")
     for name, expected in plan.guards.items():
-        if name in {"__pending_purchase_check", "__pending_purchase_check_resolved"}:
+        if name in {
+            "__pending_purchase_check",
+            "__pending_purchase_check_resolved",
+            "__farmalider_cadastro",
+        }:
             continue
         if name == "__invalid_cpf_identity":
             found = weni_identity_guard(current)

@@ -48,6 +48,12 @@ from farmalider_client import (
     FarmaliderError,
     FarmaliderUnavailableError,
 )
+from farmalider_customers import (
+    DIRECTORY_SOURCE,
+    enrichment,
+    prepare_customers,
+    selected_customer,
+)
 from farmalider_integration import resolve_contact_order, weni_identity_guard
 from geography import GEOGRAPHY_FIELDS, geography_changes
 from pedido_utils import (
@@ -93,6 +99,8 @@ ALLOWED_WRITE_FIELDS = {
     "contact_urn_facebook",
     "contact_canal_principal",
     "cpf",
+    "genero",
+    "cep",
     "idade",
     "maior_de_18_anos",
     "opt_in_lgpd",
@@ -914,6 +922,115 @@ def _sync_contact_geography_fields(
         )
 
 
+def _apply_customer_enrichment(plan, contact, farm, captured_at, available_fields):
+    captured = business_order_datetime(captured_at)
+    if captured is None:
+        return
+    original_fields = get_fields(contact)
+    effective = {**original_fields, **plan.fields}
+    customer = selected_customer(farm, {**contact, "fields": effective})
+    if customer is None:
+        return
+    additions = enrichment(effective, customer, captured.date())
+    additions = {
+        key: value
+        for key, value in additions.items()
+        if available_fields is None or key in available_fields
+    }
+    if not additions:
+        return
+    preserved = {
+        "cpf",
+        "nome",
+        "email",
+        "telefone",
+        "celular",
+        "whatsapp",
+        "contact_urn",
+        "contact_urn_whatsapp",
+        "contact_urn_instagram",
+        "contact_urn_facebook",
+        "idade",
+        "maior_de_18_anos",
+        "genero",
+        "cep",
+        *GEOGRAPHY_FIELDS,
+    }
+    source_contact = {
+        "uuid": contact["uuid"],
+        "name": contact.get("name"),
+        "urns": contact.get("urns") or [],
+        "fields": {key: original_fields.get(key) for key in preserved},
+    }
+    if weni_identity_guard(source_contact) != weni_identity_guard(contact):
+        return
+    plan.guards["__farmalider_cadastro"] = {
+        "source": DIRECTORY_SOURCE,
+        "captured_at": captured_at,
+        "customer": customer,
+        "contact": source_contact,
+    }
+    if not is_valid_cpf(normalize_cpf(effective.get("cpf"))):
+        plan.guards["__invalid_cpf_identity"] = weni_identity_guard(contact)
+        plan.guards["__native_urns"] = sorted(native_contact_urns(contact))
+    for key in {"cpf", "idade", "maior_de_18_anos", "genero", "cep", *GEOGRAPHY_FIELDS}:
+        plan.guards.setdefault(key, original_fields.get(key))
+    for key, value in additions.items():
+        _set_field_if_changed(
+            plan,
+            original_fields,
+            key,
+            value,
+            reason="cadastro oficial FARMA: preenchimento de campo ausente",
+        )
+        plan.evidence[key]["source"] = DIRECTORY_SOURCE
+
+
+def _validated_customer_changes(plan):
+    from farmalider_integration import select_cliente_response, weni_customer_identity
+
+    proof = plan.guards.get("__farmalider_cadastro")
+    if not isinstance(proof, dict) or proof.get("source") != DIRECTORY_SOURCE:
+        return {}
+    contact = proof.get("contact")
+    customer = proof.get("customer")
+    captured = business_order_datetime(proof.get("captured_at"))
+    if (
+        not isinstance(contact, dict)
+        or not isinstance(customer, dict)
+        or captured is None
+    ):
+        return {}
+    if contact.get("uuid") != plan.contact_uuid:
+        return {}
+    original = get_fields(contact)
+    claimed = {
+        key
+        for key, evidence in plan.evidence.items()
+        if evidence.get("source") == DIRECTORY_SOURCE
+    }
+    if any(plan.previous.get(key) != original.get(key) for key in claimed):
+        return {}
+    effective = {
+        **original,
+        **{key: value for key, value in plan.fields.items() if key not in claimed},
+    }
+    if not is_valid_cpf(normalize_cpf(effective.get("cpf"))):
+        if weni_identity_guard(contact) != plan.guards.get(
+            "__invalid_cpf_identity"
+        ) or sorted(native_contact_urns(contact)) != plan.guards.get("__native_urns"):
+            return {}
+    status, _ = select_cliente_response(
+        normalize_cpf(effective.get("cpf")),
+        {"cliente": customer},
+        weni_identity=weni_customer_identity({**contact, "fields": effective}),
+    )
+    if status[0] not in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO"}:
+        return {}
+    expected = enrichment(effective, customer, captured.date())
+    return {key: value for key, value in expected.items() if key in claimed}
+
+
 def _purchase_is_cancelled(order: dict[str, str]) -> bool:
     return is_order_cancelled(order)
 
@@ -1223,6 +1340,10 @@ def _build_contact_plan(
         # consentimento durante a revisão humana.
         plan.guards["opt_in_lgpd"] = fields.get("opt_in_lgpd")
 
+    _apply_customer_enrichment(
+        plan, contact, farm_client, captured_at, available_weni_fields
+    )
+
     _apply_purchase_candidate(
         plan,
         contact,
@@ -1396,13 +1517,28 @@ def audit_plans(
                 f"{plan.contact_uuid}: campos não autorizados: {', '.join(unknown)}"
             )
 
+        customer_changes = _validated_customer_changes(plan)
+        for key in {"genero", "cep"} & set(plan.fields):
+            if customer_changes.get(key) != plan.fields[key]:
+                errors.append(
+                    f"{plan.contact_uuid}: cadastro FARMA sem fonte válida para {key}"
+                )
+        for key, evidence in plan.evidence.items():
+            if (
+                key in plan.fields
+                and evidence.get("source") == DIRECTORY_SOURCE
+                and customer_changes.get(key) != plan.fields[key]
+            ):
+                errors.append(
+                    f"{plan.contact_uuid}: preenchimento cadastral sem fonte válida para {key}"
+                )
         if GEOGRAPHY_FIELDS & set(plan.fields):
             required = GEOGRAPHY_FIELDS | {"cep"}
             expected = geography_changes(plan.guards)
             if not required.issubset(plan.guards) or any(
                 expected.get(key) != value
                 for key, value in plan.fields.items()
-                if key in GEOGRAPHY_FIELDS
+                if key in GEOGRAPHY_FIELDS and customer_changes.get(key) != value
             ):
                 errors.append(
                     f"{plan.contact_uuid}: padronização de endereço sem fonte válida"
@@ -2241,6 +2377,8 @@ def _prepare_frozen_plan_for_apply(
         )
 
     for guard_name, expected in plan.guards.items():
+        if guard_name == "__farmalider_cadastro":
+            continue
         if guard_name in {
             "__pending_purchase_check",
             "__pending_purchase_check_resolved",
@@ -3129,6 +3267,7 @@ def run_update(
                         type(exc).__name__,
                     )
 
+        prepare_customers(farm, len(prepared_contacts))
         previous_phase = None
         invalid_batch = _InvalidCpfBatch()
         with TaskProgress(

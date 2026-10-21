@@ -102,7 +102,20 @@ def candidate_groups(contacts, scope=None):
 
 
 def unique_customer(farm, cpf):
-    candidates = _cliente_candidates(farm.get_cliente_by_cpf(cpf)) or []
+    from farmalider_client import FarmaliderClient
+    from farmalider_customers import directory_for
+
+    payload = (
+        farm.get_cliente_cadastro_by_cpf(cpf)
+        if isinstance(farm, FarmaliderClient)
+        else farm.get_cliente_by_cpf(cpf)
+    )
+    candidates = _cliente_candidates(payload) or []
+    directory = directory_for(farm)
+    if directory is not None:
+        candidates, conflict = directory.constrain(cpf, candidates)
+        if conflict:
+            return None
     valid = [
         c["cliente"]
         for c in candidates
@@ -123,9 +136,13 @@ def preview_refusals(canonical, pair):
 
 def prepare(contacts, farm, store_factory, *, scope=None):
     """Apenas GET e cálculo; nenhum construtor com migração de planilha."""
+    from farmalider_customers import prepare_customers
+
     groups = candidate_groups(contacts, scope)
     pending, pairs = [], []
     valid = {cpf: cs for cpf, cs in groups.items() if is_valid_cpf(cpf)}
+    if valid:
+        prepare_customers(farm, len(valid))
     for cpf, cs in groups.items():
         if cpf not in valid:
             pending.append(
@@ -428,6 +445,10 @@ def verify_retired_canonical(pair, canonical, contacts, deleted, names):
 
 def apply_batch(payload, weni, farm, store, contacts, names, directory):
     """Um lote durável; a primeira prova não é sobrescrita em retomadas."""
+    from farmalider_client import FarmaliderClient
+
+    if isinstance(farm, FarmaliderClient):
+        farm.reset_execution_reads()
     directory = Path(directory)
     state_path = directory / "state.json"
     state = (

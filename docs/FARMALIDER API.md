@@ -2,11 +2,11 @@
 
 ## Consulta de CPFs válidos e inválidos
 
-Nas cargas Weni e Analytics, o NexoFlow consulta primeiro os CPFs matematicamente válidos e aguarda essa etapa terminar antes de consultar os inválidos preenchidos. Antes de classificar um CPF curto, o NexoFlow testa a reposição de zeros à esquerda até 11 dígitos; aceita essa forma somente quando os dois dígitos verificadores são válidos. A classificação rejeita sequências repetidas e dígitos incorretos. Identificadores que continuam inválidos após essa verificação e valores como `0` ou `00000000000` também são consultados, na segunda etapa. Valores sem dígitos não geram GET. O CPF original permanece no cadastro; a consulta remove a formatação e usa zeros à esquerda somente quando a validação matemática comprova a forma de 11 dígitos. Não troca dígitos existentes.
+Nas cargas Weni e Analytics, o NexoFlow consulta primeiro os CPFs matematicamente válidos e aguarda essa etapa terminar antes de consultar os inválidos preenchidos. Antes de classificar um CPF curto, o NexoFlow testa a reposição de zeros à esquerda até 11 dígitos; aceita essa forma somente quando os dois dígitos verificadores são válidos. A classificação rejeita sequências repetidas e dígitos incorretos. Identificadores preenchidos, não zerados e com formato utilizável que continuam inválidos após essa verificação são consultados na segunda etapa. CPF ausente, inteiramente zerado ou malformado é pendência cadastral e não gera GET por CPF. O CPF original permanece no cadastro; a consulta remove a formatação e usa zeros à esquerda somente quando a validação matemática comprova a forma de 11 dígitos. Não troca dígitos existentes.
 
 O Analytics deduplica os identificadores por execução e separa os lotes das duas etapas. As cargas Weni em partes seguem essa prioridade dentro da parte selecionada, preservando o manifesto e a revisão humana. Evidência válida de CPF em mensagens entra na primeira etapa quando for o valor efetivo do plano. Toda nova carga reconsulta os identificadores no escopo selecionado; respostas duplicadas só são compartilhadas dentro da mesma execução. CPFs válidos dispensam comparação de nome, telefone e e-mail. CPFs inválidos exigem nome ou telefone correspondente.
 
-`CPF_CONFIRMADO` identifica um CPF matematicamente válido encontrado na API; `CPF_INVALIDO_ENCONTRADO` identifica um CPF inválido cujo cliente foi confirmado também pelo primeiro nome ou pelo número local do telefone. Ambos alimentam o total de clientes encontrados, mas somente CPFs matematicamente válidos entram em `cpfs_validos`. HTTP 400 registra `CPF_REJEITADO_API`, sem retry e sem contar como falha 500; HTTP 404 registra `CPF_NAO_ENCONTRADO`; falhas de servidor/rede registram `ERRO_API`, sem autorizar um vínculo de cliente por CPF inválido. Os logs públicos mostram etapas e contagens, sem CPF. O diagnóstico privado de falhas 5xx aceita também identificadores curtos e zeros.
+`CPF_CONFIRMADO` identifica um CPF matematicamente válido encontrado na API; `CPF_INVALIDO_ENCONTRADO` identifica um CPF inválido cujo cliente foi confirmado também pelo primeiro nome ou pelo número local do telefone. Ambos alimentam o total de clientes encontrados, mas somente CPFs matematicamente válidos entram em `cpfs_validos`. HTTP 400 registra `CPF_REJEITADO_API`, sem retry e sem contar como falha 500; HTTP 404 registra `CPF_NAO_ENCONTRADO`; falhas de servidor/rede registram `ERRO_API`, sem autorizar um vínculo de cliente por CPF inválido. Os logs públicos mostram etapas e contagens, sem CPF. O diagnóstico privado de falhas 5xx aceita identificadores curtos consultáveis, sem enviar zeros à API.
 
 Para CPF inválido, a coincidência do CPF não confirma a pessoa. É obrigatório comparar **primeiro nome correspondente ou número local do telefone correspondente**. A comparação de nome usa somente o primeiro nome, desconsiderando acentos, maiúsculas e símbolos; sobrenomes não precisam coincidir. O e-mail não é obrigatório para essa validação. O telefone compara apenas o número local, ignorando o prefixo brasileiro +55 e o DDD, sem completar dígitos nem inserir o nono dígito. Números nativos da Weni têm precedência sobre campos antigos de telefone/WhatsApp.
 
@@ -16,7 +16,7 @@ O cache persistente de vínculos por CPF inválido não é reutilizado, incluind
 
 Pedidos antigos com CPF inválido permanecem preservados nas tabelas de origem, mas não entram nas vendas, na atribuição de anúncios nem em `BI_Pedidos` até serem revalidados pela nova regra. A origem de um novo pedido validado com CPF inválido recebe o marcador técnico `_IDENTIDADE_VALIDADA`, usado para distinguir esses registros. Após reinstalar, execute **carga completa da Weni, com revisão humana, e depois carga completa do Analytics** para revalidar a base e atualizar os indicadores.
 
-Para aproveitar um pedido, o CPF retornado precisa corresponder ao identificador consultado, o cliente deve ter ID positivo e o pedido deve pertencer ao mesmo cliente. CPF numérico no JSON pode perder zeros à esquerda: somente essa representação numérica equivalente é aceita, sem mudar a classificação nem o CPF na Weni. A consulta não comprova emissão oficial do CPF ou titularidade da pessoa; identificadores genéricos como zero exigem atenção na revisão humana. A extração de mensagens e a gravação de um novo CPF na Weni continuam exigindo validade matemática e contexto explícito.
+Para aproveitar um pedido, o CPF retornado precisa corresponder ao identificador consultado, o cliente deve ter ID positivo e o pedido deve pertencer ao mesmo cliente. CPF numérico no JSON pode perder zeros à esquerda: somente essa representação numérica equivalente é aceita, sem mudar a classificação nem o CPF na Weni. A consulta não comprova emissão oficial do CPF ou titularidade da pessoa; identificadores genéricos como zero permanecem como pendência cadastral, sem autorizar vínculo de cliente ou pedido. A extração de mensagens e a gravação de um novo CPF na Weni continuam exigindo validade matemática e contexto explícito.
 
 Documentação atual do uso da API pelo **NexoFlow**.
 
@@ -43,6 +43,16 @@ Sem proxy:
 ```text
 https://api.farmalider.net.br:3200/farmalider
 ```
+
+## Cadastro de clientes por segmento
+
+```text
+GET /api/Delivery/clientes/FARMA?token=...
+```
+
+Retorna uma lista de cadastros com ID, CPF, nome, celular, e-mail, sexo, nascimento, data de cadastro e endereços. **Não retorna pedidos.** O NexoFlow usa o segmento FARMA; a presença de um cliente em outro segmento não autoriza exclusões nem substitui o filtro de produtos. O segmento PET permanece disponível no cliente técnico, sem carga automática na operação FarmaLíder.
+
+O índice preserva todos os candidatos de um CPF, bloqueia IDs repetidos com dados divergentes e mantém a seleção única conforme as regras abaixo. A consulta individual de CPF continua descobrindo o último pedido; as respostas cadastrais não entram no cache de descoberta de compras. Consulte [Cadastro FARMA](CADASTRO%20FARMA.md).
 
 ## Cliente por CPF
 

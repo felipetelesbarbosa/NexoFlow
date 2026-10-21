@@ -181,12 +181,13 @@ os inválidos preenchidos. Antes de classificar um CPF curto, o NexoFlow
 testa a reposição de zeros à esquerda até 11 dígitos; aceita essa forma
 somente quando os dois dígitos verificadores são válidos. A
 classificação rejeita sequências repetidas e dígitos incorretos.
-Identificadores que continuam inválidos após essa verificação e valores
-como <code>0</code> ou <code>00000000000</code> também são consultados,
-na segunda etapa. Valores sem dígitos não geram GET. O CPF original
-permanece no cadastro; a consulta remove a formatação e usa zeros à
-esquerda somente quando a validação matemática comprova a forma de 11
-dígitos. Não troca dígitos existentes.</p>
+Identificadores preenchidos, não zerados e com formato utilizável que
+continuam inválidos após essa verificação são consultados na segunda
+etapa. CPF ausente, inteiramente zerado ou malformado é pendência
+cadastral e não gera GET por CPF. O CPF original permanece no cadastro;
+a consulta remove a formatação e usa zeros à esquerda somente quando a
+validação matemática comprova a forma de 11 dígitos. Não troca dígitos
+existentes.</p>
 <p>O Analytics deduplica os identificadores por execução e separa os
 lotes das duas etapas. As cargas Weni em partes seguem essa prioridade
 dentro da parte selecionada, preservando o manifesto e a revisão humana.
@@ -211,8 +212,8 @@ encontrados, mas somente CPFs matematicamente válidos entram em
 HTTP 404 registra <code>CPF_NAO_ENCONTRADO</code>; falhas de
 servidor/rede registram <code>ERRO_API</code>, sem autorizar um vínculo
 de cliente por CPF inválido. Os logs públicos mostram etapas e
-contagens, sem CPF. O diagnóstico privado de falhas 5xx aceita também
-identificadores curtos e zeros.</p>
+contagens, sem CPF. O diagnóstico privado de falhas 5xx aceita
+identificadores curtos consultáveis, sem enviar zeros à API.</p>
 <p>Para CPF inválido, a coincidência do CPF não confirma a pessoa. É
 obrigatório comparar <strong>primeiro nome correspondente ou número
 local do telefone correspondente</strong>. A comparação de nome usa
@@ -255,9 +256,9 @@ pertencer ao mesmo cliente. CPF numérico no JSON pode perder zeros à
 esquerda: somente essa representação numérica equivalente é aceita, sem
 mudar a classificação nem o CPF na Weni. A consulta não comprova emissão
 oficial do CPF ou titularidade da pessoa; identificadores genéricos como
-zero exigem atenção na revisão humana. A extração de mensagens e a
-gravação de um novo CPF na Weni continuam exigindo validade matemática e
-contexto explícito.</p>
+zero permanecem como pendência cadastral, sem autorizar vínculo de
+cliente ou pedido. A extração de mensagens e a gravação de um novo CPF
+na Weni continuam exigindo validade matemática e contexto explícito.</p>
 <p>Software interno de integração, atualização de contatos e analytics
 da FarmaLíder.</p>
 <h3 id="arquitetura-atual-de-pedidos-fallback-e-frete">Arquitetura atual
@@ -873,6 +874,13 @@ valores e formatos em uma única transação. A Curva ABC exige cobertura
 dos itens do período e sinaliza ausência ou divergência em
 <code>BI_Qualidade</code>; a rotina Delivery também atualiza as fontes
 comerciais.</p>
+<h2 id="cadastro-oficial-farma">Cadastro oficial FARMA</h2>
+<p>Os quatro componentes compartilham o índice cadastral por segmento e
+o reaproveitamento de leituras da mesma execução. A ausência de
+<code>ultimoPedido</code> nessa listagem não indica ausência de compra.
+Gênero, idade/maioridade e localização são preenchidos somente quando
+ausentes e com vínculo de cliente único confirmado. Consulte <a
+href="CADASTRO%20FARMA.md">Cadastro FARMA</a>.</p>
 </body>
 </html>
-<!-- NexoFlow documentation: source-sha256=985facaf3251986ff0531656b659a712be501384ed77c0cb2671f36243c5768f content-sha256=b3435321b9fd8e6278b176048a1128b7c1ec7fda1226b8f3b3f890807a219cd3 -->
+<!-- NexoFlow documentation: source-sha256=4e89d91dcf7c3c93b272e917e20db1e5326eaa363ce182283d4f151ffd4781f2 content-sha256=b05575d1c0c3d966f8731d2bd84bcc0846853fe447fcd747f7b69019538b2c7c -->

@@ -22,3 +22,5 @@ Ao atualizar este repositório, mantenha a identificação pública **NexoFlow 1
 - Recompra mantém a política de bloqueio por recusa/Opt-Out, inclusive quando marketing_opt_in está afirmativo; campo vazio não é tratado como consentimento registrado. Novas inclusões e trocas de referência exigem evento D+25 ainda futuro, reconferido antes do POST. A passagem do horário, sozinha, não remove contatos já admitidos com a mesma referência.
 
 - Lançamento com `codProduto=0` e descrição vazia representa frete somente quando a soma desses lançamentos coincide com o frete oficial do cabeçalho. Validar vínculo e valores; não incluir em produtos, quantidades, Recompra ou valor dos produtos e não somar o frete duas vezes.
+
+- `clientes/FARMA` é cadastro, sem pedidos. Nunca interpretar a ausência de `ultimoPedido` nessa listagem como ausência de compra. Preservar todos os candidatos por CPF; ausência na listagem usa a consulta individual como fallback, sem exclusão automática. Cadastro só preenche campos vazios e mantém evidência na revisão. Leituras de preparação não podem autorizar uma aplicação posterior: Recompra e deduplicação reiniciam as leituras antes do apply.

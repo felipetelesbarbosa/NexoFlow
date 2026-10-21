@@ -313,7 +313,7 @@ Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/payload ma
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/NexoFlow Recompra.exe"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/NexoFlow Recompra.exe"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/weni_update.py"
-foreach ($module in @("weni_dedup", "contact_dedup_guard", "dedup_io", "dedup_sheets", "dedup_bi", "recompra_lock", "recompra_review_audit")) {
+foreach ($module in @("weni_dedup", "contact_dedup_guard", "dedup_io", "dedup_sheets", "dedup_bi", "recompra_lock", "recompra_review_audit", "farmalider_customers")) {
     Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/$module.py"
     Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/app/$module.py"
 }
@@ -349,6 +349,7 @@ Distribuição oficial do **NexoFlow 1.0**.
 O arquivo `NexoFlow-Setup-$Version.zip` contém o instalador do NexoFlow 1.0 e foi validado automaticamente em Windows para primeira instalação e atualização de uma instalação existente.
 
 Melhorias desta distribuição do NexoFlow 1.0:
+- cadastro FARMA nos quatro fluxos, preenchimento auditado de campos ausentes, conferência dos candidatos por CPF/ID e reaproveitamento de leituras por execução; pedidos continuam sendo confirmados separadamente e o apply usa consultas novas;
 - rede FarmaLíder: consultas aguardando na fila acompanham a rota atual, mantendo URL e proxy coerentes mesmo após uma troca de conexão; diagnóstico de destino sem CPF ou token;
 - Delivery/Planilhas: diagnóstico individual privado de conflitos, retomada explícita da revisão existente sem repetir operações concluídas e histórico preservado antes de gerar outra revisão; cadastro ausente é separado de ausência de pedido;
 - Recompra: lock do sistema operacional com identificação da execução e recuperação segura após encerramento, consolidação por UUID, prazo revalidado antes da inclusão e revisão resumida; CPF zerado é pendência cadastral, sem consulta à API; recusas continuam bloqueando sem alterar consentimento;

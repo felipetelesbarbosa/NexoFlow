@@ -25,6 +25,9 @@ FARMALIDER_API_TOKEN = "COLE_SEU_TOKEN_FARMALIDER_AQUI"
 # False = produção
 # True  = endpoints /api/Delivery/hml/...
 FARMALIDER_USE_HML = False
+# Listagem cadastral FARMA: auto para cargas a partir de 500 contatos.
+FARMALIDER_CUSTOMER_DIRECTORY_MODE = "auto"
+FARMALIDER_CUSTOMER_DIRECTORY_MIN_CONTACTS = 500
 
 # Webhook (futuro)
 WEBHOOK_SHARED_SECRET = "TROQUE_POR_UM_SEGREDO_FORTE"

@@ -28,6 +28,7 @@ from analytics import (
 )
 from config import FARMALIDER_MAX_WORKERS, WENI_UPDATE_STATE_FILE
 from farmalider_client import FarmaliderError
+from farmalider_customers import directory_for, prepare_customers
 from farmalider_integration import (
     _positive_id,
     cpf_cadastro_status,
@@ -167,6 +168,10 @@ class RecompraReadCache:
                         del self._responses[candidate]
         return deepcopy(future.result())
 
+    @property
+    def customer_directory(self):
+        return directory_for(self.farm)
+
     def get_cliente_by_cpf(self, cpf):
         return self._read("cpf", cpf, lambda: self.farm.get_cliente_by_cpf(cpf))
 
@@ -291,6 +296,8 @@ def build_plans(
     results = Counter()
     started = monotonic()
 
+    expected_contacts = len(contacts) if isinstance(contacts, (list, tuple)) else None
+
     def plan_contact(contact):
         if isinstance(contact, _ConflictingPaginationContact):
             return {
@@ -319,6 +326,8 @@ def build_plans(
             # Uma recusa já impede a campanha independentemente do pedido;
             # a remoção não precisa consultar ou validar uma compra na API.
             return propose(contact, None, [], structure, saved, now=now)
+        if not cpf_cadastro_status(get_fields(contact).get("cpf")):
+            prepare_customers(farm, expected_contacts)
         order, items = _resolve_checked_contact(contact, reads, now.isoformat(), saved)
         return propose(contact, order, items, structure, saved, now=now)
 
@@ -777,7 +786,10 @@ def resolve_latest(contact, farm, captured_at, lookup_cache=None, saved=None):
         return {"status_confirmacao": "CPF_REJEITADO_API"}, []
     payload = cache[cpf]
     result, selected = select_cliente_response(
-        cpf, payload, weni_identity=weni_customer_identity(contact)
+        cpf,
+        payload,
+        weni_identity=weni_customer_identity(contact),
+        customer_directory=directory_for(farm),
     )
     if result[0] not in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO"}:
         return {"status_confirmacao": result[0]}, []
@@ -822,7 +834,7 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
     }
     diagnostic = text((order or {}).get("status_confirmacao"))
     plan["order_resolution_status"] = diagnostic
-    if diagnostic.startswith("CPF_") or diagnostic.startswith("ERRO_"):
+    if diagnostic.startswith(("CPF_", "ERRO_", "CLIENTE_")):
         plan["reason"] = diagnostic
     # A recusa e o cancelamento prevalecem até sobre pedidos que a API
     # rotulou como confirmados. Não atualizamos campos desse contato.
@@ -1273,6 +1285,17 @@ def apply_review(
         check_day()
         if digest(state) != review["state_sha256"]:
             raise RuntimeError("Estado mudou após a revisão. Gere um novo dry-run.")
+        from farmalider_client import FarmaliderClient
+
+        if isinstance(farm, FarmaliderClient):
+            farm.reset_execution_reads()
+            if any(
+                plan_needs_apply(
+                    plan, _saved_with_purchase_check(state, plan["contact_uuid"])
+                )
+                for plan in review["plans"]
+            ):
+                prepare_customers(farm, len(review["plans"]))
         reads = RecompraReadCache(farm)
         for index, reviewed in enumerate(review["plans"], 1):
             check_day()

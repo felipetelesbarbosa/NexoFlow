@@ -127,6 +127,8 @@ class RecompraReviewAuditTests(unittest.TestCase):
                 plan("synthetic-http", reason="CPF_REJEITADO_API"),
                 plan("synthetic-later", reason="PEDIDO_POSTERIOR_PENDENTE_API"),
                 plan("synthetic-http-error", reason="ERRO_ITENS_PEDIDO_API"),
+                plan("synthetic-id-conflict", reason="CLIENTE_ID_DIVERGENTE_API"),
+                plan("synthetic-id-broken", reason="CLIENTE_ID_INVALIDO_API"),
                 plan("synthetic-no-order", reason="SEM_PEDIDO_CONFIRMADO"),
                 plan("synthetic-cancelled", reason="PEDIDO_STATUS_3_CANCELADO"),
             ]
@@ -135,6 +137,8 @@ class RecompraReviewAuditTests(unittest.TestCase):
         self.assertEqual(
             report["pending_reasons"],
             {
+                "CLIENTE_ID_DIVERGENTE_API": 1,
+                "CLIENTE_ID_INVALIDO_API": 1,
                 "CPF_INVALIDO_CADASTRO": 1,
                 "CPF_REJEITADO_API": 1,
                 "ERRO_ITENS_PEDIDO_API": 1,

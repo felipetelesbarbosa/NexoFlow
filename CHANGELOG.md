@@ -1,5 +1,8 @@
 # NexoFlow 1.0 — Changelog
 
+- Cadastro FARMA integrado a Weni, Analytics, Recompra e Planilhas: índice por CPF/ID, candidatos ambíguos preservados, confronto do ID da consulta individual com o cadastro FARMA e fallback quando a listagem não fornece um vínculo. Campos cadastrais ausentes são preenchidos com evidência na revisão, sem mudar CPF, contato nativo, consentimento ou pedidos.
+- Leituras repetidas de CPF e pedido reaproveitadas somente dentro da execução; novas aplicações descartam as leituras da simulação. Cargas pequenas dispensam a listagem completa no modo automático. O endpoint cadastral não substitui a descoberta de compras.
+
 - Rede FarmaLíder: destino e proxy capturados juntos após a espera na fila, evitando usar a porta da conexão direta com o proxy após uma troca de rota entre workers. Diagnóstico de falhas mostra somente domínio, porta e tipo de rota.
 
 - Check-up: testes de diagnóstico compatíveis com o modo silencioso e validação do PID real do Python em ambientes virtuais do Windows; check-up operacional conferido antes do empacotamento, além do teste da instalação completa.

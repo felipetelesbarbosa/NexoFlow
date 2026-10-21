@@ -48,10 +48,12 @@ from farmalider_client import (
     FarmaliderError,
     FarmaliderUnavailableError,
 )
+from farmalider_customers import directory_for, enrichment, prepare_customers
 from farmalider_integration import (
     cliente_link_status,
     cpf_cadastro_status,
     resolve_contact_order,
+    select_cliente_response,
     weni_customer_identity,
 )
 from google_sheets import GoogleSheetsStore
@@ -64,7 +66,7 @@ from observed_orders import (
     revalidate_observed_orders,
     verified_order_cancellation,
 )
-from pedido_utils import PENDING_ITEMS_STATUS
+from pedido_utils import PENDING_ITEMS_STATUS, business_order_datetime
 from product_scope import PHARMACY_SCOPE_VERSION
 from project_paths import load_private_settings
 from task_progress import TaskProgress, request_progress
@@ -116,6 +118,7 @@ class ClienteValidationStats:
     invalid: int = 0
     invalid_registration: int = 0
     api_errors: int = 0
+    cadastral_fields_filled: int = 0
     prior_details_retained: int = 0
     http_requests: int = 0
     retries: int = 0
@@ -274,12 +277,24 @@ def _query_cliente(
     farm_client: FarmaliderClient,
     response_cache: dict[str, dict[str, Any] | list[dict[str, Any]] | None]
     | None = None,
+    cadastro_responses: dict | None = None,
 ) -> ClienteResult:
     try:
-        api_cliente = farm_client.get_cliente_by_cpf(cpf)
-        if response_cache is not None:
+        directory = directory_for(farm_client)
+        local = bool(directory is not None and directory.candidates(cpf))
+        api_cliente = (
+            farm_client.get_cliente_cadastro_by_cpf(cpf)
+            if local
+            else farm_client.get_cliente_by_cpf(cpf)
+        )
+        if local:
+            if cadastro_responses is not None:
+                cadastro_responses[cpf] = api_cliente
+        elif response_cache is not None:
             response_cache[cpf] = api_cliente
-        return cliente_link_status(cpf, api_cliente)
+        return select_cliente_response(cpf, api_cliente, customer_directory=directory)[
+            0
+        ]
     except (FarmaliderAuthError, FarmaliderUnavailableError):
         raise
     except FarmaliderBadRequestError:
@@ -412,6 +427,8 @@ def validate_contacts(
     """
     stats = ClienteValidationStats()
     started = time.monotonic()
+    prepare_customers(farm_client, len(rows))
+    cadastro_responses: dict = {}
     rows_by_cpf: dict[str, list[Row]] = {}
 
     for row in rows:
@@ -539,6 +556,7 @@ def validate_contacts(
                                 cpf,
                                 farm_client,
                                 response_cache,
+                                cadastro_responses,
                             ): cpf
                             for cpf in chunk
                         }
@@ -651,14 +669,30 @@ def validate_contacts(
             query_result = cache.get(cpf, ("ERRO_API", "", ""))
             for row in cpf_rows:
                 result = query_result
-                if not is_valid_cpf(cpf) and cpf in response_cache:
+                if not is_valid_cpf(cpf) and (
+                    cpf in response_cache or cpf in cadastro_responses
+                ):
                     identity = (identity_by_uuid or {}).get(
                         str(row.get("contact_uuid") or ""), row
                     )
                     result = cliente_link_status(
-                        cpf, response_cache[cpf], weni_identity=identity
+                        cpf,
+                        cadastro_responses.get(cpf, response_cache.get(cpf)),
+                        weni_identity=identity,
+                        customer_directory=directory_for(farm_client),
                     )
                 _apply_cliente_result(row, result)
+                directory = directory_for(farm_client)
+                if directory is not None and result[0] in {
+                    "CPF_CONFIRMADO",
+                    "CPF_INVALIDO_ENCONTRADO",
+                }:
+                    customer = directory.by_id.get(result[1])
+                    captured = business_order_datetime(sync_time)
+                    if customer and captured:
+                        additions = enrichment(row, customer, captured.date())
+                        row.update(additions)
+                        stats.cadastral_fields_filled += len(additions)
                 if result[0] == "ERRO_API" and _preserve_cliente_on_api_error(
                     row,
                     existing_by_uuid,
@@ -701,6 +735,11 @@ def validate_contacts(
             "FarmaLíder: %s contato(s) com CPF inválido no cadastro; "
             "nenhuma consulta enviada para esses valores. Originais preservados.",
             stats.invalid_registration,
+        )
+    if stats.cadastral_fields_filled:
+        logging.info(
+            "FarmaLíder: %s campo(s) ausente(s) preenchido(s) pelo cadastro FARMA; dados existentes preservados.",
+            stats.cadastral_fields_filled,
         )
     stats.elapsed_seconds = time.monotonic() - started
     return stats

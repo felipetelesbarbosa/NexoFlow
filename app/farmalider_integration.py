@@ -5,6 +5,7 @@ import json
 from decimal import Decimal, InvalidOperation
 from typing import Any, cast
 
+from farmalider_customers import directory_for
 from pedido_utils import (
     business_order_datetime,
     effective_order_status_code,
@@ -252,6 +253,7 @@ def select_cliente_response(
     api_cliente: Any,
     *,
     weni_identity: dict[str, Any] | None = None,
+    customer_directory: Any = None,
 ) -> tuple[tuple[str, str, str], dict[str, Any] | None]:
     """Select one official customer; invalid CPFs require a matching first name or local phone."""
     from analytics import is_valid_cpf, normalize_cpf
@@ -266,6 +268,10 @@ def select_cliente_response(
         return ("ERRO_RESPOSTA_CLIENTE_API", "", ""), None
     if not candidates:
         return ("CPF_NAO_ENCONTRADO", "", ""), None
+    if customer_directory is not None:
+        candidates, conflict = customer_directory.constrain(cpf, candidates)
+        if conflict:
+            return (conflict, "", ""), None
     checked = [
         (_cpf_customer_status(cpf, candidate["cliente"]), candidate)
         for candidate in candidates
@@ -295,6 +301,19 @@ def select_cliente_response(
             for result, candidate in eligible
             if _identity_matches(weni_identity or {}, candidate["cliente"])
         ]
+        indexed = (
+            customer_directory.candidates(cpf) if customer_directory is not None else []
+        )
+        if indexed:
+            eligible = [
+                (result, candidate)
+                for result, candidate in eligible
+                if any(
+                    _positive_id(record.get("id")) == result[1]
+                    and _identity_matches(weni_identity or {}, record)
+                    for record in indexed
+                )
+            ]
         if not eligible:
             return ("CPF_IDENTIDADE_DIVERGENTE", "", ""), None
     if len(eligible) != 1:
@@ -307,9 +326,13 @@ def cliente_link_status(
     api_cliente: Any,
     *,
     weni_identity: dict[str, Any] | None = None,
+    customer_directory: Any = None,
 ) -> tuple[str, str, str]:
     result, _ = select_cliente_response(
-        weni_cpf, api_cliente, weni_identity=weni_identity
+        weni_cpf,
+        api_cliente,
+        weni_identity=weni_identity,
+        customer_directory=customer_directory,
     )
     return result
 
@@ -1035,6 +1058,7 @@ def resolve_contact_order(
         cpf,
         payload,
         weni_identity=weni_customer_identity(contact),
+        customer_directory=directory_for(farm_client),
     )
     status, confirmed_cliente_id, _ = result
     if status not in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO"}:

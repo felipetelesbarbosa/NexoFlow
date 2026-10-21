@@ -9,6 +9,8 @@ from typing import Any
 
 _KNOWN_REASONS = frozenset(
     {
+        "CLIENTE_ID_DIVERGENTE_API",
+        "CLIENTE_ID_INVALIDO_API",
         "CONTATO_DUPLICADO_DIVERGENTE",
         "CPF_CONFIRMADO",
         "CPF_DIVERGENTE_API",
@@ -51,7 +53,7 @@ _KNOWN_REASONS = frozenset(
 _PENDING_REASONS = frozenset(
     reason
     for reason in _KNOWN_REASONS
-    if reason.startswith(("ERRO_", "CPF_"))
+    if reason.startswith(("ERRO_", "CPF_", "CLIENTE_"))
     and reason not in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO"}
 ) | {
     "CONTATO_DUPLICADO_DIVERGENTE",
