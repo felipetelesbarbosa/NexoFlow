@@ -45,10 +45,22 @@ $expected
 Fechar ou cancelar esta janela NÃO aplica nenhuma alteração.
 "@
         }
-        $response = [string](Show-WeniReviewDialog -Message $message -Title $title)
-        if ($response.Trim().Equals($expected, [System.StringComparison]::OrdinalIgnoreCase)) {
-            Write-Host "[OK] Revisão humana confirmada."
-            return 0
+        for ($attempt = 1; $attempt -le 2; $attempt++) {
+            $prompt = $message
+            if ($attempt -gt 1) {
+                $prompt = "A confirmação digitada não corresponde ao texto solicitado. Tente novamente.`r`n`r`n$message"
+            }
+            $response = [string](Show-WeniReviewDialog -Message $prompt -Title $title)
+            if ([string]::IsNullOrWhiteSpace($response)) {
+                break
+            }
+            if ($response.Trim().Equals($expected, [System.StringComparison]::OrdinalIgnoreCase)) {
+                Write-Host "[OK] Revisão humana confirmada."
+                return 0
+            }
+            if ($attempt -lt 2) {
+                Write-Host "[AVISO] Texto de confirmação incorreto. Você tem mais uma tentativa."
+            }
         }
         Write-Host "[INFO] Confirmação humana não recebida. Nenhuma alteração será aplicada."
         return 2

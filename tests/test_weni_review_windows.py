@@ -625,7 +625,12 @@ class WeniReviewDialogWindowsTests(unittest.TestCase):
     """Test the actual PowerShell decision logic while replacing the GUI only."""
 
     def _run_dialog(
-        self, expression: str, expected_code: int, *, part: str = ""
+        self,
+        expression: str,
+        expected_code: int,
+        *,
+        part: str = "",
+        expected: str = "CARGA COMPLETA REVISADA",
     ) -> None:
         script = REPOSITORY / "scripts" / "confirmar_revisao_weni.ps1"
         script_literal = str(script).replace("'", "''")
@@ -637,7 +642,7 @@ class WeniReviewDialogWindowsTests(unittest.TestCase):
                 "    param([string]$Message, [string]$Title)\n"
                 f"    {expression}\n"
                 "}\n"
-                f"exit (Confirm-WeniReview -Part '{part}')\n",
+                f"exit (Confirm-WeniReview -Part '{part}' -Expected '{expected}')\n",
                 encoding="utf-8-sig",
             )
             result = subprocess.run(
@@ -693,6 +698,46 @@ class WeniReviewDialogWindowsTests(unittest.TestCase):
 
     def test_inexact_confirmation_is_cancelled(self) -> None:
         self._run_dialog("return 'CARGA COMPLETA REVISADA depois'", 2)
+
+    def test_typo_can_be_corrected_for_each_review_phrase(self) -> None:
+        for phrase in (
+            "ATUALIZAR",
+            "CARGA COMPLETA REVISADA",
+            "RECOMPRA REVISADA",
+            "PLANILHAS REVISADAS",
+        ):
+            with self.subTest(expected=phrase):
+                self._run_dialog(
+                    "$global:attempt++; if ($global:attempt -eq 1) { return 'erro' }; "
+                    "if ($global:attempt -ne 2 -or $Message -notlike '*Tente novamente*') { throw 'Missing retry' }; "
+                    f"return '  {phrase.lower()}  '",
+                    0,
+                    expected=phrase,
+                )
+
+    def test_two_typos_exhaust_the_confirmation_attempts(self) -> None:
+        self._run_dialog(
+            "$global:attempt++; if ($global:attempt -gt 2) { return 'CARGA COMPLETA REVISADA' }; return 'erro'",
+            2,
+        )
+
+    def test_cancelling_does_not_open_another_dialog(self) -> None:
+        self._run_dialog(
+            "$global:attempt++; if ($global:attempt -gt 1) { return 'CARGA COMPLETA REVISADA' }; return ''",
+            2,
+        )
+
+    def test_second_attempt_can_be_cancelled_or_fail_closed(self) -> None:
+        for response, code in (
+            ("return ''", 2),
+            ("throw 'Synthetic retry failure'", 3),
+        ):
+            with self.subTest(response=response):
+                self._run_dialog(
+                    "$global:attempt++; if ($global:attempt -eq 1) { return 'erro' }; "
+                    + response,
+                    code,
+                )
 
     def test_dialog_exception_fails_closed(self) -> None:
         self._run_dialog("throw 'Synthetic dialog failure'", 3)

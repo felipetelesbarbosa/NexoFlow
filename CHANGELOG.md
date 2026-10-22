@@ -1,5 +1,7 @@
 # NexoFlow 1.0 — Changelog
 
+- Confirmação da revisão: Weni, Recompra e Planilhas oferecem mais uma tentativa após erro de digitação. Cancelar ou fechar a janela continua encerrando sem autorizar a aplicação.
+
 - Deduplicação Weni: progresso por aba nas leituras, backups e conferências do BI, com percentual, lotes, linhas verificadas por segundo e tempo restante. A barra geral fica pausada durante essas etapas; esperas são informadas a cada 15 segundos e a conferência após o reparo recebe identificação própria.
 
 - Apresentação reorganizada: README com instalação e sequência de uso, guias resumidos, índice por assunto, política de credenciais e descrição do release mais objetivas.
