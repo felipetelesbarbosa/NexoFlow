@@ -1063,11 +1063,11 @@ def check_windows_lifecycle() -> None:
         or "SHChangeNotify" not in install
         or "-ClearIconCache" not in install
         or "-show" not in install
-        or "Refresh-NexoFlowIconCache -Executables @($appExe, $updateExe, $recompraExe, $terminalExe, $planilhaExe, $uninstallExe)"
+        or "Refresh-NexoFlowIconCache -Executables @($appExe, $updateExe, $recompraExe, $terminalExe, $planilhaExe, $uninstallExe, $nightExe)"
         not in install
     ):
         fail(
-            "Instalador precisa invalidar/recarregar os ícones do Windows após instalar Analytics, Weni, Terminal, Planilha e Uninstall."
+            "Instalador precisa invalidar/recarregar os ícones do Windows após instalar Analytics, Weni, Terminal, Planilha, Uninstall e Noturno."
         )
         return
     ok(
