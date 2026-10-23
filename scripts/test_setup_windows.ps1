@@ -80,6 +80,7 @@ function Invoke-Setup {
 function Assert-Installed {
     foreach ($relative in @(
         "NexoFlow Noturno.exe",
+        "assets\NexoFlow_Noturno.ico",
         "app\run_noturno.py",
         "NexoFlow Analytics.exe",
         "NexoFlow Weni.exe",
@@ -107,6 +108,12 @@ function Assert-Installed {
     Assert-True (Test-Path -LiteralPath $nightLink) "Atalho Noturno ausente."
     $nightShortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($nightLink)
     Assert-True ($nightShortcut.TargetPath -eq (Join-Path $InstallDir "NexoFlow Noturno.exe")) "Destino do atalho Noturno incorreto."
+
+    foreach ($nightShortcutRoot in @([Environment]::GetFolderPath("CommonDesktopDirectory"), (Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs\NexoFlow'))) {
+        $nightIconLink = Join-Path $nightShortcutRoot 'NexoFlow Noturno.lnk'
+        $nightIconShortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($nightIconLink)
+        Assert-True ($nightIconShortcut.IconLocation.StartsWith((Join-Path $InstallDir "assets\NexoFlow_Noturno.ico"))) "Ícone dedicado do Noturno incorreto: $nightIconLink"
+    }
 
     $recompraLink = Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) "NexoFlow Recompra.lnk"
     Assert-True (Test-Path -LiteralPath $recompraLink) "Atalho Recompra ausente."

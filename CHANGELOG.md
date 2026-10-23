@@ -1,5 +1,7 @@
 # NexoFlow 1.0 — Changelog
 
+- NexoFlow Noturno: ícone próprio com lua e estrelas, mantendo a base circular azul dos demais aplicativos. Ícone incorporado ao executável e aplicado aos atalhos da Área de Trabalho e do Menu Iniciar.
+
 - NexoFlow Noturno: novo executável e atalhos para Weni → Analytics → Recompra → Analytics, sem confirmação humana. Auditorias e revalidações preservadas, snapshots próprios por execução, bloqueio de concorrência, parada em falha crítica ou Analytics parcial e relatórios para conferência posterior.
 
 - Confirmação da revisão: Weni, Recompra e Planilhas oferecem mais uma tentativa após erro de digitação. Cancelar ou fechar a janela continua encerrando sem autorizar a aplicação.

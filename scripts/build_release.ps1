@@ -197,7 +197,7 @@ foreach ($folder in @($ProjectRoot, $PayloadDir)) {
 # Um .ico ao lado do EXE não altera o ícone exibido pelo Explorer.
 # Cada launcher deve incorporar seu próprio RT_ICON + RT_GROUP_ICON.
 $launcherIcons = @(
-    @{ Executable = "NexoFlow Noturno.exe"; Icon = "NexoFlow.ico" },
+    @{ Executable = "NexoFlow Noturno.exe"; Icon = "NexoFlow_Noturno.ico" },
     @{ Executable = "NexoFlow Analytics.exe"; Icon = "NexoFlow.ico" },
     @{ Executable = "NexoFlow Weni.exe"; Icon = "NexoFlow_Weni.ico" },
     @{ Executable = "NexoFlow Recompra.exe"; Icon = "NexoFlow_Recompra.ico" },

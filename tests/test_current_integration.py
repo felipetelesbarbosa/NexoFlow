@@ -1017,7 +1017,7 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn("-ClearIconCache", install)
         self.assertIn("-show", install)
         self.assertIn(
-            "Refresh-NexoFlowIconCache -Executables @($appExe, $updateExe, $recompraExe, $terminalExe, $planilhaExe, $uninstallExe)",
+            "Refresh-NexoFlowIconCache -Executables @($appExe, $updateExe, $recompraExe, $terminalExe, $planilhaExe, $uninstallExe, $nightExe)",
             install,
         )
 

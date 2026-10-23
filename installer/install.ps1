@@ -1163,7 +1163,7 @@ try {
         Ensure-InstalledPayloadFile -RelativePath $requiredFile
     }
 
-    foreach ($nightFile in @('NexoFlow Noturno.exe', 'app/run_noturno.py')) {
+    foreach ($nightFile in @('NexoFlow Noturno.exe', 'app/run_noturno.py', 'assets\NexoFlow_Noturno.ico')) {
         Ensure-InstalledPayloadFile -RelativePath $nightFile
     }
 
@@ -1172,6 +1172,7 @@ try {
 
     Write-Step 'Criando atalhos do NexoFlow na Área de Trabalho'
     $nightExe = Join-Path $InstallDir 'NexoFlow Noturno.exe'
+    $nightIcon = Join-Path $InstallDir 'assets\NexoFlow_Noturno.ico'
     $appExe = Join-Path $InstallDir 'NexoFlow Analytics.exe'
     $updateExe = Join-Path $InstallDir 'NexoFlow Weni.exe'
     $recompraExe = Join-Path $InstallDir 'NexoFlow Recompra.exe'
@@ -1214,13 +1215,13 @@ try {
     }
     $startMenu = Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs\NexoFlow'
     if (Test-Path -LiteralPath $startMenu) { Remove-Item -LiteralPath $startMenu -Recurse -Force -ErrorAction SilentlyContinue }
-    Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Noturno.lnk') -TargetPath $nightExe -WorkingDirectory $InstallDir -Description 'Weni, Analytics e Recompra automáticos, sem confirmação humana' -IconPath $appIcon
+    Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Noturno.lnk') -TargetPath $nightExe -WorkingDirectory $InstallDir -Description 'Weni, Analytics e Recompra automáticos, sem confirmação humana' -IconPath $nightIcon
     Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Analytics.lnk') -TargetPath $appExe -WorkingDirectory $InstallDir -Description 'Valida o ambiente e executa uma sincronização incremental do NexoFlow' -IconPath $appIcon
     Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Weni.lnk') -TargetPath $updateExe -WorkingDirectory $InstallDir -Description 'Audita e atualiza contatos e campos da Weni' -IconPath $updateIcon
     Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Recompra.lnk') -TargetPath $recompraExe -WorkingDirectory $InstallDir -Description 'Recompra FarmaLider D+25 com revisao antes de incluir na Weni' -IconPath $recompraIcon
     Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Planilha.lnk') -TargetPath $planilhaExe -WorkingDirectory $InstallDir -Description 'Cargas por planilhas para Weni e Analytics, com revisão humana' -IconPath $planilhaIcon
     Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Terminal.lnk') -TargetPath $terminalExe -WorkingDirectory $InstallDir -Description 'Terminal NexoFlow com ambiente e proxy preparados para a sessao' -IconPath $terminalIcon
-    Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Noturno.lnk') -TargetPath $nightExe -WorkingDirectory $InstallDir -Description 'Weni, Analytics e Recompra automáticos, sem confirmação humana' -IconPath $appIcon
+    Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Noturno.lnk') -TargetPath $nightExe -WorkingDirectory $InstallDir -Description 'Weni, Analytics e Recompra automáticos, sem confirmação humana' -IconPath $nightIcon
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Analytics.lnk') -TargetPath $appExe -WorkingDirectory $InstallDir -Description 'Sincronização manual segura do NexoFlow' -IconPath $appIcon
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Weni.lnk') -TargetPath $updateExe -WorkingDirectory $InstallDir -Description 'Atualização segura de contatos e campos da Weni' -IconPath $updateIcon
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Recompra.lnk') -TargetPath $recompraExe -WorkingDirectory $InstallDir -Description 'Recompra FarmaLider D+25 com revisao obrigatoria' -IconPath $recompraIcon
@@ -1235,7 +1236,7 @@ try {
 
     Write-Step 'Atualizando cache de ícones do Windows'
     $uninstallExe = Join-Path $InstallDir 'NexoFlow Uninstall.exe'
-    Refresh-NexoFlowIconCache -Executables @($appExe, $updateExe, $recompraExe, $terminalExe, $planilhaExe, $uninstallExe)
+    Refresh-NexoFlowIconCache -Executables @($appExe, $updateExe, $recompraExe, $terminalExe, $planilhaExe, $uninstallExe, $nightExe)
     Write-Host '[OK] Explorer notificado para reler os ícones internos dos executáveis do NexoFlow.' -ForegroundColor Green
 
     Write-Step 'Registrando NexoFlow no Windows'

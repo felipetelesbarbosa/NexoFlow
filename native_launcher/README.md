@@ -23,7 +23,7 @@ Os ícones dos oito programas são incorporados ao próprio PE como recursos `RT
 
 | Executável | Ícone |
 |---|---|
-| `NexoFlow Noturno.exe` | `assets/NexoFlow.ico` |
+| `NexoFlow Noturno.exe` | `assets/NexoFlow_Noturno.ico` |
 | `NexoFlow Setup.exe` | `assets/installer.ico` |
 | `NexoFlow Analytics.exe` | `assets/NexoFlow.ico` |
 | `NexoFlow Weni.exe` | `assets/NexoFlow_Weni.ico` |
