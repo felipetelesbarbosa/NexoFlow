@@ -41,6 +41,7 @@ function Remove-TestArtifacts {
     foreach ($shortcut in @(
         (Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) "NexoFlow Analytics.lnk"),
         (Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) "NexoFlow Weni.lnk"),
+        (Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) "NexoFlow Noturno.lnk"),
         (Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) "NexoFlow Recompra.lnk"),
         (Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) "NexoFlow Planilha.lnk"),
         (Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) "NexoFlow Terminal.lnk"),
@@ -78,6 +79,8 @@ function Invoke-Setup {
 
 function Assert-Installed {
     foreach ($relative in @(
+        "NexoFlow Noturno.exe",
+        "app\run_noturno.py",
         "NexoFlow Analytics.exe",
         "NexoFlow Weni.exe",
         "NexoFlow Recompra.exe",
@@ -99,6 +102,11 @@ function Assert-Installed {
     }
 
     Assert-True (Test-Path -LiteralPath (Join-Path $InstallDir "importacoes") -PathType Container) "A pasta importacoes não foi instalada."
+
+    $nightLink = Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) "NexoFlow Noturno.lnk"
+    Assert-True (Test-Path -LiteralPath $nightLink) "Atalho Noturno ausente."
+    $nightShortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($nightLink)
+    Assert-True ($nightShortcut.TargetPath -eq (Join-Path $InstallDir "NexoFlow Noturno.exe")) "Destino do atalho Noturno incorreto."
 
     $recompraLink = Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) "NexoFlow Recompra.lnk"
     Assert-True (Test-Path -LiteralPath $recompraLink) "Atalho Recompra ausente."

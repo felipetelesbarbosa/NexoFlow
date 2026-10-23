@@ -156,6 +156,7 @@ Write-Host "==> Compilando launchers com textos em português brasileiro"
 $LauncherDir = Join-Path $DistDir "launchers"
 New-Item -ItemType Directory -Force -Path $LauncherDir | Out-Null
 $launcherTargets = @(
+    @{ Name = "NexoFlow Noturno.exe"; Tag = "noturno"; Description = "NexoFlow Noturno — Weni, Analytics e Recompra sem confirmação humana" },
     @{ Name = "NexoFlow Analytics.exe"; Tag = "analytics"; Description = "NexoFlow Analytics — análise de dados" },
     @{ Name = "NexoFlow Weni.exe"; Tag = "updateweni"; Description = "NexoFlow Weni — atualização de contatos" },
     @{ Name = "NexoFlow Recompra.exe"; Tag = "recompra"; Description = "NexoFlow Recompra — grupo FarmaLíder D+25" },
@@ -196,6 +197,7 @@ foreach ($folder in @($ProjectRoot, $PayloadDir)) {
 # Um .ico ao lado do EXE não altera o ícone exibido pelo Explorer.
 # Cada launcher deve incorporar seu próprio RT_ICON + RT_GROUP_ICON.
 $launcherIcons = @(
+    @{ Executable = "NexoFlow Noturno.exe"; Icon = "NexoFlow.ico" },
     @{ Executable = "NexoFlow Analytics.exe"; Icon = "NexoFlow.ico" },
     @{ Executable = "NexoFlow Weni.exe"; Icon = "NexoFlow_Weni.ico" },
     @{ Executable = "NexoFlow Recompra.exe"; Icon = "NexoFlow_Recompra.ico" },
@@ -310,6 +312,8 @@ foreach ($item in @(
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/NexoFlow Setup.exe"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/payload manifest.json"
+Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/NexoFlow Noturno.exe"
+Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/NexoFlow Noturno.exe"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/NexoFlow Recompra.exe"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/NexoFlow Recompra.exe"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/weni_update.py"
@@ -352,11 +356,11 @@ Aplicativos Windows para integrar Weni e FarmaLíder, organizar pedidos no Googl
 - **NexoFlow-$Version.zip** — projeto completo.
 - **SHA256SUMS-$Version.txt** — hashes dos dois pacotes.
 
-Extraia todo o ZIP do Setup e execute **NexoFlow Setup.exe**. A distribuição inclui Weni, Analytics, Planilha, Recompra e Terminal. Configure suas próprias credenciais; os pacotes não incluem chaves ou tokens.
+Extraia todo o ZIP do Setup e execute **NexoFlow Setup.exe**. A distribuição inclui Weni, Analytics, Planilha, Recompra, Terminal e Noturno. Configure suas próprias credenciais; os pacotes não incluem chaves ou tokens.
 
 ## Primeira execução
 
-Siga a ordem: Weni completa → Planilha, se houver exports → Analytics completo → Recompra → Analytics incremental. Revise os relatórios e confirme as aplicações solicitadas. Depois atualize o Looker Studio.
+Siga a ordem: Weni completa → Planilha, se houver exports → Analytics completo → Recompra → Analytics incremental. Revise os relatórios e confirme as aplicações solicitadas. Depois atualize o Looker Studio. Para a rotina sem confirmações, use **NexoFlow Noturno.exe**; confira o resultado em `logs/noturno/`.
 
 A publicação é validada por testes no Windows, check-up e testes de instalação e atualização.
 

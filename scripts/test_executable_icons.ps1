@@ -115,6 +115,7 @@ function Assert-ExecutableIcon {
 }
 
 $icons = @(
+    @{ Executable = "NexoFlow Noturno.exe"; Icon = "NexoFlow.ico" },
     @{ Executable = "NexoFlow Analytics.exe"; Icon = "NexoFlow.ico" },
     @{ Executable = "NexoFlow Weni.exe"; Icon = "NexoFlow_Weni.ico" },
     @{ Executable = "NexoFlow Recompra.exe"; Icon = "NexoFlow_Recompra.ico" },

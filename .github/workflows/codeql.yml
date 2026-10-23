@@ -70,7 +70,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
           # Cada variante tem seu próprio main; as tags não podem ser combinadas.
           # -a força a compilação sob o CodeQL, sem reutilizar objetos em cache.
-          $tags = @('analytics', 'updateweni', 'recompra', 'planilha', 'terminal', 'setup', 'uninstall')
+          $tags = @('noturno', 'analytics', 'updateweni', 'recompra', 'planilha', 'terminal', 'setup', 'uninstall')
           foreach ($tag in $tags) {
             Write-Host "Compilando launcher: $tag"
             & go build -a -tags $tag -o (Join-Path $outputDir "$tag.exe") ./native_launcher

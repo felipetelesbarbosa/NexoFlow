@@ -8,6 +8,7 @@ Aplicativos para Windows que integram **Weni e FarmaLíder**, atualizam contatos
 
 | Aplicativo | Para que serve |
 | --- | --- |
+| **NexoFlow Noturno** | Executa Weni, Analytics e Recompra sem confirmação humana, com auditoria automática e relatório final. |
 | **NexoFlow Weni** | Atualiza cadastros, pedidos e grupos na Weni; exclui duplicados confirmados após revisão. |
 | **NexoFlow Analytics** | Sincroniza a base, acumula o histórico de pedidos e atualiza as tabelas do Google Sheets. |
 | **NexoFlow Planilha** | Revalida exports de contatos e conversas para atualizar Weni ou Analytics. |
@@ -35,6 +36,8 @@ Execute nesta ordem, revisando e confirmando os relatórios solicitados:
 
 Para percorrer essa sequência com os exports, coloque `Conversas_Delivery.xlsx` e `Contatos_Delivery.xlsx` em `importacoes/` e execute `comandos/atualizar_tudo.bat`. As confirmações continuam sendo solicitadas durante o fluxo.
 
+Para executar durante a madrugada, use **NexoFlow Noturno**. Veja [execução automática e agendamento](docs/NOTURNO.md).
+
 Na rotina diária, use os atalhos Weni, Recompra e Analytics conforme necessário. As cargas completas também podem ser divididas em quatro partes, executadas em ordem para cada componente. Consulte o [guia de operação](docs/Documentacao%20NexoFlow.md).
 
 ## O que considerar nos resultados
@@ -43,7 +46,7 @@ Na rotina diária, use os atalhos Weni, Recompra e Analytics conforme necessári
 - O recorte é da farmácia: pedidos mistos mantêm somente produtos humanos; pedidos apenas pet ou veterinários são excluídos.
 - O histórico é acumulado nas coletas. O último pedido da API não comprova todas as compras anteriores de um cliente.
 - Operação, histórico e dashboard podem usar [três arquivos do Sheets](docs/planilhas_separadas.md). O Looker lê as fontes `BI_*`; confira seus destinos e atualize os campos quando houver novas colunas.
-- Revise as propostas de Weni, Planilha e Recompra antes de aplicar. Carga parcial exige conferir o log e as pendências antes de prosseguir.
+- Nos atalhos individuais, revise as propostas de Weni, Planilha e Recompra antes de aplicar. Carga parcial exige conferir o log e as pendências antes de prosseguir.
 
 ## Referências
 

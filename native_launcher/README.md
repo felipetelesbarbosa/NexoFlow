@@ -2,7 +2,7 @@
 
 Fontes dos launchers Windows distribuídos no NexoFlow 1.0.
 
-Cada executável é compilado separadamente por tag (`analytics`, `updateweni`, `recompra`, `planilha`, `terminal`, `setup` ou `uninstall`), evitando que um componente carregue código de outro.
+Cada executável é compilado separadamente por tag (`noturno`, `analytics`, `updateweni`, `recompra`, `planilha`, `terminal`, `setup` ou `uninstall`), evitando que um componente carregue código de outro.
 
 Objetivos:
 
@@ -19,10 +19,11 @@ O `NexoFlow Terminal.exe` inicia diretamente `app/run_terminal.py` com o Python 
 
 ### Ícones incorporados nos executáveis
 
-Os ícones dos sete programas são incorporados ao próprio PE como recursos `RT_ICON` e `RT_GROUP_ICON` durante a criação dos ZIPs. Assim, o Explorador do Windows exibe o ícone específico mesmo ao visualizar o arquivo `.exe`, sem depender de um atalho ou de um arquivo `.ico` ao lado.
+Os ícones dos oito programas são incorporados ao próprio PE como recursos `RT_ICON` e `RT_GROUP_ICON` durante a criação dos ZIPs. Assim, o Explorador do Windows exibe o ícone específico mesmo ao visualizar o arquivo `.exe`, sem depender de um atalho ou de um arquivo `.ico` ao lado.
 
 | Executável | Ícone |
 |---|---|
+| `NexoFlow Noturno.exe` | `assets/NexoFlow.ico` |
 | `NexoFlow Setup.exe` | `assets/installer.ico` |
 | `NexoFlow Analytics.exe` | `assets/NexoFlow.ico` |
 | `NexoFlow Weni.exe` | `assets/NexoFlow_Weni.ico` |
@@ -40,7 +41,7 @@ O `NexoFlow Uninstall.exe` é um launcher nativo **opcional** para `installer\un
 
 ### Português brasileiro
 
-Os pacotes recompilam os sete launchers a partir destes fontes. A saída do console usa UTF-8 e os recursos de versão usam a tabela pt-BR 0416/04B0, preservando acentos e cedilha. A versão permanece NexoFlow 1.0.
+Os pacotes recompilam os oito launchers a partir destes fontes. A saída do console usa UTF-8 e os recursos de versão usam a tabela pt-BR 0416/04B0, preservando acentos e cedilha. A versão permanece NexoFlow 1.0.
 
 ## NexoFlow Planilha
 
@@ -49,3 +50,7 @@ O Setup instala **NexoFlow Planilha.exe** com ícone próprio e atalho na Área 
 ## Executável Recompra
 
 `NexoFlow Recompra.exe` foi adicionado como lançador dedicado para `comandos/atualizar_recompra.bat`. Não altera nem ignora os passos do BAT: check-only, dry-run, revisão humana e confirmação antes do apply. O workflow Windows executa o EXE compilado em uma pasta temporária com BAT sintético e verifica retorno 0 e propagação de falha; a validação de POST/GET para grupo Weni usa API simulada nos testes Python, sem atualizar contatos reais.
+
+## NexoFlow Noturno
+
+`NexoFlow Noturno.exe` inicia `app/run_noturno.py` com o Python da instalação, mantendo a trava operacional. Não espera teclas nem abre diálogos, inclusive em falhas de inicialização. A sequência e o agendamento estão em [NOTURNO.md](../docs/NOTURNO.md).

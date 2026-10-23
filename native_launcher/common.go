@@ -47,6 +47,7 @@ func acquireMutex() (syscall.Handle, bool) {
 }
 
 func waitEnter() {
+    if os.Getenv("NEXOFLOW_UNATTENDED") == "1" { return }
     fmt.Print("\nPressione ENTER para fechar...")
     _, _ = bufio.NewReader(os.Stdin).ReadString('\n')
 }

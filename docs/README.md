@@ -6,6 +6,7 @@ Comece pela [instalação](README%20INSTALACAO.md) e pelo [guia de operação](D
 
 | Assunto | Guia |
 | --- | --- |
+| Rotina automática durante a madrugada | [NexoFlow Noturno](NOTURNO.md) |
 | Contatos, pedidos e grupos na Weni | [NexoFlow Weni](README%20WENI.md) |
 | Importação de conversas e contatos | [NexoFlow Planilha](README%20DELIVERY.md) |
 | Campanha D+25 | [NexoFlow Recompra](README%20RECOMPRA.md) |
