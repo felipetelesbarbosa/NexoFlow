@@ -142,6 +142,19 @@ jobs:
             throw "Use exatamente NexoFlow 1.0 como mensagem de commit antes de publicar."
           }
 
+      - name: Go para launcher do Setup
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: "1.25.x"
+
+      - name: Testar menu e console real do NexoFlow Noturno
+        shell: pwsh
+        env:
+          GO111MODULE: 'off'
+        run: |
+          go test -v -tags noturno ./native_launcher
+          if ($LASTEXITCODE -ne 0) { throw "Falha no menu ou na espera do console do NexoFlow Noturno." }
+
       - name: Python para testes
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
@@ -168,19 +181,6 @@ jobs:
         shell: pwsh
         run: |
           python app/auditar_consistencia.py
-
-      - name: Go para launcher do Setup
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
-        with:
-          go-version: "1.25.x"
-
-      - name: Testar menu e console real do NexoFlow Noturno
-        shell: pwsh
-        env:
-          GO111MODULE: 'off'
-        run: |
-          go test -v -tags noturno ./native_launcher
-          if ($LASTEXITCODE -ne 0) { throw "Falha no menu ou na espera do console do NexoFlow Noturno." }
 
       - name: Gerar pacotes 1.0
         shell: pwsh
