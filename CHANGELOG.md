@@ -1,5 +1,7 @@
 # NexoFlow 1.0 — Changelog
 
+- Weni/Noturno: a aplicação incremental com revisão usa o snapshot congelado, assim como a carga completa. Releitura e auditoria por contato, retomada sem repetir gravações concluídas e checkpoint no corte da simulação; conflitos e falhas isoladas ficam para a próxima incremental.
+
 - NexoFlow Noturno: espera final usa a entrada nativa do console, inclusive com stdin redirecionado ou encerrado, e descarta teclas antigas antes de aguardar um novo ENTER. Teste Windows cria console real e verifica sucesso, parcial e erro sem fechar antes da confirmação.
 
 - NexoFlow Noturno: terminal interativo permanece aberto após sucesso, resultado parcial ou erro, com código de saída e caminho dos relatórios, até pressionar ENTER. A trava é liberada antes da espera; tarefas sem console continuam encerrando normalmente.

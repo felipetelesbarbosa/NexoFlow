@@ -6,6 +6,8 @@ A sequência é: check-up → Weni no modo escolhido (simulação, auditoria e a
 
 Os snapshots são gerados novamente a cada execução e aplicados sem abrir Bloco de Notas ou pedir autorização. A Weni também pode excluir duplicados comprovados pelas regras existentes. Identidade, recusa de marketing, produtos pet, propriedade dos pedidos, conflitos e validade do evento D+25 continuam sendo conferidos. A campanha Weni continua responsável pelo envio das mensagens.
 
+Na Weni, tanto a incremental quanto a carga completa aplicam o snapshot auditado sem recalcular o plano. Cada contato é relido antes da gravação; conflitos e falhas isoladas ficam pendentes para a próxima incremental, sem cancelar os demais. O checkpoint fica no corte da simulação para recuperar mensagens e mudanças posteriores.
+
 Os modos incrementais ainda percorrem a base para descobrir novas compras e mudanças que não alteram a data do contato. A opção completa usa 100% da base; o Analytics final permanece incremental para refletir a Recompra. O programa não importa arquivos XLSX e não configura o agendamento automaticamente.
 
 ## Agendar no Windows

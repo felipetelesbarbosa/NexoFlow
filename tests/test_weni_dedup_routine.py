@@ -534,28 +534,29 @@ class Fixtures(unittest.TestCase):
     def test_normal_snapshot_corruption_blocks_before_any_delete(self):
         from weni_update import UpdateStats, write_review_snapshot
 
-        with tempfile.TemporaryDirectory() as folder:
-            review = Path(folder) / "review.json"
-            write_review_snapshot([], UpdateStats(), full=True, json_path=review)
-            dedup.write_review(
-                review, self.prepare(), full=True, quarter=None, campaign_id=""
-            )
-            payload = json.loads(review.read_text())
-            payload["plan_sha256"] = "alterado"
-            save_private(review, payload)
-            with (
-                patch.object(dedup, "DIRECTORY", Path(folder) / "journal"),
-                patch.object(dedup, "WeniClient") as client,
-            ):
-                with self.assertRaises(RuntimeError):
-                    dedup.run_with_dedup(
-                        apply=True,
-                        full=True,
-                        quarter=None,
-                        review_path=review,
-                        update=Mock(),
-                    )
-            client.assert_not_called()
+        for full in (False, True):
+            with self.subTest(full=full), tempfile.TemporaryDirectory() as folder:
+                review = Path(folder) / "review.json"
+                write_review_snapshot([], UpdateStats(), full=full, json_path=review)
+                dedup.write_review(
+                    review, self.prepare(), full=full, quarter=None, campaign_id=""
+                )
+                payload = json.loads(review.read_text())
+                payload["plan_sha256"] = "alterado"
+                save_private(review, payload)
+                with (
+                    patch.object(dedup, "DIRECTORY", Path(folder) / "journal"),
+                    patch.object(dedup, "WeniClient") as client,
+                ):
+                    with self.assertRaises(RuntimeError):
+                        dedup.run_with_dedup(
+                            apply=True,
+                            full=full,
+                            quarter=None,
+                            review_path=review,
+                            update=Mock(),
+                        )
+                client.assert_not_called()
 
 
 class TransportTests(unittest.TestCase):

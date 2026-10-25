@@ -1486,6 +1486,237 @@ class WeniUpdateTests(unittest.TestCase):
     @patch("weni_update._save_state")
     @patch("weni_update._append_audit")
     @patch("weni_update.WeniClient")
+    def test_incremental_review_rejects_tampering_wrong_mode_and_invalid_cutoff(
+        self, client_cls, _audit, save_state
+    ):
+        client = client_cls.return_value
+        client.list_fields.return_value = self._required_weni_fields()
+        client.list_groups.return_value = [
+            {"uuid": "g-in", "name": "Opt-In LGPD"},
+            {"uuid": "g-out", "name": "Opt-Out LGPD"},
+        ]
+        plan = ContactUpdatePlan(contact_uuid="u1", fields={"idade": 37})
+        for variant in ("tampered", "wrong_mode", "invalid_cutoff"):
+            with self.subTest(variant=variant), tempfile.TemporaryDirectory() as tmp:
+                review = Path(tmp) / "review.json"
+                write_review_snapshot(
+                    [plan],
+                    UpdateStats(),
+                    full=False,
+                    json_path=review,
+                    captured_at_utc="2026-10-03T12:00:00Z",
+                )
+                payload = json.loads(review.read_text(encoding="utf-8"))
+                if variant == "tampered":
+                    payload["plans"][0]["changes"]["idade"] = 38
+                elif variant == "wrong_mode":
+                    payload["mode"] = "full"
+                else:
+                    payload["captured_at_utc"] = ""
+                review.write_text(json.dumps(payload), encoding="utf-8")
+                with (
+                    patch(
+                        "weni_update.resolve_window",
+                        side_effect=AssertionError("Não recalcular janela"),
+                    ),
+                    patch(
+                        "weni_update._open_farmalider",
+                        side_effect=AssertionError("Não repetir consultas"),
+                    ),
+                    self.assertRaises(PlanAuditError),
+                ):
+                    run_update(apply=True, require_review=review)
+        client.get_contact.assert_not_called()
+        client.update_contact_fields.assert_not_called()
+        client.contact_group_action.assert_not_called()
+        save_state.assert_not_called()
+
+    @patch("weni_update._save_state")
+    @patch("weni_update._append_audit")
+    @patch("weni_update.WeniClient")
+    def test_incremental_review_is_frozen_and_resumes_without_repeating_writes(
+        self, client_cls, _audit, save_state
+    ):
+        plans = [
+            ContactUpdatePlan(
+                contact_uuid=uid, fields={"idade": age}, previous={"idade": None}
+            )
+            for uid, age in (("u1", 27), ("u2", 31), ("u3", 41), ("u4", 44), ("u5", 45))
+        ]
+        contacts = {
+            uid: {"uuid": uid, "groups": [], "fields": fields}
+            for uid, fields in (
+                ("u1", {}),
+                ("u2", {"idade": 99}),
+                ("u3", {"idade": 41}),
+                ("u5", {}),
+            )
+        }
+        client = client_cls.return_value
+        client.list_fields.return_value = self._required_weni_fields()
+        client.list_groups.return_value = [
+            {"uuid": "g-in", "name": "Opt-In LGPD"},
+            {"uuid": "g-out", "name": "Opt-Out LGPD"},
+        ]
+
+        def get_contact(*, uuid):
+            if uuid == "u4":
+                raise RuntimeError("Falha de leitura simulada")
+            return deepcopy(contacts[uuid])
+
+        def update_fields(uuid, fields):
+            if uuid == "u5":
+                raise RuntimeError("Falha de gravação simulada")
+            contacts[uuid]["fields"].update(fields)
+            return deepcopy(contacts[uuid])
+
+        client.get_contact.side_effect = get_contact
+        client.update_contact_fields.side_effect = update_fields
+        with tempfile.TemporaryDirectory() as tmp:
+            review = Path(tmp) / "review.json"
+            write_review_snapshot(
+                plans,
+                UpdateStats(
+                    pending_retry_uuids=["pending-preparation"],
+                    orders_api_failed=1,
+                    purchase_confirmed=27,
+                ),
+                full=False,
+                json_path=review,
+                captured_at_utc="2026-10-03T12:00:00Z",
+            )
+            original = review.read_bytes()
+            with (
+                patch(
+                    "weni_update.resolve_window",
+                    side_effect=AssertionError("Não recalcular janela"),
+                ),
+                patch(
+                    "weni_update._open_farmalider",
+                    side_effect=AssertionError("Não repetir preparação"),
+                ),
+                patch(
+                    "weni_update._build_contact_plan",
+                    side_effect=AssertionError("Não recalcular plano"),
+                ),
+            ):
+                first = run_update(apply=True, require_review=review)
+                resumed = run_update(apply=True, require_review=review)
+
+            self.assertEqual(first.contacts_updated, 1)
+            self.assertEqual(first.contacts_conflicted, 1)
+            self.assertEqual(first.contacts_already_satisfied, 1)
+            self.assertEqual(first.contacts_failed, 3)
+            self.assertEqual(first.orders_api_failed, 1)
+            self.assertEqual(first.purchase_confirmed, 27)
+            self.assertEqual(resumed.contacts_updated, 0)
+            self.assertEqual(resumed.contacts_already_satisfied, 2)
+            self.assertEqual(review.read_bytes(), original)
+            client.list_messages.assert_not_called()
+            client.list_contacts.assert_not_called()
+            successful = [
+                call
+                for call in client.update_contact_fields.call_args_list
+                if call.args[0] == "u1"
+            ]
+            self.assertEqual(len(successful), 1)
+            saved = save_state.call_args.args[0]
+            self.assertEqual(saved["last_success_utc"], "2026-10-03T12:00:00Z")
+            self.assertEqual(saved["last_mode"], "incremental-frozen-snapshot")
+            self.assertEqual(
+                saved["pending_conflict_uuids"],
+                ["pending-preparation", "u2", "u4", "u5"],
+            )
+
+    @patch("weni_update._save_state")
+    @patch("weni_update._append_audit")
+    @patch("weni_update.WeniClient")
+    def test_noturno_incremental_applies_its_review_and_leaves_drift_for_retry(
+        self, client_cls, _audit, save_state
+    ):
+        import run_noturno as nightly
+
+        contacts = {
+            uid: {"uuid": uid, "urns": [], "groups": [], "fields": {}}
+            for uid in ("u1", "u2")
+        }
+        client = client_cls.return_value
+        client.list_fields.return_value = self._required_weni_fields()
+        client.list_groups.return_value = [
+            {"uuid": "g-in", "name": "Opt-In LGPD"},
+            {"uuid": "g-out", "name": "Opt-Out LGPD"},
+        ]
+        client.list_contacts.return_value = list(contacts.values())
+        client.list_messages.return_value = []
+        client.get_contact.side_effect = lambda *, uuid: deepcopy(contacts[uuid])
+        plans = {
+            uid: ContactUpdatePlan(
+                contact_uuid=uid, fields={"idade": 37}, previous={"idade": None}
+            )
+            for uid in contacts
+        }
+        observed = []
+        calls = []
+        cutoff = datetime(2026, 10, 3, 12, tzinfo=UTC)
+
+        def runner(arguments, **kwargs):
+            calls.append(arguments)
+            if arguments[0] != "app/run_update_weni.py" or "--check-only" in arguments:
+                return 0
+            if "--dry-run" in arguments:
+                review = Path(arguments[arguments.index("--review-out") + 1])
+                run_update(apply=False, review_out=review)
+                save_state.assert_not_called()
+                contacts["u2"]["fields"]["idade"] = 88
+                return 0
+            review = Path(arguments[arguments.index("--require-review") + 1])
+            with (
+                patch(
+                    "weni_update.resolve_window",
+                    side_effect=AssertionError("Não repetir janela"),
+                ),
+                patch(
+                    "weni_update._open_farmalider",
+                    side_effect=AssertionError("Não repetir consultas"),
+                ),
+                patch(
+                    "weni_update._build_contact_plan",
+                    side_effect=AssertionError("Não repetir plano"),
+                ),
+            ):
+                observed.append(run_update(apply=True, require_review=review))
+            return 0
+
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch(
+                "weni_update.resolve_window",
+                return_value=UpdateWindow(started_at=cutoff, after=None, full=False),
+            ),
+            patch("weni_update._open_farmalider", return_value=None),
+            patch(
+                "weni_update._build_contact_plan",
+                side_effect=lambda contact, **kwargs: plans[contact["uuid"]],
+            ),
+        ):
+            root = Path(tmp)
+            code = nightly.execute(root, runner=runner)
+            result = json.loads(
+                next((root / "logs/noturno").glob("*/resultado.json")).read_text(
+                    encoding="utf-8"
+                )
+            )
+        self.assertEqual(code, 0)
+        self.assertEqual(result["status"], "concluido")
+        self.assertEqual(len(calls), 11)
+        self.assertEqual(observed[0].contacts_updated, 1)
+        self.assertEqual(observed[0].contacts_conflicted, 1)
+        client.update_contact_fields.assert_called_once_with("u1", {"idade": 37})
+        self.assertEqual(save_state.call_args.args[0]["pending_conflict_uuids"], ["u2"])
+
+    @patch("weni_update._save_state")
+    @patch("weni_update._append_audit")
+    @patch("weni_update.WeniClient")
     def test_full_apply_uses_frozen_snapshot_without_recalculating_history(
         self,
         client_cls,

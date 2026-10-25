@@ -1399,7 +1399,7 @@ def check_weni_update_safety() -> None:
         "_prepare_frozen_plan_for_apply",
         "_plan_digest",
         "REVIEW_SCHEMA_VERSION = 6",
-        "frozen_full_apply",
+        "frozen_apply = bool(apply and require_review is not None)",
         "conflict_skipped",
         "pending_conflict_uuids",
         "apply and full and require_review is None",
@@ -1417,7 +1417,7 @@ def check_weni_update_safety() -> None:
             )
             return
     ok(
-        "Carga completa usa snapshot congelado revisado, valida conflito por contato e não recalcula o histórico no apply."
+        "Weni usa snapshot revisado nas aplicações completa e incremental, valida conflitos por contato e não recalcula o histórico no apply."
     )
 
 

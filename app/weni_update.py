@@ -1948,6 +1948,7 @@ def _review_summary(
         "group_actions": sum(len(plan.group_actions) for plan in plans),
         "purchase_confirmed": stats.purchase_confirmed,
         "orders_validated": stats.orders_validated,
+        "orders_api_failed": stats.orders_api_failed,
         "payment_unmapped_codes": dict(sorted(stats.payment_unmapped_codes.items())),
         "orders_cancelled_payment_zero": stats.orders_cancelled_payment_zero,
         "orders_pending_payment": stats.orders_pending_payment,
@@ -2718,11 +2719,11 @@ def run_update(
         if quarter not in {1, 2, 3, 4}:
             raise RuntimeError("A parte da carga 25% Weni deve ser 1, 2, 3 ou 4.")
 
-    frozen_full_apply = bool(apply and full and require_review is not None)
-    window = None if frozen_full_apply else resolve_window(full=full)
+    frozen_apply = bool(apply and require_review is not None)
+    window = None if frozen_apply else resolve_window(full=full)
     stats = UpdateStats()
     weni = WeniClient(token)
-    farm = None if frozen_full_apply else _open_farmalider()
+    farm = None if frozen_apply else _open_farmalider()
     captured_at = "" if window is None else iso_utc(window.started_at)
 
     try:
@@ -2766,11 +2767,11 @@ def run_update(
             if str(item).strip()
         }
 
-        if frozen_full_apply:
+        if frozen_apply:
             if require_review is None:
                 raise PlanAuditError("A aplicação exige um snapshot revisado.")
             plans, review_payload, digest = load_review_snapshot(
-                full=True,
+                full=full,
                 json_path=Path(require_review),
                 quarter=quarter,
             )
@@ -2795,8 +2796,9 @@ def run_update(
             stats.plans_with_changes = len(plans)
             stats.field_changes = sum(len(plan.fields) for plan in plans)
             stats.group_actions = sum(len(plan.group_actions) for plan in plans)
-            stats.purchase_confirmed = sum(
-                1 for plan in plans if plan.purchase_confirmed
+            stats.purchase_confirmed = int(
+                summary.get("purchase_confirmed")
+                or sum(1 for plan in plans if plan.purchase_confirmed)
             )
             stats.orders_validated = int(
                 summary.get("orders_validated")
@@ -2845,8 +2847,9 @@ def run_update(
                 )
 
             logging.info(
-                "APPLY de carga completa usará o snapshot congelado; o histórico não será recalculado. "
-                "Novas mensagens/contatos ficam para a próxima incremental."
+                "APPLY de %s usará o snapshot congelado; o histórico não será recalculado. "
+                "Novas mensagens/contatos ficam para a próxima incremental.",
+                "carga completa" if full else "carga incremental",
             )
 
             conflicted_uuids: list[str] = list(
@@ -2953,6 +2956,11 @@ def run_update(
                         continue
 
                     try:
+                        audit_plans(
+                            [prepared],
+                            opt_out_group_available=opt_out_available,
+                            opt_in_group_available=opt_in_available,
+                        )
                         _execute_contact_plan(weni, prepared)
                         _track_open_order(
                             open_order_uuids,
@@ -2990,7 +2998,11 @@ def run_update(
             if quarter is None:
                 state_payload = {
                     "last_success_utc": captured_at,
-                    "last_mode": "full-frozen-snapshot",
+                    "last_mode": (
+                        "full-frozen-snapshot"
+                        if full
+                        else "incremental-frozen-snapshot"
+                    ),
                     "review_sha256": digest,
                     "contacts_updated": stats.contacts_updated,
                     "contacts_conflicted": stats.contacts_conflicted,

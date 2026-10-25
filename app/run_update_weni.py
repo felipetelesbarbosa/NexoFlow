@@ -48,7 +48,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--require-review",
         help=(
-            "na carga completa, aplica exatamente o snapshot revisado e "
+            "aplica exatamente o snapshot revisado, completo ou incremental, e "
             "faz controle de conflito por contato"
         ),
     )
@@ -233,7 +233,7 @@ def main() -> int:
                 print(
                     f"Contatos já no estado revisado: {stats.contacts_already_satisfied}"
                 )
-            if args.full and require_review is not None:
+            if require_review is not None:
                 print(
                     "Modo: APPLY SNAPSHOT CONGELADO. Novas mensagens/contatos "
                     "ficam para a próxima execução incremental."
