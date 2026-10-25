@@ -38,6 +38,12 @@ raise SystemExit(int(os.environ.get('NEXOFLOW_SYNTHETIC_EXIT', '0')))
                 throw 'O launcher ficou aguardando interação inesperada.'
             }
             if ($process.ExitCode -ne $ExpectedExit) { throw "Retorno incorreto: $($process.ExitCode); esperado $ExpectedExit" }
+            $output = $process.StandardOutput.ReadToEnd()
+            if ($InputText -ne '0') {
+                if (-not $output.Contains("Código de saída: $ExpectedExit")) { throw 'O resumo final não informou o código de saída.' }
+                if (-not $output.Contains('logs\noturno\')) { throw 'O resumo final não informou o caminho dos relatórios.' }
+                if ($output.Contains('Pressione ENTER')) { throw 'A execução sem console solicitou uma tecla.' }
+            }
             if ($ExpectedMode) {
                 if (-not (Test-Path -LiteralPath $signal)) { throw 'O processo filho não foi iniciado.' }
                 if ((Get-Content -LiteralPath $signal -Raw) -cne $ExpectedMode) { throw 'Modo incorreto passado ao Python.' }
@@ -52,10 +58,12 @@ raise SystemExit(int(os.environ.get('NEXOFLOW_SYNTHETIC_EXIT', '0')))
     Invoke-NightCase -ExpectedExit 2
     $env:NEXOFLOW_SYNTHETIC_EXIT = '7'
     Invoke-NightCase -Argument '--full' -ExpectedMode '--full' -ExpectedExit 7
+    $env:NEXOFLOW_SYNTHETIC_EXIT = '3'
+    Invoke-NightCase -Argument '--incremental' -ExpectedMode '--incremental' -ExpectedExit 3
     Remove-Item Env:NEXOFLOW_SYNTHETIC_EXIT
     Remove-Item -LiteralPath $script
     Invoke-NightCase -Argument '--incremental' -ExpectedExit 2
-    Write-Host '[OK] Noturno: menu, agendamento, cancelamento e falhas sem pausas; sem APIs reais.'
+    Write-Host '[OK] Noturno: menu, resumo de sucesso/parcial/falha e encerramento sem console; sem APIs reais.'
 } finally {
     Remove-Item Env:NEXOFLOW_SYNTHETIC_EXIT -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue

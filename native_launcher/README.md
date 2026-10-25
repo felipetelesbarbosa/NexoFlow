@@ -53,4 +53,4 @@ O Setup instala **NexoFlow Planilha.exe** com ícone próprio e atalho na Área 
 
 ## NexoFlow Noturno
 
-`NexoFlow Noturno.exe` inicia `app/run_noturno.py` com o Python da instalação, mantendo a trava operacional. Não espera teclas nem abre diálogos, inclusive em falhas de inicialização. A sequência e o agendamento estão em [NOTURNO.md](../docs/NOTURNO.md).
+`NexoFlow Noturno.exe` inicia `app/run_noturno.py` com o Python da instalação, mantendo a trava operacional durante a carga. Em console interativo, mostra o resultado e aguarda ENTER ao terminar, inclusive em falhas de inicialização; libera a trava antes da espera. Sem console, encerra preservando o código de saída. A sequência e o agendamento estão em [NOTURNO.md](../docs/NOTURNO.md).
