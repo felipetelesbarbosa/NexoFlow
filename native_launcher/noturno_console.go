@@ -21,6 +21,9 @@ type nightConsoleEvent struct {
 }
 
 func waitNightConsole() {
+	if !nightHasConsole() {
+		return
+	}
 	// A entrada padrão pode ser um pipe ou já ter sido encerrada, mesmo
 	// com a janela aberta. CONIN$ acessa o console anexado ao processo.
 	input, err := os.OpenFile("CONIN$", os.O_RDWR, 0)
@@ -57,6 +60,14 @@ func waitNightConsole() {
 			return
 		}
 	}
+}
+
+func nightHasConsole() bool {
+	var processID uint32
+	count, _, _ := kernel32.NewProc("GetConsoleProcessList").Call(
+		uintptr(unsafe.Pointer(&processID)), 1,
+	)
+	return count != 0
 }
 
 func holdNightConsole() {

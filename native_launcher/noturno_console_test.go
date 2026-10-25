@@ -5,6 +5,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -37,6 +38,12 @@ func TestNightConsoleHelper(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if os.Getenv("NEXOFLOW_TEST_NIGHT_HEADLESS") == "1" {
+		if nightHasConsole() {
+			t.Fatal("O processo de teste recebeu um console inesperado")
+		}
+		os.Exit(finishNight(code, os.Stdout, waitNightConsole))
+	}
 	var mode uint32
 	if ok, _, _ := kernel32.NewProc("GetConsoleMode").Call(os.Stdin.Fd(), uintptr(unsafe.Pointer(&mode))); ok != 0 {
 		t.Fatal("O teste exige stdin redirecionado para reproduzir o encerramento prematuro")
@@ -64,6 +71,32 @@ func TestNightConsoleHelper(t *testing.T) {
 		}
 	}()
 	os.Exit(finishNight(code, os.Stdout, waitNightConsole))
+}
+
+func TestNightWithoutAttachedConsoleExitsNormally(t *testing.T) {
+	for _, code := range []int{0, 3, 7} {
+		t.Run(strconv.Itoa(code), func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			command := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestNightConsoleHelper$")
+			command.Env = append(os.Environ(),
+				fmt.Sprintf("NEXOFLOW_TEST_NIGHT_CONSOLE_CODE=%d", code),
+				"NEXOFLOW_TEST_NIGHT_HEADLESS=1",
+			)
+			command.SysProcAttr = &syscall.SysProcAttr{CreationFlags: 0x08000000, HideWindow: true}
+			command.Stdin = strings.NewReader("")
+			output, _ := command.CombinedOutput()
+			if ctx.Err() != nil {
+				t.Fatal("Execução sem console ficou aguardando uma tecla")
+			}
+			if command.ProcessState == nil || command.ProcessState.ExitCode() != code {
+				t.Fatalf("Retorno incorreto sem console: %s", output)
+			}
+			if strings.Contains(string(output), "Pressione ENTER") {
+				t.Fatalf("Execução sem console solicitou tecla: %s", output)
+			}
+		})
+	}
 }
 
 func TestNightRealConsoleIgnoresRedirectedStdinAndQueuedEnter(t *testing.T) {

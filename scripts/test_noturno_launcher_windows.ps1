@@ -36,7 +36,8 @@ raise SystemExit(int(os.environ.get('NEXOFLOW_SYNTHETIC_EXIT', '0')))
             $process.StandardInput.Close()
             if (-not $process.WaitForExit(15000)) {
                 $process.Kill($true)
-                throw 'O launcher ficou aguardando interação inesperada.'
+                $process.WaitForExit()
+                throw "O launcher ficou aguardando interação inesperada. Saída: $($process.StandardOutput.ReadToEnd()) $($process.StandardError.ReadToEnd())"
             }
             if ($process.ExitCode -ne $ExpectedExit) { throw "Retorno incorreto: $($process.ExitCode); esperado $ExpectedExit" }
             $output = $process.StandardOutput.ReadToEnd()
