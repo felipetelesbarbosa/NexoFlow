@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"unsafe"
 )
 
 func selectNightMode(args []string, input *bufio.Reader) (string, int) {
@@ -57,19 +56,6 @@ func runNight(mode string) int {
 	return runChild(python, script, mode)
 }
 
-func waitNightConsole(input *bufio.Reader) {
-	// Tarefas sem sessão e pipes não devem aguardar uma tecla indisponível.
-	var mode uint32
-	console, _, _ := kernel32.NewProc("GetConsoleMode").Call(
-		os.Stdin.Fd(), uintptr(unsafe.Pointer(&mode)),
-	)
-	if console == 0 {
-		return
-	}
-	fmt.Print("\nPressione ENTER para fechar esta janela...")
-	_, _ = input.ReadString('\n')
-}
-
 func main() {
 	input := bufio.NewReader(os.Stdin)
 	mode, rc := selectNightMode(os.Args[1:], input)
@@ -80,5 +66,5 @@ func main() {
 		rc = runNight(mode)
 	}
 	// Libera a trava antes de deixar a janela com o resultado aberta.
-	os.Exit(finishNight(rc, os.Stdout, func() { waitNightConsole(input) }))
+	os.Exit(finishNight(rc, os.Stdout, waitNightConsole))
 }

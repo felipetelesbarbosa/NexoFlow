@@ -24,6 +24,7 @@ raise SystemExit(int(os.environ.get('NEXOFLOW_SYNTHETIC_EXIT', '0')))
         $info.Arguments = $Argument
         $info.WorkingDirectory = $temp
         $info.UseShellExecute = $false
+        $info.CreateNoWindow = $true
         $info.RedirectStandardInput = $true
         $info.RedirectStandardOutput = $true
         $info.RedirectStandardError = $true

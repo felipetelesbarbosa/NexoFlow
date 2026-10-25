@@ -25,6 +25,8 @@ A rotina não solicita privilégios administrativos. Ela pode executar sem sess�
 
 Ao abrir o executável em um terminal interativo, a janela permanece aberta após sucesso, resultado parcial ou erro, inclusive falhas de inicialização. O resultado e o caminho dos relatórios ficam visíveis até você pressionar **ENTER**. A trava da carga é liberada antes dessa espera, permitindo uma nova execução mesmo com a janela anterior aberta. A opção **[0] Sair** fecha o menu normalmente.
 
+A confirmação final usa o teclado do console, mesmo com a entrada padrão redirecionada ou encerrada. Teclas acumuladas durante a carga são descartadas; somente um novo ENTER após o resumo fecha a janela.
+
 Tarefas agendadas sem console interativo encerram ao terminar e preservam o código de saída e os relatórios em arquivo. Para deixar a janela visível, execute com uma sessão interativa do usuário.
 
 Cada execução preserva seus arquivos em `logs/noturno/<execução>/`: `resultado.json`, `execucao.log` e os snapshots de Weni e Recompra. Os relatórios são privados e podem conter dados de contatos; não os publique.

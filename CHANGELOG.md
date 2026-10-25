@@ -1,5 +1,7 @@
 # NexoFlow 1.0 — Changelog
 
+- NexoFlow Noturno: espera final usa a entrada nativa do console, inclusive com stdin redirecionado ou encerrado, e descarta teclas antigas antes de aguardar um novo ENTER. Teste Windows cria console real e verifica sucesso, parcial e erro sem fechar antes da confirmação.
+
 - NexoFlow Noturno: terminal interativo permanece aberto após sucesso, resultado parcial ou erro, com código de saída e caminho dos relatórios, até pressionar ENTER. A trava é liberada antes da espera; tarefas sem console continuam encerrando normalmente.
 
 - NexoFlow Noturno: ícone próprio com lua e estrelas, mantendo a base circular azul dos demais aplicativos. Ícone incorporado ao executável e aplicado aos atalhos da Área de Trabalho e do Menu Iniciar.

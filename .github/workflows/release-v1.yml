@@ -174,13 +174,13 @@ jobs:
         with:
           go-version: "1.25.x"
 
-      - name: Testar menu e argumentos do NexoFlow Noturno
+      - name: Testar menu e console real do NexoFlow Noturno
         shell: pwsh
         env:
           GO111MODULE: 'off'
         run: |
-          go test -tags noturno ./native_launcher
-          if ($LASTEXITCODE -ne 0) { throw "Falha no menu do NexoFlow Noturno." }
+          go test -v -tags noturno ./native_launcher
+          if ($LASTEXITCODE -ne 0) { throw "Falha no menu ou na espera do console do NexoFlow Noturno." }
 
       - name: Gerar pacotes 1.0
         shell: pwsh
