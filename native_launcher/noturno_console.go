@@ -25,6 +25,9 @@ func waitNightConsole() {
 	// com a janela aberta. CONIN$ acessa o console anexado ao processo.
 	input, err := os.OpenFile("CONIN$", os.O_RDWR, 0)
 	if err != nil {
+		if window, _, _ := kernel32.NewProc("GetConsoleWindow").Call(); window != 0 {
+			holdNightConsole()
+		}
 		// Sem console anexado: tarefa agendada sem sessão interativa.
 		return
 	}
