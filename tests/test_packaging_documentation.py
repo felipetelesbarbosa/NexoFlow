@@ -142,7 +142,7 @@ class PackagingMetadataTests(unittest.TestCase):
         )
         self.assertEqual(
             setuptools["dynamic"]["optional-dependencies"]["webhook"]["file"],
-            ["requirements-webhook.txt"],
+            ["dependencias/requirements-webhook.txt"],
         )
         self.assertIn("nexo_cli", setuptools["py-modules"])
         self.assertNotIn("secrets_config", setuptools["py-modules"])

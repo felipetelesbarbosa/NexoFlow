@@ -23,6 +23,7 @@ from main import (
     split_contacts,
     validate_contacts,
 )
+from project_paths import launcher_path
 from weni_client import WeniClient
 
 
@@ -780,7 +781,7 @@ class CurrentIntegrationTests(unittest.TestCase):
 
     def test_windows_launcher_exists(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        launcher = root / "NexoFlow Analytics.exe"
+        launcher = launcher_path(root, "NexoFlow Analytics.exe")
         self.assertTrue(launcher.exists())
         self.assertGreater(launcher.stat().st_size, 1024)
         data = launcher.read_bytes()
@@ -825,7 +826,7 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn("-Verb RunAs", text)
         self.assertIn("NexoFlow-Uninstall-Stage2.ps1", text)
         self.assertIn("installer\\uninstall.ps1", wrapper_text)
-        optional_exe = root / "NexoFlow Uninstall.exe"
+        optional_exe = launcher_path(root, "NexoFlow Uninstall.exe")
         if optional_exe.exists():
             data = optional_exe.read_bytes()
             self.assertTrue(data.startswith(b"MZ"))
@@ -962,7 +963,7 @@ class CurrentIntegrationTests(unittest.TestCase):
 
     def test_update_weni_launcher_and_batches_exist(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        launcher = root / "NexoFlow Weni.exe"
+        launcher = launcher_path(root, "NexoFlow Weni.exe")
         self.assertTrue(launcher.exists())
         data = launcher.read_bytes()
         self.assertTrue(data.startswith(b"MZ"))
@@ -984,7 +985,7 @@ class CurrentIntegrationTests(unittest.TestCase):
 
     def test_update_weni_executable_embeds_dedicated_icon(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        launcher = (root / "NexoFlow Weni.exe").read_bytes()
+        launcher = (launcher_path(root, "NexoFlow Weni.exe")).read_bytes()
         update_images = _ico_images(root / "assets" / "NexoFlow_Weni.ico")
         analytics_images = _ico_images(root / "assets" / "NexoFlow.ico")
         self.assertTrue(update_images)
@@ -995,7 +996,7 @@ class CurrentIntegrationTests(unittest.TestCase):
 
     def test_terminal_executable_embeds_dedicated_icon(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        launcher = (root / "NexoFlow Terminal.exe").read_bytes()
+        launcher = (launcher_path(root, "NexoFlow Terminal.exe")).read_bytes()
         terminal_images = _ico_images(root / "assets" / "NexoFlow_Terminal.ico")
         analytics_images = _ico_images(root / "assets" / "NexoFlow.ico")
         self.assertTrue(terminal_images)
@@ -1006,7 +1007,7 @@ class CurrentIntegrationTests(unittest.TestCase):
 
     def test_update_weni_executable_has_icon_revision_marker(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        data = (root / "NexoFlow Weni.exe").read_bytes()
+        data = (launcher_path(root, "NexoFlow Weni.exe")).read_bytes()
         self.assertIn(b"NexoFlowWeniIconRevision=1.0", data)
 
     def test_installer_refreshes_windows_icon_cache(self) -> None:
@@ -1058,7 +1059,7 @@ class CurrentIntegrationTests(unittest.TestCase):
         self,
     ) -> None:
         root = Path(__file__).resolve().parents[1]
-        terminal = (root / "NexoFlow Terminal.exe").read_bytes()
+        terminal = (launcher_path(root, "NexoFlow Terminal.exe")).read_bytes()
         runner = (root / "app/run_terminal.py").read_text(encoding="utf-8")
         self.assertTrue(terminal.startswith(b"MZ"))
         self.assertIn(b"app/run_terminal.py", terminal)
@@ -1092,11 +1093,11 @@ class CurrentIntegrationTests(unittest.TestCase):
             "NexoFlow Weni.exe",
             "NexoFlow Terminal.exe",
         ):
-            data = (root / name).read_bytes()
+            data = launcher_path(root, name).read_bytes()
             self.assertIn(b"NexoFlowNativeLauncher=1.0", data)
             self.assertIn(b"CreateProcessW", data)
             self.assertNotIn(b"\x00system\x00", data)
-        optional_exe = root / "NexoFlow Uninstall.exe"
+        optional_exe = launcher_path(root, "NexoFlow Uninstall.exe")
         if optional_exe.exists():
             data = optional_exe.read_bytes()
             self.assertIn(b"NexoFlowNativeLauncher=1.0", data)

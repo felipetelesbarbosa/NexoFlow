@@ -30,7 +30,7 @@ Arquivos:
 
 - `app/webhook_pedidos.py`
 - `app/run_webhook_pedidos.py`
-- `requirements-webhook.txt`
+- `dependencias/requirements-webhook.txt`
 
 O webhook reutiliza o mesmo parser de `ultimo_pedido` usado pela
 sincronização normal. Assim, os dados gerados pelas duas rotas têm
@@ -85,7 +85,7 @@ A ativação futura exigirá, nessa ordem:
 1. definir onde o endpoint ficará hospedado;
 2. disponibilizar HTTPS público;
 3. gerar `WEBHOOK_SHARED_SECRET`;
-4. instalar `requirements-webhook.txt`;
+4. instalar `dependencias/requirements-webhook.txt`;
 5. definir `WEBHOOK_PEDIDOS_ENABLED = True`;
 6. configurar na Weni a chamada ao endpoint após gravar `ultimo_pedido`;
 7. testar duplicidade e concorrência com a sincronização periódica;

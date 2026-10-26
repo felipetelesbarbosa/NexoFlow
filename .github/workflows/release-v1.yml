@@ -31,13 +31,13 @@ jobs:
         with:
           python-version: "3.14"
       - name: Instalar ferramentas de verificação
-        run: python -m pip install -r requirements.txt -r requirements-webhook.txt -r requirements-dev.txt
+        run: python -m pip install -r requirements.txt -r dependencias/requirements-webhook.txt -r dependencias/requirements-dev.txt
       - name: Validar código e tipos
         run: |
           ruff check .
           pyright
       - name: Auditar dependências
-        run: pip-audit -r requirements.txt -r requirements-webhook.txt
+        run: pip-audit -r requirements.txt -r dependencias/requirements-webhook.txt
 
   verificar-segredos:
     runs-on: ubuntu-latest
@@ -95,7 +95,7 @@ jobs:
       - name: Instalar dependências
         shell: pwsh
         run: |
-          python -m pip install -r requirements.txt -r requirements-webhook.txt
+          python -m pip install -r requirements.txt -r dependencias/requirements-webhook.txt
 
       - name: Testar compatibilidade sem APIs reais
         shell: pwsh
@@ -159,7 +159,7 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt -r requirements-webhook.txt
+          python -m pip install -r requirements.txt -r dependencias/requirements-webhook.txt
 
       - name: Executar testes
         shell: pwsh

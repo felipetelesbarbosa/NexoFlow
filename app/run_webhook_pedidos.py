@@ -16,7 +16,7 @@ def run() -> int:
             "[ERRO] Dependências do webhook não instaladas. "
             "Quando formos ativar, execute: "
             ".venv\\Scripts\\python.exe -m pip install "
-            "-r requirements-webhook.txt"
+            "-r dependencias/requirements-webhook.txt"
         )
         return 1
 

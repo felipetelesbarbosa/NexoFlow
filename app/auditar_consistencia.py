@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from project_paths import launcher_path
+
 ROOT = Path(__file__).resolve().parents[1]
 
 ERRORS: list[str] = []
@@ -606,7 +608,13 @@ def check_windows_lifecycle() -> None:
         "docs/Documentacao NexoFlow.html",
         "docs/ASSINATURA WINDOWS.md",
     ]
-    missing = [name for name in required if not (ROOT / name).exists()]
+    missing = [
+        name
+        for name in required
+        if not (
+            launcher_path(ROOT, name) if name.endswith(".exe") else ROOT / name
+        ).exists()
+    ]
     if missing:
         fail("Ciclo Windows incompleto: " + ", ".join(missing))
         return
@@ -646,9 +654,9 @@ def check_windows_lifecycle() -> None:
         return
     ok("Arquivos BAT usam codificação compatível com cmd.exe, sem UTF-8 BOM inicial.")
 
-    launcher_bytes = (ROOT / "NexoFlow Analytics.exe").read_bytes()
-    update_launcher_bytes = (ROOT / "NexoFlow Weni.exe").read_bytes()
-    terminal_bytes = (ROOT / "NexoFlow Terminal.exe").read_bytes()
+    launcher_bytes = (launcher_path(ROOT, "NexoFlow Analytics.exe")).read_bytes()
+    update_launcher_bytes = (launcher_path(ROOT, "NexoFlow Weni.exe")).read_bytes()
+    terminal_bytes = (launcher_path(ROOT, "NexoFlow Terminal.exe")).read_bytes()
     if (
         not launcher_bytes.startswith(b"MZ")
         or not update_launcher_bytes.startswith(b"MZ")
@@ -738,7 +746,7 @@ def check_windows_lifecycle() -> None:
         "Executáveis Windows operacionais possuem VERSIONINFO de produto/empresa/versão."
     )
 
-    optional_uninstaller = ROOT / "NexoFlow Uninstall.exe"
+    optional_uninstaller = launcher_path(ROOT, "NexoFlow Uninstall.exe")
     if optional_uninstaller.exists():
         optional_bytes = optional_uninstaller.read_bytes()
         if not optional_bytes.startswith(b"MZ"):
@@ -1022,7 +1030,7 @@ def check_windows_lifecycle() -> None:
         return
     ok("NexoFlow Terminal prepara proxy e ambiente local sem expor tokens de API.")
 
-    update_launcher = (ROOT / "NexoFlow Weni.exe").read_bytes()
+    update_launcher = (launcher_path(ROOT, "NexoFlow Weni.exe")).read_bytes()
     if b"NexoFlowWeniIconRevision=1.0" not in update_launcher:
         fail(
             "Executável NexoFlow Weni não contém a revisão binária de ícone do NexoFlow 1.0."

@@ -37,7 +37,7 @@ def _upsert_result(
 
 @unittest.skipUnless(
     WEBHOOK_DEPENDENCIES_AVAILABLE,
-    "Dependências opcionais ausentes; instale requirements-webhook.txt.",
+    "Dependências opcionais ausentes; instale dependencias/requirements-webhook.txt.",
 )
 class WebhookRuntimeTests(unittest.TestCase):
     secret = "segredo-fictício-UTF-8"

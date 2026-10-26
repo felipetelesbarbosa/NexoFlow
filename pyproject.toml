@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nexoflow"
 version = "1.0"
-description = "Integração Weni, FarmaLíder, Google Sheets e analytics."
+description = "Sincronização de contatos e pedidos entre Weni, FarmaLíder e Google Sheets."
 requires-python = ">=3.11"
 dynamic = ["dependencies", "optional-dependencies"]
 
@@ -78,7 +78,7 @@ py-modules = [
 dependencies = {file = ["requirements.txt"]}
 
 [tool.setuptools.dynamic.optional-dependencies]
-webhook = {file = ["requirements-webhook.txt"]}
+webhook = {file = ["dependencias/requirements-webhook.txt"]}
 
 [tool.ruff]
 src = ["app", "."]

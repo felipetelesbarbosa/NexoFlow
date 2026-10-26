@@ -14,7 +14,7 @@ def run() -> int:
     except ImportError:
         print(
             "[ERRO] Uvicorn não instalado. Execute:\n"
-            ".venv\\Scripts\\python.exe -m pip install -r requirements-webhook.txt"
+            ".venv\\Scripts\\python.exe -m pip install -r dependencias/requirements-webhook.txt"
         )
         return 1
 

@@ -10,7 +10,7 @@ O projeto já inclui `app/webhook_eventos.py` com o endpoint:
 
 Para usar:
 
-1. Instale `requirements-webhook.txt`.
+1. Instale `dependencias/requirements-webhook.txt`.
 2. Publique o serviço em uma URL HTTPS acessível pela Weni.
 3. Configure o fluxo da Weni para enviar o referral para essa URL.
 4. Envie o header `X-Webhook-Secret`.
