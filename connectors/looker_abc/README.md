@@ -1,5 +1,7 @@
 # NexoFlow 1.0: Curva ABC por período
 
+Conector Google Apps Script para calcular a curva ABC no Looker Studio conforme o período selecionado.
+
 ## Estado
 
 Conector privado ativo na página Curva ABC. As tabelas de produtos, resumo e compras conjuntas e os seis cartões usam o período recebido do Looker. As abas existentes e a rotina Python continuam intactas.
