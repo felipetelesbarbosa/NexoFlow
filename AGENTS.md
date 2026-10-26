@@ -13,7 +13,7 @@ Ao atualizar este repositório, mantenha a identificação pública **NexoFlow 1
 
 ## Regras do projeto
 
-- Use exatamente `NexoFlow 1.0` como mensagem de commit, sem sufixo ou texto adicional.
+- Use mensagens de commit curtas em português que descrevam a área ou a alteração, como `Automação`, `Documentação`, `Instalador` ou `Corrigir revisão da Recompra`. `NexoFlow 1.0` identifica a versão, não é uma mensagem obrigatória de commit. Separe alterações por área quando isso tornar a navegação do GitHub mais clara; não reescreva o histórico apenas para mudar os textos exibidos.
 - A `main` é a única branch de trabalho do repositório. Atualize diretamente a `main`; não crie nem mantenha branches adicionais.
 - Mantenha o título do release `NexoFlow 1.0`, a tag `v1.0` e os nomes estáveis dos pacotes. Só altere a versão quando o usuário pedir explicitamente.
 - Ao publicar pacotes atualizados, republice o release para que a data corresponda à nova publicação.
