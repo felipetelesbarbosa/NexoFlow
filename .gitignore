@@ -1,3 +1,4 @@
+# Arquivos locais, dados privados e temporários excluídos do versionamento.
 .venv/
 __pycache__/
 *.pyc
