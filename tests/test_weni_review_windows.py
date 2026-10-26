@@ -13,6 +13,8 @@ import time
 import unittest
 from pathlib import Path
 
+from project_paths import launcher_path
+
 REPOSITORY = Path(__file__).resolve().parents[1]
 
 
@@ -25,7 +27,7 @@ class WeniReviewBatchWindowsTests(unittest.TestCase):
             directory = Path(temporary)
             (directory / "comandos").mkdir()
             executable = directory / "NexoFlow Weni.exe"
-            shutil.copy2(REPOSITORY / executable.name, executable)
+            shutil.copy2(launcher_path(REPOSITORY, executable.name), executable)
             (directory / "comandos/atualizar_weni.bat").write_text(
                 "@echo off\necho SYNTHETIC_WENI_LAUNCH_OK\nexit /b 0\n",
                 encoding="ascii",
