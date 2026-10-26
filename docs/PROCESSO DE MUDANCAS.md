@@ -2,7 +2,7 @@
 
 Este documento define como alterações devem ser feitas e validadas no NexoFlow 1.0. Ele documenta o processo atual do **NexoFlow 1.0**; o histórico público fica concentrado em `CHANGELOG.md`.
 
-A publicação automática confere a origem na `main` e a mensagem de commit exatamente `NexoFlow 1.0` antes de gerar os pacotes. O release mantém o título `NexoFlow 1.0`, a tag `v1.0` e os nomes estáveis dos arquivos; a republicação atualiza a data da distribuição.
+A publicação automática confere a origem na `main` antes de gerar os pacotes. Use mensagens de commit curtas que descrevam a área ou a alteração. Na lista de arquivos do GitHub, esses textos são as mensagens dos últimos commits, não descrições independentes. O release mantém o título `NexoFlow 1.0`, a tag `v1.0` e os nomes estáveis dos arquivos; a republicação atualiza a data da distribuição.
 
 ## Princípios
 
