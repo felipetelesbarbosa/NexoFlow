@@ -30,3 +30,14 @@ A publicação automática confere a origem na `main` e a mensagem de commit exa
 ## Mudanças de maior risco
 
 Exigem atenção adicional: escrita na Weni, LGPD, pedido/última compra, checkpoint, snapshot congelado, leitura/escrita do Google Sheets, cache FarmaLíder, schemas BI e instalador/desinstalador.
+
+## Conferência antes da entrega
+
+- Reproduzir o problema com dados sintéticos e validar a correção com um teste de regressão.
+- Percorrer a integração afetada com a CLI, revisões, estado e códigos de saída reais; APIs e recursos externos permanecem simulados.
+- Conferir sucesso, pendências isoladas, falhas críticas, mudanças após a revisão e retomada sem duplicidade, conforme a alteração.
+- Revisar o diff, executar as verificações exigidas e conferir os executáveis e a instalação no Windows quando houver impacto operacional.
+- Confirmar que workflow, tag e pacotes publicados correspondem ao mesmo commit antes de anunciar o release.
+- Informar os testes realizados e as limitações restantes. Aprovação automática não garante ausência de erros.
+
+O teste `tests/test_noturno_recompra_integration.py` percorre a Recompra dentro do Noturno com a CLI real, validação de pedidos, revisão em arquivo, estado persistido e contrato HTTP Weni simulado. As etapas Weni e Analytics têm validações próprias; esse teste não usa serviços de produção.

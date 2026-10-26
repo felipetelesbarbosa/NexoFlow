@@ -2,6 +2,17 @@
 
 Ao atualizar este repositório, mantenha a identificação pública **NexoFlow 1.0**.
 
+## Conferência antes da entrega
+
+- Reproduza a falha relatada com dados sintéticos e registre uma regressão que falhe antes da correção, quando houver comportamento executável alterado.
+- Valide a integração da rotina afetada: argumentos da CLI, simulação, revisão, aplicação, estado persistido, códigos de saída e continuidade das etapas. Simule APIs e recursos externos; execute a lógica real de decisão e validação.
+- Cubra sucesso, falha isolada, falha crítica, alteração após a revisão e retomada sem duplicidade, conforme o risco da mudança. Launchers exigem testes Windows do console e do executável distribuído.
+- Confira o diff e execute lint, tipos, testes pertinentes, consistência e os checks exigidos pelo workflow. Valide o pacote instalado quando houver impacto operacional; não use apenas a contagem de testes como evidência de correção.
+- Antes de anunciar publicação, confirme o sucesso do workflow do mesmo commit, a tag e os arquivos efetivamente disponibilizados no release. Preserve versões e nomes estáveis.
+- Informe o que foi validado e seus limites: teste local, compilação para Windows, execução no Windows e teste do pacote são evidências diferentes. Não prometa ausência de erros nem apresente hipótese como causa confirmada.
+
+## Regras do projeto
+
 - Use exatamente `NexoFlow 1.0` como mensagem de commit, sem sufixo ou texto adicional.
 - A `main` é a única branch de trabalho do repositório. Atualize diretamente a `main`; não crie nem mantenha branches adicionais.
 - Mantenha o título do release `NexoFlow 1.0`, a tag `v1.0` e os nomes estáveis dos pacotes. Só altere a versão quando o usuário pedir explicitamente.
