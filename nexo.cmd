@@ -1,5 +1,6 @@
 @echo off
 chcp 65001 >nul
+rem Abrir a interface de comandos do NexoFlow.
 setlocal
 for %%I in ("%~dp0") do set "NEXOFLOW_HOME=%%~fI"
 set "PYTHONPATH=%NEXOFLOW_HOME%;%NEXOFLOW_HOME%\app;%PYTHONPATH%"
