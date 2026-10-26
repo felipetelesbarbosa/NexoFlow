@@ -1,5 +1,7 @@
 # NexoFlow 1.0 — Downloads
 
+Instalador, projeto completo e hashes de verificação para download.
+
 A [release v1.0](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.0) reúne os pacotes oficiais:
 
 | Arquivo | Uso |
