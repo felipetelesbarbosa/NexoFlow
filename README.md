@@ -55,3 +55,7 @@ O código fica em [app/](app/README.md), os comandos Windows em [comandos/](coma
 [Weni](docs/README%20WENI.md) · [Planilha](docs/README%20DELIVERY.md) · [Recompra](docs/README%20RECOMPRA.md) · [Terminal](<docs/README TERMINAL.md>) · [Google Sheets](docs/GOOGLE%20SETUP.md) · [Looker Studio](docs/LOOKER%20STUDIO.md)
 
 O projeto é distribuído sem chaves, tokens ou credenciais. Use os seus próprios acessos e mantenha-os privados. Consulte [Segurança](SECURITY.md).
+
+## Organização do repositório
+
+Os executáveis de referência ficam em `native_launcher/prebuilt/`; os pacotes oficiais recompilam os aplicativos e mantêm os caminhos de instalação. Dependências opcionais e de desenvolvimento ficam em `dependencias/`. `pyproject.toml`, `pyrightconfig.json` e `requirements.txt` permanecem na raiz para as ferramentas Python.
