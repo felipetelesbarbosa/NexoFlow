@@ -15,6 +15,7 @@ Os testes cobrem, entre outros pontos:
 - cliente Weni;
 - Update Weni, auditoria e segurança de escrita;
 - preparação dos webhooks opcionais.
+- integração da Recompra no Noturno, com CLI real, revisão, estado e transporte HTTP simulado.
 
 A suíte integra o `comandos/check-up.bat` e o fluxo de publicação do NexoFlow 1.0.
 
