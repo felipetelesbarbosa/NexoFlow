@@ -1,3 +1,4 @@
+# Dependências principais das integrações e da importação de planilhas.
 requests>=2.33.0,<3
 gspread>=6.2,<7
 google-auth>=2.40,<3
