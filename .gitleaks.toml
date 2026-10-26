@@ -1,4 +1,4 @@
-# NexoFlow 1.0 — análise de segredos com todas as regras padrão.
+# Configuração da análise de segredos, preservando todas as regras padrão.
 [extend]
 useDefault = true
 
