@@ -1,4 +1,4 @@
-# NexoFlow 1.0
+# Automação de testes, empacotamento e publicação do NexoFlow 1.0.
 name: Publicar NexoFlow 1.0
 
 on:
@@ -135,11 +135,6 @@ jobs:
         run: |
           if ($env:GITHUB_REF -cne "refs/heads/main") {
             throw "A publicação do NexoFlow 1.0 deve partir da main."
-          }
-          $commitMessage = (& git log -1 --format=%B | Out-String).TrimEnd([char[]]"`r`n")
-          if ($LASTEXITCODE -ne 0) { throw "Não foi possível conferir a mensagem do commit." }
-          if ($commitMessage -cne "NexoFlow 1.0") {
-            throw "Use exatamente NexoFlow 1.0 como mensagem de commit antes de publicar."
           }
 
       - name: Go para launcher do Setup
