@@ -255,6 +255,37 @@ def build_review_audit(
     }
 
 
+def has_incomplete_query(plan: Mapping[str, Any]) -> bool:
+    return any(
+        _text(plan.get(field)).startswith("ERRO_")
+        for field in ("reason", "order_resolution_status")
+    )
+
+
+def incomplete_query_summary(plans: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    """Expõe erros da consulta mesmo quando outra regra define a decisão final."""
+    contacts = 0
+    errors: Counter[str] = Counter()
+    decisions: Counter[str] = Counter()
+    for plan in plans:
+        codes = {
+            code if code in _KNOWN_REASONS else "ERRO_NAO_CLASSIFICADO"
+            for field in ("reason", "order_resolution_status")
+            if (code := _text(plan.get(field))).startswith("ERRO_")
+        }
+        if not codes:
+            continue
+        contacts += 1
+        errors.update(codes)
+        reason = _text(plan.get("reason"))
+        decisions[reason if reason in _KNOWN_REASONS else "OUTRO_MOTIVO"] += 1
+    return {
+        "contatos": contacts,
+        "motivos_consulta": dict(sorted(errors.items())),
+        "decisoes": dict(sorted(decisions.items())),
+    }
+
+
 def public_review_lines(review: Mapping[str, Any]) -> list[str]:
     """Linhas agregadas; nenhum campo vazio é apresentado como autorização."""
     audit = build_review_audit(
@@ -304,6 +335,14 @@ def public_review_lines(review: Mapping[str, Any]) -> list[str]:
                 for reason, count in audit["pending_reasons"].items()
             )
             + "."
+        )
+    incomplete = incomplete_query_summary(review.get("plans", []))
+    if incomplete["contatos"]:
+        lines.append(
+            f"Consultas incompletas: {incomplete['contatos']} contato(s); "
+            f"motivos da consulta={incomplete['motivos_consulta']}; "
+            f"decisões finais={incomplete['decisoes']}. "
+            "A decisão final pode ocultar um erro da consulta nos totais de resultados."
         )
     if audit["warning_classes"]:
         lines.append(

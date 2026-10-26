@@ -1,5 +1,7 @@
 # NexoFlow 1.0 — Changelog
 
+- Recompra/Noturno: falhas isoladas de consulta ficam pendentes sem admitir ou atualizar o contato; os demais são revalidados e aplicados, com Analytics final e resultado parcial preservado. Motivos de consulta antes ocultos por outras decisões aparecem no log, revisão e resultado agregado. Falhas de auditoria/estado e incerteza após POST continuam bloqueando a execução.
+
 - Weni/Noturno: a aplicação incremental com revisão usa o snapshot congelado, assim como a carga completa. Releitura e auditoria por contato, retomada sem repetir gravações concluídas e checkpoint no corte da simulação; conflitos e falhas isoladas ficam para a próxima incremental.
 
 - NexoFlow Noturno: espera final usa a entrada nativa do console, inclusive com stdin redirecionado ou encerrado, e descarta teclas antigas antes de aguardar um novo ENTER. Teste Windows cria console real e verifica sucesso, parcial e erro sem fechar antes da confirmação.

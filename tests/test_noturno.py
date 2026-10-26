@@ -36,7 +36,7 @@ class NoturnoTests(unittest.TestCase):
             self.assertEqual(len(calls), 11)
             self.assertEqual(calls[5], ["app/run_main.py"])
             self.assertEqual(calls[-1], ["app/run_main.py"])
-            self.assertIn("--require-complete", calls[7])
+            self.assertNotIn("--require-complete", calls[7])
             for dry_index, apply_index in ((3, 4), (7, 9)):
                 dry, apply = calls[dry_index], calls[apply_index]
                 review = dry[dry.index("--review-out") + 1]
@@ -87,6 +87,8 @@ class NoturnoTests(unittest.TestCase):
     def test_failure_or_partial_stops_every_following_stage(self):
         for stage in range(1, 12):
             for failure in (1, 3):
+                if stage == 10 and failure == 3:
+                    continue  # Pendências isoladas da Recompra permitem o Analytics final.
                 with (
                     self.subTest(stage=stage, failure=failure),
                     tempfile.TemporaryDirectory() as temp,
@@ -98,6 +100,72 @@ class NoturnoTests(unittest.TestCase):
                     self.assertEqual(
                         result["status"], "parcial" if failure == 3 else "interrompido"
                     )
+
+    def test_partial_recompra_runs_final_analytics_and_preserves_partial_result(self):
+        for full in (False, True):
+            with self.subTest(full=full), tempfile.TemporaryDirectory() as temp:
+                code, calls, result = self.run_flow(Path(temp), {10: 3}, full=full)
+                self.assertEqual(code, 3)
+                self.assertEqual(len(calls), 11)
+                self.assertEqual(calls[-1], ["app/run_main.py"])
+                self.assertEqual(result["etapas"][-2]["codigo"], 3)
+                self.assertEqual(result["etapas"][-1]["codigo"], 0)
+                self.assertEqual(result["status"], "parcial")
+                self.assertTrue(result["fluxo_completo"])
+        with tempfile.TemporaryDirectory() as temp:
+            code, _, result = self.run_flow(Path(temp), {10: 3, 11: 1})
+            self.assertEqual(code, 1)
+            self.assertEqual(result["status"], "interrompido")
+            self.assertFalse(result["fluxo_completo"])
+
+    def test_result_records_hidden_query_failure_without_client_data(self):
+        from recompra import make_review, propose, write_review
+        from tests.test_recompra import NOW, STRUCTURE, fixture
+
+        contact, _, _ = fixture()
+        contact["fields"]["pedido_status"] = "3"
+        plan = propose(
+            contact,
+            {"status_confirmacao": "ERRO_ITENS_PEDIDO_API"},
+            [],
+            STRUCTURE,
+            now=NOW,
+        )
+
+        def runner(arguments, **kwargs):
+            if arguments[0] == "app/run_recompra.py" and "--review-out" in arguments:
+                write_review(
+                    make_review([plan], STRUCTURE, now=NOW),
+                    Path(arguments[arguments.index("--review-out") + 1]),
+                )
+            return (
+                3
+                if arguments[0] == "app/run_recompra.py" and "--apply" in arguments
+                else 0
+            )
+
+        with (
+            tempfile.TemporaryDirectory() as temp,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            root = Path(temp)
+            self.assertEqual(nightly.execute(root, runner=runner), 3)
+            result = json.loads(
+                next((root / "logs/noturno").glob("*/resultado.json")).read_text(
+                    encoding="utf-8"
+                )
+            )
+        diagnostic = result["etapas"][7]["consultas_incompletas"]
+        self.assertEqual(
+            diagnostic,
+            {
+                "contatos": 1,
+                "motivos_consulta": {"ERRO_ITENS_PEDIDO_API": 1},
+                "decisoes": {"PEDIDO_STATUS_3_CANCELADO_WENI": 1},
+            },
+        )
+        self.assertNotIn(contact["fields"]["cpf"], json.dumps(result))
+        self.assertNotIn(contact["name"], json.dumps(result))
 
     def test_expired_review_is_regenerated_once_with_a_different_path(self):
         for expiry in (8, 9, 10):

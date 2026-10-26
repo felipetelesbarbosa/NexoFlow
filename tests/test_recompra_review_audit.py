@@ -4,7 +4,11 @@ import json
 import unittest
 from copy import deepcopy
 
-from recompra_review_audit import build_review_audit, public_review_lines
+from recompra_review_audit import (
+    build_review_audit,
+    incomplete_query_summary,
+    public_review_lines,
+)
 
 
 def plan(uid, *, action="", fields=None, reason="JANELA_0_A_25", **kwargs):
@@ -23,6 +27,73 @@ def plan(uid, *, action="", fields=None, reason="JANELA_0_A_25", **kwargs):
 
 
 class RecompraReviewAuditTests(unittest.TestCase):
+    def test_query_errors_hidden_by_final_decision_remain_visible_without_identity(
+        self,
+    ):
+        plans = [
+            plan(
+                "SYNTHETIC_PRIVATE_UUID",
+                reason="PEDIDO_STATUS_3_CANCELADO_WENI",
+                order_resolution_status="ERRO_ITENS_PEDIDO_API",
+            ),
+            plan(
+                "SYNTHETIC_SECOND_UUID",
+                reason="PEDIDO_POSTERIOR_PENDENTE_API",
+                order_resolution_status="ERRO_API",
+            ),
+            plan(
+                "SYNTHETIC_THIRD_UUID",
+                reason="ERRO_API",
+                order_resolution_status="ERRO_API",
+            ),
+            plan("SYNTHETIC_FOURTH_UUID", reason="CPF_IDENTIDADE_AMBIGUA"),
+            plan("SYNTHETIC_FIFTH_UUID", reason="ERRO_SYNTHETIC_PRIVATE_PAYLOAD"),
+        ]
+        original = deepcopy(plans)
+        result = incomplete_query_summary(iter(plans))
+        self.assertEqual(
+            result,
+            {
+                "contatos": 4,
+                "motivos_consulta": {
+                    "ERRO_API": 2,
+                    "ERRO_ITENS_PEDIDO_API": 1,
+                    "ERRO_NAO_CLASSIFICADO": 1,
+                },
+                "decisoes": {
+                    "ERRO_API": 1,
+                    "OUTRO_MOTIVO": 1,
+                    "PEDIDO_POSTERIOR_PENDENTE_API": 1,
+                    "PEDIDO_STATUS_3_CANCELADO_WENI": 1,
+                },
+            },
+        )
+        self.assertEqual(plans, original)
+        self.assertNotIn("SYNTHETIC_", json.dumps(result))
+        lines = "\n".join(public_review_lines({"plans": plans}))
+        self.assertIn("Consultas incompletas: 4 contato(s)", lines)
+        self.assertIn("ERRO_ITENS_PEDIDO_API", lines)
+        self.assertNotIn("SYNTHETIC_", lines)
+
+    def test_expected_cadastro_and_eligibility_blocks_are_not_query_failures(self):
+        plans = [
+            plan("synthetic", reason=reason, order_resolution_status=reason)
+            for reason in (
+                "CPF_IDENTIDADE_AMBIGUA",
+                "CPF_INVALIDO_CADASTRO",
+                "CPF_NAO_INFORMADO",
+                "CPF_NAO_ENCONTRADO",
+                "PEDIDO_POSTERIOR_PENDENTE_API",
+                "PEDIDO_STATUS_3_CANCELADO",
+                "MAIS_DE_25_DIAS",
+                "RECUSA_MARKETING",
+            )
+        ]
+        self.assertEqual(
+            incomplete_query_summary(plans),
+            {"contatos": 0, "motivos_consulta": {}, "decisoes": {}},
+        )
+
     def test_actions_and_field_updates_are_explicit_and_do_not_double_count_contacts(
         self,
     ):

@@ -651,18 +651,32 @@ class RecompraRunnerOptimizationTests(unittest.TestCase):
                 parser.parse_args(["--dry-run", "--workers", workers])
             self.assertEqual(raised.exception.code, 2)
 
-    def test_dry_run_forwards_workers_and_streams_contacts_then_closes_clients(self):
-        for extra_args, workers in (
-            ([], FARMALIDER_MAX_WORKERS),
-            (["--workers", "1"], 1),
+    def test_dry_run_streams_contacts_and_preserves_optional_strict_gate(self):
+        for extra_args, workers, incomplete, expected in (
+            ([], FARMALIDER_MAX_WORKERS, False, 0),
+            (["--workers", "1"], 1, False, 0),
+            ([], FARMALIDER_MAX_WORKERS, True, 0),
+            (["--require-complete"], FARMALIDER_MAX_WORKERS, True, 3),
         ):
-            with self.subTest(workers=workers), ExitStack() as stack:
+            with (
+                self.subTest(
+                    workers=workers, incomplete=incomplete, arguments=extra_args
+                ),
+                ExitStack() as stack,
+            ):
                 contact, _, _ = fixture()
                 contacts = iter([contact])
                 weni, farm = Mock(), Mock()
                 weni.iter_contacts.return_value = contacts
                 state = {"schema": 1, "contacts": {}}
-                plan = {"synthetic": "plan"}
+                plan = (
+                    {
+                        "reason": "PEDIDO_STATUS_3_CANCELADO_WENI",
+                        "order_resolution_status": "ERRO_ITENS_PEDIDO_API",
+                    }
+                    if incomplete
+                    else {"synthetic": "plan"}
+                )
                 review = {"synthetic": "review", "day": NOW.date().isoformat()}
                 stack.enter_context(patch("proxy_config.configure_proxy"))
                 stack.enter_context(patch("logging_config.configure_logging"))
@@ -694,7 +708,7 @@ class RecompraRunnerOptimizationTests(unittest.TestCase):
                     run_recompra(
                         ["--dry-run", "--review-out", str(review_out), *extra_args]
                     ),
-                    0,
+                    expected,
                 )
                 planner.assert_called_once_with(
                     contacts,

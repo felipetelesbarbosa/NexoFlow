@@ -20,6 +20,8 @@ from threading import Lock
 from time import monotonic, sleep
 from zoneinfo import ZoneInfo
 
+from requests import RequestException
+
 from analytics import (
     _sales_order_is_valid,
     cpf_query_priority,
@@ -54,7 +56,12 @@ from purchase_checks import (
     register_pending_purchase_checks,
 )
 from recompra_lock import state_lock
-from recompra_review_audit import public_review_lines
+from recompra_review_audit import (
+    has_incomplete_query,
+    incomplete_query_summary,
+    public_review_lines,
+)
+from weni_client import WeniError
 
 GROUP = "Recompra FarmaLíder"
 PRODUCT_POLICY = (
@@ -1275,6 +1282,24 @@ def apply_review(
     def check_day():
         ensure_review_current(review, now_fn(), allow_refresh=not writes_started)
 
+    def defer_query(uid, stage, *, error=None, plan=None):
+        summary["consultas_pendentes"] += 1
+        append_audit(
+            {
+                "contact_uuid": uid,
+                "status": "CONSULTA_PENDENTE",
+                "stage": stage,
+                "error_type": type(error).__name__
+                if error is not None
+                else "CONSULTA_INCOMPLETA",
+                "motivos_consulta": incomplete_query_summary([plan])["motivos_consulta"]
+                if plan is not None
+                else {},
+                "at": now_fn().isoformat(),
+            },
+            audit_path,
+        )
+
     with state_lock(state_path):
         state = (
             load_state(state_path, purchase_checks_path=purchase_checks_path)
@@ -1290,7 +1315,8 @@ def apply_review(
         if isinstance(farm, FarmaliderClient):
             farm.reset_execution_reads()
             if any(
-                plan_needs_apply(
+                not has_incomplete_query(plan)
+                and plan_needs_apply(
                     plan, _saved_with_purchase_check(state, plan["contact_uuid"])
                 )
                 for plan in review["plans"]
@@ -1309,13 +1335,21 @@ def apply_review(
                 )
             audit_plan(reviewed)
             uid = reviewed["contact_uuid"]
+            if has_incomplete_query(reviewed):
+                defer_query(uid, "consulta_da_revisao", plan=reviewed)
+                continue
             saved = _saved_with_purchase_check(state, uid)
             # Um plano sem trabalho não autoriza novas alterações descobertas
             # depois da revisão; elas serão propostas no próximo dry-run.
             if not plan_needs_apply(reviewed, saved):
                 summary["sem_mudanca"] += 1
                 continue
-            current = weni.get_contact(uuid=uid)
+            try:
+                current = weni.get_contact(uuid=uid)
+            except (WeniError, RequestException) as exc:
+                check_day()
+                defer_query(uid, "reler_contato", error=exc)
+                continue
             check_day()
             if not current or guard(current) != reviewed["guard"]:
                 summary["conflitos"] += 1
@@ -1326,12 +1360,20 @@ def apply_review(
             if refused(current) or member(current, structure["opt_out_uuid"], OPT_OUT):
                 order, items = None, []
             else:
-                order, items = _resolve_checked_contact(
-                    current, reads, now_fn().isoformat(), saved
-                )
+                try:
+                    order, items = _resolve_checked_contact(
+                        current, reads, now_fn().isoformat(), saved
+                    )
+                except (FarmaliderError, RequestException) as exc:
+                    check_day()
+                    defer_query(uid, "reconsultar_pedido", error=exc)
+                    continue
             check_day()
             fresh = propose(current, order, items, structure, saved, now=now_fn())
             check_day()
+            if has_incomplete_query(fresh):
+                defer_query(uid, "reconsultar_pedido", plan=fresh)
+                continue
             if any(
                 fresh[key] != reviewed[key]
                 for key in (

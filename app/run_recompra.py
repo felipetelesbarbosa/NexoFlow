@@ -155,8 +155,16 @@ def main(argv=None):
             )
         if args.apply:
             result = apply_review(review, weni, farm)
-            print("[OK] Recompra: " + str(result))
-            return 3 if result.get("conflitos") else 0
+            partial = bool(result.get("conflitos") or result.get("consultas_pendentes"))
+            print(
+                (
+                    "[AVISO] Recompra aplicada com pendências: "
+                    if partial
+                    else "[OK] Recompra: "
+                )
+                + str(result)
+            )
+            return 3 if partial else 0
         state = load_state(STATE)
         now = now_local()
         if args.contact:
@@ -187,11 +195,19 @@ def main(argv=None):
         finalize_review(review, now_local())
         write_review(review, args.review_out)
         ensure_review_current(review, now_local())
-        if args.require_complete and any(
-            str(plan.get("reason", "")).startswith("ERRO_")
-            or str(plan.get("order_resolution_status", "")).startswith("ERRO_")
-            for plan in plans
-        ):
+        from recompra_review_audit import incomplete_query_summary
+
+        incomplete = incomplete_query_summary(plans)
+        if incomplete["contatos"]:
+            logging.warning(
+                "Recompra: consultas incompletas em %s contato(s); motivos da consulta=%s; "
+                "decisões finais=%s. Detalhes na revisão privada: %s.",
+                incomplete["contatos"],
+                incomplete["motivos_consulta"],
+                incomplete["decisoes"],
+                args.review_out,
+            )
+        if args.require_complete and incomplete["contatos"]:
             print(
                 "[AVISO] Recompra com consultas incompletas. O fluxo completo foi interrompido antes da aplicação."
             )

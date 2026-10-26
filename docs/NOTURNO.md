@@ -33,7 +33,11 @@ Tarefas agendadas sem console interativo encerram ao terminar e preservam o cód
 
 Cada execução preserva seus arquivos em `logs/noturno/<execução>/`: `resultado.json`, `execucao.log` e os snapshots de Weni e Recompra. Os relatórios são privados e podem conter dados de contatos; não os publique.
 
-Código **0** indica sequência concluída; **3**, resultado parcial; outros códigos indicam interrupção. O resumo registra a etapa e o código de saída. Falha crítica ou Analytics parcial impede as etapas seguintes. Pendências isoladas da Weni seguem a regra existente: os contatos afetados ficam para a próxima incremental.
+Código **0** indica sequência concluída; **3**, resultado com pendências; outros códigos indicam interrupção. O resumo registra a etapa e o código de saída. Falha crítica ou Analytics parcial impede as etapas seguintes. Pendências isoladas da Weni ficam para a próxima incremental.
+
+Na Recompra, contatos com erro de consulta não recebem alterações nem nova inclusão. Os demais são revalidados e aplicados, e o Analytics final continua mesmo com pendências isoladas. O resultado permanece com código **3**, sem apresentar a execução como totalmente concluída. A próxima carga gera uma nova revisão e reconsulta os pendentes. Estado/auditoria indisponível, revisão inválida e resultado incerto após POST continuam interrompendo a rotina.
+
+Erros da consulta e decisões finais aparecem separadamente no log e no relatório. O `resultado.json` também inclui esse diagnóstico agregado na etapa de simulação da Recompra, sem dados pessoais.
 
 A revisão da Recompra é renovada uma vez se atravessar a mudança de dia. Outras falhas de aplicação não são repetidas automaticamente pelo orquestrador. Gravações confirmadas permanecem salvas; respostas incertas continuam sujeitas à reconciliação e ao bloqueio contra duplicidade da Recompra. Não apague arquivos de estado para tentar novamente.
 

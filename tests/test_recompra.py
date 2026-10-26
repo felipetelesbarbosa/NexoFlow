@@ -5,9 +5,11 @@ import tempfile
 import unittest
 from copy import deepcopy
 from datetime import datetime, timedelta
+from itertools import product
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from farmalider_client import FarmaliderError
 from recompra import (
     DAY_EXPRESSION,
     FIELDS,
@@ -24,6 +26,7 @@ from recompra import (
     validate_flow_guards,
     write_review,
 )
+from weni_client import WeniError
 from weni_update import (
     ContactUpdatePlan,
     GroupAction,
@@ -224,6 +227,125 @@ class RecompraRulesTests(unittest.TestCase):
 
 
 class RecompraApplyTests(unittest.TestCase):
+    def test_isolated_query_failures_stay_pending_and_valid_contact_is_applied(self):
+        for failure, broken_first in product(
+            ("review", "weni", "farm", "response"), (True, False)
+        ):
+            with (
+                self.subTest(failure=failure, broken_first=broken_first),
+                tempfile.TemporaryDirectory() as temp,
+            ):
+                path = Path(temp) / "state.json"
+                audit = Path(temp) / "audit.jsonl"
+                state = load_state(path)
+                contacts, plans, orders = {}, [], {}
+                for uid in (
+                    ("broken", "healthy") if broken_first else ("healthy", "broken")
+                ):
+                    contact, order, items = fixture(24)
+                    contact["uuid"] = uid
+                    contacts[uid] = contact
+                    orders[uid] = (order, items)
+                    if uid == "broken" and failure == "review":
+                        contact["fields"]["pedido_status"] = "3"
+                        order, items = (
+                            {"status_confirmacao": "ERRO_ITENS_PEDIDO_API"},
+                            [],
+                        )
+                    plans.append(propose(contact, order, items, STRUCTURE, now=NOW))
+                review = make_review(plans, STRUCTURE, now=NOW, state=state)
+                original = deepcopy(review)
+                client = Mock()
+
+                def get_contact(*, uuid, failure=failure, contacts=contacts):
+                    if uuid == "broken" and failure == "weni":
+                        raise WeniError("Falha de leitura simulada")
+                    return deepcopy(contacts[uuid])
+
+                def resolve(contact, *args, failure=failure, orders=orders, **kwargs):
+                    if contact["uuid"] == "broken":
+                        if failure == "farm":
+                            raise FarmaliderError("Falha de consulta simulada")
+                        if failure == "response":
+                            return {"status_confirmacao": "ERRO_ITENS_PEDIDO_API"}, []
+                        self.fail(
+                            "O contato com erro na revisão não deve ser reconsultado no apply"
+                        )
+                    return deepcopy(orders[contact["uuid"]])
+
+                client.get_contact.side_effect = get_contact
+                client.update_contact_fields.side_effect = (
+                    lambda uid, fields, contacts=contacts: contacts[uid][
+                        "fields"
+                    ].update(fields)
+                )
+                client.contact_group_action.side_effect = (
+                    lambda uid, *, action, group, contacts=contacts: contacts[uid][
+                        "groups"
+                    ].append({"uuid": group, "name": GROUP})
+                )
+                with (
+                    patch("recompra.inspect_structure", return_value=STRUCTURE),
+                    patch("recompra.resolve_latest", side_effect=resolve),
+                ):
+                    result = apply_review(
+                        review,
+                        client,
+                        Mock(),
+                        state_path=path,
+                        audit_path=audit,
+                        now_fn=lambda: NOW,
+                    )
+                self.assertEqual(result, {"consultas_pendentes": 1, "aplicados": 1})
+                client.update_contact_fields.assert_called_once()
+                self.assertEqual(
+                    client.update_contact_fields.call_args.args[0], "healthy"
+                )
+                client.contact_group_action.assert_called_once_with(
+                    "healthy", action="add", group=STRUCTURE["group_uuid"]
+                )
+                saved = load_state(path)
+                self.assertNotIn("broken", saved["contacts"])
+                self.assertTrue(
+                    saved["contacts"]["healthy"]["orders"]["100"]["admitted"]
+                )
+                self.assertEqual(review, original)
+                events = [
+                    json.loads(line)
+                    for line in audit.read_text(encoding="utf-8").splitlines()
+                ]
+                self.assertIn(
+                    {"broken", "CONSULTA_PENDENTE"},
+                    [{event["contact_uuid"], event["status"]} for event in events],
+                )
+
+    def test_failed_pending_audit_stops_before_applying_other_contacts(self):
+        bad, _, _ = fixture(24)
+        good, order, items = fixture(24)
+        good["uuid"] = "healthy"
+        plans = [
+            propose(bad, {"status_confirmacao": "ERRO_API"}, [], STRUCTURE, now=NOW),
+            propose(good, order, items, STRUCTURE, now=NOW),
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state.json"
+            review = make_review(plans, STRUCTURE, now=NOW, state=load_state(path))
+            client = Mock()
+            with (
+                patch("recompra.inspect_structure", return_value=STRUCTURE),
+                patch(
+                    "recompra.append_audit",
+                    side_effect=PermissionError("Falha local simulada"),
+                ),
+                self.assertRaises(PermissionError),
+            ):
+                apply_review(
+                    review, client, Mock(), state_path=path, now_fn=lambda: NOW
+                )
+            client.get_contact.assert_not_called()
+            client.update_contact_fields.assert_not_called()
+            client.contact_group_action.assert_not_called()
+
     def execute(self, c, o, i, *, failure=False, changed=False, clock=None):
         now = clock or (lambda: NOW)
         temp = tempfile.TemporaryDirectory()

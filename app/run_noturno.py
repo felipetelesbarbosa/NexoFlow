@@ -10,8 +10,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
-from recompra import atomic_json
+from recompra import atomic_json, read_review
 from recompra_lock import execution_file_lock
+from recompra_review_audit import incomplete_query_summary
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -59,6 +60,7 @@ def execute(root: Path = ROOT, *, runner=run_step, full: bool = False) -> int:
         "modo": "completo" if full else "incremental",
         "confirmacao_humana": False,
         "status": "em_execucao",
+        "fluxo_completo": False,
         "etapas": [],
     }
     summary_path = directory / "resultado.json"
@@ -70,7 +72,19 @@ def execute(root: Path = ROOT, *, runner=run_step, full: bool = False) -> int:
         result = runner(
             arguments, root=root, log=directory / "execucao.log", full_sync=full_sync
         )
-        summary["etapas"].append({"etapa": name, "codigo": result})
+        record = {"etapa": name, "codigo": result}
+        if arguments[0] == "app/run_recompra.py" and "--review-out" in arguments:
+            review_path = Path(arguments[arguments.index("--review-out") + 1])
+            if review_path.is_file():
+                try:
+                    record["consultas_incompletas"] = incomplete_query_summary(
+                        read_review(review_path)["plans"]
+                    )
+                except (OSError, RuntimeError, ValueError):
+                    record["diagnostico_revisao"] = (
+                        "Não foi possível conferir o diagnóstico; a validação da revisão continua obrigatória antes da aplicação."
+                    )
+        summary["etapas"].append(record)
         atomic_json(summary_path, summary)
         return result
 
@@ -115,7 +129,6 @@ def execute(root: Path = ROOT, *, runner=run_step, full: bool = False) -> int:
                     [
                         "app/run_recompra.py",
                         "--dry-run",
-                        "--require-complete",
                         "--review-out",
                         review,
                     ],
@@ -141,9 +154,23 @@ def execute(root: Path = ROOT, *, runner=run_step, full: bool = False) -> int:
                     break
             if code != 4:
                 break
-        if code:
+        partial_recompra = (
+            code == 3
+            and arguments[0] == "app/run_recompra.py"
+            and "--apply" in arguments
+        )
+        if code and not partial_recompra:
             return code
-        return step("Analytics: refletir alterações da Recompra", ["app/run_main.py"])
+        if partial_recompra:
+            print(
+                "[AVISO] Recompra aplicada com pendências isoladas; continuando o Analytics final. Os contatos pendentes serão reconsultados na próxima carga.",
+                flush=True,
+            )
+        analytics_code = step(
+            "Analytics: refletir alterações da Recompra", ["app/run_main.py"]
+        )
+        summary["fluxo_completo"] = analytics_code == 0
+        return analytics_code or (3 if partial_recompra else 0)
 
     code = 1
     try:
@@ -167,8 +194,13 @@ def execute(root: Path = ROOT, *, runner=run_step, full: bool = False) -> int:
         summary["codigo"] = code
         summary["fim_utc"] = datetime.now(UTC).isoformat()
         atomic_json(summary_path, summary)
+        result_label = (
+            "fluxo concluído com pendências"
+            if code == 3 and summary["fluxo_completo"]
+            else summary["status"]
+        )
         print(
-            f"[RESULTADO] {summary['status']} — código {code}. Relatório: {summary_path}",
+            f"[RESULTADO] {result_label} — código {code}. Relatório: {summary_path}",
             flush=True,
         )
     return code
