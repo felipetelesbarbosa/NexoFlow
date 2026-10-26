@@ -18,6 +18,7 @@ from itertools import groupby, islice
 from pathlib import Path
 from threading import Lock
 from time import monotonic, sleep
+from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from requests import RequestException
@@ -1260,6 +1261,7 @@ def apply_review(
     now_fn=now_local,
     audit_path=AUDIT,
     purchase_checks_path=None,
+    pending_report_path=None,
 ):
     """Somente snapshots revisados; conflito ou confirmação incerta bloqueia inclusão."""
     if review.get("policy") != PRODUCT_POLICY:
@@ -1278,13 +1280,22 @@ def apply_review(
     summary = Counter()
     started = monotonic()
     writes_started = False
+    execution_id = uuid4().hex
+    pending_events = []
+
+    def record_event(event):
+        event = {**event, "execution_id": execution_id}
+        event.setdefault("at", now_fn().isoformat())
+        append_audit(event, audit_path)
+        if event["status"] != "APLICADO":
+            pending_events.append(event)
 
     def check_day():
         ensure_review_current(review, now_fn(), allow_refresh=not writes_started)
 
     def defer_query(uid, stage, *, error=None, plan=None):
         summary["consultas_pendentes"] += 1
-        append_audit(
+        record_event(
             {
                 "contact_uuid": uid,
                 "status": "CONSULTA_PENDENTE",
@@ -1297,7 +1308,6 @@ def apply_review(
                 else {},
                 "at": now_fn().isoformat(),
             },
-            audit_path,
         )
 
     with state_lock(state_path):
@@ -1353,8 +1363,25 @@ def apply_review(
             check_day()
             if not current or guard(current) != reviewed["guard"]:
                 summary["conflitos"] += 1
-                append_audit(
-                    {"contact_uuid": uid, "status": "CONFLITO_CONTATO"}, audit_path
+                actual_guard = guard(current) if current else {}
+                expected_guard = reviewed["guard"]
+                record_event(
+                    {
+                        "contact_uuid": uid,
+                        "status": "CONFLITO_CONTATO",
+                        "contact_missing": not bool(current),
+                        "changed_fields": sorted(
+                            key
+                            for key in expected_guard["fields"]
+                            if expected_guard["fields"].get(key)
+                            != actual_guard.get("fields", {}).get(key)
+                        ),
+                        "changed_sections": [
+                            key
+                            for key in ("name", "urns", "groups")
+                            if actual_guard.get(key) != expected_guard.get(key)
+                        ],
+                    }
                 )
                 continue
             if refused(current) or member(current, structure["opt_out_uuid"], OPT_OUT):
@@ -1397,9 +1424,35 @@ def apply_review(
                 )
             ):
                 summary["conflitos"] += 1
-                append_audit(
-                    {"contact_uuid": uid, "status": "CONFLITO_PEDIDO_OU_DIA"},
-                    audit_path,
+                record_event(
+                    {
+                        "contact_uuid": uid,
+                        "status": "CONFLITO_PEDIDO_OU_DIA",
+                        "changed_sections": sorted(
+                            key
+                            for key in (
+                                "fields",
+                                "action",
+                                "order_id",
+                                "reason",
+                                "purchase",
+                                "event_at",
+                                "due_today",
+                                "within_window",
+                                "scheduled_future",
+                                "warnings",
+                                "pending_purchase_check",
+                                "purchase_check_resolved",
+                                "campaign_products",
+                            )
+                            if fresh.get(key) != reviewed.get(key)
+                        ),
+                        "changed_fields": sorted(
+                            key
+                            for key in set(fresh["fields"]) | set(reviewed["fields"])
+                            if fresh["fields"].get(key) != reviewed["fields"].get(key)
+                        ),
+                    }
                 )
                 continue
             action = fresh["action"]
@@ -1594,7 +1647,7 @@ def apply_review(
                     atomic_json(state_path, state)
                 summary["aplicados"] += 1
                 stage = "registrar_auditoria"
-                append_audit(
+                record_event(
                     {
                         "contact_uuid": uid,
                         "pedido_id": fresh["order_id"],
@@ -1604,7 +1657,6 @@ def apply_review(
                         "group_confirmed": action in {"add", "replace"},
                         "at": now_fn().isoformat(),
                     },
-                    audit_path,
                 )
             except PreAdmissionConflict as exc:
                 # O POST de admissão NÃO foi tentado. O pending criado nesta
@@ -1619,7 +1671,7 @@ def apply_review(
                     uid,
                     str(exc),
                 )
-                append_audit(
+                record_event(
                     {
                         "contact_uuid": uid,
                         "pedido_id": fresh["order_id"],
@@ -1628,20 +1680,18 @@ def apply_review(
                         "reason": str(exc),
                         "at": now_fn().isoformat(),
                     },
-                    audit_path,
                 )
                 continue
             except ReviewExpiredError:
                 if contact_state != persisted_state:
                     atomic_json(state_path, state)
-                append_audit(
+                record_event(
                     {
                         "contact_uuid": uid,
                         "pedido_id": fresh["order_id"],
                         "status": "REVISAO_EXPIRADA_DURANTE_APLICACAO",
                         "at": now_fn().isoformat(),
                     },
-                    audit_path,
                 )
                 raise
             except Exception as exc:
@@ -1659,7 +1709,7 @@ def apply_review(
                 )
                 if contact_state != persisted_state:
                     atomic_json(state_path, state)
-                append_audit(
+                record_event(
                     {
                         "contact_uuid": uid,
                         "pedido_id": fresh["order_id"],
@@ -1669,7 +1719,6 @@ def apply_review(
                         "origin": frames,
                         "at": now_fn().isoformat(),
                     },
-                    audit_path,
                 )
                 raise RuntimeError(
                     f"Recompra interrompida na etapa {stage} ({type(exc).__name__}). "
@@ -1679,6 +1728,32 @@ def apply_review(
             # Se uma chamada concluída atravessou a meia-noite, seus resultados
             # conhecidos já estão persistidos antes de interromper a execução.
             check_day()
+    if pending_report_path is not None:
+        report_path = Path(pending_report_path)
+        report_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        atomic_json(
+            report_path,
+            {
+                "schema": 1,
+                "execution_id": execution_id,
+                "started_at": now.isoformat(),
+                "finished_at": now_fn().isoformat(),
+                "aplicacao_concluida": True,
+                "resultado": dict(summary),
+                "pendencias_por_motivo": dict(
+                    Counter(event["status"] for event in pending_events)
+                ),
+                "pendencias": pending_events,
+                "proxima_acao": "Gerar nova revisão para revalidar as pendências; não reaplicar a revisão antiga.",
+            },
+        )
+    if pending_events:
+        logging.warning(
+            "Recompra: aplicação concluída com %s pendência(s); motivos=%s. "
+            "Alterações confirmadas preservadas; pendências serão revalidadas na próxima revisão.",
+            len(pending_events),
+            dict(Counter(event["status"] for event in pending_events)),
+        )
     logging.info(
         "Recompra aplicação: contatos=%s; duração=%.1fs; resultados=%s; cache=%s.",
         len(review["plans"]),

@@ -182,6 +182,14 @@ Em novas falhas, `logs/nexoflow_recompra.log` registra etapa, tipo e origem (arq
 
 Somente após reconciliar as pendências, gere um **novo dry-run e nova revisão humana do dia**. O NexoFlow não faz reenvio retroativo nem altera a campanha por conta própria.
 
+## Resultado com pendências
+
+Código **3 após a aplicação** significa que a varredura terminou com consultas pendentes ou conflitos isolados. As alterações confirmadas foram preservadas; os demais contatos serão revalidados em uma nova revisão. O código continua sendo aviso de resultado parcial, não sucesso integral.
+
+A CLI informa o caminho do relatório privado da aplicação: `logs/privado/recompra_review_<id>_aplicacao.json` para o nome padrão de revisão, com um nome exclusivo por tentativa. Ele contém o identificador e horário da execução, totais, motivos e contatos pendentes. Conflitos novos registram os nomes dos campos ou seções que mudaram, sem copiar seus valores pessoais. A auditoria acumulada mantém o histórico; o relatório separa apenas a execução atual. No Noturno, o arquivo fica na pasta privada da revisão daquela execução.
+
+Não reaplique uma revisão antiga nem apague o estado. Execute a rotina novamente para gerar e conferir uma nova revisão. Falhas críticas e resultados incertos após gravação continuam interrompendo a aplicação e exigindo reconciliação; código 3 durante a preparação não significa que houve aplicação.
+
 ## Testes
 
 Fixtures sintéticas cobrem 0, 24, 25, 26 e 365 dias, futuro, fuso local, campos vazios, produtos com vírgula, recusas e Opt-Out, estados de pedido, proteção contra regressão de compra, referência nova, reprocessamento/reinicialização, resposta incerta, estado corrompido, revisão adulterada/expirada, recusa concorrente, cancelamento antes de atualizar a data e rotas do fluxo que tentariam contornar as guardas.

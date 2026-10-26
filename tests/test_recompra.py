@@ -319,6 +319,133 @@ class RecompraApplyTests(unittest.TestCase):
                     [{event["contact_uuid"], event["status"]} for event in events],
                 )
 
+    def test_partial_report_is_scoped_to_execution_and_next_review_does_not_repeat_success(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_path, audit, report = (
+                root / "state.json",
+                root / "audit.jsonl",
+                root / "report.json",
+            )
+            contacts, orders, plans = {}, {}, []
+            for uid in ("query", "contact", "order", "healthy"):
+                contact, order, items = fixture(24)
+                contact["uuid"] = uid
+                contacts[uid] = contact
+                orders[uid] = (order, items)
+                plans.append(
+                    propose(
+                        contact,
+                        {"status_confirmacao": "ERRO_ITENS_PEDIDO_API"}
+                        if uid == "query"
+                        else order,
+                        [] if uid == "query" else items,
+                        STRUCTURE,
+                        now=NOW,
+                    )
+                )
+            contacts["contact"]["name"] = "Nome alterado depois da revisão"
+            orders["order"][0].update(pedido_id="101", pedido_chave="FARMALIDER:101")
+            original_review = make_review(
+                plans, STRUCTURE, now=NOW, state=load_state(state_path)
+            )
+            audit.write_text(
+                '{"status":"CONFLITO_CONTATO","contact_uuid":"older-private"}\n',
+                encoding="utf-8",
+            )
+            client = Mock()
+            client.get_contact.side_effect = lambda *, uuid: deepcopy(contacts[uuid])
+            client.update_contact_fields.side_effect = lambda uid, fields: contacts[
+                uid
+            ]["fields"].update(fields)
+            client.contact_group_action.side_effect = lambda uid, *, action, group: (
+                contacts[uid]["groups"].append({"uuid": group, "name": GROUP})
+            )
+
+            def resolve(contact, *args, **kwargs):
+                return deepcopy(orders[contact["uuid"]])
+
+            with (
+                patch("recompra.inspect_structure", return_value=STRUCTURE),
+                patch("recompra.resolve_latest", side_effect=resolve),
+            ):
+                result = apply_review(
+                    original_review,
+                    client,
+                    Mock(),
+                    state_path=state_path,
+                    audit_path=audit,
+                    pending_report_path=report,
+                    now_fn=lambda: NOW,
+                )
+                self.assertEqual(
+                    result, {"consultas_pendentes": 1, "conflitos": 2, "aplicados": 1}
+                )
+                payload = json.loads(report.read_text(encoding="utf-8"))
+                self.assertTrue(payload["aplicacao_concluida"])
+                self.assertEqual(payload["resultado"], result)
+                self.assertEqual(
+                    payload["pendencias_por_motivo"],
+                    {
+                        "CONSULTA_PENDENTE": 1,
+                        "CONFLITO_CONTATO": 1,
+                        "CONFLITO_PEDIDO_OU_DIA": 1,
+                    },
+                )
+                self.assertEqual(len(payload["pendencias"]), 3)
+                self.assertTrue(
+                    all(
+                        p["execution_id"] == payload["execution_id"] and p["at"]
+                        for p in payload["pendencias"]
+                    )
+                )
+                by_uid = {p["contact_uuid"]: p for p in payload["pendencias"]}
+                self.assertEqual(
+                    by_uid["query"]["motivos_consulta"], {"ERRO_ITENS_PEDIDO_API": 1}
+                )
+                self.assertIn("name", by_uid["contact"]["changed_sections"])
+                self.assertIn("order_id", by_uid["order"]["changed_sections"])
+                text = report.read_text(encoding="utf-8")
+                for private_value in (
+                    "older-private",
+                    "52998224725",
+                    "Nome alterado depois da revisão",
+                    "tel:+5591",
+                ):
+                    self.assertNotIn(private_value, text)
+                self.assertEqual(client.contact_group_action.call_count, 1)
+                next_review = make_review(
+                    [
+                        propose(
+                            contact,
+                            *orders[uid],
+                            STRUCTURE,
+                            saved=load_state(state_path)["contacts"].get(uid),
+                            now=NOW,
+                        )
+                        for uid, contact in contacts.items()
+                    ],
+                    STRUCTURE,
+                    now=NOW,
+                    state=load_state(state_path),
+                )
+                followup = apply_review(
+                    next_review,
+                    client,
+                    Mock(),
+                    state_path=state_path,
+                    audit_path=audit,
+                    pending_report_path=report,
+                    now_fn=lambda: NOW,
+                )
+                self.assertEqual(followup, {"aplicados": 3, "sem_mudanca": 1})
+                self.assertEqual(client.contact_group_action.call_count, 4)
+                self.assertEqual(
+                    json.loads(report.read_text(encoding="utf-8"))["pendencias"], []
+                )
+
     def test_failed_pending_audit_stops_before_applying_other_contacts(self):
         bad, _, _ = fixture(24)
         good, order, items = fixture(24)

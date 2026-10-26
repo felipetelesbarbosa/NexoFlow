@@ -4,6 +4,7 @@ import argparse
 import json
 import logging
 from pathlib import Path
+from uuid import uuid4
 
 from requests import RequestException
 
@@ -154,7 +155,14 @@ def main(argv=None):
                 "FarmaLíder precisa estar disponível para confirmar a compra."
             )
         if args.apply:
-            result = apply_review(review, weni, farm)
+            pending_report = (
+                args.require_review.parent
+                / "privado"
+                / (args.require_review.stem + "_" + uuid4().hex + "_aplicacao.json")
+            )
+            result = apply_review(
+                review, weni, farm, pending_report_path=pending_report
+            )
             partial = bool(result.get("conflitos") or result.get("consultas_pendentes"))
             print(
                 (
@@ -164,6 +172,12 @@ def main(argv=None):
                 )
                 + str(result)
             )
+            print("[INFO] Relatório desta aplicação: " + str(pending_report))
+            if partial:
+                print(
+                    "[INFO] Alterações confirmadas preservadas. Gere uma nova revisão para "
+                    "revalidar as pendências; não reaplique a revisão antiga."
+                )
             return 3 if partial else 0
         state = load_state(STATE)
         now = now_local()

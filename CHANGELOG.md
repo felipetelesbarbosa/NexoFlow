@@ -1,5 +1,7 @@
 # NexoFlow 1.0 — Changelog
 
+- Recompra: resultado parcial após aplicação aparece como concluído com pendências, preservando código 3. Relatório privado por execução separa consultas e conflitos do histórico e informa os campos alterados; nova revisão revalida as pendências sem repetir alterações confirmadas.
+
 - Repositório: mensagens de commit descritivas por área e guias curtos das pastas. A publicação deixa de exigir a mensagem genérica `NexoFlow 1.0`; versão, tag e nomes dos pacotes permanecem iguais.
 
 - Recompra/Noturno: falhas isoladas de consulta ficam pendentes sem admitir ou atualizar o contato; os demais são revalidados e aplicados, com Analytics final e resultado parcial preservado. Motivos de consulta antes ocultos por outras decisões aparecem no log, revisão e resultado agregado. Falhas de auditoria/estado e incerteza após POST continuam bloqueando a execução.

@@ -149,6 +149,16 @@ class NoturnoRecompraIntegrationTests(unittest.TestCase):
                         encoding="utf-8"
                     )
                 )
+                reports = list(
+                    (root / "logs/noturno").glob("*/privado/*_aplicacao.json")
+                )
+                if mode in {"success", "partial_queries", "source_changed"}:
+                    self.assertEqual(len(reports), 1)
+                    application = json.loads(reports[0].read_text(encoding="utf-8"))
+                    self.assertTrue(application["aplicacao_concluida"])
+                    self.assertEqual(bool(application["pendencias"]), code == 3)
+                else:
+                    self.assertEqual(reports, [])
                 state = load_state(root / "logs/recompra_state.json")
             posts = [
                 call

@@ -11,6 +11,7 @@ title NexoFlow 1.0 - Recompra FarmaLíder
 set "REVIEW_JSON=logs\recompra_review.json"
 set "REVIEW_TXT=logs\recompra_review.txt"
 set "REVIEW_REFRESHES=0"
+set "APPLY_FINISHED=0"
 ".venv\Scripts\python.exe" app\run_recompra.py --check-only
 set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto :fim
@@ -33,6 +34,8 @@ set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto :fim
 ".venv\Scripts\python.exe" app\run_recompra.py --apply --require-review "%REVIEW_JSON%"
 set "RC=%ERRORLEVEL%"
+if "%RC%"=="0" set "APPLY_FINISHED=1"
+if "%RC%"=="3" set "APPLY_FINISHED=1"
 if "%RC%"=="4" goto :renovar_revisao
 goto :fim
 :renovar_revisao
@@ -44,10 +47,21 @@ echo [INFO] O dia mudou antes da aplicação. Gerando uma revisão atualizada.
 echo [INFO] O novo relatório precisa ser revisado e confirmado novamente.
 goto :gerar_revisao
 :fim
-if "%RC%"=="4" (
+if "%RC%"=="0" (
+    echo [OK] Recompra concluída.
+) else if "%RC%"=="3" (
+    if "%APPLY_FINISHED%"=="1" (
+        echo [AVISO] Recompra concluída com pendências. As alterações confirmadas foram preservadas.
+        echo Gere uma nova revisão na próxima execução para revalidar os contatos pendentes.
+        echo Não reaplique a revisão antiga nem apague o estado ou a auditoria.
+    ) else (
+        echo [AVISO] Há consultas pendentes na preparação. A aplicação não foi iniciada nesta tentativa.
+        echo Consulte a revisão e gere uma nova simulação antes de aplicar.
+    )
+) else if "%RC%"=="4" (
     echo [AVISO] A revisão expirou novamente. Nenhuma aplicação foi iniciada nesta tentativa. Execute a rotina novamente no dia atual.
 ) else if not "%RC%"=="0" (
-    echo [AVISO] Recompra não concluída. Confira a auditoria e o estado antes de retomar.
+    echo [ERRO] Recompra interrompida. Confira a auditoria e preserve o estado antes de retomar.
 )
 if not defined NEXOFLOW_LAUNCHER pause
 exit /b %RC%
