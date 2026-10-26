@@ -27,7 +27,7 @@ Os ícones dos oito programas são incorporados ao próprio PE como recursos `RT
 | `NexoFlow Setup.exe` | `assets/installer.ico` |
 | `NexoFlow Analytics.exe` | `assets/NexoFlow.ico` |
 | `NexoFlow Weni.exe` | `assets/NexoFlow_Weni.ico` |
-| `NexoFlow Recompra.exe` | `assets/NexoFlow_Weni.ico` |
+| `NexoFlow Recompra.exe` | `assets/NexoFlow_Recompra.ico` |
 | `NexoFlow Planilha.exe` | `assets/NexoFlow_Planilha.ico` |
 | `NexoFlow Terminal.exe` | `assets/NexoFlow_Terminal.ico` |
 | `NexoFlow Uninstall.exe` | `assets/uninstaller.ico` |
