@@ -50,6 +50,8 @@ Na rotina diária, use os atalhos Weni, Recompra e Analytics conforme necessári
 
 ## Referências
 
+O código fica em [app/](app/README.md), os comandos Windows em [comandos/](comandos/README.md) e os modelos em [configuracao/](configuracao/README.md). Os guias por assunto estão em [docs/](docs/README.md).
+
 [Weni](docs/README%20WENI.md) · [Planilha](docs/README%20DELIVERY.md) · [Recompra](docs/README%20RECOMPRA.md) · [Terminal](<docs/README TERMINAL.md>) · [Google Sheets](docs/GOOGLE%20SETUP.md) · [Looker Studio](docs/LOOKER%20STUDIO.md)
 
 O projeto é distribuído sem chaves, tokens ou credenciais. Use os seus próprios acessos e mantenha-os privados. Consulte [Segurança](SECURITY.md).
