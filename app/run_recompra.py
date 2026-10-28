@@ -16,6 +16,17 @@ def build_parser():
         description="NexoFlow 1.0 — Recompra FarmaLíder D+25"
     )
     parser.add_argument(
+        "--perfil",
+        choices=("FARMA", "PET"),
+        default="FARMA",
+        help="organização e regras da Recompra (FARMA D+25 ou PET D+30)",
+    )
+    parser.add_argument(
+        "--cleanup-cancelled",
+        action="store_true",
+        help="revisa/aplica somente remoções de cancelados do grupo",
+    )
+    parser.add_argument(
         "--require-complete",
         action="store_true",
         help="interrompe o fluxo se houver consultas de pedido incompletas",
@@ -57,9 +68,7 @@ def build_parser():
         default=FARMALIDER_MAX_WORKERS,
         help="consultas FarmaLíder simultâneas no dry-run; mantém o limitador global da API",
     )
-    parser.add_argument(
-        "--review-out", type=Path, default=Path("logs/recompra_review.json")
-    )
+    parser.add_argument("--review-out", type=Path, default=None)
     parser.add_argument(
         "--require-review", type=Path, help="snapshot que foi revisado antes do apply"
     )
@@ -69,6 +78,17 @@ def build_parser():
 def main(argv=None):
     parser = build_parser()
     args = parser.parse_args(argv)
+    from recompra_profiles import profile_for, profile_settings
+
+    profile = profile_for(args.perfil)
+    state_path = profile.directory / "recompra_state.json"
+    audit_path = profile.directory / "recompra_audit.jsonl"
+    if args.review_out is None:
+        args.review_out = profile.directory / (
+            "recompra_cancelados_review.json"
+            if args.cleanup_cancelled
+            else "recompra_review.json"
+        )
     if (args.apply or args.check_review) and not args.require_review:
         parser.error("--apply e --check-review exigem --require-review.")
     from recompra import (
@@ -84,7 +104,11 @@ def main(argv=None):
 
     if args.diagnose_state:
         try:
-            print(json.dumps(diagnose_state(), ensure_ascii=False, indent=2))
+            print(
+                json.dumps(
+                    diagnose_state(state_path, audit_path), ensure_ascii=False, indent=2
+                )
+            )
             return 0
         except (RuntimeError, OSError, ValueError) as exc:
             print("[ERRO] " + str(exc))
@@ -92,7 +116,14 @@ def main(argv=None):
     review = None
     if args.apply or args.check_review:
         try:
-            review = read_review(args.require_review)
+            if args.cleanup_cancelled:
+                from recompra_cleanup import read_cleanup_review
+
+                review = read_cleanup_review(args.require_review, args.perfil)
+            else:
+                review = read_review(args.require_review)
+                if review["structure"].get("segment", "FARMA") != args.perfil:
+                    raise RuntimeError("A revisão pertence a outro perfil.")
             ensure_review_current(review, now_local())
         except ReviewExpiredError as exc:
             print("[REVISÃO EXPIRADA] " + str(exc))
@@ -117,7 +148,7 @@ def main(argv=None):
     configure_proxy()
     from logging_config import configure_logging
 
-    configure_logging(Path("logs/nexoflow_recompra.log"))
+    configure_logging(profile.directory / "nexoflow_recompra.log")
     import secrets_config as secrets
     from recompra import (
         STATE,
@@ -136,23 +167,86 @@ def main(argv=None):
     weni = None
     farm = None
     try:
-        if not getattr(secrets, "WENI_API_TOKEN", ""):
+        settings = profile_settings(secrets, args.perfil)
+        if not settings.get("WENI_API_TOKEN"):
             raise RuntimeError("Token Weni não configurado.")
         # Uma resposta perdida de POST não autoriza repetir inclusão nem
         # atravessar a virada do dia em uma tentativa interna do cliente.
-        weni = WeniClient(secrets.WENI_API_TOKEN, retry_mutations=False)
-        structure = inspect_structure(weni)
+        weni = WeniClient(str(settings["WENI_API_TOKEN"]), retry_mutations=False)
+        if args.cleanup_cancelled:
+            from recompra_cleanup import inspect_cleanup_structure
+
+            structure = {**inspect_cleanup_structure(weni, args.perfil), "errors": []}
+        else:
+            structure = (
+                inspect_structure(weni)
+                if args.perfil == "FARMA"
+                else inspect_structure(weni, segment="PET")
+            )
         for error in structure["errors"]:
             print("[PENDÊNCIA] " + error)
         print(
-            "[INFO] Diagnóstico somente leitura: grupo, evento +25 dias, campos, fluxo e fuso."
+            f"[INFO] Perfil {args.perfil}: diagnóstico somente leitura de grupo, campos e regras D+{profile.days}."
         )
         if args.check_only:
             return 1 if structure["errors"] else 0
-        farm = _open_farmalider()
+        if structure["errors"]:
+            return 1
+        if args.perfil == "FARMA" and not getattr(secrets, "PERFIS", None):
+            farm = _open_farmalider()
+        else:
+            from farmalider_client import FarmaliderClient
+            from recompra_profiles import PetRecompraClient
+
+            if not settings.get("FARMALIDER_API_ENABLED", True) or not settings.get(
+                "FARMALIDER_API_TOKEN"
+            ):
+                raise RuntimeError("API de pedidos não configurada para este perfil.")
+            client_class = (
+                PetRecompraClient if args.perfil == "PET" else FarmaliderClient
+            )
+            farm = client_class(
+                str(settings["FARMALIDER_API_TOKEN"]),
+                use_hml=bool(settings.get("FARMALIDER_USE_HML", False)),
+            )
         if farm is None:
             raise RuntimeError(
                 "FarmaLíder precisa estar disponível para confirmar a compra."
+            )
+        if args.cleanup_cancelled:
+            from recompra_cleanup import (
+                apply_cleanup_review,
+                make_cleanup_review,
+                write_cleanup_review,
+            )
+
+            if args.apply:
+                result = apply_cleanup_review(
+                    review, weni, farm, state_path=state_path, audit_path=audit_path
+                )
+                partial = bool(
+                    result.get("conflitos") or result.get("consultas_pendentes")
+                )
+                print(
+                    ("[AVISO] " if partial else "[OK] ")
+                    + "Limpeza de cancelados: "
+                    + str(result)
+                )
+                return 3 if partial else 0
+            cleanup_review = make_cleanup_review(weni, farm, args.perfil)
+            write_cleanup_review(cleanup_review, args.review_out)
+            print(
+                "[OK] Simulação sem gravações. Revise "
+                + str(args.review_out.with_suffix(".txt"))
+            )
+            return 0
+        if (
+            args.perfil == "PET"
+            and args.apply
+            and settings.get("RECOMPRA_ENABLED") is not True
+        ):
+            raise RuntimeError(
+                'Ative RECOMPRA_ENABLED em PERFIS["PET"] após configurar o fluxo e o evento D+30.'
             )
         if args.apply:
             pending_report = (
@@ -161,7 +255,15 @@ def main(argv=None):
                 / (args.require_review.stem + "_" + uuid4().hex + "_aplicacao.json")
             )
             result = apply_review(
-                review, weni, farm, pending_report_path=pending_report
+                review,
+                weni,
+                farm,
+                pending_report_path=pending_report,
+                **(
+                    {"state_path": state_path, "audit_path": audit_path}
+                    if args.perfil == "PET"
+                    else {}
+                ),
             )
             partial = bool(result.get("conflitos") or result.get("consultas_pendentes"))
             print(
@@ -179,7 +281,7 @@ def main(argv=None):
                     "revalidar as pendências; não reaplique a revisão antiga."
                 )
             return 3 if partial else 0
-        state = load_state(STATE)
+        state = load_state(state_path if args.perfil == "PET" else STATE)
         now = now_local()
         if args.contact:
             contact = weni.get_contact(uuid=args.contact)
@@ -231,7 +333,7 @@ def main(argv=None):
             + str(args.review_out.with_suffix(".txt"))
         )
         print(
-            "[INFO] Grupo: 0 a 25 dias. Envio: exclusivamente pela campanha Weni no D+25."
+            f"[INFO] {profile.brand}: grupo de 0 a {profile.days} dias. Envio exclusivamente pela campanha Weni D+{profile.days}."
         )
         return 1 if structure["errors"] else 0
     except ReviewExpiredError as exc:

@@ -30,7 +30,11 @@ from analytics import (
     normalize_value,
 )
 from config import FARMALIDER_MAX_WORKERS, WENI_UPDATE_STATE_FILE
-from farmalider_client import FarmaliderError
+from farmalider_client import (
+    FarmaliderAuthError,
+    FarmaliderError,
+    FarmaliderUnavailableError,
+)
 from farmalider_customers import directory_for, prepare_customers
 from farmalider_integration import (
     _positive_id,
@@ -47,7 +51,7 @@ from pedido_utils import (
     serialize_pedido_products,
     serialize_weni_order_list,
 )
-from product_scope import PHARMACY_SCOPE_VERSION, is_animal_product, pharmacy_items
+from product_scope import is_animal_product, pharmacy_items
 from purchase_checks import (
     PENDING_PURCHASE_FIELD,
     contact_pending_purchase_check,
@@ -57,6 +61,7 @@ from purchase_checks import (
     register_pending_purchase_checks,
 )
 from recompra_lock import state_lock
+from recompra_profiles import CANCEL_EXPRESSION, PET_REFUSAL_EXPRESSION, profile_for
 from recompra_review_audit import (
     has_incomplete_query,
     incomplete_query_summary,
@@ -65,9 +70,7 @@ from recompra_review_audit import (
 from weni_client import WeniError
 
 GROUP = "Recompra FarmaLíder"
-PRODUCT_POLICY = (
-    f"JANELA_0_A_25_SEM_RECUSA_PRODUTOS_HUMANOS_{PHARMACY_SCOPE_VERSION}_EXECUCAO_V2"
-)
+PRODUCT_POLICY = profile_for().policy
 OPT_OUT = "Opt-Out Marketing"
 FLOW = "Recompra FarmaLíder D+25"
 TZ = ZoneInfo("America/Belem")
@@ -81,6 +84,10 @@ GUARD_FIELDS = FIELDS | {
     "nome",
     "email",
     "marketing_opt_in",
+    "opt_in_marketing",
+    "pedido_status",
+    "pedido_forma_pagamento",
+    "pedido_id",
     PENDING_PURCHASE_FIELD,
 }
 STATE = Path("logs/recompra_state.json")
@@ -309,6 +316,7 @@ def build_plans(
     def plan_contact(contact):
         if isinstance(contact, _ConflictingPaginationContact):
             return {
+                "segment": structure.get("segment", "FARMA"),
                 "contact_uuid": contact["uuid"],
                 "guard": guard(contact),
                 "fields": {},
@@ -336,7 +344,14 @@ def build_plans(
             return propose(contact, None, [], structure, saved, now=now)
         if not cpf_cadastro_status(get_fields(contact).get("cpf")):
             prepare_customers(farm, expected_contacts)
-        order, items = _resolve_checked_contact(contact, reads, now.isoformat(), saved)
+        try:
+            order, items = _resolve_checked_contact(
+                contact, reads, now.isoformat(), saved
+            )
+        except (FarmaliderAuthError, FarmaliderUnavailableError):
+            raise
+        except (FarmaliderError, RequestException):
+            order, items = {"status_confirmacao": "ERRO_API"}, []
         return propose(contact, order, items, structure, saved, now=now)
 
     prioritized = iter_prioritized_contacts(contacts, pagination_stats=pagination_stats)
@@ -412,20 +427,24 @@ def norm(value):
 
 
 def refused(contact):
-    return norm(get_fields(contact).get("marketing_opt_in")) in {
-        "recusado",
-        "nao",
-        "negado",
-        "inativo",
-        "recusa",
-        "opt-out",
-        "opt out",
-        "false",
-        "0",
-        "cancelado",
-        "nao autorizado",
-        "nao quero receber",
-    }
+    return any(
+        norm(get_fields(contact).get(key))
+        in {
+            "recusado",
+            "nao",
+            "negado",
+            "inativo",
+            "recusa",
+            "opt-out",
+            "opt out",
+            "false",
+            "0",
+            "cancelado",
+            "nao autorizado",
+            "nao quero receber",
+        }
+        for key in ("marketing_opt_in", "opt_in_marketing")
+    )
 
 
 def cancelled_order_reason(order, contact=None):
@@ -436,13 +455,16 @@ def cancelled_order_reason(order, contact=None):
     """
     if isinstance(order, dict):
         if any(
-            normalize_farmalider_order_status_code(order.get(key)) == "3"
+            (
+                normalize_farmalider_order_status_code(order.get(key)) == "3"
+                or norm(order.get(key)) in {"3.0", "cancelada"}
+            )
             for key in ("farmalider_status_pedido", "pedido_status")
         ):
             return "PEDIDO_STATUS_3_CANCELADO"
         if any(
             normalize_farmalider_payment_code(order.get(key)) == "0"
-            or norm(order.get(key)) == "cancelado"
+            or norm(order.get(key)) in {"0.0", "cancelado", "cancelada"}
             for key in ("farmalider_forma_pagamento", "pedido_forma_pagamento")
         ):
             return "PAGAMENTO_0_CANCELADO"
@@ -450,13 +472,16 @@ def cancelled_order_reason(order, contact=None):
             return "PEDIDO_CANCELADO"
     if contact is not None:
         fields = get_fields(contact)
-        if normalize_farmalider_order_status_code(fields.get("pedido_status")) == "3":
+        if normalize_farmalider_order_status_code(
+            fields.get("pedido_status")
+        ) == "3" or norm(fields.get("pedido_status")) in {"3.0", "cancelada"}:
             return "PEDIDO_STATUS_3_CANCELADO_WENI"
         payment = fields.get("pedido_forma_pagamento")
-        if (
-            normalize_farmalider_payment_code(payment) == "0"
-            or norm(payment) == "cancelado"
-        ):
+        if normalize_farmalider_payment_code(payment) == "0" or norm(payment) in {
+            "0.0",
+            "cancelado",
+            "cancelada",
+        }:
             return "PAGAMENTO_0_CANCELADO_WENI"
     return ""
 
@@ -597,7 +622,8 @@ def _resolve_checked_contact(contact, farm, captured_at, saved):
         raise
 
 
-def validate_flow_guards(flow, opt_out_uuid):
+def validate_flow_guards(flow, opt_out_uuid, *, segment="FARMA"):
+    profile = profile_for(segment)
     nodes = {node["uuid"]: node for node in flow.get("nodes", [])}
     if not nodes:
         return False
@@ -643,8 +669,9 @@ def validate_flow_guards(flow, opt_out_uuid):
     expected = [
         ("@contact.groups", "has_group", opt_out_uuid, False),
         ("marketing_opt_in", "has_phrase", "MKT_RECUSADO", False),
-        ("datetime_diff", "has_phrase", "D25_OK", True),
+        ("datetime_diff", "has_phrase", f"D{profile.days}_OK", True),
         ("@fields.pedido_produtos", "has_text", None, True),
+        ("fields.pedido_status", "has_phrase", "CANCELADO", False),
     ]
     for operand, case_type, argument, accepted in expected:
         if not current or current.get("actions"):
@@ -654,10 +681,12 @@ def validate_flow_guards(flow, opt_out_uuid):
         if operand not in expression:
             return False
         expected_expression = (
-            DAY_EXPRESSION
+            DAY_EXPRESSION.replace("25", str(profile.days))
             if operand == "datetime_diff"
-            else REFUSAL_EXPRESSION
+            else (PET_REFUSAL_EXPRESSION if segment == "PET" else REFUSAL_EXPRESSION)
             if operand == "marketing_opt_in"
+            else CANCEL_EXPRESSION
+            if operand == "fields.pedido_status"
             else operand
         )
         if "".join(expression.split()) != "".join(expected_expression.split()):
@@ -687,7 +716,8 @@ def validate_flow_guards(flow, opt_out_uuid):
     )
 
 
-def inspect_structure(weni):
+def inspect_structure(weni, *, segment="FARMA"):
+    profile = profile_for(segment)
     fields = {f.get("key"): f.get("value_type") for f in weni.list_fields()}
     groups = weni.list_groups()
     errors = []
@@ -699,8 +729,8 @@ def inspect_structure(weni):
             return ""
         return matches[0]["uuid"]
 
-    group_uuid, opt_out_uuid = find_group(GROUP), find_group(OPT_OUT)
-    for key in sorted(FIELDS):
+    group_uuid, opt_out_uuid = find_group(profile.group), find_group(OPT_OUT)
+    for key in sorted(FIELDS | {"pedido_status", "pedido_forma_pagamento"}):
         if key not in fields:
             errors.append(f"Campo obrigatório ausente: {key}")
     if fields.get("pedido_data") != "datetime":
@@ -710,11 +740,15 @@ def inspect_structure(weni):
             "pedido_produtos precisa ser campo Texto para o conteúdo da campanha."
         )
     org = weni.get_org()
+    if org.get("name") != f"Delivery {profile.brand}":
+        errors.append(
+            "O token Weni não corresponde à organização do perfil selecionado."
+        )
     if org.get("timezone") != "America/Belem":
         errors.append(
             "Organização Weni precisa usar America/Belem; nenhuma configuração será alterada."
         )
-    campaigns = [c for c in weni.list_campaigns() if c.get("name") == GROUP]
+    campaigns = [c for c in weni.list_campaigns() if c.get("name") == profile.group]
     event = {}
     if len(campaigns) != 1:
         errors.append("Campanha ausente ou ambígua.")
@@ -731,12 +765,12 @@ def inspect_structure(weni):
             event = events[0]
             if (
                 (event.get("relative_to") or {}).get("key") != "pedido_data"
-                or event.get("offset") != 25
+                or event.get("offset") != profile.days
                 or event.get("unit") != "days"
-                or (event.get("flow") or {}).get("name") != FLOW
+                or (event.get("flow") or {}).get("name") != profile.flow
             ):
                 errors.append(
-                    "Evento não corresponde a pedido_data +25 dias e ao fluxo esperado."
+                    f"Evento não corresponde a pedido_data +{profile.days} dias e ao fluxo esperado."
                 )
             definition = weni.get_flow_definition(
                 (event.get("flow") or {}).get("uuid", "")
@@ -749,11 +783,12 @@ def inspect_structure(weni):
             if len(matching) != 1:
                 errors.append("Não foi possível ler o fluxo de recompra.")
             else:
-                if not validate_flow_guards(matching[0], opt_out_uuid):
+                if not validate_flow_guards(matching[0], opt_out_uuid, segment=segment):
                     errors.append(
-                        "Rotas do fluxo não correspondem às proteções auditadas de D+25, recusa, produtos e template; revisar manualmente."
+                        f"Rotas do fluxo não correspondem às proteções auditadas de D+{profile.days}, cancelamento, recusa, produtos e template; revisar manualmente."
                     )
     return {
+        "segment": segment,
         "group_uuid": group_uuid,
         "opt_out_uuid": opt_out_uuid,
         "event_uuid": event.get("uuid", ""),
@@ -820,11 +855,13 @@ def resolve_latest(contact, farm, captured_at, lookup_cache=None, saved=None):
 
 def propose(contact, order, items, structure, saved=None, *, now=None):
     now = (now or now_local()).astimezone(TZ)
+    profile = profile_for(structure.get("segment", "FARMA"))
     saved = saved or {}
     fields = get_fields(contact)
-    in_group = member(contact, structure["group_uuid"], GROUP)
+    in_group = member(contact, structure["group_uuid"], profile.group)
     uid = text(contact.get("uuid"))
     plan = {
+        "segment": profile.segment,
         "contact_uuid": uid,
         "guard": guard(contact),
         "fields": {},
@@ -879,7 +916,7 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
                 plan["action"] = "remove"
             return plan
     dt = business_order_datetime((order or {}).get("data_hora"))
-    eligible_items = pharmacy_items(items)
+    eligible_items = pharmacy_items(items) if profile.segment == "FARMA" else items
     names = [text(item.get("produto_nome")) for item in eligible_items]
     if items and not eligible_items:
         plan["reason"] = "PEDIDO_SOMENTE_PRODUTOS_ANIMAIS"
@@ -966,7 +1003,7 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
                 )
                 if not same:
                     plan["fields"][key] = value
-            event_at = dt + timedelta(days=25)
+            event_at = dt + timedelta(days=profile.days)
             hour = structure.get("delivery_hour", -1)
             if isinstance(hour, int) and 0 <= hour <= 23:
                 event_at = event_at.replace(
@@ -974,11 +1011,13 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
                 )
             plan["event_at"] = event_at.isoformat()
             age_days = (now.date() - dt.date()).days
-            plan["due_today"] = age_days == 25
-            plan["within_window"] = 0 <= age_days <= 25
+            plan["due_today"] = age_days == profile.days
+            plan["within_window"] = 0 <= age_days <= profile.days
             plan["scheduled_future"] = event_at > now
             plan["reason"] = (
-                "JANELA_0_A_25" if plan["within_window"] else "MAIS_DE_25_DIAS"
+                f"JANELA_0_A_{profile.days}"
+                if plan["within_window"]
+                else f"MAIS_DE_{profile.days}_DIAS"
             )
     eligible = valid and plan["within_window"]
     entry = (saved.get("orders") or {}).get(plan["order_id"], {})
@@ -1007,9 +1046,10 @@ def _refresh_plan_deadline(plan, now):
     plan["scheduled_future"] = bool(event_at and event_at > now.astimezone(TZ))
     if plan["action"] in {"add", "replace"} and not plan["scheduled_future"]:
         plan["action"] = "remove" if plan["in_group"] else ""
-        plan["reason"] = "HORARIO_D25_ENCERRADO"
+        days = profile_for(plan.get("segment", "FARMA")).days
+        plan["reason"] = f"HORARIO_D{days}_ENCERRADO"
         plan["warnings"].append(
-            "Horário do evento D+25 encerrado; nenhuma nova inclusão será realizada."
+            f"Horário do evento D+{days} encerrado; nenhuma nova inclusão será realizada."
         )
 
 
@@ -1024,6 +1064,7 @@ def finalize_review(review, now):
 
 
 def audit_plan(plan):
+    profile = profile_for(plan.get("segment", "FARMA"))
     if not plan.get("contact_uuid"):
         raise RuntimeError("Plano sem UUID.")
     if not set(plan["fields"]).issubset(FIELDS):
@@ -1033,11 +1074,16 @@ def audit_plan(plan):
     if plan["action"] in {"add", "replace"} and (
         not plan["within_window"]
         or not plan.get("scheduled_future")
-        or plan["reason"] != "JANELA_0_A_25"
+        or plan["reason"] != f"JANELA_0_A_{profile.days}"
         or not plan["purchase"]
     ):
-        raise RuntimeError("Inclusão sem pedido validado na janela de 0 a 25 dias.")
-    if plan["reason"] == "JANELA_0_A_25" or plan["action"] in {"add", "replace"}:
+        raise RuntimeError(
+            f"Inclusão sem pedido validado na janela de 0 a {profile.days} dias."
+        )
+    if plan["reason"] == f"JANELA_0_A_{profile.days}" or plan["action"] in {
+        "add",
+        "replace",
+    }:
         products = plan.get("campaign_products")
         if (
             not isinstance(products, list)
@@ -1045,7 +1091,7 @@ def audit_plan(plan):
             or any(
                 not isinstance(item, dict)
                 or not text(item.get("produto_nome"))
-                or is_animal_product(item)
+                or (profile.segment == "FARMA" and is_animal_product(item))
                 for item in products
             )
         ):
@@ -1070,12 +1116,14 @@ def make_review(plans, structure, *, now=None, state=None):
     now = now or now_local()
     _validate_review_uuids(plans)
     for plan in plans:
+        if plan.get("segment", "FARMA") != structure.get("segment", "FARMA"):
+            raise RuntimeError("Plano de outro perfil; aplicação bloqueada.")
         audit_plan(plan)
     return {
         "schema": 1,
         "day": now.astimezone(TZ).date().isoformat(),
         "created_at": now.isoformat(),
-        "policy": PRODUCT_POLICY,
+        "policy": profile_for(structure.get("segment", "FARMA")).policy,
         "structure": structure,
         "state_sha256": digest(state or {"schema": 1, "contacts": {}}),
         "plans": plans,
@@ -1085,13 +1133,14 @@ def make_review(plans, structure, *, now=None, state=None):
 def write_review(review, path=REVIEW):
     path = Path(path)
     atomic_json(path, {"review": review, "sha256": digest(review)})
+    profile = profile_for(review["structure"].get("segment", "FARMA"))
     counts = Counter(plan["reason"] for plan in review["plans"])
     lines = [
-        "NexoFlow 1.0 — Revisão de recompra D+25",
+        f"NexoFlow 1.0 — Revisão {profile.brand} D+{profile.days}",
         f"Dia local: {review['day']}",
         f"Dados capturados em: {review['created_at']}",
         f"Horários conferidos ao concluir: {review.get('generated_at', review['created_at'])}",
-        "Política: grupo entre 0 e 25 dias; envio somente D+25, bloqueando recusas e pedidos somente animais. Pedidos mistos exibem apenas produtos humanos; marketing_opt_in não será alterado.",
+        f"Política: grupo entre 0 e {profile.days} dias; envio somente D+{profile.days}. Cancelamentos e recusas bloqueados. Perfil {profile.segment}; consentimento preservado.",
         "Sem disparos, sem alterações de campanha. Horário já passado não cria envio retroativo.",
         "Pendências: " + "; ".join(review["structure"]["errors"]),
         f"Resultados: {dict(counts)}",
@@ -1139,11 +1188,14 @@ def read_review(path):
         not isinstance(review, dict)
         or data.get("sha256") != digest(review)
         or review.get("schema") != 1
-        or review.get("policy") != PRODUCT_POLICY
+        or review.get("policy")
+        != profile_for(review.get("structure", {}).get("segment", "FARMA")).policy
     ):
         raise RuntimeError("Revisão inválida ou alterada. Nenhuma aplicação iniciada.")
     _validate_review_uuids(review["plans"])
     for plan in review["plans"]:
+        if plan.get("segment", "FARMA") != review["structure"].get("segment", "FARMA"):
+            raise RuntimeError("Plano de outro perfil; aplicação bloqueada.")
         audit_plan(plan)
     return review
 
@@ -1264,14 +1316,23 @@ def apply_review(
     pending_report_path=None,
 ):
     """Somente snapshots revisados; conflito ou confirmação incerta bloqueia inclusão."""
-    if review.get("policy") != PRODUCT_POLICY:
+    profile = profile_for(review.get("structure", {}).get("segment", "FARMA"))
+    if profile.segment == "PET" and (
+        Path(state_path) == STATE or Path(audit_path) == AUDIT
+    ):
+        raise RuntimeError("O perfil PET exige estado e auditoria separados.")
+    if review.get("policy") != profile.policy:
         raise RuntimeError(
             "Revisão anterior à política atual. Gere um novo dry-run e revise antes de aplicar."
         )
     _validate_review_uuids(review["plans"])
     now = now_fn()
     ensure_review_current(review, now)
-    structure = inspect_structure(weni)
+    structure = (
+        inspect_structure(weni)
+        if profile.segment == "FARMA"
+        else inspect_structure(weni, segment=profile.segment)
+    )
     ensure_review_current(review, now_fn())
     if structure["errors"]:
         raise RuntimeError("Aplicação bloqueada: " + "; ".join(structure["errors"]))
@@ -1343,6 +1404,8 @@ def apply_review(
                     dict(summary),
                     reads.metrics(),
                 )
+            if reviewed.get("segment", "FARMA") != profile.segment:
+                raise RuntimeError("Plano de outro perfil; aplicação bloqueada.")
             audit_plan(reviewed)
             uid = reviewed["contact_uuid"]
             if has_incomplete_query(reviewed):
@@ -1496,7 +1559,7 @@ def apply_review(
                     stage = "confirmar_remocao"
                     removed_contact = weni.get_contact(uuid=uid)
                     if not removed_contact or member(
-                        removed_contact, structure["group_uuid"], GROUP
+                        removed_contact, structure["group_uuid"], profile.group
                     ):
                         raise RuntimeError(
                             "Remoção do agendamento anterior não foi confirmada."
@@ -1531,12 +1594,12 @@ def apply_review(
                     actual["groups"] = [
                         g
                         for g in actual["groups"]
-                        if g not in {structure["group_uuid"], GROUP}
+                        if g not in {structure["group_uuid"], profile.group}
                     ]
                     expected["groups"] = [
                         g
                         for g in expected["groups"]
-                        if g not in {structure["group_uuid"], GROUP}
+                        if g not in {structure["group_uuid"], profile.group}
                     ]
                     purchase_dt = business_order_datetime(
                         fresh["purchase"]["data_hora"]
@@ -1577,16 +1640,16 @@ def apply_review(
                     if (
                         not 0
                         <= (now_fn().astimezone(TZ).date() - purchase_dt.date()).days
-                        <= 25
+                        <= profile.days
                     ):
                         check_day()
                         raise RuntimeError(
-                            "Janela de 0 a 25 dias terminou durante a aplicação."
+                            f"Janela de 0 a {profile.days} dias terminou durante a aplicação."
                         )
                     event_at = business_order_datetime(fresh["event_at"])
                     if event_at is None or event_at <= now_fn().astimezone(TZ):
                         raise PreAdmissionConflict(
-                            "HORARIO_D25_ENCERRADO: horário do evento passou antes da inclusão."
+                            f"HORARIO_D{profile.days}_ENCERRADO: horário do evento passou antes da inclusão."
                         )
                     check_day()
                     writes_started = True
@@ -1604,13 +1667,13 @@ def apply_review(
                         # Não há nenhum novo POST de inclusão nesta etapa.
                         verified = weni.get_contact(uuid=uid)
                         if verified and member(
-                            verified, structure["group_uuid"], GROUP
+                            verified, structure["group_uuid"], profile.group
                         ):
                             break
                         if attempt < 2:
                             sleep(0.3)
                     if not verified or not member(
-                        verified, structure["group_uuid"], GROUP
+                        verified, structure["group_uuid"], profile.group
                     ):
                         raise RuntimeError(
                             "POST de inclusão sem confirmação de associação na Weni."

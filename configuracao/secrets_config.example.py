@@ -59,3 +59,25 @@ PROXY_DETECTION_TIMEOUT = 1.5
 # Recompra integrada aos launchers Weni, após a carga normal e revisão própria.
 # Habilite somente após corrigir as pendências de campos/campanha e auditar.
 RECOMPRA_ENABLED = False
+
+
+# Recompra por perfil: os demais aplicativos continuam usando a configuração acima.
+# Se PERFIS já existir no arquivo local, atualize esse dicionário em vez de duplicá-lo.
+PERFIS = {
+    "FARMA": {
+        "SEGMENTO": "FARMA",
+        "WENI_API_TOKEN": WENI_API_TOKEN,
+        "FARMALIDER_API_ENABLED": FARMALIDER_API_ENABLED,
+        "FARMALIDER_API_TOKEN": FARMALIDER_API_TOKEN,
+        "FARMALIDER_USE_HML": FARMALIDER_USE_HML,
+    },
+    "PET": {
+        "SEGMENTO": "PET",
+        "WENI_API_TOKEN": "",
+        "FARMALIDER_API_ENABLED": True,
+        "FARMALIDER_API_TOKEN": "",
+        "FARMALIDER_USE_HML": True,
+        # Ative após configurar o fluxo e o evento D+30 usando pedido_data.
+        "RECOMPRA_ENABLED": False,
+    },
+}

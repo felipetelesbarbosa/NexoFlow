@@ -79,6 +79,8 @@ function Invoke-Setup {
 
 function Assert-Installed {
     foreach ($relative in @(
+        "app/recompra_profiles.py", "app/recompra_cleanup.py",
+        "comandos/limpar_cancelados_recompra.bat", "comandos/atualizar_recompra_pets.bat",
         "NexoFlow Noturno.exe",
         "assets\NexoFlow_Noturno.ico",
         "app\run_noturno.py",

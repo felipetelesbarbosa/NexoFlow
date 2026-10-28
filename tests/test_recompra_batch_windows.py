@@ -13,7 +13,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @unittest.skipUnless(os.name == "nt", "Requer CMD e Windows PowerShell")
 class RecompraBatchWindowsTests(unittest.TestCase):
-    def invoke(self, *, apply_code=0, dry_code=0, check_code=0, strict=False):
+    def invoke(
+        self,
+        *,
+        apply_code=0,
+        dry_code=0,
+        check_code=0,
+        strict=False,
+        cleanup=False,
+        profile="FARMA",
+    ):
         with tempfile.TemporaryDirectory(prefix="nexo recompra resultado ") as temp:
             root = Path(temp)
             for folder in ("app", "comandos", "scripts"):
@@ -35,7 +44,7 @@ if '--check-only' in args:
     raise SystemExit(scenario['check'])
 if '--dry-run' in args:
     review = Path(args[args.index('--review-out') + 1])
-    review.parent.mkdir(exist_ok=True)
+    review.parent.mkdir(exist_ok=True, parents=True)
     review.write_text('{}', encoding='utf-8')
     review.with_suffix('.txt').write_text('Revisao sintetica.', encoding='utf-8')
     raise SystemExit(scenario['dry'])
@@ -62,9 +71,24 @@ if '--apply' in args:
                 "exit 0\n",
                 encoding="utf-8-sig",
             )
-            batch = (ROOT / "comandos/atualizar_recompra.bat").read_text(
-                encoding="utf-8"
+            batch_name = (
+                "limpar_cancelados_recompra.bat"
+                if cleanup
+                else "atualizar_recompra.bat"
             )
+            batch = (ROOT / "comandos" / batch_name).read_text(encoding="utf-8")
+            if cleanup:
+                batch = batch.replace(
+                    'choice /c 12 /n /m "Escolha o segmento: "',
+                    f'"{sys.executable}" -c "raise SystemExit({2 if profile == "PET" else 1})"',
+                )
+                confirmation = root / "scripts/confirmar_revisao_weni.ps1"
+                confirmation.write_text(
+                    confirmation.read_text(encoding="utf-8-sig").replace(
+                        "RECOMPRA REVISADA", "LIMPEZA REVISADA"
+                    ),
+                    encoding="utf-8-sig",
+                )
             self.assertIn('".venv\\Scripts\\python.exe"', batch)
             self.assertIn('start "" notepad.exe', batch)
             batch = batch.replace(
@@ -73,9 +97,7 @@ if '--apply' in args:
                 'start "" notepad.exe',
                 f'"{sys.executable}" "{root / "notepad_stub.py"}"',
             )
-            (root / "comandos/atualizar_recompra.bat").write_text(
-                batch, encoding="utf-8"
-            )
+            (root / "comandos" / batch_name).write_text(batch, encoding="utf-8")
             env = {**os.environ, "NEXOFLOW_LAUNCHER": "1"}
             env.pop("NEXOFLOW_FULL_WORKFLOW", None)
             if strict:
@@ -85,7 +107,9 @@ if '--apply' in args:
                     os.environ.get("COMSPEC", "cmd.exe"),
                     "/d",
                     "/c",
-                    "comandos\\atualizar_recompra.bat",
+                    "comandos\\"
+                    + batch_name
+                    + (" PET" if profile == "PET" and not cleanup else ""),
                 ],
                 cwd=root,
                 env=env,
@@ -155,3 +179,34 @@ if '--apply' in args:
         self.assertEqual(code, 1, output)
         self.assertEqual(calls, [["--check-only"]])
         self.assertIn("[ERRO] Recompra interrompida.", output)
+
+    def test_cleanup_real_batch_selects_profile_and_only_applies_reviewed_removals(
+        self,
+    ):
+        for segment in ("FARMA", "PET"):
+            for code in (0, 3, 1):
+                with self.subTest(segment=segment, code=code):
+                    result, output, calls = self.invoke(
+                        cleanup=True, profile=segment, apply_code=code
+                    )
+                    self.assertEqual(result, code, output)
+                    self.assertEqual(len(calls), 2)
+                    self.assertTrue(
+                        all("--cleanup-cancelled" in args for args in calls)
+                    )
+                    self.assertTrue(
+                        all(
+                            args[args.index("--perfil") + 1] == segment
+                            for args in calls
+                        )
+                    )
+                    self.assertIn("--dry-run", calls[0])
+                    self.assertIn("--apply", calls[1])
+
+    def test_pet_batch_uses_pet_paths_and_profile(self):
+        result, output, calls = self.invoke(profile="PET")
+        self.assertEqual(result, 0, output)
+        self.assertTrue(
+            all(args[args.index("--perfil") + 1] == "PET" for args in calls)
+        )
+        self.assertIn("PET", calls[1][calls[1].index("--review-out") + 1])

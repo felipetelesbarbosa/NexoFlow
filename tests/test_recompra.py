@@ -26,6 +26,7 @@ from recompra import (
     validate_flow_guards,
     write_review,
 )
+from recompra_profiles import CANCEL_EXPRESSION
 from weni_client import WeniError
 from weni_update import (
     ContactUpdatePlan,
@@ -699,6 +700,7 @@ class RecompraIntegrationTests(unittest.TestCase):
             (REFUSAL_EXPRESSION, "has_phrase", ["MKT_RECUSADO"], False),
             (DAY_EXPRESSION, "has_phrase", ["D25_OK"], True),
             ("@fields.pedido_produtos", "has_text", [], True),
+            (CANCEL_EXPRESSION, "has_phrase", ["CANCELADO"], False),
         ]
         for index, (operand, kind, args, accept) in enumerate(specs):
             nodes.append(
@@ -734,7 +736,7 @@ class RecompraIntegrationTests(unittest.TestCase):
             )
         nodes.append(
             {
-                "uuid": "4",
+                "uuid": "5",
                 "actions": [
                     {
                         "type": "send_msg",

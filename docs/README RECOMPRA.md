@@ -1,5 +1,20 @@
 # NexoFlow 1.0 — Recompra FarmaLíder D+25
 
+## Limpeza de cancelados e perfil Pets
+
+Execute `comandos/limpar_cancelados_recompra.bat`, escolha **FarmaLíder** ou **Pets Líder**, revise o relatório e confirme com **LIMPEZA REVISADA**. A rotina apenas remove cancelados do grupo existente. Não exclui contatos, não altera campos, não cria campanhas/eventos e não envia mensagens. Falhas isoladas ficam pendentes; uma nova revisão não repete remoções já confirmadas. Feche outras cargas antes da limpeza.
+
+A Recompra faz a prevenção antes de incluir ou trocar a referência do grupo: confirma identidade e pedido na API, valida `pedido_data`, status e pagamento, recusa/Opt-Out, produtos e horário ainda futuro. Status 3/cancelado ou pagamento 0/cancelado bloqueiam a inclusão. Esses campos são relidos antes da gravação. O fluxo Weni mantém uma segunda barreira antes do template.
+
+- **FarmaLíder D+25:** `comandos/atualizar_recompra.bat` ou o executável existente. Somente produtos humanos.
+- **Pets Líder D+30:** `comandos/atualizar_recompra_pets.bat`. Use tokens próprios em `PERFIS["PET"]` e ative ali `RECOMPRA_ENABLED = True` após configurar o evento e importar o fluxo corrigido. Não há requisito de maioridade. O vínculo com a base `clientes/PET` é obrigatório; pedidos individuais sem segmento PET comprovado ficam pendentes.
+
+Os dois perfis usam **`pedido_data`** e os grupos/campanhas existentes. O diagnóstico exige o bloqueio de cancelamento no fluxo; reimporte os fluxos corrigidos e confira para qual fluxo o evento aponta. Não crie outro evento. Os campos `pedido_status` e `pedido_forma_pagamento` também precisam existir.
+
+Revisões, estado e auditoria Pets ficam em `logs/PET/`, separados da FarmaLíder. Não copie estado de uma marca para a outra. O Noturno e os demais aplicativos continuam no perfil FarmaLíder nesta atualização; o BAT Pets é específico da Recompra. Revisões antigas exigem nova simulação.
+
+
+
 Uma nova compra identificada em conversa e ainda ausente na API bloqueia o agendamento com a referência antiga. O campo opcional de Texto `pedido_revisao_pendente` na Weni mantém essa restrição entre instalações. A rotina reconsulta o pedido oficial; a data da conversa nunca substitui a emissão do pedido.
 
 ## Regra operacional vigente

@@ -44,6 +44,8 @@ py-modules = [
   "proxy_config",
   "project_paths",
   "recompra",
+  "recompra_cleanup",
+  "recompra_profiles",
   "run_checkup_tests",
   "run_delivery_tickets",
   "run_diagnostico",

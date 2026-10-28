@@ -1,5 +1,8 @@
 # NexoFlow 1.0 — Changelog
 
+- Recompra: limpeza revisada de cancelados por BAT, sem exclusão de contatos ou envio; prevenção de status/pagamento/data antes da inclusão, incluindo campos alterados após a revisão. Perfil Pets D+30 com tokens, vínculo PET e estado próprios; FarmaLíder permanece D+25. Auditoria dos fluxos exige bloqueio de cancelamento antes do template.
+
+
 - Recompra: resultado parcial após aplicação aparece como concluído com pendências, preservando código 3. Relatório privado por execução separa consultas e conflitos do histórico e informa os campos alterados; nova revisão revalida as pendências sem repetir alterações confirmadas.
 
 - Repositório: mensagens de commit descritivas por área e guias curtos das pastas. A publicação deixa de exigir a mensagem genérica `NexoFlow 1.0`; versão, tag e nomes dos pacotes permanecem iguais.

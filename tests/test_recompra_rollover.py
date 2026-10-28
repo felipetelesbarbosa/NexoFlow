@@ -694,7 +694,7 @@ class RecompraBatchRolloverContractTests(unittest.TestCase):
         )
         renewal = self.batch.split("\n:renovar_revisao\n", 1)[1].split("\n:fim\n", 1)[0]
         self.assertIn("goto :gerar_revisao", renewal)
-        self.assertIn('set "REVIEW_JSON=logs\\recompra_review_renovada_', renewal)
+        self.assertIn('set "REVIEW_JSON=%PROFILE_LOG%\\recompra_review_renovada_', renewal)
         self.assertIn('set "REVIEW_TXT=%REVIEW_JSON:.json=.txt%"', renewal)
 
     def test_only_safe_expiration_branches_to_refresh_and_it_is_bounded(self):
