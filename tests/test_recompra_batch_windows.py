@@ -177,7 +177,7 @@ if '--apply' in args:
     def test_failed_preflight_does_not_open_review_or_apply(self):
         code, output, calls = self.invoke(check_code=1)
         self.assertEqual(code, 1, output)
-        self.assertEqual(calls, [["--check-only"]])
+        self.assertEqual(calls, [["--check-only", "--perfil", "FARMA"]])
         self.assertIn("[ERRO] Recompra interrompida.", output)
 
     def test_cleanup_real_batch_selects_profile_and_only_applies_reviewed_removals(
