@@ -577,3 +577,51 @@ class FreshCancellationTests(unittest.TestCase):
                     self.assertEqual(plan["fields"] == {}, expected == "remove")
                 finally:
                     farm.close()
+
+
+class CanonicalPetMarketingTests(unittest.TestCase):
+    def test_pet_uses_canonical_field_while_farma_keeps_existing_rule(self):
+        c, o, items = fixture(24)
+        c["fields"].update(marketing_opt_in="Não", opt_in_marketing="Sim")
+        self.assertEqual(
+            propose(c, o, items, {**STRUCTURE, "segment": "PET"}, now=NOW)["action"],
+            "add",
+        )
+        self.assertEqual(
+            propose(c, o, items, STRUCTURE, now=NOW)["reason"], "RECUSA_MARKETING"
+        )
+        c["fields"].update(marketing_opt_in="Sim", opt_in_marketing="Não")
+        self.assertEqual(
+            propose(c, o, items, {**STRUCTURE, "segment": "PET"}, now=NOW)["reason"],
+            "RECUSA_MARKETING",
+        )
+        c["fields"]["opt_in_marketing"] = "Sim"
+        c["groups"].append({"uuid": "g-out", "name": "Opt-Out Marketing"})
+        self.assertEqual(
+            propose(c, o, items, {**STRUCTURE, "segment": "PET"}, now=NOW)["reason"],
+            "RECUSA_MARKETING",
+        )
+
+    def test_legacy_pet_flow_remains_accepted_during_migration(self):
+        from recompra_profiles import PET_LEGACY_REFUSAL_EXPRESSION
+
+        f = safe_flow("PET")
+        f["nodes"][1]["router"]["operand"] = PET_LEGACY_REFUSAL_EXPRESSION
+        self.assertTrue(validate_flow_guards(f, "g-out", segment="PET"))
+
+    def test_pet_audit_counts_the_canonical_field(self):
+        from recompra_review_audit import _add_marketing, _marketing_counts
+
+        counts = _marketing_counts()
+        _add_marketing(
+            counts,
+            {
+                "segment": "PET",
+                "guard": {
+                    "fields": {"marketing_opt_in": "Não", "opt_in_marketing": "Sim"}
+                },
+            },
+            "g-out",
+        )
+        self.assertEqual(counts["affirmative_value"], 1)
+        self.assertEqual(counts["refused_value"], 0)

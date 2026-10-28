@@ -123,7 +123,8 @@ def _add_marketing(
     counts: dict[str, int], plan: Mapping[str, Any], opt_out_uuid: str
 ) -> None:
     guard = plan.get("guard") or {}
-    value = _normalized((guard.get("fields") or {}).get("marketing_opt_in"))
+    key = "opt_in_marketing" if plan.get("segment") == "PET" else "marketing_opt_in"
+    value = _normalized((guard.get("fields") or {}).get(key))
     field_class = (
         "empty"
         if not value

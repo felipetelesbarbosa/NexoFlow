@@ -1,5 +1,8 @@
 # NexoFlow 1.0 — Changelog
 
+- Pets/Recompra: consentimento usa somente opt_in_marketing; Sim permite a análise e Não bloqueia. Opt-Out prevalece. Auditoria aceita o fluxo canônico e o legado durante a migração. FarmaLíder permanece inalterada.
+
+
 - Recompra: limpeza revisada de cancelados por BAT, sem exclusão de contatos ou envio; prevenção de status/pagamento/data antes da inclusão, incluindo campos alterados após a revisão. Perfil Pets D+30 com tokens, vínculo PET e estado próprios; FarmaLíder permanece D+25. Auditoria dos fluxos exige bloqueio de cancelamento antes do template.
 
 

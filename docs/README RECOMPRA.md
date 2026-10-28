@@ -1,5 +1,7 @@
 # NexoFlow 1.0 — Recompra FarmaLíder D+25
 
+No perfil Pets, o campo de marketing é `opt_in_marketing`: **Sim** para aceite e **Não** para recusa. O campo antigo `marketing_opt_in` deixa de decidir a elegibilidade Pets. O grupo Opt-Out Marketing continua prevalecendo. Atualize o fluxo de Recompra para gravar “Não” na saída e usar somente o campo mantido. FarmaLíder preserva suas regras atuais.
+
 ## Limpeza de cancelados e perfil Pets
 
 Execute `comandos/limpar_cancelados_recompra.bat`, escolha **FarmaLíder** ou **Pets Líder**, revise o relatório e confirme com **LIMPEZA REVISADA**. A rotina apenas remove cancelados do grupo existente. Não exclui contatos, não altera campos, não cria campanhas/eventos e não envia mensagens. Falhas isoladas ficam pendentes; uma nova revisão não repete remoções já confirmadas. Feche outras cargas antes da limpeza.

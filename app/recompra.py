@@ -61,7 +61,12 @@ from purchase_checks import (
     register_pending_purchase_checks,
 )
 from recompra_lock import state_lock
-from recompra_profiles import CANCEL_EXPRESSION, PET_REFUSAL_EXPRESSION, profile_for
+from recompra_profiles import (
+    CANCEL_EXPRESSION,
+    PET_LEGACY_REFUSAL_EXPRESSION,
+    PET_REFUSAL_EXPRESSION,
+    profile_for,
+)
 from recompra_review_audit import (
     has_incomplete_query,
     incomplete_query_summary,
@@ -338,7 +343,9 @@ def build_plans(
                 "campaign_products": [],
             }
         saved = _saved_with_purchase_check(state, contact["uuid"])
-        if refused(contact) or member(contact, structure["opt_out_uuid"], OPT_OUT):
+        if refused(contact, segment=structure.get("segment", "FARMA")) or member(
+            contact, structure["opt_out_uuid"], OPT_OUT
+        ):
             # Uma recusa já impede a campanha independentemente do pedido;
             # a remoção não precisa consultar ou validar uma compra na API.
             return propose(contact, None, [], structure, saved, now=now)
@@ -426,7 +433,7 @@ def norm(value):
     )
 
 
-def refused(contact):
+def refused(contact, *, segment="FARMA"):
     return any(
         norm(get_fields(contact).get(key))
         in {
@@ -443,7 +450,11 @@ def refused(contact):
             "nao autorizado",
             "nao quero receber",
         }
-        for key in ("marketing_opt_in", "opt_in_marketing")
+        for key in (
+            ("opt_in_marketing",)
+            if segment == "PET"
+            else ("marketing_opt_in", "opt_in_marketing")
+        )
     )
 
 
@@ -668,7 +679,12 @@ def validate_flow_guards(flow, opt_out_uuid, *, segment="FARMA"):
 
     expected = [
         ("@contact.groups", "has_group", opt_out_uuid, False),
-        ("marketing_opt_in", "has_phrase", "MKT_RECUSADO", False),
+        (
+            "opt_in_marketing" if segment == "PET" else "marketing_opt_in",
+            "has_phrase",
+            "MKT_RECUSADO",
+            False,
+        ),
         ("datetime_diff", "has_phrase", f"D{profile.days}_OK", True),
         ("@fields.pedido_produtos", "has_text", None, True),
         ("fields.pedido_status", "has_phrase", "CANCELADO", False),
@@ -684,12 +700,15 @@ def validate_flow_guards(flow, opt_out_uuid, *, segment="FARMA"):
             DAY_EXPRESSION.replace("25", str(profile.days))
             if operand == "datetime_diff"
             else (PET_REFUSAL_EXPRESSION if segment == "PET" else REFUSAL_EXPRESSION)
-            if operand == "marketing_opt_in"
+            if operand in {"marketing_opt_in", "opt_in_marketing"}
             else CANCEL_EXPRESSION
             if operand == "fields.pedido_status"
             else operand
         )
-        if "".join(expression.split()) != "".join(expected_expression.split()):
+        allowed = {"".join(expected_expression.split())}
+        if segment == "PET" and operand == "opt_in_marketing":
+            allowed.add("".join(PET_LEGACY_REFUSAL_EXPRESSION.split()))
+        if "".join(expression.split()) not in allowed:
             return False
         cases = router.get("cases", [])
         if len(cases) != 1:
@@ -885,7 +904,10 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
     # rotulou como confirmados. Não atualizamos campos desse contato.
     blocked = (
         "RECUSA_MARKETING"
-        if (refused(contact) or member(contact, structure["opt_out_uuid"], OPT_OUT))
+        if (
+            refused(contact, segment=profile.segment)
+            or member(contact, structure["opt_out_uuid"], OPT_OUT)
+        )
         else cancelled_order_reason(order, contact)
     )
     if blocked:
@@ -1447,7 +1469,9 @@ def apply_review(
                     }
                 )
                 continue
-            if refused(current) or member(current, structure["opt_out_uuid"], OPT_OUT):
+            if refused(current, segment=profile.segment) or member(
+                current, structure["opt_out_uuid"], OPT_OUT
+            ):
                 order, items = None, []
             else:
                 try:
@@ -1610,7 +1634,7 @@ def apply_review(
                         )
                     if (
                         actual != expected
-                        or refused(latest)
+                        or refused(latest, segment=profile.segment)
                         or member(latest, structure["opt_out_uuid"], OPT_OUT)
                         or cancelled_order_reason(order, latest)
                     ):
@@ -1625,7 +1649,7 @@ def apply_review(
                             for k in ("name", "urns", "groups")
                             if actual[k] != expected[k]
                         ]
-                        if refused(latest) or member(
+                        if refused(latest, segment=profile.segment) or member(
                             latest, structure["opt_out_uuid"], OPT_OUT
                         ):
                             other_diffs.append("opt_out_marketing")
@@ -1679,7 +1703,7 @@ def apply_review(
                             "POST de inclusão sem confirmação de associação na Weni."
                         )
                     if (
-                        refused(verified)
+                        refused(verified, segment=profile.segment)
                         or member(verified, structure["opt_out_uuid"], OPT_OUT)
                         or cancelled_order_reason(order, verified)
                     ):
