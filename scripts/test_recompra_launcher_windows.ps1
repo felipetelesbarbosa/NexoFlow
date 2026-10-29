@@ -1,5 +1,6 @@
 ﻿param([string]$PackageDir = "dist/NexoFlow")
 $ErrorActionPreference = "Stop"
+$env:NEXOFLOW_PERFIL = "FARMA"
 $root = Split-Path -Parent $PSScriptRoot
 $package = Join-Path $root $PackageDir
 $source = Join-Path $package "NexoFlow Recompra.exe"
@@ -23,6 +24,12 @@ try {
     if (-not ((Get-Content -LiteralPath $signal -Raw) -match "BAT_RECOMPRA_CHAMADO")) { throw "BAT nao executado" }
 
     [IO.File]::WriteAllText($bat, "@echo off`r`necho %NEXOFLOW_PERFIL%> `"%~dp0..\perfil.txt`"`r`nexit /b 0`r`n", [Text.Encoding]::ASCII)
+    $inputPath = Join-Path $testDir 'segmento.txt'
+    [IO.File]::WriteAllText($inputPath, "2`r`n", [Text.Encoding]::ASCII)
+    Remove-Item Env:NEXOFLOW_PERFIL -ErrorAction SilentlyContinue
+    $menuProc = Start-Process -FilePath $exe -WorkingDirectory $testDir -NoNewWindow -RedirectStandardInput $inputPath -PassThru -Wait
+    if ($menuProc.ExitCode -ne 0 -or (Get-Content (Join-Path $testDir 'perfil.txt') -Raw).Trim() -cne 'PET') { throw 'Menu de segmento do executável não selecionou PET.' }
+    $env:NEXOFLOW_PERFIL = 'FARMA'
     $proc = Start-Process -FilePath $exe -ArgumentList '--perfil','PET' -WorkingDirectory $testDir -NoNewWindow -PassThru -Wait
     if ($proc.ExitCode -ne 0) { throw 'Launcher Pets falhou.' }
     if ((Get-Content (Join-Path $testDir 'perfil.txt') -Raw).Trim() -cne 'PET') { throw 'O executável não propagou o perfil PET.' }

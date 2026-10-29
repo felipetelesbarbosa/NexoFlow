@@ -12,7 +12,7 @@ Aplicativos para Windows que integram **Weni e a API FarmaLíder nos segmentos F
 | **NexoFlow Weni** | Atualiza cadastros, pedidos e grupos na Weni; exclui duplicados confirmados após revisão. |
 | **NexoFlow Analytics** | Sincroniza a base, acumula o histórico de pedidos e atualiza as tabelas do Google Sheets. |
 | **NexoFlow Planilha** | Revalida exports de contatos e conversas para atualizar Weni ou Analytics. |
-| **NexoFlow Recompra** | Mantém a elegibilidade da Recompra FarmaLíder D+25; os envios ficam na campanha Weni. |
+| **NexoFlow Recompra** | Mantém a elegibilidade da Recompra FarmaLíder D+25 e Pets Líder D+30; os envios ficam na campanha Weni. |
 | **NexoFlow Terminal** | Oferece comandos, consultas e diagnóstico pelo comando `nexo`. |
 
 ## Instalar e configurar
@@ -26,7 +26,7 @@ Requer Windows x64 e Python 3.11 ou superior, 64 bits. O Setup oferece o Python 
 
 ## Escolher o segmento
 
-Os atalhos **NexoFlow Pets Weni/Analytics/Planilha/Recompra/Noturno/Terminal** usam o perfil PET. Os atalhos tradicionais continuam FARMA. Ambos executam a mesma sequência de conexão, auditoria e aplicação; credenciais, planilhas, revisões e estado permanecem separados.
+Abra o mesmo executável Weni, Analytics, Recompra, Planilha ou Noturno e escolha **[1] FarmaLíder** ou **[2] Pets Líder**. No Noturno, depois escolha incremental ou completa. O Terminal também permite selecionar a marca. Ambos executam a mesma sequência de conexão, auditoria e aplicação; credenciais, planilhas, revisões e estado permanecem separados. Para agendamentos, use `--perfil FARMA` ou `--perfil PET`; o Noturno também aceita `--incremental` ou `--full`.
 
 Preencha `PERFIS["FARMA"]` e `PERFIS["PET"]` no arquivo local, incluindo os três IDs de Sheets (Dashboard, Operação e Histórico). A credencial Google pode ser compartilhada; os arquivos de planilhas precisam ser distintos. Confira o mapa `NexoFlow_Arquivos` em cada Dashboard. O NexoFlow recusa destinos Pets divergentes e token de outra organização.
 

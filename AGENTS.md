@@ -38,6 +38,6 @@ Ao atualizar este repositório, mantenha a identificação pública **NexoFlow 1
 
 ## Perfis de segmento
 
-- Atalhos tradicionais usam FARMA; atalhos Pets propagam `NEXOFLOW_PERFIL=PET` antes dos imports. Nunca trocar perfil em um processo que já carregou configurações ou clientes.
+- Os mesmos executáveis operacionais perguntam o segmento antes de executar; o menu propaga `NEXOFLOW_PERFIL` antes dos imports. Agendamentos podem definir --perfil explicitamente. Nunca trocar perfil em um processo que já carregou configurações ou clientes.
 - Preservar os mesmos contratos de auditoria, rota direta/proxy, retentativas e aplicação nos dois perfis. Credenciais Weni, três destinos Sheets, logs, importações, revisões e estado devem permanecer separados. Revisões e manifestos copiados entre segmentos devem ser recusados.
 - FARMA mantém filtro de produtos humanos e D+25. PET exige vínculo oficial PET, preserva seus itens e usa D+30, pedido_data, compra_recente e opt_in_marketing Sim/Não, sem exigência de maioridade. Pagamento da Recompra exige código documentado de 1 a 6; falhas de consulta permanecem pendentes em ambos os perfis.

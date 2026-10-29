@@ -1,6 +1,7 @@
 # NexoFlow 1.0 — Changelog
 
-- Perfis Farma/Pets nos aplicativos operacionais: credenciais e destinos separados, revisão e manifesto vinculados ao segmento, logs/importações próprios e atalhos Pets removidos também na desinstalação. Pets preserva produtos do segmento, usa compra_recente e consentimentos Sim/Não, sem campo de maioridade. Farma permanece D+25; Pets D+30.
+- Noturno: etapas Weni/Analytics aplicadas com resultado parcial preservam pendências e continuam a sequência; o resultado final permanece parcial. Falhas críticas ou revisão não aplicada interrompem a rotina.
+- Perfis Farma/Pets nos aplicativos operacionais: credenciais e destinos separados, revisão e manifesto vinculados ao segmento, logs/importações próprios e seleção do segmento ao abrir os mesmos executáveis. Pets preserva produtos do segmento, usa compra_recente e consentimentos Sim/Não, sem campo de maioridade. Farma permanece D+25; Pets D+30.
 - Recompra: pagamento fora dos códigos 1 a 6 bloqueia admissão em ambos os segmentos; auditoria somente leitura dos integrantes por BAT, com relatórios privados JSON/CSV e falhas isoladas pendentes. API FarmaLíder usa conexão de até 10s e resposta de até 90s por tentativa, com o mesmo controle de rede direta/proxy e retentativas para ambos os perfis.
 
 

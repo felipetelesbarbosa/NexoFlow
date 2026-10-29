@@ -3,6 +3,7 @@
 )
 
 $ErrorActionPreference = "Stop"
+$env:NEXOFLOW_PERFIL = "FARMA"
 $ProgressPreference = "SilentlyContinue"
 
 $InstallDir = "C:\NexoFlow"
@@ -106,12 +107,6 @@ function Assert-Installed {
 
     Assert-True (Test-Path -LiteralPath (Join-Path $InstallDir "importacoes") -PathType Container) "A pasta importacoes não foi instalada."
 
-    foreach ($component in @('Weni', 'Analytics', 'Recompra', 'Planilha', 'Noturno', 'Terminal')) {
-        $petsLink = Join-Path ([Environment]::GetFolderPath('CommonDesktopDirectory')) ("NexoFlow Pets " + $component + '.lnk')
-        Assert-True (Test-Path -LiteralPath $petsLink) "Atalho Pets ausente: $component"
-        $petsShortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($petsLink)
-        Assert-True ($petsShortcut.Arguments -eq '--perfil PET') "Perfil incorreto no atalho Pets: $component"
-    }
     $nightLink = Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) "NexoFlow Noturno.lnk"
     Assert-True (Test-Path -LiteralPath $nightLink) "Atalho Noturno ausente."
     $nightShortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($nightLink)

@@ -4,6 +4,7 @@ package main
 
 import (
     "fmt"
+    "bufio"
     "os"
     "os/exec"
     "path/filepath"
@@ -34,6 +35,7 @@ func findPython(installDir string) (string, []string) {
 }
 
 func main() {
+    if rc := ensureProfile(bufio.NewReader(os.Stdin)); rc != 0 { os.Exit(rc) }
     if os.Getenv("NEXOFLOW_INTERNAL_BUILD_INFO") == "1" {
         fmt.Println(buildMarker)
         fmt.Println(terminalMarker)

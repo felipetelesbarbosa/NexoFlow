@@ -13,7 +13,7 @@ A Recompra faz a prevenção antes de incluir ou trocar a referência do grupo: 
 
 Os dois perfis usam **`pedido_data`** e os grupos/campanhas existentes. O diagnóstico exige o bloqueio de cancelamento no fluxo; reimporte os fluxos corrigidos e confira para qual fluxo o evento aponta. Não crie outro evento. Os campos `pedido_status` e `pedido_forma_pagamento` também precisam existir.
 
-Revisões, estado e auditoria Pets ficam em `logs/PET/`, separados da FarmaLíder. Não copie estado de uma marca para a outra. Os atalhos Pets aplicam o mesmo perfil a Weni, Analytics, Planilha, Recompra, Noturno e Terminal. Os atalhos tradicionais permanecem FarmaLíder. Revisões antigas exigem nova simulação.
+Revisões, estado e auditoria Pets ficam em `logs/PET/`, separados da FarmaLíder. Não copie estado de uma marca para a outra. Os mesmos executáveis Weni, Analytics, Planilha, Recompra, Noturno e Terminal oferecem escolha FarmaLíder/Pets Líder ao abrir. Revisões antigas exigem nova simulação.
 
 
 

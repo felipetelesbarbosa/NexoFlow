@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"os"
 )
 
 func finishNight(code int, output io.Writer, wait func()) int {
@@ -19,7 +20,11 @@ func finishNight(code int, output io.Writer, wait func()) int {
 		fmt.Fprintln(output, "\n[ERRO] NexoFlow Noturno não foi concluído.")
 	}
 	fmt.Fprintf(output, "Código de saída: %d\n", code)
-	fmt.Fprintln(output, `Relatórios da rotina: logs\noturno\ (na pasta do NexoFlow).`)
+	if os.Getenv("NEXOFLOW_PERFIL") == "PET" {
+		fmt.Fprintln(output, `Relatórios da rotina: logs\PET\noturno\ (na pasta do NexoFlow).`)
+	} else {
+		fmt.Fprintln(output, `Relatórios da rotina: logs\noturno\ (na pasta do NexoFlow).`)
+	}
 	fmt.Fprintln(output, "Se a rotina não chegou a iniciar, confira a mensagem de erro acima.")
 	wait()
 	return code

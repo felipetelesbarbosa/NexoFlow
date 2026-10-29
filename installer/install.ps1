@@ -1228,18 +1228,6 @@ try {
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Recompra.lnk') -TargetPath $recompraExe -WorkingDirectory $InstallDir -Description 'Recompra FarmaLider D+25 com revisao obrigatoria' -IconPath $recompraIcon
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Planilha.lnk') -TargetPath $planilhaExe -WorkingDirectory $InstallDir -Description 'Cargas por planilhas para Weni e Analytics, com revisão humana' -IconPath $planilhaIcon
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Terminal.lnk') -TargetPath $terminalExe -WorkingDirectory $InstallDir -Description 'Terminal NexoFlow com ambiente e proxy preparados para a sessao' -IconPath $terminalIcon
-    foreach ($entry in @(
-        @{Name='Noturno'; Exe=$nightExe; Icon=$nightIcon},
-        @{Name='Analytics'; Exe=$appExe; Icon=$appIcon},
-        @{Name='Weni'; Exe=$updateExe; Icon=$updateIcon},
-        @{Name='Recompra'; Exe=$recompraExe; Icon=$recompraIcon},
-        @{Name='Planilha'; Exe=$planilhaExe; Icon=$planilhaIcon},
-        @{Name='Terminal'; Exe=$terminalExe; Icon=$terminalIcon}
-    )) {
-        foreach ($shortcutRoot in @($desktop, $startMenu)) {
-            Create-Shortcut -ShortcutPath (Join-Path $shortcutRoot ("NexoFlow Pets " + $entry.Name + '.lnk')) -TargetPath $entry.Exe -WorkingDirectory $InstallDir -Description ('Pets Líder - ' + $entry.Name) -IconPath $entry.Icon -Arguments '--perfil PET'
-        }
-    }
     New-Item -ItemType Directory -Force -Path (Join-Path $InstallDir 'logs/PET'),(Join-Path $InstallDir 'importacoes/PET') | Out-Null
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'Desinstalar NexoFlow.lnk') -TargetPath $uninstallCmd -WorkingDirectory $InstallDir -Description 'Desinstala o NexoFlow' -IconPath (Join-Path $InstallDir 'assets\uninstaller.ico')
     $documentation = Join-Path $InstallDir 'docs/Documentacao NexoFlow.html'

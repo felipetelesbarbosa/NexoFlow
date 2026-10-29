@@ -1,5 +1,6 @@
 ﻿param([string]$PackageDir = "dist/NexoFlow")
 $ErrorActionPreference = 'Stop'
+$env:NEXOFLOW_PERFIL = 'FARMA'
 $root = Split-Path -Parent $PSScriptRoot
 $temp = Join-Path $env:TEMP ("nexoflow-noturno-" + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force -Path (Join-Path $temp 'app') | Out-Null
@@ -16,7 +17,7 @@ raise SystemExit(int(os.environ.get('NEXOFLOW_SYNTHETIC_EXIT', '0')))
 '@
     [IO.File]::WriteAllText($script, $synthetic, [Text.UTF8Encoding]::new($false))
     function Invoke-NightCase {
-        param([string]$Argument = '', [string]$InputText = '', [string]$ExpectedMode = '', [int]$ExpectedExit = 0)
+        param([string]$Argument = '', [string]$InputText = '', [string]$ExpectedMode = '', [int]$ExpectedExit = 0, [string]$ExpectedLogs = 'logs\noturno\')
         $signal = Join-Path $temp 'modo.txt'
         Remove-Item -LiteralPath $signal -ErrorAction SilentlyContinue
         $info = [Diagnostics.ProcessStartInfo]::new()
@@ -43,7 +44,7 @@ raise SystemExit(int(os.environ.get('NEXOFLOW_SYNTHETIC_EXIT', '0')))
             $output = $process.StandardOutput.ReadToEnd()
             if ($InputText -ne '0') {
                 if (-not $output.Contains("Código de saída: $ExpectedExit")) { throw 'O resumo final não informou o código de saída.' }
-                if (-not $output.Contains('logs\noturno\')) { throw 'O resumo final não informou o caminho dos relatórios.' }
+                if (-not $output.Contains($ExpectedLogs)) { throw 'O resumo final não informou o caminho dos relatórios.' }
                 if ($output.Contains('Pressione ENTER')) { throw 'A execução sem console solicitou uma tecla.' }
             }
             if ($ExpectedMode) {
@@ -52,6 +53,9 @@ raise SystemExit(int(os.environ.get('NEXOFLOW_SYNTHETIC_EXIT', '0')))
             } elseif (Test-Path -LiteralPath $signal) { throw 'Iniciou carga sem selecionar um modo válido.' }
         } finally { $process.Dispose() }
     }
+    Remove-Item Env:NEXOFLOW_PERFIL -ErrorAction SilentlyContinue
+    Invoke-NightCase -InputText "2`n1" -ExpectedMode '--incremental' -ExpectedLogs 'logs\PET\noturno\'
+    $env:NEXOFLOW_PERFIL = 'FARMA'
     Invoke-NightCase -InputText '1' -ExpectedMode '--incremental'
     Invoke-NightCase -InputText '2' -ExpectedMode '--full'
     Invoke-NightCase -InputText '0'

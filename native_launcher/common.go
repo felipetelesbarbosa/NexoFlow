@@ -5,6 +5,8 @@ package main
 import (
     "bufio"
     "fmt"
+    "io"
+    "strings"
     "os"
     "os/exec"
     "path/filepath"
@@ -34,6 +36,32 @@ func init() {
     if profile != "" { os.Setenv("NEXOFLOW_PERFIL", profile) }
     if selected := os.Getenv("NEXOFLOW_PERFIL"); selected != "" { fmt.Println("[INFO] Perfil:", selected) }
 
+}
+
+func selectProfile(input *bufio.Reader, output io.Writer) (string, int) {
+    for {
+        fmt.Fprintln(output, "NexoFlow — escolha o segmento")
+        fmt.Fprintln(output, "[1] FarmaLíder")
+        fmt.Fprintln(output, "[2] Pets Líder")
+        fmt.Fprint(output, "Escolha: ")
+        line, err := input.ReadString('\n')
+        if err != nil { return "", 2 }
+        switch strings.TrimSpace(line) {
+        case "1": return "FARMA", 0
+        case "2": return "PET", 0
+        default: fmt.Fprintln(output, "[AVISO] Opção inválida. Tente novamente.")
+        }
+    }
+}
+
+func ensureProfile(input *bufio.Reader) int {
+    existing := os.Getenv("NEXOFLOW_PERFIL")
+    if existing == "FARMA" || existing == "PET" { return 0 }
+    if existing != "" { fmt.Println("[ERRO] Perfil inválido."); return 2 }
+    if os.Getenv("NEXOFLOW_INTERNAL_BUILD_INFO") == "1" { os.Setenv("NEXOFLOW_PERFIL", "FARMA"); return 0 }
+    profile, rc := selectProfile(input, os.Stdout)
+    if rc == 0 { os.Setenv("NEXOFLOW_PERFIL", profile); fmt.Println("[INFO] Perfil:", profile) }
+    return rc
 }
 
 func profileArguments(args []string) ([]string, string, error) {
@@ -109,6 +137,7 @@ func runChild(name string, args ...string) int {
 }
 
 func prepareLauncher() (string, func(), int) {
+    if rc := ensureProfile(bufio.NewReader(os.Stdin)); rc != 0 { return "", func(){}, rc }
     if os.Getenv("NEXOFLOW_INTERNAL_BUILD_INFO") == "1" {
         fmt.Println(buildMarker)
     }

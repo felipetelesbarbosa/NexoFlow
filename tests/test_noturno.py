@@ -87,7 +87,7 @@ class NoturnoTests(unittest.TestCase):
     def test_failure_or_partial_stops_every_following_stage(self):
         for stage in range(1, 12):
             for failure in (1, 3):
-                if stage == 10 and failure == 3:
+                if stage in (5, 6, 10) and failure == 3:
                     continue  # Pendências isoladas da Recompra permitem o Analytics final.
                 with (
                     self.subTest(stage=stage, failure=failure),
@@ -251,6 +251,14 @@ class NoturnoTests(unittest.TestCase):
             self.assertEqual(
                 json.loads(report.read_text(encoding="utf-8"))["status"], "interrompido"
             )
+
+    def test_partial_weni_and_analytics_preserve_confirmed_work_and_continue(self):
+        for stage in (5, 6):
+            with self.subTest(stage=stage), tempfile.TemporaryDirectory() as temp:
+                code, calls, result = self.run_flow(Path(temp), {stage: 3})
+                self.assertEqual(code, 3)
+                self.assertEqual(len(calls), 11)
+                self.assertTrue(result["fluxo_completo"])
 
 
 if __name__ == "__main__":

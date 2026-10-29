@@ -58,6 +58,7 @@ func runNight(mode string) int {
 
 func main() {
 	input := bufio.NewReader(os.Stdin)
+	if rc := ensureProfile(input); rc != 0 { os.Exit(rc) }
 	mode, rc := selectNightMode(os.Args[1:], input)
 	if rc == 0 && mode == "" {
 		return

@@ -43,7 +43,9 @@ class GroupAuditTests(unittest.TestCase):
                 result["classificacoes"],
                 {"DENTRO_DA_REGRA": 1, "REVISAR": 2, "CONSULTA_PENDENTE": 1},
             )
-            self.assertEqual(len(json.loads(path.read_text())["contacts"]), 4)
+            self.assertEqual(
+                len(json.loads(path.read_text(encoding="utf-8"))["contacts"]), 4
+            )
             self.assertTrue(path.with_suffix(".csv").exists())
             self.assertTrue(path.with_suffix(".xlsx").exists())
         w.update_contact_fields.assert_not_called()

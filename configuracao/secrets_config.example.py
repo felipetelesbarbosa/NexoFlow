@@ -61,7 +61,7 @@ PROXY_DETECTION_TIMEOUT = 1.5
 RECOMPRA_ENABLED = False
 
 
-# Perfis dos aplicativos: atalhos padrão usam FARMA; atalhos Pets usam PET.
+# Perfis dos aplicativos: escolha FARMA ou PET ao abrir o executável.
 # Se PERFIS já existir no arquivo local, atualize esse dicionário em vez de duplicá-lo.
 PERFIS = {
     "FARMA": {

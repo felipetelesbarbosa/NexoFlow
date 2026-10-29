@@ -92,6 +92,7 @@ def execute(root: Path = ROOT, *, runner=run_step, full: bool = False) -> int:
         return result
 
     def run_flow() -> int:
+        partial_load = False
         for name, arguments in (
             ("Check-up", ["app/run_checkup_tests.py"]),
             ("Consistência", ["app/auditar_consistencia.py"]),
@@ -120,7 +121,15 @@ def execute(root: Path = ROOT, *, runner=run_step, full: bool = False) -> int:
             code = step(
                 name, arguments, full_sync=full and arguments == ["app/run_main.py"]
             )
-            if code:
+            if code == 3 and (
+                arguments[0] == "app/run_main.py" or "--apply" in arguments
+            ):
+                partial_load = True
+                print(
+                    "[AVISO] Etapa aplicada com pendências isoladas; seguindo com os dados confirmados.",
+                    flush=True,
+                )
+            elif code:
                 return code
         # Uma revisão que atravessa a meia-noite precisa ser gerada novamente;
         # nunca remover os bloqueios de data ou repetir uma aplicação incerta.
@@ -173,7 +182,7 @@ def execute(root: Path = ROOT, *, runner=run_step, full: bool = False) -> int:
             "Analytics: refletir alterações da Recompra", ["app/run_main.py"]
         )
         summary["fluxo_completo"] = analytics_code == 0
-        return analytics_code or (3 if partial_recompra else 0)
+        return analytics_code or (3 if partial_recompra or partial_load else 0)
 
     code = 1
     try:
