@@ -9,7 +9,7 @@ import (
     "runtime"
 )
 
-const iconMarker = "NexoFlowWeniIconRevision=1.0"
+const iconMarker = "NexoFlowWeniIconRevision=1.5"
 
 func main() {
     if os.Getenv("NEXOFLOW_INTERNAL_BUILD_INFO") == "1" { fmt.Println(iconMarker) }

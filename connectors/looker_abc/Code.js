@@ -1,4 +1,4 @@
-/* NexoFlow 1.0. Conector privado, somente leitura, executado no Google Apps Script. */
+/* NexoFlow 1.5. Conector privado, somente leitura, executado no Google Apps Script. */
 function getAuthType() {
   var cc = DataStudioApp.createCommunityConnector();
   return cc.newAuthTypeResponse().setAuthType(cc.AuthType.NONE).build();

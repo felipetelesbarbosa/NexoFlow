@@ -37,6 +37,7 @@ from config import (
 )
 from network_diagnostics import classify_network_failure
 from private_diagnostics import append_private_failure
+from versioning import CURRENT_VERSION
 
 
 class FarmaliderError(RuntimeError):
@@ -149,7 +150,7 @@ class FarmaliderClient:
         session.headers.update(
             {
                 "Accept": "application/json",
-                "User-Agent": "GrupoLider-NexoFlow/1.0",
+                "User-Agent": f"GrupoLider-NexoFlow/{CURRENT_VERSION}",
             }
         )
         # Segurança: estes endpoints não usam Authorization/Bearer.

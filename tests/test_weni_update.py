@@ -2515,4 +2515,4 @@ class GoogleAdsWeniUpdateTests(unittest.TestCase):
         self.assertNotIn("ultimo_anuncio_canal_destino", plan.fields)
 
 
-# NexoFlow 1.0
+# NexoFlow 1.5

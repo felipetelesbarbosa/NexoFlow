@@ -1,4 +1,4 @@
-# NexoFlow 1.0 — VS Code
+# NexoFlow 1.5 — VS Code
 
 Documentação de desenvolvimento e manutenção do **NexoFlow**.
 
@@ -160,7 +160,7 @@ O mutex `Local\NexoFlowOperationLock` impede Analytics, NexoFlow Weni, instalaç
 
 A rotina de write-back fica separada da sincronização analítica. `app/contact_enrichment.py` extrai apenas evidências conservadoras; `app/weni_update.py` monta e audita planos; `app/weni_client.py` concentra os endpoints. Nenhum novo campo pode ser escrito sem entrar em `ALLOWED_WRITE_FIELDS` e nos testes de auditoria.
 
-Antes de publicar o NexoFlow 1.0, valide especialmente que `audit_plans(plans)` aparece antes de `update_contact_fields`, que o checkpoint vem depois das escritas e que o dry-run não executa POST.
+Antes de publicar o NexoFlow 1.5, valide especialmente que `audit_plans(plans)` aparece antes de `update_contact_fields`, que o checkpoint vem depois das escritas e que o dry-run não executa POST.
 
 Mudanças em pedidos devem manter o enum de status -2 a 4, os nomes oficiais aceitos pelos normalizadores e a separação entre dados brutos da API e status efetivo na Weni/BI. Verifique a rechecagem de -2, -1, 0, 1 e 4 e a elegibilidade de vendas e `ultima_compra` para os status efetivos -2, -1, 0, 4, 1 e 2. Entre os estados documentados, somente 3 exclui a venda; cancelamento explícito ou pagamento 0/`_` força esse status. Toda nova carga deve consultar novamente os pedidos atuais no seu escopo. Para componentes do Looker baseados em `BI_Pedidos`, use `venda_valida = 1`; em `BI_Delivery_Pedidos`, use `venda_realizada = 1`. O contrato detalhado está em [docs/PEDIDOS.md](PEDIDOS.md).
 

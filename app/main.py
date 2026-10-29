@@ -70,6 +70,7 @@ from pedido_utils import PENDING_ITEMS_STATUS, business_order_datetime
 from product_scope import PHARMACY_SCOPE_VERSION
 from project_paths import load_private_settings
 from task_progress import TaskProgress, request_progress
+from versioning import CURRENT_VERSION as APP_VERSION
 from weni_client import WeniClient
 
 secrets = load_private_settings()
@@ -81,7 +82,7 @@ ClienteResult = tuple[str, str, str]
 TOKEN_PLACEHOLDER = "COLE_SEU_TOKEN_WENI_AQUI"
 FARMALIDER_TOKEN_PLACEHOLDER = "COLE_SEU_TOKEN_FARMALIDER_AQUI"
 SHEET_PLACEHOLDER = "COLE_O_ID_DA_PLANILHA_GOOGLE_AQUI"
-APP_VERSION = "1.0"
+
 PARTIAL_SYNC_EXIT_CODE = 3
 ORDER_API_FAILURES = frozenset(
     {
@@ -249,7 +250,7 @@ def split_contacts(
         if contact_has_cpf(contact):
             with_cpf.append(contact)
 
-    # Desde o NexoFlow 1.0 o Analytics preserva todos os contatos retornados pela Weni.
+    # Desde o NexoFlow 1.5 o Analytics preserva todos os contatos retornados pela Weni.
     # Consulta CPFs válidos primeiro e depois os demais informados. Pedidos podem ser
     # recuperados para estes contatos mesmo quando ultimo_pedido está vazio.
     return relevant, with_cpf, list(contacts)
@@ -1638,4 +1639,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-# NexoFlow 1.0
+# NexoFlow 1.5

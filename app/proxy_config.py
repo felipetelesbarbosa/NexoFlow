@@ -13,6 +13,7 @@ from urllib.error import HTTPError
 from urllib.parse import quote
 
 from project_paths import load_private_settings
+from versioning import CURRENT_VERSION
 
 secrets = load_private_settings()
 
@@ -133,7 +134,7 @@ def _direct_internet_available(timeout: float) -> bool:
         request = urllib.request.Request(
             DIRECT_TEST_URL,
             method="HEAD",
-            headers={"User-Agent": "NexoFlow/1.0"},
+            headers={"User-Agent": f"NexoFlow/{CURRENT_VERSION}"},
         )
         with opener.open(request, timeout=max(timeout, 3.0)) as response:
             return 200 <= getattr(response, "status", 200) < 500
@@ -163,7 +164,7 @@ def _direct_farmalider_available(timeout: float) -> bool:
         request = urllib.request.Request(
             FARMALIDER_API_BASE_URL_EXTERNAL,
             method="HEAD",
-            headers={"User-Agent": "NexoFlow/1.0"},
+            headers={"User-Agent": f"NexoFlow/{CURRENT_VERSION}"},
         )
         with opener.open(request, timeout=max(timeout, 3.0)) as response:
             return 200 <= response.status < 300

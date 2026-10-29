@@ -1,4 +1,4 @@
-# NexoFlow 1.0 — Arquivos Google Sheets separados
+# NexoFlow 1.5 — Arquivos Google Sheets separados
 
 | Arquivo | Abas |
 |---|---|

@@ -14,12 +14,12 @@ from typing import Any
 
 from farmalider_client import FarmaliderClient
 from runtime_profile import scoped_path
+from versioning import CURRENT_VERSION as VERSION
 from weni_client import WeniClient
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 
 LOG_DIR = BASE_DIR / scoped_path("logs")
-VERSION = "1.0"
 
 
 def _line(char: str = "=", width: int = 58) -> str:

@@ -1,4 +1,4 @@
-# Documentação do NexoFlow 1.0
+# Documentação do NexoFlow 1.5
 
 O NexoFlow atende **FarmaLíder e Pets Líder**, com dados separados. Confira [segmentos, campos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 
@@ -26,7 +26,7 @@ Comece pela [instalação](README%20INSTALACAO.md) e pelo [guia de operação](D
 
 O código fica em `app/`, as rotinas em `comandos/` e os modelos em `configuracao/`. Instalação, empacotamento e validação ficam em `installer/`, `scripts/` e `tests/`.
 
-[Proxy e rede](README%20PROXY.md) · [Antivírus](ANTIVIRUS%20E%20CONFIANCA.md) · [Ambiente de desenvolvimento](README%20VSCODE.md) · [Testes](../tests/README.md) · [Histórico de mudanças](../CHANGELOG.md)
+[Proxy e rede](README%20PROXY.md) · [Antivírus](ANTIVIRUS%20E%20CONFIANCA.md) · [Ambiente de desenvolvimento](README%20VSCODE.md) · [Testes](../tests/README.md) · [Histórico de mudanças](../CHANGELOG.md) · [Versionamento](VERSIONAMENTO.md)
 
 Os guias de [webhook Weni](WENI%20WEBHOOK.md), [webhook de pedidos](WEBHOOK%20PEDIDOS%20FUTURO.md) e [Meta Ads](META%20FUTURO.md) descrevem recursos opcionais ou futuros.
 

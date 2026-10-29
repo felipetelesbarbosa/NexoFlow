@@ -17,7 +17,7 @@ import (
 
 const (
     mutexName   = `Local\NexoFlowOperationLock`
-    buildMarker = "NexoFlowNativeLauncher=1.0"
+    buildMarker = "NexoFlowNativeLauncher=1.5"
 )
 
 var (

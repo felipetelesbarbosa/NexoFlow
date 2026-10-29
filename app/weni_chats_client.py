@@ -10,6 +10,8 @@ from uuid import UUID
 
 import requests
 
+from versioning import CURRENT_VERSION
+
 
 class WeniChatsError(RuntimeError):
     pass
@@ -42,7 +44,7 @@ class WeniChatsClient:
             {
                 "Authorization": "Bearer " + token.strip(),
                 "Accept": "application/json",
-                "User-Agent": "NexoFlow/1.0",
+                "User-Agent": f"NexoFlow/{CURRENT_VERSION}",
             }
         )
 

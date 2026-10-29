@@ -789,7 +789,7 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn(b"NexoFlowOperationLock", data)
         self.assertIn(b'requestedExecutionLevel level="asInvoker"', data)
         self.assertIn(b".rsrc", data)
-        self.assertIn(b"NexoFlowNativeLauncher=1.0", data)
+        self.assertIn(b"NexoFlowNativeLauncher=1.5", data)
         self.assertIn(b"CreateProcessW", data)
         self.assertNotIn(b"\x00system\x00", data)
         self.assertNotIn(b"powershell.exe", data)
@@ -830,8 +830,8 @@ class CurrentIntegrationTests(unittest.TestCase):
         if optional_exe.exists():
             data = optional_exe.read_bytes()
             self.assertTrue(data.startswith(b"MZ"))
-            self.assertIn(b"NexoFlowNativeLauncher=1.0", data)
-            self.assertIn("1.0.0.0".encode("utf-16le"), data)
+            self.assertIn(b"NexoFlowNativeLauncher=1.5", data)
+            self.assertIn("1.5.0.0".encode("utf-16le"), data)
 
     def test_installer_repairs_and_validates_required_components(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -1008,7 +1008,7 @@ class CurrentIntegrationTests(unittest.TestCase):
     def test_update_weni_executable_has_icon_revision_marker(self) -> None:
         root = Path(__file__).resolve().parents[1]
         data = (launcher_path(root, "NexoFlow Weni.exe")).read_bytes()
-        self.assertIn(b"NexoFlowWeniIconRevision=1.0", data)
+        self.assertIn(b"NexoFlowWeniIconRevision=1.5", data)
 
     def test_installer_refreshes_windows_icon_cache(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -1063,7 +1063,7 @@ class CurrentIntegrationTests(unittest.TestCase):
         runner = (root / "app/run_terminal.py").read_text(encoding="utf-8")
         self.assertTrue(terminal.startswith(b"MZ"))
         self.assertIn(b"app/run_terminal.py", terminal)
-        self.assertIn(b"NexoFlowTerminalIconRevision=1.0", terminal)
+        self.assertIn(b"NexoFlowTerminalIconRevision=1.5", terminal)
         self.assertIn(b'requestedExecutionLevel level="asInvoker"', terminal)
         self.assertIn("configure_proxy()", runner)
         self.assertIn("HTTP_PROXY", runner)
@@ -1094,13 +1094,13 @@ class CurrentIntegrationTests(unittest.TestCase):
             "NexoFlow Terminal.exe",
         ):
             data = launcher_path(root, name).read_bytes()
-            self.assertIn(b"NexoFlowNativeLauncher=1.0", data)
+            self.assertIn(b"NexoFlowNativeLauncher=1.5", data)
             self.assertIn(b"CreateProcessW", data)
             self.assertNotIn(b"\x00system\x00", data)
         optional_exe = launcher_path(root, "NexoFlow Uninstall.exe")
         if optional_exe.exists():
             data = optional_exe.read_bytes()
-            self.assertIn(b"NexoFlowNativeLauncher=1.0", data)
+            self.assertIn(b"NexoFlowNativeLauncher=1.5", data)
             self.assertNotIn(b"NexoFlowNativeLauncher=6.", data)
         self.assertTrue((root / "installer" / "uninstall.ps1").exists())
         self.assertTrue((root / "desinstalar_nexoflow.cmd").exists())
@@ -1119,7 +1119,7 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn("NexoFlow Console.lnk", uninstall)
         self.assertIn("NexoFlow - Update Weni.lnk", install)
         self.assertIn("NexoFlow Console.lnk", install)
-        self.assertIn("$AppVersion = '1.0'", install)
+        self.assertIn("$AppVersion = '1.5'", install)
         self.assertIn("${exePath}: $($_.Exception.Message)", install)
         self.assertNotIn("$exePath: $($_.Exception.Message)", install)
 
@@ -1144,7 +1144,7 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn("app/run_checkup_tests.py", batch)
         self.assertIn("logging.disable(logging.CRITICAL)", runner)
         self.assertIn('warnings.simplefilter("ignore")', runner)
-        self.assertIn("TextTestRunner(verbosity=0)", runner)
+        self.assertIn("TextTestRunner(verbosity=0, buffer=True)", runner)
         self.assertIn("result.wasSuccessful()", runner)
 
     def test_batch_files_are_cmd_compatible_without_utf8_bom(self) -> None:
@@ -1173,4 +1173,4 @@ class CurrentIntegrationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-# NexoFlow 1.0
+# NexoFlow 1.5

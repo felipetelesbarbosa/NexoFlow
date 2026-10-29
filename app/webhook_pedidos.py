@@ -11,13 +11,14 @@ from analytics import build_sales_metrics, parse_ultimo_pedido_raw
 from google_sheets import GoogleSheetsStore
 from pharmacy_scope import plan_pharmacy_scope
 from project_paths import load_private_settings
+from versioning import CURRENT_VERSION
 from webhook_runtime import WEBHOOK_WRITE_LOCK, shared_secret_matches
 
 secrets = load_private_settings()
 
 app = FastAPI(
     title="NexoFlow - Pedidos",
-    version="1.0",
+    version=CURRENT_VERSION,
 )
 
 

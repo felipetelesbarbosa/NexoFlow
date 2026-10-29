@@ -42,15 +42,19 @@ class WeniReviewBatchWindowsTests(unittest.TestCase):
             )
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertIn(b"SYNTHETIC_WENI_LAUNCH_OK", completed.stdout)
-            self.assertIn(b"NexoFlowWeniIconRevision=1.0", completed.stdout)
+            self.assertIn(b"NexoFlowWeniIconRevision=1.5", completed.stdout)
 
     def _wait_until(
         self, predicate, process, output_path: Path, description: str
     ) -> None:
         deadline = time.monotonic() + 15
         while time.monotonic() < deadline:
-            if predicate():
-                return
+            try:
+                if predicate():
+                    return
+            except (FileNotFoundError, PermissionError):
+                # Os sinais e o log podem ficar brevemente bloqueados pelo Windows.
+                pass
             if process.poll() is not None:
                 self.fail(
                     f"CMD exited before {description}: {process.returncode}\n"
@@ -60,6 +64,51 @@ class WeniReviewBatchWindowsTests(unittest.TestCase):
         self.fail(
             f"Timed out waiting for {description}\n{output_path.read_text(encoding='utf-8', errors='replace')}"
         )
+
+    def _publish_locked_decision(self, directory, process, output_path):
+        """Publica o sinal com um handle que impede leitura, como no erro relatado."""
+        import ctypes
+        from ctypes import wintypes
+
+        pending = directory / "review_decision.pending"
+        pending.write_text("0", encoding="ascii")
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.CreateFileW.argtypes = [
+            wintypes.LPCWSTR,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.LPVOID,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.HANDLE,
+        ]
+        kernel.CreateFileW.restype = wintypes.HANDLE
+        kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+        kernel.CloseHandle.restype = wintypes.BOOL
+        invalid = ctypes.c_void_p(-1).value
+        deadline = time.monotonic() + 3
+        while True:
+            # FILE_SHARE_DELETE permite publicar por rename; a leitura segue bloqueada.
+            handle = kernel.CreateFileW(
+                str(pending), 0x80000000, 4, None, 3, 0x80, None
+            )
+            if handle != invalid:
+                break
+            error = ctypes.get_last_error()
+            if error not in (32, 33) or time.monotonic() >= deadline:
+                self.fail(f"Não foi possível criar o bloqueio de teste: Win32={error}")
+            time.sleep(0.05)
+        try:
+            os.replace(pending, directory / "review_decision.txt")
+            self._wait_until(
+                lambda: (directory / "review_read_blocked").exists(),
+                process,
+                output_path,
+                "permission error reproduced by the review reader",
+            )
+            self.assertFalse((directory / "apply.json").exists())
+        finally:
+            kernel.CloseHandle(handle)
 
     def _close_process(self, process) -> None:
         if process.poll() is None:
@@ -122,11 +171,23 @@ from pathlib import Path
 Path('review_waiting.json').write_text(json.dumps(sys.argv[1:]), encoding='utf-8')
 deadline = time.monotonic() + 30
 decision = Path('review_decision.txt')
-while not decision.exists():
-    if time.monotonic() >= deadline:
+while time.monotonic() < deadline:
+    try:
+        value = decision.read_text(encoding='ascii').strip()
+    except FileNotFoundError:
+        value = ''
+    except PermissionError:
+        try:
+            Path('review_read_blocked').touch()
+        except PermissionError:
+            pass
+        value = ''
+    if value in {'0', '2', '3'}:
+        raise SystemExit(int(value))
+    if value:
         raise SystemExit(90)
     time.sleep(0.05)
-raise SystemExit(int(decision.read_text(encoding='ascii')))
+raise SystemExit(90)
 """,
             encoding="utf-8",
         )
@@ -570,9 +631,7 @@ raise SystemExit(int(decision.read_text(encoding='ascii')))
                             directory / "logs" / "weni_update_review.txt",
                         )
                         self.assertFalse((directory / "apply.json").exists())
-                        pending = directory / "review_decision.pending"
-                        pending.write_text("0")
-                        os.replace(pending, directory / "review_decision.txt")
+                        self._publish_locked_decision(directory, process, output_path)
                         expected = (
                             "A aplicação foi interrompida"
                             if apply_code
@@ -743,6 +802,53 @@ class WeniReviewDialogWindowsTests(unittest.TestCase):
 
     def test_dialog_exception_fails_closed(self) -> None:
         self._run_dialog("throw 'Synthetic dialog failure'", 3)
+
+
+class ReviewGateFixtureReadTests(unittest.TestCase):
+    """Exercise the actual generated gate script, including transient EDR locks."""
+
+    def invoke(self, reads):
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            WeniReviewBatchWindowsTests()._fixture(directory)
+            script = (directory / "review_gate_stub.py").read_text(encoding="utf-8")
+        with (
+            patch.object(Path, "write_text", return_value=0),
+            patch.object(Path, "touch"),
+            patch.object(Path, "exists", return_value=True),
+            patch.object(Path, "read_text", side_effect=reads) as read,
+            patch("time.monotonic", side_effect=range(100)),
+            patch("time.sleep"),
+        ):
+            with self.assertRaises(SystemExit) as raised:
+                exec(
+                    compile(script, "review_gate_stub.py", "exec"),
+                    {"__name__": "__main__"},
+                )
+            return raised.exception.code, read.call_count
+
+    def test_temporary_permission_error_does_not_cancel_review(self):
+        for decision in ("0", "2", "3"):
+            with self.subTest(decision=decision):
+                code, count = self.invoke(
+                    [PermissionError(13, "synthetic lock"), decision]
+                )
+                self.assertEqual(code, int(decision))
+                self.assertEqual(count, 2)
+
+    def test_absent_or_empty_signal_waits_without_authorizing_apply(self):
+        code, count = self.invoke([FileNotFoundError(), "", "2"])
+        self.assertEqual(code, 2)
+        self.assertEqual(count, 3)
+
+    def test_persistent_lock_and_invalid_decision_fail_closed(self):
+        for reads in (PermissionError(13, "persistent synthetic lock"), ["invalid"]):
+            with self.subTest(reads=type(reads).__name__):
+                code, count = self.invoke(reads)
+                self.assertEqual(code, 90)
+                self.assertLessEqual(count, 30)
 
 
 if __name__ == "__main__":

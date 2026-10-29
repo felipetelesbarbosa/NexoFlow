@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
 $AppName = 'NexoFlow'
-$AppVersion = '1.0'
+$AppVersion = '1.5'
 $Publisher = 'Grupo Lider'
 $InstallDir = 'C:\NexoFlow'
 $DataDir = 'C:\NexoFlow Data'
@@ -1353,13 +1353,13 @@ try {
     Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Noturno.lnk') -TargetPath $nightExe -WorkingDirectory $InstallDir -Description 'Weni, Analytics e Recompra automáticos, sem confirmação humana' -IconPath $nightIcon
     Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Analytics.lnk') -TargetPath $appExe -WorkingDirectory $InstallDir -Description 'Valida o ambiente e executa uma sincronização incremental do NexoFlow' -IconPath $appIcon
     Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Weni.lnk') -TargetPath $updateExe -WorkingDirectory $InstallDir -Description 'Audita e atualiza contatos e campos da Weni' -IconPath $updateIcon
-    Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Recompra.lnk') -TargetPath $recompraExe -WorkingDirectory $InstallDir -Description 'Recompra FarmaLider D+25 com revisao antes de incluir na Weni' -IconPath $recompraIcon
+    Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Recompra.lnk') -TargetPath $recompraExe -WorkingDirectory $InstallDir -Description 'Recompra FarmaLíder D+25 e Pets Líder D+30 com revisão' -IconPath $recompraIcon
     Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Planilha.lnk') -TargetPath $planilhaExe -WorkingDirectory $InstallDir -Description 'Cargas por planilhas para Weni e Analytics, com revisão humana' -IconPath $planilhaIcon
     Create-Shortcut -ShortcutPath (Join-Path $desktop 'NexoFlow Terminal.lnk') -TargetPath $terminalExe -WorkingDirectory $InstallDir -Description 'Terminal NexoFlow com ambiente e proxy preparados para a sessao' -IconPath $terminalIcon
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Noturno.lnk') -TargetPath $nightExe -WorkingDirectory $InstallDir -Description 'Weni, Analytics e Recompra automáticos, sem confirmação humana' -IconPath $nightIcon
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Analytics.lnk') -TargetPath $appExe -WorkingDirectory $InstallDir -Description 'Sincronização manual segura do NexoFlow' -IconPath $appIcon
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Weni.lnk') -TargetPath $updateExe -WorkingDirectory $InstallDir -Description 'Atualização segura de contatos e campos da Weni' -IconPath $updateIcon
-    Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Recompra.lnk') -TargetPath $recompraExe -WorkingDirectory $InstallDir -Description 'Recompra FarmaLider D+25 com revisao obrigatoria' -IconPath $recompraIcon
+    Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Recompra.lnk') -TargetPath $recompraExe -WorkingDirectory $InstallDir -Description 'Recompra FarmaLíder D+25 e Pets Líder D+30 com revisão' -IconPath $recompraIcon
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Planilha.lnk') -TargetPath $planilhaExe -WorkingDirectory $InstallDir -Description 'Cargas por planilhas para Weni e Analytics, com revisão humana' -IconPath $planilhaIcon
     Create-Shortcut -ShortcutPath (Join-Path $startMenu 'NexoFlow Terminal.lnk') -TargetPath $terminalExe -WorkingDirectory $InstallDir -Description 'Terminal NexoFlow com ambiente e proxy preparados para a sessao' -IconPath $terminalIcon
     New-Item -ItemType Directory -Force -Path (Join-Path $InstallDir 'logs/PET'),(Join-Path $InstallDir 'importacoes/PET') | Out-Null
@@ -1437,4 +1437,4 @@ catch {
     try { Stop-Transcript | Out-Null } catch { }
     exit 1
 }
-# NexoFlow 1.0
+# NexoFlow 1.5

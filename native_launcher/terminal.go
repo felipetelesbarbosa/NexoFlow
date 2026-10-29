@@ -11,7 +11,7 @@ import (
     "runtime"
 )
 
-const terminalMarker = "NexoFlowTerminalIconRevision=1.0"
+const terminalMarker = "NexoFlowTerminalIconRevision=1.5"
 
 func findPython(installDir string) (string, []string) {
     local := filepath.Join(installDir, ".venv", "Scripts", "python.exe")

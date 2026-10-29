@@ -1,10 +1,10 @@
-# NexoFlow 1.0
+# NexoFlow 1.5
 
 Aplicativos para Windows que integram **Weni e a API FarmaLíder nos segmentos FarmaLíder e Pets Líder**, atualizam contatos e pedidos e organizam os dados no **Google Sheets** para análise no **Looker Studio**.
 
 O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
 
-[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.0/NexoFlow-Setup-1.0.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
+[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5/NexoFlow-Setup-1.5.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
 
 ## Componentes
 
@@ -65,6 +65,10 @@ Na rotina diária, use os atalhos Weni, Recompra e Analytics conforme necessári
 - A Weni mantém o pedido mais recente; o histórico de pedidos distintos fica nas planilhas e no dashboard. Um pedido vindo da API não comprova que foi feito pelo WhatsApp ou pela Weni.
 - Operação, histórico e dashboard podem usar [três arquivos do Sheets](docs/planilhas_separadas.md). O Looker lê as fontes `BI_*`; confira seus destinos e atualize os campos quando houver novas colunas.
 - Nos atalhos individuais, revise as propostas de Weni, Planilha e Recompra antes de aplicar. Carga parcial exige conferir o log e as pendências antes de prosseguir.
+
+## Versões e atualizações
+
+A versão atual é **1.5**. As próximas correções seguem **1.5.1, 1.5.2, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
 
 ## Referências
 

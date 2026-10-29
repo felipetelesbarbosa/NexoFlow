@@ -1,4 +1,4 @@
-# NexoFlow 1.0 — Terminal
+# NexoFlow 1.5 — Terminal
 
 O **NexoFlow Terminal** é a interface de comandos do NexoFlow para uso operacional e diagnóstico. Ele foi pensado para quem não trabalha diariamente com Python, PowerShell ou APIs.
 
@@ -117,7 +117,7 @@ nexo weni carga-completa
 
 Executa o backfill completo com relatório para revisão humana e snapshot congelado. É a rotina indicada para primeira carga ou reconstrução geral.
 
-Depois de atualizar ou reinstalar o NexoFlow 1.0, execute essa rotina para gerar um novo dry-run completo com a política atual. Revise o relatório antes de confirmar `CARGA COMPLETA REVISADA`; não reutilize o snapshot da instalação anterior. Em seguida, execute `comandos/executar_carga_completa.bat` em `C:\NexoFlow` para recalcular o Analytics/BI e retome o incremental.
+Depois de atualizar ou reinstalar o NexoFlow 1.5, execute essa rotina para gerar um novo dry-run completo com a política atual. Revise o relatório antes de confirmar `CARGA COMPLETA REVISADA`; não reutilize o snapshot da instalação anterior. Em seguida, execute `comandos/executar_carga_completa.bat` em `C:\NexoFlow` para recalcular o Analytics/BI e retome o incremental.
 
 Na revisão, pedidos validados pela API com status efetivo -2 (Em aberto), -1 (Pendente de pagamento), 0 (Em processamento), 4 (Pronto para rota), 1 (Em trânsito) ou 2 (Concluído) entram em vendas e `ultima_compra`. Entre os estados documentados, somente o status efetivo 3 (Cancelado) exclui a venda; pagamento 0 ou `_` e cancelamento explícito forçam esse status. Os estados -2, -1, 0, 4 e 1 permanecem em rechecagem, e cada nova carga reconsulta os pedidos atuais no seu escopo. Consulte [README PEDIDOS.md](README%20PEDIDOS.md) para o contrato completo.
 
@@ -274,7 +274,7 @@ nexo logs analytics
 
 ## Segurança dos comandos de API
 
-A família `nexo api` foi criada como ferramenta de consulta e diagnóstico. Na versão 1.0 ela expõe apenas operações de leitura já suportadas pelos clientes oficiais do NexoFlow.
+A família `nexo api` foi criada como ferramenta de consulta e diagnóstico. Na versão 1.5 ela expõe apenas operações de leitura já suportadas pelos clientes oficiais do NexoFlow.
 
 Ela não oferece comando genérico para POST, PATCH ou DELETE. Atualizações da Weni continuam obrigatoriamente passando por `nexo weni atualizar` ou `nexo weni carga-completa`, preservando dry-run, auditoria e confirmação.
 

@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.0"
+    [string]$Version = "1.5"
 )
 
 $ErrorActionPreference = "Stop"
@@ -173,7 +173,7 @@ try {
         $output = Join-Path $LauncherDir $target.Name
         & go build -trimpath -tags $target.Tag -ldflags "-s -w" -o $output ./native_launcher
         if ($LASTEXITCODE -ne 0) { throw "Falha ao compilar $($target.Name)" }
-        & (Join-Path $PSScriptRoot "embed_windows_version.ps1") -ExecutablePath $output -Description $target.Description
+        & (Join-Path $PSScriptRoot "embed_windows_version.ps1") -ExecutablePath $output -Description $target.Description -Version $Version
     }
 }
 finally {
@@ -279,7 +279,7 @@ finally {
 Write-Host "==> Incorporando ícone próprio no NexoFlow Setup.exe"
 & (Join-Path $PSScriptRoot "embed_windows_version.ps1") `
     -ExecutablePath (Join-Path $SetupRoot "NexoFlow Setup.exe") `
-    -Description "NexoFlow — instalação e atualização"
+    -Description "NexoFlow — instalação e atualização" -Version $Version
 & (Join-Path $PSScriptRoot "embed_windows_icon.ps1") `
     -ExecutablePath (Join-Path $SetupRoot "NexoFlow Setup.exe") `
     -IconPath (Join-Path (Join-Path $RepoRoot "assets") "installer.ico")
@@ -311,6 +311,10 @@ foreach ($item in @(
 }
 
 
+foreach ($relative in @("VERSION", "app/versioning.py")) {
+    Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/$relative"
+    Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/$relative"
+}
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/NexoFlow Setup.exe"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/payload manifest.json"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/NexoFlow Noturno.exe"
@@ -379,4 +383,4 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.0
+# NexoFlow 1.5

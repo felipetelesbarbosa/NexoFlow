@@ -1,4 +1,14 @@
-# NexoFlow 1.0 — Changelog
+# NexoFlow 1.5 — Changelog
+
+## NexoFlow 1.5 — 29/10/2026
+
+- Suporte operacional FarmaLíder e Pets Líder nos mesmos executáveis, com perfis separados, Recompra Farma D+25/Pets D+30 e configuração própria por marca.
+- Pedidos recebidos diretamente da API, independentemente do canal de origem, com retroalimentação da base Weni e histórico observado no Sheets/BI.
+- Check-up: leitura da decisão simulada tolera bloqueios temporários do Windows; bloqueio persistente continua falhando sem autorizar aplicação. Regressão cobre o bloqueio real de leitura no CMD.
+- Documentação dos dois segmentos, fluxos, instalação e expansão por perfis. O canal da compra só é afirmado com evidência.
+- Política: próximas publicações de correção seguem 1.5.1, 1.5.2 até 1.5.99; a seguinte é 1.6. Não há incremento por commit nem mudança automática de versão principal.
+
+## Histórico da linha 1.0
 
 - Documentação dos dois segmentos: instalação, credenciais, campos, Recompra Farma D+25/Pets D+30, fluxos e fontes do Looker. Descrição pública inclui Pets, retroalimentação de clientes com pedidos externos e expansão por perfis, sem inferir canal de venda nem apresentar novos perfis como já habilitados.
 

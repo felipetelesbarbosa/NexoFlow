@@ -25,6 +25,7 @@ from config import (
 from network_diagnostics import classify_network_failure
 from proxy_config import refresh_network_route
 from task_progress import TaskProgress
+from versioning import CURRENT_VERSION
 
 
 class WeniError(RuntimeError):
@@ -44,7 +45,7 @@ class WeniClient:
             {
                 "Authorization": f"Token {token}",
                 "Accept": "application/json",
-                "User-Agent": "GrupoLider-NexoFlow/1.0",
+                "User-Agent": f"GrupoLider-NexoFlow/{CURRENT_VERSION}",
             }
         )
 
@@ -588,4 +589,4 @@ class WeniClient:
         }
 
 
-# NexoFlow 1.0
+# NexoFlow 1.5
