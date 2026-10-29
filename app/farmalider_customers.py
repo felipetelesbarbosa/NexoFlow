@@ -124,6 +124,14 @@ class CustomerDirectory:
             if not isinstance(source, dict):
                 self.skipped += 1
                 continue
+            markers = {
+                str(part["segmento"]).strip().upper()
+                for part in (raw, source)
+                if isinstance(part, dict) and part.get("segmento") not in (None, "")
+            }
+            if markers and markers != {segment}:
+                self.skipped += 1
+                continue
             cid = positive_id(source.get("id"))
             if not cid:
                 self.skipped += 1

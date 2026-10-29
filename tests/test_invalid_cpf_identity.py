@@ -900,7 +900,7 @@ class InvalidCpfIdentityTests(unittest.TestCase):
     ):
         client = FarmaliderClient("synthetic-token")
         response = Mock(status_code=200, headers={})
-        response.json.return_value = [customer_payload()]
+        response.json.return_value = [{**customer_payload(), "segmento": "FARMA"}]
         try:
             with (
                 patch.object(client.session, "get", return_value=response),
@@ -910,7 +910,10 @@ class InvalidCpfIdentityTests(unittest.TestCase):
                     side_effect=lambda _: nullcontext(RequestPermit(0, 4)),
                 ),
             ):
-                self.assertEqual(client.get_cliente_by_cpf("123"), [customer_payload()])
+                self.assertEqual(
+                    client.get_cliente_by_cpf("123"),
+                    [{**customer_payload(), "segmento": "FARMA"}],
+                )
                 with self.assertRaises(FarmaliderError):
                     client.get_pedido("201")
                 # O contrato de pedido é objeto ou ausência; nunca lista.

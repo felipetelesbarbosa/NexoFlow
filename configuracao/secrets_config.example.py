@@ -22,8 +22,7 @@ GOOGLE_SPREADSHEET_ID = "COLE_O_ID_DA_PLANILHA_GOOGLE_AQUI"
 FARMALIDER_API_ENABLED = True
 FARMALIDER_API_TOKEN = "COLE_SEU_TOKEN_FARMALIDER_AQUI"
 
-# False = produção
-# True  = endpoints /api/Delivery/hml/...
+# Produção em todos os perfis. Flag antiga mantida por compatibilidade.
 FARMALIDER_USE_HML = False
 # Listagem cadastral FARMA: auto para cargas a partir de 500 contatos.
 FARMALIDER_CUSTOMER_DIRECTORY_MODE = "auto"
@@ -82,7 +81,7 @@ PERFIS = {
         "WENI_API_TOKEN": "",
         "FARMALIDER_API_ENABLED": True,
         "FARMALIDER_API_TOKEN": "",
-        "FARMALIDER_USE_HML": True,
+        "FARMALIDER_USE_HML": False,
         # Ative após configurar o fluxo e o evento D+30 usando pedido_data.
         "RECOMPRA_ENABLED": False,
     },

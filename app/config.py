@@ -72,6 +72,8 @@ FARMALIDER_API_BASE_URL_EXTERNAL: Final = (
 )
 FARMALIDER_CONNECT_TIMEOUT_SECONDS: Final = 10
 FARMALIDER_REQUEST_TIMEOUT_SECONDS: Final = 90
+# A listagem reúne toda a base; consultas individuais mantêm 90 segundos.
+FARMALIDER_DIRECTORY_TIMEOUT_SECONDS: Final = 600
 FARMALIDER_MAX_RETRIES: Final = 4
 
 # Concorrência controlada da FarmaLíder.

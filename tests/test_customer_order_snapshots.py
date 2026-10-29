@@ -374,7 +374,7 @@ class BulkOrderFlowTests(unittest.TestCase):
                     self.assertNotEqual(plans[0]["action"], "add")
                     self.assertEqual(get.call_count, 1)
 
-    def test_incomplete_bulk_uses_individual_cpf_and_order_lookup(self):
+    def test_incomplete_bulk_reuses_complete_individual_cpf_order(self):
         incomplete = deepcopy(self.payload)
         incomplete.pop("itens")
         with patch.object(
@@ -394,4 +394,4 @@ class BulkOrderFlowTests(unittest.TestCase):
                 now=datetime.fromisoformat(NOW),
             )
             self.assertEqual(plans[0]["action"], "add")
-            self.assertEqual(get.call_count, 3)
+            self.assertEqual(get.call_count, 2)

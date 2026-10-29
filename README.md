@@ -69,3 +69,5 @@ O projeto é distribuído sem chaves, tokens ou credenciais. Use os seus própri
 ## Organização do repositório
 
 Os executáveis de referência ficam em `native_launcher/prebuilt/`; os pacotes oficiais recompilam os aplicativos e mantêm os caminhos de instalação. Dependências opcionais e de desenvolvimento ficam em `dependencias/`. `pyproject.toml`, `pyrightconfig.json` e `requirements.txt` permanecem na raiz para as ferramentas Python.
+
+A integração dos dois segmentos usa produção. A leitura da base completa pode aguardar até 10 minutos por tentativa; consultas individuais mantêm 90 segundos. Quando necessário, o NexoFlow consulta o CPF e exige confirmação do segmento antes de usar os dados.

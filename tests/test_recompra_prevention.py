@@ -332,7 +332,10 @@ class PetProfileTests(unittest.TestCase):
             self.assertRaises(FarmaliderError),
         ):
             client.get_pedido(99)
-        with self.assertRaises(FarmaliderError):
+        with (
+            patch.object(client, "_request_json", return_value={"segmento": "FARMA"}),
+            self.assertRaises(FarmaliderError),
+        ):
             client.get_cliente_by_cpf("11111111111")
 
     def test_both_flow_guards_reject_missing_cancellation_gate(self):

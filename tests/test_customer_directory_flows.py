@@ -56,6 +56,7 @@ class CustomerDirectoryFlowTests(unittest.TestCase):
         mock = farm()
         self.full_payload = deepcopy(mock.get_cliente_by_cpf.return_value)
         self.full_payload["cliente"] = deepcopy(self.api_customer)
+        self.full_payload["segmento"] = "FARMA"
         self.full_payload["ultimoPedido"].update(
             {
                 key: self.api_customer["enderecos"][0].get(key)
@@ -231,7 +232,7 @@ class CustomerDirectoryFlowTests(unittest.TestCase):
             self.assertEqual(orders[0]["pedido_id"], "201")
             paths = [c.args[0] for c in get.call_args_list]
             self.assertEqual(sum("/cliente/cpf/" in p for p in paths), 1)
-            self.assertEqual(sum("/pedido/" in p for p in paths), 1)
+            self.assertEqual(sum("/pedido/" in p for p in paths), 0)
 
     def test_recompra_cannot_treat_cadastral_record_as_missing_order(self):
         with patch.object(
@@ -243,7 +244,7 @@ class CustomerDirectoryFlowTests(unittest.TestCase):
             self.assertEqual(order["status_confirmacao"], "CONFIRMADO_API")
             self.assertEqual(order["pedido_id"], "201")
             self.assertTrue(items)
-            self.assertEqual(get.call_count, 3)
+            self.assertEqual(get.call_count, 2)
 
     def test_planilhas_share_reads_and_preserve_customer_evidence(self):
         with patch.object(self.client, "_request_json", side_effect=self.response):

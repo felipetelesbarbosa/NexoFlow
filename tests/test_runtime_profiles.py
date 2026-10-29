@@ -141,6 +141,48 @@ with TemporaryDirectory() as temp:
             "\nfrom tests.test_delivery_tickets import DeliveryTicketsTests, contact\nfrom delivery_tickets import write_delivery_review,apply_delivery_review\nfrom pathlib import Path\nfrom tempfile import TemporaryDirectory\nfrom unittest.mock import Mock\nfrom weni_update import REQUIRED_ORDER_FIELDS\ncase=DeliveryTicketsTests()\nplans,delivery=case.reconcile()\ndelivery['target']='weni'\nassert plans and plans[0].purchase_confirmed\nwith TemporaryDirectory() as temp:\n path=Path(temp)/'review.json';write_delivery_review(plans,delivery,path)\n import json\n assert json.loads(path.read_text(encoding='utf-8'))['segment']=='PET'\n w=Mock();live=contact();w.get_contact.side_effect=lambda **kwargs:live\n w.list_fields.return_value=[{'key':key,'value_type':'text'} for key in REQUIRED_ORDER_FIELDS]\n w.update_contact_fields.side_effect=lambda uid,fields:live['fields'].update(fields)\n result=apply_delivery_review(path,w,target='weni')\n assert result['contacts_accepted']==1 and result['conflicts']==0\n assert w.update_contact_fields.call_count==1\n",
         )
 
+    def test_both_profiles_fallback_feeds_weni_and_analytics_without_extra_order_get(
+        self,
+    ):
+        code = """
+from unittest.mock import patch
+from analytics import normalize_contact
+from farmalider_client import FarmaliderClient,FarmaliderError
+from main import FarmaliderSettings,validate_contacts,build_orders
+from runtime_profile import segment
+from tests.test_farmalider_customers import CPF,customer_snapshot
+from tests.test_pharmacy_scope import store_fixture
+from weni_update import _build_contact_plan,REQUIRED_ORDER_FIELDS,audit_plans
+payload=customer_snapshot()
+payload['ultimoPedido']['segmento']=segment()
+contact={'uuid':'10000000-0000-0000-0000-000000000001','name':'😊','fields':{'cpf':CPF},'urns':['whatsapp:5591987654321'],'groups':[]}
+now='2026-10-08T10:00:00-03:00'
+settings.FARMALIDER_CUSTOMER_DIRECTORY_MODE='on'
+farm=FarmaliderClient('API_TEST',use_hml=True)
+def respond(path,**kwargs):
+ if '/clientes/' in path: raise FarmaliderError('Listagem indisponível sintética')
+ if '/cliente/cpf/' in path: return payload
+ raise AssertionError('Pedido completo não deve gerar consulta adicional')
+with patch.object(farm,'_request_json',side_effect=respond) as get:
+ rows=[normalize_contact(contact,now)]
+ responses,statuses={},{}
+ validate_contacts(rows,farm_client=farm,farm_settings=FarmaliderSettings(True,'API_TEST',False),sync_time=now,cliente_responses_by_cpf=responses,cliente_lookup_status_by_cpf=statuses)
+ orders,items,_=build_orders([contact],rows_by_uuid={rows[0]['contact_uuid']:rows[0]},farm_client=farm,sync_time=now,cliente_responses_by_cpf=responses,cliente_lookup_status_by_cpf=statuses)
+ assert len(orders)==1 and orders[0]['status_confirmacao']=='CONFIRMADO_API' and len(items)==1
+ plan=_build_contact_plan(contact,context_messages=[],candidate_message_ids=set(),farm_client=farm,opt_out_group_name='',opt_out_group_uuid='',captured_at=now,available_weni_fields=REQUIRED_ORDER_FIELDS)
+ assert plan.order_validated and plan.fields['pedido_id']=='8'
+ audit_plans([plan],opt_out_group_available=True)
+ store=store_fixture()
+ result,item_result=store.upsert_pharmacy_orders(orders,items)
+ assert len(result.final_records)==1 and len(item_result.final_records)==1
+ assert get.call_count==2
+ assert not farm.use_hml
+farm.close()
+"""
+        for profile in ("FARMA", "PET"):
+            with self.subTest(profile=profile):
+                self.invoke(profile, code)
+
     def test_pet_directory_outage_stays_pending_without_reloading_base_per_contact(
         self,
     ):
@@ -150,7 +192,7 @@ with TemporaryDirectory() as temp:
 from unittest.mock import patch
 from farmalider_client import FarmaliderClient,FarmaliderError
 farm=FarmaliderClient('API_TEST')
-with patch.object(farm,'get_clientes_segmento',side_effect=FarmaliderError('Timeout sintético')) as load:
+with patch.object(farm,'get_clientes_segmento',side_effect=FarmaliderError('Timeout sintético')) as load, patch.object(farm,'_request_json',side_effect=FarmaliderError('Consulta individual indisponível')) as individual:
  for cpf in ('52998224725','11111111111'):
   try: farm.get_cliente_by_cpf(cpf)
   except FarmaliderError: pass

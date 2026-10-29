@@ -1,4 +1,4 @@
-"""Perfis exclusivos da Recompra; os demais aplicativos permanecem inalterados."""
+"""Perfis de segmento e cliente PET compartilhados pelos aplicativos."""
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -88,44 +88,32 @@ class PetRecompraClient(FarmaliderClient):
             if self._execution_cache is None:
                 self._execution_cache = ExecutionReadCache()
             try:
-                self.customer_directory = CustomerDirectory(
-                    self.get_clientes_segmento("PET"), segment="PET"
-                )
+                from task_progress import TaskProgress
+
+                with TaskProgress(
+                    "FarmaLíder: base cadastral PET",
+                    1,
+                    unit="consultas",
+                    interval=15,
+                    detail=lambda: (
+                        "aguardando base completa; resposta pode demorar até 10 minutos por tentativa"
+                    ),
+                ) as progress:
+                    self.customer_directory = CustomerDirectory(
+                        self.get_clientes_segmento("PET"), segment="PET"
+                    )
+                    progress.advance()
             except (FarmaliderAuthError, FarmaliderUnavailableError):
                 raise
             except (FarmaliderError, ValueError):
                 return False
             return True
 
+    customer_segment = "PET"
+
     def get_cliente_by_cpf(self, cpf):
         self.prepare_customer_directory()
-        directory = self.customer_directory
-        if directory is None or not directory.candidates(cpf):
-            raise FarmaliderError(
-                "Vínculo com a base PET não confirmado; contato pendente."
-            )
-        payload = super().get_cliente_by_cpf(cpf)
-        candidates = payload if isinstance(payload, list) else [payload]
-        ids = {str(record["id"]) for record in directory.candidates(cpf)}
-        for candidate in candidates:
-            if not isinstance(candidate, dict):
-                raise FarmaliderError("Cadastro PET incompleto; contato pendente.")
-            customer = candidate.get("cliente", candidate)
-            latest = candidate.get("ultimoPedido")
-            if not isinstance(customer, dict) or str(customer.get("id")) not in ids:
-                raise FarmaliderError("Cliente fora da base PET; contato pendente.")
-            if (
-                latest
-                and candidate.get("_nexoflow_source") != "FARMALIDER_CLIENTES_PET"
-                and (
-                    not isinstance(latest, dict)
-                    or str(latest.get("segmento", "")).upper() != "PET"
-                )
-            ):
-                raise FarmaliderError(
-                    "Último pedido fora do segmento PET ou sem segmento; contato pendente."
-                )
-        return payload
+        return super().get_cliente_by_cpf(cpf)
 
     def get_pedido(self, codigo):
         self.prepare_customer_directory()

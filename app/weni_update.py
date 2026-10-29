@@ -312,6 +312,17 @@ class _InvalidCpfBatch:
         self.stats = UpdateStats()
 
 
+def _pending_order_retry_uuids(stats: UpdateStats) -> list[str]:
+    return sorted(
+        {
+            item["contact_uuid"]
+            for item in stats.order_diagnostics
+            if item.get("contact_uuid")
+            and str(item.get("reason", "")).startswith("ERRO_")
+        }
+    )
+
+
 def _record_validated_order(stats: UpdateStats, plan: ContactUpdatePlan) -> None:
     """Count validated orders and incomplete queries, including unchanged contacts."""
     outcome = plan.order_resolution_status or "SEM_PEDIDO_VALIDADO"
@@ -2834,6 +2845,9 @@ def run_update(
                 summary.get("orders_cancelled_payment_zero") or 0
             )
             stats.orders_api_failed = int(summary.get("orders_api_failed") or 0)
+            stats.order_diagnostics = list(
+                review_payload.get("order_diagnostics") or []
+            )
             stats.orders_pending_payment = int(
                 summary.get("orders_pending_payment") or 0
             )
@@ -3076,6 +3090,15 @@ def run_update(
                     "sim" if component_complete else "não",
                     "sim" if campaign_complete else "não",
                 )
+            order_pending = set(_pending_order_retry_uuids(stats))
+            if quarter is not None:
+                reviewed = {plan.contact_uuid for plan in plans} | {
+                    item["contact_uuid"] for item in stats.order_diagnostics
+                }
+                order_pending.update(
+                    set(state.get("pending_order_retry_uuids") or []) - reviewed
+                )
+            state_payload["pending_order_retry_uuids"] = sorted(order_pending)
             state_payload.update(_purchase_check_state_payload(plans, conflicted_uuids))
             _save_state(state_payload)
             logging.info(
@@ -3177,7 +3200,9 @@ def run_update(
         # Conflitos isolados de uma carga completa congelada entram
         # explicitamente na próxima incremental, mesmo se a Weni não refletir
         # a mudança no modified_on do contato (por exemplo, só associação a grupo).
-        pending_conflicts = state.get("pending_conflict_uuids") or []
+        pending_conflicts = list(state.get("pending_conflict_uuids") or []) + list(
+            state.get("pending_order_retry_uuids") or []
+        )
         pending_conflict_set = (
             {str(uid).strip() for uid in pending_conflicts if str(uid).strip()}
             if isinstance(pending_conflicts, list)
@@ -3608,6 +3633,7 @@ def run_update(
                 "open_order_uuids": sorted(open_order_uuids),
                 "field_changes": stats.field_changes,
                 "group_actions": stats.group_actions,
+                "pending_order_retry_uuids": _pending_order_retry_uuids(stats),
                 **_purchase_check_state_payload(plans, conflicted_uuids),
             }
         )

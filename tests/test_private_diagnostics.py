@@ -20,7 +20,7 @@ def response(status, body=b'{"message":"Erro interno"}'):
     value = Mock(
         status_code=status, content=body, headers={"Content-Type": "application/json"}
     )
-    value.json.return_value = {"cliente": {"id": 1}}
+    value.json.return_value = {"segmento": "FARMA", "cliente": {"id": 1}}
     return value
 
 

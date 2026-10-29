@@ -1,5 +1,7 @@
 # NexoFlow 1.0 — Changelog
 
+- Integração Farma/Pets: produção em todos os aplicativos, espera de até 600s por resposta da base completa e 90s nas consultas individuais. Listagem indisponível ou incompleta usa CPF com confirmação de segmento; pedidos completos verificados são reaproveitados durante a execução. Falhas isoladas de pedidos na Weni ficam registradas para nova consulta incremental, inclusive quando não há campos a alterar.
+
 - Conexão Weni: limites separados de conexão (10s) e resposta (90s), diagnóstico com operação e fase da falha, confirmação da organização Farma/Pets no teste de acesso e amostras pequenas de contatos/mensagens. Retentativas permanecem limitadas e POST de tentativa única não é repetido.
 
 - Setup: escolha explícita entre atualizar mantendo dados, instalação limpa e cancelar. A instalação limpa reinicia configurações, credenciais, logs e estado local dos dois segmentos, preservando importacoes. Falhas restauram a instalação anterior.

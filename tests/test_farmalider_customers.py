@@ -334,7 +334,7 @@ class CustomerClientTests(unittest.TestCase):
                 self.subTest(mode=mode),
                 patch("secrets_config.FARMALIDER_CUSTOMER_DIRECTORY_MODE", mode),
                 patch.object(
-                    self.client, "_request_json", return_value={"cliente": customer()}
+                    self.client, "_request_json", return_value={"segmento": "FARMA", "cliente": customer()}
                 ) as get,
             ):
                 self.assertFalse(
@@ -348,7 +348,7 @@ class CustomerClientTests(unittest.TestCase):
         with patch.object(
             self.client,
             "_request_json",
-            side_effect=[[], {"cliente": customer(), "ultimoPedido": {"id": 8}}],
+            side_effect=[[], {"segmento": "FARMA", "cliente": customer(), "ultimoPedido": {"id": 8}}],
         ) as get:
             self.client.prepare_customer_directory(expected_contacts=1)
             payload = self.client.get_cliente_cadastro_by_cpf(CPF)
@@ -359,7 +359,7 @@ class CustomerClientTests(unittest.TestCase):
         with patch.object(
             self.client,
             "_request_json",
-            side_effect=[{"erro": "sintético"}, {"cliente": customer()}],
+            side_effect=[{"erro": "sintético"}, {"segmento": "FARMA", "cliente": customer()}],
         ) as get:
             self.assertFalse(
                 self.client.prepare_customer_directory(expected_contacts=500)

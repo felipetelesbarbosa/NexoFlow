@@ -23,6 +23,7 @@ from config import (
     FARMALIDER_CIRCUIT_MIN_5XX,
     FARMALIDER_CIRCUIT_MIN_DISTINCT_QUERIES,
     FARMALIDER_CONNECT_TIMEOUT_SECONDS,
+    FARMALIDER_DIRECTORY_TIMEOUT_SECONDS,
     FARMALIDER_MAX_ADAPTIVE_DELAY_SECONDS,
     FARMALIDER_MAX_RETRIES,
     FARMALIDER_MAX_WORKERS,
@@ -81,7 +82,11 @@ class FarmaliderClient:
 
     def __init__(self, token: str, use_hml: bool = False) -> None:
         self.token = str(token or "").strip()
-        self.use_hml = bool(use_hml)
+        self.use_hml = False
+        if use_hml:
+            logging.warning(
+                "FarmaLíder: configuração HML antiga ignorada; usando produção."
+            )
 
         if not self.token:
             raise ValueError("Token da FarmaLíder API não informado.")
@@ -266,7 +271,7 @@ class FarmaliderClient:
             self._request_gate.notify_all()
 
     def _delivery_path(self, path: str) -> str:
-        prefix = "/api/Delivery/hml" if self.use_hml else "/api/Delivery"
+        prefix = "/api/Delivery"
         return f"{prefix}/{path.lstrip('/')}"
 
     def _wait_before_request(self, endpoint_label: str) -> RequestPermit:
@@ -733,7 +738,9 @@ class FarmaliderClient:
                         params={"token": self.token},
                         timeout=(
                             FARMALIDER_CONNECT_TIMEOUT_SECONDS,
-                            FARMALIDER_REQUEST_TIMEOUT_SECONDS,
+                            FARMALIDER_DIRECTORY_TIMEOUT_SECONDS
+                            if endpoint_label == "clientes/segmento"
+                            else FARMALIDER_REQUEST_TIMEOUT_SECONDS,
                         ),
                         allow_redirects=False,
                         proxies=proxies,
@@ -929,7 +936,13 @@ class FarmaliderClient:
             self._directory_attempted = True
             try:
                 with TaskProgress(
-                    "FarmaLíder: base cadastral FARMA", 1, unit="consultas"
+                    "FarmaLíder: base cadastral FARMA",
+                    1,
+                    unit="consultas",
+                    interval=15,
+                    detail=lambda: (
+                        "aguardando base completa; resposta pode demorar até 10 minutos por tentativa"
+                    ),
                 ) as progress:
                     directory = CustomerDirectory(self.get_clientes_segmento("FARMA"))
                     progress.advance()
@@ -990,17 +1003,63 @@ class FarmaliderClient:
                 with self._metrics_lock:
                     self._directory_cpf_hits += 1
                 return snapshot
-        return self._cached_read(
-            "cpf",
-            cpf,
-            lambda: self._request_json(
-                self._delivery_path(f"cliente/cpf/{cpf}"),
-                allow_not_found=True,
-                allow_customer_list=True,
-                diagnostic_ref=self.cpf_diagnostic_ref(cpf),
-                private_cpf=cpf,
-            ),
+        return self._cached_read("cpf", cpf, lambda: self._fetch_customer(cpf))
+
+    customer_segment = "FARMA"
+
+    def _fetch_customer(self, cpf):
+        from farmalider_customers import CustomerDirectory, positive_id
+
+        payload = self._request_json(
+            self._delivery_path(f"cliente/cpf/{cpf}"),
+            allow_not_found=True,
+            allow_customer_list=True,
+            diagnostic_ref=self.cpf_diagnostic_ref(cpf),
+            private_cpf=cpf,
         )
+        if payload is None:
+            return None
+        records = payload if isinstance(payload, list) else [payload]
+        accepted = []
+        for record in records:
+            if not isinstance(record, dict):
+                raise FarmaliderError("Cadastro incompleto; contato pendente.")
+            customer = record.get("cliente", record)
+            latest = record.get("ultimoPedido")
+            if not isinstance(customer, dict):
+                raise FarmaliderError("Cadastro incompleto; contato pendente.")
+            markers = {
+                str(part["segmento"]).strip().upper()
+                for part in (record, customer, latest)
+                if isinstance(part, dict) and part.get("segmento") not in (None, "")
+            }
+            trusted = False
+            if self.customer_directory is not None:
+                trusted = positive_id(customer.get("id")) in {
+                    positive_id(c.get("id"))
+                    for c in self.customer_directory.candidates(cpf)
+                }
+            if markers and markers != {self.customer_segment}:
+                continue
+            if not markers and not trusted:
+                continue
+            accepted.append(record)
+        if not accepted:
+            raise FarmaliderError(
+                "Segmento do cliente não confirmado; contato pendente."
+            )
+        # Somente snapshots completos, com proprietário/data/itens verificados,
+        # dispensam uma segunda leitura do mesmo pedido durante esta execução.
+        directory = CustomerDirectory(accepted, segment=self.customer_segment)
+        if self._execution_cache is not None:
+            for code in directory.orders:
+                snapshot = directory.order_by_id(code)
+                if snapshot is None:
+                    continue
+                snapshot["_nexoflow_source"] = "FARMALIDER_CLIENTE_CPF"
+                snapshot["capa"]["segmento"] = self.customer_segment
+                self._execution_cache.read("pedido", code, lambda value=snapshot: value)
+        return accepted if isinstance(payload, list) else accepted[0]
 
     def _record_private_failure(
         self,

@@ -1579,6 +1579,12 @@ class WeniUpdateTests(unittest.TestCase):
                 UpdateStats(
                     pending_retry_uuids=["pending-preparation"],
                     orders_api_failed=1,
+                    order_diagnostics=[
+                        {
+                            "contact_uuid": "pending-order-no-change",
+                            "reason": "ERRO_ITENS_PEDIDO_API",
+                        }
+                    ],
                     purchase_confirmed=27,
                 ),
                 full=False,
@@ -1623,6 +1629,9 @@ class WeniUpdateTests(unittest.TestCase):
             saved = save_state.call_args.args[0]
             self.assertEqual(saved["last_success_utc"], "2026-10-03T12:00:00Z")
             self.assertEqual(saved["last_mode"], "incremental-frozen-snapshot")
+            self.assertEqual(
+                saved["pending_order_retry_uuids"], ["pending-order-no-change"]
+            )
             self.assertEqual(
                 saved["pending_conflict_uuids"],
                 ["pending-preparation", "u2", "u4", "u5"],
@@ -2073,6 +2082,54 @@ class WeniUpdateTests(unittest.TestCase):
             patch(
                 "weni_update._load_state",
                 return_value={"pending_conflict_uuids": ["u1"]},
+            ),
+            patch(
+                "weni_update.resolve_window",
+                return_value=UpdateWindow(
+                    started_at=started, after=started, full=False
+                ),
+            ),
+        ):
+            result = run_update(apply=True)
+        self.assertEqual(result.contacts_updated, 1)
+        self.assertEqual(client.update_contact_fields.call_args.args[1]["idade"], 37)
+        client.list_messages.assert_any_call(contact="u1", before=started)
+        self.assertEqual(save_state.call_args.args[0]["pending_conflict_uuids"], [])
+
+    @patch("weni_update._save_state")
+    @patch("weni_update._append_audit")
+    @patch("weni_update._open_farmalider", return_value=None)
+    @patch("weni_update.WeniClient")
+    def test_incremental_order_retry_recovers_contacts_outside_modified_window(
+        self, client_cls, _farm, _audit, save_state
+    ):
+        from datetime import datetime
+
+        started = datetime(2026, 10, 3, 12, tzinfo=UTC)
+        client = client_cls.return_value
+        client.list_fields.return_value = self._required_weni_fields()
+        client.list_groups.return_value = [{"uuid": "g1", "name": "Opt-Out LGPD"}]
+        client.list_contacts.return_value = [
+            {
+                "uuid": "u1",
+                "urns": ["whatsapp:5591999999999"],
+                "groups": [],
+                "fields": {},
+            }
+        ]
+        old = {
+            "id": "old-in",
+            "direction": "in",
+            "text": "Tenho 37 anos",
+            "created_on": "2026-10-01T12:00:00Z",
+        }
+        client.list_messages.side_effect = lambda **kw: (
+            [old] if kw.get("contact") == "u1" else []
+        )
+        with (
+            patch(
+                "weni_update._load_state",
+                return_value={"pending_order_retry_uuids": ["u1"]},
             ),
             patch(
                 "weni_update.resolve_window",

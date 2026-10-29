@@ -198,7 +198,7 @@ def load_farmalider_settings() -> FarmaliderSettings:
     return FarmaliderSettings(
         enabled=bool(getattr(secrets, "FARMALIDER_API_ENABLED", True)),
         token=token,
-        use_hml=bool(getattr(secrets, "FARMALIDER_USE_HML", False)),
+        use_hml=False,
     )
 
 
