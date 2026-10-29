@@ -6,6 +6,10 @@ $temp = Join-Path $env:TEMP ("nexoflow-noturno-" + [Guid]::NewGuid().ToString('N
 New-Item -ItemType Directory -Force -Path (Join-Path $temp 'app') | Out-Null
 try {
     Copy-Item -LiteralPath (Join-Path $root "$PackageDir/NexoFlow Noturno.exe") -Destination $temp
+    Copy-Item -LiteralPath (Join-Path $root "$PackageDir/app/run_noturno_console.py") -Destination (Join-Path $temp 'app')
+    New-Item -ItemType Directory -Force -Path (Join-Path $temp 'comandos') | Out-Null
+    Copy-Item -LiteralPath (Join-Path $root "$PackageDir/comandos/executar_noturno.bat") -Destination (Join-Path $temp 'comandos')
+    $script:NightEntry = 'EXE'
     & python -m venv --without-pip (Join-Path $temp '.venv')
     if ($LASTEXITCODE -ne 0) { throw 'Falha na preparação do ambiente sintético.' }
     $script = Join-Path $temp 'app/run_noturno.py'
@@ -13,6 +17,7 @@ try {
 import os,sys
 from pathlib import Path
 Path('modo.txt').write_text(sys.argv[1], encoding='utf-8')
+Path('perfil.txt').write_text(os.environ['NEXOFLOW_PERFIL'], encoding='ascii')
 raise SystemExit(int(os.environ.get('NEXOFLOW_SYNTHETIC_EXIT', '0')))
 '@
     [IO.File]::WriteAllText($script, $synthetic, [Text.UTF8Encoding]::new($false))
@@ -23,6 +28,10 @@ raise SystemExit(int(os.environ.get('NEXOFLOW_SYNTHETIC_EXIT', '0')))
         $info = [Diagnostics.ProcessStartInfo]::new()
         $info.FileName = Join-Path $temp 'NexoFlow Noturno.exe'
         $info.Arguments = $Argument
+        if ($script:NightEntry -eq 'BAT') {
+            $info.FileName = Join-Path $env:SystemRoot 'System32\cmd.exe'
+            $info.Arguments = '/D /S /C ""' + (Join-Path $temp 'comandos\executar_noturno.bat') + '" ' + $Argument + '"'
+        }
         $info.WorkingDirectory = $temp
         $info.UseShellExecute = $false
         $info.CreateNoWindow = $true
@@ -50,6 +59,8 @@ raise SystemExit(int(os.environ.get('NEXOFLOW_SYNTHETIC_EXIT', '0')))
             if ($ExpectedMode) {
                 if (-not (Test-Path -LiteralPath $signal)) { throw 'O processo filho não foi iniciado.' }
                 if ((Get-Content -LiteralPath $signal -Raw) -cne $ExpectedMode) { throw 'Modo incorreto passado ao Python.' }
+                $expectedProfile = if ($ExpectedLogs -like '*PET*') { 'PET' } else { 'FARMA' }
+                if ((Get-Content -LiteralPath (Join-Path $temp 'perfil.txt') -Raw) -cne $expectedProfile) { throw 'Segmento incorreto passado ao Python.' }
             } elseif (Test-Path -LiteralPath $signal) { throw 'Iniciou carga sem selecionar um modo válido.' }
         } finally { $process.Dispose() }
     }
@@ -67,7 +78,27 @@ raise SystemExit(int(os.environ.get('NEXOFLOW_SYNTHETIC_EXIT', '0')))
     $env:NEXOFLOW_SYNTHETIC_EXIT = '3'
     Invoke-NightCase -Argument '--incremental' -ExpectedMode '--incremental' -ExpectedExit 3
     Remove-Item Env:NEXOFLOW_SYNTHETIC_EXIT
+    $script:NightEntry = 'BAT'
+    Remove-Item Env:NEXOFLOW_PERFIL -ErrorAction SilentlyContinue
+    Invoke-NightCase -InputText "2`n1" -ExpectedMode '--incremental' -ExpectedLogs 'logs\PET\noturno\'
+    $env:NEXOFLOW_PERFIL = 'FARMA'
+    Invoke-NightCase -InputText '1' -ExpectedMode '--incremental'
+    Invoke-NightCase -InputText '2' -ExpectedMode '--full'
+    Invoke-NightCase -InputText '0'
+    Invoke-NightCase -Argument '--incremental' -ExpectedMode '--incremental'
+    Invoke-NightCase -ExpectedExit 2
+    $env:NEXOFLOW_SYNTHETIC_EXIT = '3'
+    Invoke-NightCase -Argument '--full' -ExpectedMode '--full' -ExpectedExit 3
+    $env:NEXOFLOW_SYNTHETIC_EXIT = '7'
+    Invoke-NightCase -Argument '--incremental' -ExpectedMode '--incremental' -ExpectedExit 7
+    Remove-Item Env:NEXOFLOW_SYNTHETIC_EXIT
+    $createdMutex = $false
+    $operationMutex = New-Object Threading.Mutex($false, 'Local\NexoFlowOperationLock', [ref]$createdMutex)
+    try { Invoke-NightCase -Argument '--incremental' -ExpectedExit 2 }
+    finally { $operationMutex.Dispose() }
     Remove-Item -LiteralPath $script
+    Invoke-NightCase -Argument '--incremental' -ExpectedExit 2
+    $script:NightEntry = 'EXE'
     Invoke-NightCase -Argument '--incremental' -ExpectedExit 2
     Write-Host '[OK] Noturno: menu, resumo de sucesso/parcial/falha e encerramento sem console; sem APIs reais.'
 } finally {

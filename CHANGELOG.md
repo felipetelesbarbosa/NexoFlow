@@ -1,4 +1,10 @@
-# NexoFlow 1.5.2 — Changelog
+# NexoFlow 1.5.3 — Changelog
+
+## NexoFlow 1.5.3 — 29/10/2026
+
+- O Setup trata acesso negado ou indisponibilidade do launcher EXE do Noturno usando uma entrada em script validada no mesmo atalho. O arquivo sem leitura não é copiado nem executado. Scripts, motor Python e demais componentes obrigatórios continuam sujeitos ao manifesto e à validação da cópia instalada; conteúdo divergente não é aceito.
+- A entrada em script mantém seleção FARMA/PET, incremental/completo, trava compartilhada com os launchers nativos, códigos de saída e resultado visível no console até um novo ENTER.
+- Regressões de acesso negado real por ACL Windows, proteção dos componentes obrigatórios e dos scripts, menus do pacote, preservação dos dados e console real com stdin encerrado.
 
 ## NexoFlow 1.5.2 — 29/10/2026
 

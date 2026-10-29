@@ -1,6 +1,6 @@
-# NexoFlow 1.5.2 — Launchers nativos
+# NexoFlow 1.5.3 — Launchers nativos
 
-Fontes dos launchers Windows distribuídos no NexoFlow 1.5.2.
+Fontes dos launchers Windows distribuídos no NexoFlow 1.5.3.
 
 Cada executável é compilado separadamente por tag (`noturno`, `analytics`, `updateweni`, `recompra`, `planilha`, `terminal`, `setup` ou `uninstall`), evitando que um componente carregue código de outro.
 
@@ -41,7 +41,7 @@ O `NexoFlow Uninstall.exe` é um launcher nativo **opcional** para `installer\un
 
 ### Português brasileiro
 
-Os pacotes recompilam os oito launchers a partir destes fontes. A saída do console usa UTF-8 e os recursos de versão usam a tabela pt-BR 0416/04B0, preservando acentos e cedilha. A versão permanece NexoFlow 1.5.2.
+Os pacotes recompilam os oito launchers a partir destes fontes. A saída do console usa UTF-8 e os recursos de versão usam a tabela pt-BR 0416/04B0, preservando acentos e cedilha. A versão permanece NexoFlow 1.5.3.
 
 ## NexoFlow Planilha
 

@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.2"
+    [string]$Version = "1.5.3"
 )
 
 $ErrorActionPreference = "Stop"
@@ -319,6 +319,10 @@ Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/NexoFlow Setup.exe
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/payload manifest.json"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/NexoFlow Noturno.exe"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/NexoFlow Noturno.exe"
+foreach ($relative in @('app/run_noturno_console.py','comandos/executar_noturno.bat')) {
+    Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/$relative"
+    Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/$relative"
+}
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/NexoFlow Recompra.exe"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/NexoFlow Recompra.exe"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/weni_update.py"
@@ -371,7 +375,7 @@ Extraia todo o ZIP do Setup e execute **NexoFlow Setup.exe**. A distribuição i
 
 ## Primeira execução
 
-Siga a ordem: Weni completa → Planilha, se houver exports → Analytics completo → Recompra → Analytics incremental. Revise os relatórios e confirme as aplicações solicitadas. Depois atualize o Data Studio. Para a rotina sem confirmações, use **NexoFlow Noturno.exe**; confira o resultado em `logs/noturno/` (Farma) ou `logs/PET/noturno/` (Pets). A Recompra usa pedido_data: Farma D+25 e Pets D+30.
+Siga a ordem: Weni completa → Planilha, se houver exports → Analytics completo → Recompra → Analytics incremental. Revise os relatórios e confirme as aplicações solicitadas. Depois atualize o Data Studio. Para a rotina sem confirmações, use o atalho **NexoFlow Noturno** (EXE ou entrada em script validada, conforme disponibilidade); confira o resultado em `logs/noturno/` (Farma) ou `logs/PET/noturno/` (Pets). A Recompra usa pedido_data: Farma D+25 e Pets D+30.
 
 A arquitetura por perfis permite incluir novos departamentos e segmentos mediante registro, configuração e validação das integrações e regras próprias. Os perfis disponíveis nesta versão são FARMA e PET.
 
@@ -383,4 +387,4 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.2
+# NexoFlow 1.5.3

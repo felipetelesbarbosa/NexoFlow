@@ -79,10 +79,12 @@ function Invoke-Setup {
 }
 
 function Assert-Installed {
+    param([bool]$ExpectNightExe = $true)
     foreach ($relative in @(
         "app/recompra_profiles.py", "app/recompra_cleanup.py", "app/runtime_profile.py",
         "comandos/limpar_cancelados_recompra.bat", "comandos/atualizar_recompra_pets.bat",
-        "NexoFlow Noturno.exe",
+        "app/run_noturno_console.py",
+        "comandos/executar_noturno.bat",
         "assets\NexoFlow_Noturno.ico",
         "app\run_noturno.py",
         "NexoFlow Analytics.exe",
@@ -110,7 +112,9 @@ function Assert-Installed {
     $nightLink = Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) "NexoFlow Noturno.lnk"
     Assert-True (Test-Path -LiteralPath $nightLink) "Atalho Noturno ausente."
     $nightShortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($nightLink)
-    Assert-True ($nightShortcut.TargetPath -eq (Join-Path $InstallDir "NexoFlow Noturno.exe")) "Destino do atalho Noturno incorreto."
+    $nightTarget = if ($ExpectNightExe) { 'NexoFlow Noturno.exe' } else { 'comandos\executar_noturno.bat' }
+    Assert-True ($nightShortcut.TargetPath -eq (Join-Path $InstallDir $nightTarget)) 'Destino do atalho Noturno incorreto.'
+    Assert-True ((Test-Path -LiteralPath (Join-Path $InstallDir 'NexoFlow Noturno.exe')) -eq $ExpectNightExe) 'O launcher indisponível não deve ficar na instalação.'
 
     foreach ($nightShortcutRoot in @([Environment]::GetFolderPath("CommonDesktopDirectory"), (Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs\NexoFlow'))) {
         $nightIconLink = Join-Path $nightShortcutRoot 'NexoFlow Noturno.lnk'
@@ -138,9 +142,9 @@ function Assert-Installed {
 
     Assert-True (Test-Path -LiteralPath $UninstallKey) "Registro de desinstalação não foi criado."
     $installedVersion = (Get-Content -Raw -LiteralPath (Join-Path $InstallDir "VERSION")).Trim()
-    Assert-True ($installedVersion -eq "1.5.2") "Versão instalada inesperada: $installedVersion"
+    Assert-True ($installedVersion -eq "1.5.3") "Versão instalada inesperada: $installedVersion"
     $displayVersion = (Get-ItemProperty -LiteralPath $UninstallKey -Name DisplayVersion -ErrorAction Stop).DisplayVersion
-    Assert-True ($displayVersion -eq "1.5.2") "DisplayVersion inesperada: $displayVersion"
+    Assert-True ($displayVersion -eq "1.5.3") "DisplayVersion inesperada: $displayVersion"
 }
 
 Remove-TestArtifacts
@@ -155,7 +159,7 @@ try {
     $importsPayload = Join-Path $SetupDir 'payload\importacoes'
     Assert-True (Test-Path -LiteralPath $importsPayload -PathType Container) 'Pasta importacoes ausente no ZIP do Setup.'
     Assert-True (@(Get-ChildItem -LiteralPath $importsPayload -Force -Recurse).Count -eq 0) 'O pacote deve conter importacoes vazia, sem exports.'
-    $projectZip = Join-Path (Split-Path -Parent $resolvedZip) 'NexoFlow-1.5.2.zip'
+    $projectZip = Join-Path (Split-Path -Parent $resolvedZip) 'NexoFlow-1.5.3.zip'
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $projectArchive = [IO.Compression.ZipFile]::OpenRead($projectZip)
     try {
@@ -251,6 +255,20 @@ public static class NexoFlowSetupRootLock {
     Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir "secrets_config.py") -Raw) -match "TOKEN_TESTE_WENI") "secrets_config.py não foi preservado."
     Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir 'importacoes\planilha-teste.txt') -Raw) -eq 'export privado sintético') 'Importações não foram preservadas na atualização.'
 
+    Write-Host '==> Reproduzindo acesso negado real ao launcher Noturno no payload'
+    $nightSource = Join-Path $SetupDir 'payload\NexoFlow Noturno.exe'
+    $nightAcl = Get-Acl -LiteralPath $nightSource
+    $deniedAcl = Get-Acl -LiteralPath $nightSource
+    $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User
+    $denyRead = New-Object Security.AccessControl.FileSystemAccessRule($sid, [Security.AccessControl.FileSystemRights]::ReadData, [Security.AccessControl.AccessControlType]::Deny)
+    $deniedAcl.AddAccessRule($denyRead)
+    Set-Acl -LiteralPath $nightSource -AclObject $deniedAcl
+    try {
+        Invoke-Setup 'Atualização com acesso negado ao EXE Noturno e atalho para script validado'
+        Assert-Installed -ExpectNightExe $false
+        Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'logs\setup-smoke-marker.txt')).Trim() -eq 'preservar') 'Dados privados foram perdidos na instalação com entrada em script.'
+    } finally { Set-Acl -LiteralPath $nightSource -AclObject $nightAcl }
+
     Write-Host "==> Simulando antivírus/EDR removendo o launcher opcional Uninstall"
     $optionalSource = Join-Path $SetupDir "payload\NexoFlow Uninstall.exe"
     Remove-Item -LiteralPath $optionalSource -Force -ErrorAction SilentlyContinue
@@ -329,7 +347,7 @@ public static class NexoFlowSetupRootLock {
         }
     }
 
-    Write-Host "[OK] Smoke test do NexoFlow Setup 1.5.2 concluído."
+    Write-Host "[OK] Smoke test do NexoFlow Setup 1.5.3 concluído."
 }
 finally {
     Remove-Item Env:NEXOFLOW_SETUP_INSTALL_MODE -ErrorAction SilentlyContinue
@@ -338,4 +356,4 @@ finally {
     Remove-TestArtifacts
     Remove-Item -LiteralPath $TempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
-# NexoFlow 1.5.2
+# NexoFlow 1.5.3

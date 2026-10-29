@@ -1,8 +1,8 @@
-# Pedidos no NexoFlow 1.5.2
+# Pedidos no NexoFlow 1.5.3
 
 As regras compartilhadas de pedidos atendem **FarmaLíder e Pets Líder**, com organizações e planilhas separadas. Farma usa `ultima_compra`; Pets usa `compra_recente`. A referência dos eventos é `pedido_data`: D+25 na Farma e D+30 no Pets. Veja [segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 
-O **NexoFlow 1.5.2** usa a FarmaLíder API como fonte de verdade dos dados de pedido. A Weni recebe um snapshot operacional dos campos `pedido_*`; Google Sheets e Data Studio recebem a estrutura analítica correspondente.
+O **NexoFlow 1.5.3** usa a FarmaLíder API como fonte de verdade dos dados de pedido. A Weni recebe um snapshot operacional dos campos `pedido_*`; Google Sheets e Data Studio recebem a estrutura analítica correspondente.
 
 ## Arquitetura de coleta
 
@@ -265,4 +265,4 @@ Respostas inconsistentes não alimentam métricas como venda confirmada.
 
 Leia também [FarmaLíder API](FARMALIDER%20API.md), [NexoFlow Weni](README%20WENI.md) e [Data Studio](DATA%20STUDIO.md).
 
-<!-- NexoFlow 1.5.2 -->
+<!-- NexoFlow 1.5.3 -->

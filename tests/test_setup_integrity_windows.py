@@ -25,10 +25,102 @@ public static class NexoFlowHashTestLock {
 '@
 """
 
+NIGHT_PAYLOAD = r"""
+$PayloadDir = Join-Path $root 'payload'
+$ManifestPath = Join-Path $PayloadDir 'payload manifest.json'
+$files = @()
+foreach ($relative in @('NexoFlow Noturno.exe', 'comandos/executar_noturno.bat', 'app/run_noturno_console.py', 'app/run_noturno.py')) {
+    $path = Join-Path $PayloadDir $relative
+    Write-Fixture $path 'fixture sintetico'
+    $files += @{ path = $relative; sha256 = (Get-Sha256File -Path $path) }
+}
+@{files=$files} | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $ManifestPath -Encoding UTF8
+"""
+
+DENY_READ = r"""
+function Deny-Read([string]$Path) {
+    $before = Get-Acl -LiteralPath $Path
+    $changed = Get-Acl -LiteralPath $Path
+    $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User
+    $rule = New-Object Security.AccessControl.FileSystemAccessRule($sid, [Security.AccessControl.FileSystemRights]::ReadData, [Security.AccessControl.AccessControlType]::Deny)
+    $changed.AddAccessRule($rule)
+    Set-Acl -LiteralPath $Path -AclObject $changed
+    return $before
+}
+"""
+
 
 @unittest.skipUnless(os.name == "nt", "Requer bloqueios reais do Windows")
 class SetupIntegrityWindowsTests(unittest.TestCase):
     run_harness = lifecycle.ImportsLifecycleWindowsTests.run_harness
+
+    def test_access_denied_native_launcher_keeps_script_integrity_mandatory(self):
+        self.run_harness(
+            "install.ps1",
+            NIGHT_PAYLOAD
+            + r"""
+$script:originalHash = ${function:Get-Sha256File}
+function Get-Sha256File([string]$Path) {
+    if ([IO.Path]::GetFileName($Path) -eq 'NexoFlow Noturno.exe') { throw [UnauthorizedAccessException]::new('Acesso negado sintético') }
+    return (& $script:originalHash -Path $Path)
+}
+Validate-Payload
+Assert-True (-not $script:OptionalNightValidated) 'Um EXE sem leitura foi aprovado.'
+Assert-True (-not (Install-OptionalNightLauncher)) 'Tentou instalar um launcher sem hash confirmado.'
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $InstallDir 'NexoFlow Noturno.exe'))) 'O EXE bloqueado foi copiado.'
+Write-Fixture (Join-Path $PayloadDir 'app/run_noturno_console.py') 'conteudo alterado'
+$message = ''
+try { Validate-Payload } catch { $message = $_.Exception.Message }
+Assert-True ($message -like '*Falha de integridade*') 'O fallback fez o Setup aceitar um script alterado.'
+""",
+        )
+
+    def test_real_windows_access_denied_to_native_noturno_selects_script(self):
+        self.run_harness(
+            "install.ps1",
+            NIGHT_PAYLOAD
+            + DENY_READ
+            + r"""
+$path = Join-Path $PayloadDir 'NexoFlow Noturno.exe'
+$before = Deny-Read $path
+try {
+    $denied = $false
+    try { Get-Sha256File -Path $path | Out-Null } catch {
+        $cause = $_.Exception
+        while ($cause.InnerException) { $cause = $cause.InnerException }
+        $denied = $cause -is [UnauthorizedAccessException]
+    }
+    Assert-True $denied 'O fixture nao reproduziu o acesso negado do Windows.'
+    Validate-Payload
+    Assert-True (-not $script:OptionalNightValidated) 'O EXE negado recebeu aprovacao.'
+    Assert-True (-not (Install-OptionalNightLauncher)) 'Tentou copiar o EXE negado.'
+} finally { Set-Acl -LiteralPath $path -AclObject $before }
+""",
+        )
+
+    def test_access_denied_to_required_component_still_blocks_setup(self):
+        self.run_harness(
+            "install.ps1",
+            NIGHT_PAYLOAD
+            + DENY_READ
+            + r"""
+$path = Join-Path $PayloadDir 'NexoFlow Weni.exe'
+Write-Fixture $path 'fixture sintetico'
+$manifest = Get-Content -Raw -Encoding UTF8 -LiteralPath $ManifestPath | ConvertFrom-Json
+$manifest.files += @{path='NexoFlow Weni.exe'; sha256=(Get-Sha256File -Path $path)}
+$manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $ManifestPath -Encoding UTF8
+Write-Fixture (Join-Path $InstallDir 'original.txt') 'instalacao anterior'
+$before = Deny-Read $path
+$denied = $false
+try { try { Validate-Payload } catch {
+    $cause = $_.Exception
+    while ($cause.InnerException) { $cause = $cause.InnerException }
+    $denied = $cause -is [UnauthorizedAccessException]
+} } finally { Set-Acl -LiteralPath $path -AclObject $before }
+Assert-True $denied 'O Setup ignorou acesso negado a componente obrigatorio.'
+Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir 'original.txt') -Raw) -ceq 'instalacao anterior') 'A instalacao anterior foi alterada.'
+""",
+        )
 
     def test_compatible_open_handle_does_not_prevent_integrity_validation(self):
         self.run_harness(

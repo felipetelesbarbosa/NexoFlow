@@ -11,3 +11,5 @@ Rotinas BAT para cargas completas e incrementais, importação de planilhas, rev
 - `check-up.bat`: verifica sintaxe, testes e consistência.
 
 Para a ordem de execução e os pré-requisitos, consulte o [guia de operação](../docs/Documentacao%20NexoFlow.md).
+
+`executar_noturno.bat` abre a rotina noturna em script: escolha o segmento e o modo incremental ou completo. O resultado fica visível até um novo ENTER. O Setup usa essa entrada no atalho quando o launcher EXE do Noturno está indisponível.

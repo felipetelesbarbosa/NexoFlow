@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
 $AppName = 'NexoFlow'
-$AppVersion = '1.5.2'
+$AppVersion = '1.5.3'
 $Publisher = 'Grupo Lider'
 $InstallDir = 'C:\NexoFlow'
 $DataDir = 'C:\NexoFlow Data'
@@ -20,6 +20,7 @@ $BundledPythonSha256 = '759be887b96e736a3ca886daf8d575f18fcae1a09efab6902f42d59e
 $UninstallKey = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\NexoFlow'
 $AppKey = 'HKLM:\Software\Grupo Lider\NexoFlow'
 $script:OptionalUninstallerValidated = $true
+$script:OptionalNightValidated = $true
 $script:RollbackInstallDir = $null
 $script:RollbackUsesExistingRoot = $false
 
@@ -778,6 +779,8 @@ function Validate-Payload {
 
     $script:OptionalUninstallerValidated = $true
     $optionalRelative = 'NexoFlow Uninstall.exe'
+    $script:OptionalNightValidated = $true
+    $nightRelative = 'NexoFlow Noturno.exe'
     $manifest = Get-Content -LiteralPath $ManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
     $count = 0
 
@@ -792,6 +795,11 @@ function Validate-Payload {
                 Write-Warning "$optionalRelative foi removido ou bloqueado antes da instalação. Como ele é opcional, o Setup continuará normalmente."
                 continue
             }
+            if ($relative -eq $nightRelative) {
+                $script:OptionalNightValidated = $false
+                Write-Warning 'Launcher EXE do Noturno indisponível. A entrada em script será validada e usada no atalho.'
+                continue
+            }
             throw "Arquivo ausente no pacote: $relative"
         }
 
@@ -801,6 +809,17 @@ function Validate-Payload {
             if ($relative -eq $optionalRelative) {
                 $script:OptionalUninstallerValidated = $false
                 Write-Warning "Não foi possível validar $optionalRelative. O componente será ignorado e o Setup continuará."
+                continue
+            }
+            $failure = $_.Exception
+            while ($failure.InnerException) { $failure = $failure.InnerException }
+            if ($relative -eq $nightRelative -and (
+                $failure -is [UnauthorizedAccessException] -or
+                $failure -is [IO.FileNotFoundException] -or
+                $failure -is [TimeoutException]
+            )) {
+                $script:OptionalNightValidated = $false
+                Write-Warning 'O Windows não liberou a leitura do launcher EXE do Noturno. Ele ficará fora da instalação; o atalho usará a entrada em script validada.'
                 continue
             }
             throw
@@ -818,6 +837,14 @@ function Validate-Payload {
         $count++
     }
 
+    if (-not $script:OptionalNightValidated) {
+        foreach ($required in @('comandos/executar_noturno.bat', 'app/run_noturno_console.py', 'app/run_noturno.py')) {
+            $entries = @($manifest.files | Where-Object { $_.path -ceq $required })
+            if ($entries.Count -ne 1 -or ([string]$entries[0].sha256) -notmatch '^[a-fA-F0-9]{64}$') {
+                throw "Entrada em script do Noturno ausente ou inválida no manifesto: $required"
+            }
+        }
+    }
     Write-Host "[OK] Integridade dos componentes obrigatórios validada ($count arquivos)." -ForegroundColor Green
 }
 
@@ -827,7 +854,7 @@ function Validate-InstalledPayload {
     $manifest = Get-Content -LiteralPath $ManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
     foreach ($entry in $manifest.files) {
         $relative = [string]$entry.path
-        if ($relative -in @('payload manifest.json', 'NexoFlow Uninstall.exe')) { continue }
+        if ($relative -in @('payload manifest.json', 'NexoFlow Uninstall.exe', 'NexoFlow Noturno.exe')) { continue }
         $target = Join-Path $InstallDir $relative
         if (-not (Test-Path -LiteralPath $target -PathType Leaf)) {
             throw "Arquivo obrigatório ausente após a cópia: $relative"
@@ -877,6 +904,35 @@ function Ensure-InstalledPayloadFile([string]$RelativePath) {
     }
 
     Write-Host "[OK] $RelativePath validado no destino." -ForegroundColor Green
+}
+
+function Install-OptionalNightLauncher {
+    # O motor Python, o BAT e o ícone são obrigatórios e já foram validados.
+    # Um EXE que o Windows não permite ler/copiar nunca é usado como atalho.
+    if (-not $script:OptionalNightValidated) { return $false }
+    $relative = 'NexoFlow Noturno.exe'
+    $source = Join-Path $PayloadDir $relative
+    $target = Join-Path $InstallDir $relative
+    $manifest = Get-Content -LiteralPath $ManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $entry = @($manifest.files | Where-Object { $_.path -ceq $relative })
+    if ($entry.Count -ne 1) { throw 'Manifesto do Noturno ausente ou duplicado.' }
+    try {
+        Copy-Item -LiteralPath $source -Destination $target -Force -ErrorAction Stop
+        $hash = Get-Sha256File -Path $target
+    } catch {
+        $failure = $_.Exception
+        while ($failure.InnerException) { $failure = $failure.InnerException }
+        if ($failure -is [UnauthorizedAccessException] -or $failure -is [IO.IOException] -or $failure -is [TimeoutException] -or $failure -is [Management.Automation.ItemNotFoundException]) {
+            Write-Warning 'Launcher EXE do Noturno indisponível no destino. O atalho usará a entrada em script validada.'
+            if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Force -ErrorAction Stop }
+            return $false
+        }
+        throw
+    }
+    if ($hash -cne ([string]$entry[0].sha256).ToLowerInvariant()) {
+        throw 'Falha de integridade no launcher EXE instalado do Noturno.'
+    }
+    return $true
 }
 
 function Install-OptionalUninstaller {
@@ -1334,7 +1390,7 @@ try {
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
     # O launcher NexoFlow Uninstall.exe é opcional e pode ser bloqueado por EDR/antivírus.
     # Ele é copiado separadamente em modo tolerante para nunca reprovar o Setup.
-    Get-ChildItem -LiteralPath $PayloadDir -Force | Where-Object { $_.Name -notin @('payload manifest.json','NexoFlow Uninstall.exe') } | ForEach-Object {
+    Get-ChildItem -LiteralPath $PayloadDir -Force | Where-Object { $_.Name -notin @('payload manifest.json','NexoFlow Uninstall.exe','NexoFlow Noturno.exe') } | ForEach-Object {
         Copy-Item -LiteralPath $_.FullName -Destination $InstallDir -Recurse -Force
     }
 
@@ -1379,15 +1435,18 @@ try {
         Ensure-InstalledPayloadFile -RelativePath $requiredFile
     }
 
-    foreach ($nightFile in @('NexoFlow Noturno.exe', 'app/run_noturno.py', 'assets\NexoFlow_Noturno.ico')) {
+    foreach ($nightFile in @('app/run_noturno.py', 'app/run_noturno_console.py', 'comandos/executar_noturno.bat', 'assets\NexoFlow_Noturno.ico')) {
         Ensure-InstalledPayloadFile -RelativePath $nightFile
     }
+
+    Write-Step 'Configurando entrada do NexoFlow Noturno'
+    $nightLauncherAvailable = Install-OptionalNightLauncher
 
     Write-Step 'Verificando launcher opcional de desinstalação'
     Install-OptionalUninstaller
 
     Write-Step 'Criando atalhos do NexoFlow na Área de Trabalho'
-    $nightExe = Join-Path $InstallDir 'NexoFlow Noturno.exe'
+    $nightExe = if ($nightLauncherAvailable) { Join-Path $InstallDir 'NexoFlow Noturno.exe' } else { Join-Path $InstallDir 'comandos\executar_noturno.bat' }
     $nightIcon = Join-Path $InstallDir 'assets\NexoFlow_Noturno.ico'
     $appExe = Join-Path $InstallDir 'NexoFlow Analytics.exe'
     $updateExe = Join-Path $InstallDir 'NexoFlow Weni.exe'
@@ -1518,4 +1577,4 @@ catch {
     try { Stop-Transcript | Out-Null } catch { }
     exit 1
 }
-# NexoFlow 1.5.2
+# NexoFlow 1.5.3
