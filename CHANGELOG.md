@@ -1,5 +1,7 @@
 # NexoFlow 1.0 — Changelog
 
+- Setup: bloqueios temporários de leitura recebem até 30 segundos de retentativas durante a verificação SHA-256. A validação continua obrigatória; arquivo ainda em uso ou hash divergente interrompe a instalação com diagnóstico claro. Testes Windows cobrem liberação do bloqueio, prazo esgotado e integridade após a espera. Setup e Uninstall não pedem segmento; a escolha permanece nos aplicativos operacionais.
+
 - Noturno: etapas Weni/Analytics aplicadas com resultado parcial preservam pendências e continuam a sequência; o resultado final permanece parcial. Falhas críticas ou revisão não aplicada interrompem a rotina.
 - Perfis Farma/Pets nos aplicativos operacionais: credenciais e destinos separados, revisão e manifesto vinculados ao segmento, logs/importações próprios e seleção do segmento ao abrir os mesmos executáveis. Pets preserva produtos do segmento, usa compra_recente e consentimentos Sim/Não, sem campo de maioridade. Farma permanece D+25; Pets D+30.
 - Recompra: pagamento fora dos códigos 1 a 6 bloqueia admissão em ambos os segmentos; auditoria somente leitura dos integrantes por BAT, com relatórios privados JSON/CSV e falhas isoladas pendentes. API FarmaLíder usa conexão de até 10s e resposta de até 90s por tentativa, com o mesmo controle de rede direta/proxy e retentativas para ambos os perfis.

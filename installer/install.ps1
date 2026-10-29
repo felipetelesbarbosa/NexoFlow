@@ -74,17 +74,45 @@ function Show-Info([string]$Text, [string]$Title = $AppName) {
     } catch { Write-Host $Text }
 }
 
-function Get-Sha256File([string]$Path) {
-    $stream = $null
-    $sha = $null
-    try {
-        $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
-        $sha = [Security.Cryptography.SHA256]::Create()
-        $bytes = $sha.ComputeHash($stream)
-        return ([BitConverter]::ToString($bytes)).Replace('-', '').ToLowerInvariant()
-    } finally {
-        if ($sha) { $sha.Dispose() }
-        if ($stream) { $stream.Dispose() }
+function Get-Sha256File {
+    param(
+        [string]$Path,
+        [ValidateRange(0, 60)][double]$RetryTimeoutSeconds = 30,
+        [ValidateRange(1, 1000)][int]$RetryDelayMilliseconds = 500
+    )
+
+    $watch = [Diagnostics.Stopwatch]::StartNew()
+    $waitingReported = $false
+    while ($true) {
+        $stream = $null
+        $sha = $null
+        try {
+            # Não compartilhar escrita: o conteúdo não pode mudar durante o hash.
+            $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+            $sha = [Security.Cryptography.SHA256]::Create()
+            $bytes = $sha.ComputeHash($stream)
+            return ([BitConverter]::ToString($bytes)).Replace('-', '').ToLowerInvariant()
+        } catch {
+            $failure = $_.Exception
+            while ($failure.InnerException) { $failure = $failure.InnerException }
+            $nativeCode = $failure.HResult -band 0xffff
+            # ERROR_SHARING_VIOLATION / ERROR_LOCK_VIOLATION. Outros erros não são transitórios.
+            if (-not ($failure -is [IO.IOException]) -or $nativeCode -notin @(32, 33)) { throw }
+            if ($watch.Elapsed.TotalSeconds -ge $RetryTimeoutSeconds) {
+                throw "Não foi possível verificar a integridade de '$Path': o arquivo continua em uso após $RetryTimeoutSeconds segundo(s). Encerre as rotinas abertas nessa pasta e aguarde a liberação do arquivo antes de tentar novamente. A instalação não pode continuar sem validar esse componente."
+            }
+            if (-not $waitingReported) {
+                Write-Host "[AVISO] Arquivo em uso; aguardando liberação para validar a integridade: $Path (até $RetryTimeoutSeconds s)." -ForegroundColor Yellow
+                $waitingReported = $true
+            }
+        } finally {
+            if ($sha) { $sha.Dispose() }
+            if ($stream) { $stream.Dispose() }
+        }
+        $remainingMs = ($RetryTimeoutSeconds - $watch.Elapsed.TotalSeconds) * 1000
+        if ($remainingMs -gt 0) {
+            Start-Sleep -Milliseconds ([int][Math]::Min($RetryDelayMilliseconds, [Math]::Ceiling($remainingMs)))
+        }
     }
 }
 

@@ -167,7 +167,29 @@ try {
     $env:NEXOFLOW_SETUP_NONINTERACTIVE = "1"
     $env:NEXOFLOW_PYTHON_EXE = $python
 
-    Invoke-Setup "Primeira instalação"
+    # Reproduz o bloqueio transitório do payload no Setup real, sem relaxar o hash.
+    Add-Type -TypeDefinition @'
+using System;
+using System.IO;
+using System.Threading;
+public static class NexoFlowPayloadTestLock {
+    public static FileStream Hold(string path) {
+        FileStream handle = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.None);
+        Thread worker = new Thread(delegate() { Thread.Sleep(10000); handle.Dispose(); });
+        worker.IsBackground = true;
+        worker.Start();
+        return handle;
+    }
+}
+'@
+    Remove-Item Env:NEXOFLOW_PERFIL -ErrorAction SilentlyContinue
+    $payloadLock = [NexoFlowPayloadTestLock]::Hold((Join-Path $SetupDir 'payload\NexoFlow Noturno.exe'))
+    try { Invoke-Setup "Primeira instalação com arquivo do payload temporariamente em uso" }
+    finally { $payloadLock.Dispose() }
+    $firstOutput = [IO.File]::ReadAllText((Join-Path $TempRoot 'setup-stdout.txt'), [Text.Encoding]::UTF8)
+    Assert-True ($firstOutput -match 'aguardando .* para validar a integridade') 'O teste nao exercitou a espera pelo arquivo do payload.'
+    Assert-True ($firstOutput -notmatch '\[1\] Farma') 'O Setup exibiu indevidamente a selecao de segmento.'
+    $env:NEXOFLOW_PERFIL = 'FARMA'
     Assert-Installed
 
     Write-Host "==> Criando dados privados para testar preservação"

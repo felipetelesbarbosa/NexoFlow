@@ -137,7 +137,13 @@ func runChild(name string, args ...string) int {
 }
 
 func prepareLauncher() (string, func(), int) {
-    if rc := ensureProfile(bufio.NewReader(os.Stdin)); rc != 0 { return "", func(){}, rc }
+    return prepareLauncherWithProfile(true)
+}
+
+func prepareLauncherWithProfile(selectSegment bool) (string, func(), int) {
+    if selectSegment {
+        if rc := ensureProfile(bufio.NewReader(os.Stdin)); rc != 0 { return "", func(){}, rc }
+    }
     if os.Getenv("NEXOFLOW_INTERNAL_BUILD_INFO") == "1" {
         fmt.Println(buildMarker)
     }

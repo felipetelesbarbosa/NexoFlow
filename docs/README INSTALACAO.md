@@ -63,4 +63,4 @@ O desinstalador remove o programa e os atalhos. As importações são preservada
 
 ## Se houver problema
 
-Consulte o resultado exibido e os arquivos em `logs/`. Se uma pasta ou um arquivo estiver em uso, encerre as rotinas e as janelas abertas nessa instalação antes de tentar novamente. Para alertas do antivírus corporativo, consulte o [guia de confiança](ANTIVIRUS%20E%20CONFIANCA.md).
+Consulte o resultado exibido e os arquivos em `logs/`. Na verificação de integridade, o Setup aguarda até 30 segundos por arquivo com bloqueio temporário de leitura. Ele não dispensa a validação SHA-256. Se uma pasta ou um arquivo continuar em uso, encerre as rotinas e as janelas abertas nessa instalação antes de tentar novamente. Para alertas do antivírus corporativo, consulte o [guia de confiança](ANTIVIRUS%20E%20CONFIANCA.md).

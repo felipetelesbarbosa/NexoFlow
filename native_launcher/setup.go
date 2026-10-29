@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-    installDir, cleanup, rc := prepareLauncher()
+    installDir, cleanup, rc := prepareLauncherWithProfile(false)
     if rc != 0 { os.Exit(rc) }
     defer cleanup()
 
