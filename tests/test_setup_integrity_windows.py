@@ -37,7 +37,7 @@ class SetupIntegrityWindowsTests(unittest.TestCase):
             + r"""
 $path = Join-Path $root 'NexoFlow Noturno.exe'
 Write-Fixture $path 'conteudo sintetico'
-$expected = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+$expected = '236d4b4b6a1829e48159a8d47a26f5a237d4d56d9044a5f3f13dffbb76718607'
 $handle = [NexoFlowHashTestLock]::Hold($path, 700)
 try {
     # Reproduz a linha antiga antes de testar a recuperação do instalador.
@@ -105,7 +105,7 @@ $PayloadDir = Join-Path $root 'payload'
 $ManifestPath = Join-Path $PayloadDir 'payload manifest.json'
 $path = Join-Path $PayloadDir 'NexoFlow Noturno.exe'
 Write-Fixture $path 'conteudo original'
-$expected = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
+$expected = '7f6571c4fd4025e893ceb3c4b0ca3859dd350a11795d7c1c7df22aeefdcab91f'
 @{ files = @(@{ path = 'NexoFlow Noturno.exe'; sha256 = $expected }) } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $ManifestPath -Encoding UTF8
 Write-Fixture $path 'conteudo alterado'
 Write-Fixture (Join-Path $InstallDir 'original.txt') 'instalacao anterior'
