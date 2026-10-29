@@ -27,8 +27,11 @@ try {
     $inputPath = Join-Path $testDir 'segmento.txt'
     [IO.File]::WriteAllText($inputPath, "2`r`n", [Text.Encoding]::ASCII)
     Remove-Item Env:NEXOFLOW_PERFIL -ErrorAction SilentlyContinue
-    $menuProc = Start-Process -FilePath $exe -WorkingDirectory $testDir -NoNewWindow -RedirectStandardInput $inputPath -PassThru -Wait
+    $menuOutput = Join-Path $testDir 'menu-saida.txt'
+    $menuProc = Start-Process -FilePath $exe -WorkingDirectory $testDir -NoNewWindow -RedirectStandardInput $inputPath -RedirectStandardOutput $menuOutput -PassThru -Wait
     if ($menuProc.ExitCode -ne 0 -or (Get-Content (Join-Path $testDir 'perfil.txt') -Raw).Trim() -cne 'PET') { throw 'Menu de segmento do executável não selecionou PET.' }
+    $menuText = [IO.File]::ReadAllText($menuOutput, [Text.Encoding]::UTF8)
+    if ($menuText -notmatch 'Pets Líder D\+30' -or $menuText -match 'FarmaLider D\+25') { throw 'O launcher exibiu a campanha errada para o perfil PET.' }
     $env:NEXOFLOW_PERFIL = 'FARMA'
     $proc = Start-Process -FilePath $exe -ArgumentList '--perfil','PET' -WorkingDirectory $testDir -NoNewWindow -PassThru -Wait
     if ($proc.ExitCode -ne 0) { throw 'Launcher Pets falhou.' }

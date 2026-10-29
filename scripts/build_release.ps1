@@ -160,7 +160,7 @@ $launcherTargets = @(
     @{ Name = "NexoFlow Noturno.exe"; Tag = "noturno"; Description = "NexoFlow Noturno — Weni, Analytics e Recompra sem confirmação humana" },
     @{ Name = "NexoFlow Analytics.exe"; Tag = "analytics"; Description = "NexoFlow Analytics — análise de dados" },
     @{ Name = "NexoFlow Weni.exe"; Tag = "updateweni"; Description = "NexoFlow Weni — atualização de contatos" },
-    @{ Name = "NexoFlow Recompra.exe"; Tag = "recompra"; Description = "NexoFlow Recompra — grupo FarmaLíder D+25" },
+    @{ Name = "NexoFlow Recompra.exe"; Tag = "recompra"; Description = "NexoFlow Recompra — FarmaLíder D+25 e Pets Líder D+30" },
     @{ Name = "NexoFlow Planilha.exe"; Tag = "planilha"; Description = "NexoFlow Planilha — cargas por planilhas" },
     @{ Name = "NexoFlow Terminal.exe"; Tag = "terminal"; Description = "NexoFlow Terminal — consultas e diagnóstico" },
     @{ Name = "NexoFlow Uninstall.exe"; Tag = "uninstall"; Description = "NexoFlow — desinstalação" }
