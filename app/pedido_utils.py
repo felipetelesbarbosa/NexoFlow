@@ -337,4 +337,4 @@ def serialize_pedido_products(
     )
 
 
-# NexoFlow 1.5.1
+# NexoFlow 1.5.2

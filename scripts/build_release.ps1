@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.1"
+    [string]$Version = "1.5.2"
 )
 
 $ErrorActionPreference = "Stop"
@@ -383,4 +383,4 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.1
+# NexoFlow 1.5.2

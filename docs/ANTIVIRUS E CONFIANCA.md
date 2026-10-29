@@ -1,6 +1,6 @@
-# Antivírus e confiança — NexoFlow 1.5.1
+# Antivírus e confiança — NexoFlow 1.5.2
 
-O NexoFlow 1.5.1 foi empacotado para reduzir padrões que costumam gerar falsos positivos sem ocultar o funcionamento do software.
+O NexoFlow 1.5.2 foi empacotado para reduzir padrões que costumam gerar falsos positivos sem ocultar o funcionamento do software.
 
 ## Princípios de distribuição
 
@@ -26,7 +26,7 @@ O NexoFlow não tenta desativar ou contornar antivírus/EDR. Caso uma política 
 
 O Update Weni mantém revisão humana na carga completa, snapshot congelado, controle de concorrência por contato, checkpoint seguro e logs de auditoria. O Analytics mantém timeout/retry controlado para serviços externos e não amplia permissões de API além das credenciais configuradas pelo operador.
 
-## NexoFlow 1.5.1
+## NexoFlow 1.5.2
 
-Toda a distribuição deve ser identificada como **NexoFlow 1.5.1**. Os executáveis Windows usam `1.5.0.0` somente no recurso VERSIONINFO, formato de quatro componentes do Windows.
-<!-- NexoFlow 1.5.1 -->
+Toda a distribuição deve ser identificada como **NexoFlow 1.5.2**. Os executáveis Windows usam `1.5.0.0` somente no recurso VERSIONINFO, formato de quatro componentes do Windows.
+<!-- NexoFlow 1.5.2 -->

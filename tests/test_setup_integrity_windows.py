@@ -30,6 +30,76 @@ public static class NexoFlowHashTestLock {
 class SetupIntegrityWindowsTests(unittest.TestCase):
     run_harness = lifecycle.ImportsLifecycleWindowsTests.run_harness
 
+    def test_compatible_open_handle_does_not_prevent_integrity_validation(self):
+        self.run_harness(
+            "install.ps1",
+            r"""
+$path = Join-Path $root 'NexoFlow Noturno.exe'
+Write-Fixture $path 'conteudo sintetico'
+$handle = [IO.File]::Open($path, 'Open', 'ReadWrite', 'Read')
+try {
+    $actual = Get-Sha256File -Path $path -RetryTimeoutSeconds 0.3 -RetryDelayMilliseconds 25
+    Assert-True ($actual -ceq '236d4b4b6a1829e48159a8d47a26f5a237d4d56d9044a5f3f13dffbb76718607') 'Arquivo aberto compativel nao teve seu conteudo validado.'
+} finally { $handle.Dispose() }
+""",
+        )
+
+    def test_blocked_io_cannot_bypass_total_hash_deadline(self):
+        self.run_harness(
+            "install.ps1",
+            r"""
+# Simula uma leitura que nunca retorna, sem bloquear o processo de testes.
+Add-Type -TypeDefinition @'
+using System;
+using System.Threading;
+public sealed class NexoFlowHashJob {
+    public string Hash { get { return null; } }
+    public Exception Error { get { return null; } }
+    public bool SharingBlocked { get { return false; } }
+    public static bool Cancelled;
+    public static NexoFlowHashJob Start(string path, int delay) { return new NexoFlowHashJob(); }
+    public bool Wait(int milliseconds) { Thread.Sleep(milliseconds); return false; }
+    public void Cancel() { Cancelled = true; }
+}
+'@
+$path = Join-Path $root 'NexoFlow Noturno.exe'
+Write-Fixture $path 'conteudo sintetico'
+$watch = [Diagnostics.Stopwatch]::StartNew()
+$actual = $null
+$message = ''
+try { $actual = Get-Sha256File -Path $path -RetryTimeoutSeconds 0.2 }
+catch { $message = $_.Exception.Message }
+Assert-True ($message -like '*prazo*') 'Uma leitura bloqueada nao encerrou no prazo total.'
+Assert-True ($message.Contains($path)) 'O diagnostico nao identifica o arquivo.'
+Assert-True ($null -eq $actual) 'Uma leitura bloqueada devolveu um hash.'
+Assert-True ([NexoFlowHashJob]::Cancelled) 'O worker nao recebeu cancelamento.'
+Assert-True ($watch.Elapsed.TotalSeconds -lt 3) 'O controle continuou preso na leitura.'
+""",
+        )
+
+    def test_installed_copy_is_checked_against_manifest_before_execution(self):
+        self.run_harness(
+            "install.ps1",
+            r"""
+$PayloadDir = Join-Path $root 'payload'
+$ManifestPath = Join-Path $PayloadDir 'payload manifest.json'
+$relative = 'instalar.bat'
+Write-Fixture (Join-Path $PayloadDir $relative) 'conteudo original'
+$expected = '7f6571c4fd4025e893ceb3c4b0ca3859dd350a11795d7c1c7df22aeefdcab91f'
+@{ files = @(@{ path = $relative; sha256 = $expected }) } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $ManifestPath -Encoding UTF8
+Write-Fixture (Join-Path $InstallDir $relative) 'conteudo alterado'
+$message = ''
+try { Validate-InstalledPayload } catch { $message = $_.Exception.Message }
+Assert-True ($message -like '*Falha de integridade*') 'Copia alterada passou pela validacao do destino.'
+Write-Fixture (Join-Path $InstallDir $relative) 'conteudo original'
+Validate-InstalledPayload
+Remove-Item -LiteralPath (Join-Path $InstallDir $relative)
+$message = ''
+try { Validate-InstalledPayload } catch { $message = $_.Exception.Message }
+Assert-True ($message -like '*ausente*') 'Copia removida passou pela validacao do destino.'
+""",
+        )
+
     def test_hash_waits_for_exclusive_handle_and_reads_actual_content(self):
         self.run_harness(
             "install.ps1",
@@ -64,6 +134,9 @@ Assert-True ((Get-Content -LiteralPath $path -Raw) -ceq 'conteudo sintetico') 'A
             r"""
 $path = Join-Path $root 'NexoFlow Noturno.exe'
 Write-Fixture $path 'conteudo sintetico'
+$warmup = Join-Path $root 'warmup.txt'
+Write-Fixture $warmup 'fixture'
+Get-Sha256File -Path $warmup | Out-Null
 $handle = [IO.File]::Open($path, 'Open', 'Read', 'None')
 $watch = [Diagnostics.Stopwatch]::StartNew()
 $message = ''
@@ -83,6 +156,9 @@ Assert-True ($watch.Elapsed.TotalSeconds -lt 3) 'A espera excedeu o prazo limita
         self.run_harness(
             "install.ps1",
             r"""
+$warmup = Join-Path $root 'warmup.txt'
+Write-Fixture $warmup 'fixture'
+Get-Sha256File -Path $warmup | Out-Null
 $watch = [Diagnostics.Stopwatch]::StartNew()
 $failed = $false
 try { Get-Sha256File -Path (Join-Path $root 'ausente.exe') -RetryTimeoutSeconds 5 | Out-Null }

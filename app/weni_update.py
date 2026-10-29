@@ -3721,4 +3721,4 @@ def run_update(
             farm.close()
 
 
-# NexoFlow 1.5.1
+# NexoFlow 1.5.2

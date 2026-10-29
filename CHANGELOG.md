@@ -1,4 +1,10 @@
-# NexoFlow 1.5.1 — Changelog
+# NexoFlow 1.5.2 — Changelog
+
+## NexoFlow 1.5.2 — 29/10/2026
+
+- Instalador com prazo total para leitura SHA-256, inclusive quando o I/O do Windows não retorna, e progresso durante a espera. Arquivos abertos com compartilhamento compatível podem ser lidos sem modificar o arquivo ou desbloquear handles exclusivos.
+- Integridade dos arquivos copiados reconferida com o manifesto antes de executar o ambiente Python. Bloqueios persistentes, cópias alteradas e componentes ausentes continuam impedindo a instalação, com preservação da versão anterior.
+- Regressões de leitura bloqueada, handles compatíveis, prazo, conteúdo alterado e cópia instalada; validação do Setup real no Windows.
 
 ## NexoFlow 1.5.1 — 29/10/2026
 

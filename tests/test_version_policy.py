@@ -44,7 +44,7 @@ class VersionPolicyTests(unittest.TestCase):
         from nexo_cli import VERSION
 
         metadata = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-        self.assertEqual(CURRENT_VERSION, "1.5.1")
+        self.assertEqual(CURRENT_VERSION, "1.5.2")
         self.assertEqual(APP_VERSION, CURRENT_VERSION)
         self.assertEqual(VERSION, CURRENT_VERSION)
         self.assertEqual(metadata["project"]["version"], CURRENT_VERSION)
@@ -65,7 +65,7 @@ class VersionPolicyTests(unittest.TestCase):
         )
         self.assertIn(f"NexoFlow-Setup-{CURRENT_VERSION}.zip", workflow)
         self.assertIn(f"gh release create v{CURRENT_VERSION}", workflow)
-        self.assertNotIn("git push origin refs/tags/v1.5.1 --force", workflow)
+        self.assertNotIn("git push origin refs/tags/v1.5.2 --force", workflow)
         self.assertRegex(workflow, r"Incremente o patch")
 
     def test_runtime_contract_without_github_in_installed_layout(self):

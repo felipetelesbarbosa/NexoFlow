@@ -1,4 +1,4 @@
-# NexoFlow 1.5.1
+# NexoFlow 1.5.2
 
 Válido para **FarmaLíder e Pets Líder**. Escolha a marca no executável. Use exports do projeto correspondente em `importacoes/` (Farma) ou `importacoes/PET/` (Pets). [Segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 

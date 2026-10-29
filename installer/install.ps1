@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
 $AppName = 'NexoFlow'
-$AppVersion = '1.5.1'
+$AppVersion = '1.5.2'
 $Publisher = 'Grupo Lider'
 $InstallDir = 'C:\NexoFlow'
 $DataDir = 'C:\NexoFlow Data'
@@ -82,41 +82,101 @@ function Get-Sha256File {
         [ValidateRange(1, 1000)][int]$RetryDelayMilliseconds = 500
     )
 
+    # Uma leitura síncrona retida por um filtro do Windows não permite conferir
+    # o relógio. O worker mantém todo I/O fora do controle do prazo e do console.
+    if (-not ('NexoFlowHashJob' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.IO;
+using System.Security.Cryptography;
+using System.Threading;
+public sealed class NexoFlowHashJob {
+    private readonly ManualResetEventSlim completed = new ManualResetEventSlim(false);
+    private volatile bool cancelled;
+    private volatile bool sharingBlocked;
+    public string Hash { get; private set; }
+    public Exception Error { get; private set; }
+    public bool SharingBlocked { get { return sharingBlocked; } }
+    public bool Wait(int milliseconds) { return completed.Wait(milliseconds); }
+    public void Cancel() { cancelled = true; }
+    public static NexoFlowHashJob Start(string path, int delay) {
+        NexoFlowHashJob job = new NexoFlowHashJob();
+        Thread worker = new Thread(delegate() { job.Run(path, delay); });
+        worker.IsBackground = true;
+        worker.Start();
+        return job;
+    }
+    private void Run(string path, int delay) {
+        try {
+            while (!cancelled) {
+                try {
+                    // Aceita handles que permitem leitura. Não escreve nem
+                    // desbloqueia arquivos; o manifesto continua obrigatório.
+                    using (FileStream stream = File.Open(path, FileMode.Open,
+                        FileAccess.Read, FileShare.ReadWrite | FileShare.Delete)) {
+                        long length = stream.Length;
+                        DateTime stamp = File.GetLastWriteTimeUtc(path);
+                        using (SHA256 sha = SHA256.Create()) {
+                            byte[] buffer = new byte[65536];
+                            int read;
+                            while ((read = stream.Read(buffer, 0, buffer.Length)) > 0) {
+                                if (cancelled) return;
+                                sha.TransformBlock(buffer, 0, read, buffer, 0);
+                            }
+                            if (cancelled) return;
+                            sha.TransformFinalBlock(buffer, 0, 0);
+                            if (stream.Length != length || File.GetLastWriteTimeUtc(path) != stamp)
+                                throw new IOException("O arquivo mudou durante a validação de integridade: " + path);
+                            Hash = BitConverter.ToString(sha.Hash).Replace("-", "").ToLowerInvariant();
+                        }
+                    }
+                    return;
+                } catch (IOException failure) {
+                    int code = failure.HResult & 0xffff;
+                    if (code != 32 && code != 33) throw;
+                    sharingBlocked = true;
+                    Thread.Sleep(delay);
+                }
+            }
+        } catch (Exception failure) {
+            Error = failure;
+        } finally { completed.Set(); }
+    }
+}
+'@
+    }
+
+    $job = [NexoFlowHashJob]::Start($Path, $RetryDelayMilliseconds)
     $watch = [Diagnostics.Stopwatch]::StartNew()
     $waitingReported = $false
-    while ($true) {
-        $stream = $null
-        $sha = $null
-        try {
-            # Não compartilhar escrita: o conteúdo não pode mudar durante o hash.
-            $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
-            $sha = [Security.Cryptography.SHA256]::Create()
-            $bytes = $sha.ComputeHash($stream)
-            return ([BitConverter]::ToString($bytes)).Replace('-', '').ToLowerInvariant()
-        } catch {
-            $failure = $_.Exception
-            while ($failure.InnerException) { $failure = $failure.InnerException }
-            $nativeCode = $failure.HResult -band 0xffff
-            # ERROR_SHARING_VIOLATION / ERROR_LOCK_VIOLATION. Outros erros não são transitórios.
-            if (-not ($failure -is [IO.IOException]) -or $nativeCode -notin @(32, 33)) { throw }
-            if ($watch.Elapsed.TotalSeconds -ge $RetryTimeoutSeconds) {
-                throw "Não foi possível verificar a integridade de '$Path': o arquivo continua em uso após $RetryTimeoutSeconds segundo(s). Encerre as rotinas abertas nessa pasta e aguarde a liberação do arquivo antes de tentar novamente. A instalação não pode continuar sem validar esse componente."
+    $lastReport = 0.0
+    try {
+        while ($true) {
+            $remainingMs = ($RetryTimeoutSeconds - $watch.Elapsed.TotalSeconds) * 1000
+            $waitMs = [int][Math]::Max(0, [Math]::Min(200, [Math]::Ceiling($remainingMs)))
+            if ($job.Wait($waitMs)) {
+                if ($job.Error) { throw $job.Error }
+                if ($job.Hash -notmatch '^[a-f0-9]{64}$') { throw "Leitura de integridade incompleta: $Path" }
+                return $job.Hash
             }
-            if (-not $waitingReported) {
+            if ($watch.Elapsed.TotalSeconds -ge $RetryTimeoutSeconds) {
+                if ($job.SharingBlocked) { $reason = 'o arquivo continua em uso' }
+                else { $reason = 'a leitura do arquivo não respondeu' }
+                throw [TimeoutException]::new("Não foi possível verificar a integridade de '$Path': $reason no prazo de $RetryTimeoutSeconds segundo(s). Aguarde a liberação do arquivo pelo Windows e tente novamente. A instalação não pode continuar sem validar esse componente.")
+            }
+            if ($job.SharingBlocked -and -not $waitingReported) {
                 Write-Host "[AVISO] Arquivo em uso; aguardando liberação para validar a integridade: $Path (até $RetryTimeoutSeconds s)." -ForegroundColor Yellow
                 $waitingReported = $true
             }
-        } finally {
-            if ($sha) { $sha.Dispose() }
-            if ($stream) { $stream.Dispose() }
+            if (($watch.Elapsed.TotalSeconds - $lastReport) -ge 5) {
+                $elapsed = [int]$watch.Elapsed.TotalSeconds
+                $remaining = [int][Math]::Ceiling($RetryTimeoutSeconds - $watch.Elapsed.TotalSeconds)
+                Write-Host "[INFO] Validando integridade: $Path | espera: $elapsed s | prazo restante: $remaining s."
+                $lastReport = $watch.Elapsed.TotalSeconds
+            }
         }
-        $remainingMs = ($RetryTimeoutSeconds - $watch.Elapsed.TotalSeconds) * 1000
-        if ($remainingMs -gt 0) {
-            Start-Sleep -Milliseconds ([int][Math]::Min($RetryDelayMilliseconds, [Math]::Ceiling($remainingMs)))
-        }
-    }
+    } finally { $job.Cancel() }
 }
-
 
 function Test-PythonInterpreter {
     param(
@@ -761,6 +821,24 @@ function Validate-Payload {
     Write-Host "[OK] Integridade dos componentes obrigatórios validada ($count arquivos)." -ForegroundColor Green
 }
 
+function Validate-InstalledPayload {
+    # A origem pode ter sido alterada após o primeiro hash. Confere a cópia
+    # final com o manifesto antes de executar BAT/Python ou restaurar dados.
+    $manifest = Get-Content -LiteralPath $ManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    foreach ($entry in $manifest.files) {
+        $relative = [string]$entry.path
+        if ($relative -in @('payload manifest.json', 'NexoFlow Uninstall.exe')) { continue }
+        $target = Join-Path $InstallDir $relative
+        if (-not (Test-Path -LiteralPath $target -PathType Leaf)) {
+            throw "Arquivo obrigatório ausente após a cópia: $relative"
+        }
+        if ((Get-Sha256File -Path $target) -cne ([string]$entry.sha256).ToLowerInvariant()) {
+            throw "Falha de integridade no arquivo instalado: $relative"
+        }
+    }
+    Write-Host '[OK] Cópia instalada validada antes da execução.' -ForegroundColor Green
+}
+
 function Ensure-InstalledPayloadFile([string]$RelativePath) {
     $source = Join-Path $PayloadDir $RelativePath
     $target = Join-Path $InstallDir $RelativePath
@@ -1260,6 +1338,9 @@ try {
         Copy-Item -LiteralPath $_.FullName -Destination $InstallDir -Recurse -Force
     }
 
+    Write-Step 'Conferindo integridade dos arquivos copiados'
+    Validate-InstalledPayload
+
     Restore-SetupData -BackupRoot $backupDir -Target $InstallDir -Mode $selectedMode
     New-Item -ItemType Directory -Force -Path (Join-Path $InstallDir 'importacoes') | Out-Null
 
@@ -1437,4 +1518,4 @@ catch {
     try { Stop-Transcript | Out-Null } catch { }
     exit 1
 }
-# NexoFlow 1.5.1
+# NexoFlow 1.5.2

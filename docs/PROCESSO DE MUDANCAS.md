@@ -1,8 +1,8 @@
-# NexoFlow 1.5.1 — Processo de mudanças
+# NexoFlow 1.5.2 — Processo de mudanças
 
-Este documento define como alterações devem ser feitas e validadas no NexoFlow 1.5.1. Ele documenta o processo atual do **NexoFlow 1.5.1**; o histórico público fica concentrado em `CHANGELOG.md`.
+Este documento define como alterações devem ser feitas e validadas no NexoFlow 1.5.2. Ele documenta o processo atual do **NexoFlow 1.5.2**; o histórico público fica concentrado em `CHANGELOG.md`.
 
-A publicação automática confere a origem na `main` antes de gerar os pacotes. Use mensagens de commit curtas que descrevam a área ou a alteração. Na lista de arquivos do GitHub, esses textos são as mensagens dos últimos commits, não descrições independentes. A versão atual usa o título `NexoFlow 1.5.1`, a tag `v1.5.1` e pacotes com sufixo `1.5.1`. Cada próxima publicação recebe um patch, de 1.5.2 até 1.5.99; depois 1.6. Tags e releases anteriores são preservados. Veja [versionamento](VERSIONAMENTO.md).
+A publicação automática confere a origem na `main` antes de gerar os pacotes. Use mensagens de commit curtas que descrevam a área ou a alteração. Na lista de arquivos do GitHub, esses textos são as mensagens dos últimos commits, não descrições independentes. A versão atual usa o título `NexoFlow 1.5.2`, a tag `v1.5.2` e pacotes com sufixo `1.5.2`. Cada próxima publicação recebe um patch, de 1.5.3 até 1.5.99; depois 1.6. Tags e releases anteriores são preservados. Veja [versionamento](VERSIONAMENTO.md).
 
 ## Princípios
 
@@ -25,7 +25,7 @@ A publicação automática confere a origem na `main` antes de gerar os pacotes.
 - regenerar manifest e checksums;
 - testar integridade dos ZIPs;
 - assinar os executáveis quando houver certificado corporativo;
-- publicar apenas artefatos identificados como **NexoFlow 1.5.1**.
+- publicar apenas artefatos identificados como **NexoFlow 1.5.2**.
 
 ## Mudanças de maior risco
 

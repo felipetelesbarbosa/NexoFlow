@@ -589,4 +589,4 @@ class WeniClient:
         }
 
 
-# NexoFlow 1.5.1
+# NexoFlow 1.5.2
