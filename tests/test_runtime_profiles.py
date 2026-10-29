@@ -183,6 +183,53 @@ farm.close()
             with self.subTest(profile=profile):
                 self.invoke(profile, code)
 
+    def test_both_segments_discover_review_create_and_deliver_history_without_network(
+        self,
+    ):
+        code = """
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import Mock,patch
+from datetime import UTC,datetime
+from farmalider_client import FarmaliderClient
+from runtime_profile import segment
+from tests.test_farmalider_customers import customer_snapshot
+from weni_update import run_update,UpdateWindow,REQUIRED_ORDER_FIELDS,REQUIRED_MULTICHANNEL_FIELDS
+from customer_observations import history_rows,acknowledge
+payload=customer_snapshot()
+payload['ultimoPedido']['segmento']=segment()
+settings.FARMALIDER_CUSTOMER_DIRECTORY_MODE='on'
+contacts=[]
+w=Mock();w.list_contacts.side_effect=lambda **kwargs:list(contacts)
+w.list_fields.return_value=[{'key':k} for k in REQUIRED_ORDER_FIELDS | REQUIRED_MULTICHANNEL_FIELDS | {'cpf','email','origem_contato','genero','idade','cep','cidade','estado','bairro'}]
+w.list_groups.return_value=[];w.list_messages.return_value=[];w.get_contact.return_value=None
+def create(**kwargs):
+ c={'uuid':'new-1',**kwargs};contacts.append(c);return c
+w.create_contact.side_effect=create
+def farm():
+ f=FarmaliderClient('API_TEST');f._request_json=Mock(return_value=[payload]);return f
+cutoff=datetime(2026,10,29,10,tzinfo=UTC)
+with TemporaryDirectory() as temp,patch('weni_update.WeniClient',return_value=w),patch('weni_update._open_farmalider',side_effect=farm),patch('weni_update._load_state',return_value={}),patch('weni_update._save_state'),patch('weni_update._append_audit'),patch('weni_update.resolve_window',return_value=UpdateWindow(started_at=cutoff,after=None,full=False)):
+ review=Path(temp)/'review.json'
+ stats=run_update(apply=False,review_out=review)
+ assert stats.plans_with_changes==1
+ w.create_contact.assert_not_called()
+ stats=run_update(apply=True,require_review=review)
+ assert stats.contacts_created==1 and stats.contacts_failed==0
+ assert w.create_contact.call_count==1
+ stats=run_update(apply=True,require_review=review)
+ assert stats.contacts_created==0 and w.create_contact.call_count==1
+ orders,items,receipts=history_rows(contacts,[],captured_at=cutoff.isoformat())
+ assert len(orders)==1 and len(items)==1 and orders[0]['contact_uuid']=='new-1'
+ assert orders[0]['origem_pedido']=='FARMALIDER_HISTORICO_OBSERVADO'
+ acknowledge(receipts)
+ assert not history_rows(contacts,[],captured_at=cutoff.isoformat())[0]
+ assert not w.contact_group_action.called
+"""
+        for profile in ("FARMA", "PET"):
+            with self.subTest(profile=profile):
+                self.invoke(profile, code)
+
     def test_pet_directory_outage_stays_pending_without_reloading_base_per_contact(
         self,
     ):

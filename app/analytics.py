@@ -1746,11 +1746,7 @@ def build_bi_summary_record(
     updated_at: str,
 ) -> dict[str, Any]:
     valid_orders = _bi_valid_orders(order_records)
-    all_buyers = {
-        r.get("contact_uuid", "").strip()
-        for r in valid_orders
-        if r.get("contact_uuid", "").strip()
-    }
+    all_buyers = {bi_customer_key(r) for r in valid_orders if bi_customer_key(r)}
     all_order_keys = {r.get("pedido_chave", "").strip() for r in valid_orders}
     all_products = sum((_order_revenue_parts(r)[0] for r in valid_orders), Decimal("0"))
     all_freight = sum((_order_revenue_parts(r)[1] for r in valid_orders), Decimal("0"))

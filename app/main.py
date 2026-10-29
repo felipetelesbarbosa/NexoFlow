@@ -1015,6 +1015,7 @@ def main() -> int:
             finally:
                 weni_client.close()
             contacts_api_total = len(contacts)
+            all_weni_contacts = contacts
             quarter_context: dict[str, Any] | None = None
             if full_quarter is not None:
                 quarter_context = prepare_full_load_quarter(
@@ -1075,7 +1076,13 @@ def main() -> int:
                 ),
             )
 
-            if not force_full and after is not None and not contacts_to_process:
+            prepare_customers(farm_client, None)
+            if (
+                not force_full
+                and after is not None
+                and not contacts_to_process
+                and farm_client is None
+            ):
                 sheets.set_controls(
                     {
                         "ultima_sincronizacao_sucesso_utc": utc_iso(sync_started),
@@ -1194,6 +1201,30 @@ def main() -> int:
             pedido_responses_by_id=pedido_responses_by_id,
         )
         order_rows, item_rows = observed.orders, observed.items
+        from customer_observations import acknowledge, history_rows, merge_history
+        from farmalider_customers import directory_for
+
+        history_receipts = []
+        if directory_for(farm_client) is not None:
+            history_orders, history_items, history_receipts = history_rows(
+                all_weni_contacts,
+                existing_orders,
+                captured_at=sync_time,
+                quarter=full_quarter,
+                existing_items=existing_order_items,
+            )
+            before = len(order_rows)
+            order_rows, item_rows = merge_history(
+                order_rows, item_rows, history_orders, history_items, existing_orders
+            )
+            order_stats.confirmed_api = sum(
+                row.get("status_confirmacao", "").startswith("CONFIRMADO_API")
+                for row in order_rows
+            )
+            logging.info(
+                "Histórico observado da API: %s pedidos recuperados; canal de compra não inferido.",
+                len(order_rows) - before,
+            )
         order_stats.api_errors += observed.api_errors
         order_stats.pending_without_items = len(
             {
@@ -1577,6 +1608,7 @@ def main() -> int:
             )
         else:
             logging.info("Sincronização concluída com sucesso em %.2fs.", total_elapsed)
+        acknowledge(history_receipts)
         return PARTIAL_SYNC_EXIT_CODE if completion_status == "parcial" else 0
 
     except Exception as exc:

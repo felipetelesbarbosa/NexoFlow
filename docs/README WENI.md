@@ -430,3 +430,9 @@ Para uma parte, use `--quarter N` e o arquivo `logs/weni_update_review_full_25_p
 ## Deduplicação integrada
 
 O relatório do dry-run também apresenta os contatos duplicados propostos para exclusão. A aplicação revalida a propriedade nas APIs, preserva os pedidos reais e as recusas e limpa as fontes do Sheets e do Looker. Falhas isoladas não cancelam a carga: os comprovantes permanecem para retomada na próxima incremental. Consulte [Deduplicação na rotina Weni](deduplicacao_weni.md).
+
+## Clientes encontrados na API
+
+Nos dois perfis, a rotina lê a base do segmento e propõe incluir clientes com pedido validado que ainda não tenham vínculo na Weni. A revisão lista as novas inclusões; o apply confere novamente a organização, o cadastro, o pedido e a existência de CPF/telefone antes do POST. Nome e campos disponíveis são preenchidos sem inventar consentimentos, grupos ou canal de venda. CPF inválido sem identidade independente e conflitos ficam pendentes. Resposta incerta na criação exige reconciliação: o programa não repete o POST às cegas.
+
+Os pedidos completos observados nas consultas são registrados privadamente em `logs/privado/` (Farma) ou `logs/PET/privado/` (Pets). Preserve esses diretórios nas atualizações. A execução seguinte do Analytics entrega os pedidos ao Sheets por ID e atualiza o BI, inclusive o vínculo com contatos recém-criados. A Weni conserva o pedido mais recente nos campos; as planilhas conservam os pedidos anteriores observados. Compras não observadas entre duas coletas continuam dependendo do futuro endpoint de pedidos por período.

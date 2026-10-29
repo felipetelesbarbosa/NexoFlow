@@ -54,7 +54,9 @@ Na rotina diária, use os atalhos Weni, Recompra e Analytics conforme necessári
 
 - Pedidos e valores dependem da confirmação na API FarmaLíder. Cancelados, inclusive pedidos oficialmente sem itens, ficam fora das vendas e da Recompra.
 - No perfil FARMA, o recorte é da farmácia: pedidos mistos mantêm somente produtos humanos; pedidos apenas pet ou veterinários são excluídos.
-- O histórico é acumulado nas coletas. O último pedido da API não comprova todas as compras anteriores de um cliente.
+- O histórico é acumulado nas coletas dos dois segmentos, inclusive pedidos de clientes ainda ausentes na Weni. Pedidos observados ficam guardados localmente até a entrega idempotente ao Analytics/Sheets. O último pedido da API não comprova todas as compras anteriores nem compras intermediárias não observadas.
+- A rotina Weni propõe criar clientes da API com pedido validado e identidade única, preenchendo nome, telefone e campos disponíveis. Sem telefone, o cadastro pode ficar sem canal de contato. CPF inválido sem vínculo independente, conflito cadastral e resposta incerta ficam pendentes; não são criados consentimentos nem inclusões em grupos.
+- A Weni mantém o pedido mais recente; o histórico de pedidos distintos fica nas planilhas e no dashboard. Um pedido vindo da API não comprova que foi feito pelo WhatsApp ou pela Weni.
 - Operação, histórico e dashboard podem usar [três arquivos do Sheets](docs/planilhas_separadas.md). O Looker lê as fontes `BI_*`; confira seus destinos e atualize os campos quando houver novas colunas.
 - Nos atalhos individuais, revise as propostas de Weni, Planilha e Recompra antes de aplicar. Carga parcial exige conferir o log e as pendências antes de prosseguir.
 

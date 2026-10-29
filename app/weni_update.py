@@ -221,6 +221,8 @@ class UpdateStats:
     field_changes: int = 0
     group_actions: int = 0
     contacts_updated: int = 0
+    contacts_created: int = 0
+    creation_pending: dict[str, int] = field(default_factory=dict)
     contacts_failed: int = 0
     contacts_conflicted: int = 0
     contacts_already_satisfied: int = 0
@@ -1499,6 +1501,25 @@ def _build_contact_plan(
     return plan
 
 
+def _apply_creation(session, plan, stats):
+    try:
+        status, uuid = session.apply(plan)
+        stats.contacts_updated += int(status == "created")
+        stats.contacts_created += int(status == "created")
+        stats.contacts_already_satisfied += int(status == "already_exists")
+        event = _audit_plan_event(plan, mode="create", status=status)
+        event["created_contact_uuid"] = uuid
+        _append_audit(event)
+    except Exception as exc:
+        stats.contacts_failed += 1
+        reason = type(exc).__name__
+        stats.creation_pending[reason] = stats.creation_pending.get(reason, 0) + 1
+        event = _audit_plan_event(plan, mode="create", status="pending", error=reason)
+        if isinstance(exc, WeniError):
+            event["detail"] = str(exc)
+        _append_audit(event)
+
+
 def _execute_contact_plan(weni, plan):
     # Uma referência nova não pode deixar o evento antigo ativo enquanto os
     # campos são atualizados. A remoção já faz parte do plano revisado.
@@ -1549,6 +1570,17 @@ def audit_plans(
         if plan.contact_uuid in seen:
             errors.append(f"contact_uuid duplicado no plano: {plan.contact_uuid}")
         seen.add(plan.contact_uuid)
+
+        if (
+            plan.contact_uuid.startswith("novo-api:")
+            or "__new_api_customer" in plan.guards
+        ):
+            from customer_discovery import audit_creation
+
+            try:
+                audit_creation(plan)
+            except ValueError as exc:
+                errors.append(str(exc))
 
         unknown = sorted(set(plan.fields) - ALLOWED_WRITE_FIELDS)
         if unknown:
@@ -2094,6 +2126,8 @@ def write_review_snapshot(
         f"Mensagens recebidas analisadas: {summary['messages_incoming']}",
         f"Contatos considerados: {summary['contacts_considered']}",
         f"Contatos com alterações: {summary['contacts_with_changes']}",
+        f"Novos contatos da API propostos: {sum('__new_api_customer' in p.guards for p in plans)}",
+        "Novos contatos não recebem consentimento nem inclusão automática em grupos.",
         f"Alterações de campos: {summary['field_changes']}",
         f"Ações de grupo: {summary['group_actions']}",
         f"Contatos com alteração de LGPD: {summary['lgpd_contacts']}",
@@ -2896,6 +2930,15 @@ def run_update(
                 review_payload.get("pending_retry_uuids") or []
             )
             stats.contacts_failed = len(conflicted_uuids)
+            from customer_discovery import CreationSession
+
+            if any("__new_api_customer" in p.guards for p in plans):
+                farm = _open_farmalider()
+            creation_session = (
+                CreationSession(weni, farm)
+                if any("__new_api_customer" in p.guards for p in plans)
+                else None
+            )
             with TaskProgress(
                 "Aplicação do snapshot",
                 len(plans),
@@ -2906,6 +2949,9 @@ def run_update(
                 ),
             ) as progress:
                 for index, plan in progress.track(enumerate(plans, start=1)):
+                    if "__new_api_customer" in plan.guards:
+                        _apply_creation(creation_session, plan, stats)
+                        continue
                     # Em atendimento 24h, relê somente este contato imediatamente
                     # antes da escrita. Mudanças em outros contatos não cancelam a carga.
                     try:
@@ -3362,7 +3408,27 @@ def run_update(
                         type(exc).__name__,
                     )
 
-        prepare_customers(farm, len(prepared_contacts))
+        prepare_customers(farm, None)
+        from customer_discovery import build_new_customer_plans
+
+        creation_plans, creation_pending = build_new_customer_plans(
+            farm,
+            all_contacts if quarter is not None else modified_contacts,
+            captured_at=captured_at,
+            available_fields=available_weni_fields,
+            quarter=quarter,
+        )
+        plans.extend(creation_plans)
+        for creation_plan in creation_plans:
+            stats.contacts_considered += 1
+            _record_validated_order(stats, creation_plan)
+            stats.purchase_confirmed += int(creation_plan.purchase_confirmed)
+        logging.info(
+            "API → Weni: novos cadastros propostos=%s; pendências=%s.",
+            len(creation_plans),
+            creation_pending,
+        )
+
         previous_phase = None
         invalid_batch = _InvalidCpfBatch(size=WENI_PROGRESS_BATCH_SIZE)
         with TaskProgress(
@@ -3550,6 +3616,13 @@ def run_update(
             return stats
 
         conflicted_uuids: list[str] = list(stats.pending_retry_uuids)
+        from customer_discovery import CreationSession
+
+        creation_session = (
+            CreationSession(weni, farm)
+            if any("__new_api_customer" in p.guards for p in plans)
+            else None
+        )
         with TaskProgress(
             "Aplicação Weni",
             len(plans),
@@ -3560,6 +3633,9 @@ def run_update(
             ),
         ) as progress:
             for plan in progress.track(plans):
+                if "__new_api_customer" in plan.guards:
+                    _apply_creation(creation_session, plan, stats)
+                    continue
                 try:
                     if plan.order_validated or any(
                         action.group_name == recompra_group()

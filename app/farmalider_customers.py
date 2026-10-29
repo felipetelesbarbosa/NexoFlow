@@ -506,6 +506,13 @@ def prepare_customers(farm, expected_contacts: int | None):
 
     if isinstance(farm, FarmaliderClient):
         farm.prepare_customer_directory(expected_contacts=expected_contacts)
+        directory = directory_for(farm)
+        if directory is not None:
+            from datetime import UTC, datetime
+
+            from customer_observations import record_directory
+
+            record_directory(directory, datetime.now(UTC).isoformat())
 
 
 def selected_customer(farm, contact: dict) -> dict | None:

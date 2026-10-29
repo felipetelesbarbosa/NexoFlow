@@ -1051,6 +1051,12 @@ class FarmaliderClient:
         # Somente snapshots completos, com proprietário/data/itens verificados,
         # dispensam uma segunda leitura do mesmo pedido durante esta execução.
         directory = CustomerDirectory(accepted, segment=self.customer_segment)
+        if directory.orders:
+            from datetime import UTC, datetime
+
+            from customer_observations import record_directory
+
+            record_directory(directory, datetime.now(UTC).isoformat())
         if self._execution_cache is not None:
             for code in directory.orders:
                 snapshot = directory.order_by_id(code)

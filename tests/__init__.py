@@ -2,6 +2,7 @@
 
 import socket
 import sys
+import tempfile
 from pathlib import Path
 from types import ModuleType
 
@@ -40,3 +41,9 @@ sys.modules["secrets_config"] = settings
 # de transmitir tokens ou dados. Esta proteção existe somente na suíte.
 socket.socket.connect = _block_network
 socket.socket.connect_ex = _block_network
+
+# O histórico observado da suíte nunca usa os dados operacionais locais.
+import customer_observations  # noqa: E402
+
+_OBSERVED_TEMP = tempfile.TemporaryDirectory(prefix="nexoflow_test_observations_")
+customer_observations.DB_ROOT = Path(_OBSERVED_TEMP.name)

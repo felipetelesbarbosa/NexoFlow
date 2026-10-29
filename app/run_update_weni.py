@@ -196,6 +196,11 @@ def main() -> int:
         print(f"Contatos considerados: {stats.contacts_considered}")
         print(f"Contatos com alterações: {stats.plans_with_changes}")
         print(f"Campos propostos: {stats.field_changes}")
+        print(f"Novos contatos criados a partir da API: {stats.contacts_created}")
+        if stats.creation_pending:
+            print(
+                f"Novos cadastros pendentes: {stats.creation_pending}. Motivos detalhados na auditoria privada."
+            )
         print(f"Ações de grupo: {stats.group_actions}")
         print(f"Pedidos confirmados pela FarmaLíder: {stats.purchase_confirmed}")
         print(

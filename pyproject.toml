@@ -25,6 +25,8 @@ py-modules = [
   "farmalider_client",
   "farmalider_integration",
   "farmalider_customers",
+  "customer_discovery",
+  "customer_observations",
   "google_sheets",
   "sheets_storage",
   "sheets_migration",

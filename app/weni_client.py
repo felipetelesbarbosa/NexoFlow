@@ -401,6 +401,20 @@ class WeniClient:
             max_results=max_results,
         )
 
+    def create_contact(self, *, name, urns, fields):
+        """Criação tem tentativa única: um timeout não autoriza repetir o POST."""
+        if not self._profile_verified:
+            self._check_profile_org()
+        retry = self.retry_mutations
+        self.retry_mutations = False
+        try:
+            return self._post_json(
+                WENI_CONTACTS_API_URL,
+                json_body={"name": name, "urns": urns, "fields": fields},
+            )
+        finally:
+            self.retry_mutations = retry
+
     def update_contact_fields(
         self,
         contact_uuid: str,
