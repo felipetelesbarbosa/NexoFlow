@@ -11,6 +11,20 @@ from weni_client import WeniClient, WeniError
 
 
 class NetworkDiagnosticTests(unittest.TestCase):
+    def test_timeout_phase_is_preserved_through_nested_proxy_errors(self):
+        for timeout, phase in (
+            (requests.exceptions.ConnectTimeout("private-marker"), "conexao"),
+            (requests.exceptions.ReadTimeout("private-marker"), "resposta"),
+            (TimeoutError("private-marker"), "indeterminada"),
+        ):
+            with self.subTest(phase=phase):
+                result = classify_network_failure(
+                    requests.exceptions.ProxyError(timeout)
+                )
+                self.assertEqual(result.category, "TIMEOUT")
+                self.assertEqual(result.phase, phase)
+                self.assertNotIn("private-marker", result.summary)
+
     def test_nested_proxy_codes_are_classified_without_disclosing_exception_text(self):
         for code, category in (
             (407, "PROXY_AUTENTICACAO"),

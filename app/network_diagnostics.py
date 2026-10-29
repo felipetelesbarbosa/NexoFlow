@@ -17,6 +17,7 @@ class NetworkFailure:
     action: str
     retryable: bool = True
     status: int | None = None
+    phase: str | None = None
 
     @property
     def summary(self) -> str:
@@ -108,10 +109,30 @@ def classify_network_failure(error: BaseException) -> NetworkFailure:
         or type(e).__name__ in {"ConnectTimeoutError", "ReadTimeoutError"}
         for e in errors
     ):
+        connect_timeout = any(
+            isinstance(e, requests.exceptions.ConnectTimeout)
+            or type(e).__name__ == "ConnectTimeoutError"
+            for e in errors
+        )
+        read_timeout = any(
+            isinstance(e, requests.exceptions.ReadTimeout)
+            or type(e).__name__ == "ReadTimeoutError"
+            for e in errors
+        )
+        if connect_timeout:
+            detail = "A conexão com a rota do serviço excedeu o tempo limite."
+            phase = "conexao"
+        elif read_timeout:
+            detail = "A espera pela resposta do serviço excedeu o tempo limite."
+            phase = "resposta"
+        else:
+            detail = "A conexão ou resposta excedeu o tempo limite."
+            phase = "indeterminada"
         return NetworkFailure(
             "TIMEOUT",
-            "A conexão ou resposta excedeu o tempo limite.",
+            detail,
             "Confira a disponibilidade da rota e do serviço.",
+            phase=phase,
         )
     if any(
         isinstance(e, OSError)

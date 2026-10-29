@@ -12,7 +12,7 @@ import requests
 from config import (
     MAX_RETRIES,
     PAGE_LIMIT,
-    REQUEST_TIMEOUT_SECONDS,
+    WENI_CONNECT_TIMEOUT_SECONDS,
     WENI_CONTACT_ACTIONS_API_URL,
     WENI_CONTACTS_API_URL,
     WENI_FIELDS_API_URL,
@@ -20,6 +20,7 @@ from config import (
     WENI_MESSAGES_API_URL,
     WENI_PROGRESS_BATCH_SIZE,
     WENI_PROGRESS_INTERVAL_SECONDS,
+    WENI_READ_TIMEOUT_SECONDS,
 )
 from network_diagnostics import classify_network_failure
 from proxy_config import refresh_network_route
@@ -77,18 +78,21 @@ class WeniClient:
             self._profile_verified = True
         last_error = "erro desconhecido"
         last_status = None
+        last_phase = "indeterminada"
+        operation = f"{method.upper()} {urlsplit(url).path or '/'}"
         max_attempts = (
             MAX_RETRIES if method.upper() == "GET" or self.retry_mutations else 1
         )
 
         for attempt in range(1, max_attempts + 1):
+            started = time.monotonic()
             try:
                 response = self.session.request(
                     method,
                     url,
                     params=params,
                     json=json_body,
-                    timeout=REQUEST_TIMEOUT_SECONDS,
+                    timeout=(WENI_CONNECT_TIMEOUT_SECONDS, WENI_READ_TIMEOUT_SECONDS),
                     allow_redirects=False,
                 )
 
@@ -134,6 +138,7 @@ class WeniClient:
                     last_status = getattr(exc.response, "status_code", None)
                     failure = classify_network_failure(exc)
                     last_error = failure.summary
+                    last_phase = failure.phase or "indeterminada"
                     if not failure.retryable:
                         break
                     if attempt < max_attempts:
@@ -144,21 +149,31 @@ class WeniClient:
                     last_error = (
                         "[RESPOSTA_INVALIDA] A resposta da Weni não contém JSON válido."
                     )
+                    last_phase = "resposta"
                 if attempt >= max_attempts:
                     break
                 wait = float(2 ** (attempt - 1))
                 logging.warning(
                     "Falha temporária ao acessar Weni: %s Tentativa %s/%s. "
-                    "Repetindo em %.1fs.",
+                    "Repetindo em %.1fs. Operação=%s | fase=%s | "
+                    "conexão=%ss | resposta=%ss | decorrido=%.1fs.",
                     last_error,
                     attempt,
                     max_attempts,
                     wait,
+                    operation,
+                    last_phase,
+                    WENI_CONNECT_TIMEOUT_SECONDS,
+                    WENI_READ_TIMEOUT_SECONDS,
+                    time.monotonic() - started,
                 )
                 time.sleep(wait)
 
         raise WeniError(
-            f"Não foi possível acessar a API da Weni. Diagnóstico: {last_error}",
+            f"Não foi possível acessar a API da Weni. Diagnóstico: {last_error} "
+            f"Operação: {operation}; fase={last_phase}; "
+            f"limites: conexão={WENI_CONNECT_TIMEOUT_SECONDS}s, "
+            f"resposta={WENI_READ_TIMEOUT_SECONDS}s.",
             status_code=last_status,
         ) from None
 
@@ -502,7 +517,23 @@ class WeniClient:
             "https://flows.weni.ai/api/v2/definitions.json", params={"flow": flow_uuid}
         )
 
+    def _check_profile_org(self) -> None:
+        from runtime_profile import segment
+
+        expected = (
+            "Delivery Pets Líder" if segment() == "PET" else "Delivery FarmaLíder"
+        )
+        org = self.get_org()
+        if not isinstance(org, dict) or org.get("name") != expected:
+            raise WeniError(
+                f"O token da Weni não pertence à organização {expected}. "
+                f"Perfil selecionado: {segment()}. Confira a configuração do segmento."
+            )
+        self._profile_verified = True
+        logging.info("Weni: organização confirmada no diagnóstico: %s.", expected)
+
     def test_connection(self) -> dict[str, Any]:
+        self._check_profile_org()
         payload = self._get_json(
             WENI_CONTACTS_API_URL,
             params={"deleted": "false", "limit": 1},
@@ -513,6 +544,13 @@ class WeniClient:
     def test_update_access(self, opt_out_group: str) -> dict[str, Any]:
         # Somente leitura. Confirma acesso aos recursos necessários sem alterar
         # nenhum contato durante o diagnóstico.
+        self._check_profile_org()
+        logging.info(
+            "Weni: teste somente leitura de contatos | GET /api/v2/contacts.json | "
+            "conexão=%ss | resposta=%ss.",
+            WENI_CONNECT_TIMEOUT_SECONDS,
+            WENI_READ_TIMEOUT_SECONDS,
+        )
         contacts_payload = self._get_json(
             WENI_CONTACTS_API_URL,
             params={"deleted": "false", "limit": 1},
@@ -520,7 +558,7 @@ class WeniClient:
         contacts, _ = self.extract_results(contacts_payload)
         messages_payload = self._get_json(
             WENI_MESSAGES_API_URL,
-            params={"folder": "incoming"},
+            params={"folder": "incoming", "limit": 1},
         )
         messages, _ = self.extract_results(messages_payload)
         groups = self.list_groups(opt_out_group)

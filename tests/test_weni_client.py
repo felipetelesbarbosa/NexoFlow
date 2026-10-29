@@ -1,12 +1,139 @@
+import os
 import unittest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, patch
+
+import requests
 
 from config import WENI_CONTACTS_API_URL
 from weni_client import WeniClient
 
 
 class WeniClientTests(unittest.TestCase):
+    @staticmethod
+    def response(payload):
+        response = Mock(status_code=200, content=b"{}")
+        response.json.return_value = payload
+        return response
+
+    def test_preflight_confirms_org_then_recovers_slow_read_for_each_segment(self):
+        for segment, org in (
+            ("FARMA", "Delivery FarmaLíder"),
+            ("PET", "Delivery Pets Líder"),
+        ):
+            with (
+                self.subTest(segment=segment),
+                patch.dict(os.environ, {"NEXOFLOW_PERFIL": segment}),
+            ):
+                client = WeniClient("synthetic-token")
+                self.addCleanup(client.close)
+                with (
+                    patch.object(
+                        client.session,
+                        "request",
+                        side_effect=[
+                            self.response({"name": org}),
+                            requests.exceptions.ReadTimeout("private-marker"),
+                            self.response({"results": []}),
+                            self.response({"results": [{"id": "synthetic-message"}]}),
+                            self.response(
+                                {"results": [{"name": "Opt-Out LGPD", "uuid": "group"}]}
+                            ),
+                        ],
+                    ) as request,
+                    patch("weni_client.refresh_network_route") as refresh,
+                    patch("weni_client.time.sleep"),
+                ):
+                    result = client.test_update_access("Opt-Out LGPD")
+                self.assertTrue(result["ok"])
+                self.assertTrue(result["opt_out_group_found"])
+                self.assertEqual(result["sample_messages"], 1)
+                self.assertTrue(request.call_args_list[0].args[1].endswith("/org.json"))
+                self.assertEqual(request.call_args_list[3].kwargs["params"]["limit"], 1)
+                self.assertEqual(request.call_count, 5)
+                refresh.assert_called_once()
+                for call in request.call_args_list:
+                    self.assertEqual(call.args[0], "GET")
+                    self.assertEqual(call.kwargs["timeout"], (10, 90))
+                    self.assertFalse(call.kwargs["allow_redirects"])
+                    self.assertIsNot(call.kwargs.get("verify", True), False)
+
+    def test_preflight_rejects_wrong_org_before_reading_contacts(self):
+        for segment, wrong_org in (
+            ("FARMA", "Delivery Pets Líder"),
+            ("PET", "Delivery FarmaLíder"),
+        ):
+            with (
+                self.subTest(segment=segment),
+                patch.dict(os.environ, {"NEXOFLOW_PERFIL": segment}),
+            ):
+                client = WeniClient("synthetic-token")
+                self.addCleanup(client.close)
+                with patch.object(
+                    client.session,
+                    "request",
+                    return_value=self.response({"name": wrong_org}),
+                ) as request:
+                    from weni_client import WeniError
+
+                    with self.assertRaisesRegex(WeniError, "Perfil selecionado"):
+                        client.test_update_access("Opt-Out LGPD")
+                request.assert_called_once()
+                self.assertTrue(request.call_args.args[1].endswith("/org.json"))
+
+    def test_single_attempt_post_does_not_repeat_after_read_timeout(self):
+        from weni_client import WeniError
+
+        client = WeniClient("synthetic-token", retry_mutations=False)
+        self.addCleanup(client.close)
+        with (
+            patch.object(
+                client.session,
+                "request",
+                side_effect=requests.exceptions.ReadTimeout("private-marker"),
+            ) as request,
+            patch("weni_client.refresh_network_route") as refresh,
+            patch("weni_client.time.sleep") as sleep,
+        ):
+            with self.assertRaises(WeniError) as caught:
+                client._post_json(
+                    WENI_CONTACTS_API_URL + "?token=private-marker",
+                    json_body={"fields": {"synthetic": "value"}},
+                )
+        self.assertEqual(request.call_count, 1)
+        self.assertEqual(request.call_args.kwargs["timeout"], (10, 90))
+        refresh.assert_not_called()
+        sleep.assert_not_called()
+        message = str(caught.exception)
+        self.assertIn("POST /api/v2/contacts.json", message)
+        self.assertIn("fase=resposta", message)
+        self.assertNotIn("private-marker", message)
+
+    def test_connection_timeouts_are_bounded_and_identify_the_read_operation(self):
+        from weni_client import WeniError
+
+        client = WeniClient("synthetic-token")
+        self.addCleanup(client.close)
+        with (
+            patch.object(
+                client.session,
+                "request",
+                side_effect=requests.exceptions.ConnectTimeout("private-marker"),
+            ) as request,
+            patch("weni_client.refresh_network_route") as refresh,
+            patch("weni_client.time.sleep") as sleep,
+        ):
+            with self.assertRaises(WeniError) as caught:
+                client._get_json(WENI_CONTACTS_API_URL)
+        self.assertEqual(request.call_count, 4)
+        self.assertEqual(refresh.call_count, 3)
+        self.assertEqual(sleep.call_count, 3)
+        message = str(caught.exception)
+        self.assertIn("GET /api/v2/contacts.json", message)
+        self.assertIn("fase=conexao", message)
+        self.assertIn("conexão=10s", message)
+        self.assertNotIn("private-marker", message)
+
     def test_paginated_logs_are_consolidated_without_claiming_a_known_total(self):
         from task_progress import TaskProgress
 
