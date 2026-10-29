@@ -97,6 +97,8 @@ echo.
 echo Verificando configuração do proxy...
 if exist "secrets_config.py" (
     echo secrets_config.py encontrado.
+) else if defined NEXOFLOW_SETUP_NETWORK_CONFIG (
+    echo Usando a configuração de rede temporária do Setup.
 ) else (
     echo [AVISO] secrets_config.py não foi encontrado.
     echo O pip tentará usar conexão direta.

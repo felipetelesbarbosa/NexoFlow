@@ -53,7 +53,7 @@ function Remove-TestArtifacts {
 }
 
 function Invoke-Setup {
-    param([string]$Label)
+    param([string]$Label, [int]$ExpectedExitCode = 0)
 
     Write-Host "==> $Label"
     $outputLog = Join-Path $TempRoot "setup-stdout.txt"
@@ -67,7 +67,7 @@ function Invoke-Setup {
         throw "O teste de instalação excedeu quatro minutos: $Label"
     }
 
-    if ($process.ExitCode -ne 0) {
+    if ($process.ExitCode -ne $ExpectedExitCode) {
         $log = Join-Path $env:TEMP "NexoFlow-Setup.log"
         if (Test-Path -LiteralPath $log) {
             Write-Host "----- NexoFlow-Setup.log -----"
@@ -257,6 +257,48 @@ public static class NexoFlowSetupRootLock {
     Assert-Installed
     Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir "logs\setup-smoke-marker.txt") -Raw).Trim() -eq "preservar") "Dados privados foram perdidos sem o launcher opcional."
 
+    $env:NEXOFLOW_SETUP_INSTALL_MODE = 'Cancel'
+    Invoke-Setup 'Cancelamento sem alterar a instalação existente' -ExpectedExitCode 2
+    Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir 'secrets_config.py') -Raw) -match 'TOKEN_TESTE_WENI') 'Cancelar alterou a configuração.'
+    Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir 'logs\setup-smoke-marker.txt') -Raw).Trim() -eq 'preservar') 'Cancelar alterou os logs.'
+
+    # Falha sintética após preparar a instalação limpa: o rollback precisa devolver tudo.
+    $payloadBat = Join-Path $SetupDir 'payload\instalar.bat'
+    $payloadManifest = Join-Path $SetupDir 'payload\payload manifest.json'
+    $savedBat = [IO.File]::ReadAllBytes($payloadBat)
+    $savedManifest = [IO.File]::ReadAllBytes($payloadManifest)
+    try {
+        [IO.File]::WriteAllText($payloadBat, "@echo off`r`nexit /b 1`r`n", [Text.Encoding]::ASCII)
+        $sha = [Security.Cryptography.SHA256]::Create()
+        try { $changedHash = ([BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes($payloadBat)))).Replace('-', '').ToLowerInvariant() }
+        finally { $sha.Dispose() }
+        $manifest = [IO.File]::ReadAllText($payloadManifest, [Text.Encoding]::UTF8) | ConvertFrom-Json
+        $entry = @($manifest.files | Where-Object { $_.path -eq 'instalar.bat' })
+        Assert-True ($entry.Count -eq 1) 'instalar.bat não está no manifesto de teste.'
+        $entry[0].sha256 = $changedHash
+        [IO.File]::WriteAllText($payloadManifest, ($manifest | ConvertTo-Json -Depth 8), (New-Object Text.UTF8Encoding($false)))
+        $env:NEXOFLOW_SETUP_INSTALL_MODE = 'Clean'
+        Invoke-Setup 'Instalação limpa com falha sintética e recuperação' -ExpectedExitCode 1
+    } finally {
+        [IO.File]::WriteAllBytes($payloadBat, $savedBat)
+        [IO.File]::WriteAllBytes($payloadManifest, $savedManifest)
+    }
+    Assert-Installed
+    Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir 'secrets_config.py') -Raw) -match 'TOKEN_TESTE_WENI') 'Falha da instalação limpa perdeu a configuração anterior.'
+    Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir 'logs\setup-smoke-marker.txt') -Raw).Trim() -eq 'preservar') 'Falha da instalação limpa perdeu os logs.'
+    Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir 'credentials\google_credentials.json') -Raw) -match 'smoke_test') 'Falha da instalação limpa perdeu credenciais.'
+
+    $env:NEXOFLOW_PERFIL = 'PET'
+    Invoke-Setup 'Instalação limpa bem-sucedida mantendo somente importações'
+    $env:NEXOFLOW_PERFIL = 'FARMA'
+    Assert-Installed
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $InstallDir 'secrets_config.py'))) 'A instalação limpa restaurou a configuração anterior.'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $InstallDir 'credentials\google_credentials.json'))) 'A instalação limpa restaurou credenciais anteriores.'
+    Assert-True (@(Get-ChildItem -LiteralPath (Join-Path $InstallDir '__pycache__') -Filter 'secrets_config*.pyc' -ErrorAction SilentlyContinue).Count -eq 0) 'A instalação limpa reteve bytecode da configuração anterior.'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $InstallDir 'logs\setup-smoke-marker.txt'))) 'A instalação limpa restaurou logs anteriores.'
+    Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir 'importacoes\planilha-teste.txt') -Raw) -eq 'export privado sintético') 'A instalação limpa perdeu as importações.'
+    Remove-Item Env:NEXOFLOW_SETUP_INSTALL_MODE -ErrorAction SilentlyContinue
+
     Write-Host "==> Executando check-up da instalação real"
     $oldLauncher = $env:NEXOFLOW_LAUNCHER
     $env:NEXOFLOW_LAUNCHER = "1"
@@ -287,6 +329,7 @@ public static class NexoFlowSetupRootLock {
     Write-Host "[OK] Smoke test do NexoFlow Setup 1.0 concluído."
 }
 finally {
+    Remove-Item Env:NEXOFLOW_SETUP_INSTALL_MODE -ErrorAction SilentlyContinue
     Remove-Item Env:NEXOFLOW_SETUP_NONINTERACTIVE -ErrorAction SilentlyContinue
     Remove-Item Env:NEXOFLOW_PYTHON_EXE -ErrorAction SilentlyContinue
     Remove-TestArtifacts

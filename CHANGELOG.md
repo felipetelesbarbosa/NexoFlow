@@ -1,5 +1,7 @@
 # NexoFlow 1.0 — Changelog
 
+- Setup: escolha explícita entre atualizar mantendo dados, instalação limpa e cancelar. A instalação limpa reinicia configurações, credenciais, logs e estado local dos dois segmentos, preservando importacoes. Falhas restauram a instalação anterior.
+
 - Setup: bloqueios temporários de leitura recebem até 30 segundos de retentativas durante a verificação SHA-256. A validação continua obrigatória; arquivo ainda em uso ou hash divergente interrompe a instalação com diagnóstico claro. Testes Windows cobrem liberação do bloqueio, prazo esgotado e integridade após a espera. Setup e Uninstall não pedem segmento; a escolha permanece nos aplicativos operacionais.
 
 - Noturno: etapas Weni/Analytics aplicadas com resultado parcial preservam pendências e continuam a sequência; o resultado final permanece parcial. Falhas críticas ou revisão não aplicada interrompem a rotina.

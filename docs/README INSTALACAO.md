@@ -51,7 +51,13 @@ As cargas completas oferecem **100%** ou quatro partes de **25%**. Execute as pa
 
 ## Atualizar
 
-Encerre as rotinas e execute o novo **NexoFlow Setup.exe**. O instalador preserva `secrets_config.py`, `credentials/`, `logs/` e `importacoes/`.
+Encerre as rotinas e execute o novo **NexoFlow Setup.exe**. Quando houver instalação ou dados anteriores, escolha:
+
+- **Atualizar mantendo dados:** preserva `secrets_config.py`, `credentials/`, `logs/` e o estado de FarmaLíder/Pets Líder.
+- **Instalação limpa:** reinicia esses dados locais nos dois segmentos. Configure os acessos novamente e gere novas cargas e revisões.
+- **Cancelar:** encerra sem alterar a instalação.
+
+Os arquivos de `importacoes/` são preservados nas duas opções. O Setup não exclui dados na Weni ou no Google Sheets. Se a instalação falhar, tenta restaurar a versão anterior com seus dados.
 
 Após atualizar, rode o diagnóstico e gere novas revisões antes de aplicar mudanças. Faça carga completa quando precisar revalidar a base ou preencher novos campos. O [histórico de mudanças](../CHANGELOG.md) informa os ajustes de cada publicação.
 
@@ -59,7 +65,7 @@ Após atualizar, rode o diagnóstico e gere novas revisões antes de aplicar mud
 
 Use **Configurações do Windows → Aplicativos instalados → NexoFlow**, o atalho do Menu Iniciar ou `C:\NexoFlow\desinstalar_nexoflow.cmd`. O executável Uninstall é opcional.
 
-O desinstalador remove o programa e os atalhos. As importações são preservadas em `C:\NexoFlow Data\importacoes`; a preservação das demais configurações e dos logs é opcional. Uma reinstalação restaura os arquivos preservados. O Python global permanece instalado.
+O desinstalador remove o programa e os atalhos. As importações são preservadas em `C:\NexoFlow Data\importacoes`; a preservação das demais configurações e dos logs é opcional. Na reinstalação, escolha atualizar mantendo dados para recuperar configurações e logs preservados. O Python global permanece instalado.
 
 ## Se houver problema
 

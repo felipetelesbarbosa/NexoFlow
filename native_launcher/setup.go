@@ -21,11 +21,18 @@ func main() {
     nonInteractive := os.Getenv("NEXOFLOW_SETUP_NONINTERACTIVE") == "1"
     if nonInteractive {
         args = append(args, "-NonInteractive")
+        if mode := os.Getenv("NEXOFLOW_SETUP_INSTALL_MODE"); mode != "" {
+            args = append(args, "-InstallMode", mode)
+        }
     }
     rc = runChild(powershellPath(), args...)
+    if rc == 2 {
+        fmt.Println("[INFO] Instalação cancelada. Nenhum arquivo instalado foi alterado.")
+        os.Exit(rc)
+    }
     if rc != 0 {
         fmt.Printf("\n[ERRO] O NexoFlow Setup foi encerrado com o código %d.\n", rc)
-        fmt.Println("Consulte também o log: %TEMP%\\NexoFlow-Setup.log")
+        fmt.Println("Consulte também o log:", "%TEMP%\\NexoFlow-Setup.log")
         if !nonInteractive {
             fmt.Println("A janela permanecerá aberta para que a causa possa ser lida.")
             waitEnter()

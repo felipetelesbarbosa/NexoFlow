@@ -1,6 +1,7 @@
 ﻿[CmdletBinding()]
 param(
-    [switch]$NonInteractive
+    [switch]$NonInteractive,
+    [ValidateSet('Preserve', 'Clean', 'Cancel')][string]$InstallMode = 'Preserve'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -646,19 +647,69 @@ Abra o atalho "Python 3.14.8" uma vez para confirmar que o interpretador inicia 
 
 }
 
-function Confirm-Update {
-    if ($NonInteractive) { return $true }
-
+function Show-InstallModeDialog {
+    Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+    $form = New-Object System.Windows.Forms.Form
     try {
-        Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
-        $result = [System.Windows.Forms.MessageBox]::Show(
-            "Uma instalação do $AppName já existe.`n`nDeseja atualizar/reinstalar mantendo configurações, credenciais e logs?",
-            "$AppName - Atualização", 'OKCancel', 'Question')
-        return ($result -eq [System.Windows.Forms.DialogResult]::OK)
-    } catch {
-        $answer = Read-Host 'Instalação existente encontrada. Atualizar/reinstalar? (S/N)'
-        return ($answer -match '^[Ss]')
+        $form.Name = 'NexoFlowInstallMode'
+        $form.Text = 'NexoFlow — Instalação'
+        $form.ClientSize = New-Object System.Drawing.Size(660, 285)
+        $form.StartPosition = 'CenterScreen'
+        $form.FormBorderStyle = 'FixedDialog'
+        $form.MaximizeBox = $false
+        $form.MinimizeBox = $false
+        $form.AutoScaleMode = 'Font'
+        $form.Font = [Drawing.SystemFonts]::MessageBoxFont
+
+        $label = New-Object System.Windows.Forms.Label
+        $label.Location = New-Object System.Drawing.Point(20, 20)
+        $label.Size = New-Object System.Drawing.Size(620, 185)
+        $label.Text = "Já existem arquivos do NexoFlow neste computador.`n`nAtualizar mantendo dados: mantém configurações, credenciais, logs e estado local.`n`nInstalação limpa: reinicia esses dados para FarmaLíder e Pets Líder. Será necessário configurar os acessos novamente.`n`nOs arquivos de importacoes são preservados nas duas opções."
+        $form.Controls.Add($label)
+
+        foreach ($choice in @(
+            @{ Name = 'Preserve'; Text = 'Atualizar mantendo dados'; X = 20; Width = 260; Result = [Windows.Forms.DialogResult]::Yes },
+            @{ Name = 'Clean'; Text = 'Instalação limpa'; X = 295; Width = 200; Result = [Windows.Forms.DialogResult]::No },
+            @{ Name = 'Cancel'; Text = 'Cancelar'; X = 510; Width = 130; Result = [Windows.Forms.DialogResult]::Cancel }
+        )) {
+            $button = New-Object System.Windows.Forms.Button
+            $button.Name = $choice.Name
+            $button.Text = $choice.Text
+            $button.Location = New-Object System.Drawing.Point($choice.X, 230)
+            $button.Size = New-Object System.Drawing.Size($choice.Width, 35)
+            $button.DialogResult = $choice.Result
+            $form.Controls.Add($button)
+            if ($choice.Name -eq 'Preserve') { $form.AcceptButton = $button }
+            if ($choice.Name -eq 'Cancel') { $form.CancelButton = $button }
+        }
+        switch ($form.ShowDialog()) {
+            ([Windows.Forms.DialogResult]::Yes) { return 'Preserve' }
+            ([Windows.Forms.DialogResult]::No) { return 'Clean' }
+            default { return 'Cancel' }
+        }
+    } finally { $form.Dispose() }
+}
+
+function Read-InstallModeFromConsole {
+    while ($true) {
+        Write-Host '[1] Atualizar mantendo configurações, credenciais, logs e estado local'
+        Write-Host '[2] Instalação limpa — reiniciar esses dados nos dois segmentos'
+        Write-Host '[0] Cancelar'
+        Write-Host 'Os arquivos de importacoes serão preservados.'
+        switch ((Read-Host 'Escolha uma opção')) {
+            '1' { return 'Preserve' }
+            '2' { return 'Clean' }
+            '0' { return 'Cancel' }
+            '' { return 'Cancel' }
+            default { Write-Host '[AVISO] Opção inválida. Tente novamente.' }
+        }
     }
+}
+
+function Select-InstallMode {
+    if ($NonInteractive) { return $InstallMode }
+    try { return Show-InstallModeDialog }
+    catch { return Read-InstallModeFromConsole }
 }
 
 function Validate-Payload {
@@ -864,6 +915,36 @@ function Restore-PrivateData([string]$Backup, [string]$Target) {
             Copy-Item -LiteralPath $srcDir -Destination $dstDir -Recurse -Force
         }
     }
+}
+
+function Restore-SetupData {
+    param(
+        [string]$BackupRoot,
+        [string]$Target,
+        [ValidateSet('Preserve', 'Clean')][string]$Mode
+    )
+    foreach ($name in @('legacy preserved', 'legacy installed', 'preserved', 'installed')) {
+        $backup = Join-Path $BackupRoot $name
+        if ($Mode -eq 'Preserve') {
+            Restore-PrivateData -Backup $backup -Target $Target
+        } else {
+            # Exports do usuário são documentos, não configuração ou estado da aplicação.
+            $imports = Join-Path $backup 'importacoes'
+            if (Test-Path -LiteralPath $imports -PathType Container) {
+                Copy-ImportDirectory -Source $imports -Target (Join-Path $Target 'importacoes')
+            }
+        }
+    }
+}
+
+function Get-SetupNetworkSettingsDirectory([string]$BackupRoot) {
+    foreach ($name in @('installed', 'preserved', 'legacy installed', 'legacy preserved')) {
+        $directory = Join-Path $BackupRoot $name
+        if (Test-Path -LiteralPath (Join-Path $directory 'secrets_config.py') -PathType Leaf) {
+            return $directory
+        }
+    }
+    return $null
 }
 
 function Test-InstalledProcessPath([string]$Path) {
@@ -1137,13 +1218,26 @@ try {
     Write-Step 'Validando integridade do pacote'
     Validate-Payload
 
+    $selectedMode = $InstallMode
+    $hasPreviousData = @($InstallDir, $DataDir, $LegacyInstallDir, $LegacyDataDir) | Where-Object { Test-Path -LiteralPath $_ -PathType Container }
+    if ($hasPreviousData) { $selectedMode = Select-InstallMode }
+    if ($selectedMode -eq 'Cancel') {
+        Write-Host '[INFO] Instalação cancelada pelo usuário. Nenhum arquivo instalado foi alterado.'
+        try { Stop-Transcript | Out-Null } catch { }
+        exit 2
+    }
+    if ($selectedMode -eq 'Clean') {
+        Write-Host '[INFO] Instalação limpa: configurações, credenciais, logs e estado local serão reiniciados; importacoes será preservada.'
+    } else {
+        Write-Host '[INFO] Atualização mantendo configurações, credenciais, logs e estado local.'
+    }
+
     Write-Step 'Verificando requisito Python'
     $pythonExe = Install-PythonIfNeeded
     $pythonDir = Split-Path -Parent $pythonExe
     $pythonScripts = Join-Path $pythonDir 'Scripts'
     $env:Path = "$pythonDir;$pythonScripts;$env:Path"
     if (Test-Path -LiteralPath $InstallDir -PathType Container) {
-        if (-not (Confirm-Update)) { Write-Host '[INFO] Instalação cancelada pelo usuário.'; try { Stop-Transcript | Out-Null } catch { }; exit 2 }
         Write-Step 'Fechando processos da instalação anterior'
         Stop-InstalledNexoFlowProcesses
     }
@@ -1151,7 +1245,7 @@ try {
     $backupDir = Join-Path $env:TEMP ('NexoFlow Setup ' + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
 
-    Write-Step 'Preservando configurações, credenciais e logs existentes'
+    Write-Step 'Preparando recuperação dos dados existentes em caso de falha'
     Backup-PrivateData -Source $LegacyDataDir -Backup (Join-Path $backupDir 'legacy preserved')
     Backup-PrivateData -Source $LegacyInstallDir -Backup (Join-Path $backupDir 'legacy installed')
     Backup-PrivateData -Source $DataDir -Backup (Join-Path $backupDir 'preserved')
@@ -1166,16 +1260,25 @@ try {
         Copy-Item -LiteralPath $_.FullName -Destination $InstallDir -Recurse -Force
     }
 
-    # Ordem: legado primeiro; dados de uma instalação NexoFlow existente prevalecem.
-    Restore-PrivateData -Backup (Join-Path $backupDir 'legacy preserved') -Target $InstallDir
-    Restore-PrivateData -Backup (Join-Path $backupDir 'legacy installed') -Target $InstallDir
-    Restore-PrivateData -Backup (Join-Path $backupDir 'preserved') -Target $InstallDir
-    Restore-PrivateData -Backup (Join-Path $backupDir 'installed') -Target $InstallDir
+    Restore-SetupData -BackupRoot $backupDir -Target $InstallDir -Mode $selectedMode
     New-Item -ItemType Directory -Force -Path (Join-Path $InstallDir 'importacoes') | Out-Null
 
     Write-Step 'Preparando ambiente Python e dependências'
     $oldInstaller = $env:NEXOFLOW_INSTALLER
     $oldPythonExe = $env:NEXOFLOW_PYTHON_EXE
+    $oldSetupPythonPath = $env:PYTHONPATH
+    $oldSetupNetworkConfig = $env:NEXOFLOW_SETUP_NETWORK_CONFIG
+    $oldSetupProfile = $env:NEXOFLOW_PERFIL
+    $env:NEXOFLOW_PERFIL = 'FARMA'
+    if ($selectedMode -eq 'Clean') {
+        $networkSettings = Get-SetupNetworkSettingsDirectory -BackupRoot $backupDir
+        if ($networkSettings) {
+            # A configuração permanece no backup privado, fora da instalação limpa.
+            $env:PYTHONPATH = "$networkSettings;$oldSetupPythonPath"
+            $env:NEXOFLOW_SETUP_NETWORK_CONFIG = '1'
+            Write-Host '[INFO] Configuração de rede anterior disponível somente durante a preparação das dependências.'
+        }
+    }
     $env:NEXOFLOW_INSTALLER = '1'
     $env:NEXOFLOW_PYTHON_EXE = $pythonExe
     Push-Location $InstallDir
@@ -1184,6 +1287,9 @@ try {
         Pop-Location
         if ($null -eq $oldInstaller) { Remove-Item Env:NEXOFLOW_INSTALLER -ErrorAction SilentlyContinue } else { $env:NEXOFLOW_INSTALLER = $oldInstaller }
         if ($null -eq $oldPythonExe) { Remove-Item Env:NEXOFLOW_PYTHON_EXE -ErrorAction SilentlyContinue } else { $env:NEXOFLOW_PYTHON_EXE = $oldPythonExe }
+        if ($null -eq $oldSetupPythonPath) { Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue } else { $env:PYTHONPATH = $oldSetupPythonPath }
+        if ($null -eq $oldSetupNetworkConfig) { Remove-Item Env:NEXOFLOW_SETUP_NETWORK_CONFIG -ErrorAction SilentlyContinue } else { $env:NEXOFLOW_SETUP_NETWORK_CONFIG = $oldSetupNetworkConfig }
+        if ($null -eq $oldSetupProfile) { Remove-Item Env:NEXOFLOW_PERFIL -ErrorAction SilentlyContinue } else { $env:NEXOFLOW_PERFIL = $oldSetupProfile }
     }
     if ($installRc -ne 0) { throw "A preparação do ambiente Python falhou (código $installRc). Os arquivos e dados privados foram preservados." }
 
