@@ -44,7 +44,7 @@ class NoturnoConsoleTests(unittest.TestCase):
         self.assertEqual(args[0][-1], "--full")
         self.assertEqual(kwargs["env"]["NEXOFLOW_PERFIL"], "PET")
         self.assertEqual(kwargs["env"]["NEXOFLOW_UNATTENDED"], "1")
-        self.assertEqual(kwargs["cwd"], self.root)
+        self.assertTrue(kwargs["cwd"].samefile(self.root))
         self.assertFalse(kwargs["check"])
 
     def test_modes_profiles_and_partial_exit_are_preserved(self):

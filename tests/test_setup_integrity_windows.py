@@ -39,12 +39,12 @@ foreach ($relative in @('NexoFlow Noturno.exe', 'comandos/executar_noturno.bat',
 
 DENY_READ = r"""
 function Deny-Read([string]$Path) {
-    $before = Get-Acl -LiteralPath $Path
-    $changed = Get-Acl -LiteralPath $Path
+    $before = [IO.File]::GetAccessControl($Path)
+    $changed = [IO.File]::GetAccessControl($Path)
     $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User
     $rule = New-Object Security.AccessControl.FileSystemAccessRule($sid, [Security.AccessControl.FileSystemRights]::ReadData, [Security.AccessControl.AccessControlType]::Deny)
     $changed.AddAccessRule($rule)
-    Set-Acl -LiteralPath $Path -AclObject $changed
+    [IO.File]::SetAccessControl($Path, $changed)
     return $before
 }
 """
@@ -94,7 +94,7 @@ try {
     Validate-Payload
     Assert-True (-not $script:OptionalNightValidated) 'O EXE negado recebeu aprovacao.'
     Assert-True (-not (Install-OptionalNightLauncher)) 'Tentou copiar o EXE negado.'
-} finally { Set-Acl -LiteralPath $path -AclObject $before }
+} finally { [IO.File]::SetAccessControl($path, $before) }
 """,
         )
 
@@ -116,7 +116,7 @@ try { try { Validate-Payload } catch {
     $cause = $_.Exception
     while ($cause.InnerException) { $cause = $cause.InnerException }
     $denied = $cause -is [UnauthorizedAccessException]
-} } finally { Set-Acl -LiteralPath $path -AclObject $before }
+} } finally { [IO.File]::SetAccessControl($path, $before) }
 Assert-True $denied 'O Setup ignorou acesso negado a componente obrigatorio.'
 Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir 'original.txt') -Raw) -ceq 'instalacao anterior') 'A instalacao anterior foi alterada.'
 """,
