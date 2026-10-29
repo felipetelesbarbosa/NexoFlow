@@ -35,3 +35,9 @@ Ao atualizar este repositório, mantenha a identificação pública **NexoFlow 1
 - Lançamento com `codProduto=0` e descrição vazia representa frete somente quando a soma desses lançamentos coincide com o frete oficial do cabeçalho. Validar vínculo e valores; não incluir em produtos, quantidades, Recompra ou valor dos produtos e não somar o frete duas vezes.
 
 - `clientes/FARMA` pode retornar `cliente`, `ultimoPedido` e `itens`. Guardar snapshots completos e verificados em memória por CPF/ID durante a execução. Pedido/cliente/itens precisam pertencer à mesma identidade; respostas ausentes, incompletas ou ambíguas usam consulta individual, sem concluir ausência de compra. Cadastro só preenche campos vazios e mantém evidência na revisão. Endereço exige correspondência única com o último pedido (CEP, cidade/UF, logradouro, número e complemento), inclusive quando o endereço correspondente não é o principal. Leituras de preparação não podem autorizar uma aplicação posterior: Recompra e deduplicação reiniciam as leituras antes do apply. O arquivo PET usado como referência de formato não alimenta a operação FARMA.
+
+## Perfis de segmento
+
+- Atalhos tradicionais usam FARMA; atalhos Pets propagam `NEXOFLOW_PERFIL=PET` antes dos imports. Nunca trocar perfil em um processo que já carregou configurações ou clientes.
+- Preservar os mesmos contratos de auditoria, rota direta/proxy, retentativas e aplicação nos dois perfis. Credenciais Weni, três destinos Sheets, logs, importações, revisões e estado devem permanecer separados. Revisões e manifestos copiados entre segmentos devem ser recusados.
+- FARMA mantém filtro de produtos humanos e D+25. PET exige vínculo oficial PET, preserva seus itens e usa D+30, pedido_data, compra_recente e opt_in_marketing Sim/Não, sem exigência de maioridade. Pagamento da Recompra exige código documentado de 1 a 6; falhas de consulta permanecem pendentes em ambos os perfis.

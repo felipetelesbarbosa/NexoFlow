@@ -22,6 +22,7 @@ from config import (
     FARMALIDER_429_COOLDOWN_SECONDS,
     FARMALIDER_CIRCUIT_MIN_5XX,
     FARMALIDER_CIRCUIT_MIN_DISTINCT_QUERIES,
+    FARMALIDER_CONNECT_TIMEOUT_SECONDS,
     FARMALIDER_MAX_ADAPTIVE_DELAY_SECONDS,
     FARMALIDER_MAX_RETRIES,
     FARMALIDER_MAX_WORKERS,
@@ -68,6 +69,15 @@ class FarmaliderClient:
     sua própria requests.Session, enquanto o limitador de ritmo e o cooldown de
     HTTP 429 são compartilhados globalmente entre todas elas.
     """
+
+    def __new__(cls, *args, **kwargs):
+        from runtime_profile import segment
+
+        if cls is FarmaliderClient and segment() == "PET":
+            from recompra_profiles import PetRecompraClient
+
+            return object.__new__(PetRecompraClient)
+        return object.__new__(cls)
 
     def __init__(self, token: str, use_hml: bool = False) -> None:
         self.token = str(token or "").strip()
@@ -721,7 +731,10 @@ class FarmaliderClient:
                     response = self._get_session().get(
                         url,
                         params={"token": self.token},
-                        timeout=FARMALIDER_REQUEST_TIMEOUT_SECONDS,
+                        timeout=(
+                            FARMALIDER_CONNECT_TIMEOUT_SECONDS,
+                            FARMALIDER_REQUEST_TIMEOUT_SECONDS,
+                        ),
                         allow_redirects=False,
                         proxies=proxies,
                     )
@@ -1092,7 +1105,10 @@ class FarmaliderClient:
                     response = self._get_session().get(
                         url,
                         params={"token": self.token},
-                        timeout=FARMALIDER_REQUEST_TIMEOUT_SECONDS,
+                        timeout=(
+                            FARMALIDER_CONNECT_TIMEOUT_SECONDS,
+                            FARMALIDER_REQUEST_TIMEOUT_SECONDS,
+                        ),
                         allow_redirects=False,
                         proxies=proxies,
                     )

@@ -18,7 +18,9 @@ def load_private_settings():
     import importlib
 
     ensure_root_import_path()
-    return importlib.import_module("secrets_config")
+    from runtime_profile import select_settings
+
+    return select_settings(importlib.import_module("secrets_config"))
 
 
 def launcher_path(root: Path, name: str) -> Path:

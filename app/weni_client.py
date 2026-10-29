@@ -36,6 +36,7 @@ class WeniError(RuntimeError):
 
 class WeniClient:
     def __init__(self, token: str, *, retry_mutations: bool = True) -> None:
+        self._profile_verified = False
         self.retry_mutations = retry_mutations
         self.session = requests.Session()
         self.session.headers.update(
@@ -63,6 +64,17 @@ class WeniClient:
         params: dict[str, Any] | None = None,
         json_body: dict[str, Any] | None = None,
     ) -> Any:
+        from runtime_profile import segment
+
+        if (
+            segment() == "PET"
+            and not self._profile_verified
+            and not url.endswith("/org.json")
+        ):
+            org = self._request_json("GET", "https://flows.weni.ai/api/v2/org.json")
+            if not isinstance(org, dict) or org.get("name") != "Delivery Pets Líder":
+                raise WeniError("Token não pertence ao projeto Delivery Pets Líder.")
+            self._profile_verified = True
         last_error = "erro desconhecido"
         last_status = None
         max_attempts = (
@@ -274,6 +286,21 @@ class WeniClient:
                     )
                 )
             )
+
+    def iter_group_contacts(self, group_uuid: str):
+        for contact in self._iter_paginated(
+            WENI_CONTACTS_API_URL,
+            {"deleted": "false", "group": group_uuid, "limit": 1000},
+            item_label="integrantes da Recompra",
+        ):
+            if not any(
+                isinstance(g, dict) and g.get("uuid") == group_uuid
+                for g in contact.get("groups", [])
+            ):
+                raise WeniError(
+                    "A API não confirmou o filtro do grupo; auditoria interrompida."
+                )
+            yield contact
 
     def iter_contacts(
         self,

@@ -3,8 +3,13 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from farmalider_client import FarmaliderClient, FarmaliderError
-from farmalider_customers import CustomerDirectory
+from farmalider_client import (
+    FarmaliderAuthError,
+    FarmaliderClient,
+    FarmaliderError,
+    FarmaliderUnavailableError,
+)
+from farmalider_customers import CustomerDirectory, ExecutionReadCache
 from product_scope import PHARMACY_SCOPE_VERSION
 
 
@@ -29,7 +34,7 @@ class RecompraProfile:
             if self.segment == "FARMA"
             else "BASE_PET"
         )
-        return f"JANELA_0_A_{self.days}_SEM_RECUSA_{scope}_EXECUCAO_V3"
+        return f"JANELA_0_A_{self.days}_SEM_RECUSA_{scope}_EXECUCAO_V4"
 
     @property
     def directory(self):
@@ -75,10 +80,21 @@ class PetRecompraClient(FarmaliderClient):
 
     def prepare_customer_directory(self, *, expected_contacts=None):
         with self._directory_lock:
-            if self.customer_directory is None:
+            if self.customer_directory is not None:
+                return True
+            if self._directory_attempted:
+                return False
+            self._directory_attempted = True
+            if self._execution_cache is None:
+                self._execution_cache = ExecutionReadCache()
+            try:
                 self.customer_directory = CustomerDirectory(
                     self.get_clientes_segmento("PET"), segment="PET"
                 )
+            except (FarmaliderAuthError, FarmaliderUnavailableError):
+                raise
+            except (FarmaliderError, ValueError):
+                return False
             return True
 
     def get_cliente_by_cpf(self, cpf):

@@ -36,6 +36,7 @@ from farmalider_integration import (
 )
 from pedido_utils import business_order_datetime, effective_order_status_code
 from product_scope import PHARMACY_SCOPE_VERSION
+from runtime_profile import last_purchase_field, recompra_days, recompra_group, segment
 from urn_utils import native_contact_urns
 from weni_client import WeniError
 from weni_update import (
@@ -56,6 +57,8 @@ from weni_update import (
     load_review_snapshot,
     write_review_snapshot,
 )
+
+LAST_PURCHASE_FIELD = last_purchase_field()
 
 TICKET_COLUMNS = [
     "ticket_uuid",
@@ -224,14 +227,15 @@ def _recompra_removals(plan, contact, captured_at):
     )
     local_now = business_order_datetime(captured_at)
     expired = reference is None or bool(
-        local_now and (local_now.astimezone(TZ).date() - reference.date()).days > 25
+        local_now
+        and (local_now.astimezone(TZ).date() - reference.date()).days > recompra_days()
     )
     if not (
         "pedido_data" in plan.fields
         or _recompra_products_need_unscheduling(plan)
         or (plan.order_validated and not plan.purchase_confirmed)
         or expired
-        or refused(contact)
+        or refused(contact, segment=segment())
         or member(contact, "", OPT_OUT)
     ):
         return []
@@ -268,9 +272,9 @@ def _order_plan(contact, resolved, farm, captured_at, available_fields):
         available_weni_fields=available_fields,
         resolved_order=resolved,
     )
-    plan.fields.pop("ultima_compra", None)
-    plan.previous.pop("ultima_compra", None)
-    plan.evidence.pop("ultima_compra", None)
+    plan.fields.pop(LAST_PURCHASE_FIELD, None)
+    plan.previous.pop(LAST_PURCHASE_FIELD, None)
+    plan.evidence.pop(LAST_PURCHASE_FIELD, None)
     plan.group_actions.extend(_recompra_removals(plan, contact, captured_at))
     if plan.group_actions:
         plan.guards["marketing_opt_in"] = fields.get("marketing_opt_in")
@@ -708,10 +712,10 @@ def apply_delivery_review(path, weni, *, store_factory=None, target=None):
     _ensure_order_fields(available)
     # A orientação vigente usa pedido_data; não editar o arquivo revisado.
     # A projeção abaixo somente elimina a escrita legada de ultima_compra.
-    legacy = sum("ultima_compra" in p.fields for p in plans)
+    legacy = sum(LAST_PURCHASE_FIELD in p.fields for p in plans)
     for plan in plans:
         for data in (plan.fields, plan.previous, plan.guards, plan.evidence):
-            data.pop("ultima_compra", None)
+            data.pop(LAST_PURCHASE_FIELD, None)
     if legacy:
         logging.warning(
             "Delivery: escrita legada de ultima_compra desconsiderada em %s plano(s); pedido_data permanece como referência. Snapshot original preservado.",
@@ -785,8 +789,7 @@ def apply_delivery_review(path, weni, *, store_factory=None, target=None):
             reviewed_groups = {
                 action.group
                 for action in plan.group_actions
-                if action.action == "remove"
-                and action.group_name == "Recompra FarmaLíder"
+                if action.action == "remove" and action.group_name == recompra_group()
             }
             if any(
                 action.group not in reviewed_groups

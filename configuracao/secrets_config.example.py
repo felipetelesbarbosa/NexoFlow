@@ -61,18 +61,24 @@ PROXY_DETECTION_TIMEOUT = 1.5
 RECOMPRA_ENABLED = False
 
 
-# Recompra por perfil: os demais aplicativos continuam usando a configuração acima.
+# Perfis dos aplicativos: atalhos padrão usam FARMA; atalhos Pets usam PET.
 # Se PERFIS já existir no arquivo local, atualize esse dicionário em vez de duplicá-lo.
 PERFIS = {
     "FARMA": {
         "SEGMENTO": "FARMA",
         "WENI_API_TOKEN": WENI_API_TOKEN,
+        "GOOGLE_SPREADSHEET_ID": GOOGLE_SPREADSHEET_ID,
+        "GOOGLE_OPERATIONS_SPREADSHEET_ID": "",
+        "GOOGLE_HISTORY_SPREADSHEET_ID": "",
         "FARMALIDER_API_ENABLED": FARMALIDER_API_ENABLED,
         "FARMALIDER_API_TOKEN": FARMALIDER_API_TOKEN,
         "FARMALIDER_USE_HML": FARMALIDER_USE_HML,
     },
     "PET": {
         "SEGMENTO": "PET",
+        "GOOGLE_SPREADSHEET_ID": "",
+        "GOOGLE_OPERATIONS_SPREADSHEET_ID": "",
+        "GOOGLE_HISTORY_SPREADSHEET_ID": "",
         "WENI_API_TOKEN": "",
         "FARMALIDER_API_ENABLED": True,
         "FARMALIDER_API_TOKEN": "",

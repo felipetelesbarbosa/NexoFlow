@@ -33,6 +33,7 @@ _KNOWN_REASONS = frozenset(
         "JANELA_0_A_30",
         "MAIS_DE_30_DIAS",
         "MAIS_DE_25_DIAS",
+        "PAGAMENTO_INVALIDO",
         "PAGAMENTO_0_CANCELADO",
         "PAGAMENTO_0_CANCELADO_WENI",
         "PEDIDO_ANTIGO_BLOQUEADO",

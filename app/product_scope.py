@@ -12,8 +12,13 @@ from functools import lru_cache
 from typing import Any
 
 from pet_catalog import CATALOG_REVISION, catalog_contains
+from runtime_profile import segment
 
-PHARMACY_SCOPE_VERSION = f"human_products_v3_{CATALOG_REVISION}"
+PHARMACY_SCOPE_VERSION = (
+    f"human_products_v3_{CATALOG_REVISION}"
+    if segment() == "FARMA"
+    else "pet_segment_verified_v1"
+)
 
 
 def _normalized(value: Any) -> str:
@@ -65,4 +70,12 @@ def is_animal_product(item: dict[str, Any]) -> bool:
 
 def pharmacy_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Preserve ordem e valores dos itens sem indicação de uso animal."""
-    return [item for item in items if not is_animal_product(item)]
+    return (
+        list(items)
+        if segment() == "PET"
+        else [item for item in items if not is_animal_product(item)]
+    )
+
+
+def is_out_of_scope_product(item: dict[str, Any]) -> bool:
+    return segment() == "FARMA" and is_animal_product(item)

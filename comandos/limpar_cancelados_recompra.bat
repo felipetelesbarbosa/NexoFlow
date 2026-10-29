@@ -4,6 +4,10 @@ setlocal EnableExtensions DisableDelayedExpansion
 for %%I in ("%~dp0..") do set "NEXOFLOW_HOME=%%~fI"
 set "PYTHONPATH=%NEXOFLOW_HOME%;%NEXOFLOW_HOME%\app;%PYTHONPATH%"
 set "PYTHONIOENCODING=utf-8"
+set "PROFILE_LOG=logs"
+set "IMPORT_DIR=importacoes"
+if /i "%NEXOFLOW_PERFIL%"=="PET" set "PROFILE_LOG=logs\PET"
+if /i "%NEXOFLOW_PERFIL%"=="PET" set "IMPORT_DIR=importacoes\PET"
 cd /d "%NEXOFLOW_HOME%\"
 title NexoFlow - Limpar cancelados da Recompra
 echo [1] FarmaLíder D+25
@@ -14,10 +18,12 @@ if errorlevel 2 goto :pet
 set "PROFILE=FARMA"
 set "PROFILE_LOG=logs"
 goto :iniciar
+set "NEXOFLOW_PERFIL=%PROFILE%"
 :pet
 set "PROFILE=PET"
 set "PROFILE_LOG=logs\PET"
 :iniciar
+set "NEXOFLOW_PERFIL=%PROFILE%"
 set "RC=1"
 set "REVIEW=%PROFILE_LOG%\recompra_cancelados_%RANDOM%_%RANDOM%.json"
 echo Esta rotina apenas remove cancelados do grupo de Recompra.

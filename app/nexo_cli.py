@@ -13,10 +13,12 @@ from pathlib import Path
 from typing import Any
 
 from farmalider_client import FarmaliderClient
+from runtime_profile import scoped_path
 from weni_client import WeniClient
 
 BASE_DIR = Path(__file__).resolve().parents[1]
-LOG_DIR = BASE_DIR / "logs"
+
+LOG_DIR = BASE_DIR / scoped_path("logs")
 VERSION = "1.0"
 
 
@@ -57,7 +59,9 @@ def _load_secrets() -> Any:
         raise RuntimeError("Não foi possível carregar secrets_config.py.")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module
+    from runtime_profile import select_settings
+
+    return select_settings(module)
 
 
 def _prepare_network() -> str:
@@ -617,7 +621,9 @@ def build_parser() -> argparse.ArgumentParser:
     recompra.add_argument(
         "recompra_op", choices=["auditoria", "dry-run", "aplicar", "atualizar"]
     )
-    recompra.add_argument("--revisao", default="logs/recompra_review.json")
+    recompra.add_argument(
+        "--revisao", default=str(scoped_path("logs/recompra_review.json"))
+    )
     recompra.add_argument("--contato", help="UUID de um contato para a simulação")
     recompra.add_argument("--full", action="store_true")
     recompra.add_argument(

@@ -22,6 +22,10 @@ try {
     if (-not (Test-Path -LiteralPath $signal -PathType Leaf)) { throw "O executavel NAO chamou comandos/atualizar_recompra.bat" }
     if (-not ((Get-Content -LiteralPath $signal -Raw) -match "BAT_RECOMPRA_CHAMADO")) { throw "BAT nao executado" }
 
+    [IO.File]::WriteAllText($bat, "@echo off`r`necho %NEXOFLOW_PERFIL%> `"%~dp0..\perfil.txt`"`r`nexit /b 0`r`n", [Text.Encoding]::ASCII)
+    $proc = Start-Process -FilePath $exe -ArgumentList '--perfil','PET' -WorkingDirectory $testDir -NoNewWindow -PassThru -Wait
+    if ($proc.ExitCode -ne 0) { throw 'Launcher Pets falhou.' }
+    if ((Get-Content (Join-Path $testDir 'perfil.txt') -Raw).Trim() -cne 'PET') { throw 'O executável não propagou o perfil PET.' }
     [IO.File]::WriteAllText($bat, "@echo off`r`nexit /b 7`r`n", [Text.Encoding]::ASCII)
     $proc = Start-Process -FilePath $exe -WorkingDirectory $testDir -NoNewWindow -PassThru -Wait
     if ($proc.ExitCode -ne 7) { throw "Launcher falha: exit $($proc.ExitCode) deveria ser 7" }

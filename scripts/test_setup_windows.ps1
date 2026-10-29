@@ -79,7 +79,7 @@ function Invoke-Setup {
 
 function Assert-Installed {
     foreach ($relative in @(
-        "app/recompra_profiles.py", "app/recompra_cleanup.py",
+        "app/recompra_profiles.py", "app/recompra_cleanup.py", "app/runtime_profile.py",
         "comandos/limpar_cancelados_recompra.bat", "comandos/atualizar_recompra_pets.bat",
         "NexoFlow Noturno.exe",
         "assets\NexoFlow_Noturno.ico",
@@ -106,6 +106,12 @@ function Assert-Installed {
 
     Assert-True (Test-Path -LiteralPath (Join-Path $InstallDir "importacoes") -PathType Container) "A pasta importacoes não foi instalada."
 
+    foreach ($component in @('Weni', 'Analytics', 'Recompra', 'Planilha', 'Noturno', 'Terminal')) {
+        $petsLink = Join-Path ([Environment]::GetFolderPath('CommonDesktopDirectory')) ("NexoFlow Pets " + $component + '.lnk')
+        Assert-True (Test-Path -LiteralPath $petsLink) "Atalho Pets ausente: $component"
+        $petsShortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($petsLink)
+        Assert-True ($petsShortcut.Arguments -eq '--perfil PET') "Perfil incorreto no atalho Pets: $component"
+    }
     $nightLink = Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) "NexoFlow Noturno.lnk"
     Assert-True (Test-Path -LiteralPath $nightLink) "Atalho Noturno ausente."
     $nightShortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($nightLink)

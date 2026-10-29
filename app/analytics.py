@@ -23,6 +23,7 @@ from pedido_utils import (
     parse_weni_order_list,
     weni_order_datetime_text,
 )
+from runtime_profile import segment as active_segment
 from urn_utils import resolve_contact_urns
 
 AD_FIELDS = [
@@ -99,6 +100,8 @@ def _full_load_25_load() -> dict[str, Any]:
         ) from exc
     if not isinstance(payload, dict) or payload.get("schema_version") != 1:
         raise RuntimeError("Manifesto da carga completa 25% incompatível.")
+    if payload.get("segment", "FARMA") != active_segment():
+        raise RuntimeError("Manifesto de outro segmento.")
     uuids = payload.get("contact_uuids")
     if not isinstance(uuids, list) or not uuids:
         raise RuntimeError("Manifesto da carga completa 25% sem contatos.")
@@ -142,6 +145,7 @@ def _full_load_25_new_manifest(
     campaign_id = hashlib.sha256(f"{captured}|{digest}".encode()).hexdigest()[:16]
     return {
         "schema_version": 1,
+        "segment": active_segment(),
         "campaign_id": campaign_id,
         "captured_at_utc": captured,
         "total_parts": FULL_LOAD_25_PARTS,
@@ -677,7 +681,17 @@ def normalize_order_source(value: Any) -> str:
 
 def get_fields(contact: dict[str, Any]) -> dict[str, Any]:
     fields = contact.get("fields")
-    return fields if isinstance(fields, dict) else {}
+    if not isinstance(fields, dict):
+        return {}
+    from runtime_profile import segment
+
+    if segment() == "PET":
+        return {
+            **fields,
+            "ultima_compra": fields.get("compra_recente", ""),
+            "marketing_opt_in": fields.get("opt_in_marketing", ""),
+        }
+    return fields
 
 
 def get_phone_and_urn(

@@ -23,7 +23,9 @@ def run(argv: list[str] | None = None) -> int:
     from proxy_config import configure_proxy
 
     configure_proxy()
-    import secrets_config as secrets
+    from project_paths import load_private_settings
+
+    secrets = load_private_settings()
     from google_sheets import GoogleSheetsStore
     from logging_config import configure_logging
 

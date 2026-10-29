@@ -8,6 +8,8 @@ from uuid import uuid4
 
 from requests import RequestException
 
+from runtime_profile import segment as active_segment
+
 
 def build_parser():
     from config import FARMALIDER_MAX_WORKERS
@@ -18,7 +20,7 @@ def build_parser():
     parser.add_argument(
         "--perfil",
         choices=("FARMA", "PET"),
-        default="FARMA",
+        default=active_segment(),
         help="organização e regras da Recompra (FARMA D+25 ou PET D+30)",
     )
     parser.add_argument(
@@ -32,6 +34,11 @@ def build_parser():
         help="interrompe o fluxo se houver consultas de pedido incompletas",
     )
     mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument(
+        "--audit-group",
+        action="store_true",
+        help="revalida os integrantes atuais do grupo; somente leitura",
+    )
     mode.add_argument(
         "--check-only",
         action="store_true",
@@ -149,7 +156,9 @@ def main(argv=None):
     from logging_config import configure_logging
 
     configure_logging(profile.directory / "nexoflow_recompra.log")
-    import secrets_config as secrets
+    from project_paths import load_private_settings
+
+    secrets = load_private_settings()
     from recompra import (
         STATE,
         apply_review,
@@ -213,6 +222,21 @@ def main(argv=None):
             raise RuntimeError(
                 "FarmaLíder precisa estar disponível para confirmar a compra."
             )
+        if args.audit_group:
+            from recompra_group_audit import audit_group
+
+            path = profile.directory / "privado" / "auditoria_grupo_recompra.json"
+            result = audit_group(weni, farm, structure, path)
+            print("[INFO] Auditoria somente leitura: " + str(result))
+            print(
+                "[INFO] Relatórios privados: "
+                + str(path)
+                + " e "
+                + str(path.with_suffix(".csv"))
+                + " e "
+                + str(path.with_suffix(".xlsx"))
+            )
+            return 3 if result["classificacoes"].get("CONSULTA_PENDENTE") else 0
         if args.cleanup_cancelled:
             from recompra_cleanup import (
                 apply_cleanup_review,
@@ -372,4 +396,12 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
+    import os
+
+    selection = argparse.ArgumentParser(add_help=False)
+    selection.add_argument(
+        "--perfil", choices=("FARMA", "PET"), default=active_segment()
+    )
+    selected, _ = selection.parse_known_args()
+    os.environ["NEXOFLOW_PERFIL"] = selected.perfil
     raise SystemExit(main())

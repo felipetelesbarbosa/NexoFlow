@@ -4,9 +4,11 @@ import os
 from pathlib import Path
 from typing import Final
 
+from runtime_profile import scoped_path
+
 BASE_DIR: Final = Path(__file__).resolve().parents[1]
 CREDENTIALS_DIR: Final = BASE_DIR / "credentials"
-LOG_DIR: Final = BASE_DIR / "logs"
+LOG_DIR: Final = BASE_DIR / scoped_path("logs")
 
 WENI_CONTACTS_API_URL: Final = "https://flows.weni.ai/api/v2/contacts.json"
 WENI_MESSAGES_API_URL: Final = "https://flows.weni.ai/api/v2/messages.json"
@@ -66,7 +68,8 @@ FARMALIDER_API_BASE_URL_PROXY: Final = "https://api.farmalider.net.br/farmalider
 FARMALIDER_API_BASE_URL_EXTERNAL: Final = (
     "https://api.farmalider.net.br:3200/farmalider"
 )
-FARMALIDER_REQUEST_TIMEOUT_SECONDS: Final = 60
+FARMALIDER_CONNECT_TIMEOUT_SECONDS: Final = 10
+FARMALIDER_REQUEST_TIMEOUT_SECONDS: Final = 90
 FARMALIDER_MAX_RETRIES: Final = 4
 
 # Concorrência controlada da FarmaLíder.

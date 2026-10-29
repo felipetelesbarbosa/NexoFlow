@@ -15,6 +15,7 @@ from pedido_utils import (
     is_order_sale,
     serialize_pedido_products,
 )
+from runtime_profile import segment as active_segment
 
 
 def _text(value: Any) -> str:
@@ -1116,8 +1117,10 @@ def resolve_contact_order(
     fallback_order["pedido_id"] = pedido_id
     fallback_order["farmalider_cliente_id"] = linked_id
     source = "FARMALIDER_CLIENTE_CPF"
-    if payload and payload.get("_nexoflow_source") == "FARMALIDER_CLIENTES_FARMA":
-        source = "FARMALIDER_CLIENTES_FARMA"
+    if payload and payload.get("_nexoflow_source") == (
+        "FARMALIDER_CLIENTES_" + active_segment()
+    ):
+        source = "FARMALIDER_CLIENTES_" + active_segment()
     fallback_order["origem_pedido"] = source + (
         "_IDENTIDADE_VALIDADA" if invalid_cpf else ""
     )
@@ -1155,8 +1158,10 @@ def resolve_contact_order(
         order["pedido_id"] = pedido_id
         order["farmalider_cliente_id"] = linked_id
         source = "FARMALIDER_PEDIDO_API"
-        if response.get("_nexoflow_source") == "FARMALIDER_CLIENTES_FARMA":
-            source = "FARMALIDER_CLIENTES_FARMA"
+        if response.get("_nexoflow_source") == (
+            "FARMALIDER_CLIENTES_" + active_segment()
+        ):
+            source = "FARMALIDER_CLIENTES_" + active_segment()
         order["origem_pedido"] = source + (
             "_IDENTIDADE_VALIDADA" if invalid_cpf else ""
         )

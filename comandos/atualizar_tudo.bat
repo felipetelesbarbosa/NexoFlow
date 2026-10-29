@@ -4,6 +4,10 @@ setlocal EnableExtensions DisableDelayedExpansion
 for %%I in ("%~dp0..") do set "NEXOFLOW_HOME=%%~fI"
 set "PYTHONPATH=%NEXOFLOW_HOME%;%NEXOFLOW_HOME%\app;%PYTHONPATH%"
 set "PYTHONIOENCODING=utf-8"
+set "PROFILE_LOG=logs"
+set "IMPORT_DIR=importacoes"
+if /i "%NEXOFLOW_PERFIL%"=="PET" set "PROFILE_LOG=logs\PET"
+if /i "%NEXOFLOW_PERFIL%"=="PET" set "IMPORT_DIR=importacoes\PET"
 set "NEXOFLOW_LAUNCHER=1"
 set "NEXOFLOW_FULL_WORKFLOW=1"
 set "FORCE_FULL_SYNC="
@@ -22,8 +26,8 @@ set "ETAPA=Preparação"
 set "RC=1"
 if not exist ".venv\Scripts\python.exe" goto :ambiente_ausente
 for %%F in (comandos\atualizar_weni_carga_completa.bat comandos\atualizar_weni_planilhas.bat comandos\executar_analytics_planilhas.bat comandos\executar_carga_completa.bat comandos\atualizar_recompra.bat comandos\executar_manual.bat) do if not exist "%%F" goto :componente_ausente
-if not exist "importacoes\Conversas_Delivery.xlsx" goto :planilhas_ausentes
-if not exist "importacoes\Contatos_Delivery.xlsx" goto :planilhas_ausentes
+if not exist "%IMPORT_DIR%\Conversas_Delivery.xlsx" goto :planilhas_ausentes
+if not exist "%IMPORT_DIR%\Contatos_Delivery.xlsx" goto :planilhas_ausentes
 
 set "ETAPA=1/5 - Weni: carga completa 100%%"
 echo [ETAPA %ETAPA%]
@@ -74,7 +78,7 @@ goto :interrompido
 echo [ERRO] Componente ausente. Reinstale o Setup atualizado do NexoFlow.
 goto :interrompido
 :planilhas_ausentes
-echo [ERRO] Coloque Conversas_Delivery.xlsx e Contatos_Delivery.xlsx em importacoes.
+echo [ERRO] Coloque Conversas_Delivery.xlsx e Contatos_Delivery.xlsx em %IMPORT_DIR%.
 goto :interrompido
 :interrompido
 echo.

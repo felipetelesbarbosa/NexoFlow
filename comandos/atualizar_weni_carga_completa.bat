@@ -4,6 +4,10 @@ setlocal EnableExtensions DisableDelayedExpansion
 for %%I in ("%~dp0..") do set "NEXOFLOW_HOME=%%~fI"
 set "PYTHONPATH=%NEXOFLOW_HOME%;%NEXOFLOW_HOME%\app;%PYTHONPATH%"
 set "PYTHONIOENCODING=utf-8"
+set "PROFILE_LOG=logs"
+set "IMPORT_DIR=importacoes"
+if /i "%NEXOFLOW_PERFIL%"=="PET" set "PROFILE_LOG=logs\PET"
+if /i "%NEXOFLOW_PERFIL%"=="PET" set "IMPORT_DIR=importacoes\PET"
 cd /d "%NEXOFLOW_HOME%\"
 title NexoFlow Weni - Carga Completa
 set "NEXOFLOW_LAUNCHER=1"
@@ -40,8 +44,8 @@ set /p "OPCAO=Opção: " < CON
 :opcao_escolhida
 set "PART="
 set "PART_ARG="
-set "REVIEW_JSON=logs\weni_update_review_full.json"
-set "REVIEW_TXT=logs\weni_update_review_full.txt"
+set "REVIEW_JSON=%PROFILE_LOG%\weni_update_review_full.json"
+set "REVIEW_TXT=%PROFILE_LOG%\weni_update_review_full.txt"
 
 if "%OPCAO%"=="0" goto :configurado
 if "%OPCAO%"=="1" set "PART=1"
@@ -55,8 +59,8 @@ if not defined PART (
 )
 
 set "PART_ARG=--quarter %PART%"
-set "REVIEW_JSON=logs\weni_update_review_full_25_parte_%PART%.json"
-set "REVIEW_TXT=logs\weni_update_review_full_25_parte_%PART%.txt"
+set "REVIEW_JSON=%PROFILE_LOG%\weni_update_review_full_25_parte_%PART%.json"
+set "REVIEW_TXT=%PROFILE_LOG%\weni_update_review_full_25_parte_%PART%.txt"
 
 :configurado
 if not exist "%NEXOFLOW_HOME%\scripts\confirmar_revisao_weni.ps1" (

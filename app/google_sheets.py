@@ -115,6 +115,15 @@ class GoogleSheetsStore:
         *,
         validate_structure: bool = False,
     ):
+        from runtime_profile import segment
+
+        if segment() == "PET":
+            from project_paths import load_private_settings
+
+            if spreadsheet_id != getattr(
+                load_private_settings(), "GOOGLE_SPREADSHEET_ID", ""
+            ):
+                raise ValueError("Dashboard não pertence ao perfil PET.")
         if not GOOGLE_CREDENTIALS_FILE.exists():
             raise FileNotFoundError(
                 f"Credencial Google não encontrada: {GOOGLE_CREDENTIALS_FILE}"
@@ -232,12 +241,24 @@ class GoogleSheetsStore:
         storage_sheet = next(
             (ws for ws in worksheets if ws.title == STORAGE_SHEET), None
         )
+        if storage_sheet is None:
+            from runtime_profile import segment
+
+            if segment() == "PET":
+                raise ValueError(
+                    "O Dashboard PET precisa do mapa NexoFlow_Arquivos antes da carga."
+                )
         if storage_sheet is not None:
             values = self._read_with_retry(
                 "ler configuração dos arquivos Google Sheets",
                 lambda: storage_sheet.get("A1:B5"),
             )
             layout = SheetsStorage.from_values(values, self._hub_id)
+            from runtime_profile import validate_sheet_destinations
+
+            validate_sheet_destinations(
+                layout.dashboard, layout.operations, layout.history
+            )
             books = {layout.dashboard: self.book}
             for role, book_id in (
                 ("operação", layout.operations),

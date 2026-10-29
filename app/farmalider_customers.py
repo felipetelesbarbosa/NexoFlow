@@ -16,6 +16,8 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
+from runtime_profile import segment as active_segment
+
 CUSTOMER_FIELDS = (
     "id",
     "cpf",
@@ -76,7 +78,7 @@ ITEM_FIELDS = (
     "filialId",
     "categoria",
 )
-DIRECTORY_SOURCE = "FARMALIDER_CLIENTES_FARMA"
+DIRECTORY_SOURCE = "FARMALIDER_CLIENTES_" + active_segment()
 
 
 def positive_id(value: Any) -> str:

@@ -545,6 +545,16 @@ def infer_contact_fields(
     }
 
     def save(field: str, value: str | int, current: MessageView, reason: str) -> None:
+        from runtime_profile import segment
+
+        if segment() == "PET" and field == "maior_de_18_anos":
+            return
+        if (
+            segment() == "PET"
+            and field == "opt_in_lgpd"
+            and value in {"ativo", "recusado"}
+        ):
+            value = "Sim" if value == "ativo" else "Não"
         evidences[field] = FieldEvidence(
             field=field,
             value=value,

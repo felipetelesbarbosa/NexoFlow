@@ -43,6 +43,8 @@ py-modules = [
   "private_diagnostics",
   "proxy_config",
   "project_paths",
+  "runtime_profile",
+  "recompra_group_audit",
   "recompra",
   "recompra_cleanup",
   "recompra_profiles",

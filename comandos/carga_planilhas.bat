@@ -4,8 +4,11 @@ setlocal EnableExtensions DisableDelayedExpansion
 for %%I in ("%~dp0..") do set "NEXOFLOW_HOME=%%~fI"
 set "PYTHONPATH=%NEXOFLOW_HOME%;%NEXOFLOW_HOME%\app;%PYTHONPATH%"
 set "PYTHONIOENCODING=utf-8"
+set "PROFILE_LOG=logs"
+set "IMPORT_DIR=importacoes"
+if /i "%NEXOFLOW_PERFIL%"=="PET" set "PROFILE_LOG=logs\PET"
+if /i "%NEXOFLOW_PERFIL%"=="PET" set "IMPORT_DIR=importacoes\PET"
 set "STRICT_ARG="
-if defined NEXOFLOW_FULL_WORKFLOW set "STRICT_ARG=--require-complete"
 cd /d "%NEXOFLOW_HOME%\"
 set "DESTINO=%~1"
 if /I "%DESTINO%"=="weni" goto :destino_ok
@@ -15,10 +18,10 @@ exit /b 1
 
 :destino_ok
 title NexoFlow 1.0 - Carga por planilhas
-set "REVIEW_JSON=logs\delivery_%DESTINO%_review.json"
-set "REVIEW_TXT=logs\delivery_%DESTINO%_review.txt"
+set "REVIEW_JSON=%PROFILE_LOG%\delivery_%DESTINO%_review.json"
+set "REVIEW_TXT=%PROFILE_LOG%\delivery_%DESTINO%_review.txt"
 set "ARCHIVE_ARG="
-if not exist "importacoes" mkdir "importacoes"
+if not exist "%IMPORT_DIR%" mkdir "%IMPORT_DIR%"
 if not exist ".venv\Scripts\python.exe" (
     echo [ERRO] Ambiente virtual ausente. Execute instalar.bat primeiro.
     set "RC=1"
@@ -27,7 +30,7 @@ if not exist ".venv\Scripts\python.exe" (
 echo ==========================================================
 echo NexoFlow 1.0 - Carga por planilhas - %DESTINO%
 echo ==========================================================
-echo Coloque os exports originais na pasta importacoes:
+echo Coloque os exports originais na pasta %IMPORT_DIR%:
 echo   Conversas_Delivery.xlsx
 echo   Contatos_Delivery.xlsx
 echo.

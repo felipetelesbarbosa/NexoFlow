@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import tempfile
 import unittest
 import warnings
@@ -12,6 +13,7 @@ def main() -> int:
     # O check-up deve mostrar somente o que importa. Logs/warnings esperados
     # dos mocks ficam silenciosos; falhas e tracebacks do unittest continuam
     # visíveis normalmente pelo TextTestRunner.
+    os.environ["NEXOFLOW_PERFIL"] = "FARMA"
     logging.disable(logging.CRITICAL)
     warnings.simplefilter("ignore")
 

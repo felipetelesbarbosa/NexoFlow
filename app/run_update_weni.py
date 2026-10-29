@@ -3,9 +3,9 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-from pathlib import Path
 
 from proxy_config import configure_proxy
+from runtime_profile import scoped_path
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -152,14 +152,16 @@ def main() -> int:
                 )
             return 0
 
-        review_out = Path(args.review_out) if args.review_out else None
-        require_review = Path(args.require_review) if args.require_review else None
+        review_out = scoped_path(args.review_out) if args.review_out else None
+        require_review = (
+            scoped_path(args.require_review) if args.require_review else None
+        )
         from weni_dedup import run_with_dedup
 
         default_review = (
-            Path(f"logs/weni_update_review_full_25_parte_{args.quarter}.json")
+            scoped_path(f"logs/weni_update_review_full_25_parte_{args.quarter}.json")
             if args.quarter is not None
-            else Path(
+            else scoped_path(
                 "logs/weni_update_review_full.json"
                 if args.full
                 else "logs/weni_update_review.json"

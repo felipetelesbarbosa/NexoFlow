@@ -4,6 +4,10 @@ setlocal EnableExtensions DisableDelayedExpansion
 for %%I in ("%~dp0..") do set "NEXOFLOW_HOME=%%~fI"
 set "PYTHONPATH=%NEXOFLOW_HOME%;%NEXOFLOW_HOME%\app;%PYTHONPATH%"
 set "PYTHONIOENCODING=utf-8"
+set "PROFILE_LOG=logs"
+set "IMPORT_DIR=importacoes"
+if /i "%NEXOFLOW_PERFIL%"=="PET" set "PROFILE_LOG=logs\PET"
+if /i "%NEXOFLOW_PERFIL%"=="PET" set "IMPORT_DIR=importacoes\PET"
 cd /d "%NEXOFLOW_HOME%\"
 title NexoFlow Weni
 set "NEXOFLOW_LAUNCHER=1"
@@ -55,7 +59,7 @@ echo.
 echo [INFO] A confirmação será solicitada em uma janela separada.
 echo [INFO] Revise também as exclusões propostas em logs\weni_update_review.txt.
 echo [INFO] Encerre outras cargas de Analytics, Planilhas e Recompra.
-start "" notepad.exe "%NEXOFLOW_HOME%\logs\weni_update_review.txt" >nul 2>&1
+start "" notepad.exe "%NEXOFLOW_HOME%\%PROFILE_LOG%\weni_update_review.txt" >nul 2>&1
 echo [INFO] Digite ATUALIZAR apenas depois de revisar o relatório do dry-run.
 "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -STA -ExecutionPolicy Bypass -File "%NEXOFLOW_HOME%\scripts\confirmar_revisao_weni.ps1" -Expected "ATUALIZAR" -Title "NexoFlow Weni - Confirmacao Incremental"
 set "RC=%ERRORLEVEL%"

@@ -13,7 +13,7 @@ A Recompra faz a prevenção antes de incluir ou trocar a referência do grupo: 
 
 Os dois perfis usam **`pedido_data`** e os grupos/campanhas existentes. O diagnóstico exige o bloqueio de cancelamento no fluxo; reimporte os fluxos corrigidos e confira para qual fluxo o evento aponta. Não crie outro evento. Os campos `pedido_status` e `pedido_forma_pagamento` também precisam existir.
 
-Revisões, estado e auditoria Pets ficam em `logs/PET/`, separados da FarmaLíder. Não copie estado de uma marca para a outra. O Noturno e os demais aplicativos continuam no perfil FarmaLíder nesta atualização; o BAT Pets é específico da Recompra. Revisões antigas exigem nova simulação.
+Revisões, estado e auditoria Pets ficam em `logs/PET/`, separados da FarmaLíder. Não copie estado de uma marca para a outra. Os atalhos Pets aplicam o mesmo perfil a Weni, Analytics, Planilha, Recompra, Noturno e Terminal. Os atalhos tradicionais permanecem FarmaLíder. Revisões antigas exigem nova simulação.
 
 
 
@@ -214,3 +214,9 @@ Fixtures sintéticas cobrem 0, 24, 25, 26 e 365 dias, futuro, fuso local, campos
 Os testes de otimização verificam paginação sob demanda, concorrência limitada, prioridade global dos CPFs, cache de payloads sem compartilhamento de identidade, descarte de falhas transitórias, limpeza de temporários e aplicação sem consultas para planos sem trabalho.
 
 Os testes de virada do dia verificam expiração antes das gravações, interrupção após alterações parciais, preservação de uma inclusão confirmada que atravessou a meia-noite, renovação de todo o dry-run e ausência de repetição interna de POST.
+
+## Conferência do grupo atual
+
+`comandos/auditar_grupo_recompra.bat` revalida os integrantes atuais com consultas oficiais de CPF e último pedido, mantendo prioridade dos CPFs válidos e verificação por identidade dos demais. Não altera grupos ou campos. Os relatórios ficam em `logs/privado/auditoria_grupo_recompra.*` ou `logs/PET/privado/`, conforme o perfil. Falhas isoladas aparecem como CONSULTA_PENDENTE, sem comprovar ausência de compra.
+
+Na Recompra de todos os segmentos, status 3, pagamento 0, ausência de pagamento confirmado ou código fora de 1 a 6 bloqueiam inclusão/troca de referência. O grupo mantém a janela D+0 a D+25 (Farma) ou D+0 a D+30 (Pets); a campanha envia no dia D+25/D+30.

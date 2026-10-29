@@ -28,6 +28,7 @@ from farmalider_integration import (
     _positive_id,
 )
 from project_paths import load_private_settings
+from runtime_profile import segment as active_segment
 from task_progress import TaskProgress
 from weni_client import WeniClient, WeniError
 
@@ -303,6 +304,7 @@ def prepare(contacts, farm, store_factory, *, scope=None):
 def write_review(path, result, *, full, quarter, campaign_id):
     payload = {
         "schema": SCHEMA,
+        "segment": active_segment(),
         "full": full,
         "quarter": quarter,
         "campaign_id": campaign_id,
@@ -343,6 +345,10 @@ def write_review(path, result, *, full, quarter, campaign_id):
 
 def load_review(path, *, full, quarter):
     payload = json.loads(companion(path).read_text(encoding="utf-8"))
+    from runtime_profile import segment
+
+    if payload.get("segment", "FARMA") != segment():
+        raise ValueError("Revisão de duplicados pertence a outro segmento.")
     original_hash = payload.pop("sha256", "")
     if (
         not original_hash

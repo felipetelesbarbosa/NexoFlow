@@ -72,6 +72,7 @@ from recompra_review_audit import (
     incomplete_query_summary,
     public_review_lines,
 )
+from runtime_profile import scoped_path as profile_path
 from weni_client import WeniError
 
 GROUP = "Recompra FarmaLíder"
@@ -95,9 +96,9 @@ GUARD_FIELDS = FIELDS | {
     "pedido_id",
     PENDING_PURCHASE_FIELD,
 }
-STATE = Path("logs/recompra_state.json")
+STATE = profile_path("logs/recompra_state.json")
 REVIEW = Path("logs/recompra_review.json")
-AUDIT = Path("logs/recompra_audit.jsonl")
+AUDIT = profile_path("logs/recompra_audit.jsonl")
 REVIEW_EXPIRED_EXIT_CODE = 4
 PROGRESS_LOG_EVERY_CONTACTS = 1000
 
@@ -920,6 +921,23 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
         if in_group:
             plan["action"] = "remove"
         return plan
+    allowed_payments = {"1", "2", "3", "4", "5", "6"}
+    official_payment = normalize_farmalider_payment_code(
+        (order or {}).get("farmalider_forma_pagamento")
+    )
+    weni_payment = text(fields.get("pedido_forma_pagamento"))
+    if (
+        order
+        and str(order.get("status_confirmacao", "")).startswith("CONFIRMADO_API")
+        and official_payment not in allowed_payments
+    ) or (
+        weni_payment
+        and normalize_farmalider_payment_code(weni_payment) not in allowed_payments
+    ):
+        plan["reason"] = "PAGAMENTO_INVALIDO"
+        if in_group:
+            plan["action"] = "remove"
+        return plan
     pending_check = contact_pending_purchase_check(
         contact, saved.get("pending_purchase_check")
     )
@@ -1340,7 +1358,8 @@ def apply_review(
     """Somente snapshots revisados; conflito ou confirmação incerta bloqueia inclusão."""
     profile = profile_for(review.get("structure", {}).get("segment", "FARMA"))
     if profile.segment == "PET" and (
-        Path(state_path) == STATE or Path(audit_path) == AUDIT
+        Path(state_path) == Path("logs/recompra_state.json")
+        or Path(audit_path) == Path("logs/recompra_audit.jsonl")
     ):
         raise RuntimeError("O perfil PET exige estado e auditoria separados.")
     if review.get("policy") != profile.policy:

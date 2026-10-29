@@ -13,6 +13,7 @@ from uuid import uuid4
 from recompra import atomic_json, read_review
 from recompra_lock import execution_file_lock
 from recompra_review_audit import incomplete_query_summary
+from runtime_profile import scoped_path as profile_path
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -52,7 +53,9 @@ def run_step(
 
 def execute(root: Path = ROOT, *, runner=run_step, full: bool = False) -> int:
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ_") + uuid4().hex[:8]
-    directory = root / "logs" / "noturno" / run_id
+    from runtime_profile import scoped_path
+
+    directory = root / scoped_path("logs") / "noturno" / run_id
     directory.mkdir(parents=True, mode=0o700)
     summary = {
         "execucao": run_id,
@@ -175,7 +178,7 @@ def execute(root: Path = ROOT, *, runner=run_step, full: bool = False) -> int:
     code = 1
     try:
         with execution_file_lock(
-            root / "logs" / "noturno.lock",
+            root / profile_path("logs") / "noturno.lock",
             protocol="nexoflow-noturno-v1",
             operation="NexoFlow Noturno",
         ):

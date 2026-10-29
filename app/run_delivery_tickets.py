@@ -10,6 +10,8 @@ import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
+from runtime_profile import scoped_path
+
 
 def _validate_review_destination(path: Path, *, archive_existing: bool) -> None:
     if path.exists() and not archive_existing:
@@ -65,7 +67,7 @@ def main():
         help="aplica o snapshot revisado na Weni e no Google Sheets",
     )
     parser.add_argument(
-        "--review-out", type=Path, default=Path("logs/delivery_review.json")
+        "--review-out", type=Path, default=scoped_path("logs/delivery_review.json")
     )
     parser.add_argument(
         "--require-review", type=Path, help="snapshot Delivery previamente revisado"
@@ -83,7 +85,7 @@ def main():
     parser.add_argument(
         "--import-dir",
         type=Path,
-        default=Path("importacoes"),
+        default=scoped_path("importacoes"),
         help="pasta dos dois exports XLSX",
     )
     parser.add_argument(
@@ -92,6 +94,10 @@ def main():
         help="destino da carga; fica congelado no relatório de revisão",
     )
     args = parser.parse_args()
+    args.review_out = scoped_path(args.review_out)
+    args.import_dir = scoped_path(args.import_dir)
+    if args.require_review is not None:
+        args.require_review = scoped_path(args.require_review)
     if args.apply and args.require_review is None:
         parser.error("--apply exige --require-review com o snapshot revisado.")
     if args.archive_review and not args.dry_run:
@@ -100,7 +106,9 @@ def main():
         from proxy_config import configure_proxy
 
         configure_proxy()
-    import secrets_config as secrets
+    from project_paths import load_private_settings
+
+    secrets = load_private_settings()
     from delivery_tickets import (
         apply_delivery_review,
         reconcile_tickets,
@@ -113,7 +121,7 @@ def main():
     from weni_client import WeniClient
     from weni_update import _available_weni_fields, _open_farmalider
 
-    configure_logging(Path("logs/nexoflow_delivery.log"))
+    configure_logging(scoped_path("logs/nexoflow_delivery.log"))
     weni, chats, farm = None, None, None
     try:
         if args.dry_run:

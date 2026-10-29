@@ -4,6 +4,10 @@ setlocal EnableExtensions DisableDelayedExpansion
 for %%I in ("%~dp0..") do set "NEXOFLOW_HOME=%%~fI"
 set "PYTHONPATH=%NEXOFLOW_HOME%;%NEXOFLOW_HOME%\app;%PYTHONPATH%"
 set "PYTHONIOENCODING=utf-8"
+set "PROFILE_LOG=logs"
+set "IMPORT_DIR=importacoes"
+if /i "%NEXOFLOW_PERFIL%"=="PET" set "PROFILE_LOG=logs\PET"
+if /i "%NEXOFLOW_PERFIL%"=="PET" set "IMPORT_DIR=importacoes\PET"
 cd /d "%NEXOFLOW_HOME%\"
 title NexoFlow Planilha
 
@@ -12,7 +16,7 @@ cls
 echo ==========================================================
 echo NexoFlow Planilha - NexoFlow 1.0
 echo ==========================================================
-echo Coloque os arquivos na pasta importacoes:
+echo Coloque os arquivos na pasta %IMPORT_DIR%:
 echo   Conversas_Delivery.xlsx
 echo   Contatos_Delivery.xlsx
 echo.
@@ -29,8 +33,8 @@ if errorlevel 1 goto :weni
 exit /b 1
 
 :importacoes
-if not exist "importacoes" mkdir "importacoes"
-start "" explorer.exe "%CD%\importacoes"
+if not exist "%IMPORT_DIR%" mkdir "%IMPORT_DIR%"
+start "" explorer.exe "%CD%\%IMPORT_DIR%"
 goto :menu
 
 :weni

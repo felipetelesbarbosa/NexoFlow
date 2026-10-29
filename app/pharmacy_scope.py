@@ -15,11 +15,16 @@ from analytics import (
     parse_ultimo_pedido,
 )
 from pedido_utils import business_order_datetime
-from product_scope import is_animal_product, pharmacy_items
+from product_scope import is_out_of_scope_product as is_animal_product
+from product_scope import pharmacy_items
+from runtime_profile import segment
 from task_progress import TaskProgress
 
 Row = dict[str, Any]
-SCOPE_VALUE_ORIGIN = "FARMACIA_ITENS_HUMANOS"
+
+SCOPE_VALUE_ORIGIN = (
+    "FARMACIA_ITENS_HUMANOS" if segment() == "FARMA" else "PET_PEDIDO_COMPLETO"
+)
 
 
 def _decimal(value: Any, label: str) -> Decimal:

@@ -19,9 +19,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
+from runtime_profile import scoped_path
+
 PROTOCOL = "nexoflow-recompra-os-lock-v1"
 MAX_METADATA_BYTES = 16_384
-DEFAULT_STATE = Path("logs/recompra_state.json")
+DEFAULT_STATE = scoped_path("logs/recompra_state.json")
 
 
 class RecompraLockError(RuntimeError):

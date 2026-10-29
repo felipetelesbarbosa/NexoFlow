@@ -99,6 +99,12 @@ function Remove-Shortcuts {
     # Nomes exatos atuais e legados. Não usar curingas nem resolver TargetPath:
     # o Stage2 já removeu os executáveis quando chega a esta limpeza.
     $names = @(
+        'NexoFlow Pets Noturno.lnk',
+        'NexoFlow Pets Analytics.lnk',
+        'NexoFlow Pets Weni.lnk',
+        'NexoFlow Pets Recompra.lnk',
+        'NexoFlow Pets Planilha.lnk',
+        'NexoFlow Pets Terminal.lnk',
         'NexoFlow Noturno.lnk',
         'NexoFlow Analytics.lnk',
         'NexoFlow Weni.lnk',

@@ -28,6 +28,26 @@ var (
 func init() {
     kernel32.NewProc("SetConsoleCP").Call(65001)
     kernel32.NewProc("SetConsoleOutputCP").Call(65001)
+    args, profile, err := profileArguments(os.Args)
+    if err != nil { fmt.Println("[ERRO]", err); os.Exit(2) }
+    os.Args = args
+    if profile != "" { os.Setenv("NEXOFLOW_PERFIL", profile) }
+    if selected := os.Getenv("NEXOFLOW_PERFIL"); selected != "" { fmt.Println("[INFO] Perfil:", selected) }
+
+}
+
+func profileArguments(args []string) ([]string, string, error) {
+    out := []string{}
+    profile := ""
+    for i := 0; i < len(args); i++ {
+        if args[i] != "--perfil" { out = append(out, args[i]); continue }
+        if i+1 >= len(args) || (args[i+1] != "FARMA" && args[i+1] != "PET") {
+            return nil, "", fmt.Errorf("--perfil exige FARMA ou PET")
+        }
+        if profile != "" && profile != args[i+1] { return nil, "", fmt.Errorf("Perfis divergentes") }
+        profile = args[i+1]; i++
+    }
+    return out, profile, nil
 }
 
 const errorAlreadyExists = 183

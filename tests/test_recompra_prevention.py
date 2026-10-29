@@ -625,3 +625,18 @@ class CanonicalPetMarketingTests(unittest.TestCase):
         )
         self.assertEqual(counts["affirmative_value"], 1)
         self.assertEqual(counts["refused_value"], 0)
+
+
+class InvalidPaymentPreventionTests(unittest.TestCase):
+    def test_invalid_payment_does_not_enter_any_campaign(self):
+        for segment in ("FARMA", "PET"):
+            for payment in ("", "99", "-1", "desconhecido"):
+                c, o, items = fixture(24, grouped=True)
+                c["groups"][0]["name"] = (
+                    "Recompra Pets Líder" if segment == "PET" else "Recompra FarmaLíder"
+                )
+                o["farmalider_forma_pagamento"] = payment
+                plan = propose(c, o, items, {**STRUCTURE, "segment": segment}, now=NOW)
+                self.assertEqual(plan["action"], "remove")
+                self.assertEqual(plan["reason"], "PAGAMENTO_INVALIDO")
+                self.assertEqual(plan["fields"], {})

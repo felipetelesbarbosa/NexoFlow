@@ -71,7 +71,7 @@ from pedido_utils import (
     serialize_weni_order_list,
     weni_order_datetime_text,
 )
-from product_scope import is_animal_product
+from product_scope import is_out_of_scope_product as is_animal_product
 from project_paths import load_private_settings
 from purchase_checks import (
     PENDING_PURCHASE_FIELD,
@@ -81,6 +81,7 @@ from purchase_checks import (
     merge_purchase_checks,
     normalize_purchase_checks,
 )
+from runtime_profile import last_purchase_field, recompra_group, segment
 from task_progress import TaskProgress
 from urn_utils import (
     CHANNEL_FIELD_MAP,
@@ -89,6 +90,8 @@ from urn_utils import (
     urn_channel,
 )
 from weni_client import WeniClient, WeniError
+
+LAST_PURCHASE_FIELD = last_purchase_field()
 
 secrets = load_private_settings()
 
@@ -114,7 +117,7 @@ ALLOWED_WRITE_FIELDS = {
     "pedido_valor_produtos",
     "pedido_valor",
     "pedido_forma_pagamento",
-    "ultima_compra",
+    LAST_PURCHASE_FIELD,
     *GOOGLE_ADS_WRITE_FIELDS,
 }
 
@@ -135,7 +138,7 @@ PURCHASE_FIELDS = {
     "pedido_valor_produtos",
     "pedido_valor",
     "pedido_forma_pagamento",
-    "ultima_compra",
+    LAST_PURCHASE_FIELD,
 }
 
 REQUIRED_ORDER_FIELDS = {
@@ -449,7 +452,7 @@ def _same_value(field_name: str, current: Any, proposed: Any) -> bool:
         proposed_num = _safe_number(proposed)
         if current_num is not None and proposed_num is not None:
             return Decimal(str(current_num)) == Decimal(str(proposed_num))
-    if field_name in {"pedido_data", "ultima_compra"}:
+    if field_name in {"pedido_data", LAST_PURCHASE_FIELD}:
         current_dt = business_order_datetime(normalize_value(current))
         proposed_dt = business_order_datetime(normalize_value(proposed))
         if current_dt is not None and proposed_dt is not None:
@@ -898,6 +901,16 @@ def _set_field_if_changed(
 ) -> None:
     if value is None or str(value).strip() == "":
         return
+    if segment() == "PET" and field_name == "maior_de_18_anos":
+        return
+    if (
+        segment() == "PET"
+        and field_name == "opt_in_lgpd"
+        and value in {"ativo", "recusado"}
+    ):
+        value = "Sim" if value == "ativo" else "Não"
+        if evidence is not None:
+            evidence = replace(evidence, value=value)
     current = current_fields.get(field_name)
     if _same_value(field_name, current, value):
         return
@@ -1206,16 +1219,16 @@ def _apply_purchase_candidate(
         _set_field_if_changed(plan, current_fields, field_name, value, reason=reason)
 
     if plan.purchase_confirmed and (
-        available_weni_fields is None or "ultima_compra" in available_weni_fields
+        available_weni_fields is None or LAST_PURCHASE_FIELD in available_weni_fields
     ):
         current_last_purchase = business_order_datetime(
-            normalize_value(current_fields.get("ultima_compra"))
+            normalize_value(current_fields.get(LAST_PURCHASE_FIELD))
         )
         if current_last_purchase is None or current_last_purchase <= proposed_dt:
             _set_field_if_changed(
                 plan,
                 current_fields,
-                "ultima_compra",
+                LAST_PURCHASE_FIELD,
                 proposed_dt.isoformat(),
                 reason="pedido não cancelado confirmado pela API FarmaLíder",
             )
@@ -1300,6 +1313,13 @@ def _build_contact_plan(
     opt_in_target = opt_in_group_uuid or opt_in_group_name
     opt_out_target = opt_out_group_uuid or opt_out_group_name
 
+    desired_lgpd = (
+        {"sim": "ativo", "não": "recusado", "nao": "recusado"}.get(
+            desired_lgpd, desired_lgpd
+        )
+        if segment() == "PET"
+        else desired_lgpd
+    )
     if desired_lgpd == "ativo":
         if not is_opt_in:
             plan.group_actions.append(
@@ -1474,7 +1494,7 @@ def _execute_contact_plan(weni, plan):
     removals = [
         a
         for a in plan.group_actions
-        if a.action == "remove" and a.group_name == "Recompra FarmaLíder"
+        if a.action == "remove" and a.group_name == recompra_group()
     ]
     for action in removals:
         weni.contact_group_action(
@@ -1591,6 +1611,7 @@ def audit_plans(
             if str(plan.fields["opt_in_lgpd"]).strip().casefold() not in {
                 "ativo",
                 "recusado",
+                *({"sim", "não"} if segment() == "PET" else set()),
             }:
                 errors.append(f"{plan.contact_uuid}: valor inválido em opt_in_lgpd")
 
@@ -1659,7 +1680,7 @@ def audit_plans(
                 errors.append(
                     f"{plan.contact_uuid}: pagamento Cancelado exige pedido_status=3"
                 )
-            if "ultima_compra" in plan.fields and (
+            if LAST_PURCHASE_FIELD in plan.fields and (
                 status not in {"-2", "-1", "0", "4", "1", "2"}
                 or payment.casefold() == "cancelado"
             ):
@@ -1706,15 +1727,15 @@ def audit_plans(
                     f"{plan.contact_uuid}: origem de anúncio não autorizada pelo detector Google Ads"
                 )
 
-        if set(plan.fields) & (PURCHASE_FIELDS - {"ultima_compra"}) and not (
+        if set(plan.fields) & (PURCHASE_FIELDS - {LAST_PURCHASE_FIELD}) and not (
             plan.order_validated or plan.purchase_confirmed
         ):
             errors.append(f"{plan.contact_uuid}: campos de pedido sem validação")
-        if "ultima_compra" in plan.fields and not plan.purchase_confirmed:
+        if LAST_PURCHASE_FIELD in plan.fields and not plan.purchase_confirmed:
             errors.append(
                 f"{plan.contact_uuid}: ultima_compra sem compra não cancelada confirmada"
             )
-        for date_field in ("pedido_data", "ultima_compra"):
+        for date_field in ("pedido_data", LAST_PURCHASE_FIELD):
             if (
                 date_field in plan.fields
                 and business_order_datetime(plan.fields[date_field]) is None
@@ -1995,6 +2016,7 @@ def write_review_snapshot(
     snapshot_cutoff = str(captured_at_utc or created_at).strip()
     payload = {
         "schema_version": REVIEW_SCHEMA_VERSION,
+        "segment": segment(),
         "created_at_utc": created_at,
         "captured_at_utc": snapshot_cutoff,
         "mode": "full" if full else "incremental",
@@ -2185,6 +2207,8 @@ def verify_review_snapshot(
     except (OSError, json.JSONDecodeError) as exc:
         raise PlanAuditError("Snapshot de revisão inválido ou corrompido.") from exc
 
+    if payload.get("segment", "FARMA") != segment():
+        raise PlanAuditError("Revisão de outro segmento; nenhuma gravação iniciada.")
     if payload.get("schema_version") != REVIEW_SCHEMA_VERSION:
         raise PlanAuditError("Versão do snapshot de revisão incompatível.")
     expected_mode = "full" if full else "incremental"
@@ -2234,6 +2258,8 @@ def load_review_snapshot(
     except (OSError, json.JSONDecodeError) as exc:
         raise PlanAuditError("Snapshot de revisão inválido ou corrompido.") from exc
 
+    if payload.get("segment", "FARMA") != segment():
+        raise PlanAuditError("Revisão de outro segmento; nenhuma gravação iniciada.")
     if payload.get("schema_version") != REVIEW_SCHEMA_VERSION:
         raise PlanAuditError(
             "Versão do snapshot de revisão incompatível. Execute novamente a carga completa para gerar um snapshot novo."
@@ -2365,7 +2391,7 @@ def _prepare_frozen_plan_for_apply(
     conflicts: list[str] = []
 
     if _recompra_products_need_unscheduling(plan):
-        campaign_name = "Recompra FarmaLíder"
+        campaign_name = recompra_group()
         reviewed_removals = {
             action.group
             for action in plan.group_actions
@@ -3511,7 +3537,7 @@ def run_update(
             for plan in progress.track(plans):
                 try:
                     if plan.order_validated or any(
-                        action.group_name == "Recompra FarmaLíder"
+                        action.group_name == recompra_group()
                         for action in plan.group_actions
                     ):
                         current_contact = weni.get_contact(uuid=plan.contact_uuid)

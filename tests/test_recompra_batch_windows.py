@@ -170,7 +170,7 @@ if '--apply' in args:
         code, output, calls = self.invoke(dry_code=3, strict=True)
         self.assertEqual(code, 3, output)
         self.assertEqual([args[0] for args in calls], ["--check-only", "--dry-run"])
-        self.assertIn("--require-complete", calls[1])
+        self.assertNotIn("--require-complete", calls[1])
         self.assertIn("A aplicação não foi iniciada nesta tentativa.", output)
         self.assertNotIn("concluída com pendências", output)
 
