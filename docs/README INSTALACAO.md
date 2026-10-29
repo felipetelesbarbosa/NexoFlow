@@ -4,7 +4,7 @@
 
 - Windows x64.
 - Python 3.11 ou superior, 64 bits. O Setup oferece o Python 3.14.8 x64 incluído se não encontrar um compatível.
-- Acesso às integrações Weni, FarmaLíder e Google Sheets, com suas próprias credenciais.
+- Acesso à Weni, à API FarmaLíder e ao Google Sheets, com suas próprias credenciais para FarmaLíder e/ou Pets Líder.
 
 ## Instalar
 
@@ -18,9 +18,11 @@ O [release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.0) ta
 
 | Integração | Configuração |
 | --- | --- |
-| Weni e FarmaLíder | Use `configuracao/secrets_config.example.py` como modelo para criar `C:\NexoFlow\secrets_config.py`. Preencha os seus tokens e as opções aplicáveis. |
-| Google Sheets | Salve a sua credencial em `C:\NexoFlow\credentials\google_credentials.json`, configure o ID da planilha e compartilhe o arquivo como **Editor** com a conta de serviço. |
+| Weni e FarmaLíder | Use `configuracao/secrets_config.example.py` como modelo para criar `C:\NexoFlow\secrets_config.py`. Preencha os tokens e os três IDs de Sheets em `PERFIS["FARMA"]` e `PERFIS["PET"]`, nas organizações corretas. |
+| Google Sheets | Salve a sua credencial em `C:\NexoFlow\credentials\google_credentials.json`, configure Dashboard, Operação e Histórico de cada segmento e compartilhe cada arquivo como **Editor** com a conta de serviço. |
 | Proxy | Se necessário, siga o [guia de rede e proxy](README%20PROXY.md). |
+
+A mesma credencial Google pode atender aos dois perfis; as planilhas e os tokens Weni são próprios de cada marca. O ambiente da API é produção nos dois perfis. Veja [segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 
 Para configurar a conta Google, consulte [Google Sheets](GOOGLE%20SETUP.md). Se houver destinos separados de operação e histórico, confira a [divisão em três arquivos](planilhas_separadas.md).
 
@@ -28,18 +30,24 @@ O NexoFlow não inclui chaves, tokens nem credenciais. Mantenha seus acessos pri
 
 ## Preparar a Weni
 
-Crie os campos abaixo como **Texto**, quando ainda não existirem:
+Configure os campos em cada projeto Weni, respeitando os tipos:
 
-| Grupo | Campos |
+| Tipo | Campos |
 | --- | --- |
-| Canais | `contact_urn_whatsapp`, `contact_urn_instagram`, `contact_urn_facebook`, `contact_canal_principal` |
-| Pedidos | `pedido_id`, `pedido_data`, `pedido_status`, `pedido_produtos`, `pedido_quantidade_itens`, `pedido_valor_produtos`, `pedido_valor`, `pedido_forma_pagamento` |
+| Texto — canais | `contact_urn_whatsapp`, `contact_urn_instagram`, `contact_urn_facebook`, `contact_canal_principal` |
+| Texto — pedidos | `pedido_id`, `pedido_status`, `pedido_produtos`, `pedido_quantidade_itens`, `pedido_valor_produtos`, `pedido_valor`, `pedido_forma_pagamento` |
 
-Confira também os grupos operacionais e os campos opcionais no [guia Weni](README%20WENI.md). A [Recompra D+25](README%20RECOMPRA.md) tem configuração própria de grupo, campos e campanha.
+`pedido_data` é **Data e hora** nos dois projetos. `ultima_compra` (Farma) e `compra_recente` (Pets) também são Data e hora. No Pets, use `opt_in_marketing` e `opt_in_lgpd` como Texto, com Sim/Não; não há exigência de maioridade.
+
+Confira também os grupos operacionais e os campos opcionais no [guia Weni](README%20WENI.md). As campanhas [Farma D+25 e Pets D+30](README%20RECOMPRA.md) têm grupo, fluxo, template e evento próprios, usando `pedido_data`.
+
+A arquitetura permite incluir novos departamentos e segmentos mediante registro e configuração do perfil, das integrações e das regras, com validação antes da ativação. Consulte [expansão por perfis](SEGMENTOS%20E%20FLUXOS.md#novos-departamentos-e-segmentos).
+
+A rotina Weni retroalimenta os contatos a partir dos pedidos da API do segmento, inclusive compras realizadas fora da Weni. Execute Weni antes de Analytics para consolidar cadastros, pedidos e histórico. Os aplicativos individuais mantêm a revisão; o Noturno aplica automaticamente.
 
 ## Validar e executar a primeira carga
 
-Abra **NexoFlow Terminal** e execute:
+Abra **NexoFlow Terminal**, escolha FarmaLíder ou Pets Líder e execute:
 
 ```text
 nexo diagnostico
@@ -51,7 +59,7 @@ As cargas completas oferecem **100%** ou quatro partes de **25%**. Execute as pa
 
 ## Atualizar
 
-Encerre as rotinas e execute o novo **NexoFlow Setup.exe**. Quando houver instalação ou dados anteriores, escolha:
+Encerre as rotinas dos dois segmentos e execute o novo **NexoFlow Setup.exe**. Quando houver instalação ou dados anteriores, escolha:
 
 - **Atualizar mantendo dados:** preserva `secrets_config.py`, `credentials/`, `logs/` e o estado de FarmaLíder/Pets Líder.
 - **Instalação limpa:** reinicia esses dados locais nos dois segmentos. Configure os acessos novamente e gere novas cargas e revisões.

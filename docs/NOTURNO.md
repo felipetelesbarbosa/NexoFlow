@@ -1,10 +1,10 @@
 # NexoFlow Noturno
 
-Execute **NexoFlow Noturno.exe** para atualizar Weni, Analytics e Recompra sem confirmações humanas durante a carga. Ao abrir, escolha **[1] Incremental**, **[2] Carga completa 100%** ou **[0] Sair**. Depois da escolha, não será solicitada revisão humana. O Setup instala o executável e seus atalhos. Configure e teste as credenciais e o proxy pelos aplicativos individuais antes da primeira noite.
+Execute **NexoFlow Noturno.exe** para atualizar Weni, Analytics e Recompra sem confirmações humanas durante a carga. Ao abrir, escolha primeiro **FarmaLíder** ou **Pets Líder**. Depois escolha **[1] Incremental**, **[2] Carga completa 100%** ou **[0] Sair**. Depois da escolha, não será solicitada revisão humana. O Setup instala o executável e seus atalhos. Configure e teste as credenciais e o proxy pelos aplicativos individuais antes da primeira noite.
 
 A sequência é: check-up → Weni no modo escolhido (simulação, auditoria e aplicação) → Analytics no modo escolhido → Recompra (simulação, validação e aplicação) → Analytics incremental para refletir as mudanças finais.
 
-Os snapshots são gerados novamente a cada execução e aplicados sem abrir Bloco de Notas ou pedir autorização. A Weni também pode excluir duplicados comprovados pelas regras existentes. Identidade, recusa de marketing, produtos pet, propriedade dos pedidos, conflitos e validade do evento D+25 continuam sendo conferidos. A campanha Weni continua responsável pelo envio das mensagens.
+Os snapshots são gerados novamente a cada execução e aplicados sem abrir Bloco de Notas ou pedir autorização. A Weni também pode excluir duplicados comprovados pelas regras existentes. Identidade, recusa de marketing, escopo dos produtos de cada segmento, propriedade dos pedidos, conflitos e validade do evento D+25/D+30 continuam sendo conferidos. A campanha Weni continua responsável pelo envio das mensagens.
 
 Na Weni, tanto a incremental quanto a carga completa aplicam o snapshot auditado sem recalcular o plano. Cada contato é relido antes da gravação; conflitos e falhas isoladas ficam pendentes para a próxima incremental, sem cancelar os demais. O checkpoint fica no corte da simulação para recuperar mensagens e mudanças posteriores.
 
@@ -15,7 +15,7 @@ Os modos incrementais ainda percorrem a base para descobrir novas compras e muda
 No **Agendador de Tarefas**, crie uma tarefa com o horário desejado:
 
 - **Programa:** `C:\NexoFlow\NexoFlow Noturno.exe`.
-- **Argumentos:** `--incremental` ou `--full`, conforme o modo desejado. Esse argumento dispensa o menu inicial para permitir o agendamento sem interação.
+- **Argumentos:** `--perfil FARMA --incremental` ou `--perfil PET --full`, por exemplo, conforme o modo desejado. O perfil e o modo explícitos dispensam os menus iniciais para permitir o agendamento sem interação.
 - **Iniciar em:** `C:\NexoFlow`.
 - Use a mesma conta Windows em que as credenciais e o proxy foram configurados.
 - Em instâncias simultâneas, selecione **Não iniciar uma nova instância**.
@@ -31,7 +31,7 @@ A confirmação final usa o teclado do console, mesmo com a entrada padrão redi
 
 Tarefas agendadas sem console interativo encerram ao terminar e preservam o código de saída e os relatórios em arquivo. Para deixar a janela visível, execute com uma sessão interativa do usuário.
 
-Cada execução preserva seus arquivos em `logs/noturno/<execução>/`: `resultado.json`, `execucao.log` e os snapshots de Weni e Recompra. Os relatórios são privados e podem conter dados de contatos; não os publique.
+Cada execução preserva seus arquivos em `logs/noturno/<execução>/` (Farma) ou `logs/PET/noturno/<execução>/` (Pets): `resultado.json`, `execucao.log` e os snapshots de Weni e Recompra. Os relatórios são privados e podem conter dados de contatos; não os publique.
 
 Código **0** indica sequência concluída; **3**, resultado com pendências; outros códigos indicam interrupção. O resumo registra a etapa e o código de saída. Falha crítica ou Analytics parcial impede as etapas seguintes. Pendências isoladas da Weni ficam para a próxima incremental.
 

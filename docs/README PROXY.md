@@ -1,6 +1,6 @@
 # NexoFlow 1.0 — Proxy e rede
 
-Documentação atual de rede do **NexoFlow**.
+A mesma seleção de conexão direta/proxy e os controles de consulta se aplicam a **FarmaLíder e Pets Líder**. O perfil define os tokens e o segmento, sem alterar a regra de rede.
 
 ## Objetivo
 

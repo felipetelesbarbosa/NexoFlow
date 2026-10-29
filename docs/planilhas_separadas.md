@@ -8,6 +8,8 @@
 
 O histórico de alterações é uma trilha de auditoria de contatos. As compras observadas continuam em `Pedidos_FarmaLider` e `Itens_Pedidos_FarmaLider` no arquivo de operação e alimentam todas as tabelas BI. A migração preserva esse histórico comercial; os KPIs não passam a considerar apenas compras novas.
 
+A estrutura acima se repete para **FarmaLíder e Pets Líder**, totalizando seis arquivos quando os dois perfis são usados. A conta de serviço pode ser a mesma; os IDs e o mapa de destinos são próprios de cada marca. As abas mantêm o mesmo esquema nos dois segmentos, inclusive os nomes técnicos `Pedidos_FarmaLider` e `Itens_Pedidos_FarmaLider`.
+
 ## Migração
 
 1. Atualize o NexoFlow e encerre todas as rotinas de Weni, Analytics, Planilhas e Recompra.

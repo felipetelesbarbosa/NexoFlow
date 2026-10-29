@@ -353,7 +353,9 @@ $shaLines = @(
 $releaseNotes = @"
 # NexoFlow $Version
 
-Aplicativos Windows para integrar Weni e FarmaLíder, organizar pedidos no Google Sheets e alimentar painéis do Looker Studio.
+Aplicativos Windows para FarmaLíder e Pets Líder: integração Weni/API, clientes, pedidos, Recompra, Google Sheets e Looker Studio.
+
+O NexoFlow identifica pedidos registrados na API independentemente do canal de origem e retroalimenta a base de contatos Weni, inclusive para compras feitas por telefone ou fora da plataforma. O canal específico só é afirmado com evidência.
 
 ## Downloads
 
@@ -361,11 +363,13 @@ Aplicativos Windows para integrar Weni e FarmaLíder, organizar pedidos no Googl
 - **NexoFlow-$Version.zip** — projeto completo.
 - **SHA256SUMS-$Version.txt** — hashes dos dois pacotes.
 
-Extraia todo o ZIP do Setup e execute **NexoFlow Setup.exe**. A distribuição inclui Weni, Analytics, Planilha, Recompra, Terminal e Noturno. Configure suas próprias credenciais; os pacotes não incluem chaves ou tokens.
+Extraia todo o ZIP do Setup e execute **NexoFlow Setup.exe**. A distribuição inclui Weni, Analytics, Planilha, Recompra, Terminal e Noturno. Escolha FarmaLíder ou Pets Líder ao abrir os aplicativos. Configure seus próprios tokens Weni e os destinos de cada perfil; os pacotes não incluem chaves ou tokens.
 
 ## Primeira execução
 
-Siga a ordem: Weni completa → Planilha, se houver exports → Analytics completo → Recompra → Analytics incremental. Revise os relatórios e confirme as aplicações solicitadas. Depois atualize o Looker Studio. Para a rotina sem confirmações, use **NexoFlow Noturno.exe**; confira o resultado em `logs/noturno/`.
+Siga a ordem: Weni completa → Planilha, se houver exports → Analytics completo → Recompra → Analytics incremental. Revise os relatórios e confirme as aplicações solicitadas. Depois atualize o Looker Studio. Para a rotina sem confirmações, use **NexoFlow Noturno.exe**; confira o resultado em `logs/noturno/` (Farma) ou `logs/PET/noturno/` (Pets). A Recompra usa pedido_data: Farma D+25 e Pets D+30.
+
+A arquitetura por perfis permite incluir novos departamentos e segmentos mediante registro, configuração e validação das integrações e regras próprias. Os perfis disponíveis nesta versão são FARMA e PET.
 
 A publicação é validada por testes no Windows, check-up e testes de instalação e atualização.
 

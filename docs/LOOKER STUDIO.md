@@ -2,6 +2,8 @@
 
 O **NexoFlow Analytics** prepara as tabelas no **Google Sheets**. O **Looker Studio** lê essas fontes para apresentar os indicadores; executar o NexoFlow não cria gráficos nem configura o relatório automaticamente.
 
+Cada segmento usa seu próprio Dashboard. Para reproduzir o painel Farma no Pets, duplique o relatório e substitua todas as fontes por abas `BI_*` equivalentes no Dashboard Pets. O NexoFlow não duplica o relatório automaticamente. Veja [segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
+
 ## Conectar e atualizar
 
 1. Conclua a carga do Analytics e confira o resultado da execução.
@@ -71,6 +73,7 @@ Sem cobertura completa, SKU ou receita positiva, ou com divergência entre itens
 ## Regras e limites dos dados
 
 - **Vendas:** status documentados -2, -1, 0, 4, 1 e 2 contam após validação. Status 3, pagamento cancelado e pedidos oficialmente sem itens ficam fora. Em `BI_Delivery_Pedidos`, use `venda_realizada = 1`.
+- **Pets Líder:** produtos PET são preservados no perfil PET; os destinos não se misturam com Farma.
 - **Farmácia:** pedidos apenas pet ou veterinários são excluídos; pedidos mistos mantêm itens humanos e seu valor, sem o frete do pedido inteiro.
 - **Valores:** produtos e frete são separados. O faturamento total inclui frete quando aplicável; não o some novamente. Quantidades fracionárias devem ser preservadas.
 - **Histórico:** a API retorna o último pedido, não todas as compras. O Analytics acumula o que identifica nas coletas, sem declarar cobertura histórica completa. Compras podem não ser capturadas entre coletas.

@@ -1,5 +1,7 @@
 # Documentação do NexoFlow 1.0
 
+O NexoFlow atende **FarmaLíder e Pets Líder**, com dados separados. Confira [segmentos, campos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
+
 Comece pela [instalação](README%20INSTALACAO.md) e pelo [guia de operação](Documentacao%20NexoFlow.md).
 
 ## Uso dos aplicativos
@@ -9,7 +11,7 @@ Comece pela [instalação](README%20INSTALACAO.md) e pelo [guia de operação](D
 | Rotina automática durante a madrugada | [NexoFlow Noturno](NOTURNO.md) |
 | Contatos, pedidos e grupos na Weni | [NexoFlow Weni](README%20WENI.md) |
 | Importação de conversas e contatos | [NexoFlow Planilha](README%20DELIVERY.md) |
-| Campanha D+25 | [NexoFlow Recompra](README%20RECOMPRA.md) |
+| Campanhas Farma D+25 e Pets D+30 | [NexoFlow Recompra](README%20RECOMPRA.md) |
 | Comandos e diagnóstico | [NexoFlow Terminal](README%20TERMINAL.md) |
 
 ## Dados e integrações
@@ -17,7 +19,7 @@ Comece pela [instalação](README%20INSTALACAO.md) e pelo [guia de operação](D
 - [Configuração do Google Sheets](GOOGLE%20SETUP.md) e [divisão em três arquivos](planilhas_separadas.md).
 - [Fontes e indicadores do Looker Studio](LOOKER%20STUDIO.md).
 - [Regras de pedidos](PEDIDOS.md), [campos de pedido na Weni](PEDIDOS%20WENI.md) e [API FarmaLíder](FARMALIDER%20API.md).
-- [Cadastro FARMA](CADASTRO%20FARMA.md), [localização](geografia.md) e [contatos duplicados](deduplicacao_weni.md).
+- [Cadastro por segmento](CADASTRO%20FARMA.md), [localização](geografia.md) e [contatos duplicados](deduplicacao_weni.md).
 - [Google Ads](GOOGLE%20ADS.md).
 
 ## Suporte e desenvolvimento

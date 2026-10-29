@@ -1,5 +1,9 @@
 # NexoFlow 1.0 — Weni
 
+A rotina atende **FarmaLíder e Pets Líder**. Escolha o perfil ao abrir o mesmo executável; cada marca usa sua organização, token, planilhas e estado. Veja [campos, campanhas e fluxos](SEGMENTOS%20E%20FLUXOS.md).
+
+O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
+
 ## Objetivo
 
 A rotina **NexoFlow Weni** elimina o processo manual de exportar mensagens/contatos da Weni, tratar planilhas e importar uma nova planilha. Ela consulta a API da Weni, monta um plano de alterações, audita obrigatoriamente esse plano e só então permite gravar os campos.
@@ -7,7 +11,7 @@ A rotina **NexoFlow Weni** elimina o processo manual de exportar mensagens/conta
 ## Acompanhamento no CMD
 
 Durante consultas, preparação, dry-run e aplicação, o CMD e o log recebem
-atualizações a cada 2 segundos, inclusive durante espera pela API:
+progresso por lotes de 1.000 contatos e atualizações a cada 15 segundos, inclusive durante espera pela API:
 
 ```text
 Aplicação Weni [##########----------]  50% | 9500/19000 contatos | 30.0 contatos/s | decorrido=00:05:17 | restante estimado=00:05:17 | aplicados=9400; conflitos=50; já corretos=50; falhas=0
@@ -120,6 +124,8 @@ comandos/testar_update_weni.bat
 O teste é somente leitura e valida acesso a contatos, mensagens, grupos Opt-In LGPD e Opt-Out LGPD e disponibilidade da FarmaLíder para confirmação de pedidos.
 
 ## Campos que a rotina pode escrever
+
+A lista de referência usa `ultima_compra` na Farma; no Pets, use `compra_recente`. Os campos de maioridade abaixo são próprios da Farma.
 
 A lista é fechada e auditada:
 
@@ -253,6 +259,8 @@ O primeiro anúncio válido é preservado. O último anúncio só é substituíd
 
 ## Regras de idade e maioridade
 
+As regras de maioridade desta seção são da **FarmaLíder**. Pets pode manter idade como informação cadastral, sem exigir nem preencher `maior_de_18_anos`.
+
 - idade explícita, como `Tenho 27 anos`, pode preencher `idade = 27` e `maior_de_18_anos = sim`;
 - idade abaixo de 18 gera `maior_de_18_anos = não`;
 - declaração explícita de maioridade pode atualizar apenas `maior_de_18_anos`;
@@ -260,6 +268,8 @@ O primeiro anúncio válido é preservado. O último anúncio só é substituíd
 - mensagens ambíguas são ignoradas.
 
 ## Regras de LGPD
+
+Na Farma, os valores são ativo/recusado. No Pets, são **Sim/Não** em `opt_in_lgpd`; os grupos Opt-In/Opt-Out LGPD são próprios de cada organização. Marketing Pets usa `opt_in_marketing`, separadamente da LGPD.
 
 - Decisões usam mensagens recebidas, com data válida. Respostas compostas são aceitas quando o sentido está claro; respostas contextuais exigem uma pergunta compatível na janela de 24 horas.
 - Continuar expressamente o atendimento após uma pergunta única de autorização dos dados pode indicar aceite operacional, preservando recusas já registradas. Isso não altera `marketing_opt_in`.
@@ -395,9 +405,9 @@ nexo api weni campos
 
 As consultas `nexo api` são somente leitura. Consulte `docs/README TERMINAL.md` para a referência completa.
 
-## Recompra FarmaLíder D+25
+## Recompra FarmaLíder D+25 e Pets Líder D+30
 
-Grupo sincronizado com a última compra confirmada entre 0 e 25 dias, remoção depois de 25 dias e por recusa. O envio continua somente no D+25 pela campanha Weni. Execute `nexo weni recompra auditoria`, `dry-run` e `aplicar` com revisão, ou `nexo weni recompra atualizar`. Confira [implementação, configuração e limites da recompra](README%20RECOMPRA.md). A rotina não altera marketing_opt_in, não dispara WhatsApp e não modifica a campanha.
+O grupo Farma mantém compras confirmadas de 0 a 25 dias; o Pets, de 0 a 30 dias. O envio ocorre no D+25/D+30 pela campanha Weni, com `pedido_data` como referência. No Pets, `compra_recente` é o campo de compra confirmada e `opt_in_marketing` usa Sim/Não, sem exigência de maioridade. Execute `nexo weni recompra auditoria`, `dry-run` e `aplicar` com revisão, ou `nexo weni recompra atualizar`. Confira [implementação, configuração e limites da recompra](README%20RECOMPRA.md). A rotina não altera marketing_opt_in, não dispara WhatsApp e não modifica a campanha.
 
 ## NexoFlow Planilha
 

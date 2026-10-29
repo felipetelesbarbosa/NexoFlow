@@ -1,6 +1,8 @@
 # NexoFlow 1.0 — Guia de operação
 
-O NexoFlow integra Weni e FarmaLíder para manter contatos e pedidos atualizados e alimentar o Google Sheets e os painéis do Looker Studio.
+O NexoFlow integra Weni e a API FarmaLíder para **FarmaLíder e Pets Líder**, mantendo dados separados por perfil. O objetivo é manter contatos e pedidos atualizados e alimentar o Google Sheets e os painéis do Looker Studio.
+
+O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
 
 ## Escolha o aplicativo
 
@@ -9,14 +11,17 @@ O NexoFlow integra Weni e FarmaLíder para manter contatos e pedidos atualizados
 | **Weni** | Atualizar cadastros, pedidos e grupos; excluir duplicados confirmados após revisão. |
 | **Analytics** | Atualizar a base, o histórico de pedidos e as tabelas analíticas do Sheets. |
 | **Planilha** | Revalidar exports de conversas e contatos antes de atualizar Weni ou Analytics. |
-| **Recompra** | Revisar e aplicar a elegibilidade para a campanha FarmaLíder D+25. |
+| **Recompra** | Revisar e aplicar a elegibilidade das campanhas FarmaLíder D+25 e Pets Líder D+30. |
+| **Noturno** | Executar Weni, Analytics e Recompra na marca escolhida sem confirmações durante a carga. |
 | **Terminal** | Executar comandos, consultar dados e diagnosticar a instalação. |
 
 ## Antes de começar
 
 Instale pelo [Setup oficial](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.0), configure suas próprias credenciais e compartilhe as planilhas com a conta de serviço Google. O diretório padrão é `C:\NexoFlow`. Confira os requisitos e os campos necessários no [guia de instalação](README%20INSTALACAO.md).
 
-Abra **NexoFlow Terminal** e execute:
+Abra o mesmo aplicativo e escolha **FarmaLíder** ou **Pets Líder** antes da carga. Configure tokens Weni e três destinos Sheets em cada perfil. A credencial Google pode ser compartilhada. Veja [configuração dos segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
+
+Abra **NexoFlow Terminal** no perfil desejado e execute:
 
 ```text
 nexo diagnostico
@@ -34,14 +39,14 @@ Resolva as pendências de conexão ou configuração antes das cargas. Evite exe
 | 4 | **Recompra:** abra o aplicativo, gere a revisão e confirme depois de conferir as pendências. |
 | 5 | **Analytics:** sincronização incremental; em seguida, atualize o Looker Studio. |
 
-Com os dois exports em `importacoes/`, `comandos/atualizar_tudo.bat` executa essa sequência e aguarda as revisões. Falha, cancelamento ou resultado parcial interrompe o fluxo.
+Com os dois exports em `importacoes/` (Farma) ou `importacoes/PET/` (Pets), `comandos/atualizar_tudo.bat` executa essa sequência e aguarda as revisões. Falha, cancelamento ou resultado parcial interrompe o fluxo.
 
 Sem exports, execute as etapas necessárias pelos aplicativos e dispense a etapa Planilha. Para cargas em partes, siga **1 → 2 → 3 → 4** separadamente na Weni e no Analytics. Uma parte do Analytics com erro ou resultado parcial precisa ser concluída antes da próxima.
 
 ## Rotina diária
 
 1. Execute **NexoFlow Weni** para atualizar contatos, pedidos e grupos.
-2. Execute **NexoFlow Recompra** quando precisar revisar a campanha D+25.
+2. Execute **NexoFlow Recompra** quando precisar revisar a campanha Farma D+25 ou Pets D+30.
 3. Execute **NexoFlow Analytics** para refletir as alterações no Sheets.
 4. Atualize os dados do painel no Looker Studio.
 
@@ -49,7 +54,7 @@ A atualização da Recompra após a Weni pode ser habilitada na configuração; 
 
 ## Carga por planilhas
 
-Coloque os exports originais, sem alterar abas ou cabeçalhos, em `C:\NexoFlow\importacoes`:
+Coloque os exports originais, sem alterar abas ou cabeçalhos, em `C:\NexoFlow\importacoes` (Farma) ou `C:\NexoFlow\importacoes\PET` (Pets):
 
 ```text
 Conversas_Delivery.xlsx
@@ -78,9 +83,9 @@ A API FarmaLíder confirma os dados do cliente e do pedido. CPF válido dispensa
 
 Todos os status documentados não cancelados contam como venda validada. Status 3, pagamento cancelado e pedidos oficialmente sem itens ficam fora das vendas. O Analytics reconsulta o status dos pedidos já registrados de hoje até 20 dias atrás; preserva os anteriores e continua buscando novas compras.
 
-O recorte comercial inclui produtos para humanos. Em pedidos mistos, entram somente os itens humanos e seu valor, sem o frete do pedido inteiro. Pedidos apenas pet ou veterinários são excluídos. A listagem FARMA ajuda a reduzir consultas; o [cadastro oficial](CADASTRO%20FARMA.md) explica as validações.
+Na **FarmaLíder**, o recorte comercial inclui produtos para humanos. Em pedidos mistos, entram somente os itens humanos e seu valor, sem o frete do pedido inteiro. Pedidos apenas pet ou veterinários são excluídos. No **Pets Líder**, são preservados os produtos do segmento PET, sem exigência de maioridade. A listagem do segmento ajuda a reduzir consultas; o [cadastro oficial](CADASTRO%20FARMA.md) explica as validações.
 
-A Recompra mantém o grupo para compras confirmadas entre D+0 e D+25 e bloqueia recusas de marketing. O envio ocorre no D+25 pela campanha Weni. Veja [Recompra](README%20RECOMPRA.md).
+A Recompra mantém o grupo para compras confirmadas entre D+0 e D+25 (Farma) ou D+0 e D+30 (Pets), bloqueando recusas de marketing. O envio ocorre no D+25/D+30 pela campanha Weni, usando `pedido_data` nos dois eventos. Veja [Recompra](README%20RECOMPRA.md).
 
 ## Google Sheets e Looker Studio
 
@@ -88,7 +93,15 @@ O Analytics alimenta as planilhas; o Looker Studio lê as fontes conectadas a el
 
 A configuração pode separar **Operação**, **Histórico** e **Dashboard** em três arquivos. As abas `BI_*` ficam no arquivo de dashboard; confira os destinos no [guia de divisão](planilhas_separadas.md).
 
-Depois de uma atualização, confira a data da última carga, atualize os dados do painel e, se houver novas colunas, os campos das fontes. O histórico cobre os pedidos capturados nas coletas; a API de último pedido não comprova todas as compras antigas. As fórmulas, fontes e limites dos indicadores estão no [guia do Looker Studio](LOOKER%20STUDIO.md).
+Depois de uma atualização, confira a data da última carga, atualize os dados do painel e, se houver novas colunas, os campos das fontes. Cada segmento tem seu próprio arquivo Dashboard. Para usar o mesmo desenho no Pets, duplique o relatório e substitua todas as fontes pelas abas `BI_*` Pets correspondentes.
+
+A Weni propõe criar clientes ausentes com pedido/identidade validados, sem presumir consentimentos ou grupos. Pedidos completos observados são guardados localmente e entregues pelo Analytics ao Sheets por ID. Preserve os logs ao atualizar.
+
+O histórico cobre os pedidos capturados nas coletas; a API de último pedido não comprova todas as compras antigas. As fórmulas, fontes e limites dos indicadores estão no [guia do Looker Studio](LOOKER%20STUDIO.md).
+
+## Expansão por perfis
+
+O NexoFlow já tem arquitetura organizada por perfis para inclusão de novos departamentos e segmentos. A habilitação inclui registrar o novo perfil nos seletores e configurar organização Weni, credenciais, API autorizada, destinos Sheets, campos, fluxos e regras próprias, com validação antes de ativar. Os perfis operacionais disponíveis nesta versão são **FARMA** e **PET**.
 
 ## Terminal e referências
 

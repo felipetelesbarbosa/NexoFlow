@@ -1,50 +1,43 @@
-# Google Sheets: configuração da Service Account
+# Google Sheets — FarmaLíder e Pets Líder
 
-A autenticação usa uma **Service Account**, adequada para execução automatizada porque não depende do login Google de uma pessoa nem do usuário do Windows.
+O NexoFlow usa uma conta de serviço Google para atualizar as planilhas. A mesma credencial pode atender aos dois segmentos; os arquivos são próprios de cada marca.
 
-## 1. Crie a planilha
+## Criar e compartilhar os arquivos
 
-Crie uma planilha no Google Sheets, por exemplo:
+Para cada segmento, crie **Dashboard**, **Operação** e **Histórico**. Com os dois perfis ativos, são seis arquivos. Sugestão de organização no Drive:
 
-`NexoFlow - FarmaLíder Analytics`
+```text
+NexoFlow/
+  FarmaLíder/
+    Dashboard
+    Operação
+    Histórico
+  Pets Líder/
+    Dashboard
+    Operação
+    Histórico
+```
 
-Não é necessário criar as abas manualmente. O NexoFlow cria a estrutura automaticamente.
+No Google Cloud, habilite Google Sheets API e Google Drive API. Crie uma conta de serviço ou use a que já está configurada e autorizada. Salve sua chave JSON em `C:\NexoFlow\credentials\google_credentials.json`.
 
-## 2. Google Cloud
+Localize `client_email` nesse JSON e compartilhe **cada um dos arquivos** como **Editor** com esse e-mail. Usar o mesmo JSON não compartilha automaticamente novos arquivos.
 
-Crie ou selecione um projeto no Google Cloud e habilite:
+## Configurar os perfis
 
-- Google Sheets API
-- Google Drive API
+No arquivo `secrets_config.py`, preencha em `PERFIS["FARMA"]` e `PERFIS["PET"]`:
 
-## 3. Crie uma Service Account
+- `GOOGLE_SPREADSHEET_ID`: Dashboard.
+- `GOOGLE_OPERATIONS_SPREADSHEET_ID`: Operação.
+- `GOOGLE_HISTORY_SPREADSHEET_ID`: Histórico.
 
-No Google Cloud, crie uma Service Account e gere uma chave do tipo JSON.
-Baixe o arquivo e renomeie para:
+Em `https://docs.google.com/spreadsheets/d/{id}/edit`, copie somente `{id}`. Use os IDs da marca correta. O [modelo de configuração](../configuracao/secrets_config.example.py) mostra a estrutura.
 
-`google_credentials.json`
+O NexoFlow cria as abas necessárias; não copie dados Farma para inicializar o Pets. Para separar uma instalação que já usa um único arquivo, siga a [migração em três destinos](planilhas_separadas.md). Confira o mapa `NexoFlow_Arquivos` do Dashboard antes de executar.
 
-Coloque em:
+## Validar e conectar o dashboard
 
-`credentials/google_credentials.json`
+Abra o Terminal, escolha o perfil e execute `nexo diagnostico`. Depois rode Weni e Analytics na mesma marca. O Analytics preenche as abas `BI_*` do Dashboard correspondente.
 
-## 4. Compartilhe a planilha
+No Looker Studio, a conta responsável pelas fontes precisa ter acesso ao Dashboard. Ao duplicar o painel Farma para Pets, substitua todas as fontes pelas abas Pets equivalentes. Veja [Looker Studio](LOOKER%20STUDIO.md).
 
-Abra o JSON e localize `client_email`.
-Compartilhe a planilha com esse e-mail como **Editor**.
-
-## 5. ID da planilha
-
-Exemplo:
-
-`https://docs.google.com/spreadsheets/d/1AbCdEfGh123456/edit`
-
-O ID é:
-
-`1AbCdEfGh123456`
-
-Cole em `secrets_config.py` no campo `GOOGLE_SPREADSHEET_ID`.
-
-## Segurança
-
-O JSON contém uma chave privada. Não publique em GitHub nem compartilhe fora da equipe responsável.
+O projeto não inclui credenciais. Use seus próprios acessos e mantenha o JSON privado.

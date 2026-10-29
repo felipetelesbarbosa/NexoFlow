@@ -1,6 +1,6 @@
 # Webhook de pedidos - preparado, não ativado
 
-O projeto está preparado para capturar cada pedido em tempo real no futuro, mas o funcionamento atual continua sendo feito por sincronização periódica da API da Weni.
+O webhook de pedidos é futuro e permanece desativado. A operação atual dos perfis Farma e Pets usa consultas à API FarmaLíder, sincronização Weni e histórico observado no Sheets.
 
 ## Situação atual
 
@@ -8,7 +8,7 @@ Ativo agora:
 
 Weni → API de contatos → Python → Google Sheets
 
-O Python lê `ultimo_pedido` e salva o histórico nas abas:
+O Python valida os dados oficiais da API do segmento e salva os pedidos observados nas abas:
 
 - `Pedidos_FarmaLider`
 - `Itens_Pedidos_FarmaLider`

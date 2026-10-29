@@ -1,5 +1,7 @@
 # NexoFlow 1.0
 
+Válido para **FarmaLíder e Pets Líder**. Escolha a marca no executável. Use exports do projeto correspondente em `importacoes/` (Farma) ou `importacoes/PET/` (Pets). [Segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
+
 ## Atendimentos Delivery com as tags Pedido e Pedido finalizado
 
 A tag legada `Pedido is deleted` também é aceita como `Pedido`, por correspondência exata, desconsiderando maiúsculas e espaços duplicados. O formato de export `Pedido_is_deleted_<data e hora com fuso>` é aceito somente para a antiga tag Pedido, com timestamp válido. Ela seleciona atendimentos; não significa cancelamento do pedido na FarmaLíder.
@@ -69,9 +71,9 @@ WENI_CHATS_API_TOKEN = "TOKEN_DE_INTEGRACAO_DO_PROJETO"
 WENI_CHATS_ORDER_ID_FIELD = ""
 ```
 
-O token de integração do Chats é um Bearer UUID do projeto **Delivery FarmaLíder**. Ele é diferente do `WENI_API_TOKEN` usado para contatos e mensagens. A origem deve ser a API, não a página do navegador, sem caminhos, parâmetros ou credenciais. O token restringe as consultas ao projeto: confirme essa organização antes de configurar. O comando lê `GET /v2/external/rooms_metrics/`, todas as páginas de atendimentos encerrados até o corte da execução, sem janela inicial de 90 dias. Redirecionamentos e paginação para outro destino são bloqueados.
+O token de integração do Chats é um Bearer UUID do projeto **Delivery FarmaLíder** ou **Delivery Pets Líder**, conforme o perfil. Ele é diferente do `WENI_API_TOKEN` usado para contatos e mensagens. A origem deve ser a API, não a página do navegador, sem caminhos, parâmetros ou credenciais. O token restringe as consultas ao projeto: confirme essa organização antes de configurar. O comando lê `GET /v2/external/rooms_metrics/`, todas as páginas de atendimentos encerrados até o corte da execução, sem janela inicial de 90 dias. Redirecionamentos e paginação para outro destino são bloqueados.
 
-**Como obter os dados:** no código oficial da Weni, o token de integração é chamado `project_auth` e fica na configuração do serviço de atendimento (`ticketer`) que conecta Chats e Flows. A API pública `/api/v2/ticketers.json` mostra UUID, nome, tipo e data de criação; não entrega esse segredo. Solicite ao administrador da integração ou ao suporte da Weni/VTEX o `project_auth` do projeto Delivery FarmaLíder e a origem HTTPS da API do Chats, com acesso de leitura a `GET /v2/external/rooms_metrics/`. Se a configuração administrativa já mostrar esse valor, copie-o diretamente para o arquivo local, sem publicar no GitHub.
+**Como obter os dados:** no código oficial da Weni, o token de integração é chamado `project_auth` e fica na configuração do serviço de atendimento (`ticketer`) que conecta Chats e Flows. A API pública `/api/v2/ticketers.json` mostra UUID, nome, tipo e data de criação; não entrega esse segredo. Solicite ao administrador da integração ou ao suporte da Weni/VTEX o `project_auth` do projeto do segmento e a origem HTTPS da API do Chats, com acesso de leitura a `GET /v2/external/rooms_metrics/`. Se a configuração administrativa já mostrar esse valor, copie-o diretamente para o arquivo local, sem publicar no GitHub.
 
 Para identificar a origem da API, abra Atendimento/Chats no navegador, pressione F12, entre em Rede/Network e observe a URL de uma requisição de salas/atendimentos ao Chats. Use somente a origem (`https://host`), sem caminho ou parâmetros. O Bearer da sessão do navegador pode ser um JWT temporário de login; ele não substitui o UUID de integração exigido pela API externa.
 
@@ -97,7 +99,7 @@ Depois de revisar:
 python app/run_delivery_tickets.py --apply --require-review logs/delivery_review.json
 ```
 
-O apply relê cada contato e bloqueia alterações nas informações usadas para identificar o cliente ou validar o pedido. Contatos em conflito não são gravados nem publicados como reconciliação bem-sucedida. Cada POST tem tentativa única; se uma integração falhar depois de outras gravações, retome com o mesmo snapshot, que verifica o estado atual antes de executar operações pendentes. Esse comando não altera o checkpoint da carga geral nem o consentimento LGPD. Ao gravar na Weni, remove primeiro a associação revisada ao grupo Recompra FarmaLíder quando a referência mudou ou ficou inelegível, para cancelar o evento antigo. Não inclui clientes no grupo nem dispara mensagens; a nova admissão exige a rotina própria de Recompra.
+O apply relê cada contato e bloqueia alterações nas informações usadas para identificar o cliente ou validar o pedido. Contatos em conflito não são gravados nem publicados como reconciliação bem-sucedida. Cada POST tem tentativa única; se uma integração falhar depois de outras gravações, retome com o mesmo snapshot, que verifica o estado atual antes de executar operações pendentes. Esse comando não altera o checkpoint da carga geral nem o consentimento LGPD. Ao gravar na Weni, remove primeiro a associação revisada ao grupo de Recompra do perfil quando a referência mudou ou ficou inelegível, para cancelar o evento antigo. Não inclui clientes no grupo nem dispara mensagens; a nova admissão exige a rotina própria de Recompra.
 
 ### Validação e limitações
 

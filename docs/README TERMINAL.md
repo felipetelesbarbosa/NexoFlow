@@ -10,6 +10,8 @@ Ao abrir `NexoFlow Terminal.exe`, o NexoFlow:
 - mantém tokens Weni/FarmaLíder e credenciais Google nos arquivos locais, sem exportá-los para o ambiente;
 - disponibiliza o comando curto `nexo`.
 
+Ao abrir, escolha **FarmaLíder** ou **Pets Líder** antes dos comandos. Configuração, consultas, planilhas e logs usam o perfil selecionado. Consulte [segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
+
 ## Começando
 
 Digite:

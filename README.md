@@ -2,6 +2,8 @@
 
 Aplicativos para Windows que integram **Weni e a API FarmaLíder nos segmentos FarmaLíder e Pets Líder**, atualizam contatos e pedidos e organizam os dados no **Google Sheets** para análise no **Looker Studio**.
 
+O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
+
 [Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.0/NexoFlow-Setup-1.0.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
 
 ## Componentes
@@ -9,7 +11,7 @@ Aplicativos para Windows que integram **Weni e a API FarmaLíder nos segmentos F
 | Aplicativo | Para que serve |
 | --- | --- |
 | **NexoFlow Noturno** | Executa Weni, Analytics e Recompra sem confirmação humana, com auditoria automática e relatório final. |
-| **NexoFlow Weni** | Atualiza cadastros, pedidos e grupos na Weni; exclui duplicados confirmados após revisão. |
+| **NexoFlow Weni** | Retroalimenta contatos e pedidos da API na Weni, incluindo compras externas; atualiza grupos e trata duplicados após revisão. |
 | **NexoFlow Analytics** | Sincroniza a base, acumula o histórico de pedidos e atualiza as tabelas do Google Sheets. |
 | **NexoFlow Planilha** | Revalida exports de contatos e conversas para atualizar Weni ou Analytics. |
 | **NexoFlow Recompra** | Mantém a elegibilidade da Recompra FarmaLíder D+25 e Pets Líder D+30; os envios ficam na campanha Weni. |
@@ -28,11 +30,15 @@ Requer Windows x64 e Python 3.11 ou superior, 64 bits. O Setup oferece o Python 
 
 Abra o mesmo executável Weni, Analytics, Recompra, Planilha ou Noturno e escolha **[1] FarmaLíder** ou **[2] Pets Líder**. No Noturno, depois escolha incremental ou completa. O Terminal também permite selecionar a marca. Ambos executam a mesma sequência de conexão, auditoria e aplicação; credenciais, planilhas, revisões e estado permanecem separados. Para agendamentos, use `--perfil FARMA` ou `--perfil PET`; o Noturno também aceita `--incremental` ou `--full`.
 
-Preencha `PERFIS["FARMA"]` e `PERFIS["PET"]` no arquivo local, incluindo os três IDs de Sheets (Dashboard, Operação e Histórico). A credencial Google pode ser compartilhada; os arquivos de planilhas precisam ser distintos. Confira o mapa `NexoFlow_Arquivos` em cada Dashboard. O NexoFlow recusa destinos Pets divergentes e token de outra organização.
+Preencha `PERFIS["FARMA"]` e `PERFIS["PET"]` no arquivo local, incluindo os três IDs de Sheets (Dashboard, Operação e Histórico). A credencial Google pode ser compartilhada; os arquivos de planilhas precisam ser distintos. Confira o [guia dos segmentos e fluxos](docs/SEGMENTOS%20E%20FLUXOS.md) e o mapa `NexoFlow_Arquivos` em cada Dashboard. O NexoFlow recusa destinos Pets divergentes e token de outra organização.
 
-Pets usa `logs/PET/`, `importacoes/PET/`, `compra_recente` e `opt_in_marketing` com Sim/Não. Não exige maioridade. A Recompra usa **pedido_data D+30**; FarmaLíder usa **pedido_data D+25**. O filtro humano permanece exclusivo da FarmaLíder; pedidos Pets exigem vínculo com `clientes/PET`.
+Pets usa `logs/PET/`, `importacoes/PET/`, `compra_recente` e `opt_in_marketing` com Sim/Não. Não exige maioridade. A Recompra usa **pedido_data D+30**; FarmaLíder usa **pedido_data D+25**. O filtro humano permanece exclusivo da FarmaLíder; pedidos Pets exigem segmento PET comprovado pela listagem ou pela consulta individual por CPF.
 
 Para conferir apenas o grupo atual, execute `comandos/auditar_grupo_recompra.bat` no perfil desejado. A auditoria consulta a API sem modificar contatos e salva JSON/CSV privado. Consulta inconclusiva permanece pendente.
+
+## Novos departamentos e segmentos
+
+O NexoFlow já tem arquitetura organizada por perfis para inclusão de novos departamentos e segmentos. A habilitação inclui registrar o novo perfil nos seletores e configurar organização Weni, credenciais, API autorizada, destinos Sheets, campos, fluxos e regras próprias, com validação antes de ativar. Os perfis operacionais disponíveis nesta versão são **FARMA** e **PET**.
 
 ## Primeira carga e atualização completa
 
@@ -44,7 +50,7 @@ Execute nesta ordem, revisando e confirmando os relatórios solicitados:
 4. **Recompra:** gere a revisão, confira as pendências e confirme a aplicação.
 5. **Analytics:** sincronização incremental; depois atualize os dados no Looker Studio.
 
-Para percorrer essa sequência com os exports, coloque `Conversas_Delivery.xlsx` e `Contatos_Delivery.xlsx` em `importacoes/` e execute `comandos/atualizar_tudo.bat`. As confirmações continuam sendo solicitadas durante o fluxo.
+Para percorrer essa sequência com os exports, coloque `Conversas_Delivery.xlsx` e `Contatos_Delivery.xlsx` em `importacoes/` (Farma) ou `importacoes/PET/` (Pets) e execute `comandos/atualizar_tudo.bat`. As confirmações continuam sendo solicitadas durante o fluxo.
 
 Para executar durante a madrugada, use **NexoFlow Noturno**. Veja [execução automática e agendamento](docs/NOTURNO.md).
 

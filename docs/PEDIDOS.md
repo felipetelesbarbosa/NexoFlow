@@ -1,5 +1,7 @@
 # Pedidos no NexoFlow 1.0
 
+As regras compartilhadas de pedidos atendem **FarmaLíder e Pets Líder**, com organizações e planilhas separadas. Farma usa `ultima_compra`; Pets usa `compra_recente`. A referência dos eventos é `pedido_data`: D+25 na Farma e D+30 no Pets. Veja [segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
+
 O **NexoFlow 1.0** usa a FarmaLíder API como fonte de verdade dos dados de pedido. A Weni recebe um snapshot operacional dos campos `pedido_*`; Google Sheets e Looker Studio recebem a estrutura analítica correspondente.
 
 ## Arquitetura de coleta
@@ -128,7 +130,7 @@ De-para usado pela integração:
 
 A Weni recebe o **código efetivo** em `pedido_status`. Os nomes oficiais do enum, como `EmAberto`, `PendenteDePagamento`, `EmProcessamento`, `ProntoParaRota`, `EmTransito`, `Concluido` e `Cancelado`, são normalizados para -2 a 4. O Analytics deriva `pedido_status_nome` para apresentação no Google Sheets/Looker Studio. Se `formaPagamento=0` ou `_`, o status efetivo é 3, Cancelado, mesmo que a API informe outro status. Cancelamento explícito também prevalece. `Pedidos_FarmaLider` preserva o status bruto em `farmalider_status_pedido`; Weni e `BI_Pedidos` aplicam o status efetivo.
 
-Pedidos validados pela API nos estados -2, -1, 0, 4, 1 e 2 contam como venda e atualizam `ultima_compra`. Status 3, cancelamento explícito ou pagamento 0 excluem a venda; estados desconhecidos permanecem pendentes.
+Pedidos validados pela API nos estados -2, -1, 0, 4, 1 e 2 contam como venda e atualizam `ultima_compra` (Farma) ou `compra_recente` (Pets). Status 3, cancelamento explícito ou pagamento 0 excluem a venda; estados desconhecidos permanecem pendentes.
 
 ## Forma de pagamento
 
