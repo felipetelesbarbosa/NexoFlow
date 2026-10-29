@@ -1,4 +1,9 @@
-# NexoFlow 1.5 — Changelog
+# NexoFlow 1.5.1 — Changelog
+
+## NexoFlow 1.5.1 — 29/10/2026
+
+- Nome público atualizado para Data Studio em guias, mensagens, ajuda do Terminal e descrições dos pacotes, conforme anúncio do Google. Guia renomeado e links internos atualizados.
+- Identificadores técnicos e o comando `nexo looker` preservados para compatibilidade. Sem alteração das regras de negócio, fontes ou cálculos dos indicadores.
 
 ## NexoFlow 1.5 — 29/10/2026
 
@@ -10,7 +15,7 @@
 
 ## Histórico da linha 1.0
 
-- Documentação dos dois segmentos: instalação, credenciais, campos, Recompra Farma D+25/Pets D+30, fluxos e fontes do Looker. Descrição pública inclui Pets, retroalimentação de clientes com pedidos externos e expansão por perfis, sem inferir canal de venda nem apresentar novos perfis como já habilitados.
+- Documentação dos dois segmentos: instalação, credenciais, campos, Recompra Farma D+25/Pets D+30, fluxos e fontes do Data Studio. Descrição pública inclui Pets, retroalimentação de clientes com pedidos externos e expansão por perfis, sem inferir canal de venda nem apresentar novos perfis como já habilitados.
 
 - Base API → Weni nos perfis Farma e Pets: novos clientes com pedido validado entram na revisão, com conferência de CPF/telefone, organização e fonte atual no apply. Inclusões não presumem consentimento nem associam grupos. Histórico privado dos pedidos observados alimenta o Sheets/BI por ID, preserva compras anteriores e reconcilia o vínculo quando o contato é criado. Criações incertas não repetem POST automaticamente.
 
@@ -81,7 +86,7 @@
 - Filtro farmacêutico: MacroGard e Becordil excluídos também por nomes abreviados; curativos Topz com estampa Patrulha Canina deixam de ser confundidos com produtos animais. A nova política exige nova revisão da Recompra e reconciliação do escopo nas próximas cargas do Analytics/Planilhas.
 - Recompra: bloqueios temporários ao substituir o estado local recebem tentativas limitadas, sem repetir escritas na Weni; bloqueios persistentes preservam o estado anterior e são identificados como falhas locais, com diagnóstico de permissão.
 
-- Looker: conector privado opcional para recalcular a Curva ABC, o resumo e os produtos comprados juntos no período solicitado pelo relatório, com leitura das bases BI e validação de consistência.
+- Data Studio: conector privado opcional para recalcular a Curva ABC, o resumo e os produtos comprados juntos no período solicitado pelo relatório, com leitura das bases BI e validação de consistência.
 
 - Planilhas: leitura das constantes booleanas `=FALSE()` e `=TRUE()` usadas pelo export original de conversas no campo `is_active`, preservando o filtro de atendimentos encerrados e o bloqueio de outras fórmulas.
 
@@ -101,10 +106,10 @@
 
 - Antes de classificar um CPF curto como inválido, restaurar zeros à esquerda somente quando o resultado de 11 dígitos passar nos verificadores. Valores como 0 e identificadores errados permanecem em validação por identidade.
 - CPF válido dispensa comparação de nome, telefone e e-mail. CPF inválido pode ser validado pelo primeiro nome, normalizando acentos e símbolos, ou pelo número local do telefone, ignorando +55 e DDD. E-mail não é obrigatório; cache não compartilha identidade entre contatos e respostas ambíguas continuam pendentes.
-- Analytics/Looker contabilizam pedidos API validados em estados documentados não cancelados, incluindo Em processamento; regra alinhada com Weni e Recompra e reconsulta em cada nova carga no escopo selecionado.
+- Analytics/Data Studio contabilizam pedidos API validados em estados documentados não cancelados, incluindo Em processamento; regra alinhada com Weni e Recompra e reconsulta em cada nova carga no escopo selecionado.
 - Inserções no Sheets delimitam a tabela desde a coluna A para evitar deslocamento de pedidos e histórico.
 - Analytics reconsulta por código os pedidos oficiais já observados no escopo da carga somente nos últimos 20 dias, incluindo concluídos e cancelados. Pedidos mais antigos permanecem preservados; a consulta por CPF continua descobrindo compras novas. Mudanças de status e itens atualizam o histórico; falhas preservam o snapshot anterior e o checkpoint.
-- Orientações do Looker usam os indicadores de venda validada, incluindo os estados -2, -1 e 0; validação do primeiro nome também aceita símbolos internos sem resolver identidades ambíguas.
+- Orientações do Data Studio usam os indicadores de venda validada, incluindo os estados -2, -1 e 0; validação do primeiro nome também aceita símbolos internos sem resolver identidades ambíguas.
 - Planilhas vincula conversas por UUID/URN, sem exigir igualdade do nome completo do canal. A validação do CPF e do pedido na API permanece obrigatória.
 - Desinstalação remove os atalhos oficiais de todos os componentes, incluindo Recompra, preservando atalhos de outros programas.
 - Ícone da Planilha redesenhado no padrão arredondado azul e ciano, com tamanho visual alinhado aos demais componentes.
@@ -117,13 +122,13 @@
 
 - Migração do Sheets recupera erros internos da cópia integral de abas grandes com transferência nativa em blocos, preservando tipos de células, formatos e dimensões. Cada bloco confirmado registra a retomada; os originais só são retirados após nova comparação integral.
 
-- Operação, histórico e dashboard podem usar arquivos separados, com descoberta automática pela planilha original. A migração copia abas nativas, confere o conteúdo em blocos e só retira os originais após a ativação e nova conferência. As fontes BI do Looker mantêm arquivo e IDs das abas.
+- Operação, histórico e dashboard podem usar arquivos separados, com descoberta automática pela planilha original. A migração copia abas nativas, confere o conteúdo em blocos e só retira os originais após a ativação e nova conferência. As fontes BI do Data Studio mantêm arquivo e IDs das abas.
 
 - Sheets reserva exatamente as linhas necessárias antes de iniciar o upsert de cada tabela. Falta de capacidade nessa reserva interrompe a tabela antes de alterar registros existentes, com orientação para liberar espaço sem apagar dados automaticamente.
 
 - Sheets recupera falhas de rede durante a autenticação Google, revalida a rota configurada e repete a operação dentro dos limites existentes. Recusas de autenticação e falhas de certificado continuam interrompendo a execução.
 
-- Padronização de cidades, estados por extenso e bairros nas revisões da Weni, no Sheets e nas fontes do Looker. Referências locais corrigem grafias e distritos redundantes, mantendo conjuntos e subdivisões. Alterações de endereço respeitam a conferência de conflito antes da aplicação.
+- Padronização de cidades, estados por extenso e bairros nas revisões da Weni, no Sheets e nas fontes do Data Studio. Referências locais corrigem grafias e distritos redundantes, mantendo conjuntos e subdivisões. Alterações de endereço respeitam a conferência de conflito antes da aplicação.
 - Cidade `Pa` interpretada como Belém conforme confirmação operacional. Grafias de Manaus com diferenças de caixa, espaços nas extremidades ou caracteres invisíveis usam o mesmo nome oficial.
 
 - Catálogo pet amplia a higienização por código de referência e nome exato, reconhecendo também abreviações verificadas da API. A atualização reprocessa o histórico e os indicadores do Sheets e exige nova revisão da Recompra; o catálogo original permanece fora dos pacotes públicos.
@@ -132,7 +137,7 @@
 
 - Analytics informa barra, velocidade e tempo restante por etapa nas consultas de CPF, validação de pedidos e gravações do Sheets. O indicador continua ativo durante respostas lentas e retries; apenas linhas confirmadas avançam a gravação, e falhas não exibem conclusão de 100%.
 
-- `comandos/atualizar_tudo.bat` executa as cargas completas, Planilhas, Recompra e sincronização incremental em ordem, mantendo as revisões humanas e interrompendo o fluxo diante de erros, conflitos ou consultas parciais. Looker Studio recebe orientação para atualização manual ao final.
+- `comandos/atualizar_tudo.bat` executa as cargas completas, Planilhas, Recompra e sincronização incremental em ordem, mantendo as revisões humanas e interrompendo o fluxo diante de erros, conflitos ou consultas parciais. Data Studio recebe orientação para atualização manual ao final.
 
 - Compra posterior ainda não confirmada pela API pode ser sinalizada na Weni e no Sheets, com bloqueio da referência antiga de recompra e indicadores de pendência no BI.
 
@@ -147,7 +152,7 @@
 
 - Check-up com leitura UTF-8 explícita nos testes de pacotes, corrigindo a falha de acentuação no Windows. CI também valida esses testes sem forçar o modo UTF-8 do Python.
 
-- Camada comercial para Looker com histórico acumulado, clientes por chave estável, itens com tipos numéricos, KPIs por período, Curva ABC e produtos comprados juntos. Migração do faturamento interpretado como data e campos opcionais de gênero/categoria sem inferência; cobertura histórica e ausência de anúncios sinalizadas.
+- Camada comercial para Data Studio com histórico acumulado, clientes por chave estável, itens com tipos numéricos, KPIs por período, Curva ABC e produtos comprados juntos. Migração do faturamento interpretado como data e campos opcionais de gênero/categoria sem inferência; cobertura histórica e ausência de anúncios sinalizadas.
 
 - Weni com ícone azul e ciano, contato e balão de conversa, seguindo a estética do Analytics e do Recompra. Executável, imagem e atalhos atualizados.
 - Recompra com ícone próprio de sacola e setas circulares; Planilha com ícone azul alinhado à identidade do NexoFlow. Executáveis e atalhos atualizados.
@@ -339,7 +344,7 @@
 - cancelamento explícito ou pagamento 0 prevalece e grava o status efetivo **3, Cancelado** na Weni/BI;
 - `Pedidos_FarmaLider` preserva os valores brutos de status e pagamento retornados pela API para auditoria;
 - status efetivo 4 (Pronto para rota), 1 (Em trânsito) ou 2 (Concluído), validado pela API e sem cancelamento entra nos indicadores de venda e atualiza `ultima_compra`;
-- `pedido_status` também é preservado na `Base_Contatos` para Google Sheets/Looker Studio;
+- `pedido_status` também é preservado na `Base_Contatos` para Google Sheets/Data Studio;
 - pedidos em **Em aberto (-2)**, **Pendente de pagamento (-1)**, **Em processamento (0)**, **Pronto para rota (4)** ou **Em trânsito (1)** ficam numa fila persistente de rechecagem até chegarem a **Concluído** ou **Cancelado**, mesmo sem nova mensagem na Weni.
 
 Data de consolidação: 05/10/2026.

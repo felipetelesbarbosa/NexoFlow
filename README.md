@@ -1,10 +1,10 @@
-# NexoFlow 1.5
+# NexoFlow 1.5.1
 
-Aplicativos para Windows que integram **Weni e a API FarmaLíder nos segmentos FarmaLíder e Pets Líder**, atualizam contatos e pedidos e organizam os dados no **Google Sheets** para análise no **Looker Studio**.
+Aplicativos para Windows que integram **Weni e a API FarmaLíder nos segmentos FarmaLíder e Pets Líder**, atualizam contatos e pedidos e organizam os dados no **Google Sheets** para análise no **Data Studio**.
 
 O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
 
-[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5/NexoFlow-Setup-1.5.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
+[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.1/NexoFlow-Setup-1.5.1.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
 
 ## Componentes
 
@@ -48,7 +48,7 @@ Execute nesta ordem, revisando e confirmando os relatórios solicitados:
 2. **Planilha, quando houver exports:** opção **[1] Atualizar Weni**, depois **[2] Atualizar Analytics e Google Sheets**.
 3. **Analytics:** carga completa em `comandos/executar_carga_completa.bat`.
 4. **Recompra:** gere a revisão, confira as pendências e confirme a aplicação.
-5. **Analytics:** sincronização incremental; depois atualize os dados no Looker Studio.
+5. **Analytics:** sincronização incremental; depois atualize os dados no Data Studio.
 
 Para percorrer essa sequência com os exports, coloque `Conversas_Delivery.xlsx` e `Contatos_Delivery.xlsx` em `importacoes/` (Farma) ou `importacoes/PET/` (Pets) e execute `comandos/atualizar_tudo.bat`. As confirmações continuam sendo solicitadas durante o fluxo.
 
@@ -63,18 +63,18 @@ Na rotina diária, use os atalhos Weni, Recompra e Analytics conforme necessári
 - O histórico é acumulado nas coletas dos dois segmentos, inclusive pedidos de clientes ainda ausentes na Weni. Pedidos observados ficam guardados localmente até a entrega idempotente ao Analytics/Sheets. O último pedido da API não comprova todas as compras anteriores nem compras intermediárias não observadas.
 - A rotina Weni propõe criar clientes da API com pedido validado e identidade única, preenchendo nome, telefone e campos disponíveis. Sem telefone, o cadastro pode ficar sem canal de contato. CPF inválido sem vínculo independente, conflito cadastral e resposta incerta ficam pendentes; não são criados consentimentos nem inclusões em grupos.
 - A Weni mantém o pedido mais recente; o histórico de pedidos distintos fica nas planilhas e no dashboard. Um pedido vindo da API não comprova que foi feito pelo WhatsApp ou pela Weni.
-- Operação, histórico e dashboard podem usar [três arquivos do Sheets](docs/planilhas_separadas.md). O Looker lê as fontes `BI_*`; confira seus destinos e atualize os campos quando houver novas colunas.
+- Operação, histórico e dashboard podem usar [três arquivos do Sheets](docs/planilhas_separadas.md). O Data Studio lê as fontes `BI_*`; confira seus destinos e atualize os campos quando houver novas colunas.
 - Nos atalhos individuais, revise as propostas de Weni, Planilha e Recompra antes de aplicar. Carga parcial exige conferir o log e as pendências antes de prosseguir.
 
 ## Versões e atualizações
 
-A versão atual é **1.5**. As próximas correções seguem **1.5.1, 1.5.2, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
+A versão atual é **1.5.1**. As próximas correções seguem **1.5.2, 1.5.3, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
 
 ## Referências
 
 O código fica em [app/](app/README.md), os comandos Windows em [comandos/](comandos/README.md) e os modelos em [configuracao/](configuracao/README.md). Os guias por assunto estão em [docs/](docs/README.md).
 
-[Weni](docs/README%20WENI.md) · [Planilha](docs/README%20DELIVERY.md) · [Recompra](docs/README%20RECOMPRA.md) · [Terminal](<docs/README TERMINAL.md>) · [Google Sheets](docs/GOOGLE%20SETUP.md) · [Looker Studio](docs/LOOKER%20STUDIO.md)
+[Weni](docs/README%20WENI.md) · [Planilha](docs/README%20DELIVERY.md) · [Recompra](docs/README%20RECOMPRA.md) · [Terminal](<docs/README TERMINAL.md>) · [Google Sheets](docs/GOOGLE%20SETUP.md) · [Data Studio](docs/DATA%20STUDIO.md)
 
 O projeto é distribuído sem chaves, tokens ou credenciais. Use os seus próprios acessos e mantenha-os privados. Consulte [Segurança](SECURITY.md).
 

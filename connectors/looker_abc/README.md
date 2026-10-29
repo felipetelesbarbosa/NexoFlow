@@ -1,10 +1,10 @@
-# NexoFlow 1.5: Curva ABC por período
+# NexoFlow 1.5.1: Curva ABC por período
 
-Conector Google Apps Script para calcular a curva ABC no Looker Studio conforme o período selecionado.
+Conector Google Apps Script para calcular a curva ABC no Data Studio conforme o período selecionado.
 
 ## Estado
 
-Conector privado ativo na página Curva ABC. As tabelas de produtos, resumo e compras conjuntas e os seis cartões usam o período recebido do Looker. As abas existentes e a rotina Python continuam intactas.
+Conector privado ativo na página Curva ABC. As tabelas de produtos, resumo e compras conjuntas e os seis cartões usam o período recebido do Data Studio. As abas existentes e a rotina Python continuam intactas.
 
 ## Registro de validação e pendências (17/10/2026)
 
@@ -26,9 +26,9 @@ Não retorna CPF, cliente, contato ou número original de pedido. Não usa servi
 
 ## Instalação privada
 
-1. No Google Apps Script da conta dona do relatório, crie um projeto com o nome **NexoFlow 1.5 - Curva ABC**.
+1. No Google Apps Script da conta dona do relatório, crie um projeto com o nome **NexoFlow 1.5.1 - Curva ABC**.
 2. Copie `AbcCore.js` e `Code.js` para arquivos de script com os mesmos nomes (o editor pode mostrá-los como `.gs`). Habilite a exibição de `appsscript.json` e copie o manifesto.
-3. Salve. Em **Implantar > Testar implantações**, selecione o tipo conector do Looker/Data Studio. Use o ID de implantação fornecido pelo Google, sem tornar o projeto público.
+3. Salve. Em **Implantar > Testar implantações**, selecione o tipo conector do Data Studio. Use o ID de implantação fornecido pelo Google, sem tornar o projeto público.
 4. Autorize a leitura no Google e crie três fontes privadas a partir da mesma implantação. Informe o ID da planilha BI e escolha `abc`, `resumo` e `juntos`, respectivamente. Mantenha o ID fora do repositório.
 5. Somente após testar a resposta do conector, use `abc` na tabela detalhada, `resumo` no resumo e nos seis cartões, e `juntos` na tabela de compras conjuntas. Mantenha o intervalo automático dos componentes. Não substitua fontes do relatório inteiro.
 6. Prefira componentes novos com campos nativos: referências calculadas de fontes antigas podem permanecer inválidas mesmo após trocar a fonte. Preserve o estilo e os limites dos componentes ao substituí-los.
@@ -52,7 +52,7 @@ node --test tests/test_looker_abc_connector.cjs
 PYTHONPATH=app python3 -m unittest discover -s tests -p test_looker_bi.py
 ```
 
-A suíte do conector usa somente dados fictícios. Não envia dados nem modifica Google Sheets. O resultado local não substitui a validação de OAuth, execução Apps Script e funcionamento no Looker com dados reais.
+A suíte do conector usa somente dados fictícios. Não envia dados nem modifica Google Sheets. O resultado local não substitui a validação de OAuth, execução Apps Script e funcionamento no Data Studio com dados reais.
 
 ## Referências
 

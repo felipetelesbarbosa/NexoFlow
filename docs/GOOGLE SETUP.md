@@ -38,6 +38,6 @@ O NexoFlow cria as abas necessárias; não copie dados Farma para inicializar o 
 
 Abra o Terminal, escolha o perfil e execute `nexo diagnostico`. Depois rode Weni e Analytics na mesma marca. O Analytics preenche as abas `BI_*` do Dashboard correspondente.
 
-No Looker Studio, a conta responsável pelas fontes precisa ter acesso ao Dashboard. Ao duplicar o painel Farma para Pets, substitua todas as fontes pelas abas Pets equivalentes. Veja [Looker Studio](LOOKER%20STUDIO.md).
+No Data Studio, a conta responsável pelas fontes precisa ter acesso ao Dashboard. Ao duplicar o painel Farma para Pets, substitua todas as fontes pelas abas Pets equivalentes. Veja [Data Studio](DATA%20STUDIO.md).
 
 O projeto não inclui credenciais. Use seus próprios acessos e mantenha o JSON privado.

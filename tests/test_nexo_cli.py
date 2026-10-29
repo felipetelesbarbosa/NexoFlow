@@ -38,6 +38,8 @@ class NexoCliTests(unittest.TestCase):
             code = nexo_cli.run(["ajuda"])
         text = out.getvalue()
         self.assertEqual(code, 0)
+        self.assertIn("Data Studio", text)
+        self.assertIn("nexo looker", text)
         self.assertIn("nexo status", text)
         self.assertIn("nexo api weni contato", text)
         self.assertIn("nexo api farmalider pedido", text)

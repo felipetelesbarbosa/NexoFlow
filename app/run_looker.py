@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 
 def run(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Atualiza as tabelas do Looker Studio a partir do Google Sheets."
+        description="Atualiza as tabelas do Data Studio a partir do Google Sheets."
     )
     parser.add_argument("--inicio", help="Início do período ABC, AAAA-MM-DD")
     parser.add_argument("--fim", help="Fim do período ABC, AAAA-MM-DD")
@@ -33,7 +33,7 @@ def run(argv: list[str] | None = None) -> int:
     spreadsheet_id = str(getattr(secrets, "GOOGLE_SPREADSHEET_ID", "") or "").strip()
     if not spreadsheet_id or "COLE_" in spreadsheet_id:
         raise ValueError(
-            "Configure o ID da planilha Google antes de atualizar o Looker."
+            "Configure o ID da planilha Google antes de atualizar o Data Studio."
         )
     store = GoogleSheetsStore(spreadsheet_id)
     try:

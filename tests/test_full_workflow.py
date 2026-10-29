@@ -247,7 +247,7 @@ class FullWorkflowWindowsTests(unittest.TestCase):
                 for index in range(6)
             ],
         )
-        self.assertIn("Looker Studio", result.stdout)
+        self.assertIn("Data Studio", result.stdout)
 
     def test_failures_cancellations_and_partial_runs_stop_at_each_stage(self):
         for stage in range(6):

@@ -1,4 +1,4 @@
-# NexoFlow 1.5 — Arquivos Google Sheets separados
+# NexoFlow 1.5.1 — Arquivos Google Sheets separados
 
 | Arquivo | Abas |
 |---|---|
@@ -18,15 +18,15 @@ A estrutura acima se repete para **FarmaLíder e Pets Líder**, totalizando seis
 4. Aguarde a cópia nativa e a conferência de todas as células. Valores, fórmulas e posições de linhas são comparados em blocos limitados. Estruturas nativas são copiadas pelo Google e o cabeçalho e metadados são conferidos. Se a cópia integral falhar sem criar uma aba, abas simples podem ser transferidas em blocos nativos com valores tipados, formatos, notas, validações e dimensões. A retomada escreve intervalos fixos, sem acrescentar linhas duplicadas. Abas com estruturas vinculadas que não possam ser preservadas interrompem a migração para revisão.
 5. A configuração é ativada na aba `NexoFlow_Arquivos` do arquivo original. O ID em `secrets_config.py` permanece igual. Todos os computadores que executam o NexoFlow devem usar a atualização com suporte a essa configuração.
 6. Somente depois da ativação e de nova conferência as abas operacionais originais são retiradas. Dependências de fórmulas ou intervalos nomeados interrompem a limpeza para revisão.
-7. Retome a sincronização incremental. O Looker mantém suas fontes `BI_*` no mesmo arquivo e nos mesmos IDs de abas; atualize os dados do relatório.
+7. Retome a sincronização incremental. O Data Studio mantém suas fontes `BI_*` no mesmo arquivo e nos mesmos IDs de abas; atualize os dados do relatório.
 
 Não apague as abas manualmente. Se uma etapa falhar, preserve os arquivos e `logs/privado/migracao_planilhas.json` e repita a rotina com os mesmos destinos. Destinos com abas de mesmo nome não são sobrescritos. Uma resposta perdida durante a cópia pode ser retomada quando existe exatamente uma nova aba identificável.
 
 ## Acesso ao dashboard
 
-A conta de serviço precisa de edição nos três arquivos. A conta Google proprietária das fontes do Looker precisa de leitura no arquivo Dashboard. Configure **credenciais do proprietário** nas fontes e compartilhe o relatório somente com as pessoas autorizadas. Os espectadores do relatório não precisam de acesso aos arquivos operacionais ou de histórico.
+A conta de serviço precisa de edição nos três arquivos. A conta Google proprietária das fontes do Data Studio precisa de leitura no arquivo Dashboard. Configure **credenciais do proprietário** nas fontes e compartilhe o relatório somente com as pessoas autorizadas. Os espectadores do relatório não precisam de acesso aos arquivos operacionais ou de histórico.
 
-A migração não torna arquivos públicos nem altera os usuários que já têm acesso. Fontes do Looker que apontem diretamente para abas operacionais precisam ser substituídas pelas tabelas `BI_*` correspondentes antes da retirada dessas abas; a preservação automática cobre as fontes BI.
+A migração não torna arquivos públicos nem altera os usuários que já têm acesso. Fontes do Data Studio que apontem diretamente para abas operacionais precisam ser substituídas pelas tabelas `BI_*` correspondentes antes da retirada dessas abas; a preservação automática cobre as fontes BI.
 
 Cada arquivo continua sujeito ao limite de células do Google Sheets. A divisão libera capacidade, mas não cria armazenamento ilimitado. Arquivamento por período e troca do destino de histórico exigem uma migração própria; não remova arquivos anteriores para liberar espaço.
 

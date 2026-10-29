@@ -12,7 +12,7 @@ A aba `Campanhas_Meta` já está preparada para:
 - impressões
 - cliques
 
-Isso permitirá no Looker Studio métricas como campanhas que mais trouxeram clientes, custo por contato e, com `Eventos_Anuncios`, custo por conversa.
+Isso permitirá no Data Studio métricas como campanhas que mais trouxeram clientes, custo por contato e, com `Eventos_Anuncios`, custo por conversa.
 
 Nenhuma credencial da Meta é necessária para a primeira fase.
 ## Separação entre anúncio e canal

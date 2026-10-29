@@ -1,4 +1,4 @@
-# NexoFlow 1.5 — Weni
+# NexoFlow 1.5.1 — Weni
 
 A rotina atende **FarmaLíder e Pets Líder**. Escolha o perfil ao abrir o mesmo executável; cada marca usa sua organização, token, planilhas e estado. Veja [campos, campanhas e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 
@@ -82,7 +82,7 @@ Na deduplicação, as leituras e conferências do BI mostram progresso por aba, 
 
 O componente `scripts\confirmar_revisao_weni.ps1` faz parte do projeto completo e do Setup. Se ele estiver ausente, a rotina interrompe a carga antes da revisão e solicita a reinstalação do Setup atualizado.
 
-Depois de atualizar ou reinstalar o NexoFlow 1.5, gere um novo dry-run completo com a política atual de pagamento/status e revise o novo relatório. Em seguida, execute a carga completa do Analytics para atualizar Google Sheets e BI. Snapshots anteriores à nova política de cancelamento por pagamento 0 devem ser regenerados.
+Depois de atualizar ou reinstalar o NexoFlow 1.5.1, gere um novo dry-run completo com a política atual de pagamento/status e revise o novo relatório. Em seguida, execute a carga completa do Analytics para atualizar Google Sheets e BI. Snapshots anteriores à nova política de cancelamento por pagamento 0 devem ser regenerados.
 
 Arquivos gerados:
 
@@ -91,7 +91,7 @@ logs\weni_update_review_full.txt   relatório legível para o operador
 logs\weni_update_review_full.json  snapshot verificável do plano revisado
 ```
 
-O TXT é aberto automaticamente no Bloco de Notas. Ele mostra, por contato, valores anteriores e propostos, evidência técnica, ações de grupo e confirmação FarmaLíder. No NexoFlow 1.5, o plano revisado fica **congelado**. Depois da confirmação, o NexoFlow não recalcula mensagens nem inclui novos contatos no mesmo apply. Em vez disso, relê cada contato imediatamente antes de gravá-lo. Se os campos/URNs/fontes relevantes daquele contato mudaram, somente aquele contato é marcado como conflito e ignorado. Os demais continuam normalmente. O checkpoint usa o corte temporal do dry-run, permitindo que mensagens, contatos e conflitos posteriores sejam reprocessados na próxima incremental.
+O TXT é aberto automaticamente no Bloco de Notas. Ele mostra, por contato, valores anteriores e propostos, evidência técnica, ações de grupo e confirmação FarmaLíder. No NexoFlow 1.5.1, o plano revisado fica **congelado**. Depois da confirmação, o NexoFlow não recalcula mensagens nem inclui novos contatos no mesmo apply. Em vez disso, relê cada contato imediatamente antes de gravá-lo. Se os campos/URNs/fontes relevantes daquele contato mudaram, somente aquele contato é marcado como conflito e ignorado. Os demais continuam normalmente. O checkpoint usa o corte temporal do dry-run, permitindo que mensagens, contatos e conflitos posteriores sejam reprocessados na próxima incremental.
 
 ### Carga completa fragmentada em quatro partes
 
@@ -201,7 +201,7 @@ Regras:
 - um campo específico não é apagado por ausência temporária da URN numa resposta da API;
 - clique/anúncio não é URN. `primeiro_anuncio_*` e `ultimo_anuncio_*` continuam registrando atribuição de mídia separadamente.
 
-A revisão humana mostra a URN e o canal principal, contabiliza alterações de identificação de canal e também informa quantos contatos receberam atribuição Google Ads. O snapshot de revisão do NexoFlow 1.5 usa schema 6, inclui guardas de concorrência e o corte temporal do dry-run. Snapshots incompatíveis são rejeitados para evitar apply com semântica incorreta.
+A revisão humana mostra a URN e o canal principal, contabiliza alterações de identificação de canal e também informa quantos contatos receberam atribuição Google Ads. O snapshot de revisão do NexoFlow 1.5.1 usa schema 6, inclui guardas de concorrência e o corte temporal do dry-run. Snapshots incompatíveis são rejeitados para evitar apply com semântica incorreta.
 
 
 
@@ -214,7 +214,7 @@ Ao final, o checkpoint avança para o **corte do dry-run**, não para o horário
 
 ## Google Ads e canal de destino
 
-O NexoFlow 1.5 pode reconhecer um contato como vindo de **Google Ads** quando a evidência do clique chega à Weni em campos/metadados estruturados. São aceitos marcadores explícitos como `gclid`, `gbraid`, `wbraid`, `utm_source=google` com meio pago ou metadados equivalentes de Google Ads. Um URL comum do Google é ignorado. Para evitar falso positivo, um link com `gclid` simplesmente colado pelo cliente no texto livre da conversa também não é usado como prova de origem.
+O NexoFlow 1.5.1 pode reconhecer um contato como vindo de **Google Ads** quando a evidência do clique chega à Weni em campos/metadados estruturados. São aceitos marcadores explícitos como `gclid`, `gbraid`, `wbraid`, `utm_source=google` com meio pago ou metadados equivalentes de Google Ads. Um URL comum do Google é ignorado. Para evitar falso positivo, um link com `gclid` simplesmente colado pelo cliente no texto livre da conversa também não é usado como prova de origem.
 
 O anúncio e o canal continuam separados. Exemplos:
 
@@ -385,7 +385,7 @@ O executável/atalho **NexoFlow Weni** usa o ícone exclusivo `assets\NexoFlow_W
 
 ## Uso pelo NexoFlow Terminal
 
-No NexoFlow 1.5, as rotinas desta documentação também podem ser chamadas por comandos amigáveis:
+No NexoFlow 1.5.1, as rotinas desta documentação também podem ser chamadas por comandos amigáveis:
 
 ```text
 nexo weni testar
@@ -439,7 +439,7 @@ Para uma parte, use `--quarter N` e o arquivo `logs/weni_update_review_full_25_p
 
 ## Deduplicação integrada
 
-O relatório do dry-run também apresenta os contatos duplicados propostos para exclusão. A aplicação revalida a propriedade nas APIs, preserva os pedidos reais e as recusas e limpa as fontes do Sheets e do Looker. Falhas isoladas não cancelam a carga: os comprovantes permanecem para retomada na próxima incremental. Consulte [Deduplicação na rotina Weni](deduplicacao_weni.md).
+O relatório do dry-run também apresenta os contatos duplicados propostos para exclusão. A aplicação revalida a propriedade nas APIs, preserva os pedidos reais e as recusas e limpa as fontes do Sheets e do Data Studio. Falhas isoladas não cancelam a carga: os comprovantes permanecem para retomada na próxima incremental. Consulte [Deduplicação na rotina Weni](deduplicacao_weni.md).
 
 ## Clientes encontrados na API
 

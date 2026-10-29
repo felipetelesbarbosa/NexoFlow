@@ -13,10 +13,10 @@ set "NEXOFLOW_FULL_WORKFLOW=1"
 set "FORCE_FULL_SYNC="
 set "FULL_SYNC_QUARTER="
 cd /d "%NEXOFLOW_HOME%\"
-title NexoFlow 1.5 - Atualização completa
+title NexoFlow 1.5.1 - Atualização completa
 
 echo ==========================================================
-echo NexoFlow 1.5 - Atualização completa em ordem
+echo NexoFlow 1.5.1 - Atualização completa em ordem
 echo ==========================================================
 echo As cargas integrais serão executadas com 100%% da base.
 echo Cada aplicação Weni, Planilhas e Recompra exige sua revisão.
@@ -67,8 +67,8 @@ set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto :interrompido
 echo.
 echo [OK] As cinco etapas foram concluídas.
-echo No Looker Studio, atualize os dados e os campos das fontes alteradas.
-echo Essa atualização no Looker precisa ser feita na interface do painel.
+echo No Data Studio, atualize os dados e os campos das fontes alteradas.
+echo Essa atualização no Data Studio precisa ser feita na interface do painel.
 goto :fim
 
 :ambiente_ausente

@@ -1,4 +1,4 @@
-# NexoFlow 1.5 — Instalação
+# NexoFlow 1.5.1 — Instalação
 
 ## Requisitos
 
@@ -8,11 +8,11 @@
 
 ## Instalar
 
-1. Baixe [NexoFlow-Setup-1.5.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5/NexoFlow-Setup-1.5.zip).
+1. Baixe [NexoFlow-Setup-1.5.1.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.1/NexoFlow-Setup-1.5.1.zip).
 2. Extraia todo o pacote e execute **NexoFlow Setup.exe**. Autorize a instalação quando o Windows solicitar.
 3. Conclua o assistente. O destino padrão é `C:\NexoFlow`, com atalhos dos aplicativos na Área de Trabalho e no Menu Iniciar.
 
-O [release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5) também oferece o projeto completo e o arquivo de hashes dos pacotes.
+O [release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.1) também oferece o projeto completo e o arquivo de hashes dos pacotes.
 
 ## Configurar os acessos
 
@@ -53,7 +53,7 @@ Abra **NexoFlow Terminal**, escolha FarmaLíder ou Pets Líder e execute:
 nexo diagnostico
 ```
 
-Depois, siga o [guia de operação](Documentacao%20NexoFlow.md): **Weni completa → Planilha, quando houver exports → Analytics completo → Recompra → Analytics incremental**. Revise os relatórios solicitados. Finalize atualizando os dados e os campos necessários no Looker Studio.
+Depois, siga o [guia de operação](Documentacao%20NexoFlow.md): **Weni completa → Planilha, quando houver exports → Analytics completo → Recompra → Analytics incremental**. Revise os relatórios solicitados. Finalize atualizando os dados e os campos necessários no Data Studio.
 
 As cargas completas oferecem **100%** ou quatro partes de **25%**. Execute as partes em ordem, separadamente para Weni e Analytics. Não avance para a parte seguinte do Analytics se a anterior terminou parcial ou com erro.
 

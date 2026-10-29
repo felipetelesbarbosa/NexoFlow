@@ -1,8 +1,8 @@
-# NexoFlow 1.5 — Pedidos
+# NexoFlow 1.5.1 — Pedidos
 
 As regras compartilhadas de pedidos atendem **FarmaLíder e Pets Líder**, com organizações e planilhas separadas. Farma usa `ultima_compra`; Pets usa `compra_recente`. A referência dos eventos é `pedido_data`: D+25 na Farma e D+30 no Pets. Veja [segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 
-A FarmaLíder API é a fonte de verdade dos pedidos do NexoFlow 1.5.
+A FarmaLíder API é a fonte de verdade dos pedidos do NexoFlow 1.5.1.
 
 Fluxo atual:
 
@@ -10,7 +10,7 @@ Fluxo atual:
 CPF -> GET cliente/cpf/{cpf} -> ultimoPedido + itens
     -> GET pedido/{pedido_id}
     -> campos pedido_* na Weni
-    -> Google Sheets / BI_Pedidos / Looker Studio
+    -> Google Sheets / BI_Pedidos / Data Studio
 ```
 
 O nome do produto vem de `itens[].descricao`. `codProduto` é apenas código técnico.
@@ -46,6 +46,6 @@ Pagamento 0 ou `_` grava o texto literal `Cancelado` em `pedido_forma_pagamento`
 
 Depois de atualizar ou reinstalar, gere um novo dry-run completo com `comandos/atualizar_weni_carga_completa.bat`, revise o relatório e confirme o apply para revalidar os snapshots com essa política. Em seguida, execute `comandos/executar_carga_completa.bat` para recalcular o Analytics/BI. Não reutilize um snapshot de revisão gerado pela política anterior.
 
-A documentação completa está em [Pedidos no NexoFlow 1.5](PEDIDOS.md) e [FarmaLíder API](FARMALIDER%20API.md).
+A documentação completa está em [Pedidos no NexoFlow 1.5.1](PEDIDOS.md) e [FarmaLíder API](FARMALIDER%20API.md).
 
-<!-- NexoFlow 1.5 -->
+<!-- NexoFlow 1.5.1 -->

@@ -1,4 +1,4 @@
-"""Tabelas comerciais para o Looker; somente compras confirmadas e observadas."""
+"""Tabelas comerciais para o Data Studio; somente compras confirmadas e observadas."""
 
 from __future__ import annotations
 

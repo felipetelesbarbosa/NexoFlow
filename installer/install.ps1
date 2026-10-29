@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
 $AppName = 'NexoFlow'
-$AppVersion = '1.5'
+$AppVersion = '1.5.1'
 $Publisher = 'Grupo Lider'
 $InstallDir = 'C:\NexoFlow'
 $DataDir = 'C:\NexoFlow Data'
@@ -1437,4 +1437,4 @@ catch {
     try { Stop-Transcript | Out-Null } catch { }
     exit 1
 }
-# NexoFlow 1.5
+# NexoFlow 1.5.1

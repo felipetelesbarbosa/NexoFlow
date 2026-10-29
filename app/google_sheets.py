@@ -1806,7 +1806,7 @@ class GoogleSheetsStore:
         ws = self._get_or_create_sheet(
             "BI_Delivery_Pedidos", DELIVERY_ORDER_COLUMNS, existing_sheets=known
         )
-        # A numeric sale flag and order value become numeric cells; ISO dates remain stable for Looker parsing.
+        # A numeric sale flag and order value become numeric cells; ISO dates remain stable for Data Studio parsing.
         rows = [
             [record.get(column, "") for column in DELIVERY_ORDER_COLUMNS]
             for record in records
@@ -2142,4 +2142,4 @@ class GoogleSheetsStore:
         return order_result, item_result
 
 
-# NexoFlow 1.5
+# NexoFlow 1.5.1

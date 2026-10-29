@@ -5,7 +5,7 @@ A revisão de duplicados integra as cargas incrementais e completas do NexoFlow 
 1. Execute o dry-run. O relatório da Weni inclui **DEDUPLICAÇÃO DE CONTATOS**, com os nomes e UUIDs a excluir e a manter, os pedidos comprovados e as pendências.
 2. Revise o relatório e confirme a aplicação pela janela habitual.
 3. A aplicação revalida a identidade nas APIs, interrompe os fluxos e exclui somente os duplicados comprovados. Limpa as fontes e confere o resultado. Falhas isoladas ficam pendentes; a atualização dos demais contatos continua.
-4. Atualize os dados no Looker Studio para consultar as fontes corrigidas.
+4. Atualize os dados no Data Studio para consultar as fontes corrigidas.
 
 Antes da aplicação, encerre outras cargas de Analytics, Planilhas e Recompra. A rotina bloqueia outra execução simultânea da própria Weni; não inicia nem encerra os outros programas.
 
@@ -26,7 +26,7 @@ Nas cargas de 25%, a comparação considera a base global para identificar o con
 
 Os pedidos e itens reais são vinculados ao contato correto, preservando seus IDs, produtos, status e valores. Registros dos contatos excluídos saem da Base, do histórico de alterações, dos tickets e eventos associados e das fontes BI. Apenas diagnósticos sem pedido, sem itens e sem qualquer valor financeiro podem ser descartados da tabela de pedidos.
 
-A rotina descobre os arquivos de Operação, Histórico e dashboard pela configuração `NexoFlow_Arquivos`; também aceita instalações com um único arquivo. Não altera as fontes do Looker, os períodos dos indicadores nem os marcos incrementais do Analytics.
+A rotina descobre os arquivos de Operação, Histórico e dashboard pela configuração `NexoFlow_Arquivos`; também aceita instalações com um único arquivo. Não altera as fontes do Data Studio, os períodos dos indicadores nem os marcos incrementais do Analytics.
 
 O snapshot complementar `*_duplicados.json` acompanha a revisão da Weni. Novas instalações exigem um novo dry-run: uma revisão antiga não autoriza exclusões.
 

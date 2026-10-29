@@ -1,4 +1,4 @@
-# Documentação do NexoFlow 1.5
+# Documentação do NexoFlow 1.5.1
 
 O NexoFlow atende **FarmaLíder e Pets Líder**, com dados separados. Confira [segmentos, campos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 
@@ -17,7 +17,7 @@ Comece pela [instalação](README%20INSTALACAO.md) e pelo [guia de operação](D
 ## Dados e integrações
 
 - [Configuração do Google Sheets](GOOGLE%20SETUP.md) e [divisão em três arquivos](planilhas_separadas.md).
-- [Fontes e indicadores do Looker Studio](LOOKER%20STUDIO.md).
+- [Fontes e indicadores do Data Studio](DATA%20STUDIO.md).
 - [Regras de pedidos](PEDIDOS.md), [campos de pedido na Weni](PEDIDOS%20WENI.md) e [API FarmaLíder](FARMALIDER%20API.md).
 - [Cadastro por segmento](CADASTRO%20FARMA.md), [localização](geografia.md) e [contatos duplicados](deduplicacao_weni.md).
 - [Google Ads](GOOGLE%20ADS.md).

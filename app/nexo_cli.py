@@ -303,7 +303,7 @@ def _print_commands() -> None:
     print("ANALYTICS")
     print("  nexo analytics               Executa o NexoFlow Analytics")
     print(
-        "  nexo looker --inicio AAAA-MM-DD --fim AAAA-MM-DD  Recalcula KPIs do Sheets"
+        "  nexo looker --inicio AAAA-MM-DD --fim AAAA-MM-DD  Recalcula KPIs para o Data Studio"
     )
     print(
         "  nexo analytics planilhas     Consulta os exports e atualiza o Google Sheets"
@@ -596,7 +596,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     looker = sub.add_parser(
-        "looker", help="recalcula os KPIs usando o histórico do Google Sheets"
+        "looker", help="recalcula os KPIs do Data Studio usando o histórico do Google Sheets"
     )
     looker.add_argument("--inicio", help="Início do período, AAAA-MM-DD")
     looker.add_argument("--fim", help="Fim do período, AAAA-MM-DD")

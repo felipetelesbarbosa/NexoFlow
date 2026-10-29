@@ -61,7 +61,7 @@ Execute **Weni → Analytics** na marca escolhida, ou use o Noturno. Planilha e 
 
 A Weni mantém o pedido mais recente. O Analytics acumula os pedidos observados por ID e atualiza as tabelas `BI_*` do Dashboard do segmento. A API de último pedido não recupera compras intermediárias nunca observadas. Preserve os logs ao atualizar, incluindo o histórico local ainda não entregue ao Sheets.
 
-Para um painel Pets com o mesmo desenho do Farma, duplique o relatório no Looker Studio e substitua **cada fonte** pela aba `BI_*` equivalente do Dashboard Pets. Confira filtros, datas e atualização antes de compartilhar. As planilhas têm o mesmo esquema; a separação dos arquivos identifica a marca. O NexoFlow atualiza os dados, sem duplicar automaticamente o relatório do Looker.
+Para um painel Pets com o mesmo desenho do Farma, duplique o relatório no Data Studio e substitua **cada fonte** pela aba `BI_*` equivalente do Dashboard Pets. Confira filtros, datas e atualização antes de compartilhar. As planilhas têm o mesmo esquema; a separação dos arquivos identifica a marca. O NexoFlow atualiza os dados, sem duplicar automaticamente o relatório do Data Studio.
 
 ## Novos departamentos e segmentos
 

@@ -26,7 +26,7 @@ def spreadsheet_id(value: str) -> str:
 
 def run(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Divide operação, histórico e dashboard sem trocar as fontes BI do Looker."
+        description="Divide operação, histórico e dashboard sem trocar as fontes BI do Data Studio."
     )
     parser.add_argument(
         "--operacao",

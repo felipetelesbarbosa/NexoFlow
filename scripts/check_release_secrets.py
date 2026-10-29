@@ -19,8 +19,8 @@ import zipfile
 from contextlib import ExitStack
 from pathlib import Path, PurePosixPath
 
-PACKAGE_NAMES = ("NexoFlow-Setup-1.5.zip", "NexoFlow-1.5.zip")
-CHECKSUM_NAME = "SHA256SUMS-1.5.txt"
+PACKAGE_NAMES = ("NexoFlow-Setup-1.5.1.zip", "NexoFlow-1.5.1.zip")
+CHECKSUM_NAME = "SHA256SUMS-1.5.1.txt"
 MAX_PACKAGE_BYTES = 2 * 1024 * 1024 * 1024
 MAX_PACKAGE_ENTRIES = 100_000
 WINDOWS_RESERVED = {"CON", "PRN", "AUX", "NUL"} | {
@@ -235,7 +235,7 @@ def is_within(path: Path, directory: Path) -> bool:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="NexoFlow 1.5 — verificação de segredos antes da publicação."
+        description="NexoFlow 1.5.1 — verificação de segredos antes da publicação."
     )
     parser.add_argument(
         "--scanner",
@@ -247,7 +247,7 @@ def main(argv: list[str] | None = None) -> int:
         "--repo", required=True, type=Path, help="Raiz com .gitleaks.toml."
     )
     parser.add_argument(
-        "--assets-dir", type=Path, help="Diretório dos dois ZIPs e SHA256SUMS-1.5.txt."
+        "--assets-dir", type=Path, help="Diretório dos dois ZIPs e SHA256SUMS-1.5.1.txt."
     )
     parser.add_argument(
         "--report-dir",

@@ -1,4 +1,4 @@
-# NexoFlow 1.5 — Cadastro por segmento
+# NexoFlow 1.5.1 — Cadastro por segmento
 
 Weni, Analytics, Recompra e Planilha compartilham o cliente da API FarmaLíder. O perfil selecionado determina a listagem **`clientes/FARMA`** ou **`clientes/PET`**, sempre em produção, com a mesma seleção de conexão direta/proxy.
 

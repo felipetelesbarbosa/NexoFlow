@@ -1176,7 +1176,7 @@ def write_review(review, path=REVIEW):
     profile = profile_for(review["structure"].get("segment", "FARMA"))
     counts = Counter(plan["reason"] for plan in review["plans"])
     lines = [
-        f"NexoFlow 1.5 — Revisão {profile.brand} D+{profile.days}",
+        f"NexoFlow 1.5.1 — Revisão {profile.brand} D+{profile.days}",
         f"Dia local: {review['day']}",
         f"Dados capturados em: {review['created_at']}",
         f"Horários conferidos ao concluir: {review.get('generated_at', review['created_at'])}",

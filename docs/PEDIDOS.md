@@ -1,8 +1,8 @@
-# Pedidos no NexoFlow 1.5
+# Pedidos no NexoFlow 1.5.1
 
 As regras compartilhadas de pedidos atendem **FarmaLíder e Pets Líder**, com organizações e planilhas separadas. Farma usa `ultima_compra`; Pets usa `compra_recente`. A referência dos eventos é `pedido_data`: D+25 na Farma e D+30 no Pets. Veja [segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 
-O **NexoFlow 1.5** usa a FarmaLíder API como fonte de verdade dos dados de pedido. A Weni recebe um snapshot operacional dos campos `pedido_*`; Google Sheets e Looker Studio recebem a estrutura analítica correspondente.
+O **NexoFlow 1.5.1** usa a FarmaLíder API como fonte de verdade dos dados de pedido. A Weni recebe um snapshot operacional dos campos `pedido_*`; Google Sheets e Data Studio recebem a estrutura analítica correspondente.
 
 ## Arquitetura de coleta
 
@@ -112,7 +112,7 @@ Campo Weni:
 05/06/26 15:45:27
 ```
 
-Nas tabelas analíticas, o NexoFlow também mantém `data` e `hora` separadas para filtros, séries e agrupamentos do Looker Studio.
+Nas tabelas analíticas, o NexoFlow também mantém `data` e `hora` separadas para filtros, séries e agrupamentos do Data Studio.
 
 ## Status
 
@@ -128,7 +128,7 @@ De-para usado pela integração:
 | 2 | `Concluido` | Concluído |
 | 3 | `Cancelado` | Cancelado |
 
-A Weni recebe o **código efetivo** em `pedido_status`. Os nomes oficiais do enum, como `EmAberto`, `PendenteDePagamento`, `EmProcessamento`, `ProntoParaRota`, `EmTransito`, `Concluido` e `Cancelado`, são normalizados para -2 a 4. O Analytics deriva `pedido_status_nome` para apresentação no Google Sheets/Looker Studio. Se `formaPagamento=0` ou `_`, o status efetivo é 3, Cancelado, mesmo que a API informe outro status. Cancelamento explícito também prevalece. `Pedidos_FarmaLider` preserva o status bruto em `farmalider_status_pedido`; Weni e `BI_Pedidos` aplicam o status efetivo.
+A Weni recebe o **código efetivo** em `pedido_status`. Os nomes oficiais do enum, como `EmAberto`, `PendenteDePagamento`, `EmProcessamento`, `ProntoParaRota`, `EmTransito`, `Concluido` e `Cancelado`, são normalizados para -2 a 4. O Analytics deriva `pedido_status_nome` para apresentação no Google Sheets/Data Studio. Se `formaPagamento=0` ou `_`, o status efetivo é 3, Cancelado, mesmo que a API informe outro status. Cancelamento explícito também prevalece. `Pedidos_FarmaLider` preserva o status bruto em `farmalider_status_pedido`; Weni e `BI_Pedidos` aplicam o status efetivo.
 
 Pedidos validados pela API nos estados -2, -1, 0, 4, 1 e 2 contam como venda e atualizam `ultima_compra` (Farma) ou `compra_recente` (Pets). Status 3, cancelamento explícito ou pagamento 0 excluem a venda; estados desconhecidos permanecem pendentes.
 
@@ -198,7 +198,7 @@ Agregação diária para pedidos validados pela API com status efetivo -2, -1, 0
 
 ### BI_Pedidos
 
-Tabela pronta para o Looker Studio, uma linha por pedido, contendo:
+Tabela pronta para o Data Studio, uma linha por pedido, contendo:
 
 - pedido_id;
 - data e hora amigáveis;
@@ -263,6 +263,6 @@ O NexoFlow valida:
 
 Respostas inconsistentes não alimentam métricas como venda confirmada.
 
-Leia também [FarmaLíder API](FARMALIDER%20API.md), [NexoFlow Weni](README%20WENI.md) e [Looker Studio](LOOKER%20STUDIO.md).
+Leia também [FarmaLíder API](FARMALIDER%20API.md), [NexoFlow Weni](README%20WENI.md) e [Data Studio](DATA%20STUDIO.md).
 
-<!-- NexoFlow 1.5 -->
+<!-- NexoFlow 1.5.1 -->

@@ -250,7 +250,7 @@ def split_contacts(
         if contact_has_cpf(contact):
             with_cpf.append(contact)
 
-    # Desde o NexoFlow 1.5 o Analytics preserva todos os contatos retornados pela Weni.
+    # Desde o NexoFlow 1.5.1 o Analytics preserva todos os contatos retornados pela Weni.
     # Consulta CPFs válidos primeiro e depois os demais informados. Pedidos podem ser
     # recuperados para estes contatos mesmo quando ultimo_pedido está vazio.
     return relevant, with_cpf, list(contacts)
@@ -1282,10 +1282,10 @@ def main() -> int:
             time.monotonic() - postprocess_started,
         )
 
-        # Camada BI pronta para o Looker Studio. As abas são mantidas pelo próprio
+        # Camada BI pronta para o Data Studio. As abas são mantidas pelo próprio
         # Analytics para que o relatório não precise recalcular regras de negócio.
         bi_started = time.monotonic()
-        logging.info("Google Sheets: camada BI/Looker Studio - iniciando 7 tabelas.")
+        logging.info("Google Sheets: camada BI/Data Studio - iniciando 7 tabelas.")
         bi_summary = build_bi_summary_record(
             contact_result.final_records,
             all_order_records,
@@ -1639,4 +1639,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-# NexoFlow 1.5
+# NexoFlow 1.5.1

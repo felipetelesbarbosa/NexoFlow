@@ -13,7 +13,7 @@ Nova VI, por exemplo, passam a **Cidade Nova VI**. Qualificadores de distrito
 redundantes recebem o nome do bairro, como **Tapanã**.
 
 A padronização é aplicada nas revisões da Weni, na gravação do Sheets e nas
-tabelas do Looker. A revisão verifica cidade, estado, bairro e CEP antes de
+tabelas do Data Studio. A revisão verifica cidade, estado, bairro e CEP antes de
 aplicar alterações na Weni. Casos sem referência confiável permanecem para
 conferência do endereço.
 

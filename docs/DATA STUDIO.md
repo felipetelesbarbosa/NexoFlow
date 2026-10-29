@@ -1,18 +1,20 @@
-# Looker Studio — dados do NexoFlow
+# Data Studio — dados do NexoFlow
 
-O **NexoFlow Analytics** prepara as tabelas no **Google Sheets**. O **Looker Studio** lê essas fontes para apresentar os indicadores; executar o NexoFlow não cria gráficos nem configura o relatório automaticamente.
+Nome atualizado conforme o [anúncio oficial do Google de 10/04/2026](https://cloud.google.com/blog/products/data-analytics/looker-studio-is-data-studio).
+
+O **NexoFlow Analytics** prepara as tabelas no **Google Sheets**. O **Data Studio** lê essas fontes para apresentar os indicadores; executar o NexoFlow não cria gráficos nem configura o relatório automaticamente.
 
 Cada segmento usa seu próprio Dashboard. Para reproduzir o painel Farma no Pets, duplique o relatório e substitua todas as fontes por abas `BI_*` equivalentes no Dashboard Pets. O NexoFlow não duplica o relatório automaticamente. Veja [segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 
 ## Conectar e atualizar
 
 1. Conclua a carga do Analytics e confira o resultado da execução.
-2. Conecte cada aba necessária como fonte do Google Sheets no Looker Studio.
+2. Conecte cada aba necessária como fonte do Google Sheets no Data Studio.
 3. Se a base usa três arquivos, selecione as abas `BI_*` do arquivo **Dashboard**. Operação e Histórico ficam nos destinos descritos no [guia de divisão](planilhas_separadas.md).
 4. Confira os tipos: datas como datas, medidas como números e identificadores como texto. Formate valores monetários com duas casas decimais.
 5. Atualize os dados do relatório. Quando uma atualização acrescentar colunas, atualize também os campos das fontes.
 
-A conta usada pelo conector do Looker precisa ter acesso à planilha de dashboard. O compartilhamento da conta de serviço do NexoFlow é configurado separadamente em [Google Sheets](GOOGLE%20SETUP.md).
+A conta usada pelo conector do Data Studio precisa ter acesso à planilha de dashboard. O compartilhamento da conta de serviço do NexoFlow é configurado separadamente em [Google Sheets](GOOGLE%20SETUP.md).
 
 ## Escolher a fonte
 
@@ -64,7 +66,7 @@ Para recalcular outro período pelo histórico do Sheets:
 nexo looker --inicio AAAA-MM-DD --fim AAAA-MM-DD
 ```
 
-Substitua as datas pelo intervalo desejado. O comando não consulta Weni nem FarmaLíder. O filtro do Looker não recalcula automaticamente essas tabelas; confira as datas antes de apresentar os resultados. O [conector opcional](../connectors/looker_abc/README.md) permite cálculos por período no próprio relatório quando configurado.
+O nome técnico `nexo looker` foi mantido para compatibilidade. Substitua as datas pelo intervalo desejado. O comando não consulta Weni nem FarmaLíder. O filtro do Data Studio não recalcula automaticamente essas tabelas; confira as datas antes de apresentar os resultados. O [conector opcional](../connectors/looker_abc/README.md) permite cálculos por período no próprio relatório quando configurado.
 
 A Curva ABC usa a receita de todos os itens, sem frete: A até 80%, B até 95% e C depois. O produto que cruza um limite permanece na classe iniciada antes dele. Empates mantêm ranking e classe iguais, podendo ultrapassar o limite.
 

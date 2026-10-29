@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>NexoFlow 1.5 - Documentação</title>
+  <title>NexoFlow 1.5.1 - Documentação</title>
   <style>
     html {
       color: #1a1a1a;
@@ -170,14 +170,14 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">NexoFlow 1.5 - Documentação</h1>
+<h1 class="title">NexoFlow 1.5.1 - Documentação</h1>
 </header>
-<h1 id="nexoflow-15--guia-de-operação">NexoFlow 1.5 — Guia de
+<h1 id="nexoflow-151--guia-de-operação">NexoFlow 1.5.1 — Guia de
 operação</h1>
 <p>O NexoFlow integra Weni e a API FarmaLíder para <strong>FarmaLíder e
 Pets Líder</strong>, mantendo dados separados por perfil. O objetivo é
 manter contatos e pedidos atualizados e alimentar o Google Sheets e os
-painéis do Looker Studio.</p>
+painéis do Data Studio.</p>
 <p>O NexoFlow identifica pedidos registrados na API
 <strong>independentemente de terem sido feitos por conversa na Weni,
 ligação telefônica ou outro atendimento externo</strong>. A rotina Weni
@@ -229,7 +229,7 @@ confirmações durante a carga.</td>
 </table>
 <h2 id="antes-de-começar">Antes de começar</h2>
 <p>Instale pelo <a
-href="https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5">Setup
+href="https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.1">Setup
 oficial</a>, configure suas próprias credenciais e compartilhe as
 planilhas com a conta de serviço Google. O diretório padrão é
 <code>C:\NexoFlow</code>. Confira os requisitos e os campos necessários
@@ -279,7 +279,7 @@ confirme depois de conferir as pendências.</td>
 <tr class="odd">
 <td>5</td>
 <td><strong>Analytics:</strong> sincronização incremental; em seguida,
-atualize o Looker Studio.</td>
+atualize o Data Studio.</td>
 </tr>
 </tbody>
 </table>
@@ -301,7 +301,7 @@ pedidos e grupos.</li>
 campanha Farma D+25 ou Pets D+30.</li>
 <li>Execute <strong>NexoFlow Analytics</strong> para refletir as
 alterações no Sheets.</li>
-<li>Atualize os dados do painel no Looker Studio.</li>
+<li>Atualize os dados do painel no Data Studio.</li>
 </ol>
 <p>A atualização da Recompra após a Weni pode ser habilitada na
 configuração; confira o resultado antes de executá-la novamente. Os <a
@@ -358,9 +358,8 @@ validações.</p>
 (Farma) ou D+0 e D+30 (Pets), bloqueando recusas de marketing. O envio
 ocorre no D+25/D+30 pela campanha Weni, usando <code>pedido_data</code>
 nos dois eventos. Veja <a href="README%20RECOMPRA.md">Recompra</a>.</p>
-<h2 id="google-sheets-e-looker-studio">Google Sheets e Looker
-Studio</h2>
-<p>O Analytics alimenta as planilhas; o Looker Studio lê as fontes
+<h2 id="google-sheets-e-data-studio">Google Sheets e Data Studio</h2>
+<p>O Analytics alimenta as planilhas; o Data Studio lê as fontes
 conectadas a elas. Atualizar o Sheets não cria nem configura os gráficos
 automaticamente.</p>
 <p>A configuração pode separar <strong>Operação</strong>,
@@ -379,8 +378,8 @@ observados são guardados localmente e entregues pelo Analytics ao Sheets
 por ID. Preserve os logs ao atualizar.</p>
 <p>O histórico cobre os pedidos capturados nas coletas; a API de último
 pedido não comprova todas as compras antigas. As fórmulas, fontes e
-limites dos indicadores estão no <a href="LOOKER%20STUDIO.md">guia do
-Looker Studio</a>.</p>
+limites dos indicadores estão no <a href="DATA%20STUDIO.md">guia do Data
+Studio</a>.</p>
 <h2 id="expansão-por-perfis">Expansão por perfis</h2>
 <p>O NexoFlow já tem arquitetura organizada por perfis para inclusão de
 novos departamentos e segmentos. A habilitação inclui registrar o novo
@@ -403,4 +402,4 @@ seus próprios acessos e mantenha-os privados. Veja <a
 href="../SECURITY.md">Segurança</a>.</p>
 </body>
 </html>
-<!-- NexoFlow documentation: source-sha256=16f3860de0ffd196b5b0591303a6bc244d941e8453d567244635970240baf0ea content-sha256=d439668592c62e5e6c3f945d5901756475dca4921331e444b9769342cf554cae -->
+<!-- NexoFlow documentation: source-sha256=e4ff8a63ca8f4e3792983ea964c8b01003723f6fc840e13197a33a775128470a content-sha256=2ee05fbff6d731348c26c5439a34f6f91cca08da6f0572178428a9138cc92678 -->

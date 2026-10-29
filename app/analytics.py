@@ -1984,7 +1984,7 @@ def build_bi_order_rows(
     *,
     updated_at: str,
 ) -> list[list[Any]]:
-    """Order-level table ready for Looker Studio detail/buyers pages."""
+    """Order-level table ready for Data Studio detail/buyers pages."""
     base_by_uuid = {
         (record.get("contact_uuid") or "").strip(): normalize_geography(record)
         for record in base_records
@@ -2190,4 +2190,4 @@ def build_bi_ads_rows(
     return rows
 
 
-# NexoFlow 1.5
+# NexoFlow 1.5.1

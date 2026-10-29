@@ -1,6 +1,6 @@
-# NexoFlow 1.5 — Guia de operação
+# NexoFlow 1.5.1 — Guia de operação
 
-O NexoFlow integra Weni e a API FarmaLíder para **FarmaLíder e Pets Líder**, mantendo dados separados por perfil. O objetivo é manter contatos e pedidos atualizados e alimentar o Google Sheets e os painéis do Looker Studio.
+O NexoFlow integra Weni e a API FarmaLíder para **FarmaLíder e Pets Líder**, mantendo dados separados por perfil. O objetivo é manter contatos e pedidos atualizados e alimentar o Google Sheets e os painéis do Data Studio.
 
 O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
 
@@ -17,7 +17,7 @@ O NexoFlow identifica pedidos registrados na API **independentemente de terem si
 
 ## Antes de começar
 
-Instale pelo [Setup oficial](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5), configure suas próprias credenciais e compartilhe as planilhas com a conta de serviço Google. O diretório padrão é `C:\NexoFlow`. Confira os requisitos e os campos necessários no [guia de instalação](README%20INSTALACAO.md).
+Instale pelo [Setup oficial](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.1), configure suas próprias credenciais e compartilhe as planilhas com a conta de serviço Google. O diretório padrão é `C:\NexoFlow`. Confira os requisitos e os campos necessários no [guia de instalação](README%20INSTALACAO.md).
 
 Abra o mesmo aplicativo e escolha **FarmaLíder** ou **Pets Líder** antes da carga. Configure tokens Weni e três destinos Sheets em cada perfil. A credencial Google pode ser compartilhada. Veja [configuração dos segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 
@@ -37,7 +37,7 @@ Resolva as pendências de conexão ou configuração antes das cargas. Evite exe
 | 2 | **Planilha, se houver exports:** opção **[1] Atualizar Weni**, depois **[2] Atualizar Analytics e Google Sheets**; revise cada destino. |
 | 3 | **Analytics:** `comandos/executar_carga_completa.bat`, opção **[0] 100%**. |
 | 4 | **Recompra:** abra o aplicativo, gere a revisão e confirme depois de conferir as pendências. |
-| 5 | **Analytics:** sincronização incremental; em seguida, atualize o Looker Studio. |
+| 5 | **Analytics:** sincronização incremental; em seguida, atualize o Data Studio. |
 
 Com os dois exports em `importacoes/` (Farma) ou `importacoes/PET/` (Pets), `comandos/atualizar_tudo.bat` executa essa sequência e aguarda as revisões. Falha, cancelamento ou resultado parcial interrompe o fluxo.
 
@@ -48,7 +48,7 @@ Sem exports, execute as etapas necessárias pelos aplicativos e dispense a etapa
 1. Execute **NexoFlow Weni** para atualizar contatos, pedidos e grupos.
 2. Execute **NexoFlow Recompra** quando precisar revisar a campanha Farma D+25 ou Pets D+30.
 3. Execute **NexoFlow Analytics** para refletir as alterações no Sheets.
-4. Atualize os dados do painel no Looker Studio.
+4. Atualize os dados do painel no Data Studio.
 
 A atualização da Recompra após a Weni pode ser habilitada na configuração; confira o resultado antes de executá-la novamente. Os [guias dos aplicativos](README.md) detalham suas opções.
 
@@ -87,9 +87,9 @@ Na **FarmaLíder**, o recorte comercial inclui produtos para humanos. Em pedidos
 
 A Recompra mantém o grupo para compras confirmadas entre D+0 e D+25 (Farma) ou D+0 e D+30 (Pets), bloqueando recusas de marketing. O envio ocorre no D+25/D+30 pela campanha Weni, usando `pedido_data` nos dois eventos. Veja [Recompra](README%20RECOMPRA.md).
 
-## Google Sheets e Looker Studio
+## Google Sheets e Data Studio
 
-O Analytics alimenta as planilhas; o Looker Studio lê as fontes conectadas a elas. Atualizar o Sheets não cria nem configura os gráficos automaticamente.
+O Analytics alimenta as planilhas; o Data Studio lê as fontes conectadas a elas. Atualizar o Sheets não cria nem configura os gráficos automaticamente.
 
 A configuração pode separar **Operação**, **Histórico** e **Dashboard** em três arquivos. As abas `BI_*` ficam no arquivo de dashboard; confira os destinos no [guia de divisão](planilhas_separadas.md).
 
@@ -97,7 +97,7 @@ Depois de uma atualização, confira a data da última carga, atualize os dados 
 
 A Weni propõe criar clientes ausentes com pedido/identidade validados, sem presumir consentimentos ou grupos. Pedidos completos observados são guardados localmente e entregues pelo Analytics ao Sheets por ID. Preserve os logs ao atualizar.
 
-O histórico cobre os pedidos capturados nas coletas; a API de último pedido não comprova todas as compras antigas. As fórmulas, fontes e limites dos indicadores estão no [guia do Looker Studio](LOOKER%20STUDIO.md).
+O histórico cobre os pedidos capturados nas coletas; a API de último pedido não comprova todas as compras antigas. As fórmulas, fontes e limites dos indicadores estão no [guia do Data Studio](DATA%20STUDIO.md).
 
 ## Expansão por perfis
 

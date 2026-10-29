@@ -43,7 +43,7 @@ if /i not "%CONFIRMACAO%"=="MIGRAR" (
 ".venv\Scripts\python.exe" app\run_sheets_migration.py --operacao "%OPERACAO%" --historico "%HISTORICO%" --aplicar --rotinas-paradas --retirar-originais
 if errorlevel 1 goto :erro
 echo.
-echo [OK] Migração concluída. As fontes BI do Looker permanecem no arquivo atual.
+echo [OK] Migração concluída. As fontes BI do Data Studio permanecem no arquivo atual.
 pause
 exit /b 0
 
