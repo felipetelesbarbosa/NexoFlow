@@ -39,7 +39,7 @@ class VersionPolicyTests(unittest.TestCase):
         self.assertEqual(windows_version("1.5.99"), "1.5.99.0")
         self.assertEqual(windows_version("1.6"), "1.6.0.0")
 
-    def test_runtime_installer_package_and_workflow_share_current_version(self):
+    def test_runtime_installer_package_share_current_version(self):
         from main import APP_VERSION
         from nexo_cli import VERSION
 
@@ -50,12 +50,35 @@ class VersionPolicyTests(unittest.TestCase):
         self.assertEqual(metadata["project"]["version"], CURRENT_VERSION)
         installer = (ROOT / "installer/install.ps1").read_text(encoding="utf-8-sig")
         self.assertIn(f"$AppVersion = '{CURRENT_VERSION}'", installer)
-        workflow = (ROOT / ".github/workflows/release-v1.yml").read_text()
+        self.assertIn(
+            f"/releases/download/v{CURRENT_VERSION}/NexoFlow-Setup-{CURRENT_VERSION}.zip",
+            (ROOT / "README.md").read_text(encoding="utf-8"),
+        )
+
+    @unittest.skipUnless(
+        (ROOT / ".github/workflows/release-v1.yml").is_file(),
+        "Workflow verificado no repositório; não faz parte da instalação.",
+    )
+    def test_repository_workflow_matches_version_and_preserves_previous_tags(self):
+        workflow = (ROOT / ".github/workflows/release-v1.yml").read_text(
+            encoding="utf-8"
+        )
         self.assertIn(f"NexoFlow-Setup-{CURRENT_VERSION}.zip", workflow)
         self.assertIn(f"gh release create v{CURRENT_VERSION}", workflow)
         self.assertNotIn("git push origin refs/tags/v1.5 --force", workflow)
         self.assertRegex(workflow, r"Incremente o patch")
-        self.assertIn(
-            f"/releases/download/v{CURRENT_VERSION}/NexoFlow-Setup-{CURRENT_VERSION}.zip",
-            (ROOT / "README.md").read_text(),
-        )
+
+    def test_runtime_contract_without_github_in_installed_layout(self):
+        import shutil
+        import tempfile
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as directory:
+            installed = Path(directory)
+            for relative in ("pyproject.toml", "installer/install.ps1", "README.md"):
+                destination = installed / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / relative, destination)
+            self.assertFalse((installed / ".github").exists())
+            with patch(f"{__name__}.ROOT", installed):
+                self.test_runtime_installer_package_share_current_version()
