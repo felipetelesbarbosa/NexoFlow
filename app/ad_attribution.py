@@ -9,6 +9,7 @@ from urllib.parse import parse_qs, urlparse
 from urn_utils import urn_channel
 
 GOOGLE_ADS_ORIGIN = "Google Ads"
+META_ADS_ORIGIN = "Meta Ads"
 
 # Campos genéricos já usados pelo projeto para primeira/última atribuição.
 GOOGLE_ADS_BASE_WRITE_FIELDS = {
@@ -35,6 +36,13 @@ GOOGLE_ADS_EXTRA_WRITE_FIELDS = {
 }
 
 GOOGLE_ADS_WRITE_FIELDS = GOOGLE_ADS_BASE_WRITE_FIELDS | GOOGLE_ADS_EXTRA_WRITE_FIELDS
+AD_CLEARABLE_FIELDS = {
+    "ultimo_anuncio_titulo",
+    "ultimo_anuncio_url",
+    "ultimo_anuncio_clique_id",
+    "ultimo_anuncio_tipo_campanha",
+    "ultimo_anuncio_canal_destino",
+}
 
 _CLICK_KEYS = ("gclid", "gbraid", "wbraid")
 _URL_KEYS = {
@@ -83,7 +91,7 @@ _QUERY_TOKEN_RE = re.compile(
 
 
 @dataclass(frozen=True)
-class GoogleAdsAttribution:
+class AdAttribution:
     occurred_at: str
     message_id: str
     click_id: str
@@ -94,6 +102,70 @@ class GoogleAdsAttribution:
     campaign_type: str
     destination_channel: str
     reason: str
+    origin: str = GOOGLE_ADS_ORIGIN
+
+
+# Compatibilidade com consumidores do detector Google existente.
+GoogleAdsAttribution = AdAttribution
+
+
+def extract_meta_ads_attribution(message: dict[str, Any]) -> AdAttribution | None:
+    """Lê referral estruturado; texto e ausência de metadados não provam anúncio.
+
+    A API pública messages.json pode omitir o referral recebido pelo canal.
+    Este detector não recupera dados que a Weni não disponibiliza.
+    """
+    if str(message.get("direction") or "").strip().casefold() not in {
+        "in",
+        "incoming",
+        "received",
+    }:
+        return None
+    metadata = message.get("metadata")
+    containers = [message]
+    if isinstance(metadata, dict):
+        containers.append(metadata)
+    referrals = [c["referral"] for c in containers if "referral" in c]
+    if not referrals or any(not isinstance(r, dict) for r in referrals):
+        return None
+    referral = referrals[0]
+    if any(r != referral for r in referrals[1:]):
+        return None
+    if _text(referral.get("source_type")).casefold() != "ad":
+        return None
+    ad_id = _text(referral.get("source_id"))
+    if (
+        not ad_id.isascii()
+        or not ad_id.isdecimal()
+        or int(ad_id) <= 0
+        or not _message_id(message)
+    ):
+        return None
+    destination = urn_channel(_message_urn(message))
+    if destination == "other":
+        destination = "outro"
+    click_id = _text(referral.get("ctwa_clid"))
+    return AdAttribution(
+        occurred_at=_message_created_on(message),
+        message_id=_message_id(message),
+        click_id=click_id,
+        click_id_type="ctwa_clid" if click_id else "",
+        ad_id=ad_id,
+        title=_text(referral.get("headline")),
+        url=_text(referral.get("source_url")),
+        # Referral não informa o objetivo da campanha no Gerenciador Meta.
+        campaign_type="",
+        destination_channel=destination,
+        reason=(
+            "evidência explícita de Meta Ads; referral.source_type=ad e source_id presentes"
+            + (
+                "; fonte=events.json"
+                if message.get("event_source") == "weni_events_ctwa"
+                else ""
+            )
+        ),
+        origin=META_ADS_ORIGIN,
+    )
 
 
 def _norm_key(value: Any) -> str:

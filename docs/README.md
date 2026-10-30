@@ -1,4 +1,4 @@
-# Documentação do NexoFlow 1.5.8
+# Documentação do NexoFlow 1.5.9
 
 O NexoFlow atende **FarmaLíder e Pets Líder**, com dados separados. Confira [segmentos, campos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 

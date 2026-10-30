@@ -476,4 +476,4 @@ class AnalyticsOrderFlowTests(unittest.TestCase):
 if __name__ == "__main__":
     unittest.main()
 
-# NexoFlow 1.5.8
+# NexoFlow 1.5.9

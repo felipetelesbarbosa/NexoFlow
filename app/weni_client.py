@@ -9,12 +9,14 @@ from urllib.parse import urljoin, urlsplit
 
 import requests
 
+from ad_attribution import AD_CLEARABLE_FIELDS
 from config import (
     MAX_RETRIES,
     PAGE_LIMIT,
     WENI_CONNECT_TIMEOUT_SECONDS,
     WENI_CONTACT_ACTIONS_API_URL,
     WENI_CONTACTS_API_URL,
+    WENI_EVENTS_API_URL,
     WENI_FIELDS_API_URL,
     WENI_GROUPS_API_URL,
     WENI_MESSAGES_API_URL,
@@ -263,6 +265,7 @@ class WeniClient:
         *,
         item_label: str,
         max_results: int | None = None,
+        strict_items: bool = False,
     ) -> Iterator[dict[str, Any]]:
         """Read the next page only when its records are requested."""
         if max_results is not None and max_results <= 0:
@@ -297,6 +300,20 @@ class WeniClient:
                 params=params if first_request else None,
             )
             first_request = False
+            if strict_items:
+                raw_items = (
+                    payload
+                    if isinstance(payload, list)
+                    else payload.get("results")
+                    if isinstance(payload, dict)
+                    else None
+                )
+                if not isinstance(raw_items, list) or any(
+                    not isinstance(item, dict) for item in raw_items
+                ):
+                    raise WeniError(
+                        "A API de eventos da Weni retornou um lote malformado."
+                    )
             page_results, next_url = self.extract_results(payload)
             logging.debug(
                 "Weni %s página %s: %s registro(s).",
@@ -437,6 +454,24 @@ class WeniClient:
             max_results=max_results,
         )
 
+    def list_ctwa_events(
+        self, *, after: datetime, before: datetime
+    ) -> list[dict[str, Any]]:
+        if not self._profile_verified:
+            self._check_profile_org()
+        return list(
+            self._iter_paginated(
+                WENI_EVENTS_API_URL,
+                {
+                    "date_start": self.format_datetime(after),
+                    "date_end": self.format_datetime(before),
+                    "event_name": "ctwa",
+                },
+                item_label="eventos CTWA",
+                strict_items=True,
+            )
+        )
+
     def create_contact(self, *, name, urns, fields):
         """Criação tem tentativa única: um timeout não autoriza repetir o POST."""
         if not self._profile_verified:
@@ -469,7 +504,11 @@ class WeniClient:
         clean_fields = {
             str(key): value
             for key, value in fields.items()
-            if str(key).strip() and value is not None and str(value).strip() != ""
+            if str(key).strip()
+            and value is not None
+            and (
+                str(value).strip() != "" or (key in AD_CLEARABLE_FIELDS and value == "")
+            )
         }
         if not clean_fields:
             return {"skipped": True, "reason": "nenhum campo para atualizar"}
@@ -632,4 +671,4 @@ class WeniClient:
         }
 
 
-# NexoFlow 1.5.8
+# NexoFlow 1.5.9

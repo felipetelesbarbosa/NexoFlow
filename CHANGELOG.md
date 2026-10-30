@@ -1,4 +1,12 @@
-# NexoFlow 1.5.8 — Changelog
+# NexoFlow 1.5.9 — Changelog
+
+## NexoFlow 1.5.9 — 30/10/2026
+
+- Captura CTWA por events.json com períodos delimitados, filtro de evento, vínculo exato à URN, deduplicação e cursor próprio. Falhas isoladas ficam pendentes sem descartar a carga válida.
+- Reconciliador Meta/Google preserva campos corretos, completa vazios e corrige ID/data/origem divergentes quando o evento correspondente é comprovado. Não infere anúncio pela mensagem sugerida nem fabrica título, URL ou objetivo.
+- Guarda de alterações concorrentes, snapshot revisado e auditoria permanecem ativos. Primeiro anúncio fora da cobertura não é substituído; cobertura incompleta não congela um primeiro anúncio novo.
+- Analytics mantém os 16 campos na Base_Contatos, acrescenta URL/clique aos pedidos e atualiza BI_Ads. Noturno usa a mesma sequência Weni e Analytics. Pedidos continuam exigindo confirmação oficial, com cancelados e pagamento zero fora das vendas.
+- Instruções para Oscarzinho/PET e Lili/FARMA, com os campos existentes e limites da interpretação do Manager.
 
 ## NexoFlow 1.5.8 — 30/10/2026
 

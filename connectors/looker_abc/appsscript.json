@@ -6,7 +6,7 @@
     "https://www.googleapis.com/auth/spreadsheets.readonly"
   ],
   "dataStudio": {
-    "name": "NexoFlow 1.5.8 - Curva ABC",
+    "name": "NexoFlow 1.5.9 - Curva ABC",
     "logoUrl": "https://raw.githubusercontent.com/felipetelesbarbosa/NexoFlow/main/connectors/looker_abc/logo.png",
     "company": "NexoFlow",
     "companyUrl": "https://github.com/felipetelesbarbosa/NexoFlow",

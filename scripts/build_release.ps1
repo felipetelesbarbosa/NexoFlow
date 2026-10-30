@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.8",
+    [string]$Version = "1.5.9",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -352,7 +352,7 @@ foreach ($relative in @('app/run_noturno_console.py','comandos/executar_noturno.
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/NexoFlow Recompra.exe"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/NexoFlow Recompra.exe"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/weni_update.py"
-foreach ($module in @("weni_dedup", "contact_dedup_guard", "dedup_io", "dedup_sheets", "dedup_bi", "recompra_lock", "recompra_review_audit", "farmalider_customers", "recompra_profiles", "recompra_cleanup", "runtime_profile", "recompra_group_audit")) {
+foreach ($module in @("meta_events", "ad_attribution", "weni_dedup", "contact_dedup_guard", "dedup_io", "dedup_sheets", "dedup_bi", "recompra_lock", "recompra_review_audit", "farmalider_customers", "recompra_profiles", "recompra_cleanup", "runtime_profile", "recompra_group_audit")) {
     Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/$module.py"
     Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/app/$module.py"
 }
@@ -407,9 +407,9 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-Trata ultimoPedido explicitamente null como cliente sem pedido, sem erro de API ou pendência de segmento. Não reconstrói venda a partir de pedido antigo da Weni, não cria cancelamento ou admissão na Recompra e preserva o histórico armazenado. CPF, identidade e vínculo cadastral do segmento mantêm suas proteções.
+Reconcilia anúncios Meta com eventos CTWA oficiais em FARMA e PET, mantendo a revisão, auditoria e conferência de alterações concorrentes. Completa campos vazios e corrige divergências com evento comprovado; não inventa título ou URL ausentes na API. Falhas isoladas ficam pendentes em cursor próprio.
 
-A regra é compartilhada por FARMA e PET nos aplicativos existentes. O Analytics registra clientes sem pedido separadamente e conclui normalmente quando não existem outras falhas. As continuações de planilhas permanecem disponíveis mediante autorização Google local e configuração inicial do Data Studio. Consulte [Continuações](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/CONTINUACOES.md).
+Analytics leva os campos à Base_Contatos, aos pedidos e ao BI_Ads. O Noturno usa as mesmas etapas. Pedidos permanecem sujeitos à confirmação oficial da API FarmaLíder, sem tratar cliques como venda. Consulte [instruções de Oscarzinho e Lili](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/RASTREAMENTO_META.md).
 
 A compilação suporta assinatura Authenticode com certificado de código confiável, timestamp e validação antes dos hashes. Sem certificado configurado, o pacote permanece sem assinatura; isso não é uma aprovação do Windows nem do antivírus. Consulte `RELATORIO DE SEGURANCA.json` dentro do ZIP.
 
@@ -421,4 +421,4 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.8
+# NexoFlow 1.5.9

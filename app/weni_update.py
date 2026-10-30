@@ -12,9 +12,12 @@ from pathlib import Path
 from typing import Any
 
 from ad_attribution import (
+    AD_CLEARABLE_FIELDS,
     GOOGLE_ADS_ORIGIN,
     GOOGLE_ADS_WRITE_FIELDS,
+    META_ADS_ORIGIN,
     extract_google_ads_attribution,
+    extract_meta_ads_attribution,
 )
 from analytics import (
     cpf_query_priority,
@@ -58,6 +61,7 @@ from farmalider_customers import (
 )
 from farmalider_integration import resolve_contact_order, weni_identity_guard
 from geography import GEOGRAPHY_FIELDS, geography_changes
+from meta_events import meta_event_state, read_meta_events
 from pedido_utils import (
     business_order_datetime,
     effective_order_status_code,
@@ -240,6 +244,7 @@ class UpdateStats:
     order_resolution_counts: dict[str, int] = field(default_factory=dict)
     order_diagnostics: list[dict[str, str]] = field(default_factory=list)
     pending_retry_uuids: list[str] = field(default_factory=list)
+    meta_events_report: dict[str, Any] = field(default_factory=dict)
 
 
 def _record_invalid_cpf_result(stats: UpdateStats, plan: ContactUpdatePlan) -> None:
@@ -465,6 +470,13 @@ def _same_value(field_name: str, current: Any, proposed: Any) -> bool:
         proposed_num = _safe_number(proposed)
         if current_num is not None and proposed_num is not None:
             return Decimal(str(current_num)) == Decimal(str(proposed_num))
+    if field_name in {"primeiro_anuncio_data", "ultimo_anuncio_data"}:
+        current_dt = _parse_datetime(current)
+        proposed_dt = _parse_datetime(proposed)
+        if current_dt is not None and proposed_dt is not None:
+            return current_dt.replace(microsecond=0) == proposed_dt.replace(
+                microsecond=0
+            )
     if field_name in {"pedido_data", LAST_PURCHASE_FIELD}:
         current_dt = business_order_datetime(normalize_value(current))
         proposed_dt = business_order_datetime(normalize_value(proposed))
@@ -560,13 +572,18 @@ def _sync_contact_channel_fields(
         plan.guards["__native_urns"] = list(resolved.native_urns)
 
 
-def _ad_event_values(prefix: str, attribution: Any) -> dict[str, str]:
-    """Mapeia uma evidência Google Ads para os campos genéricos de atribuição."""
-    occurred = _weni_datetime(attribution.occurred_at)
+def _ad_event_values(
+    prefix: str, attribution: Any, *, include_missing: bool = False
+) -> dict[str, str]:
+    """Mapeia uma evidência estruturada para os campos genéricos de atribuição."""
+    occurred_at = _parse_datetime(attribution.occurred_at)
+    occurred = iso_utc(occurred_at) if occurred_at is not None else ""
     ad_id = attribution.ad_id or attribution.click_id
-    title = attribution.title or attribution.campaign_type or GOOGLE_ADS_ORIGIN
+    title = attribution.title
+    if attribution.origin == GOOGLE_ADS_ORIGIN:
+        title = title or attribution.campaign_type or attribution.origin
     values = {
-        f"{prefix}_anuncio_origem": GOOGLE_ADS_ORIGIN,
+        f"{prefix}_anuncio_origem": attribution.origin,
         f"{prefix}_anuncio_id": ad_id,
         f"{prefix}_anuncio_titulo": title,
         f"{prefix}_anuncio_url": attribution.url,
@@ -575,7 +592,11 @@ def _ad_event_values(prefix: str, attribution: Any) -> dict[str, str]:
         f"{prefix}_anuncio_tipo_campanha": attribution.campaign_type,
         f"{prefix}_anuncio_canal_destino": attribution.destination_channel,
     }
-    return {key: value for key, value in values.items() if str(value or "").strip()}
+    return {
+        key: value
+        for key, value in values.items()
+        if include_missing or str(value or "").strip()
+    }
 
 
 def _set_ad_field(
@@ -599,7 +620,40 @@ def _set_ad_field(
         created_on=attribution.occurred_at,
         reason=attribution.reason,
     )
+    if not value and str(current_fields.get(field_name) or "").strip():
+        # Um anúncio novo não pode herdar gclid, URL ou objetivo do anterior.
+        # Somente este caminho, com evidência do novo evento, autoriza limpar.
+        plan.previous[field_name] = current_fields[field_name]
+        plan.fields[field_name] = ""
+        plan.evidence[field_name] = _build_evidence_payload(evidence)
     _set_field_if_changed(plan, current_fields, field_name, value, evidence=evidence)
+    if field_name in plan.fields:
+        plan.evidence[field_name].update(
+            {
+                "ad_origin": attribution.origin,
+                "ad_id": attribution.ad_id or attribution.click_id,
+                "value": value,
+            }
+        )
+
+
+def _has_ad_event_evidence(plan: ContactUpdatePlan, field_name: str) -> bool:
+    evidence = plan.evidence.get(field_name, {})
+    origin = evidence.get("ad_origin")
+    return bool(
+        field_name in GOOGLE_ADS_WRITE_FIELDS
+        and origin in {GOOGLE_ADS_ORIGIN, META_ADS_ORIGIN}
+        and evidence.get("ad_id")
+        and evidence.get("message_id")
+        and _parse_datetime(evidence.get("created_on"))
+        and evidence.get("value") == plan.fields.get(field_name)
+        and (
+            "referral.source_type=ad e source_id presentes"
+            in evidence.get("reason", "")
+            if origin == META_ADS_ORIGIN
+            else "evidência explícita de Google Ads" in evidence.get("reason", "")
+        )
+    )
 
 
 def _same_ad_event(
@@ -608,7 +662,12 @@ def _same_ad_event(
     origin = (
         str(current_fields.get(f"{prefix}_anuncio_origem") or "").strip().casefold()
     )
-    if origin not in {"google ads", "googleads", "google adwords", "adwords"}:
+    accepted_origins = (
+        {"google ads", "googleads", "google adwords", "adwords"}
+        if attribution.origin == GOOGLE_ADS_ORIGIN
+        else {attribution.origin.casefold()}
+    )
+    if origin not in accepted_origins:
         return False
     current_click = str(current_fields.get(f"{prefix}_anuncio_clique_id") or "").strip()
     current_id = str(current_fields.get(f"{prefix}_anuncio_id") or "").strip()
@@ -616,7 +675,10 @@ def _same_ad_event(
         return current_click == attribution.click_id
     candidate_id = attribution.ad_id or attribution.click_id
     if current_id and candidate_id:
-        return current_id == candidate_id
+        if current_id != candidate_id:
+            return False
+        if attribution.origin != META_ADS_ORIGIN:
+            return True
     current_date = _parse_datetime(current_fields.get(f"{prefix}_anuncio_data"))
     candidate_date = _parse_datetime(attribution.occurred_at)
     return (
@@ -626,16 +688,54 @@ def _same_ad_event(
     )
 
 
-def _sync_google_ads_attribution(
+def _matched_meta_event(current_fields, prefix, detected):
+    """Só corrige um registro existente quando há vínculo com evento oficial.
+
+    Ausência no período consultado não comprova que um anúncio antigo é errado.
+    ID do clique é a âncora principal; ID do anúncio sozinho não distingue cliques.
+    """
+    click = str(current_fields.get(f"{prefix}_anuncio_clique_id") or "").strip()
+    ad = str(current_fields.get(f"{prefix}_anuncio_id") or "").strip()
+    date = _parse_datetime(current_fields.get(f"{prefix}_anuncio_data"))
+    candidates = []
+    for occurred, event in detected:
+        if event.origin != META_ADS_ORIGIN:
+            continue
+        by_click = bool(click and event.click_id == click)
+        by_ad_date = bool(
+            ad
+            and ad == event.ad_id
+            and date is not None
+            and date.replace(microsecond=0) == occurred.replace(microsecond=0)
+        )
+        if by_click or by_ad_date:
+            candidates.append(event)
+    identities = {(e.ad_id, e.click_id, e.occurred_at) for e in candidates}
+    return candidates[0] if len(identities) == 1 else None
+
+
+def _partial_meta_record(current_fields, prefix, event):
+    return (
+        event.origin == META_ADS_ORIGIN
+        and current_fields.get(f"{prefix}_anuncio_origem") == META_ADS_ORIGIN
+        and not current_fields.get(f"{prefix}_anuncio_clique_id")
+        and _parse_datetime(current_fields.get(f"{prefix}_anuncio_data")) is None
+        and str(current_fields.get(f"{prefix}_anuncio_id") or "").strip()
+        in {"", event.ad_id}
+    )
+
+
+def _sync_ads_attribution(
     plan: ContactUpdatePlan,
     contact: dict[str, Any],
     current_fields: dict[str, Any],
     context_messages: list[dict[str, Any]],
     *,
     available_weni_fields: set[str] | None,
+    history_complete: bool = True,
 ) -> None:
     """
-    Sincroniza atribuição Google Ads somente quando a evidência chega à Weni.
+    Sincroniza Google e Meta apenas quando a evidência chega pela API da Weni.
 
     O canal de destino vem da URN da própria mensagem. Origem de anúncio nunca
     fabrica nem altera URNs de contato.
@@ -651,9 +751,22 @@ def _sync_google_ads_attribution(
     single_contact_channel = contact_channels[0] if len(contact_channels) == 1 else ""
 
     for message in context_messages:
-        attribution = extract_google_ads_attribution(message)
+        meta = extract_meta_ads_attribution(message)
+        google = extract_google_ads_attribution(message)
+        # Duas plataformas na mesma mensagem exigem resolução na fonte.
+        if meta is not None and google is not None:
+            continue
+        attribution = meta or google
         if attribution is None:
             continue
+        if meta is not None and available_weni_fields is not None:
+            core = {
+                f"{prefix}_anuncio_{key}"
+                for prefix in ("primeiro", "ultimo")
+                for key in ("origem", "id", "data")
+            }
+            if not core <= available_weni_fields:
+                continue
         if not attribution.destination_channel and single_contact_channel:
             attribution = replace(
                 attribution, destination_channel=single_contact_channel
@@ -666,11 +779,15 @@ def _sync_google_ads_attribution(
 
     if not detected:
         return
+    for name in GOOGLE_ADS_WRITE_FIELDS:
+        plan.guards[name] = current_fields.get(name)
+    plan.guards["__native_urns"] = sorted(native_contact_urns(contact))
     detected.sort(key=lambda item: (item[0], item[1].message_id))
     first = detected[0][1]
     last = detected[-1][1]
 
-    # Primeiro anúncio é imutável depois que existe evidência válida.
+    # Preserva o primeiro existente fora do histórico comprovado. Corrige
+    # divergências do Manager somente quando o evento correspondente é conhecido.
     first_markers = (
         "primeiro_anuncio_origem",
         "primeiro_anuncio_id",
@@ -678,7 +795,12 @@ def _sync_google_ads_attribution(
         "primeiro_anuncio_data",
     )
     has_first = any(str(current_fields.get(key) or "").strip() for key in first_markers)
-    if not has_first:
+    matched_first = _matched_meta_event(current_fields, "primeiro", detected)
+    if history_complete and (
+        not has_first
+        or matched_first is not None
+        or _partial_meta_record(current_fields, "primeiro", first)
+    ):
         for field_name, value in _ad_event_values("primeiro", first).items():
             _set_ad_field(
                 plan,
@@ -701,7 +823,7 @@ def _sync_google_ads_attribution(
                 only_if_blank=True,
             )
 
-    # Último anúncio só muda quando a evidência Google Ads é realmente mais nova.
+    # Último anúncio só muda quando a evidência é realmente mais nova.
     last_markers = (
         "ultimo_anuncio_origem",
         "ultimo_anuncio_id",
@@ -713,11 +835,26 @@ def _sync_google_ads_attribution(
     candidate_last_date = _parse_datetime(last.occurred_at)
 
     replace_last = not has_last
+    matched_last = _matched_meta_event(current_fields, "ultimo", detected)
     if has_last and current_last_date is not None and candidate_last_date is not None:
         replace_last = candidate_last_date > current_last_date
+    if matched_last is not None:
+        replace_last = True
+    if _partial_meta_record(current_fields, "ultimo", last):
+        replace_last = True
 
     if replace_last:
-        for field_name, value in _ad_event_values("ultimo", last).items():
+        same_ad = str(
+            current_fields.get("ultimo_anuncio_origem") or ""
+        ).strip() == last.origin and str(
+            current_fields.get("ultimo_anuncio_id") or ""
+        ).strip() == (last.ad_id or last.click_id)
+        same_verified_event = (
+            matched_last is not None and matched_last.click_id == last.click_id
+        )
+        for field_name, value in _ad_event_values(
+            "ultimo", last, include_missing=not (same_ad or same_verified_event)
+        ).items():
             _set_ad_field(
                 plan,
                 current_fields,
@@ -1274,6 +1411,7 @@ def _build_contact_plan(
     opt_in_group_uuid: str = "",
     available_weni_fields: set[str] | None = None,
     pending_purchase_check: dict[str, str] | None = None,
+    ads_history_complete: bool = True,
 ) -> ContactUpdatePlan:
     contact_uuid = str(contact.get("uuid") or "").strip()
     fields = get_fields(contact)
@@ -1300,12 +1438,13 @@ def _build_contact_plan(
             evidence=evidence,
         )
 
-    _sync_google_ads_attribution(
+    _sync_ads_attribution(
         plan,
         contact,
         fields,
         context_messages,
         available_weni_fields=available_weni_fields,
+        history_complete=ads_history_complete,
     )
 
     # O valor efetivo de opt_in_lgpd é a fonte de verdade para os grupos.
@@ -1620,7 +1759,11 @@ def audit_plans(
                 )
 
         for field_name, value in plan.fields.items():
-            if value is None or str(value).strip() == "":
+            if (value is None or str(value).strip() == "") and not (
+                field_name in AD_CLEARABLE_FIELDS
+                and value == ""
+                and _has_ad_event_evidence(plan, field_name)
+            ):
                 errors.append(
                     f"{plan.contact_uuid}: tentativa de gravar vazio em {field_name}"
                 )
@@ -1766,13 +1909,18 @@ def audit_plans(
                     )
 
         for field_name in ("primeiro_anuncio_origem", "ultimo_anuncio_origem"):
-            if (
-                field_name in plan.fields
-                and str(plan.fields[field_name]).strip() != GOOGLE_ADS_ORIGIN
-            ):
+            if field_name in plan.fields and str(
+                plan.fields[field_name]
+            ).strip() not in {GOOGLE_ADS_ORIGIN, META_ADS_ORIGIN}:
                 errors.append(
-                    f"{plan.contact_uuid}: origem de anúncio não autorizada pelo detector Google Ads"
+                    f"{plan.contact_uuid}: origem de anúncio não autorizada pelo detector"
                 )
+
+            if plan.fields.get(field_name) == META_ADS_ORIGIN:
+                if not _has_ad_event_evidence(plan, field_name):
+                    errors.append(
+                        f"{plan.contact_uuid}: atribuição Meta sem evidência estruturada"
+                    )
 
         if set(plan.fields) & (PURCHASE_FIELDS - {LAST_PURCHASE_FIELD}) and not (
             plan.order_validated or plan.purchase_confirmed
@@ -2032,6 +2180,7 @@ def _review_summary(
         "purchase_contacts": purchase_contacts,
         "channel_contacts": channel_contacts,
         "google_ads_contacts": google_ads_contacts,
+        "meta_events": stats.meta_events_report,
         "principal_channels": dict(sorted(principal_channels.items())),
         "opt_in_additions": opt_in_add,
         "opt_in_removals": opt_in_remove,
@@ -2505,7 +2654,12 @@ def _prepare_frozen_plan_for_apply(
         if guard_name in plan.fields:
             continue
         current = current_fields.get(guard_name)
-        if not _same_guard_value(current, expected):
+        same = (
+            _same_value(guard_name, current, expected)
+            if guard_name in GOOGLE_ADS_WRITE_FIELDS
+            else _same_guard_value(current, expected)
+        )
+        if not same:
             conflicts.append(
                 f"fonte {guard_name} mudou de {_display_value(expected)} para {_display_value(current)}"
             )
@@ -2808,7 +2962,7 @@ def run_update(
         missing_google_ads = _missing_google_ads_fields(available_weni_fields)
         if missing_google_ads:
             logging.warning(
-                "Campos de atribuição Google Ads ausentes na Weni: %s. "
+                "Campos de atribuição Meta/Google Ads ausentes na Weni: %s. "
                 "A detecção continuará, mas esses metadados não serão gravados até os campos existirem.",
                 ", ".join(missing_google_ads),
             )
@@ -2865,6 +3019,7 @@ def run_update(
             if not isinstance(summary, dict):
                 summary = {}
             stats.messages_incoming = int(summary.get("messages_incoming") or 0)
+            stats.meta_events_report = dict(summary.get("meta_events") or {})
             stats.contacts_considered = int(
                 summary.get("contacts_considered") or len(plans)
             )
@@ -3150,6 +3305,15 @@ def run_update(
                 )
             state_payload["pending_order_retry_uuids"] = sorted(order_pending)
             state_payload.update(_purchase_check_state_payload(plans, conflicted_uuids))
+            state_payload.update(
+                meta_event_state(
+                    stats.meta_events_report,
+                    state,
+                    plans,
+                    conflicted_uuids,
+                    quarter=quarter,
+                )
+            )
             _save_state(state_payload)
             logging.info(
                 "Snapshot congelado concluído: aplicados=%s | conflitos ignorados=%s | já satisfeitos=%s. "
@@ -3241,6 +3405,27 @@ def run_update(
             )
 
         stats.contacts_modified = len(modified_contacts)
+        meta_events = read_meta_events(
+            weni,
+            all_contacts if quarter is not None else modified_contacts,
+            incoming_all,
+            before=window.started_at,
+            state=state,
+            full=window.full,
+            initial_days=WENI_UPDATE_INITIAL_LOOKBACK_DAYS,
+            overlap_minutes=WENI_UPDATE_OVERLAP_MINUTES,
+        )
+        stats.meta_events_report = meta_events.report
+        meta_core = {
+            f"{prefix}_anuncio_{key}"
+            for prefix in ("primeiro", "ultimo")
+            for key in ("origem", "id", "data")
+        }
+        if meta_events.report["linked"] and not meta_core <= available_weni_fields:
+            stats.meta_events_report["pending_from"] = stats.meta_events_report["after"]
+            logging.warning(
+                "Weni: campos centrais de anúncio ausentes; eventos Meta serão reconsultados após a configuração."
+            )
         contacts_by_uuid = {
             str(contact.get("uuid") or "").strip(): contact
             for contact in modified_contacts
@@ -3383,6 +3568,8 @@ def run_update(
                         if not context:
                             context = candidate_messages
 
+                    context = [*context, *meta_events.by_contact.get(contact_uuid, [])]
+
                     # Determine priority from the effective CPF, including a valid CPF
                     # inferred from messages. Preparation performs no FarmaLíder GET.
                     evidences = infer_contact_fields(
@@ -3481,6 +3668,10 @@ def run_update(
                         available_weni_fields=available_weni_fields,
                         pending_purchase_check=pending_purchase_checks.get(
                             contact_uuid
+                        ),
+                        ads_history_complete=not (
+                            stats.meta_events_report.get("failed_batches")
+                            or stats.meta_events_report.get("invalid")
                         ),
                     )
                 except Exception as exc:
@@ -3641,9 +3832,13 @@ def run_update(
                     _apply_creation(creation_session, plan, stats)
                     continue
                 try:
-                    if plan.order_validated or any(
-                        action.group_name == recompra_group()
-                        for action in plan.group_actions
+                    if (
+                        plan.order_validated
+                        or (set(plan.fields) & GOOGLE_ADS_WRITE_FIELDS)
+                        or any(
+                            action.group_name == recompra_group()
+                            for action in plan.group_actions
+                        )
                     ):
                         current_contact = weni.get_contact(uuid=plan.contact_uuid)
                         prepared = None
@@ -3715,6 +3910,13 @@ def run_update(
                 "group_actions": stats.group_actions,
                 "pending_order_retry_uuids": _pending_order_retry_uuids(stats),
                 **_purchase_check_state_payload(plans, conflicted_uuids),
+                **meta_event_state(
+                    stats.meta_events_report,
+                    state,
+                    plans,
+                    conflicted_uuids,
+                    quarter=quarter,
+                ),
             }
         )
         return stats
@@ -3725,4 +3927,4 @@ def run_update(
             farm.close()
 
 
-# NexoFlow 1.5.8
+# NexoFlow 1.5.9

@@ -438,6 +438,10 @@ ORDER_COLUMNS = [
     "ultimo_pedido_raw",
     "weni_modified_on",
     "capturado_em",
+    "primeiro_anuncio_url",
+    "primeiro_anuncio_clique_id",
+    "ultimo_anuncio_url",
+    "ultimo_anuncio_clique_id",
 ]
 
 ORDER_ITEM_COLUMNS = [
@@ -813,6 +817,9 @@ def normalize_contact(
 
     for key in AD_FIELDS:
         row[key] = normalize_value(fields.get(key))
+        if key in {"primeiro_anuncio_data", "ultimo_anuncio_data"}:
+            if moment := business_order_datetime(row[key]):
+                row[key] = moment.isoformat(timespec="seconds")
 
     for key in (
         "pedido_id",
@@ -2079,6 +2086,14 @@ def build_bi_order_rows(
     return rows
 
 
+def ad_is_after_order(record: dict[str, str], prefix: str) -> bool:
+    ad_date = business_order_datetime(record.get(prefix + "data"))
+    order_date = business_order_datetime(
+        record.get("data_hora") or record.get("farmalider_emissao")
+    )
+    return bool(ad_date is not None and order_date is not None and ad_date > order_date)
+
+
 def build_bi_ads_rows(
     base_records: list[dict[str, str]],
     order_records: list[dict[str, str]],
@@ -2121,6 +2136,8 @@ def build_bi_ads_rows(
 
     for label, prefix in dimensions:
         for record in _bi_valid_orders(order_records):
+            if ad_is_after_order(record, prefix):
+                continue
             ad_id = (record.get(prefix + "id") or "").strip()
             title = (record.get(prefix + "titulo") or "").strip()
             origin = (record.get(prefix + "origem") or "").strip()
@@ -2190,4 +2207,4 @@ def build_bi_ads_rows(
     return rows
 
 
-# NexoFlow 1.5.8
+# NexoFlow 1.5.9

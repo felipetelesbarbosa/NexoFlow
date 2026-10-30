@@ -13,10 +13,10 @@ set "NEXOFLOW_FULL_WORKFLOW=1"
 set "FORCE_FULL_SYNC="
 set "FULL_SYNC_QUARTER="
 cd /d "%NEXOFLOW_HOME%\"
-title NexoFlow 1.5.8 - Atualização completa
+title NexoFlow 1.5.9 - Atualização completa
 
 echo ==========================================================
-echo NexoFlow 1.5.8 - Atualização completa em ordem
+echo NexoFlow 1.5.9 - Atualização completa em ordem
 echo ==========================================================
 echo As cargas integrais serão executadas com 100%% da base.
 echo Cada aplicação Weni, Planilhas e Recompra exige sua revisão.

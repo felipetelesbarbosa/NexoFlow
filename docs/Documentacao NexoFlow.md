@@ -1,4 +1,4 @@
-# NexoFlow 1.5.8 — Guia de operação
+# NexoFlow 1.5.9 — Guia de operação
 
 O NexoFlow integra Weni e a API FarmaLíder para **FarmaLíder e Pets Líder**, mantendo dados separados por perfil. O objetivo é manter contatos e pedidos atualizados e alimentar o Google Sheets e os painéis do Data Studio.
 
@@ -17,7 +17,7 @@ O NexoFlow identifica pedidos registrados na API **independentemente de terem si
 
 ## Antes de começar
 
-Instale pelo [Setup oficial](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.8), configure suas próprias credenciais e compartilhe as planilhas com a conta de serviço Google. O diretório padrão é `C:\NexoFlow`. Confira os requisitos e os campos necessários no [guia de instalação](README%20INSTALACAO.md).
+Instale pelo [Setup oficial](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.9), configure suas próprias credenciais e compartilhe as planilhas com a conta de serviço Google. O diretório padrão é `C:\NexoFlow`. Confira os requisitos e os campos necessários no [guia de instalação](README%20INSTALACAO.md).
 
 Abra o mesmo aplicativo e escolha **FarmaLíder** ou **Pets Líder** antes da carga. Configure tokens Weni e três destinos Sheets em cada perfil. A credencial Google pode ser compartilhada. Veja [configuração dos segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 
@@ -110,3 +110,7 @@ No **NexoFlow Terminal**, `nexo` abre o menu e `nexo ajuda` lista os comandos. R
 [Instalação](README%20INSTALACAO.md) · [Weni](README%20WENI.md) · [Planilha](README%20DELIVERY.md) · [Recompra](README%20RECOMPRA.md) · [Proxy](README%20PROXY.md) · [Documentação por assunto](README.md)
 
 O NexoFlow é distribuído sem chaves, tokens ou credenciais. Configure seus próprios acessos e mantenha-os privados. Veja [Segurança](../SECURITY.md).
+
+## Anúncios Meta e IA Manager
+
+A rotina Weni reconcilia eventos CTWA nos dois segmentos, e o Analytics mantém os campos na Base_Contatos, nos pedidos e no BI_Ads do Dashboard correto. O Noturno usa as mesmas etapas. Consulte [regras e instruções de Oscarzinho e Lili](RASTREAMENTO_META.md).

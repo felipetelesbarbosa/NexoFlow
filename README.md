@@ -1,10 +1,10 @@
-# NexoFlow 1.5.8
+# NexoFlow 1.5.9
 
 Aplicativos para Windows que integram **Weni e a API FarmaLíder nos segmentos FarmaLíder e Pets Líder**, atualizam contatos e pedidos e organizam os dados no **Google Sheets** para análise no **Data Studio**.
 
 O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
 
-[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.8/NexoFlow-Setup-1.5.8.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
+[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.9/NexoFlow-Setup-1.5.9.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
 
 ## Componentes
 
@@ -72,7 +72,7 @@ As continuações automáticas no Meu Drive exigem autorização Google local. O
 
 ## Versões e atualizações
 
-A versão atual é **1.5.8**. As próximas correções seguem **1.5.9, 1.5.10, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
+A versão atual é **1.5.9**. As próximas correções seguem **1.5.10, 1.5.11, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
 
 ## Referências
 
@@ -89,3 +89,7 @@ Os executáveis de referência ficam em `native_launcher/prebuilt/`; os pacotes 
 A integração dos dois segmentos usa produção. A leitura da base completa pode aguardar até 10 minutos por tentativa; consultas individuais mantêm 90 segundos. Quando necessário, o NexoFlow consulta o CPF e exige confirmação do segmento antes de usar os dados.
 
 Os três IDs de planilha podem ser configurados em cada perfil do `secrets_config.py`: Dashboard, Operação e Histórico. O mapa `NexoFlow_Arquivos`, quando existir, deve coincidir com esses IDs. Consulte o relatório de cada execução: HTTP 200 não dispensa a validação do conteúdo e do segmento.
+
+## Anúncios Meta e IA Manager
+
+O Weni consulta eventos oficiais CTWA para completar e conferir os campos de anúncios de FARMA e PET. Oscarzinho e Lili podem tentar o preenchimento imediato; o NexoFlow reconcilia os dados disponíveis sem depender da decisão do agente. Analytics leva os campos à Base_Contatos e aos pedidos, e atualiza BI_Ads; o Noturno usa as mesmas etapas. Confira [regras, limites e instruções dos agentes](docs/RASTREAMENTO_META.md).

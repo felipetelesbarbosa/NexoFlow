@@ -13,6 +13,8 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from analytics import (
+    AD_FIELDS,
+    ad_is_after_order,
     build_bi_ads_rows,
     build_bi_channel_records,
     build_bi_conversion_records,
@@ -825,21 +827,13 @@ def build_orders(
                 "",
             ) or order.get("farmalider_cliente_id", "")
 
-            for key in (
-                "primeiro_anuncio_origem",
-                "primeiro_anuncio_id",
-                "primeiro_anuncio_titulo",
-                "primeiro_anuncio_data",
-                "primeiro_anuncio_tipo_campanha",
-                "primeiro_anuncio_canal_destino",
-                "ultimo_anuncio_origem",
-                "ultimo_anuncio_id",
-                "ultimo_anuncio_titulo",
-                "ultimo_anuncio_data",
-                "ultimo_anuncio_tipo_campanha",
-                "ultimo_anuncio_canal_destino",
-            ):
+            for key in AD_FIELDS:
                 order[key] = contact_row.get(key, "")
+            for prefix in ("primeiro_anuncio_", "ultimo_anuncio_"):
+                if ad_is_after_order(order, prefix):
+                    for key in AD_FIELDS:
+                        if key.startswith(prefix):
+                            order[key] = ""
 
             pedido_id = order.get("pedido_id", "").strip()
             for item in items:
@@ -1622,4 +1616,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-# NexoFlow 1.5.8
+# NexoFlow 1.5.9

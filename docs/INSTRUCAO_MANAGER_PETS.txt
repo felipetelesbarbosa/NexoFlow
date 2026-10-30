@@ -1,0 +1,41 @@
+RASTREAMENTO DE ANÚNCIOS META — Oscarzinho / Pets Líder
+
+Objetivo: tentar registrar imediatamente a origem de anúncio no contato atual, sem interromper o atendimento. O NexoFlow fará a conferência posterior com os eventos oficiais disponíveis.
+
+1. Ao receber uma mensagem, consulte get_context. Se o contexto dessa mensagem já foi obtido, reutilize-o. Procure o objeto referral estruturado associado à mensagem recebida. Não procure evidência de anúncio no texto digitado pelo cliente.
+2. Prossiga somente se referral.source_type for exatamente "ad" e referral.source_id estiver preenchido. Sem esses dados, não execute contact-fields para rastreamento e não apague os campos existentes.
+3. Use contact-fields somente para o contato atual deste projeto. Copie os valores originais, sem resumir, completar ou inventar IDs, título, URL ou clique. Um source_url do Instagram não muda o canal de destino de WhatsApp para Instagram.
+4. Cada clique é identificado por referral.ctwa_clid. Não repita a gravação de um clique que já esteja corretamente registrado. Um novo clique na mesma conversa pode atualizar o último anúncio.
+5. Consulte os valores atuais dos campos antes de gravar. Se a ferramenta não permitir essa conferência, não substitua atribuições existentes cuja ordem temporal seja desconhecida; deixe a reconciliação para o NexoFlow.
+
+CAMPOS EXISTENTES E VALORES PERMITIDOS
+
+Primeiro anúncio:
+- primeiro_anuncio_origem: "Meta Ads".
+- primeiro_anuncio_id: referral.source_id, como texto.
+- primeiro_anuncio_titulo: referral.headline, somente quando presente.
+- primeiro_anuncio_url: referral.source_url, somente quando presente.
+- primeiro_anuncio_clique_id: referral.ctwa_clid, somente quando presente.
+- primeiro_anuncio_data: data/hora oficial da mensagem ou evento que trouxe esse referral, em ISO 8601 com fuso. Preserve o instante original; para apresentação local use America/Belem (UTC-3). Não use o horário da execução da ferramenta. Se a data não estiver disponível, não a invente.
+- primeiro_anuncio_canal_destino: "whatsapp", somente se o canal atual estiver confirmado como WhatsApp.
+- primeiro_anuncio_tipo_campanha: preencher somente se o contexto informar explicitamente o tipo/objetivo. source_type="ad", headline="api.whatsapp.com" e media_type="image" não informam o objetivo da campanha. Sem informação, não gravar esse campo.
+
+Último anúncio:
+- ultimo_anuncio_origem: "Meta Ads".
+- ultimo_anuncio_id: referral.source_id, como texto.
+- ultimo_anuncio_titulo: referral.headline, somente quando presente.
+- ultimo_anuncio_url: referral.source_url, somente quando presente.
+- ultimo_anuncio_clique_id: referral.ctwa_clid, somente quando presente.
+- ultimo_anuncio_data: mesma regra de data/hora oficial descrita para primeiro_anuncio_data.
+- ultimo_anuncio_canal_destino: "whatsapp", somente com canal confirmado.
+- ultimo_anuncio_tipo_campanha: mesma regra de informação explícita descrita acima; não inferir pelo formato da mídia.
+
+COMO DECIDIR A GRAVAÇÃO
+
+- Primeiro anúncio: se os marcadores de origem, ID, clique e data estiverem todos vazios, registre o evento atual nos campos primeiro_anuncio_* que tenham valores comprovados. Se já houver primeiro anúncio registrado, preserve-o, inclusive quando for Google Ads. Só complete um campo vazio desse registro se o ID do clique comprovar que se trata do mesmo evento; o mesmo ID de anúncio pode ter vários cliques diferentes.
+- Último anúncio: se estiver vazio, registre o evento. Se já existir, substitua somente se a data oficial do evento atual for mais recente. Para o mesmo clique, complete dados ausentes sem alterar a data original. Se não conseguir comparar as datas, não substitua o registro existente.
+- Se uma informação opcional não veio no contexto, não copie o valor de outro clique/anúncio para completar o novo registro. Não afirme que essa informação foi validada.
+- Envie somente os campos necessários em contact-fields. Se a resposta da ferramenta não confirmar a gravação, não trate a operação como concluída nem entre em repetição de chamadas. Continue o atendimento normalmente; o NexoFlow poderá completar os campos cobertos pelos eventos da API.
+- Não tente iniciar o fluxo de rastreamento: o IA Manager não aciona fluxos.
+- Não envie mensagens ao cliente sobre esta operação interna.
+- O anúncio não confirma uma compra. Este rastreamento não altera CPF, campos de pedido, consentimentos ou grupos de Recompra. A confirmação de pedidos continua sob responsabilidade das rotinas já configuradas e da API FarmaLíder.

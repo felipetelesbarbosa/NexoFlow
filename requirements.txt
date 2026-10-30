@@ -5,4 +5,4 @@ google-auth>=2.40,<3
 google-auth-oauthlib>=1.2.4,<2
 tzdata>=2025.2,<2027
 openpyxl>=3.1.5,<4
-# NexoFlow 1.5.8
+# NexoFlow 1.5.9

@@ -12,6 +12,7 @@ LOG_DIR: Final = BASE_DIR / scoped_path("logs")
 
 WENI_CONTACTS_API_URL: Final = "https://flows.weni.ai/api/v2/contacts.json"
 WENI_MESSAGES_API_URL: Final = "https://flows.weni.ai/api/v2/messages.json"
+WENI_EVENTS_API_URL: Final = "https://flows.weni.ai/api/v2/events.json"
 WENI_CONTACT_ACTIONS_API_URL: Final = (
     "https://flows.weni.ai/api/v2/contact_actions.json"
 )

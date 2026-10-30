@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-No NexoFlow 1.5.8, o NexoFlow consegue reconhecer contatos originados por Google Ads quando a evidência do clique chega às mensagens/metadados da Weni. A identidade do canal continua independente: um anúncio do Google pode terminar em WhatsApp, Instagram Direct ou Facebook/Messenger sem alterar a regra de URN.
+No NexoFlow 1.5.9, o NexoFlow consegue reconhecer contatos originados por Google Ads quando a evidência do clique chega às mensagens/metadados da Weni. A identidade do canal continua independente: um anúncio do Google pode terminar em WhatsApp, Instagram Direct ou Facebook/Messenger sem alterar a regra de URN.
 
 ## Evidências aceitas
 

@@ -1,4 +1,4 @@
-/* NexoFlow 1.5.8: cálculo puro, sem rede e sem escrita na planilha. */
+/* NexoFlow 1.5.9: cálculo puro, sem rede e sem escrita na planilha. */
 var NexoAbc = (function () {
   'use strict';
   function fail(message) { throw new Error(message); }

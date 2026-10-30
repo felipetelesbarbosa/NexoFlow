@@ -136,14 +136,14 @@ def main() -> int:
             missing_google_ads = list(weni.get("missing_google_ads_fields") or [])
             if missing_google_ads:
                 print(
-                    "[AVISO] Campos de atribuição Google Ads ausentes: "
+                    "[AVISO] Campos de atribuição Meta/Google Ads ausentes: "
                     + ", ".join(missing_google_ads)
                 )
                 print(
-                    "        O NexoFlow continuará funcionando, mas a atribuição Google Ads ficará parcial até esses campos existirem."
+                    "        O NexoFlow continuará funcionando, mas a atribuição Meta/Google Ads ficará parcial até esses campos existirem."
                 )
             else:
-                print("[OK] Campos de atribuição Google Ads localizados.")
+                print("[OK] Campos de atribuição Meta/Google Ads localizados.")
             if farm.get("ok"):
                 print("[OK] FarmaLíder API acessível para confirmação de pedidos.")
             else:
@@ -196,6 +196,11 @@ def main() -> int:
         print(f"Contatos considerados: {stats.contacts_considered}")
         print(f"Contatos com alterações: {stats.plans_with_changes}")
         print(f"Campos propostos: {stats.field_changes}")
+        meta = stats.meta_events_report
+        if meta:
+            print(
+                f"Anúncios Meta: eventos={meta.get('read', 0)}; vinculados={meta.get('linked', 0)}; lotes pendentes={meta.get('failed_batches', 0)}"
+            )
         print(f"Novos contatos criados a partir da API: {stats.contacts_created}")
         if stats.creation_pending:
             print(
@@ -251,6 +256,7 @@ def main() -> int:
             stats.orders_api_failed
             or stats.contacts_conflicted
             or stats.contacts_failed
+            or stats.meta_events_report.get("pending_from")
             or dedup["skipped"]
             or dedup.get("failed_batches", 0)
         ):

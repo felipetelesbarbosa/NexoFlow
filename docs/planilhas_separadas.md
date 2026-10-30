@@ -1,4 +1,4 @@
-# NexoFlow 1.5.8 — Arquivos Google Sheets separados
+# NexoFlow 1.5.9 — Arquivos Google Sheets separados
 
 | Arquivo | Abas |
 |---|---|
