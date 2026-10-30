@@ -5,6 +5,8 @@
 - Consultas por CPF distinguem lista vazia, resposta inválida, segmento não confirmado e cliente de outro segmento. JSON inválido após HTTP 200 deixa de ser apresentado apenas como erro HTTP. Cadastros e pedidos sem vínculo continuam bloqueados, com revalidação nas próximas cargas.
 - Analytics apresenta resultados por lote, sem um aviso repetido para cada CPF. A Recompra reaproveita rejeições de segmento durante a mesma execução, mantendo novas leituras na próxima revisão/aplicação.
 - Os três IDs explícitos do perfil podem rotear Operação, Histórico e Dashboard quando o mapa remoto não existe. Divergência entre IDs locais e mapa remoto bloqueia gravações; deduplicação usa os mesmos destinos.
+- Recompra sincroniza ID, data, produtos, status, pagamento e última compra antes da inclusão. Uma nova conferência após o POST detecta campos apagados ou elegibilidade alterada, remove o grupo com confirmação e preserva pendência sem repetir a admissão. A política V5 exige gerar nova revisão.
+- O teste de log por lote funciona também no check-up operacional, que desativa a saída dos logs da suíte.
 - Novos cadastros Weni enviam campos como texto e registram categorias seguras da rejeição HTTP 400/422, sem expor valores do retorno, CPF ou telefone. Não há repetição automática do POST nem consentimento presumido.
 
 ## NexoFlow 1.5.3 — 29/10/2026

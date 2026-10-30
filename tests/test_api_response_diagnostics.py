@@ -100,7 +100,7 @@ class ApiResponseDiagnosticsTests(unittest.TestCase):
             "responses_200": 1,
             "responses_404": 0,
         }
-        with self.assertLogs(level="INFO") as logs:
+        with patch("main.logging.info") as logs:
             stats = validate_contacts(
                 rows,
                 existing_by_uuid={},
@@ -108,7 +108,7 @@ class ApiResponseDiagnosticsTests(unittest.TestCase):
                 farm_client=farm,
                 sync_time=NEW_TIME,
             )
-        text = "\n".join(logs.output)
+        text = "\n".join(call.args[0] % call.args[1:] for call in logs.call_args_list)
         self.assertEqual(stats.api_errors, 1)
         self.assertIn("resultado do lote", text)
         self.assertNotIn("falha para", text)

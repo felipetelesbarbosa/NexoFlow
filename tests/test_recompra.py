@@ -106,7 +106,7 @@ class RecompraRulesTests(unittest.TestCase):
         plan = propose(c, o, i, STRUCTURE, now=NOW)
         self.assertEqual(plan["action"], "add")
         self.assertNotIn("marketing_opt_in", plan["fields"])
-        self.assertNotIn("ultima_compra", plan["fields"])
+        self.assertEqual(plan["fields"]["ultima_compra"], o["data_hora"])
         self.assertIn("pedido_data", plan["fields"])
         self.assertEqual(plan["fields"]["pedido_data"], o["data_hora"])
         self.assertNotIn("ultimo_pedido", plan["fields"])
@@ -170,7 +170,7 @@ class RecompraRulesTests(unittest.TestCase):
         self.assertEqual(p["order_id"], "200")
         self.assertFalse(p["due_today"])
 
-    def test_recompra_writes_only_date_and_products_not_analytics_fields(self):
+    def test_recompra_refreshes_campaign_identity_status_and_reference_only(self):
         c, o, i = fixture(0, order_id="200", grouped=True)
         c["fields"].update(
             {
@@ -181,7 +181,17 @@ class RecompraRulesTests(unittest.TestCase):
             }
         )
         p = propose(c, o, i, STRUCTURE, now=NOW)
-        self.assertEqual(set(p["fields"]), {"pedido_data", "pedido_produtos"})
+        self.assertEqual(
+            set(p["fields"]),
+            {
+                "pedido_data",
+                "pedido_produtos",
+                "pedido_id",
+                "pedido_status",
+                "pedido_forma_pagamento",
+                "ultima_compra",
+            },
+        )
         self.assertEqual(p["fields"]["pedido_data"], o["data_hora"])
         self.assertEqual(p["order_id"], "200")
         self.assertNotIn("ultimo_pedido", p["guard"]["fields"])
@@ -194,13 +204,17 @@ class RecompraRulesTests(unittest.TestCase):
         self.assertEqual(p["action"], "remove")
         self.assertEqual(p["fields"], {})
 
-    def test_ultima_compra_is_ignored_even_when_it_conflicts(self):
+    def test_ultima_compra_does_not_drive_campaign_and_is_refreshed_from_official_order(
+        self,
+    ):
         c, o, i = fixture(24)
         c["fields"]["ultima_compra"] = (NOW + timedelta(days=10)).isoformat()
         p = propose(c, o, i, STRUCTURE, now=NOW)
         self.assertEqual(p["action"], "add")
-        self.assertNotIn("ultima_compra", p["fields"])
-        self.assertNotIn("ultima_compra", p["guard"]["fields"])
+        self.assertEqual(p["fields"]["ultima_compra"], o["data_hora"])
+        self.assertEqual(
+            p["guard"]["fields"]["ultima_compra"], c["fields"]["ultima_compra"]
+        )
 
     def test_same_order_never_reenters_after_flow_removes_group(self):
         c, o, i = fixture(24)
@@ -901,7 +915,17 @@ class RecompraRuntimeDiagnosticsTests(unittest.TestCase):
         contact["fields"]["ultimo_pedido"] = "{JSON INVÁLIDO " + "X" * 2000
         amended = propose(contact, order, items, STRUCTURE, now=NOW)
         self.assertEqual(amended, baseline)
-        self.assertEqual(FIELDS, {"pedido_data", "pedido_produtos"})
+        self.assertEqual(
+            FIELDS,
+            {
+                "pedido_data",
+                "pedido_produtos",
+                "pedido_id",
+                "pedido_status",
+                "pedido_forma_pagamento",
+                "ultima_compra",
+            },
+        )
         self.assertNotIn("ultimo_pedido", amended["guard"]["fields"])
         self.assertNotIn("ultimo_pedido", amended["fields"])
 

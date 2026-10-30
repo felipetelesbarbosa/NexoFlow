@@ -146,6 +146,8 @@ def weni_fixture(segment, contacts):
         {"key": key, "value_type": kind}
         for key, kind in (
             ("pedido_data", "datetime"),
+            ("pedido_id", "text"),
+            ("compra_recente" if segment == "PET" else "ultima_compra", "datetime"),
             ("pedido_produtos", "text"),
             ("pedido_status", "text"),
             ("pedido_forma_pagamento", "text"),
@@ -307,7 +309,17 @@ class PetProfileTests(unittest.TestCase):
         self.assertEqual(propose(c, o, items, STRUCTURE, now=NOW)["action"], "")
         with self.assertRaises(RuntimeError):
             make_review([pet], STRUCTURE, now=NOW)
-        self.assertEqual(set(pet["fields"]), {"pedido_data", "pedido_produtos"})
+        self.assertEqual(
+            set(pet["fields"]),
+            {
+                "pedido_data",
+                "pedido_produtos",
+                "pedido_id",
+                "pedido_status",
+                "pedido_forma_pagamento",
+                "compra_recente",
+            },
+        )
 
     def test_pet_credentials_never_fall_back_to_farma(self):
         with self.assertRaises(ValueError):

@@ -127,7 +127,17 @@ class RecompraGroupApiContractTests(unittest.TestCase):
         ]
         self.assertEqual(len(posts), 2)
         self.assertEqual(posts[0][0], WENI_CONTACTS_API_URL)
-        self.assertEqual(set(posts[0][1]["fields"]), {"pedido_data", "pedido_produtos"})
+        self.assertEqual(
+            set(posts[0][1]["fields"]),
+            {
+                "pedido_data",
+                "pedido_produtos",
+                "pedido_id",
+                "pedido_status",
+                "pedido_forma_pagamento",
+                "ultima_compra",
+            },
+        )
         self.assertEqual(posts[1][0], WENI_CONTACT_ACTIONS_API_URL)
         self.assertEqual(posts[1][1]["action"], "add")
         self.assertTrue(transport.pending_checked)

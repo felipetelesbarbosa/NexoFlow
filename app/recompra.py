@@ -49,6 +49,7 @@ from pedido_utils import (
     is_order_cancelled,
     normalize_farmalider_order_status_code,
     normalize_farmalider_payment_code,
+    parse_weni_order_list,
     serialize_pedido_products,
     serialize_weni_order_list,
 )
@@ -74,6 +75,7 @@ from recompra_review_audit import (
     public_review_lines,
 )
 from runtime_profile import scoped_path as profile_path
+from runtime_profile import segment as active_segment
 from weni_client import WeniError
 
 GROUP = "Recompra FarmaLíder"
@@ -85,8 +87,23 @@ DAY_EXPRESSION = '@(if(default(datetime_diff(format_date(fields.pedido_data, "YY
 REFUSAL_EXPRESSION = '@(if(or(lower(trim(fields.marketing_opt_in)) = "recusado", lower(trim(fields.marketing_opt_in)) = "não", lower(trim(fields.marketing_opt_in)) = "nao", lower(trim(fields.marketing_opt_in)) = "negado"), "MKT_RECUSADO", "MKT_SEM_RECUSA"))'
 # Somente os campos essenciais ao agendamento e ao texto da campanha.
 # ultimo_pedido pertence às demais integrações, nunca à recompra.
-FIELDS = {"pedido_data", "pedido_produtos"}
-GUARD_FIELDS = FIELDS | {
+CORE_FIELDS = {
+    "pedido_data",
+    "pedido_produtos",
+    "pedido_id",
+    "pedido_status",
+    "pedido_forma_pagamento",
+}
+
+
+def campaign_fields(segment):
+    return CORE_FIELDS | {"compra_recente" if segment == "PET" else "ultima_compra"}
+
+
+FIELDS = campaign_fields(active_segment())
+GUARD_FIELDS = CORE_FIELDS | {
+    "compra_recente",
+    "ultima_compra",
     "cpf",
     "nome",
     "email",
@@ -106,6 +123,16 @@ PROGRESS_LOG_EVERY_CONTACTS = 1000
 
 class PreAdmissionConflict(RuntimeError):
     """A inclusão ainda não foi tentada; o contato precisa de nova revisão."""
+
+
+class CampaignFieldsPending(RuntimeError):
+    """Admissão ocorreu, mas foi removida após divergência confirmada na Weni."""
+
+    def __init__(self, fields):
+        self.fields = fields
+        super().__init__(
+            "Campos ou elegibilidade mudaram após a inclusão; grupo removido."
+        )
 
 
 class ReviewExpiredError(RuntimeError):
@@ -168,7 +195,9 @@ class RecompraReadCache:
 
                 # HTTP 400 é definitivo para esta consulta; falhas transitórias
                 # não impedem outra tentativa nesta mesma execução.
-                if not isinstance(exc, (FarmaliderBadRequestError, FarmaliderLookupError)):
+                if not isinstance(
+                    exc, (FarmaliderBadRequestError, FarmaliderLookupError)
+                ):
                     with self._lock:
                         if self._responses.get(cache_key) is future:
                             del self._responses[cache_key]
@@ -513,13 +542,18 @@ def member(contact, group_uuid, group_name):
 
 
 def field_guard(key, value):
+    if key == "pedido_produtos" and text(value):
+        try:
+            return serialize_weni_order_list(sorted(parse_weni_order_list(text(value))))
+        except ValueError:
+            return text(value)
     if key in {"pedido_valor", "pedido_forma_pagamento"} and text(value):
         from weni_update import _weni_number_text
 
         number = _weni_number_text(value)
         if number:
             return number
-    if key == "pedido_data":
+    if key in {"pedido_data", "compra_recente", "ultima_compra"}:
         dt = business_order_datetime(value)
         if dt is not None:
             return dt.isoformat()
@@ -755,7 +789,7 @@ def inspect_structure(weni, *, segment="FARMA"):
         return matches[0]["uuid"]
 
     group_uuid, opt_out_uuid = find_group(profile.group), find_group(OPT_OUT)
-    for key in sorted(FIELDS | {"pedido_status", "pedido_forma_pagamento"}):
+    for key in sorted(campaign_fields(segment)):
         if key not in fields:
             errors.append(f"Campo obrigatório ausente: {key}")
     if fields.get("pedido_data") != "datetime":
@@ -1008,7 +1042,7 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
                 farm_client=None,
                 captured_at=now.isoformat(),
                 resolved_order=(order, items),
-                available_weni_fields=FIELDS,
+                available_weni_fields=campaign_fields(profile.segment),
             )
             if not purchase_plan.order_validated:
                 plan["reason"] = "PEDIDO_INCOMPLETO"
@@ -1039,6 +1073,16 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
             proposal = {
                 "pedido_data": dt.isoformat(),
                 "pedido_produtos": serialize_weni_order_list(names),
+                "pedido_id": order_id,
+                "pedido_status": str(
+                    normalize_farmalider_order_status_code(
+                        order.get("farmalider_status_pedido")
+                    )
+                ),
+                "pedido_forma_pagamento": str(official_payment),
+                "compra_recente"
+                if profile.segment == "PET"
+                else "ultima_compra": dt.isoformat(),
             }
             for key, value in proposal.items():
                 same = (
@@ -1108,11 +1152,51 @@ def finalize_review(review, now):
     return review
 
 
+def campaign_field_errors(plan, contact):
+    profile = profile_for(plan.get("segment", "FARMA"))
+    actual = get_fields(contact)
+    expected = {**plan["guard"]["fields"], **plan["fields"]}
+    errors = {
+        key
+        for key in campaign_fields(profile.segment)
+        if not text(actual.get(key))
+        or field_guard(key, actual.get(key)) != field_guard(key, expected.get(key))
+    }
+    if normalize_farmalider_order_status_code(actual.get("pedido_status")) not in {
+        "-2",
+        "-1",
+        "0",
+        "4",
+        "1",
+        "2",
+    }:
+        errors.add("pedido_status")
+    if normalize_farmalider_payment_code(actual.get("pedido_forma_pagamento")) not in {
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+    }:
+        errors.add("pedido_forma_pagamento")
+    if text(actual.get("pedido_id")) != text(plan.get("order_id")):
+        errors.add("pedido_id")
+    purchase = business_order_datetime((plan.get("purchase") or {}).get("data_hora"))
+    for key in {
+        "pedido_data",
+        "compra_recente" if profile.segment == "PET" else "ultima_compra",
+    }:
+        if purchase is None or business_order_datetime(actual.get(key)) != purchase:
+            errors.add(key)
+    return sorted(errors)
+
+
 def audit_plan(plan):
     profile = profile_for(plan.get("segment", "FARMA"))
     if not plan.get("contact_uuid"):
         raise RuntimeError("Plano sem UUID.")
-    if not set(plan["fields"]).issubset(FIELDS):
+    if not set(plan["fields"]).issubset(campaign_fields(profile.segment)):
         raise RuntimeError("Plano tenta alterar campo fora da recompra.")
     if plan["action"] not in {"", "add", "remove", "replace"}:
         raise RuntimeError("Ação de grupo inválida.")
@@ -1129,6 +1213,14 @@ def audit_plan(plan):
         "add",
         "replace",
     }:
+        missing = campaign_field_errors(
+            plan, {"fields": {**plan["guard"]["fields"], **plan["fields"]}}
+        )
+        if missing:
+            raise RuntimeError(
+                "Campos essenciais da campanha incompletos ou divergentes: "
+                + ",".join(missing)
+            )
         products = plan.get("campaign_products")
         if (
             not isinstance(products, list)
@@ -1320,6 +1412,7 @@ def diagnose_state(state_path=STATE, audit_path=AUDIT):
                 if status in {
                     "FALHA_OU_RESULTADO_INDETERMINADO",
                     "CONFLITO_PRE_INCLUSAO",
+                    "CAMPOS_PENDENTES_APOS_INCLUSAO",
                     "REVISAO_EXPIRADA_DURANTE_APLICACAO",
                 }:
                     last_failures.append(
@@ -1730,10 +1823,24 @@ def apply_review(
                         refused(verified, segment=profile.segment)
                         or member(verified, structure["opt_out_uuid"], OPT_OUT)
                         or cancelled_order_reason(order, verified)
+                        or campaign_field_errors(fresh, verified)
                     ):
-                        raise RuntimeError(
-                            "Contato tornou-se inelegível após o POST; inclusão precisa de reconciliação."
+                        # A campanha pode ter sido alterada por outra automação após a admissão.
+                        # Remover o grupo evita deixar uma referência incompleta agendada.
+                        changed = campaign_field_errors(fresh, verified)
+                        stage = "remover_inclusao_sem_campos_confirmados"
+                        weni.contact_group_action(
+                            uid, action="remove", group=structure["group_uuid"]
                         )
+                        stage = "confirmar_remocao_sem_campos"
+                        after_removal = weni.get_contact(uuid=uid)
+                        if not after_removal or member(
+                            after_removal, structure["group_uuid"], profile.group
+                        ):
+                            raise RuntimeError(
+                                "A remoção preventiva não foi confirmada; preserve o estado para conciliação."
+                            )
+                        raise CampaignFieldsPending(changed)
                     entry.update(
                         {
                             "pending": False,
@@ -1769,6 +1876,21 @@ def apply_review(
                         "at": now_fn().isoformat(),
                     },
                 )
+            except CampaignFieldsPending as exc:
+                summary["conflitos"] += 1
+                record_event(
+                    {
+                        "contact_uuid": uid,
+                        "pedido_id": fresh["order_id"],
+                        "status": "CAMPOS_PENDENTES_APOS_INCLUSAO",
+                        "stage": stage,
+                        "changed_fields": exc.fields,
+                        "group_removal_confirmed": True,
+                    }
+                )
+                # A campanha pode ter observado o primeiro POST. Preservar pending
+                # impede uma segunda admissão automática do mesmo pedido.
+                continue
             except PreAdmissionConflict as exc:
                 # O POST de admissão NÃO foi tentado. O pending criado nesta
                 # passagem não pode impedir uma nova revisão do mesmo pedido.

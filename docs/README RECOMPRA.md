@@ -36,6 +36,10 @@ Conversa indicando compra posterior ainda não confirmada pela API mantém a ref
 
 O BAT principal é `comandos/atualizar_recompra.bat`; `comandos/atualizar_recompra_pets.bat` fixa o perfil Pets. `RECOMPRA_ENABLED` controla a integração da etapa nas outras rotinas. No Noturno, a revisão é automática, mantendo as validações.
 
+A aplicação sincroniza os campos essenciais do pedido (`pedido_id`, `pedido_data`, `pedido_produtos`, `pedido_status`, `pedido_forma_pagamento`) e a última compra (`ultima_compra` na Farma; `compra_recente` no Pets). O evento continua usando somente `pedido_data`. Confere a persistência antes da admissão e novamente depois de confirmar a inclusão. Se os campos ou a elegibilidade mudarem após o POST, remove preventivamente o grupo, confirma a remoção e deixa o contato pendente; os demais continuam. O estado preservado impede repetir uma admissão que pode ter sido observada pela campanha.
+
+No Pets, os campos antigos de rótulo **Pedido** e **Ultima_compra** são distintos de `pedido_data` e **Compra recente**. Não os use para conferir o agendamento atual.
+
 A aplicação confere novamente os dados relevantes antes de alterar campos ou grupo. Alterações confirmadas são preservadas. Contatos com falha isolada de consulta ficam pendentes para nova revisão; os demais podem ser aplicados. Uma resposta incerta após gravação exige reconciliação e não autoriza repetir o POST às cegas.
 
 ## Conferir ou limpar o grupo
