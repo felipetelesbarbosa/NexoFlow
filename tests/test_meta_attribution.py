@@ -240,3 +240,23 @@ class MetaAttributionTests(unittest.TestCase):
             base, [order], snapshot_date="2026-10-30", updated_at="2026-10-30T15:00:00Z"
         )
         self.assertTrue(all(r[10] == 0 for r in ads))
+
+    def test_click_identifiers_preserve_case_and_wrong_case_is_corrected(self):
+        msg = incoming()
+        msg["metadata"]["referral"]["ctwa_clid"] = "ClickCaseSensitive"
+        initial = plan_for([msg])
+        fields = dict(initial.fields)
+        fields["primeiro_anuncio_clique_id"] = "clickcasesensitive"
+        fields["ultimo_anuncio_clique_id"] = "clickcasesensitive"
+        fields["primeiro_anuncio_origem"] = "meta ads"
+        fields["ultimo_anuncio_canal_destino"] = "WhatsApp"
+        corrected = plan_for([msg], fields)
+        self.assertEqual(
+            corrected.fields["primeiro_anuncio_clique_id"], "ClickCaseSensitive"
+        )
+        self.assertEqual(
+            corrected.fields["ultimo_anuncio_clique_id"], "ClickCaseSensitive"
+        )
+        self.assertEqual(corrected.fields["primeiro_anuncio_origem"], "Meta Ads")
+        self.assertEqual(corrected.fields["ultimo_anuncio_canal_destino"], "whatsapp")
+        audit_plans([corrected], opt_out_group_available=True)

@@ -477,6 +477,8 @@ def _same_value(field_name: str, current: Any, proposed: Any) -> bool:
             return current_dt.replace(microsecond=0) == proposed_dt.replace(
                 microsecond=0
             )
+    if field_name in GOOGLE_ADS_WRITE_FIELDS:
+        return str(current or "").strip() == str(proposed or "").strip()
     if field_name in {"pedido_data", LAST_PURCHASE_FIELD}:
         current_dt = business_order_datetime(normalize_value(current))
         proposed_dt = business_order_datetime(normalize_value(proposed))
