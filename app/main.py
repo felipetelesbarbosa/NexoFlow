@@ -119,6 +119,7 @@ class ClienteValidationStats:
     cache_reused: int = 0
     confirmed: int = 0
     not_found: int = 0
+    without_order: int = 0
     invalid: int = 0
     invalid_registration: int = 0
     api_errors: int = 0
@@ -345,6 +346,7 @@ def _preserve_cliente_on_api_error(
             "CPF_CONFIRMADO",
             "CPF_INVALIDO_ENCONTRADO",
             "ERRO_API",
+            "SEM_PEDIDO_API",
         }
     ):
         return False
@@ -670,7 +672,9 @@ def validate_contacts(
                         additions = enrichment(row, customer, captured.date())
                         row.update(additions)
                         stats.cadastral_fields_filled += len(additions)
-                if result[0].startswith("ERRO_") and _preserve_cliente_on_api_error(
+                if (
+                    result[0].startswith("ERRO_") or result[0] == "SEM_PEDIDO_API"
+                ) and _preserve_cliente_on_api_error(
                     row,
                     existing_by_uuid,
                 ):
@@ -691,6 +695,8 @@ def validate_contacts(
             stats.confirmed += 1
         elif status == "CPF_NAO_ENCONTRADO":
             stats.not_found += 1
+        elif status == "SEM_PEDIDO_API":
+            stats.without_order += 1
         if normalize_cpf(row.get("cpf")) and not is_valid_cpf(row.get("cpf")):
             stats.invalid += 1
 
@@ -1414,6 +1420,7 @@ def main() -> int:
                     cliente_stats.confirmed
                 ),
                 "ultima_execucao_cpfs_nao_encontrados": str(cliente_stats.not_found),
+                "ultima_execucao_clientes_sem_pedido": str(cliente_stats.without_order),
                 "ultima_execucao_cpfs_invalidos": str(cliente_stats.invalid),
                 "ultima_execucao_erros_cliente_farmalider": str(
                     cliente_stats.api_errors
@@ -1531,7 +1538,7 @@ def main() -> int:
         )
         logging.info(
             "  FarmaLíder | CPFs válidos únicos=%s | contatos com CPF inválido=%s | "
-            "consultas=%s | cache=%s | clientes encontrados=%s | "
+            "consultas=%s | cache=%s | clientes encontrados=%s | clientes sem pedido=%s | "
             "HTTP=%s | retries=%s | 429=%s | 5xx=%s | lentas=%s | "
             "latência média/p95/máx=%s/%s/%s | tempo=%.2fs.",
             len(valid_unique_cpfs),
@@ -1539,6 +1546,7 @@ def main() -> int:
             cliente_stats.unique_queries,
             cliente_stats.cache_reused,
             cliente_stats.confirmed,
+            cliente_stats.without_order,
             cliente_stats.http_requests,
             cliente_stats.retries,
             cliente_stats.rate_limits,
@@ -1614,4 +1622,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-# NexoFlow 1.5.7
+# NexoFlow 1.5.8

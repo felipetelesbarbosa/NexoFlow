@@ -1,4 +1,12 @@
-# NexoFlow 1.5.7 — Changelog
+# NexoFlow 1.5.8 — Changelog
+
+## NexoFlow 1.5.8 — 30/10/2026
+
+- `ultimoPedido: null` em resposta válida representa cliente sem pedido (`SEM_PEDIDO_API`), sem erro de API ou pendência de validação do segmento de um pedido inexistente. Weni, Analytics, Recompra e Planilha compartilham essa interpretação.
+- A ausência explícita não busca pedido_id ou ultimo_pedido antigo da Weni para reconstruir uma venda, não gera cancelamento e não admite o contato na Recompra. Histórico já armazenado e detalhes cadastrais anteriormente verificados são preservados.
+- Null não autoriza usar um cadastro global para enriquecer ou deduplicar uma organização sem segmento comprovado. CPF/identidade, respostas malformadas, pedidos existentes e falhas de rede mantêm suas proteções.
+- Analytics distingue clientes sem pedido nos totais e no Controle, mantém as cargas válidas e conclui normalmente quando a única pendência anterior era um null.
+- Regressões sintéticas cobrem os dois segmentos, cache por execução, ausência versus campo omitido, CPF divergente, identidade ambígua, itens sem cabeçalho, resposta com pedido real, deduplicação, planejamento Weni, carga/retomada do Analytics e aplicação/retomada da Recompra.
 
 ## NexoFlow 1.5.7 — 30/10/2026
 

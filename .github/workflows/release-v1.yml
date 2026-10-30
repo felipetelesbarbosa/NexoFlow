@@ -1,5 +1,5 @@
-# Automação de testes, empacotamento e publicação do NexoFlow 1.5.7.
-name: Publicar NexoFlow 1.5.7
+# Automação de testes, empacotamento e publicação do NexoFlow 1.5.8.
+name: Publicar NexoFlow 1.5.8
 
 on:
   push:
@@ -136,7 +136,7 @@ jobs:
         shell: pwsh
         run: |
           if ($env:GITHUB_REF -cne "refs/heads/main") {
-            throw "A publicação do NexoFlow 1.5.7 deve partir da main."
+            throw "A publicação do NexoFlow 1.5.8 deve partir da main."
           }
 
       - name: Go para launcher do Setup
@@ -203,15 +203,15 @@ jobs:
         shell: pwsh
         run: ./scripts/test_segment_lock_windows.ps1
 
-      - name: Gerar pacotes 1.5.7
+      - name: Gerar pacotes 1.5.8
         shell: pwsh
         run: |
-          ./scripts/build_release.ps1 -Version "1.5.7"
+          ./scripts/build_release.ps1 -Version "1.5.8"
 
       - name: Validar ícones incorporados nos executáveis
         shell: pwsh
         run: |
-          ./scripts/test_executable_icons.ps1 -Version "1.5.7"
+          ./scripts/test_executable_icons.ps1 -Version "1.5.8"
 
       - name: Testar Weni com BAT sintético e inspeção durante carga ativa
         shell: pwsh
@@ -227,20 +227,20 @@ jobs:
         run: |
           ./scripts/test_noturno_launcher_windows.ps1
 
-      - name: Smoke test do Setup 1.5.7 no Windows
+      - name: Smoke test do Setup 1.5.8 no Windows
         shell: pwsh
         run: |
-          ./scripts/test_setup_windows.ps1 -SetupZip "dist/NexoFlow-Setup-1.5.7.zip"
+          ./scripts/test_setup_windows.ps1 -SetupZip "dist/NexoFlow-Setup-1.5.8.zip"
 
-      - name: Disponibilizar pacotes do NexoFlow 1.5.7
+      - name: Disponibilizar pacotes do NexoFlow 1.5.8
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: NexoFlow-1.5.7-pacotes
+          name: NexoFlow-1.5.8-pacotes
           path: |
-            dist/NexoFlow-Setup-1.5.7.zip
-            dist/NexoFlow-1.5.7.zip
-            dist/SHA256SUMS-1.5.7.txt
+            dist/NexoFlow-Setup-1.5.8.zip
+            dist/NexoFlow-1.5.8.zip
+            dist/SHA256SUMS-1.5.8.txt
             dist/release-notes.md
           if-no-files-found: error
           retention-days: 7
@@ -248,7 +248,7 @@ jobs:
       - name: Resumo
         shell: pwsh
         run: |
-          Get-Content "dist/SHA256SUMS-1.5.7.txt"
+          Get-Content "dist/SHA256SUMS-1.5.8.txt"
 
   verificar-pacotes:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
@@ -267,7 +267,7 @@ jobs:
       - name: Receber pacotes para análise
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
-          name: NexoFlow-1.5.7-pacotes
+          name: NexoFlow-1.5.8-pacotes
           path: dist
 
       - name: Instalar Gitleaks com SHA-256 conferido
@@ -305,7 +305,7 @@ jobs:
       - name: Receber pacotes validados
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
-          name: NexoFlow-1.5.7-pacotes
+          name: NexoFlow-1.5.8-pacotes
           path: dist
 
       - name: Conferir o commit atual da main
@@ -318,47 +318,47 @@ jobs:
             throw "A main recebeu outro commit. O release deve usar a execução mais recente."
           }
 
-      - name: Atualizar tag v1.5.7
+      - name: Atualizar tag v1.5.8
         shell: pwsh
         run: |
-          $existing = (& git ls-remote origin refs/tags/v1.5.7 | Out-String).Trim()
-          if ($LASTEXITCODE -ne 0) { throw "Falha ao consultar a tag v1.5.7." }
+          $existing = (& git ls-remote origin refs/tags/v1.5.8 | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0) { throw "Falha ao consultar a tag v1.5.8." }
           if ($existing) {
             if (($existing -split '\s+')[0] -cne $env:GITHUB_SHA) {
-              throw "A versão 1.5.7 já foi usada por outro commit. Incremente o patch antes de publicar."
+              throw "A versão 1.5.8 já foi usada por outro commit. Incremente o patch antes de publicar."
             }
           } else {
-            git tag v1.5.7 "$env:GITHUB_SHA"
-            if ($LASTEXITCODE -ne 0) { throw "Falha ao preparar a tag v1.5.7." }
-            git push origin refs/tags/v1.5.7
-            if ($LASTEXITCODE -ne 0) { throw "Falha ao publicar a tag v1.5.7." }
+            git tag v1.5.8 "$env:GITHUB_SHA"
+            if ($LASTEXITCODE -ne 0) { throw "Falha ao preparar a tag v1.5.8." }
+            git push origin refs/tags/v1.5.8
+            if ($LASTEXITCODE -ne 0) { throw "Falha ao publicar a tag v1.5.8." }
           }
 
-      - name: Publicar NexoFlow 1.5.7 no GitHub
+      - name: Publicar NexoFlow 1.5.8 no GitHub
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view v1.5.7 --json id 2>$null
+          gh release view v1.5.8 --json id 2>$null
           if ($LASTEXITCODE -ne 0) {
-            gh release create v1.5.7 --verify-tag --title "NexoFlow 1.5.7" --notes-file "dist/release-notes.md" --draft
-            if ($LASTEXITCODE -ne 0) { throw "Falha ao criar o release NexoFlow 1.5.7." }
+            gh release create v1.5.8 --verify-tag --title "NexoFlow 1.5.8" --notes-file "dist/release-notes.md" --draft
+            if ($LASTEXITCODE -ne 0) { throw "Falha ao criar o release NexoFlow 1.5.8." }
           }
-          gh release upload v1.5.7 "dist/NexoFlow-Setup-1.5.7.zip" "dist/NexoFlow-1.5.7.zip" "dist/SHA256SUMS-1.5.7.txt" --clobber
-          if ($LASTEXITCODE -ne 0) { throw "Falha ao enviar os pacotes do NexoFlow 1.5.7." }
-          gh release edit v1.5.7 --title "NexoFlow 1.5.7" --notes-file "dist/release-notes.md"
-          if ($LASTEXITCODE -ne 0) { throw "Falha ao atualizar as notas do NexoFlow 1.5.7." }
+          gh release upload v1.5.8 "dist/NexoFlow-Setup-1.5.8.zip" "dist/NexoFlow-1.5.8.zip" "dist/SHA256SUMS-1.5.8.txt" --clobber
+          if ($LASTEXITCODE -ne 0) { throw "Falha ao enviar os pacotes do NexoFlow 1.5.8." }
+          gh release edit v1.5.8 --title "NexoFlow 1.5.8" --notes-file "dist/release-notes.md"
+          if ($LASTEXITCODE -ne 0) { throw "Falha ao atualizar as notas do NexoFlow 1.5.8." }
           # Republicar preserva a tag e os arquivos, atualizando a data exibida.
-          gh release edit v1.5.7 --draft
-          if ($LASTEXITCODE -ne 0) { throw "Falha ao preparar a republicacao do NexoFlow 1.5.7." }
-          gh release edit v1.5.7 --draft=false --latest
+          gh release edit v1.5.8 --draft
+          if ($LASTEXITCODE -ne 0) { throw "Falha ao preparar a republicacao do NexoFlow 1.5.8." }
+          gh release edit v1.5.8 --draft=false --latest
           if ($LASTEXITCODE -ne 0) {
             # Uma segunda tentativa evita deixar o release em rascunho por falha temporaria.
-            gh release edit v1.5.7 --draft=false --latest
-            if ($LASTEXITCODE -ne 0) { throw "Falha ao republicar o NexoFlow 1.5.7." }
+            gh release edit v1.5.8 --draft=false --latest
+            if ($LASTEXITCODE -ne 0) { throw "Falha ao republicar o NexoFlow 1.5.8." }
           }
 
       - name: Resumo
         shell: pwsh
         run: |
-          Get-Content "dist/SHA256SUMS-1.5.7.txt"
+          Get-Content "dist/SHA256SUMS-1.5.8.txt"

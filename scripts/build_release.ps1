@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.7",
+    [string]$Version = "1.5.8",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -407,11 +407,9 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-Corrige a interrupção do Analytics por percentual de falhas individuais: os registros válidos são preservados, os demais ficam pendentes e o cursor de uma carga parcial não avança. Falhas de autenticação, circuito aberto e armazenamento estrutural continuam bloqueantes.
+Trata ultimoPedido explicitamente null como cliente sem pedido, sem erro de API ou pendência de segmento. Não reconstrói venda a partir de pedido antigo da Weni, não cria cancelamento ou admissão na Recompra e preserva o histórico armazenado. CPF, identidade e vínculo cadastral do segmento mantêm suas proteções.
 
-Corrige conflitos falsos na Recompra PET ao atualizar compra_recente, mantendo as guardas de alterações externas e a confirmação dos campos antes/depois da inclusão. O resumo apresenta a janela correta D+30 para PET e D+25 para FARMA. Diagnósticos de segmento são agregados e não expõem dados pessoais.
-
-As continuações introduzidas na 1.5.5 permanecem disponíveis mediante autorização Google local e configuração inicial das fontes no Data Studio. Consulte [Continuações](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/CONTINUACOES.md).
+A regra é compartilhada por FARMA e PET nos aplicativos existentes. O Analytics registra clientes sem pedido separadamente e conclui normalmente quando não existem outras falhas. As continuações de planilhas permanecem disponíveis mediante autorização Google local e configuração inicial do Data Studio. Consulte [Continuações](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/CONTINUACOES.md).
 
 A compilação suporta assinatura Authenticode com certificado de código confiável, timestamp e validação antes dos hashes. Sem certificado configurado, o pacote permanece sem assinatura; isso não é uma aprovação do Windows nem do antivírus. Consulte `RELATORIO DE SEGURANCA.json` dentro do ZIP.
 
@@ -423,4 +421,4 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.7
+# NexoFlow 1.5.8

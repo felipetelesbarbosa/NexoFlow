@@ -898,6 +898,8 @@ def resolve_latest(contact, farm, captured_at, lookup_cache=None, saved=None):
         weni_identity=weni_customer_identity(contact),
         customer_directory=directory_for(farm),
     )
+    if result[0] == "SEM_PEDIDO_API":
+        return None, []
     if result[0] not in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO"}:
         return {"status_confirmacao": result[0]}, []
     # Sem ultimoPedido, não reconstruir a compra a partir de campos soltos.
@@ -1278,7 +1280,7 @@ def write_review(review, path=REVIEW):
     profile = profile_for(review["structure"].get("segment", "FARMA"))
     counts = Counter(plan["reason"] for plan in review["plans"])
     lines = [
-        f"NexoFlow 1.5.7 — Revisão {profile.brand} D+{profile.days}",
+        f"NexoFlow 1.5.8 — Revisão {profile.brand} D+{profile.days}",
         f"Dia local: {review['day']}",
         f"Dados capturados em: {review['created_at']}",
         f"Horários conferidos ao concluir: {review.get('generated_at', review['created_at'])}",

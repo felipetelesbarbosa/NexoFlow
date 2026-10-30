@@ -1025,7 +1025,27 @@ class FarmaliderClient:
                 with self._metrics_lock:
                     self._directory_hits += 1
                 return candidates
-        return self.get_cliente_by_cpf(cpf)
+        payload = self.get_cliente_by_cpf(cpf)
+        from farmalider_integration import explicit_no_order
+
+        # Null basta para encerrar a consulta de pedido, mas não comprova que
+        # um cadastro global pertence à organização atual para deduplicação.
+        records = payload if isinstance(payload, list) else [payload]
+        usable = []
+        for record in records:
+            if isinstance(record, dict) and explicit_no_order(record):
+                markers = {
+                    str(part["segmento"]).strip().upper()
+                    for part in (record, record.get("cliente"))
+                    if isinstance(part, dict) and part.get("segmento") not in (None, "")
+                }
+                if markers != {self.customer_segment}:
+                    continue
+            if record is not None:
+                usable.append(record)
+        if not usable:
+            return None
+        return usable if isinstance(payload, list) else usable[0]
 
     def _cached_read(self, kind: str, key: str, fetch):
         # Ativado somente para a preparação desta execução, nunca persistido
@@ -1049,6 +1069,7 @@ class FarmaliderClient:
 
     def _fetch_customer(self, cpf):
         from farmalider_customers import CustomerDirectory, positive_id
+        from farmalider_integration import explicit_no_order
 
         payload = self._request_json(
             self._delivery_path(f"cliente/cpf/{cpf}"),
@@ -1063,6 +1084,7 @@ class FarmaliderClient:
         if not records:
             return None
         accepted = []
+        no_orders = []
         rejected = []
         for record in records:
             if not isinstance(record, dict):
@@ -1073,6 +1095,12 @@ class FarmaliderClient:
                 self._reject_lookup("ERRO_RESPOSTA_CLIENTE_API")
             if not positive_id(customer.get("id")):
                 self._reject_lookup("ERRO_RESPOSTA_CLIENTE_API")
+            if explicit_no_order(record):
+                # Nenhum pedido existe para fornecer um marcador de segmento.
+                # A seleção por CPF/identidade ocorre normalmente no consumidor;
+                # este cadastro não autoriza enriquecimento ou criação de venda.
+                no_orders.append(record)
+                continue
             markers = {
                 str(part["segmento"]).strip().upper()
                 for part in (record, customer, latest)
@@ -1109,6 +1137,8 @@ class FarmaliderClient:
                 continue
             accepted.append(record)
         if not accepted:
+            if no_orders:
+                return no_orders if isinstance(payload, list) else no_orders[0]
             self._reject_lookup(
                 "CPF_FORA_SEGMENTO_API"
                 if rejected and set(rejected) == {"CPF_FORA_SEGMENTO_API"}

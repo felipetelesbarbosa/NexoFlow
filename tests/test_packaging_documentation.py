@@ -130,7 +130,7 @@ class DocumentationTests(unittest.TestCase):
 class PackagingMetadataTests(unittest.TestCase):
     def test_metadata_preserves_version_and_python_311_support(self):
         metadata = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-        self.assertEqual(metadata["project"]["version"], "1.5.7")
+        self.assertEqual(metadata["project"]["version"], "1.5.8")
         self.assertEqual(metadata["project"]["requires-python"], ">=3.11")
         self.assertEqual(metadata["tool"]["ruff"]["target-version"], "py311")
 

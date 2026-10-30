@@ -1,4 +1,4 @@
-# NexoFlow 1.5.7 — Proxy e rede
+# NexoFlow 1.5.8 — Proxy e rede
 
 A mesma seleção de conexão direta/proxy e os controles de consulta se aplicam a **FarmaLíder e Pets Líder**. O perfil define os tokens e o segmento, sem alterar a regra de rede.
 

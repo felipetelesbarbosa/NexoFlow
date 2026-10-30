@@ -65,7 +65,7 @@ set "REVIEW_TXT=%PROFILE_LOG%\weni_update_review_full_25_parte_%PART%.txt"
 :configurado
 if not exist "%NEXOFLOW_HOME%\scripts\confirmar_revisao_weni.ps1" (
     echo [ERRO] Componente de revisão ausente: scripts\confirmar_revisao_weni.ps1
-    echo Reinstale o Setup atualizado do NexoFlow 1.5.7 antes de continuar.
+    echo Reinstale o Setup atualizado do NexoFlow 1.5.8 antes de continuar.
     set "RC=3"
     goto :erro
 )
@@ -81,7 +81,7 @@ if defined PART (
     echo [INFO] Carga completa Weni tradicional - 100%%.
 )
 echo.
-echo SEGURANÇA NexoFlow 1.5.7 - ATENDIMENTO 24H:
+echo SEGURANÇA NexoFlow 1.5.8 - ATENDIMENTO 24H:
 echo   1. check-up
 echo   2. teste de acesso
 echo   3. dry-run + auditoria + snapshot congelado

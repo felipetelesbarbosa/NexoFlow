@@ -15,7 +15,7 @@ def build_parser():
     from config import FARMALIDER_MAX_WORKERS
 
     parser = argparse.ArgumentParser(
-        description="NexoFlow 1.5.7 — Recompra FarmaLíder D+25 / Pets Líder D+30"
+        description="NexoFlow 1.5.8 — Recompra FarmaLíder D+25 / Pets Líder D+30"
     )
     parser.add_argument(
         "--perfil",

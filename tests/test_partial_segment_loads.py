@@ -44,7 +44,11 @@ class PartialSegmentLoadsTests(unittest.TestCase):
                         return deepcopy(snapshot)
                     if incomplete[0]:
                         raise FarmaliderLookupError("ERRO_SEGMENTO_NAO_CONFIRMADO_API")
-                    return None
+                    return {
+                        "cliente": {"id": 999, "cpf": int(cpf), "nome": "Sintético"},
+                        "ultimoPedido": None,
+                        "itens": [],
+                    }
 
                 farm.get_cliente_by_cpf.side_effect = query
                 farm.get_pedido.return_value = {
@@ -66,7 +70,9 @@ class PartialSegmentLoadsTests(unittest.TestCase):
                 controls = {
                     "ultima_sincronizacao_sucesso_utc": "2026-10-01T12:00:00+00:00"
                 }
-                sheets.get_control.side_effect = lambda key, controls=controls: controls.get(key, "")
+                sheets.get_control.side_effect = lambda key, controls=controls: (
+                    controls.get(key, "")
+                )
                 sheets.set_controls.side_effect = controls.update
                 sheets.request_stats.return_value = {
                     "reads": 1,
@@ -147,6 +153,7 @@ class PartialSegmentLoadsTests(unittest.TestCase):
                 incomplete[0] = False
                 self.assertEqual(main.main(), 0)
                 self.assertEqual(controls["ultima_execucao_status"], "sucesso")
+                self.assertEqual(controls["ultima_execucao_clientes_sem_pedido"], "1")
                 self.assertNotEqual(
                     controls["ultima_sincronizacao_sucesso_utc"],
                     "2026-10-01T12:00:00+00:00",

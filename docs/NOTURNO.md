@@ -48,3 +48,5 @@ Crie duas tarefas separadas no Agendador, uma com `--perfil FARMA` e outra com `
 Na 1.5.6, o check-up inspeciona o launcher Weni sem iniciar uma segunda carga. Os testes de desinstalação usam cópias temporárias com travas próprias; a manutenção real continua bloqueada enquanto houver carga FARMA ou PET.
 
 Na 1.5.7, falhas individuais de consulta no Analytics permanecem pendentes sem interromper os outros registros por percentual de erros. O código 3 indica conclusão parcial e preserva o marco incremental; o Noturno continua as demais etapas. Falhas de autenticação, circuito aberto e problemas estruturais continuam bloqueantes. Na Recompra PET, a conferência usa campos físicos para evitar conflito falso entre `compra_recente` e o alias analítico `ultima_compra`.
+
+Na 1.5.8, `ultimoPedido: null` é tratado como cliente sem pedido, sem erro de consulta ou validação de segmento de um pedido inexistente. Não gera venda ou inclusão na Recompra, não tenta substituir o null por um pedido antigo da Weni e não apaga o histórico armazenado. O próximo carregamento consulta novamente a fonte oficial.

@@ -22,6 +22,18 @@ def _text(value: Any) -> str:
     return "" if value is None else str(value).strip()
 
 
+NO_ORDER_API_STATUS = "SEM_PEDIDO_API"
+
+
+def explicit_no_order(payload: Any) -> bool:
+    """Null explícito é ausência; campo omitido não comprova ausência de pedido."""
+    return (
+        isinstance(payload, dict)
+        and "ultimoPedido" in payload
+        and payload["ultimoPedido"] is None
+    )
+
+
 def cpf_cadastro_status(value: Any) -> str:
     """Separate absent/placeholding data from an official API rejection.
 
@@ -319,6 +331,10 @@ def select_cliente_response(
             return ("CPF_IDENTIDADE_DIVERGENTE", "", ""), None
     if len(eligible) != 1:
         return ("CPF_IDENTIDADE_AMBIGUA", "", ""), None
+    if explicit_no_order(eligible[0][1]):
+        # Sem pedido não há segmento do pedido a validar. A ausência não
+        # confirma vínculo cadastral com este perfil nem autoriza enriquecimento.
+        return (NO_ORDER_API_STATUS, "", ""), eligible[0][1]
     return eligible[0]
 
 
@@ -953,6 +969,8 @@ def resolve_contact_order(
         "ERRO_RESPOSTA_CLIENTE_API",
         "CPF_NAO_INFORMADO_API",
     }
+    if cliente_lookup_status == NO_ORDER_API_STATUS:
+        return None, []
     if cliente_lookup_status in {
         "CPF_FORA_SEGMENTO_API",
         "ERRO_SEGMENTO_NAO_CONFIRMADO_API",
@@ -1083,6 +1101,10 @@ def resolve_contact_order(
         customer_directory=directory_for(farm_client),
     )
     status, confirmed_cliente_id, _ = result
+    if status == NO_ORDER_API_STATUS:
+        # Não consultar pedido_id/ultimo_pedido antigo para substituir o null
+        # oficial. Pedidos históricos permanecem no armazenamento existente.
+        return None, []
     if status not in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO"}:
         # Resposta concreta com CPF divergente/cliente inválido é falha dura:
         # não tentamos contornar uma inconsistência de identidade.
@@ -1210,4 +1232,4 @@ def resolve_contact_order(
     return fallback_order, fallback_items
 
 
-# NexoFlow 1.5.7
+# NexoFlow 1.5.8

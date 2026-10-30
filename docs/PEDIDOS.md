@@ -1,8 +1,8 @@
-# Pedidos no NexoFlow 1.5.7
+# Pedidos no NexoFlow 1.5.8
 
 As regras compartilhadas de pedidos atendem **FarmaLíder e Pets Líder**, com organizações e planilhas separadas. Farma usa `ultima_compra`; Pets usa `compra_recente`. A referência dos eventos é `pedido_data`: D+25 na Farma e D+30 no Pets. Veja [segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 
-O **NexoFlow 1.5.7** usa a FarmaLíder API como fonte de verdade dos dados de pedido. A Weni recebe um snapshot operacional dos campos `pedido_*`; Google Sheets e Data Studio recebem a estrutura analítica correspondente.
+O **NexoFlow 1.5.8** usa a FarmaLíder API como fonte de verdade dos dados de pedido. A Weni recebe um snapshot operacional dos campos `pedido_*`; Google Sheets e Data Studio recebem a estrutura analítica correspondente.
 
 ## Arquitetura de coleta
 
@@ -265,4 +265,10 @@ Respostas inconsistentes não alimentam métricas como venda confirmada.
 
 Leia também [FarmaLíder API](FARMALIDER%20API.md), [NexoFlow Weni](README%20WENI.md) e [Data Studio](DATA%20STUDIO.md).
 
-<!-- NexoFlow 1.5.7 -->
+<!-- NexoFlow 1.5.8 -->
+
+## Cliente sem pedido
+
+`ultimoPedido: null` explícito em resposta válida do cliente significa que não há pedido retornado. O resultado cadastral é `SEM_PEDIDO_API`, sem falha ou pendência de consulta; Weni e Recompra apresentam o resultado normal de ausência de pedido. Não validar segmento, status, pagamento ou itens de um pedido inexistente, nem reconstruir um pedido a partir dos campos antigos da Weni. Itens sem cabeçalho não criam venda ou cancelamento. O histórico já armazenado é preservado, com suas regras próprias de reconsulta.
+
+Campo omitido, resposta malformada, falha de rede e erro HTTP continuam seguindo os diagnósticos existentes. CPF/identidade permanecem verificados, e cadastros sem segmento comprovado não autorizam enriquecimento ou exclusão de duplicados. Um pedido existente continua exigindo vínculo com o segmento.

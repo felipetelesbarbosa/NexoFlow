@@ -13,7 +13,7 @@ Instale e administre a chave por mecanismos do fornecedor/Windows, preferencialm
 Em um Windows autorizado, com o certificado e a chave já acessíveis no repositório pessoal de certificados:
 
 ```powershell
-.\scripts\build_release.ps1 -Version '1.5.7' -CertificateThumbprint '{IMPRESSAO_DIGITAL_DO_CERTIFICADO}' -RequireSignature
+.\scripts\build_release.ps1 -Version '1.5.8' -CertificateThumbprint '{IMPRESSAO_DIGITAL_DO_CERTIFICADO}' -RequireSignature
 ```
 
 O build valida validade, chave e uso de assinatura de código. Incorpora versão/ícones antes de assinar, usa SHA-256 e timestamp HTTPS, verifica `Valid`, editor esperado e timestamp, e só então gera manifesto, checksums e ZIPs. Falha na assinatura interrompe o build. O instalador oficial do Python mantém a assinatura original.
