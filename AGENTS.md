@@ -1,6 +1,6 @@
-# NexoFlow 1.5.5
+# NexoFlow 1.5.6
 
-A versão pública atual é **NexoFlow 1.5.5**, autorizada pelo usuário em 30/10/2026.
+A versão pública atual é **NexoFlow 1.5.6**, autorizada pelo usuário em 30/10/2026.
 
 ## Conferência antes da entrega
 
@@ -13,9 +13,9 @@ A versão pública atual é **NexoFlow 1.5.5**, autorizada pelo usuário em 30/1
 
 ## Regras do projeto
 
-- Use mensagens de commit curtas em português que descrevam a área ou a alteração, como `Automação`, `Documentação`, `Instalador` ou `Corrigir revisão da Recompra`. `NexoFlow 1.5.5` identifica a versão, não é uma mensagem obrigatória de commit. Separe alterações por área quando isso tornar a navegação do GitHub mais clara; não reescreva o histórico apenas para mudar os textos exibidos.
+- Use mensagens de commit curtas em português que descrevam a área ou a alteração, como `Automação`, `Documentação`, `Instalador` ou `Corrigir revisão da Recompra`. `NexoFlow 1.5.6` identifica a versão, não é uma mensagem obrigatória de commit. Separe alterações por área quando isso tornar a navegação do GitHub mais clara; não reescreva o histórico apenas para mudar os textos exibidos.
 - A `main` é a única branch de trabalho do repositório. Atualize diretamente a `main`; não crie nem mantenha branches adicionais.
-- O release atual usa `NexoFlow 1.5.5`, tag `v1.5.5` e pacotes com sufixo `1.5.5`. Para cada próxima publicação de atualização/hotfix/patch, incremente uma única vez: 1.5.6, 1.5.7, ... 1.5.99; depois 1.6, 1.6.1, ... 1.6.99. Não incremente por commit ou tentativa de CI da mesma entrega. Preserve tags e releases anteriores; nunca sobrescreva uma versão anterior com um novo patch. Confira `VERSION` e `docs/VERSIONAMENTO.md`.
+- O release atual usa `NexoFlow 1.5.6`, tag `v1.5.6` e pacotes com sufixo `1.5.6`. Para cada próxima publicação de atualização/hotfix/patch, incremente uma única vez: 1.5.7, 1.5.8, ... 1.5.99; depois 1.6, 1.6.1, ... 1.6.99. Não incremente por commit ou tentativa de CI da mesma entrega. Preserve tags e releases anteriores; nunca sobrescreva uma versão anterior com um novo patch. Confira `VERSION` e `docs/VERSIONAMENTO.md`.
 - Cada release deve mostrar a data da sua publicação. Não reutilize uma versão já publicada para código novo.
 - Preserve as credenciais e os diagnósticos privados fora do Git e dos pacotes públicos.
 - Use os nomes de pagamento: 0 Cancelado, 1 Dinheiro, 2 Débito, 3 Crédito, 4 Ticket, 5 Pix por Link de Pagamento, 6 Pix no POS.
@@ -43,3 +43,5 @@ A versão pública atual é **NexoFlow 1.5.5**, autorizada pelo usuário em 30/1
 - FARMA mantém filtro de produtos humanos e D+25. PET exige vínculo oficial PET, preserva seus itens e usa D+30, pedido_data, compra_recente e opt_in_marketing Sim/Não, sem exigência de maioridade. Pagamento da Recompra exige código documentado de 1 a 6; falhas de consulta permanecem pendentes em ambos os perfis.
 
 - Cargas FARMA e PET podem coexistir; duas cargas do mesmo segmento continuam bloqueadas. Launchers nativos e BAT do Noturno usam o mesmo contrato Win32. Instalação/desinstalação precisam das travas global e dos dois segmentos antes de modificar arquivos. Estado, logs e destinos permanecem isolados.
+
+- O check-up precisa passar enquanto o próprio Noturno mantém a trava do segmento, inclusive com FARMA e PET ativos. Fixtures usam nomes de trava exclusivos e somente diretórios temporários. Inspeção de PE não inicia outra carga; nenhum modo de teste pode desativar as travas operacionais. Validar essa combinação no pacote instalado.

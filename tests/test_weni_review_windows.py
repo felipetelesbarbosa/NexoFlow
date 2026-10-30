@@ -22,7 +22,7 @@ REPOSITORY = Path(__file__).resolve().parents[1]
 class WeniReviewBatchWindowsTests(unittest.TestCase):
     """Run the real BAT, replacing only its external service and UI calls."""
 
-    def test_native_weni_launcher_runs_after_icon_update(self):
+    def test_native_weni_build_info_runs_after_icon_update_without_a_load(self):
         with tempfile.TemporaryDirectory(prefix="nexo weni icon ") as temporary:
             directory = Path(temporary)
             (directory / "comandos").mkdir()
@@ -33,7 +33,7 @@ class WeniReviewBatchWindowsTests(unittest.TestCase):
                 encoding="ascii",
             )
             completed = subprocess.run(
-                [str(executable)],
+                [str(executable), "--build-info"],
                 cwd=directory,
                 env={**os.environ, "NEXOFLOW_INTERNAL_BUILD_INFO": "1"},
                 capture_output=True,
@@ -41,7 +41,8 @@ class WeniReviewBatchWindowsTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(completed.returncode, 0, completed.stderr)
-            self.assertIn(b"SYNTHETIC_WENI_LAUNCH_OK", completed.stdout)
+            self.assertNotIn(b"SYNTHETIC_WENI_LAUNCH_OK", completed.stdout)
+            self.assertIn(b"NexoFlowNativeLauncher=1.5", completed.stdout)
             self.assertIn(b"NexoFlowWeniIconRevision=1.5", completed.stdout)
 
     def _wait_until(

@@ -44,3 +44,5 @@ A revisão da Recompra é renovada uma vez se atravessar a mudança de dia. Outr
 Desde a 1.5.5, pode executar um Noturno FARMA e outro PET ao mesmo tempo no mesmo computador. Não execute outra carga do mesmo segmento enquanto seu Noturno estiver ativo. Os executáveis e a entrada BAT usam travas por segmento, além do bloqueio próprio da rotina. Instalação e desinstalação exigem os dois segmentos parados. Os atalhos individuais continuam solicitando revisão humana.
 
 Crie duas tarefas separadas no Agendador, uma com `--perfil FARMA` e outra com `--perfil PET`. Mantenha “Não iniciar uma nova instância” em cada tarefa. Versões anteriores ainda usam trava global; atualize a instalação inteira antes de tentar paralelismo. API, proxy e quotas Google continuam compartilhando capacidade e podem reduzir a velocidade quando as cargas coincidem. Não há garantia de ganho proporcional.
+
+Na 1.5.6, o check-up inspeciona o launcher Weni sem iniciar uma segunda carga. Os testes de desinstalação usam cópias temporárias com travas próprias; a manutenção real continua bloqueada enquanto houver carga FARMA ou PET.

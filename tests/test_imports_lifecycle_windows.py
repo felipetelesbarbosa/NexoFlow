@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from uuid import uuid4
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -13,9 +14,19 @@ ROOT = Path(__file__).resolve().parents[1]
 class ImportsLifecycleWindowsTests(unittest.TestCase):
     def run_harness(self, installer, body):
         source = ROOT / "installer" / installer
-        literal = str(source).replace("'", "''")
         with tempfile.TemporaryDirectory(prefix="nexo importacoes ") as temp:
             root = Path(temp)
+            # Preservar as travas reais no programa; somente a cópia sintética
+            # recebe nomes próprios, sem disputar as cargas em execução.
+            fixture_source = root / "source.ps1"
+            fixture_source.write_text(
+                source.read_text(encoding="utf-8-sig").replace(
+                    r"Local\NexoFlowOperationLock",
+                    r"Local\NexoFlowImportFixture_" + uuid4().hex,
+                ),
+                encoding="utf-8-sig",
+            )
+            literal = str(fixture_source).replace("'", "''")
             root_literal = str(root).replace("'", "''")
             harness = root / "harness.ps1"
             harness.write_text(

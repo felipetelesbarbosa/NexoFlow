@@ -1,4 +1,4 @@
-# NexoFlow 1.5.5: Curva ABC por período
+# NexoFlow 1.5.6: Curva ABC por período
 
 Conector Google Apps Script para calcular a curva ABC no Data Studio conforme o período selecionado.
 
@@ -26,7 +26,7 @@ Não retorna CPF, cliente, contato ou número original de pedido. Não usa servi
 
 ## Instalação privada
 
-1. No Google Apps Script da conta dona do relatório, crie um projeto com o nome **NexoFlow 1.5.5 - Curva ABC**.
+1. No Google Apps Script da conta dona do relatório, crie um projeto com o nome **NexoFlow 1.5.6 - Curva ABC**.
 2. Copie `AbcCore.js`, `Code.js` e `Tables.js` para arquivos de script com os mesmos nomes (o editor pode mostrá-los como `.gs`). Habilite a exibição de `appsscript.json` e copie o manifesto.
 3. Salve. Em **Implantar > Testar implantações**, selecione o tipo conector do Data Studio. Use o ID de implantação fornecido pelo Google, sem tornar o projeto público.
 4. Autorize a leitura no Google e crie três fontes privadas a partir da mesma implantação. Informe o ID da planilha BI e escolha `abc`, `resumo` e `juntos`, respectivamente. Mantenha o ID fora do repositório.
@@ -64,6 +64,6 @@ A suíte do conector usa somente dados fictícios. Não envia dados nem modifica
 
 Este componente destina-se ao uso interno, sob as permissões da conta que o instalar. O operador é responsável por autorizar apenas fontes e leitores permitidos. A instalação não estabelece oferta comercial, contrato de suporte ou política para terceiros. Não publicar em galeria sem revisão específica de identidade, termos e política de privacidade. O código não grava registros de negócio em logs nem transmite dados para fora dos serviços Google usados pelo próprio relatório.
 
-## Continuações a partir da 1.5.5
+## Continuações a partir da 1.5.6
 
 O leitor atualizado precisa ser copiado para o Apps Script e sua implantação atualizada antes de habilitar as partes BI. Validações registradas de uma implantação anterior não comprovam que esta alteração já está ativa no relatório. Confira o [guia de continuações](../../docs/CONTINUACOES.md).

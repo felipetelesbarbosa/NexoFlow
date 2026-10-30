@@ -1,4 +1,11 @@
-# NexoFlow 1.5.5 — Changelog
+# NexoFlow 1.5.6 — Changelog
+
+## NexoFlow 1.5.6 — 30/10/2026
+
+- Check-up deixa de disputar a trava da própria carga. O teste de preservação executa uma cópia temporária do desinstalador com nomes de mutex exclusivos; as travas do instalador/desinstalador de produção permanecem obrigatórias.
+- O launcher Weni oferece `--build-info` somente para inspeção, sem BAT, Python, credenciais ou admissão de carga. O teste do executável incorporado funciona mesmo com Farma e Pets ativos; a execução normal continua sujeita às travas e tem smoke test próprio.
+- Validação do pacote instalado reproduz as duas falhas dos testes da 1.5.5, mantém duas cargas sintéticas FARMA/PET ativas, executa os dois check-ups completos em paralelo e confere a continuidade das onze etapas simuladas, sem APIs reais. Uma segunda execução FARMA continua bloqueada.
+- Preservadas as continuações de planilhas, regras de negócio e rotinas de aplicação/revisão da 1.5.5.
 
 ## NexoFlow 1.5.5 — 30/10/2026
 

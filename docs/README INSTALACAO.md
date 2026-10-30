@@ -1,4 +1,4 @@
-# NexoFlow 1.5.5 — Instalação
+# NexoFlow 1.5.6 — Instalação
 
 ## Requisitos
 
@@ -8,11 +8,11 @@
 
 ## Instalar
 
-1. Baixe [NexoFlow-Setup-1.5.5.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.5/NexoFlow-Setup-1.5.5.zip).
+1. Baixe [NexoFlow-Setup-1.5.6.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.6/NexoFlow-Setup-1.5.6.zip).
 2. Extraia todo o pacote e execute **NexoFlow Setup.exe**. Autorize a instalação quando o Windows solicitar.
 3. Conclua o assistente. O destino padrão é `C:\NexoFlow`, com atalhos dos aplicativos na Área de Trabalho e no Menu Iniciar.
 
-O [release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.5) também oferece o projeto completo e o arquivo de hashes dos pacotes.
+O [release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.6) também oferece o projeto completo e o arquivo de hashes dos pacotes.
 
 ## Configurar os acessos
 
@@ -67,7 +67,7 @@ Encerre as rotinas dos dois segmentos e execute o novo **NexoFlow Setup.exe**. Q
 
 Os arquivos de `importacoes/` são preservados nas duas opções. O Setup não exclui dados na Weni ou no Google Sheets. Se a instalação falhar, tenta restaurar a versão anterior com seus dados.
 
-A série atual é 1.5; patches posteriores seguem 1.5.5 até 1.5.99, antes de 1.6. A versão instalada aparece no Terminal e nos metadados dos aplicativos.
+A série atual é 1.5; patches posteriores seguem 1.5.6 até 1.5.99, antes de 1.6. A versão instalada aparece no Terminal e nos metadados dos aplicativos.
 
 Após atualizar, rode o diagnóstico e gere novas revisões antes de aplicar mudanças. Faça carga completa quando precisar revalidar a base ou preencher novos campos. O [histórico de mudanças](../CHANGELOG.md) informa os ajustes de cada publicação.
 

@@ -14,7 +14,7 @@ Não apague, renomeie ou mova manualmente as continuações, suas abas ou o índ
 
 A conta de serviço de `credentials/google_credentials.json` continua lendo e gravando as planilhas. Para **criar** arquivos no Meu Drive, é necessária uma autorização do usuário Google no computador onde as cargas serão executadas. Não é preciso criar outra conta de serviço para Pets.
 
-1. Encerre as cargas. Instale a 1.5.5 preservando credenciais, configurações e logs.
+1. Encerre as cargas. Instale a 1.5.6 ou superior preservando credenciais, configurações e logs.
 2. No Google Cloud, habilite Google Drive API e Google Sheets API. Configure a tela de consentimento OAuth e crie um cliente **Aplicativo para computador**. A conta autorizada precisa editar as três origens e acessar suas pastas no Meu Drive.
 3. Baixe o JSON oficial desse cliente para `credentials/google_oauth_client.json`. Não envie pelo chat, não inclua no Git e não substitua `google_credentials.json`.
 4. Execute `comandos/configurar_continuacoes.bat`, escolha FarmaLíder ou Pets Líder e a opção de autorizar/configurar. Conclua a autorização no navegador local.

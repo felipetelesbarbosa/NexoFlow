@@ -831,7 +831,7 @@ class CurrentIntegrationTests(unittest.TestCase):
             data = optional_exe.read_bytes()
             self.assertTrue(data.startswith(b"MZ"))
             self.assertIn(b"NexoFlowNativeLauncher=1.5", data)
-            self.assertIn("1.5.5.0".encode("utf-16le"), data)
+            self.assertIn("1.5.6.0".encode("utf-16le"), data)
 
     def test_installer_repairs_and_validates_required_components(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -1119,7 +1119,7 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn("NexoFlow Console.lnk", uninstall)
         self.assertIn("NexoFlow - Update Weni.lnk", install)
         self.assertIn("NexoFlow Console.lnk", install)
-        self.assertIn("$AppVersion = '1.5.5'", install)
+        self.assertIn("$AppVersion = '1.5.6'", install)
         self.assertIn("${exePath}: $($_.Exception.Message)", install)
         self.assertNotIn("$exePath: $($_.Exception.Message)", install)
 
@@ -1173,4 +1173,4 @@ class CurrentIntegrationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-# NexoFlow 1.5.5
+# NexoFlow 1.5.6

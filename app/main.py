@@ -253,7 +253,7 @@ def split_contacts(
         if contact_has_cpf(contact):
             with_cpf.append(contact)
 
-    # Desde o NexoFlow 1.5.5 o Analytics preserva todos os contatos retornados pela Weni.
+    # Desde o NexoFlow 1.5.6 o Analytics preserva todos os contatos retornados pela Weni.
     # Consulta CPFs válidos primeiro e depois os demais informados. Pedidos podem ser
     # recuperados para estes contatos mesmo quando ultimo_pedido está vazio.
     return relevant, with_cpf, list(contacts)
@@ -1628,4 +1628,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-# NexoFlow 1.5.5
+# NexoFlow 1.5.6

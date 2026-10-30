@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.5",
+    [string]$Version = "1.5.6",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -407,7 +407,9 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-Continuações de planilhas antes de 18 milhões de células alocadas ou 500 mil linhas por parte, com histórico preservado e autorização Google no Meu Drive. A criação exige configurar `comandos/configurar_continuacoes.bat`. O Data Studio exige instalar o conector privado e substituir suas fontes uma vez; o Setup não altera o relatório automaticamente. Consulte [Continuações](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/CONTINUACOES.md).
+Corrige o check-up do Noturno durante cargas ativas: fixtures de desinstalação têm travas próprias e a inspeção do launcher Weni não inicia outra carga. A validação do pacote instalado reproduz as falhas anteriores e executa dois check-ups completos com FARMA/PET simultâneos, preservando o bloqueio de duplicação do mesmo segmento.
+
+As continuações introduzidas na 1.5.5 permanecem disponíveis mediante autorização Google local e configuração inicial das fontes no Data Studio. Consulte [Continuações](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/CONTINUACOES.md).
 
 A compilação suporta assinatura Authenticode com certificado de código confiável, timestamp e validação antes dos hashes. Sem certificado configurado, o pacote permanece sem assinatura; isso não é uma aprovação do Windows nem do antivírus. Consulte `RELATORIO DE SEGURANCA.json` dentro do ZIP.
 
@@ -419,4 +421,4 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.5
+# NexoFlow 1.5.6
