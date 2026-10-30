@@ -276,6 +276,9 @@ class OAuthSetupTests(unittest.TestCase):
             )
             self.assertEqual(flow.run_local_server.call_args.kwargs["port"], 0)
             self.assertEqual(
+                flow.run_local_server.call_args.kwargs.get("prompt"), "consent"
+            )
+            self.assertEqual(
                 json.loads(user.read_text()), {"refresh_token": "FICTICIO"}
             )
             import os

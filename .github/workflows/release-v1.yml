@@ -159,10 +159,11 @@ jobs:
           try {
             $proof = & go test -tags noturno -run '^TestSegmentLocksAllowDifferentProfilesAndBlockSameProfile$' . 2>&1
             $failed = $LASTEXITCODE -ne 0
-            if (-not $failed -or ($proof | Out-String) -notmatch 'FARMA bloqueou PET') {
-              throw "A regressão não reproduziu o bloqueio entre segmentos da versão anterior."
+            Write-Host ($proof | Out-String)
+            if (-not $failed -or ($proof | Out-String) -notmatch '(FARMA bloqueou PET|admitiu duas cargas FARMA)') {
+              throw "A regressão não reproduziu a falha de isolamento da versão anterior."
             }
-            Write-Host '[OK] Regressão reproduzida na versão anterior: FARMA bloqueava PET.'
+            Write-Host '[OK] Regressão reproduzida: a versão anterior falha no contrato de isolamento por segmento.'
           } finally { Pop-Location; Remove-Item -LiteralPath $fixture -Recurse -Force }
           go test -v -tags noturno ./native_launcher
           if ($LASTEXITCODE -ne 0) { throw "Falha no menu ou na espera do console do NexoFlow Noturno." }

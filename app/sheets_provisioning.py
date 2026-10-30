@@ -56,6 +56,9 @@ def authorize_user(client_file: Path = CLIENT_FILE, user_file: Path = USER_FILE)
         host="localhost",
         port=0,
         open_browser=True,
+        # Nova autorização precisa de refresh token também após uma concessão
+        # anterior, como ao configurar o segundo perfil no mesmo computador.
+        prompt="consent",
         authorization_prompt_message="Conclua a autorização na janela do navegador.",
         success_message="Autorização NexoFlow concluída. Você pode fechar esta janela.",
         timeout_seconds=300,
