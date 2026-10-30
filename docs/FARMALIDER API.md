@@ -343,4 +343,8 @@ GET /api/Delivery/pedidos/cpf/{cpf}
 ```
 
 Filtros desejáveis: `inicio`, `fim`, `status`, `pagina` e `tamanhoPagina`. Essa rota é uma proposta de evolução, não uma integração atualmente implementada.
-<!-- NexoFlow 1.5.3 -->
+<!-- NexoFlow 1.5.4 -->
+
+### Respostas e pendências
+
+A resposta HTTP 200 passa por validação de JSON, CPF, proprietário e segmento. Lista vazia na consulta por CPF significa cliente não localizado nessa resposta; não comprova ausência histórica de compras. Resposta inválida ou segmento não comprovado fica pendente. Outro segmento não autoriza cadastro, pedido nem admissão na campanha atual. O Analytics resume os resultados por lote, sem repetir CPF por CPF.

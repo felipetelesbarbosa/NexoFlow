@@ -31,9 +31,12 @@ from versioning import CURRENT_VERSION
 class WeniError(RuntimeError):
     """Controlled user-facing messages, without raw HTTP exception text."""
 
-    def __init__(self, message: str, *, status_code: int | None = None):
+    def __init__(
+        self, message: str, *, status_code: int | None = None, validation=None
+    ):
         super().__init__(message)
         self.status_code = status_code
+        self.validation = validation or {}
 
 
 class WeniClient:
@@ -57,6 +60,31 @@ class WeniClient:
         return (
             dt.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
         )
+
+    @staticmethod
+    def _validation_summary(response, body):
+        try:
+            data = response.json()
+        except ValueError:
+            return {"reason": "RESPOSTA_NAO_JSON", "fields": []}
+        text = str(data).lower()
+        categories = (
+            ("urn belongs to another contact", "TELEFONE_JA_CADASTRADO"),
+            ("invalid contact field key", "CAMPO_INEXISTENTE"),
+            ("disallowed", "CAMPO_SEM_PERMISSAO"),
+            ("invalid urn", "TELEFONE_OU_URN_INVALIDO"),
+            ("max_length", "TAMANHO_EXCEDIDO"),
+            ("no more than", "TAMANHO_EXCEDIDO"),
+        )
+        reason = next(
+            (code for pattern, code in categories if pattern in text),
+            "VALIDACAO_REJEITADA",
+        )
+        submitted = set((body or {}).get("fields", {}))
+        affected = sorted(key for key in submitted if key in text)
+        if isinstance(data, dict):
+            affected += [key for key in ("name", "urns", "fields") if key in data]
+        return {"reason": reason, "fields": sorted(set(affected))}
 
     def _request_json(
         self,
@@ -127,6 +155,13 @@ class WeniClient:
                     time.sleep(wait)
                     continue
 
+                if response.status_code in (400, 422):
+                    validation = self._validation_summary(response, json_body)
+                    raise WeniError(
+                        f"Weni recusou os dados: HTTP {response.status_code}; motivo={validation['reason']}; campos={','.join(validation['fields']) or 'não informado'}. Operação: {operation}.",
+                        status_code=response.status_code,
+                        validation=validation,
+                    )
                 response.raise_for_status()
                 if not response.content:
                     return {}
@@ -411,7 +446,15 @@ class WeniClient:
         try:
             return self._post_json(
                 WENI_CONTACTS_API_URL,
-                json_body={"name": name, "urns": urns, "fields": fields},
+                json_body={
+                    "name": name,
+                    "urns": urns,
+                    "fields": {
+                        str(k): str(v)
+                        for k, v in fields.items()
+                        if v is not None and str(v).strip()
+                    },
+                },
             )
         finally:
             self.retry_mutations = retry
@@ -589,4 +632,4 @@ class WeniClient:
         }
 
 
-# NexoFlow 1.5.3
+# NexoFlow 1.5.4

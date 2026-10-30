@@ -5,6 +5,7 @@ import math
 import os
 import sys
 import time
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -87,6 +88,8 @@ PARTIAL_SYNC_EXIT_CODE = 3
 ORDER_API_FAILURES = frozenset(
     {
         "ERRO_API",
+        "ERRO_JSON_CLIENTE_API",
+        "ERRO_SEGMENTO_NAO_CONFIRMADO_API",
         "ERRO_RESPOSTA_CLIENTE_API",
         "CLIENTE_ID_INVALIDO_API",
         "CLIENTE_ID_DIVERGENTE_API",
@@ -250,7 +253,7 @@ def split_contacts(
         if contact_has_cpf(contact):
             with_cpf.append(contact)
 
-    # Desde o NexoFlow 1.5.3 o Analytics preserva todos os contatos retornados pela Weni.
+    # Desde o NexoFlow 1.5.4 o Analytics preserva todos os contatos retornados pela Weni.
     # Consulta CPFs válidos primeiro e depois os demais informados. Pedidos podem ser
     # recuperados para estes contatos mesmo quando ultimo_pedido está vazio.
     return relevant, with_cpf, list(contacts)
@@ -280,6 +283,8 @@ def _query_cliente(
     | None = None,
     cadastro_responses: dict | None = None,
 ) -> ClienteResult:
+    from farmalider_client import FarmaliderLookupError
+
     try:
         directory = directory_for(farm_client)
         local = bool(directory is not None and directory.candidates(cpf))
@@ -301,6 +306,8 @@ def _query_cliente(
         raise
     except FarmaliderBadRequestError:
         return "CPF_REJEITADO_API", "", ""
+    except FarmaliderLookupError as exc:
+        return exc.code, "", ""
     except FarmaliderError:
         # O erro individual vira status. Se a taxa de falha do lote subir
         # demais, validate_contacts interrompe a carga antes de gravar.
@@ -579,34 +586,8 @@ def validate_contacts(
                             completed += 1
                             progress.advance()
                             batch_completed += 1
-                            if result[0] == "ERRO_API":
+                            if result[0].startswith("ERRO_"):
                                 batch_errors += 1
-                                contact_refs = (
-                                    sorted(
-                                        {
-                                            farm_client.weni_contact_diagnostic_ref(
-                                                str(row["contact_uuid"])
-                                            )
-                                            for row in rows_by_cpf[cpf]
-                                            if row.get("contact_uuid")
-                                        }
-                                    )
-                                    if isinstance(farm_client, FarmaliderClient)
-                                    else []
-                                )
-                                lookup_ref = (
-                                    farm_client.cpf_diagnostic_ref(cpf)
-                                    if isinstance(farm_client, FarmaliderClient)
-                                    else "-"
-                                )
-                                logging.warning(
-                                    "FarmaLíder cliente/cpf [consulta %s]: falha para %s "
-                                    "contato(s) Weni; contato_ref=%s%s.",
-                                    lookup_ref,
-                                    len(rows_by_cpf[cpf]),
-                                    ",".join(contact_refs[:3]) or "indisponivel",
-                                    ",..." if len(contact_refs) > 3 else "",
-                                )
 
                         if (
                             batch_completed >= 100
@@ -623,6 +604,14 @@ def validate_contacts(
                                 "e pedidos no Google Sheets."
                             )
 
+                    batch_reasons = Counter(cache[cpf][0] for cpf in batch)
+                    logging.info(
+                        "FarmaLíder: resultado do lote %s/%s | consultas=%s | resultados=%s.",
+                        batch_number,
+                        total_batches,
+                        len(batch),
+                        dict(sorted(batch_reasons.items())),
+                    )
                     error_rate = batch_errors / len(batch) if batch else 0.0
                     if (
                         batch_errors >= FARMALIDER_BATCH_ERROR_ABORT_MIN_ERRORS
@@ -695,7 +684,7 @@ def validate_contacts(
                         additions = enrichment(row, customer, captured.date())
                         row.update(additions)
                         stats.cadastral_fields_filled += len(additions)
-                if result[0] == "ERRO_API" and _preserve_cliente_on_api_error(
+                if result[0].startswith("ERRO_") and _preserve_cliente_on_api_error(
                     row,
                     existing_by_uuid,
                 ):
@@ -707,7 +696,7 @@ def validate_contacts(
         stats.api_errors = sum(
             len(rows_by_cpf[cpf])
             for cpf, result in cache.items()
-            if result[0] == "ERRO_API"
+            if result[0].startswith("ERRO_")
         )
 
     for row in rows:
@@ -740,7 +729,7 @@ def validate_contacts(
         )
     if stats.cadastral_fields_filled:
         logging.info(
-            "FarmaLíder: %s campo(s) ausente(s) preenchido(s) pelo cadastro FARMA; dados existentes preservados.",
+            "FarmaLíder: %s campo(s) ausente(s) preenchido(s) pelo cadastro do segmento; dados existentes preservados.",
             stats.cadastral_fields_filled,
         )
     stats.elapsed_seconds = time.monotonic() - started
@@ -1639,4 +1628,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-# NexoFlow 1.5.3
+# NexoFlow 1.5.4

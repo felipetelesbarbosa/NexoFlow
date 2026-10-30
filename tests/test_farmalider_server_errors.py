@@ -272,7 +272,10 @@ class FarmaliderServerErrorTests(unittest.TestCase):
             {"contact_uuid": "contact-two", "cpf": "16899535009"},
         ]
         lookup_status: dict[str, str] = {}
-        with patch("main.logging.warning") as warnings:
+        with (
+            patch("main.logging.info") as batch_logs,
+            patch("main.logging.warning") as warnings,
+        ):
             stats = validate_contacts(
                 rows,
                 farm_client=farm,
@@ -294,7 +297,9 @@ class FarmaliderServerErrorTests(unittest.TestCase):
         text = _logged_messages(warnings)
         for private in (CPF, "16899535009", "contact-one", "contact-two"):
             self.assertNotIn(private, text)
-        self.assertIn("contato_ref=", text)
+        self.assertNotIn("falha para", text)
+        self.assertIn("resultado do lote", _logged_messages(batch_logs))
+        self.assertIn("ERRO_API", _logged_messages(batch_logs))
 
         # A second partial run must not erase the previously confirmed ID.
         repeated = {"contact_uuid": "contact-one", "cpf": CPF}

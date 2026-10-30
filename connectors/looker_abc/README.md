@@ -1,4 +1,4 @@
-# NexoFlow 1.5.3: Curva ABC por período
+# NexoFlow 1.5.4: Curva ABC por período
 
 Conector Google Apps Script para calcular a curva ABC no Data Studio conforme o período selecionado.
 
@@ -26,7 +26,7 @@ Não retorna CPF, cliente, contato ou número original de pedido. Não usa servi
 
 ## Instalação privada
 
-1. No Google Apps Script da conta dona do relatório, crie um projeto com o nome **NexoFlow 1.5.3 - Curva ABC**.
+1. No Google Apps Script da conta dona do relatório, crie um projeto com o nome **NexoFlow 1.5.4 - Curva ABC**.
 2. Copie `AbcCore.js` e `Code.js` para arquivos de script com os mesmos nomes (o editor pode mostrá-los como `.gs`). Habilite a exibição de `appsscript.json` e copie o manifesto.
 3. Salve. Em **Implantar > Testar implantações**, selecione o tipo conector do Data Studio. Use o ID de implantação fornecido pelo Google, sem tornar o projeto público.
 4. Autorize a leitura no Google e crie três fontes privadas a partir da mesma implantação. Informe o ID da planilha BI e escolha `abc`, `resumo` e `juntos`, respectivamente. Mantenha o ID fora do repositório.

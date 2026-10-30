@@ -1108,9 +1108,12 @@ def _apply_purchase_candidate(
         )
     except (FarmaliderAuthError, FarmaliderUnavailableError):
         raise
-    except FarmaliderError:
-        plan.order_resolution_status = "ERRO_API"
-        logging.warning("Falha ao consultar ou confirmar pedido na FarmaLíder API.")
+    except FarmaliderError as exc:
+        from farmalider_client import FarmaliderLookupError
+
+        plan.order_resolution_status = (
+            exc.code if isinstance(exc, FarmaliderLookupError) else "ERRO_API"
+        )
         return False
 
     plan.order_resolution_status = (
@@ -1517,6 +1520,7 @@ def _apply_creation(session, plan, stats):
         event = _audit_plan_event(plan, mode="create", status="pending", error=reason)
         if isinstance(exc, WeniError):
             event["detail"] = str(exc)
+            event["validation"] = exc.validation
         _append_audit(event)
 
 
@@ -3721,4 +3725,4 @@ def run_update(
             farm.close()
 
 
-# NexoFlow 1.5.3
+# NexoFlow 1.5.4

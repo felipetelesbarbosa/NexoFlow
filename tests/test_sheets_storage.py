@@ -1,5 +1,6 @@
 import unittest
-from unittest.mock import Mock
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from google_sheets import GoogleSheetsStore
 from sheets_storage import STORAGE_SHEET, SheetsStorage
@@ -93,3 +94,48 @@ class SheetsStorageTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "abas essenciais"):
             store._initialize_structure(validate_structure=False)
         store.ensure_structure.assert_not_called()
+
+
+class ExplicitStorageTests(unittest.TestCase):
+    def test_explicit_ids_route_without_remote_map_for_both_profiles(self):
+        from runtime_profile import validate_sheet_destinations
+        from sheets_storage import configured_storage
+
+        settings = SimpleNamespace(
+            GOOGLE_OPERATIONS_SPREADSHEET_ID="operations",
+            GOOGLE_HISTORY_SPREADSHEET_ID="history",
+        )
+        with (
+            patch("project_paths.load_private_settings", return_value=settings),
+            patch(
+                "runtime_profile.validate_sheet_destinations",
+                wraps=validate_sheet_destinations,
+            ),
+        ):
+            self.assertEqual(
+                configured_storage("dashboard"),
+                SheetsStorage("dashboard", "operations", "history"),
+            )
+        settings.GOOGLE_HISTORY_SPREADSHEET_ID = ""
+        with patch("project_paths.load_private_settings", return_value=settings):
+            with self.assertRaises(ValueError):
+                configured_storage("dashboard")
+
+    def test_disagreement_local_and_remote_blocks_before_mutations(self):
+        test = SheetsStorageTests()
+        layout = test.layout()
+        store = GoogleSheetsStore.__new__(GoogleSheetsStore)
+        store._hub_id = "dashboard"
+        store.book = Mock()
+        config = Mock(title=STORAGE_SHEET)
+        config.get.return_value = layout.values()
+        store.book.worksheets.return_value = [config]
+        store._read_with_retry = lambda _, call: call()
+        store.client = Mock()
+        with patch(
+            "sheets_storage.configured_storage",
+            return_value=SheetsStorage("dashboard", "different", "history"),
+        ):
+            with self.assertRaisesRegex(ValueError, "divergem"):
+                store._initialize_structure(validate_structure=False)
+        store.client.open_by_key.assert_not_called()

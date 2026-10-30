@@ -81,6 +81,19 @@ for ids in [('D_PET','O_FARMA','H_PET'),('D_FARMA','O_PET','H_PET')]:
 """,
         )
 
+    def test_explicit_storage_is_available_in_each_profile_without_remote_map(self):
+        for profile in ("FARMA", "PET"):
+            self.invoke(
+                profile,
+                """
+from sheets_storage import configured_storage
+from runtime_profile import segment
+layout = configured_storage('D_' + segment())
+assert layout.operations == 'O_' + segment()
+assert layout.history == 'H_' + segment()
+""",
+            )
+
     def test_pet_token_wrong_org_is_blocked_before_contact_request(self):
         self.invoke(
             "PET",

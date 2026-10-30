@@ -241,19 +241,33 @@ class GoogleSheetsStore:
         storage_sheet = next(
             (ws for ws in worksheets if ws.title == STORAGE_SHEET), None
         )
-        if storage_sheet is None:
+        from sheets_storage import configured_storage
+
+        configured = configured_storage(getattr(self, "_hub_id", ""))
+        if storage_sheet is None and configured is None:
             from runtime_profile import segment
 
             if segment() == "PET":
                 raise ValueError(
-                    "O Dashboard PET precisa do mapa NexoFlow_Arquivos antes da carga."
+                    "Configure os três IDs PET ou o mapa NexoFlow_Arquivos antes da carga."
                 )
-        if storage_sheet is not None:
-            values = self._read_with_retry(
-                "ler configuração dos arquivos Google Sheets",
-                lambda: storage_sheet.get("A1:B5"),
+        if storage_sheet is not None or configured is not None:
+            layout = (
+                SheetsStorage.from_values(
+                    self._read_with_retry(
+                        "ler configuração dos arquivos Google Sheets",
+                        lambda: storage_sheet.get("A1:B5"),
+                    ),
+                    self._hub_id,
+                )
+                if storage_sheet is not None
+                else configured
             )
-            layout = SheetsStorage.from_values(values, self._hub_id)
+            assert layout is not None
+            if configured is not None and configured != layout:
+                raise ValueError(
+                    "Os IDs locais divergem do mapa NexoFlow_Arquivos. Nenhuma gravação autorizada."
+                )
             from runtime_profile import validate_sheet_destinations
 
             validate_sheet_destinations(
@@ -2142,4 +2156,4 @@ class GoogleSheetsStore:
         return order_result, item_result
 
 
-# NexoFlow 1.5.3
+# NexoFlow 1.5.4

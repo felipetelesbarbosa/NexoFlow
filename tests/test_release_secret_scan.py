@@ -152,12 +152,12 @@ class ReleaseSecretScanTests(unittest.TestCase):
                     if path.is_file()
                 ),
                 [
-                    "NexoFlow-1.5.3/NexoFlow/pasta/README.txt",
-                    "NexoFlow-Setup-1.5.3/NexoFlow Setup/payload/README.txt",
+                    "NexoFlow-1.5.4/NexoFlow/pasta/README.txt",
+                    "NexoFlow-Setup-1.5.4/NexoFlow Setup/payload/README.txt",
                 ],
             )
             self.assertEqual(
-                (extracted / "NexoFlow-1.5.3/NexoFlow/pasta/README.txt").read_text(
+                (extracted / "NexoFlow-1.5.4/NexoFlow/pasta/README.txt").read_text(
                     encoding="utf-8"
                 ),
                 "portátil",

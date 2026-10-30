@@ -33,6 +33,7 @@ from config import FARMALIDER_MAX_WORKERS, WENI_UPDATE_STATE_FILE
 from farmalider_client import (
     FarmaliderAuthError,
     FarmaliderError,
+    FarmaliderLookupError,
     FarmaliderUnavailableError,
 )
 from farmalider_customers import directory_for, prepare_customers
@@ -167,7 +168,7 @@ class RecompraReadCache:
 
                 # HTTP 400 é definitivo para esta consulta; falhas transitórias
                 # não impedem outra tentativa nesta mesma execução.
-                if not isinstance(exc, FarmaliderBadRequestError):
+                if not isinstance(exc, (FarmaliderBadRequestError, FarmaliderLookupError)):
                     with self._lock:
                         if self._responses.get(cache_key) is future:
                             del self._responses[cache_key]
@@ -358,6 +359,8 @@ def build_plans(
             )
         except (FarmaliderAuthError, FarmaliderUnavailableError):
             raise
+        except FarmaliderLookupError as exc:
+            order, items = {"status_confirmacao": exc.code}, []
         except (FarmaliderError, RequestException):
             order, items = {"status_confirmacao": "ERRO_API"}, []
         return propose(contact, order, items, structure, saved, now=now)
@@ -628,6 +631,8 @@ def _saved_with_purchase_check(state, uid):
 def _resolve_checked_contact(contact, farm, captured_at, saved):
     try:
         return resolve_latest(contact, farm, captured_at, saved=saved)
+    except FarmaliderLookupError:
+        raise
     except FarmaliderError:
         if contact_pending_purchase_check(contact, saved.get("pending_purchase_check")):
             return {"status_confirmacao": "ERRO_API"}, []
@@ -1176,7 +1181,7 @@ def write_review(review, path=REVIEW):
     profile = profile_for(review["structure"].get("segment", "FARMA"))
     counts = Counter(plan["reason"] for plan in review["plans"])
     lines = [
-        f"NexoFlow 1.5.3 — Revisão {profile.brand} D+{profile.days}",
+        f"NexoFlow 1.5.4 — Revisão {profile.brand} D+{profile.days}",
         f"Dia local: {review['day']}",
         f"Dados capturados em: {review['created_at']}",
         f"Horários conferidos ao concluir: {review.get('generated_at', review['created_at'])}",

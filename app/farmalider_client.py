@@ -44,6 +44,25 @@ class FarmaliderError(RuntimeError):
     """Erro base da integração FarmaLíder."""
 
 
+class FarmaliderLookupError(FarmaliderError):
+    """Resposta recebida, mas sem cadastro utilizável para o segmento atual."""
+
+    CODES = frozenset(
+        {
+            "CPF_FORA_SEGMENTO_API",
+            "ERRO_SEGMENTO_NAO_CONFIRMADO_API",
+            "ERRO_RESPOSTA_CLIENTE_API",
+            "ERRO_JSON_CLIENTE_API",
+        }
+    )
+
+    def __init__(self, code):
+        if code not in self.CODES:
+            raise ValueError("Diagnóstico de cadastro desconhecido.")
+        super().__init__(code)
+        self.code = code
+
+
 class FarmaliderBadRequestError(FarmaliderError):
     """Consulta rejeitada com HTTP 400, sem retry nem inferência de inexistência."""
 
@@ -99,6 +118,7 @@ class FarmaliderClient:
         self._diagnostic_execution_id = secrets.token_hex(8)
         self._private_diagnostic_lock = threading.Lock()
         self._private_recorded_refs: set[str] = set()
+        self._lookup_diagnostics: dict[str, int] = {}
 
         self.customer_directory = None
         self._directory_attempted = False
@@ -231,11 +251,18 @@ class FarmaliderClient:
             while self._in_flight:
                 self._request_gate.wait()
         metrics = self.metrics_snapshot()
+        if self._lookup_diagnostics:
+            logging.info(
+                "FarmaLíder: respostas de cadastro não aproveitadas | segmento=%s | motivos=%s. HTTP 200 não comprova vínculo ou formato válido.",
+                self.customer_segment,
+                dict(sorted(self._lookup_diagnostics.items())),
+            )
         if self._directory_attempted or self._execution_cache is not None:
             logging.info(
-                "FarmaLíder: reaproveitamento nesta execução | cadastros locais=%s | leituras HTTP evitadas=%s | cadastros FARMA=%s | últimos pedidos locais=%s | pedidos por ID locais=%s.",
+                "FarmaLíder: reaproveitamento nesta execução | cadastros locais=%s | leituras HTTP evitadas=%s | cadastros %s=%s | últimos pedidos locais=%s | pedidos por ID locais=%s.",
                 metrics["customer_directory_hits"],
                 metrics["execution_read_cache_hits"],
+                self.customer_segment,
                 metrics["customer_directory_records"],
                 metrics["customer_directory_cpf_hits"],
                 metrics["customer_directory_order_hits"],
@@ -845,14 +872,17 @@ class FarmaliderClient:
                     else:
                         try:
                             response.raise_for_status()
-                            payload = response.json()
                         except requests.RequestException:
                             self._mark_unhealthy()
                             raise FarmaliderError(
                                 f"FarmaLíder API retornou HTTP {status}."
                             ) from None
+                        try:
+                            payload = response.json()
                         except ValueError:
                             self._mark_unhealthy()
+                            if endpoint_label == "cliente/cpf":
+                                self._reject_lookup("ERRO_JSON_CLIENTE_API")
                             raise FarmaliderError(
                                 "FarmaLíder API retornou JSON inválido."
                             ) from None
@@ -864,6 +894,8 @@ class FarmaliderClient:
                             )
                         ):
                             self._mark_unhealthy()
+                            if endpoint_label == "cliente/cpf":
+                                self._reject_lookup("ERRO_RESPOSTA_CLIENTE_API")
                             raise FarmaliderError(
                                 "FarmaLíder API retornou um formato inesperado."
                             )
@@ -1021,14 +1053,19 @@ class FarmaliderClient:
         if payload is None:
             return None
         records = payload if isinstance(payload, list) else [payload]
+        if not records:
+            return None
         accepted = []
+        rejected = []
         for record in records:
             if not isinstance(record, dict):
-                raise FarmaliderError("Cadastro incompleto; contato pendente.")
+                self._reject_lookup("ERRO_RESPOSTA_CLIENTE_API")
             customer = record.get("cliente", record)
             latest = record.get("ultimoPedido")
             if not isinstance(customer, dict):
-                raise FarmaliderError("Cadastro incompleto; contato pendente.")
+                self._reject_lookup("ERRO_RESPOSTA_CLIENTE_API")
+            if not positive_id(customer.get("id")):
+                self._reject_lookup("ERRO_RESPOSTA_CLIENTE_API")
             markers = {
                 str(part["segmento"]).strip().upper()
                 for part in (record, customer, latest)
@@ -1041,13 +1078,21 @@ class FarmaliderClient:
                     for c in self.customer_directory.candidates(cpf)
                 }
             if markers and markers != {self.customer_segment}:
+                rejected.append(
+                    "CPF_FORA_SEGMENTO_API"
+                    if markers <= {"FARMA", "PET"} and len(markers) == 1
+                    else "ERRO_SEGMENTO_NAO_CONFIRMADO_API"
+                )
                 continue
             if not markers and not trusted:
+                rejected.append("ERRO_SEGMENTO_NAO_CONFIRMADO_API")
                 continue
             accepted.append(record)
         if not accepted:
-            raise FarmaliderError(
-                "Segmento do cliente não confirmado; contato pendente."
+            self._reject_lookup(
+                "CPF_FORA_SEGMENTO_API"
+                if rejected and set(rejected) == {"CPF_FORA_SEGMENTO_API"}
+                else "ERRO_SEGMENTO_NAO_CONFIRMADO_API"
             )
         # Somente snapshots completos, com proprietário/data/itens verificados,
         # dispensam uma segunda leitura do mesmo pedido durante esta execução.
@@ -1067,6 +1112,11 @@ class FarmaliderClient:
                 snapshot["capa"]["segmento"] = self.customer_segment
                 self._execution_cache.read("pedido", code, lambda value=snapshot: value)
         return accepted if isinstance(payload, list) else accepted[0]
+
+    def _reject_lookup(self, code):
+        with self._metrics_lock:
+            self._lookup_diagnostics[code] = self._lookup_diagnostics.get(code, 0) + 1
+        raise FarmaliderLookupError(code)
 
     def _record_private_failure(
         self,

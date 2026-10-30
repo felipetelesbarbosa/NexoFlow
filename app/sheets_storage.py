@@ -67,3 +67,31 @@ class SheetsStorage:
         if title.startswith("BI_"):
             return self.dashboard
         return self.operations
+
+
+def configured_storage(hub_id: str) -> SheetsStorage | None:
+    """IDs explícitos são alternativa ao mapa remoto, nunca destinos inferidos."""
+    from project_paths import load_private_settings
+    from runtime_profile import validate_sheet_destinations
+
+    settings = load_private_settings()
+    operations = str(
+        getattr(settings, "GOOGLE_OPERATIONS_SPREADSHEET_ID", "") or ""
+    ).strip()
+    history = str(getattr(settings, "GOOGLE_HISTORY_SPREADSHEET_ID", "") or "").strip()
+    if not operations and not history:
+        return None
+    if not operations or not history:
+        raise ValueError(
+            "Preencha os IDs de Operação e Histórico juntos, ou use o mapa NexoFlow_Arquivos."
+        )
+    configured_hub = str(
+        getattr(settings, "GOOGLE_SPREADSHEET_ID", hub_id) or ""
+    ).strip()
+    if configured_hub != hub_id:
+        raise ValueError("O Dashboard informado diverge do perfil selecionado.")
+    layout = SheetsStorage.from_values(
+        SheetsStorage(hub_id, operations, history).values(), hub_id
+    )
+    validate_sheet_destinations(layout.dashboard, layout.operations, layout.history)
+    return layout

@@ -17,7 +17,7 @@ from contact_dedup_guard import contact_refusals, customer_phones, native_phones
 from dedup_io import DedupHTTPClient, digest, save_private
 from farmalider_integration import _positive_id
 from google_sheets import column_letter
-from sheets_storage import STORAGE_SHEET, SheetsStorage
+from sheets_storage import STORAGE_SHEET, SheetsStorage, configured_storage
 from task_progress import TaskProgress, request_progress
 
 SOURCE_TABS = (
@@ -257,10 +257,18 @@ class DedupSheets:
         self.hub = self.client.open_by_key(hub_id)
         try:
             tabs = {w.title: w for w in self.hub.worksheets()}
+            configured = configured_storage(hub_id)
             self.layout = (
                 SheetsStorage.from_values(tabs[STORAGE_SHEET].get("A1:B5"), hub_id)
                 if STORAGE_SHEET in tabs
-                else SheetsStorage(hub_id, hub_id, hub_id)
+                else configured or SheetsStorage(hub_id, hub_id, hub_id)
+            )
+            if configured is not None and self.layout != configured:
+                raise ValueError("Os IDs locais divergem do mapa NexoFlow_Arquivos.")
+            from runtime_profile import validate_sheet_destinations
+
+            validate_sheet_destinations(
+                self.layout.dashboard, self.layout.operations, self.layout.history
             )
             self.books: dict[str, Any] = {hub_id: self.hub}
             for key in (self.layout.operations, self.layout.history):

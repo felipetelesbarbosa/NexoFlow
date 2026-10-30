@@ -1,10 +1,10 @@
-# NexoFlow 1.5.3
+# NexoFlow 1.5.4
 
 Aplicativos para Windows que integram **Weni e a API FarmaLíder nos segmentos FarmaLíder e Pets Líder**, atualizam contatos e pedidos e organizam os dados no **Google Sheets** para análise no **Data Studio**.
 
 O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
 
-[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.3/NexoFlow-Setup-1.5.3.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
+[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.4/NexoFlow-Setup-1.5.4.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
 
 ## Componentes
 
@@ -68,7 +68,7 @@ Na rotina diária, use os atalhos Weni, Recompra e Analytics conforme necessári
 
 ## Versões e atualizações
 
-A versão atual é **1.5.3**. As próximas correções seguem **1.5.4, 1.5.5, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
+A versão atual é **1.5.4**. As próximas correções seguem **1.5.5, 1.5.6, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
 
 ## Referências
 
@@ -83,3 +83,5 @@ O projeto é distribuído sem chaves, tokens ou credenciais. Use os seus própri
 Os executáveis de referência ficam em `native_launcher/prebuilt/`; os pacotes oficiais recompilam os aplicativos e mantêm os caminhos de instalação. Dependências opcionais e de desenvolvimento ficam em `dependencias/`. `pyproject.toml`, `pyrightconfig.json` e `requirements.txt` permanecem na raiz para as ferramentas Python.
 
 A integração dos dois segmentos usa produção. A leitura da base completa pode aguardar até 10 minutos por tentativa; consultas individuais mantêm 90 segundos. Quando necessário, o NexoFlow consulta o CPF e exige confirmação do segmento antes de usar os dados.
+
+Os três IDs de planilha podem ser configurados em cada perfil do `secrets_config.py`: Dashboard, Operação e Histórico. O mapa `NexoFlow_Arquivos`, quando existir, deve coincidir com esses IDs. Consulte o relatório de cada execução: HTTP 200 não dispensa a validação do conteúdo e do segmento.

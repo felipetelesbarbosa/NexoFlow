@@ -843,6 +843,7 @@ def resolve_contact_order(
         FarmaliderAuthError,
         FarmaliderBadRequestError,
         FarmaliderError,
+        FarmaliderLookupError,
         FarmaliderUnavailableError,
     )
 
@@ -952,6 +953,19 @@ def resolve_contact_order(
         "ERRO_RESPOSTA_CLIENTE_API",
         "CPF_NAO_INFORMADO_API",
     }
+    if cliente_lookup_status in {
+        "CPF_FORA_SEGMENTO_API",
+        "ERRO_SEGMENTO_NAO_CONFIRMADO_API",
+        "ERRO_JSON_CLIENTE_API",
+        "ERRO_RESPOSTA_CLIENTE_API",
+    }:
+        return _failure(
+            _empty_order(contact, captured_at),
+            [],
+            cliente_lookup_status,
+            "Vínculo com o segmento não confirmado nesta carga.",
+        )
+
     if invalid_cpf and cliente_lookup_status in identity_failure_statuses | {
         "ERRO_API",
         "CPF_NAO_ENCONTRADO",
@@ -1010,6 +1024,13 @@ def resolve_contact_order(
             [],
             "CPF_REJEITADO_API",
             "Consulta de CPF rejeitada pela API (HTTP 400).",
+        )
+    except FarmaliderLookupError as exc:
+        return _failure(
+            _empty_order(contact, captured_at),
+            [],
+            exc.code,
+            "Resposta oficial sem vínculo utilizável para o segmento atual.",
         )
     except FarmaliderError:
         if invalid_cpf:
@@ -1189,4 +1210,4 @@ def resolve_contact_order(
     return fallback_order, fallback_items
 
 
-# NexoFlow 1.5.3
+# NexoFlow 1.5.4

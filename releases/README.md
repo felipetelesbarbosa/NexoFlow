@@ -1,14 +1,14 @@
-# NexoFlow 1.5.3 — Downloads
+# NexoFlow 1.5.4 — Downloads
 
 Instalador, projeto completo e hashes de verificação para download.
 
-A [release v1.5.3](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.3) reúne os pacotes oficiais:
+A [release v1.5.4](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.4) reúne os pacotes oficiais:
 
 | Arquivo | Uso |
 | --- | --- |
-| [NexoFlow-Setup-1.5.3.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.3/NexoFlow-Setup-1.5.3.zip) | Instalador para Windows; recomendado para usar o NexoFlow. |
-| [NexoFlow-1.5.3.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.3/NexoFlow-1.5.3.zip) | Projeto completo. |
-| [SHA256SUMS-1.5.3.txt](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.3/SHA256SUMS-1.5.3.txt) | Hashes para conferir os dois pacotes baixados. |
+| [NexoFlow-Setup-1.5.4.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.4/NexoFlow-Setup-1.5.4.zip) | Instalador para Windows; recomendado para usar o NexoFlow. |
+| [NexoFlow-1.5.4.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.4/NexoFlow-1.5.4.zip) | Projeto completo. |
+| [SHA256SUMS-1.5.4.txt](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.4/SHA256SUMS-1.5.4.txt) | Hashes para conferir os dois pacotes baixados. |
 
 Extraia todo o ZIP do Setup antes de executar **NexoFlow Setup.exe**. Os pacotes não incluem credenciais; configure seus próprios acessos.
 
