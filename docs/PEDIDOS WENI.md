@@ -1,4 +1,4 @@
-# NexoFlow 1.5.6 — Pedidos na Weni
+# NexoFlow 1.5.7 — Pedidos na Weni
 
 As regras compartilhadas de pedidos atendem **FarmaLíder e Pets Líder**, com organizações e planilhas separadas. Farma usa `ultima_compra`; Pets usa `compra_recente`. A referência dos eventos é `pedido_data`: D+25 na Farma e D+30 no Pets. Veja [segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 
@@ -73,4 +73,4 @@ Os logs de preparação e auditoria precedem as gravações. O total de contatos
 
 Veja [PEDIDOS.md](PEDIDOS.md) para regras completas.
 
-<!-- NexoFlow 1.5.6 -->
+<!-- NexoFlow 1.5.7 -->

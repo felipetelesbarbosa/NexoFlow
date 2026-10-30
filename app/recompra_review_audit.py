@@ -302,12 +302,13 @@ def public_review_lines(review: Mapping[str, Any]) -> list[str]:
     actions = audit["actions"]
     marketing = audit["marketing_within_window"]
     products = audit["products_within_window"]
+    days = 30 if (review.get("structure") or {}).get("segment") == "PET" else 25
     lines = [
         "Resumo por contato único; não representa mensagens enviadas.",
         f"Contatos únicos revisados: {audit['reviewed_unique']}; "
         f"linhas repetidas: {audit['duplicate_rows']}; "
         f"duplicidades divergentes: {audit['conflicting_duplicate_uuids']}.",
-        f"Na janela de 0 a 25 dias: {audit['within_window']}.",
+        f"Na janela de 0 a {days} dias: {audit['within_window']}.",
         f"Ações de grupo: inclusões={actions['add']}; remoções={actions['remove']}; "
         f"trocas de referência={actions['replace']}; sem ação={actions['none']}.",
         f"Contatos com alterações planejadas: {audit['planned_changes']}; "

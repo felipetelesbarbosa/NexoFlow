@@ -1,4 +1,12 @@
-# NexoFlow 1.5.6 — Changelog
+# NexoFlow 1.5.7 — Changelog
+
+## NexoFlow 1.5.7 — 30/10/2026
+
+- Analytics não interrompe toda a carga pelo percentual de erros individuais de consulta. Registros válidos continuam para as planilhas e o BI; falhas ficam pendentes, o resultado permanece parcial (código 3) e o cursor incremental anterior é preservado. Autenticação, circuito aberto e falhas estruturais continuam bloqueantes.
+- Recompra confere os campos físicos da Weni. A escrita em `compra_recente` no PET deixa de parecer alteração externa de `ultima_compra`, mantendo as guardas de mudanças concorrentes, recusas, cancelamentos e confirmação antes/depois da inclusão.
+- Diagnóstico agregado de respostas sem vínculo distingue ausência de marcador sem confirmação no índice, índice indisponível, marcador desconhecido, marcadores conflitantes e outro segmento. Nenhum dado pessoal ou conteúdo do marcador é exposto; HTTP 200 não autoriza vínculo sem evidência.
+- Resumo da janela da Recompra mostra D+30 para PET e D+25 para FARMA.
+- Regressões reproduzem a interrupção por percentual e o conflito PET da versão anterior. Integração do Analytics com I/O simulado confere gravação dos pedidos válidos, código 3, preservação do cursor e retomada com código 0; inclusão e troca de referência PET usam a normalização real do perfil.
 
 ## NexoFlow 1.5.6 — 30/10/2026
 

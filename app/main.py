@@ -32,8 +32,8 @@ from analytics import (
     validate_full_load_quarter,
 )
 from config import (
-    FARMALIDER_BATCH_ERROR_ABORT_MIN_ERRORS,
-    FARMALIDER_BATCH_ERROR_ABORT_RATE,
+    FARMALIDER_BATCH_ERROR_WARN_MIN_ERRORS,
+    FARMALIDER_BATCH_ERROR_WARN_RATE,
     FARMALIDER_BATCH_SIZE,
     FARMALIDER_CACHE_CONFIRMED_HOURS,
     FARMALIDER_CACHE_NOT_FOUND_HOURS,
@@ -253,7 +253,7 @@ def split_contacts(
         if contact_has_cpf(contact):
             with_cpf.append(contact)
 
-    # Desde o NexoFlow 1.5.6 o Analytics preserva todos os contatos retornados pela Weni.
+    # O Analytics preserva todos os contatos retornados pela Weni.
     # Consulta CPFs válidos primeiro e depois os demais informados. Pedidos podem ser
     # recuperados para estes contatos mesmo quando ultimo_pedido está vazio.
     return relevant, with_cpf, list(contacts)
@@ -309,8 +309,8 @@ def _query_cliente(
     except FarmaliderLookupError as exc:
         return exc.code, "", ""
     except FarmaliderError:
-        # O erro individual vira status. Se a taxa de falha do lote subir
-        # demais, validate_contacts interrompe a carga antes de gravar.
+        # Falha individual permanece pendente; somente autenticação ou circuito
+        # indisponível interrompe a consulta global.
         return "ERRO_API", "", ""
 
 
@@ -554,9 +554,8 @@ def validate_contacts(
                         len(batch),
                     )
                     batch_errors = 0
-                    batch_completed = 0
-                    # Evaluate complete, bounded sub-batches. The first responses
-                    # to finish may be fast failures while successful calls are slow.
+                    # Sub-lotes limitam o trabalho em voo e permitem cancelar pendentes
+                    # quando houver falha global de autenticação ou circuito aberto.
                     for chunk_start in range(0, len(batch), 100):
                         chunk = batch[chunk_start : chunk_start + 100]
                         futures = {
@@ -585,24 +584,8 @@ def validate_contacts(
                                 cliente_lookup_status_by_cpf[cpf] = result[0]
                             completed += 1
                             progress.advance()
-                            batch_completed += 1
                             if result[0].startswith("ERRO_"):
                                 batch_errors += 1
-
-                        if (
-                            batch_completed >= 100
-                            and batch_errors >= FARMALIDER_BATCH_ERROR_ABORT_MIN_ERRORS
-                            and batch_errors / batch_completed
-                            >= FARMALIDER_BATCH_ERROR_ABORT_RATE
-                        ):
-                            raise FarmaliderError(
-                                "FarmaLíder apresentou taxa elevada de erros no lote "
-                                f"{batch_number}/{total_batches}: "
-                                f"{batch_errors}/{batch_completed} consultas concluídas "
-                                f"({batch_errors / batch_completed:.1%}). "
-                                "Carga interrompida antes de atualizar contatos "
-                                "e pedidos no Google Sheets."
-                            )
 
                     batch_reasons = Counter(cache[cpf][0] for cpf in batch)
                     logging.info(
@@ -614,15 +597,18 @@ def validate_contacts(
                     )
                     error_rate = batch_errors / len(batch) if batch else 0.0
                     if (
-                        batch_errors >= FARMALIDER_BATCH_ERROR_ABORT_MIN_ERRORS
-                        and error_rate >= FARMALIDER_BATCH_ERROR_ABORT_RATE
+                        batch_errors >= FARMALIDER_BATCH_ERROR_WARN_MIN_ERRORS
+                        and error_rate >= FARMALIDER_BATCH_ERROR_WARN_RATE
                     ):
-                        raise FarmaliderError(
-                            "FarmaLíder apresentou taxa elevada de erros no lote "
-                            f"{batch_number}/{total_batches}: "
-                            f"{batch_errors}/{len(batch)} "
-                            f"({error_rate:.1%}). Carga interrompida antes da "
-                            "atualização de contatos e pedidos no Google Sheets."
+                        logging.warning(
+                            "FarmaLíder: lote %s/%s com %s/%s consultas pendentes "
+                            "(%.1f%%). Os demais resultados serão preservados; "
+                            "a carga continua sem validar os registros que falharam.",
+                            batch_number,
+                            total_batches,
+                            batch_errors,
+                            len(batch),
+                            error_rate * 100,
                         )
 
                     elapsed = max(time.monotonic() - started, 0.001)
@@ -1628,4 +1614,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-# NexoFlow 1.5.6
+# NexoFlow 1.5.7

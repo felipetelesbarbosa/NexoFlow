@@ -396,7 +396,7 @@ class FarmaliderServerErrorTests(unittest.TestCase):
         api.get_cliente_by_cpf.assert_not_called()
         api.get_pedido.assert_not_called()
 
-    def test_batch_aborts_before_finishing_500_failing_contacts(self) -> None:
+    def test_individual_errors_do_not_abort_remaining_contacts(self) -> None:
         farm = Mock()
         calls = 0
 
@@ -407,6 +407,14 @@ class FarmaliderServerErrorTests(unittest.TestCase):
             raise FarmaliderError("HTTP 500")
 
         farm.get_cliente_by_cpf.side_effect = fail
+        farm.metrics_snapshot.return_value = {
+            "total_requests": 200,
+            "retries": 0,
+            "rate_limits": 0,
+            "server_errors": 200,
+            "max_response_ms": 1,
+            "effective_delay_ms": 0,
+        }
         rows = [
             {"contact_uuid": f"contact-{index}", "cpf": f"{index + 1000:011d}"}
             for index in range(200)
@@ -415,18 +423,18 @@ class FarmaliderServerErrorTests(unittest.TestCase):
             patch("main.is_valid_cpf", return_value=True),
             patch("main.FARMALIDER_BATCH_SIZE", 200),
             patch("main.FARMALIDER_MAX_WORKERS", 1),
-            patch("main.FARMALIDER_BATCH_ERROR_ABORT_MIN_ERRORS", 2),
-            patch("main.FARMALIDER_BATCH_ERROR_ABORT_RATE", 0.5),
+            patch("main.FARMALIDER_BATCH_ERROR_WARN_MIN_ERRORS", 2),
+            patch("main.FARMALIDER_BATCH_ERROR_WARN_RATE", 0.5),
             patch("main.logging.warning"),
         ):
-            with self.assertRaises(FarmaliderError):
-                validate_contacts(
-                    rows,
-                    farm_client=farm,
-                    farm_settings=FarmaliderSettings(True, "synthetic", False),
-                    sync_time=NEW_TIME,
-                )
-        self.assertEqual(calls, 100)
+            stats = validate_contacts(
+                rows,
+                farm_client=farm,
+                farm_settings=FarmaliderSettings(True, "synthetic", False),
+                sync_time=NEW_TIME,
+            )
+        self.assertEqual(calls, 200)
+        self.assertEqual(stats.api_errors, 200)
 
     def test_fast_500s_do_not_bias_the_completed_chunk_error_rate(self) -> None:
         farm = Mock()
@@ -457,8 +465,8 @@ class FarmaliderServerErrorTests(unittest.TestCase):
         with (
             patch("main.is_valid_cpf", return_value=True),
             patch("main.FARMALIDER_MAX_WORKERS", 4),
-            patch("main.FARMALIDER_BATCH_ERROR_ABORT_MIN_ERRORS", 20),
-            patch("main.FARMALIDER_BATCH_ERROR_ABORT_RATE", 0.5),
+            patch("main.FARMALIDER_BATCH_ERROR_WARN_MIN_ERRORS", 20),
+            patch("main.FARMALIDER_BATCH_ERROR_WARN_RATE", 0.5),
             patch("main.logging.warning"),
         ):
             stats = validate_contacts(

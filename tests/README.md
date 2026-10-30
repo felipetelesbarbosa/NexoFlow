@@ -1,6 +1,6 @@
-# NexoFlow 1.5.6 — Testes
+# NexoFlow 1.5.7 — Testes
 
-Suíte automatizada do NexoFlow 1.5.6.
+Suíte automatizada do NexoFlow 1.5.7.
 
 Os testes cobrem, entre outros pontos:
 
@@ -17,7 +17,7 @@ Os testes cobrem, entre outros pontos:
 - preparação dos webhooks opcionais.
 - integração da Recompra no Noturno, com CLI real, revisão, estado e transporte HTTP simulado.
 
-A suíte integra o `comandos/check-up.bat` e o fluxo de publicação do NexoFlow 1.5.6.
+A suíte integra o `comandos/check-up.bat` e o fluxo de publicação do NexoFlow 1.5.7.
 
 Na raiz do repositório, com as dependências instaladas, execute:
 
@@ -31,7 +31,7 @@ Os testes de pedidos verificam a normalização dos enums oficiais e a preserva�
 
 Os testes de identidade usam somente valores fictícios. CPF matematicamente válido dispensa comparação de nome, telefone ou e-mail; a reposição de zeros à esquerda só é aceita quando os dígitos verificadores são válidos. CPF inválido exige primeiro nome correspondente ou número local do telefone correspondente do mesmo cliente, ignorando +55 e DDD e preservando os bloqueios por ambiguidade.
 
-Consulte [Pedidos](../docs/PEDIDOS.md) para o contrato completo. A validação dos executáveis e os smoke tests de instalação são executados no Windows pelo [workflow da release v1.5.6](../.github/workflows/release-v1.yml).
+Consulte [Pedidos](../docs/PEDIDOS.md) para o contrato completo. A validação dos executáveis e os smoke tests de instalação são executados no Windows pelo [workflow da release v1.5.7](../.github/workflows/release-v1.yml).
 
 A reconsulta do histórico no Analytics usa a data do pedido em America/Belem, incluindo hoje e os 20 dias anteriores. Pedidos já registrados fora dessa janela são preservados; a consulta por CPF continua detectando compras novas. Os testes cobrem o limite de 20/21 dias, fuso horário, cancelamentos com itens incompletos, checkpoint parcial e preservação das chaves legadas.
 

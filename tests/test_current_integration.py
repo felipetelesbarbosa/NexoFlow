@@ -656,7 +656,9 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertEqual(rows[0]["farmalider_cliente_status"], "CPF_CONFIRMADO")
         farm.get_cliente_by_cpf.assert_not_called()
 
-    def test_validate_contacts_aborts_on_high_unrecovered_error_rate(self) -> None:
+    def test_validate_contacts_preserves_pending_on_high_individual_error_rate(
+        self,
+    ) -> None:
         class FailingClient:
             def get_cliente_by_cpf(self, cpf: str):
                 raise FarmaliderError("falha simulada")
@@ -681,16 +683,19 @@ class CurrentIntegrationTests(unittest.TestCase):
         with (
             patch("main.FARMALIDER_BATCH_SIZE", 2),
             patch("main.FARMALIDER_MAX_WORKERS", 2),
-            patch("main.FARMALIDER_BATCH_ERROR_ABORT_MIN_ERRORS", 1),
-            patch("main.FARMALIDER_BATCH_ERROR_ABORT_RATE", 0.5),
+            patch("main.FARMALIDER_BATCH_ERROR_WARN_MIN_ERRORS", 1),
+            patch("main.FARMALIDER_BATCH_ERROR_WARN_RATE", 0.5),
         ):
-            with self.assertRaises(FarmaliderError):
-                validate_contacts(
-                    rows,
-                    farm_client=FailingClient(),  # type: ignore[arg-type]
-                    farm_settings=FarmaliderSettings(True, "token", False),
-                    sync_time="2026-09-30T21:00:00+00:00",
-                )
+            stats = validate_contacts(
+                rows,
+                farm_client=FailingClient(),  # type: ignore[arg-type]
+                farm_settings=FarmaliderSettings(True, "token", False),
+                sync_time="2026-09-30T21:00:00+00:00",
+            )
+        self.assertEqual(stats.api_errors, 2)
+        self.assertTrue(
+            all(row["farmalider_cliente_status"] == "ERRO_API" for row in rows)
+        )
 
     def test_validate_contacts_queries_each_unique_cpf_once(self) -> None:
         class FakeClient:
@@ -831,7 +836,7 @@ class CurrentIntegrationTests(unittest.TestCase):
             data = optional_exe.read_bytes()
             self.assertTrue(data.startswith(b"MZ"))
             self.assertIn(b"NexoFlowNativeLauncher=1.5", data)
-            self.assertIn("1.5.6.0".encode("utf-16le"), data)
+            self.assertIn("1.5.7.0".encode("utf-16le"), data)
 
     def test_installer_repairs_and_validates_required_components(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -1119,7 +1124,7 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn("NexoFlow Console.lnk", uninstall)
         self.assertIn("NexoFlow - Update Weni.lnk", install)
         self.assertIn("NexoFlow Console.lnk", install)
-        self.assertIn("$AppVersion = '1.5.6'", install)
+        self.assertIn("$AppVersion = '1.5.7'", install)
         self.assertIn("${exePath}: $($_.Exception.Message)", install)
         self.assertNotIn("$exePath: $($_.Exception.Message)", install)
 
@@ -1173,4 +1178,4 @@ class CurrentIntegrationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-# NexoFlow 1.5.6
+# NexoFlow 1.5.7

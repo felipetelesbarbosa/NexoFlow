@@ -561,7 +561,12 @@ def field_guard(key, value):
 
 
 def guard(contact):
-    fields = get_fields(contact)
+    # Guardas comparam campos físicos da Weni. Os aliases de get_fields(PET)
+    # transformariam nossa própria escrita em compra_recente numa alteração
+    # externa de ultima_compra e ocultariam mudanças reais nos campos legados.
+    fields = contact.get("fields")
+    if not isinstance(fields, dict):
+        fields = {}
     return {
         "fields": {
             key: field_guard(key, fields.get(key)) for key in sorted(GUARD_FIELDS)
@@ -1273,7 +1278,7 @@ def write_review(review, path=REVIEW):
     profile = profile_for(review["structure"].get("segment", "FARMA"))
     counts = Counter(plan["reason"] for plan in review["plans"])
     lines = [
-        f"NexoFlow 1.5.6 — Revisão {profile.brand} D+{profile.days}",
+        f"NexoFlow 1.5.7 — Revisão {profile.brand} D+{profile.days}",
         f"Dia local: {review['day']}",
         f"Dados capturados em: {review['created_at']}",
         f"Horários conferidos ao concluir: {review.get('generated_at', review['created_at'])}",

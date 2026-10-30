@@ -16,6 +16,44 @@ from weni_client import WeniClient, WeniError
 
 
 class ApiResponseDiagnosticsTests(unittest.TestCase):
+    def test_segment_rejections_explain_fixed_categories_without_personal_data(self):
+        from farmalider_customers import CustomerDirectory
+
+        client = FarmaliderClient("PRIVATE_TOKEN")
+        for directory, marker in (
+            (None, None),
+            (CustomerDirectory([]), None),
+            (None, "PRIVATE_UNEXPECTED_MARKER"),
+            (None, "PET"),
+        ):
+            client.customer_directory = directory
+            payload = customer_snapshot()
+            payload["ultimoPedido"].pop("segmento", None)
+            if marker:
+                payload["ultimoPedido"]["segmento"] = marker
+            with patch.object(client, "_request_json", return_value=payload):
+                with self.assertRaises(FarmaliderLookupError):
+                    client.get_cliente_by_cpf(CPF)
+        payload["segmento"] = "FARMA"
+        with patch.object(client, "_request_json", return_value=payload):
+            with self.assertRaises(FarmaliderLookupError):
+                client.get_cliente_by_cpf(CPF)
+        with patch("farmalider_client.logging.info") as logs:
+            client.close()
+        messages = "\n".join(
+            call.args[0] % call.args[1:] for call in logs.call_args_list
+        )
+        for reason in (
+            "SEM_MARCADOR_E_INDICE_INDISPONIVEL",
+            "SEM_MARCADOR_E_SEM_ID_NO_INDICE",
+            "MARCADOR_DESCONHECIDO",
+            "MARCADORES_CONFLITANTES",
+            "OUTRO_SEGMENTO",
+        ):
+            self.assertIn(reason, messages)
+        for secret in (CPF, "PRIVATE_TOKEN", "PRIVATE_UNEXPECTED_MARKER"):
+            self.assertNotIn(secret, messages)
+
     def test_http_200_empty_customer_list_is_absence_not_api_failure(self):
         for cls in (FarmaliderClient, PetRecompraClient):
             client = cls("TOKEN_SINTETICO")

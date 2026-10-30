@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.6",
+    [string]$Version = "1.5.7",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -407,7 +407,9 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-Corrige o check-up do Noturno durante cargas ativas: fixtures de desinstalação têm travas próprias e a inspeção do launcher Weni não inicia outra carga. A validação do pacote instalado reproduz as falhas anteriores e executa dois check-ups completos com FARMA/PET simultâneos, preservando o bloqueio de duplicação do mesmo segmento.
+Corrige a interrupção do Analytics por percentual de falhas individuais: os registros válidos são preservados, os demais ficam pendentes e o cursor de uma carga parcial não avança. Falhas de autenticação, circuito aberto e armazenamento estrutural continuam bloqueantes.
+
+Corrige conflitos falsos na Recompra PET ao atualizar compra_recente, mantendo as guardas de alterações externas e a confirmação dos campos antes/depois da inclusão. O resumo apresenta a janela correta D+30 para PET e D+25 para FARMA. Diagnósticos de segmento são agregados e não expõem dados pessoais.
 
 As continuações introduzidas na 1.5.5 permanecem disponíveis mediante autorização Google local e configuração inicial das fontes no Data Studio. Consulte [Continuações](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/CONTINUACOES.md).
 
@@ -421,4 +423,4 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.6
+# NexoFlow 1.5.7

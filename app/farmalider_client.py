@@ -119,6 +119,7 @@ class FarmaliderClient:
         self._private_diagnostic_lock = threading.Lock()
         self._private_recorded_refs: set[str] = set()
         self._lookup_diagnostics: dict[str, int] = {}
+        self._segment_rejection_details: dict[str, int] = {}
 
         self.customer_directory = None
         self._directory_attempted = False
@@ -256,6 +257,12 @@ class FarmaliderClient:
                 "FarmaLíder: respostas de cadastro não aproveitadas | segmento=%s | motivos=%s. HTTP 200 não comprova vínculo ou formato válido.",
                 self.customer_segment,
                 dict(sorted(self._lookup_diagnostics.items())),
+            )
+        if self._segment_rejection_details:
+            logging.info(
+                "FarmaLíder: registros recusados na conferência de segmento | "
+                "detalhes=%s. Contagem de registros de resposta, não de contatos únicos.",
+                dict(sorted(self._segment_rejection_details.items())),
             )
         if self._directory_attempted or self._execution_cache is not None:
             logging.info(
@@ -1078,6 +1085,14 @@ class FarmaliderClient:
                     for c in self.customer_directory.candidates(cpf)
                 }
             if markers and markers != {self.customer_segment}:
+                detail = (
+                    "MARCADORES_CONFLITANTES"
+                    if len(markers) > 1
+                    else "OUTRO_SEGMENTO"
+                    if markers <= {"FARMA", "PET"}
+                    else "MARCADOR_DESCONHECIDO"
+                )
+                self._record_segment_rejection(detail)
                 rejected.append(
                     "CPF_FORA_SEGMENTO_API"
                     if markers <= {"FARMA", "PET"} and len(markers) == 1
@@ -1085,6 +1100,11 @@ class FarmaliderClient:
                 )
                 continue
             if not markers and not trusted:
+                self._record_segment_rejection(
+                    "SEM_MARCADOR_E_SEM_ID_NO_INDICE"
+                    if self.customer_directory is not None
+                    else "SEM_MARCADOR_E_INDICE_INDISPONIVEL"
+                )
                 rejected.append("ERRO_SEGMENTO_NAO_CONFIRMADO_API")
                 continue
             accepted.append(record)
@@ -1112,6 +1132,13 @@ class FarmaliderClient:
                 snapshot["capa"]["segmento"] = self.customer_segment
                 self._execution_cache.read("pedido", code, lambda value=snapshot: value)
         return accepted if isinstance(payload, list) else accepted[0]
+
+    def _record_segment_rejection(self, detail):
+        # Somente categorias fixas; nenhum conteúdo/identificador da resposta.
+        with self._metrics_lock:
+            self._segment_rejection_details[detail] = (
+                self._segment_rejection_details.get(detail, 0) + 1
+            )
 
     def _reject_lookup(self, code):
         with self._metrics_lock:

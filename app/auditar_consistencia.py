@@ -309,7 +309,7 @@ def check_farmalider_runtime() -> None:
         "FARMALIDER_MAX_WORKERS",
         "FARMALIDER_PARALLEL_MIN_CPFS",
         "FARMALIDER_BATCH_SIZE",
-        "FARMALIDER_BATCH_ERROR_ABORT_RATE",
+        "FARMALIDER_BATCH_ERROR_WARN_RATE",
     ]
     missing_main = [item for item in required_main_parts if item not in main_text]
     if missing_main:
@@ -318,7 +318,7 @@ def check_farmalider_runtime() -> None:
             + ", ".join(missing_main)
         )
     else:
-        ok("Processamento de CPF usa concorrência controlada e circuit breaker.")
+        ok("Processamento de CPF usa concorrência controlada e pendências por lote.")
 
     tests = read("tests/test_current_integration.py")
     hardcoded_operational_test = re.search(
@@ -502,7 +502,7 @@ def check_google_sheets_retry_if_configured() -> None:
     ]
     if missing_observability:
         fail(
-            "Google Sheets não contém observabilidade/resiliência do NexoFlow 1.5.6: "
+            "Google Sheets não contém observabilidade/resiliência do NexoFlow 1.5.7: "
             + ", ".join(missing_observability)
         )
     else:
@@ -562,7 +562,7 @@ def check_google_sheets_retry_if_configured() -> None:
     )
     missing_bi = [item for item in bi_required if item not in bi_source]
     if missing_bi:
-        fail("Camada BI/Data Studio 1.5.6 incompleta: " + ", ".join(missing_bi))
+        fail("Camada BI/Data Studio 1.5.7 incompleta: " + ", ".join(missing_bi))
     else:
         ok(
             "Camada BI/Data Studio contém as tabelas operacionais e comerciais, com tipos numéricos, cobertura de itens e migração financeira atômica."
@@ -675,7 +675,7 @@ def check_windows_lifecycle() -> None:
         for data in (launcher_bytes, update_launcher_bytes, terminal_bytes)
     ):
         fail(
-            "Launchers Windows não possuem a revisão nativa de segurança do NexoFlow 1.5.6."
+            "Launchers Windows não possuem a revisão nativa de segurança do NexoFlow 1.5.7."
         )
     elif any(
         b"CreateProcessW" not in data
@@ -725,21 +725,21 @@ def check_windows_lifecycle() -> None:
 
     version_markers = [
         "Grupo Líder".encode("utf-16le"),
-        "1.5.6.0".encode("utf-16le"),
+        "1.5.7.0".encode("utf-16le"),
         "ProductVersion".encode("utf-16le"),
         "FileDescription".encode("utf-16le"),
     ]
     if any(marker not in launcher_bytes for marker in version_markers):
-        fail("Executável Analytics não contém VERSIONINFO completo do NexoFlow 1.5.6.")
+        fail("Executável Analytics não contém VERSIONINFO completo do NexoFlow 1.5.7.")
         return
     if any(marker not in update_launcher_bytes for marker in version_markers):
         fail(
-            "Executável NexoFlow Weni não contém VERSIONINFO completo do NexoFlow 1.5.6."
+            "Executável NexoFlow Weni não contém VERSIONINFO completo do NexoFlow 1.5.7."
         )
         return
     if any(marker not in terminal_bytes for marker in version_markers):
         fail(
-            "Executável NexoFlow Terminal não contém VERSIONINFO completo do NexoFlow 1.5.6."
+            "Executável NexoFlow Terminal não contém VERSIONINFO completo do NexoFlow 1.5.7."
         )
         return
     ok(
@@ -754,14 +754,14 @@ def check_windows_lifecycle() -> None:
             return
         if b"NexoFlowNativeLauncher=1.5" not in optional_bytes:
             fail(
-                "NexoFlow Uninstall.exe opcional não está identificado como NexoFlow 1.5.6."
+                "NexoFlow Uninstall.exe opcional não está identificado como NexoFlow 1.5.7."
             )
             return
-        if "1.5.6.0".encode("utf-16le") not in optional_bytes:
-            fail("NexoFlow Uninstall.exe opcional não contém VERSIONINFO 1.5.6.0.")
+        if "1.5.7.0".encode("utf-16le") not in optional_bytes:
+            fail("NexoFlow Uninstall.exe opcional não contém VERSIONINFO 1.5.7.0.")
             return
         ok(
-            "NexoFlow Uninstall.exe opcional está presente e identificado como release 1.5.6."
+            "NexoFlow Uninstall.exe opcional está presente e identificado como release 1.5.7."
         )
     else:
         ok(
@@ -1033,12 +1033,12 @@ def check_windows_lifecycle() -> None:
     update_launcher = (launcher_path(ROOT, "NexoFlow Weni.exe")).read_bytes()
     if b"NexoFlowWeniIconRevision=1.5" not in update_launcher:
         fail(
-            "Executável NexoFlow Weni não contém a revisão binária de ícone do NexoFlow 1.5.6."
+            "Executável NexoFlow Weni não contém a revisão binária de ícone do NexoFlow 1.5.7."
         )
         return
     if b"NexoFlowTerminalIconRevision=1.5" not in terminal_bytes:
         fail(
-            "Executável NexoFlow Terminal não contém a revisão binária de ícone do NexoFlow 1.5.6."
+            "Executável NexoFlow Terminal não contém a revisão binária de ícone do NexoFlow 1.5.7."
         )
         return
     update_icon_images = ico_images(ROOT / "assets" / "NexoFlow_Weni.ico")
@@ -1546,4 +1546,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-# NexoFlow 1.5.6
+# NexoFlow 1.5.7

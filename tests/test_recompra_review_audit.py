@@ -27,6 +27,13 @@ def plan(uid, *, action="", fields=None, reason="JANELA_0_A_25", **kwargs):
 
 
 class RecompraReviewAuditTests(unittest.TestCase):
+    def test_window_label_uses_profile_days(self):
+        for segment, days in (("FARMA", 25), ("PET", 30)):
+            lines = public_review_lines(
+                {"plans": [], "structure": {"segment": segment}}
+            )
+            self.assertIn(f"Na janela de 0 a {days} dias: 0.", lines)
+
     def test_query_errors_hidden_by_final_decision_remain_visible_without_identity(
         self,
     ):
