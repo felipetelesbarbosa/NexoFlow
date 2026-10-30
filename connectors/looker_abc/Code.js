@@ -1,4 +1,4 @@
-/* NexoFlow 1.5.4. Conector privado, somente leitura, executado no Google Apps Script. */
+/* NexoFlow 1.5.5. Conector privado, somente leitura, executado no Google Apps Script. */
 function getAuthType() {
   var cc = DataStudioApp.createCommunityConnector();
   return cc.newAuthTypeResponse().setAuthType(cc.AuthType.NONE).build();
@@ -45,20 +45,18 @@ function fields_(mode) {
   return f;
 }
 function getSchema(request) { return {schema: fields_(request.configParams.tabela).build()}; }
-function readTables_(id) {
-  // API Sheets v4 aceita o escopo somente leitura; SpreadsheetApp.openById não aceita.
-  var response = Sheets.Spreadsheets.Values.batchGet(id, {
-    ranges: ["'BI_Itens'!A:L", "'BI_Clientes_Vendas'!A:I"],
-    valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'FORMATTED_STRING', majorDimension: 'ROWS'
-  });
-  var ranges = response.valueRanges || [];
-  if (ranges.length !== 2) throw new Error('Aba BI obrigatória ausente.');
-  return ranges.map(function (range) {
-    var values = range.values || [];
-    if (!values.length) throw new Error('Aba BI obrigatória ausente.');
-    if (values.length > 150000) throw new Error('A origem excede o limite de leitura desta versão do conector.');
-    return values;
-  });
+function readTables_(id, dateRange) {
+  var api = {
+    meta: function (key) { return Sheets.Spreadsheets.get(key, {fields: 'sheets(properties(sheetId,title,gridProperties)),developerMetadata'}); },
+    values: function (key, range) { return Sheets.Spreadsheets.Values.get(key, range, {valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'FORMATTED_STRING', majorDimension: 'ROWS'}).values || []; }
+  };
+  var hash = function (text) { return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text, Utilities.Charset.UTF_8).map(function (b) { return ('0' + ((b + 256) % 256).toString(16)).slice(-2); }).join(''); };
+  return NexoTables.read(id, ['BI_Itens', 'BI_Clientes_Vendas'], {api: api, hash: hash, widths: {BI_Itens: 12, BI_Clientes_Vendas: 9}, legacy: true, accept: function (title, headers, row) {
+    var value = row[headers.indexOf('data')];
+    var date = typeof value === 'number' ? new Date(Date.UTC(1899,11,30) + Math.floor(value) * 86400000).toISOString().slice(0,10) : String(value).slice(0,10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(Date.parse(date)) || new Date(date).toISOString().slice(0,10) !== date) throw new Error('Data inválida na tabela BI.');
+    return !dateRange || (date >= dateRange.startDate && date <= dateRange.endDate);
+  }});
 }
 function getData(request) {
   var cc = DataStudioApp.createCommunityConnector();
@@ -71,7 +69,7 @@ function getData(request) {
     if (names.some(function (name) { return !valid.has(name); })) throw new Error('O relatório solicitou um campo desconhecido.');
     var requestedFields = fields.forIds(names);
     names = requestedFields.asArray().map(function (f) { return f.getId(); });
-    var tables = readTables_(id);
+    var tables = readTables_(id, request.dateRange);
     var result = NexoAbc.calculate(tables[0], tables[1], request.dateRange.startDate, request.dateRange.endDate);
     return {
       schema: requestedFields.build(),
@@ -83,7 +81,7 @@ function getData(request) {
     };
   } catch (error) {
     // Mensagens produzidas pelo motor não contêm registros. Erros Google ficam privados.
-    var safe = /^(Data inválida|Valor monetário|Cabeçalho|Chave obrigatória|Registros conflitantes|O início|Item sem|Versão da carga|Quantidade inválida|Valor acima|As bases|Pedido com|Selecione|Aba BI|A origem excede|Informe um ID|A consulta precisa|O relatório solicitou)/.test(String(error.message));
+    var safe = /^(Continuações:|Data inválida|Valor monetário|Cabeçalho|Chave obrigatória|Registros conflitantes|O início|Item sem|Versão da carga|Quantidade inválida|Valor acima|As bases|Pedido com|Selecione|Aba BI|A origem excede|Informe um ID|A consulta precisa|O relatório solicitou)/.test(String(error.message));
     cc.newUserError().setText(safe ? error.message : 'Não foi possível ler a planilha BI. Confira o acesso e tente novamente.').throwException();
   }
 }

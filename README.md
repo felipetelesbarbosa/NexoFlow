@@ -1,10 +1,10 @@
-# NexoFlow 1.5.4
+# NexoFlow 1.5.5
 
 Aplicativos para Windows que integram **Weni e a API FarmaLíder nos segmentos FarmaLíder e Pets Líder**, atualizam contatos e pedidos e organizam os dados no **Google Sheets** para análise no **Data Studio**.
 
 O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
 
-[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.4/NexoFlow-Setup-1.5.4.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
+[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.5/NexoFlow-Setup-1.5.5.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
 
 ## Componentes
 
@@ -52,7 +52,7 @@ Execute nesta ordem, revisando e confirmando os relatórios solicitados:
 
 Para percorrer essa sequência com os exports, coloque `Conversas_Delivery.xlsx` e `Contatos_Delivery.xlsx` em `importacoes/` (Farma) ou `importacoes/PET/` (Pets) e execute `comandos/atualizar_tudo.bat`. As confirmações continuam sendo solicitadas durante o fluxo.
 
-Para executar durante a madrugada, use **NexoFlow Noturno**. Veja [execução automática e agendamento](docs/NOTURNO.md).
+Para executar durante a madrugada, use **NexoFlow Noturno**. A partir da 1.5.5, FARMA e PET podem executar simultaneamente; duas cargas do mesmo segmento permanecem bloqueadas. Veja [execução automática e agendamento](docs/NOTURNO.md).
 
 Na rotina diária, use os atalhos Weni, Recompra e Analytics conforme necessário. As cargas completas também podem ser divididas em quatro partes, executadas em ordem para cada componente. Consulte o [guia de operação](docs/Documentacao%20NexoFlow.md).
 
@@ -66,9 +66,13 @@ Na rotina diária, use os atalhos Weni, Recompra e Analytics conforme necessári
 - Operação, histórico e dashboard podem usar [três arquivos do Sheets](docs/planilhas_separadas.md). O Data Studio lê as fontes `BI_*`; confira seus destinos e atualize os campos quando houver novas colunas.
 - Nos atalhos individuais, revise as propostas de Weni, Planilha e Recompra antes de aplicar. Carga parcial exige conferir o log e as pendências antes de prosseguir.
 
+## Capacidade das planilhas
+
+As continuações automáticas no Meu Drive exigem autorização Google local. O Data Studio precisa do conector privado e de uma troca inicial de fontes para somar as partes. Veja [configuração e limites](docs/CONTINUACOES.md); a instalação não muda o dashboard automaticamente.
+
 ## Versões e atualizações
 
-A versão atual é **1.5.4**. As próximas correções seguem **1.5.5, 1.5.6, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
+A versão atual é **1.5.5**. As próximas correções seguem **1.5.6, 1.5.7, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
 
 ## Referências
 

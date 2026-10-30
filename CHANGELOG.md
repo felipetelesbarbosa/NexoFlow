@@ -1,4 +1,15 @@
-# NexoFlow 1.5.4 — Changelog
+# NexoFlow 1.5.5 — Changelog
+
+## NexoFlow 1.5.5 — 30/10/2026
+
+- Travas operacionais por segmento permitem FARMA e PET simultâneos, mantendo exclusão de duas cargas do mesmo perfil e bloqueio de instalação/desinstalação enquanto houver carga ativa. Contrato compartilhado pelo Noturno EXE e BAT.
+
+- Continuações automáticas no Meu Drive para tabelas lógicas de Operação, Histórico e BI, com margem de capacidade, leitura de todas as partes e atualização pela chave original. Ativação exige OAuth local do usuário; a conta de serviço permanece responsável pelos acessos existentes.
+- Índice separado por segmento/papel, validação de origem e esquema, trava remota pelo horário do Google e retomada por coordenadas/hashes. Criação indeterminada não repete POST; histórico parcialmente entregue preserva comprovante local.
+- Conector privado do Data Studio e leitor da Curva ABC somam partes com conferência de revisão/contagens, sem amostragem silenciosa ou janela histórica fixa de 30 dias. BI só cria continuações após o operador configurar e confirmar as fontes; o relatório não é alterado pelo Setup.
+- Deduplicação lê e corrige as partes preservando auditoria e os totais financeiros; migração antiga recusa índice de continuações para não copiar apenas a primeira parte.
+- Build com assinatura Authenticode opcional por certificado de código já instalado, verificação de editor/timestamp e manifesto calculado após a assinatura. Sem certificado confiável provisionado, a distribuição permanece sem assinatura, com aviso e relatório explícitos.
+- Relatório de integridade/assinatura do Setup e exame pelo Microsoft Defender quando ativo no runner, sem alterar proteções nem afirmar aprovação do Kaspersky ou SmartScreen. Guia de reanálise e tratamento de certificados locais.
 
 ## NexoFlow 1.5.4 — 30/10/2026
 

@@ -1,60 +1,33 @@
-# Assinatura de executáveis Windows — NexoFlow 1.5.4
+# Assinatura Windows e confiança
 
-## Por que o Windows pode mostrar aviso
+O build suporta assinatura Authenticode dos executáveis e scripts PowerShell. Isso identifica o editor e detecta alterações, mas não garante aprovação do SmartScreen ou de qualquer antivírus.
 
-SmartScreen e UAC avaliam assinatura digital, reputação do arquivo/editor e origem do download. Um executável novo pode ser legítimo e ainda aparecer como **Editor desconhecido** quando não possui assinatura Authenticode confiável.
+## Certificado adequado
 
-Não é recomendado desativar SmartScreen, UAC ou outras proteções para contornar o aviso.
+Use um certificado **Code Signing** OV/EV de autoridade confiável ou um certificado corporativo cuja cadeia seja administrada pela TI. O nome do editor deve corresponder à pessoa jurídica responsável. Certificados SelfCert do Office ou autoassinados servem para testes locais, sem criar confiança pública. Não são certificados de site HTTPS.
 
-## Forma recomendada
+Instale e administre a chave por mecanismos do fornecedor/Windows, preferencialmente hardware ou serviço protegido. Nunca envie PFX, chave privada ou senha por chat, Git ou artefatos públicos. O NexoFlow não importa chaves nem instala certificados em autoridades confiáveis.
 
-Assine os executáveis do NexoFlow 1.5.4 com um certificado de assinatura de código:
+## Build assinado
 
-- certificado OV/EV de uma autoridade certificadora confiável; ou
-- certificado corporativo cuja cadeia seja distribuída como confiável nas máquinas da organização por TI/GPO/Intune.
+Em um Windows autorizado, com o certificado e a chave já acessíveis no repositório pessoal de certificados:
 
-Arquivos que devem ser assinados:
-
-```text
-NexoFlow Setup.exe
-NexoFlow Analytics.exe
-NexoFlow Weni.exe
-NexoFlow Planilha.exe
-NexoFlow Recompra.exe
-NexoFlow Terminal.exe
-NexoFlow Uninstall.exe (quando distribuído)
-installer/install.ps1
-installer/uninstall.ps1
+```powershell
+.\scripts\build_release.ps1 -Version '1.5.5' -CertificateThumbprint '{IMPRESSAO_DIGITAL_DO_CERTIFICADO}' -RequireSignature
 ```
 
-Os executáveis e scripts PowerShell podem receber assinatura Authenticode. Use SHA-256 e timestamp confiável para manter a assinatura verificável após o vencimento do certificado.
+O build valida validade, chave e uso de assinatura de código. Incorpora versão/ícones antes de assinar, usa SHA-256 e timestamp HTTPS, verifica `Valid`, editor esperado e timestamp, e só então gera manifesto, checksums e ZIPs. Falha na assinatura interrompe o build. O instalador oficial do Python mantém a assinatura original.
 
-## Procedimento de assinatura
+Sem certificado configurado, o build avisa e produz arquivos **não assinados**, com esse estado registrado em `ASSINATURA.txt` e `RELATORIO DE SEGURANCA.json` no ZIP do Setup. Não existe um editor verificado implícito. O script antigo `Assinar Release.ps1`, que apenas exibia instruções, foi substituído por esse processo de build.
 
-O pacote do NexoFlow 1.5.4 contém `Assinar Release.ps1`, que apenas informa que a assinatura Authenticode não é automatizada. Ele não procura certificados, assina arquivos nem recalcula hashes. A distribuição atual não recebe assinatura automaticamente.
+Não assine nem modifique os arquivos depois de publicados: isso altera hashes, invalida a integridade do pacote e exige reconstrução e nova versão. No CI público, não há certificado ou chave privada provisionados automaticamente.
 
-Quando houver certificado corporativo confiável, a equipe responsável deve:
+## Conferência pelo operador
 
-1. assinar os executáveis e scripts PowerShell do payload e do projeto completo;
-2. validar o status Authenticode dos arquivos assinados;
-3. recalcular `payload manifest.json` depois de assinar os arquivos do payload;
-4. assinar `NexoFlow Setup.exe` e os scripts externos do Setup;
-5. recalcular `checksums SHA256.txt`, gerar os dois ZIPs e atualizar `SHA256SUMS-1.5.4.txt`.
+```powershell
+Get-AuthenticodeSignature -LiteralPath 'C:\NexoFlow\NexoFlow Noturno.exe' |
+    Format-List Status,StatusMessage,SignerCertificate,TimeStamperCertificate
+Get-FileHash -Algorithm SHA256 -LiteralPath 'C:\NexoFlow\NexoFlow Noturno.exe'
+```
 
-Nenhuma chave privada ou certificado é incluído no projeto.
-
-## Estado do NexoFlow 1.5.4
-
-- executáveis PE32+ x64 nativos;
-- VERSIONINFO configurado como 1.5.0.0, representação de quatro componentes usada pelo Windows;
-- sem packers ou ofuscação;
-- sem tokens ou senhas embutidos;
-- launchers sem `system()`;
-- integridade SHA-256 do payload do instalador;
-- hashes SHA-256 externos publicados junto ao NexoFlow 1.5.4;
-- `ExecutionPolicy Bypass` restrito ao entrypoint local do Setup quando o script ainda não estiver assinado.
-
-Essas medidas melhoram transparência e integridade, mas não substituem uma assinatura Authenticode confiável para reputação do Windows.
-
-Consulte também `ANTIVIRUS E CONFIANCA.md`.
-<!-- NexoFlow 1.5.4 -->
+Uma assinatura `Valid` e um hash conferido não substituem a análise do software. Para um certificado corporativo, outro computador pode não confiar na cadeia até a distribuição oficial pela TI.

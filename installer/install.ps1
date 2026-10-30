@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
 $AppName = 'NexoFlow'
-$AppVersion = '1.5.4'
+$AppVersion = '1.5.5'
 $Publisher = 'Grupo Lider'
 $InstallDir = 'C:\NexoFlow'
 $DataDir = 'C:\NexoFlow Data'
@@ -34,6 +34,30 @@ $SetupLogPath = Join-Path $env:TEMP 'NexoFlow-Setup.log'
 try {
     Start-Transcript -LiteralPath $SetupLogPath -Append -Force | Out-Null
 } catch { }
+
+# A existência das travas protege os dois perfis; não depende de arquivos antigos.
+function Enter-NexoMaintenance {
+    $script:NexoMaintenanceHandles = New-Object 'System.Collections.Generic.List[System.IDisposable]'
+    try {
+        foreach ($name in @('Local\NexoFlowOperationLock', 'Local\NexoFlowOperationLock_FARMA', 'Local\NexoFlowOperationLock_PET')) {
+            $created = $false
+            $handle = New-Object Threading.Mutex($false, $name, [ref]$created)
+            $script:NexoMaintenanceHandles.Add($handle)
+            if (-not $created) {
+                throw 'Existe uma carga Farma/Pets ou uma manutenção em andamento. Encerre as cargas antes de instalar/desinstalar.'
+            }
+        }
+    } catch {
+        Exit-NexoMaintenance
+        throw
+    }
+}
+function Exit-NexoMaintenance {
+    if ($script:NexoMaintenanceHandles) {
+        foreach ($handle in $script:NexoMaintenanceHandles) { $handle.Dispose() }
+        $script:NexoMaintenanceHandles.Clear()
+    }
+}
 
 function Write-Step([string]$Text) { Write-Host "`n==> $Text" -ForegroundColor Cyan }
 
@@ -1348,6 +1372,7 @@ try {
     Write-Host ' NexoFlow - Instalador' -ForegroundColor Cyan
     Write-Host '==========================================================' -ForegroundColor DarkCyan
     Ensure-Administrator
+    Enter-NexoMaintenance
 
     Write-Step 'Validando integridade do pacote'
     Validate-Payload
@@ -1577,4 +1602,5 @@ catch {
     try { Stop-Transcript | Out-Null } catch { }
     exit 1
 }
-# NexoFlow 1.5.4
+finally { Exit-NexoMaintenance }
+# NexoFlow 1.5.5

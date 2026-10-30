@@ -596,7 +596,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     looker = sub.add_parser(
-        "looker", help="recalcula os KPIs do Data Studio usando o histórico do Google Sheets"
+        "looker",
+        help="recalcula os KPIs do Data Studio usando o histórico do Google Sheets",
     )
     looker.add_argument("--inicio", help="Início do período, AAAA-MM-DD")
     looker.add_argument("--fim", help="Fim do período, AAAA-MM-DD")
@@ -636,6 +637,11 @@ def build_parser() -> argparse.ArgumentParser:
         "planilhas",
         help="carga de pedidos a partir dos exports XLSX, com revisão humana",
     )
+
+    storage = sub.add_parser(
+        "armazenamento", help="continuações de planilhas e fontes Data Studio"
+    )
+    storage.add_argument("storage_args", nargs=argparse.REMAINDER)
 
     logs = sub.add_parser("logs", help="consulta logs do NexoFlow")
     logs.add_argument("tipo", nargs="?", default="weni", choices=["weni", "analytics"])
@@ -764,6 +770,10 @@ def run(argv: list[str] | None = None) -> int:
             if args.weni_op not in mapping:
                 parser.parse_args(["weni", "-h"])
             return _run_windows_target(mapping[args.weni_op])
+        if args.command == "armazenamento":
+            from run_sheets_continuation import run as storage_run
+
+            return storage_run(args.storage_args)
         if args.command == "logs":
             path = _log_path(args.tipo)
             if args.seguir:

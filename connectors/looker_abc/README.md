@@ -1,4 +1,4 @@
-# NexoFlow 1.5.4: Curva ABC por período
+# NexoFlow 1.5.5: Curva ABC por período
 
 Conector Google Apps Script para calcular a curva ABC no Data Studio conforme o período selecionado.
 
@@ -26,8 +26,8 @@ Não retorna CPF, cliente, contato ou número original de pedido. Não usa servi
 
 ## Instalação privada
 
-1. No Google Apps Script da conta dona do relatório, crie um projeto com o nome **NexoFlow 1.5.4 - Curva ABC**.
-2. Copie `AbcCore.js` e `Code.js` para arquivos de script com os mesmos nomes (o editor pode mostrá-los como `.gs`). Habilite a exibição de `appsscript.json` e copie o manifesto.
+1. No Google Apps Script da conta dona do relatório, crie um projeto com o nome **NexoFlow 1.5.5 - Curva ABC**.
+2. Copie `AbcCore.js`, `Code.js` e `Tables.js` para arquivos de script com os mesmos nomes (o editor pode mostrá-los como `.gs`). Habilite a exibição de `appsscript.json` e copie o manifesto.
 3. Salve. Em **Implantar > Testar implantações**, selecione o tipo conector do Data Studio. Use o ID de implantação fornecido pelo Google, sem tornar o projeto público.
 4. Autorize a leitura no Google e crie três fontes privadas a partir da mesma implantação. Informe o ID da planilha BI e escolha `abc`, `resumo` e `juntos`, respectivamente. Mantenha o ID fora do repositório.
 5. Somente após testar a resposta do conector, use `abc` na tabela detalhada, `resumo` no resumo e nos seis cartões, e `juntos` na tabela de compras conjuntas. Mantenha o intervalo automático dos componentes. Não substitua fontes do relatório inteiro.
@@ -42,7 +42,7 @@ Não retorna CPF, cliente, contato ou número original de pedido. Não usa servi
 - Conferir que o líder pode mudar, os percentuais são recalculados e os cards somam a quantidade total de produtos classificados e 100% da receita quando disponíveis.
 - Conferir Top 5 sobre todos os produtos e pares por pedidos distintos.
 - Testar um intervalo vazio e ausência/divergência de itens. Classes e Top 5 ficam indisponíveis em dados inconsistentes; não inventar classes ou percentuais.
-- Confirmar desempenho com a base real. A versão lê até 150 mil linhas por aba e falha explicitamente se o limite for excedido; não entrega amostra silenciosa. Consulta com pedido acima de 500 SKUs também falha explicitamente no cálculo de pares.
+- Confirmar desempenho com a base real. O leitor examina até 1 milhão de linhas e retorna até 200 mil por consulta, em até 240 segundos, e falha explicitamente se o limite for excedido; não entrega amostra silenciosa. Consulta com pedido acima de 500 SKUs também falha explicitamente no cálculo de pares.
 - Exportar a página e conferir se o período, classes, cards, tabela e pares são coerentes. Retornar ao período padrão após os testes.
 
 ## Testes locais
@@ -63,3 +63,7 @@ A suíte do conector usa somente dados fictícios. Não envia dados nem modifica
 ## Uso privado e privacidade
 
 Este componente destina-se ao uso interno, sob as permissões da conta que o instalar. O operador é responsável por autorizar apenas fontes e leitores permitidos. A instalação não estabelece oferta comercial, contrato de suporte ou política para terceiros. Não publicar em galeria sem revisão específica de identidade, termos e política de privacidade. O código não grava registros de negócio em logs nem transmite dados para fora dos serviços Google usados pelo próprio relatório.
+
+## Continuações a partir da 1.5.5
+
+O leitor atualizado precisa ser copiado para o Apps Script e sua implantação atualizada antes de habilitar as partes BI. Validações registradas de uma implantação anterior não comprovam que esta alteração já está ativa no relatório. Confira o [guia de continuações](../../docs/CONTINUACOES.md).

@@ -12,6 +12,30 @@ $AppName = 'NexoFlow'
 $UninstallKey = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\NexoFlow'
 $AppKey = 'HKLM:\Software\Grupo Lider\NexoFlow'
 
+# A existência das travas protege os dois perfis; não depende de arquivos antigos.
+function Enter-NexoMaintenance {
+    $script:NexoMaintenanceHandles = New-Object 'System.Collections.Generic.List[System.IDisposable]'
+    try {
+        foreach ($name in @('Local\NexoFlowOperationLock', 'Local\NexoFlowOperationLock_FARMA', 'Local\NexoFlowOperationLock_PET')) {
+            $created = $false
+            $handle = New-Object Threading.Mutex($false, $name, [ref]$created)
+            $script:NexoMaintenanceHandles.Add($handle)
+            if (-not $created) {
+                throw 'Existe uma carga Farma/Pets ou uma manutenção em andamento. Encerre as cargas antes de instalar/desinstalar.'
+            }
+        }
+    } catch {
+        Exit-NexoMaintenance
+        throw
+    }
+}
+function Exit-NexoMaintenance {
+    if ($script:NexoMaintenanceHandles) {
+        foreach ($handle in $script:NexoMaintenanceHandles) { $handle.Dispose() }
+        $script:NexoMaintenanceHandles.Clear()
+    }
+}
+
 function Show-Message([string]$Text, [string]$Title = $AppName, [string]$Icon = 'Information') {
     try {
         Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
@@ -363,6 +387,7 @@ if ($Stage2) {
 
     $KeepData = ($KeepDataFlag -eq 1)
     try {
+        Enter-NexoMaintenance
         Stop-NexoFlowProcesses | Out-Null
         Preserve-Imports
     } catch {
@@ -411,6 +436,7 @@ if ($Stage2) {
 Ensure-Administrator
 
 try {
+    Enter-NexoMaintenance
     Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
     $result = [System.Windows.Forms.MessageBox]::Show(
         "Deseja manter configurações, credenciais e logs para uma futura reinstalação?`n`nSIM (recomendado): preserva secrets_config.py, credentials e logs.`nNÃO: remove configurações, credenciais e logs.`nCANCELAR: não desinstala.`n`nA pasta importacoes e seus arquivos SEMPRE serão preservados em $DataDir\importacoes.`n`nProcessos do NexoFlow que estiverem em execução serão encerrados para permitir a remoção segura.",
@@ -436,9 +462,12 @@ try {
 
     $tempWorkingDir = [IO.Path]::GetTempPath()
     # Mantemos a janela visível. A release não oculta PowerShell no Stage2.
+    Exit-NexoMaintenance
     Start-Process -FilePath (Get-WindowsPowerShellPath) -ArgumentList $argLine -WorkingDirectory $tempWorkingDir
     exit 0
 } catch {
     Show-Message "A desinstalação não foi concluída.`n`n$($_.Exception.Message)" "$AppName - Erro" 'Error'
     exit 1
 }
+
+finally { Exit-NexoMaintenance }

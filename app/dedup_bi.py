@@ -525,6 +525,10 @@ def backup_native(hub, tables, backup_dir):
 
 def refresh(store, removed_uuids, delivery_keys, directory):
     """Cada plano é imutável; reenvio de transação incerta nunca é automático."""
+    if vars(store).get("continuity") is not None:
+        from dedup_partitions import refresh as refresh_partitions
+
+        return refresh_partitions(store, removed_uuids, delivery_keys, directory)
     directory = Path(directory)
     path, receipt_path = directory / "bi_plan.json", directory / "bi_receipt.json"
     hub = store.hub

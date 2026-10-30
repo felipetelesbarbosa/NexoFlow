@@ -226,6 +226,33 @@ class Fixtures(unittest.TestCase):
                 )
         self.assertEqual(before, self.tables)
 
+    def test_continuation_repairs_identity_without_deleting_financial_facts(self):
+        pair = self.pair()
+        tables = {}
+        for title in ("Pedidos_FarmaLider", "Itens_Pedidos_FarmaLider"):
+            physical = deepcopy(self.tables[title])
+            physical["source_title"] = title
+            tables[title + "::continuacao::1"] = physical
+        before = deepcopy(tables)
+        requests, _ = requests_for(tables, [pair], {CAN: self.canonical})
+        for key, updates in requests.items():
+            self.assertTrue(updates)
+            for request in updates:
+                self.assertIn("updateCells", request)
+                column = request["updateCells"]["range"]["startColumnIndex"]
+                self.assertIn(
+                    tables[key]["headers"][column],
+                    {
+                        "contact_uuid",
+                        "telefone",
+                        "cliente",
+                        "cpf",
+                        "cpf_normalizado",
+                        "farmalider_cliente_id",
+                    },
+                )
+        self.assertEqual(tables, before)
+
     def test_item_key_cannot_reassign_items_from_another_order(self):
         self.tables["Itens_Pedidos_FarmaLider"]["ledger_orders"] = {"api-123": "456"}
         result = self.prepare()

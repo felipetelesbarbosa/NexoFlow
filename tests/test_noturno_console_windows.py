@@ -64,6 +64,36 @@ class NoturnoConsoleWindowsTests(unittest.TestCase):
             with console.operation_lock():
                 pass
 
+    def test_real_segment_locks_allow_other_profile_and_block_maintenance(self):
+        with patch.object(
+            console, "MUTEX_NAME", "Local\\NexoFlowSegmentsTest_" + uuid4().hex
+        ):
+            with console.operation_lock("FARMA"):
+                with console.operation_lock("PET"):
+                    with self.assertRaisesRegex(RuntimeError, "segmento"):
+                        with console.operation_lock("FARMA"):
+                            self.fail("Duas cargas FARMA")
+            import ctypes
+            from ctypes import wintypes
+
+            kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+            kernel.CreateMutexW.argtypes = [
+                ctypes.c_void_p,
+                wintypes.BOOL,
+                wintypes.LPCWSTR,
+            ]
+            kernel.CreateMutexW.restype = wintypes.HANDLE
+            kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+            maintenance = kernel.CreateMutexW(None, False, console.MUTEX_NAME)
+            self.assertTrue(maintenance)
+            try:
+                for profile in ("FARMA", "PET"):
+                    with self.assertRaisesRegex(RuntimeError, "instalação"):
+                        with console.operation_lock(profile):
+                            self.fail("Entrou durante manutenção")
+            finally:
+                kernel.CloseHandle(maintenance)
+
     def test_real_window_stays_open_with_closed_stdin_until_new_console_enter(self):
         for code in (0, 3, 7):
             with (

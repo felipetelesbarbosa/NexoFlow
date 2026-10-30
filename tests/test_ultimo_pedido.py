@@ -330,4 +330,4 @@ class UltimoPedidoTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-# NexoFlow 1.5.4
+# NexoFlow 1.5.5

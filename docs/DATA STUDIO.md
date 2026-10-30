@@ -87,3 +87,7 @@ O início das novas coletas é registrado em `Controle.historico_observado_desde
 ## Se o número parecer incorreto
 
 Confira o resultado e a data da última carga, a fonte conectada, o período, os filtros de venda e a cobertura em `BI_Qualidade`. Uma carga parcial pode preservar registros anteriores. Siga o [guia de operação](Documentacao%20NexoFlow.md) antes de apresentar os resultados.
+
+## Fontes com continuações
+
+Uma fonte nativa Google Sheets não une arquivos automaticamente. Para somar continuações, instale o conector privado, substitua cada fonte e valide os indicadores antes de autorizar partes BI no NexoFlow. O Setup não altera o relatório. Procedimento e limites em [CONTINUACOES.md](CONTINUACOES.md).

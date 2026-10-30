@@ -41,3 +41,7 @@ Abra o Terminal, escolha o perfil e execute `nexo diagnostico`. Depois rode Weni
 No Data Studio, a conta responsável pelas fontes precisa ter acesso ao Dashboard. Ao duplicar o painel Farma para Pets, substitua todas as fontes pelas abas Pets equivalentes. Veja [Data Studio](DATA%20STUDIO.md).
 
 O projeto não inclui credenciais. Use seus próprios acessos e mantenha o JSON privado.
+
+## Continuação automática no Meu Drive
+
+A partir da 1.5.5, uma autorização OAuth de usuário permite criar continuações sem trocar a conta de serviço. Esse passo é local e separado das credenciais existentes. Consulte [CONTINUACOES.md](CONTINUACOES.md) antes de ativar.

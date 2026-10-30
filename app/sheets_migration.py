@@ -38,6 +38,10 @@ class SheetsMigration:
             key: client.open_by_key(key)
             for key in (layout.dashboard, layout.operations, layout.history)
         }
+        from sheets_continuation import INDEX_TITLE, ContinuationError
+
+        if any(ws.title == INDEX_TITLE for book in self.books.values() for ws in book.worksheets()):
+            raise ContinuationError("Esta base já usa continuações. A migração antiga não pode copiar apenas os arquivos iniciais.")
         self.state: dict[str, Any] = {"layout": layout.values(), "copies": {}}
         if journal.exists():
             self.state = json.loads(journal.read_text(encoding="utf-8"))

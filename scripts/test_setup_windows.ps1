@@ -84,6 +84,9 @@ function Assert-Installed {
         "app/recompra_profiles.py", "app/recompra_cleanup.py", "app/runtime_profile.py",
         "comandos/limpar_cancelados_recompra.bat", "comandos/atualizar_recompra_pets.bat",
         "app/run_noturno_console.py",
+        "app/sheets_partitions.py", "app/sheets_continuation.py",
+        "app/sheets_provisioning.py", "app/run_sheets_console.py",
+        "comandos/configurar_continuacoes.bat", "connectors/continuacoes/Code.js",
         "comandos/executar_noturno.bat",
         "assets\NexoFlow_Noturno.ico",
         "app\run_noturno.py",
@@ -142,9 +145,9 @@ function Assert-Installed {
 
     Assert-True (Test-Path -LiteralPath $UninstallKey) "Registro de desinstalação não foi criado."
     $installedVersion = (Get-Content -Raw -LiteralPath (Join-Path $InstallDir "VERSION")).Trim()
-    Assert-True ($installedVersion -eq "1.5.4") "Versão instalada inesperada: $installedVersion"
+    Assert-True ($installedVersion -eq "1.5.5") "Versão instalada inesperada: $installedVersion"
     $displayVersion = (Get-ItemProperty -LiteralPath $UninstallKey -Name DisplayVersion -ErrorAction Stop).DisplayVersion
-    Assert-True ($displayVersion -eq "1.5.4") "DisplayVersion inesperada: $displayVersion"
+    Assert-True ($displayVersion -eq "1.5.5") "DisplayVersion inesperada: $displayVersion"
 }
 
 Remove-TestArtifacts
@@ -159,7 +162,7 @@ try {
     $importsPayload = Join-Path $SetupDir 'payload\importacoes'
     Assert-True (Test-Path -LiteralPath $importsPayload -PathType Container) 'Pasta importacoes ausente no ZIP do Setup.'
     Assert-True (@(Get-ChildItem -LiteralPath $importsPayload -Force -Recurse).Count -eq 0) 'O pacote deve conter importacoes vazia, sem exports.'
-    $projectZip = Join-Path (Split-Path -Parent $resolvedZip) 'NexoFlow-1.5.4.zip'
+    $projectZip = Join-Path (Split-Path -Parent $resolvedZip) 'NexoFlow-1.5.5.zip'
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $projectArchive = [IO.Compression.ZipFile]::OpenRead($projectZip)
     try {
@@ -347,7 +350,7 @@ public static class NexoFlowSetupRootLock {
         }
     }
 
-    Write-Host "[OK] Smoke test do NexoFlow Setup 1.5.4 concluído."
+    Write-Host "[OK] Smoke test do NexoFlow Setup 1.5.5 concluído."
 }
 finally {
     Remove-Item Env:NEXOFLOW_SETUP_INSTALL_MODE -ErrorAction SilentlyContinue
@@ -356,4 +359,4 @@ finally {
     Remove-TestArtifacts
     Remove-Item -LiteralPath $TempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
-# NexoFlow 1.5.4
+# NexoFlow 1.5.5

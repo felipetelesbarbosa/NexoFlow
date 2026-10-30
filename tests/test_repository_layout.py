@@ -35,3 +35,39 @@ class RepositoryLayoutTests(unittest.TestCase):
             "NexoFlow Terminal.exe",
         ):
             self.assertTrue(launcher_path(root, name).is_file())
+
+
+class ReleaseSigningOrderTests(unittest.TestCase):
+    def test_build_signs_final_bytes_before_payload_hashes_and_archives(self):
+        root = Path(__file__).resolve().parents[1]
+        path = root / "scripts/build_release.ps1"
+        if not path.is_file():
+            self.skipTest("Build disponível no repositório, fora da instalação.")
+        text = path.read_text(encoding="utf-8-sig")
+        icon = text.index('Write-Host "==> Incorporando ícones PE')
+        sign = text.index("Invoke-NexoFolderSigning -Root $PayloadDir")
+        manifest = text.index("Write-PayloadManifest -Payload $PayloadDir")
+        setup_icon = text.index('Write-Host "==> Incorporando ícone próprio')
+        setup_sign = text.index(
+            "Set-AuthenticodeSignature -LiteralPath (Join-Path $SetupRoot"
+        )
+        report = text.index("test_release_security_windows.ps1")
+        checksum = text.index("Write-Checksums -Root $SetupRoot")
+        archive = text.index("Compress-Archive -Path $SetupRoot")
+        self.assertEqual(
+            sorted(
+                [
+                    icon,
+                    sign,
+                    manifest,
+                    setup_icon,
+                    setup_sign,
+                    report,
+                    checksum,
+                    archive,
+                ]
+            ),
+            [icon, sign, manifest, setup_icon, setup_sign, report, checksum, archive],
+        )
+        self.assertIn("elseif ($RequireSignature)", text)
+        self.assertNotIn("Add-MpPreference", text)

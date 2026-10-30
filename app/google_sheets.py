@@ -15,6 +15,8 @@ from google.auth.exceptions import TransportError as GoogleAuthTransportError
 
 if TYPE_CHECKING:
     from gspread.worksheet import Worksheet
+
+    from sheets_partitions import RolloverManager
 from gspread.exceptions import APIError, SpreadsheetNotFound, WorksheetNotFound
 from gspread.utils import ValueInputOption
 from requests.exceptions import RequestException
@@ -106,6 +108,7 @@ class UpsertResult:
 
 
 class GoogleSheetsStore:
+    _continuity: RolloverManager | None = None
     SCHEMA_CONTROL_KEY = "_schema_fingerprint"
     SCHEMA_HEADERS_CONTROL_KEY = "_schema_headers_layout"
 
@@ -157,10 +160,15 @@ class GoogleSheetsStore:
         self._hub_id = spreadsheet_id
         self._storage_books: dict[str, Any] = {}
         self._storage_layout: SheetsStorage | None = None
+        self._continuity = None
         self._initialize_structure(validate_structure=validate_structure)
 
     def close(self) -> None:
-        self.client.http_client.session.close()
+        try:
+            if self._continuity is not None:
+                self._continuity.close()
+        finally:
+            self.client.http_client.session.close()
 
     @staticmethod
     def _schema_map() -> dict[str, list[str]]:
@@ -182,6 +190,19 @@ class GoogleSheetsStore:
             SHEET_BI_STATUS: BI_STATUS_COLUMNS,
             SHEET_CONTROLE: CONTROL_COLUMNS,
             **LOOKER_SCHEMAS,
+        }
+
+    @classmethod
+    def bi_schemas(cls):
+        from delivery_tickets import DELIVERY_ORDER_COLUMNS
+
+        return {
+            **{
+                title: headers
+                for title, headers in cls._schema_map().items()
+                if title.startswith("BI_")
+            },
+            "BI_Delivery_Pedidos": DELIVERY_ORDER_COLUMNS,
         }
 
     @classmethod
@@ -237,6 +258,11 @@ class GoogleSheetsStore:
         worksheets = self._read_with_retry(
             "listar abas da planilha",
             self.book.worksheets,
+        )
+        from sheets_continuation import INDEX_TITLE
+
+        continuation_sheet = next(
+            (ws for ws in worksheets if ws.title == INDEX_TITLE), None
         )
         storage_sheet = next(
             (ws for ws in worksheets if ws.title == STORAGE_SHEET), None
@@ -301,6 +327,14 @@ class GoogleSheetsStore:
                 "Google Sheets: operação, histórico e dashboard em arquivos separados."
             )
         sheets_by_title = {ws.title: ws for ws in worksheets}
+        self._known_sheets = sheets_by_title
+        from sheets_partitions import RolloverManager
+
+        self._continuity = RolloverManager.attach(self, continuation_sheet)
+        if self._continuity is not None:
+            for part in self._continuity.index.parts.values():
+                if part.number == 0:
+                    sheets_by_title[part.title] = self._continuity.worksheet(part)
         if storage_sheet is not None:
             required_data = {
                 SHEET_BASE_CONTATOS,
@@ -316,7 +350,6 @@ class GoogleSheetsStore:
                     + ", ".join(missing)
                     + ". Confira a migração; nenhuma estrutura vazia foi criada."
                 )
-        self._known_sheets = sheets_by_title
         expected = self.schema_fingerprint()
         stored = ""
 
@@ -561,18 +594,29 @@ class GoogleSheetsStore:
         }
 
     def _write_with_retry(self, description: str, func):
+        from sheets_continuation import ContinuationError
+
         """Executa escrita com retry de rede/autenticação, 429 e erros 5xx."""
         with request_progress("Google Sheets: " + description):
             attempts = max(1, int(GOOGLE_SHEETS_WRITE_MAX_RETRIES))
 
             for attempt in range(1, attempts + 1):
                 self._wait_before_write()
+                if self._continuity is not None:
+                    self._continuity.require()
 
                 try:
                     self._write_requests = getattr(self, "_write_requests", 0) + 1
                     return func()
                 except APIError as exc:
                     status = self._api_status_code(exc)
+                    if self._continuity is not None and (
+                        (status is not None and status >= 500) or status in (408, 499)
+                    ):
+                        self._continuity.lease.note_uncertain()
+                        raise ContinuationError(
+                            "O Google Sheets não confirmou uma gravação. Aguarde até 5 minutos e retome a carga para conferir o resultado."
+                        ) from None
                     if not self._retryable_status(status) or attempt >= attempts:
                         raise
 
@@ -601,6 +645,11 @@ class GoogleSheetsStore:
                     )
                     time.sleep(wait)
                 except (RequestException, GoogleAuthTransportError) as exc:
+                    if self._continuity is not None:
+                        self._continuity.lease.note_uncertain()
+                        raise ContinuationError(
+                            "O Google Sheets não confirmou uma gravação. Aguarde até 5 minutos e retome a carga para conferir o resultado."
+                        ) from None
                     failure = classify_network_failure(exc)
                     if not failure.retryable or attempt >= attempts:
                         raise
@@ -648,7 +697,16 @@ class GoogleSheetsStore:
             headers.pop()
         return headers
 
+    def _table_values(self, ws):
+        if self._continuity is not None:
+            return self._continuity.read(ws)
+        return ws.get_all_values()
+
     def _book_for_title(self, title: str):
+        if self._continuity is not None:
+            parts = self._continuity.index.table_parts(title)
+            if parts:
+                return self._continuity._book(parts[0].book_id)
         layout = getattr(self, "_storage_layout", None)
         if layout is None:
             return self.book
@@ -673,14 +731,17 @@ class GoogleSheetsStore:
                     lambda title=title: self._book_for_title(title).worksheet(title),
                 )
             except WorksheetNotFound:
-                ws = self._write_with_retry(
-                    f"criação da aba {title}",
-                    lambda: self._book_for_title(title).add_worksheet(
-                        title=title,
-                        rows=rows,
-                        cols=max(len(headers), 5),
-                    ),
-                )
+                if self._continuity is not None:
+                    ws = self._continuity.create_anchor(title, headers)
+                else:
+                    ws = self._write_with_retry(
+                        f"criação da aba {title}",
+                        lambda: self._book_for_title(title).add_worksheet(
+                            title=title,
+                            rows=rows,
+                            cols=max(len(headers), 5),
+                        ),
+                    )
                 created = True
 
         current = self._read_header_bounded(
@@ -834,7 +895,7 @@ class GoogleSheetsStore:
         logging.info("Google Sheets: pré-carregando Base_Contatos completa...")
         values = self._read_with_retry(
             "ler Base_Contatos",
-            self.base.get_all_values,
+            lambda: self._table_values(self.base),
         )
         records = self._values_to_records(values)
         uuids = {
@@ -862,6 +923,8 @@ class GoogleSheetsStore:
         )
         if "contact_uuid" not in headers:
             raise RuntimeError("A aba Base_Contatos não possui a coluna contact_uuid.")
+        if self._continuity is not None:
+            return self.load_base_snapshot()[2]
         column = headers.index("contact_uuid") + 1
         values = self._read_with_retry(
             "ler UUIDs da Base_Contatos",
@@ -872,21 +935,21 @@ class GoogleSheetsStore:
     def load_order_records(self) -> list[dict[str, str]]:
         values = self._read_with_retry(
             "ler Pedidos_FarmaLider",
-            self.orders.get_all_values,
+            lambda: self._table_values(self.orders),
         )
         return self._values_to_records(values)
 
     def load_order_item_records(self) -> list[dict[str, str]]:
         values = self._read_with_retry(
             "ler Itens_Pedidos_FarmaLider",
-            self.order_items.get_all_values,
+            lambda: self._table_values(self.order_items),
         )
         return self._values_to_records(values)
 
     def sales_metric_row_count(self) -> int:
         values = self._read_with_retry(
             "ler Metricas_Vendas",
-            self.sales_metrics.get_all_values,
+            lambda: self._table_values(self.sales_metrics),
         )
         return max(0, len(values) - 1)
 
@@ -999,20 +1062,21 @@ class GoogleSheetsStore:
 
         return self._write_with_retry(f"gravar novas linhas em {ws.title}", write)
 
-    def _append_history_batch(self, batch, *, start_row=None):
+    def _append_history_batch(self, batch, *, start_row=None, _worksheet=None):
+        ws = self.history if _worksheet is None else _worksheet
         if not batch:
             return None
         if start_row is None:
             values = self._read_with_retry(
-                "localizar novas linhas do histórico", self.history.get_all_values
+                "localizar novas linhas do histórico", ws.get_all_values
             )
             start_row = max(2, len(values) + 1)
-        self._reserve_table_rows(self.history, start_row + len(batch) - 1)
+        self._reserve_table_rows(ws, start_row + len(batch) - 1)
         width = max(map(len, batch))
         cell_range = f"A{start_row}:{column_letter(width)}{start_row + len(batch) - 1}"
         return self._write_with_retry(
             "gravar novas linhas em Historico_Alteracoes",
-            lambda: self.history.update(
+            lambda: ws.update(
                 range_name=cell_range,
                 values=copy.deepcopy(batch),
                 value_input_option=ValueInputOption.raw,
@@ -1053,6 +1117,7 @@ class GoogleSheetsStore:
         ignore_compare_fields: set[str] | None = None,
         value_input_option: str = "RAW",
         preserve_types: bool = False,
+        _physical: bool = False,
     ) -> UpsertResult:
         # Consolida a carga antes de agendar writes: duas entradas da mesma
         # chave não podem atualizar uma linha futura ainda aguardando append.
@@ -1070,6 +1135,15 @@ class GoogleSheetsStore:
                 len(unique_records),
             )
         records = list(unique_records.values())
+        if not _physical and self._continuity is not None:
+            return self._continuity.upsert(
+                ws,
+                records,
+                key_name,
+                ignore_compare_fields=ignore_compare_fields,
+                value_input_option=value_input_option,
+                preserve_types=preserve_types,
+            )
         if existing_values is None:
             logging.info(
                 "Google Sheets: %s - lendo base atual para comparar %s registro(s)...",
@@ -1347,12 +1421,21 @@ class GoogleSheetsStore:
             ranges = [f"A{index + 2}:{last_col}{index + 2}" for index in stale_indexes]
             # Limpar valores de linhas específicas é idempotente e não desloca
             # os demais pedidos, inclusive quando há retry da requisição.
-            for start in range(0, len(ranges), 100):
-                batch = ranges[start : start + 100]
-                self._write_with_retry(
-                    "reconciliar itens removidos dos pedidos atualizados",
-                    lambda batch=batch: self.order_items.batch_clear(batch),
+            if self._continuity is not None:
+                keys = {
+                    str(result.final_records[index].get("item_chave") or "")
+                    for index in stale_indexes
+                }
+                self._clear_scope_records(
+                    self.order_items, result.final_records, "item_chave", keys
                 )
+            else:
+                for start in range(0, len(ranges), 100):
+                    batch = ranges[start : start + 100]
+                    self._write_with_retry(
+                        "reconciliar itens removidos dos pedidos atualizados",
+                        lambda batch=batch: self.order_items.batch_clear(batch),
+                    )
             stale = set(stale_indexes)
             result.final_records = [
                 record
@@ -1410,6 +1493,10 @@ class GoogleSheetsStore:
             record.update(contact)
             rows.append([record.get(header, "") for header in headers])
 
+        if self._continuity is not None:
+            self._continuity.append_history(self.history, rows)
+            return
+
         batches = self._adaptive_batches(
             rows,
             max_items=GOOGLE_SHEETS_APPEND_BATCH_SIZE,
@@ -1457,7 +1544,12 @@ class GoogleSheetsStore:
         *,
         value_input_option: str = "RAW",
         force: bool = False,
+        _physical: bool = False,
     ) -> bool:
+        if not _physical and self._continuity is not None:
+            return self._continuity.replace(
+                ws, headers, rows, value_input_option=value_input_option, force=force
+            )
         data = [headers] + rows
         current = self._read_with_retry(
             f"ler {ws.title} antes de substituir tabela",
@@ -1543,8 +1635,11 @@ class GoogleSheetsStore:
         return typed
 
     def _format_bi_columns(
-        self, ws, headers: list[str], *, text_columns: set[str]
+        self, ws, headers: list[str], *, text_columns: set[str], _physical: bool = False
     ) -> None:
+        if not _physical and self._continuity is not None:
+            self._continuity.format(ws, headers, text_columns)
+            return
         formats = []
         for index, header in enumerate(headers, 1):
             if header in text_columns:
@@ -1577,6 +1672,15 @@ class GoogleSheetsStore:
         # interpretou como yyyy.mm; preservar as linhas históricas da base.
         revision = "_bi_numeric_revision"
         if self.get_control(revision) != "2":
+            if (
+                self._continuity is not None
+                and len(self._continuity.index.table_parts(self.bi_summary.title)) > 1
+            ):
+                from sheets_continuation import ContinuationError
+
+                raise ContinuationError(
+                    "Migração numérica antiga pendente em tabela distribuída. Preserve as continuações para revisão."
+                )
             old = self._read_with_retry(
                 "migrar números de BI_Resumo_Diario", self.bi_summary.get_all_values
             )
@@ -1681,7 +1785,9 @@ class GoogleSheetsStore:
             )
         self._write_with_retry(
             "migração financeira atômica em BI_Resumo_Diario",
-            lambda: self.book.batch_update(copy.deepcopy({"requests": requests})),
+            lambda: self._book_for_title(ws.title).batch_update(
+                copy.deepcopy({"requests": requests})
+            ),
         )
 
     def upsert_bi_summary(self, record: dict[str, Any]) -> UpsertResult:
@@ -1810,7 +1916,9 @@ class GoogleSheetsStore:
             "Tickets_Delivery_Weni", TICKET_COLUMNS, existing_sheets=known
         )
         tickets = self._values_to_records(
-            self._read_with_retry("ler tickets Delivery", tickets_ws.get_all_values)
+            self._read_with_retry(
+                "ler tickets Delivery", lambda: self._table_values(tickets_ws)
+            )
         )
         records = build_delivery_order_records(
             tickets,
@@ -1909,6 +2017,12 @@ class GoogleSheetsStore:
         )
 
     def existing_event_ids(self) -> set[str]:
+        if self._continuity is not None:
+            return {
+                str(row[0])
+                for row in self._table_values(self.events)[1:]
+                if row and row[0]
+            }
         values = self._read_with_retry(
             "ler IDs de Eventos_Anuncios",
             lambda: self.events.col_values(1),
@@ -1916,9 +2030,29 @@ class GoogleSheetsStore:
         return set(values[1:]) if len(values) > 1 else set()
 
     def _clear_scope_records(
-        self, ws, records: list[dict[str, Any]], key_name: str, keys: set[str]
+        self,
+        ws,
+        records: list[dict[str, Any]],
+        key_name: str,
+        keys: set[str],
+        *,
+        _physical=False,
     ) -> None:
         if not keys:
+            return
+        if not _physical and self._continuity is not None:
+            self._continuity.require()
+            snapshots = self._continuity.snapshots(ws, refresh=True)
+            self._continuity._begin(ws.title)
+            for snapshot in snapshots:
+                self._clear_scope_records(
+                    snapshot.worksheet,
+                    self._values_to_records(snapshot.values),
+                    key_name,
+                    keys,
+                    _physical=True,
+                )
+            self._continuity.finish(ws)
             return
         headers = getattr(self, "_headers_cache", {}).get(ws.title)
         if headers is None:
@@ -1948,9 +2082,31 @@ class GoogleSheetsStore:
                 progress.advance(len(batch))
 
     def _sanitize_scope_rows(
-        self, ws, sanitizer, *, values=None, value_input_option=ValueInputOption.raw
+        self,
+        ws,
+        sanitizer,
+        *,
+        values=None,
+        value_input_option=ValueInputOption.raw,
+        _physical=False,
     ) -> int:
         """Atualiza somente linhas alteradas, preservando posições e colunas."""
+        if not _physical and self._continuity is not None:
+            self._continuity.require()
+            snapshots = self._continuity.snapshots(ws, refresh=True)
+            self._continuity._begin(ws.title)
+            count = sum(
+                self._sanitize_scope_rows(
+                    snapshot.worksheet,
+                    sanitizer,
+                    values=snapshot.values,
+                    value_input_option=value_input_option,
+                    _physical=True,
+                )
+                for snapshot in snapshots
+            )
+            self._continuity.finish(ws)
+            return count
         if values is None:
             values = self._read_with_retry(
                 f"ler {ws.title} para saneamento da farmácia", ws.get_all_values
@@ -2003,11 +2159,11 @@ class GoogleSheetsStore:
         """Corrige snapshots antigos de vendas preservando dados de contatos."""
         summary_values = self._read_with_retry(
             "ler snapshots de resumo para recorte da farmácia",
-            self.bi_summary.get_all_values,
+            lambda: self._table_values(self.bi_summary),
         )
         conversion_values = self._read_with_retry(
             "ler snapshots de conversão para recorte da farmácia",
-            self.bi_conversion.get_all_values,
+            lambda: self._table_values(self.bi_conversion),
         )
         summaries, conversions = recalculate_scope_snapshots(
             self._values_to_records(summary_values),
@@ -2156,4 +2312,4 @@ class GoogleSheetsStore:
         return order_result, item_result
 
 
-# NexoFlow 1.5.4
+# NexoFlow 1.5.5

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 import gspread
@@ -16,9 +16,13 @@ from config import GOOGLE_CREDENTIALS_FILE, WENI_PROGRESS_INTERVAL_SECONDS
 from contact_dedup_guard import contact_refusals, customer_phones, native_phones
 from dedup_io import DedupHTTPClient, digest, save_private
 from farmalider_integration import _positive_id
-from google_sheets import column_letter
+from google_sheets import GoogleSheetsStore, column_letter
 from sheets_storage import STORAGE_SHEET, SheetsStorage, configured_storage
 from task_progress import TaskProgress, request_progress
+
+if TYPE_CHECKING:
+    from sheets_partitions import RolloverManager
+
 
 SOURCE_TABS = (
     "Base_Contatos",
@@ -97,7 +101,8 @@ def requests_for(tables, pairs, canonicals):
     pairs = {p["duplicate_uuid"]: p for p in pairs}
     requests = {}
     delivery_keys = set()
-    for title, table in tables.items():
+    for table_key, table in tables.items():
+        title = table.get("source_title", table_key)
         updates, deletions = [], []
         for number, cells in table["cells"].items():
             row = record(table, cells)
@@ -191,7 +196,7 @@ def requests_for(tables, pairs, canonicals):
             }
             for n in sorted(deletions, reverse=True)
         )
-        requests[title] = updates
+        requests[table_key] = updates
     return requests, delivery_keys
 
 
@@ -231,7 +236,7 @@ def verify_transaction(entry, current, removed):
             "Pedidos_FarmaLider": "pedido_chave",
             "Itens_Pedidos_FarmaLider": "item_chave",
             "Base_Contatos": "contact_uuid",
-        }[title]
+        }[old.get("source_title", title)]
         before = old["cells"][row]
         identity = record(old, before)[key]
         matches = [
@@ -249,7 +254,10 @@ def verify_transaction(entry, current, removed):
 
 
 class DedupSheets:
+    continuity: RolloverManager | None = None
+
     def __init__(self, hub_id: str):
+        self.continuity = None
         self.client = gspread.service_account(
             filename=str(GOOGLE_CREDENTIALS_FILE), http_client=DedupHTTPClient
         )
@@ -278,12 +286,62 @@ class DedupSheets:
                 key: {w.title: w for w in book.worksheets()}
                 for key, book in self.books.items()
             }
+            from sheets_continuation import INDEX_TITLE
+            from sheets_partitions import RolloverManager
+
+            if INDEX_TITLE in tabs:
+                # Contexto sem __init__: ler a auditoria não cria abas nem migra schemas.
+                context = GoogleSheetsStore.__new__(GoogleSheetsStore)
+                context.book, context.client = self.hub, self.client
+                context._hub_id, context._storage_layout = hub_id, self.layout
+                context._storage_books = self.books
+                context._headers_cache = {}
+                context._last_write_started_at = 0.0
+                context._read_requests = context._write_requests = 0
+                self.continuity = RolloverManager.attach(context, tabs[INDEX_TITLE])
+                context._continuity = self.continuity
+                assert self.continuity is not None
+                self.books = self.continuity.books
+
         except Exception:
             self.close()
             raise
 
     def close(self):
-        self.client.http_client.session.close()
+        try:
+            if self.continuity is not None:
+                self.continuity.close()
+        finally:
+            self.client.http_client.session.close()
+
+    def locations(self, title):
+        """Localizadores físicos; a simulação não escreve no índice."""
+        manager = self.continuity
+        parts = manager.index.table_parts(title) if manager is not None else []
+        if parts:
+            assert manager is not None
+            result = []
+            for part in parts:
+                ws = self.handles.get(part.book_id, {}).get(title)
+                if ws is None or ws.id != part.sheet_id:
+                    ws = manager.worksheet(part)
+                if part.book_id not in self.handles:
+                    self.handles[part.book_id] = {
+                        w.title: w for w in self.books[part.book_id].worksheets()
+                    }
+                result.append((part.book_id, ws, part))
+            return result
+        book_id = self.layout.destination(title)
+        ws = self.handles[book_id].get(title)
+        return [(book_id, ws, None)] if ws is not None else []
+
+    def refresh_handles(self):
+        self.handles = {
+            key: {ws.title: ws for ws in book.worksheets()}
+            for key, book in self.books.items()
+        }
+        if self.continuity is not None:
+            self.continuity.handles.clear()
 
     def scan(self, ws, name, headers):
         letter = column_letter(headers.index(name) + 1)
@@ -307,11 +365,10 @@ class DedupSheets:
         return result
 
     def capture(self, targets):
-        """Leitura restrita aos contatos candidatos, preservando células nativas."""
-        tables = {}
-        ledger_ids = set()
-        ledger_orders = {}
-        item_keys = set()
+        """Lê candidatos em todas as partes; preserva linhas e células nativas."""
+        from sheets_continuation import fingerprint
+
+        tables, ledger_ids, ledger_orders, item_keys = {}, set(), {}, set()
         with TaskProgress(
             "Weni: fontes da deduplicação",
             len(SOURCE_TABS),
@@ -320,74 +377,100 @@ class DedupSheets:
             show_nested=True,
         ) as progress:
             for title in progress.track(SOURCE_TABS):
-                progress.set_activity(f"aba em conferência: {title}")
-                book_id = self.layout.destination(title)
-                ws = self.handles[book_id].get(title)
-                if ws is None:
+                locations = self.locations(title)
+                if not locations:
                     if title in ("Eventos_Anuncios", "Tickets_Delivery_Weni"):
                         continue
                     raise ValueError(
                         f"Aba {title} ausente. Execute o Analytics antes da deduplicação."
                     )
-                header = ws.get(
-                    f"A1:{column_letter(ws.col_count)}1",
-                    value_render_option=ValueRenderOption.formula,
-                )
-                headers = list(header[0]) if header else []
-                if (
-                    not headers
-                    or any(not isinstance(h, str) or not h for h in headers)
-                    or len(headers) != len(set(headers))
-                    or "contact_uuid" not in headers
-                ):
-                    raise ValueError(f"Cabeçalho inválido em {title}.")
-                if title == "Pedidos_FarmaLider":
-                    ids = self.scan(ws, "pedido_id", headers)
-                    keys = self.scan(ws, "pedido_chave", headers)
-                    if len(keys.values()) != len(set(keys.values())):
-                        raise ValueError("Chave de pedido duplicada na fonte.")
-                    ledger_ids = {_positive_id(v) for v in ids.values()} - {""}
-                    ledger_orders = {
-                        key: _positive_id(ids.get(n)) for n, key in keys.items()
-                    }
-                if title == "Itens_Pedidos_FarmaLider":
-                    item_keys = set(self.scan(ws, "pedido_chave", headers).values())
-                identifiers = self.scan(ws, "contact_uuid", headers)
-                numbers = sorted(
-                    int(n) for n, uid in identifiers.items() if uid in targets
-                )
-                cells = {}
-                for start in range(0, len(numbers), 40):
-                    ranges = [
-                        f"'{title}'!A{n}:{column_letter(len(headers))}{n}"
-                        for n in numbers[start : start + 40]
-                    ]
-                    response = self.books[book_id].fetch_sheet_metadata(
-                        params={
-                            "includeGridData": True,
-                            "ranges": ranges,
-                            "fields": "sheets(properties(sheetId),data(startRow,startColumn,rowData(values(userEnteredValue,userEnteredFormat,dataValidation))))",
-                        }
+                for book_id, ws, part in locations:
+                    progress.set_activity(
+                        f"aba em conferência: {title}; parte={part.number if part else 0}"
                     )
-                    for sheet in response.get("sheets", []):
-                        if sheet["properties"]["sheetId"] != ws.id:
-                            raise ValueError("Leitura nativa retornou outra aba.")
-                        for block in sheet.get("data", []):
-                            data = block.get("rowData", [])
-                            row = data[0].get("values", []) if data else []
-                            cells[str(block.get("startRow", 0) + 1)] = row + [
-                                {} for _ in range(len(headers) - len(row))
-                            ]
-                if set(cells) != set(map(str, numbers)):
-                    raise ValueError("Backup nativo incompleto.")
-                tables[title] = {
-                    "id": ws.id,
-                    "book": book_id,
-                    "headers": headers,
-                    "cells": cells,
-                }
-        tables["Pedidos_FarmaLider"]["item_order_keys"] = sorted(item_keys)
-        tables["Itens_Pedidos_FarmaLider"]["ledger_orders"] = ledger_orders
+                    header = ws.get(
+                        f"A1:{column_letter(ws.col_count)}1",
+                        value_render_option=ValueRenderOption.formula,
+                    )
+                    headers = list(header[0]) if header else []
+                    if (
+                        not headers
+                        or any(not isinstance(h, str) or not h for h in headers)
+                        or len(headers) != len(set(headers))
+                        or "contact_uuid" not in headers
+                        or (
+                            part is not None
+                            and (
+                                len(headers) != part.width
+                                or fingerprint(headers) != part.schema
+                            )
+                        )
+                    ):
+                        raise ValueError(f"Cabeçalho inválido em {title}.")
+                    if title == "Pedidos_FarmaLider":
+                        ids = self.scan(ws, "pedido_id", headers)
+                        keys = self.scan(ws, "pedido_chave", headers)
+                        if len(keys.values()) != len(set(keys.values())) or set(
+                            keys.values()
+                        ) & set(ledger_orders):
+                            raise ValueError(
+                                "Chave de pedido duplicada nas fontes e continuações."
+                            )
+                        ledger_ids.update(
+                            {_positive_id(v) for v in ids.values()} - {""}
+                        )
+                        ledger_orders.update(
+                            {key: _positive_id(ids.get(n)) for n, key in keys.items()}
+                        )
+                    if title == "Itens_Pedidos_FarmaLider":
+                        item_keys.update(
+                            self.scan(ws, "pedido_chave", headers).values()
+                        )
+                    identifiers = self.scan(ws, "contact_uuid", headers)
+                    numbers = sorted(
+                        int(n) for n, uid in identifiers.items() if uid in targets
+                    )
+                    cells = {}
+                    for start in range(0, len(numbers), 40):
+                        ranges = [
+                            f"'{title}'!A{n}:{column_letter(len(headers))}{n}"
+                            for n in numbers[start : start + 40]
+                        ]
+                        response = self.books[book_id].fetch_sheet_metadata(
+                            params={
+                                "includeGridData": True,
+                                "ranges": ranges,
+                                "fields": "sheets(properties(sheetId),data(startRow,startColumn,rowData(values(userEnteredValue,userEnteredFormat,dataValidation))))",
+                            }
+                        )
+                        for sheet in response.get("sheets", []):
+                            if sheet["properties"]["sheetId"] != ws.id:
+                                raise ValueError("Leitura nativa retornou outra aba.")
+                            for block in sheet.get("data", []):
+                                data = block.get("rowData", [])
+                                row = data[0].get("values", []) if data else []
+                                cells[str(block.get("startRow", 0) + 1)] = row + [
+                                    {} for _ in range(len(headers) - len(row))
+                                ]
+                    if set(cells) != set(map(str, numbers)):
+                        raise ValueError("Backup nativo incompleto.")
+                    table_key = (
+                        title
+                        if part is None or part.number == 0
+                        else f"{title}::{book_id}::{ws.id}"
+                    )
+                    tables[table_key] = {
+                        "id": ws.id,
+                        "book": book_id,
+                        "source_title": title,
+                        "headers": headers,
+                        "cells": cells,
+                    }
+        for table in tables.values():
+            if table["source_title"] == "Pedidos_FarmaLider":
+                table["item_order_keys"] = sorted(item_keys)
+            if table["source_title"] == "Itens_Pedidos_FarmaLider":
+                table["ledger_orders"] = ledger_orders
         return tables, ledger_ids
 
     @staticmethod
@@ -408,12 +491,30 @@ class DedupSheets:
                 oid = _positive_id(row.get("pedido_id"))
                 if oid:
                     refs.add(oid)
-                    if title == "Historico_Alteracoes" and oid not in ledger_ids:
+                    if (
+                        table.get("source_title", title) == "Historico_Alteracoes"
+                        and oid not in ledger_ids
+                    ):
                         reasons.append("PEDIDO_HISTORICO_SEM_LEDGER")
         return refs, owners, reasons
 
     def cleanup(self, pairs, canonicals, directory):
         """Backup e transação por arquivo; reenvio de exclusão incerta é bloqueado."""
+        if self.continuity is not None:
+            self.continuity.require()
+            current = self.continuity.sheet.get_all_values()
+            from sheets_continuation import ContinuationError, fingerprint
+
+            if fingerprint(current) != self.continuity.persisted_hash:
+                raise ContinuationError(
+                    "O índice de continuações mudou; gere uma nova auditoria de duplicados."
+                )
+            if any(
+                v.get("pending_history") for v in self.continuity.index.status.values()
+            ):
+                raise ContinuationError(
+                    "Há histórico incompleto; retome o Analytics antes da deduplicação."
+                )
         targets = {p[k] for p in pairs for k in ("duplicate_uuid", "canonical_uuid")}
         tables, ledger = self.capture(targets)
         for pair in pairs:
@@ -430,9 +531,10 @@ class DedupSheets:
                 )
             if (
                 sum(
-                    record(tables["Base_Contatos"], r)["contact_uuid"]
-                    == pair["canonical_uuid"]
-                    for r in tables["Base_Contatos"]["cells"].values()
+                    record(table, row)["contact_uuid"] == pair["canonical_uuid"]
+                    for key, table in tables.items()
+                    if table.get("source_title", key) == "Base_Contatos"
+                    for row in table["cells"].values()
                 )
                 != 1
             ):
@@ -446,7 +548,12 @@ class DedupSheets:
                 and self.layout.history != self.layout.operations
                 else "operations"
             )
-            path = Path(directory) / f"{role}.json"
+            suffix = (
+                ""
+                if book_id in {self.layout.operations, self.layout.history}
+                else "-" + digest(book_id)[:12]
+            )
+            path = Path(directory) / f"{role}{suffix}.json"
             selected = {t: v for t, v in tables.items() if v["book"] == book_id}
             body = [q for t in selected for q in requests[t]]
             previous = (
@@ -483,6 +590,8 @@ class DedupSheets:
             save_private(path, entry)
             try:
                 with request_progress(f"limpeza das fontes: {role}"):
+                    if self.continuity is not None:
+                        self.continuity.require()
                     self.books[book_id].batch_update({"requests": body})
             except Exception as exc:
                 code = exc.response.status_code if isinstance(exc, APIError) else 0
@@ -491,6 +600,8 @@ class DedupSheets:
                     if 400 <= code < 500 and code not in (408, 499)
                     else "uncertain"
                 )
+                if entry["state"] == "uncertain" and self.continuity is not None:
+                    self.continuity.lease.note_uncertain()
                 entry["error_type"] = type(exc).__name__
                 save_private(path, entry)
                 raise
@@ -502,4 +613,12 @@ class DedupSheets:
             verify_transaction(entry, fresh, removed)
             entry["state"] = "verified"
             save_private(path, entry)
+        if self.continuity is not None:
+            affected = {
+                tables[title].get("source_title", title)
+                for title, body in requests.items()
+                if body
+            }
+            for title in sorted(affected):
+                self.continuity.finish(self.locations(title)[0][1])
         return keys

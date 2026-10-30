@@ -1,9 +1,21 @@
 ﻿param(
-    [string]$Version = "1.5.4"
+    [string]$Version = "1.5.5",
+    [string]$CertificateThumbprint = "",
+    [switch]$RequireSignature
 )
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
+
+. (Join-Path $PSScriptRoot 'sign_release.ps1')
+$SigningCertificate = $null
+if ($CertificateThumbprint) {
+    $SigningCertificate = Get-NexoSigningCertificate -Thumbprint $CertificateThumbprint
+} elseif ($RequireSignature) {
+    throw 'Este build exige assinatura. Informe um certificado de código confiável já instalado no Windows.'
+} else {
+    Write-Warning 'Build sem assinatura Authenticode: não apresenta editor verificado e ainda pode gerar alertas de Windows/antivírus.'
+}
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $DistDir = Join-Path $RepoRoot "dist"
@@ -223,6 +235,11 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "A auditoria dos arquivos empacotados falhou." }
 }
 finally { Pop-Location }
+# Recursos PE são finalizados antes da assinatura; hashes são calculados depois.
+if ($SigningCertificate) {
+    Invoke-NexoFolderSigning -Root $ProjectRoot -Certificate $SigningCertificate
+    Invoke-NexoFolderSigning -Root $PayloadDir -Certificate $SigningCertificate
+}
 Write-PayloadManifest -Payload $PayloadDir
 
 New-Item -ItemType Directory -Force -Path (Join-Path $SetupRoot "installer") | Out-Null
@@ -252,12 +269,10 @@ Não coloque credenciais dentro deste pacote.
 [IO.File]::WriteAllText((Join-Path $SetupRoot "LEIA-ME INSTALACAO.txt"), $readme, (New-Object Text.UTF8Encoding($false)))
 [IO.File]::WriteAllText((Join-Path $SetupRoot "SETUP VALIDADO.txt"), "NexoFlow $Version - Setup validado automaticamente em Windows para instalação, atualização e ausência do Uninstall opcional.", (New-Object Text.UTF8Encoding($false)))
 
-$signing = @'
-param()
-Write-Host "Assinatura Authenticode não automatizada neste pacote."
-Write-Host "Assine os executáveis somente quando houver certificado corporativo confiável."
-'@
-[IO.File]::WriteAllText((Join-Path $SetupRoot "Assinar Release.ps1"), $signing, (New-Object Text.UTF8Encoding($true)))
+$signingInfo = "Este pacote foi gerado pelo pipeline de build. Consulte docs/ASSINATURA WINDOWS.md. " +
+    "Assinatura: $(if ($SigningCertificate) { 'habilitada e verificada' } else { 'não configurada' }). " +
+    "Não modifique os EXEs após a publicação; isso invalida assinaturas e hashes."
+[IO.File]::WriteAllText((Join-Path $SetupRoot 'ASSINATURA.txt'), $signingInfo, (New-Object Text.UTF8Encoding($false)))
 
 Write-Host "==> Compilando launcher do Setup"
 Push-Location $RepoRoot
@@ -283,6 +298,17 @@ Write-Host "==> Incorporando ícone próprio no NexoFlow Setup.exe"
 & (Join-Path $PSScriptRoot "embed_windows_icon.ps1") `
     -ExecutablePath (Join-Path $SetupRoot "NexoFlow Setup.exe") `
     -IconPath (Join-Path (Join-Path $RepoRoot "assets") "installer.ico")
+
+if ($SigningCertificate) {
+    # Payload já assinado: não alterar seus bytes depois do manifesto.
+    Invoke-NexoFolderSigning -Root (Join-Path $SetupRoot 'installer') -Certificate $SigningCertificate
+    Set-AuthenticodeSignature -LiteralPath (Join-Path $SetupRoot 'NexoFlow Setup.exe') `
+        -Certificate $SigningCertificate -HashAlgorithm SHA256 `
+        -TimestampServer 'https://timestamp.digicert.com' | Out-Null
+    Assert-NexoSignature -Path (Join-Path $SetupRoot 'NexoFlow Setup.exe') -Thumbprint $SigningCertificate.Thumbprint
+}
+& (Join-Path $PSScriptRoot 'test_release_security_windows.ps1') -SetupRoot $SetupRoot `
+    -ExpectedThumbprint $CertificateThumbprint
 
 Write-Host "==> Gerando checksums internos do Setup"
 Write-Checksums -Root $SetupRoot -OutputFile (Join-Path $SetupRoot "checksums SHA256.txt")
@@ -311,7 +337,7 @@ foreach ($item in @(
 }
 
 
-foreach ($relative in @("VERSION", "app/versioning.py")) {
+foreach ($relative in @("VERSION", "app/versioning.py", "app/sheets_continuation.py", "app/sheets_partitions.py", "app/sheets_provisioning.py", "app/run_sheets_continuation.py", "app/run_sheets_console.py", "app/dedup_partitions.py", "comandos/configurar_continuacoes.bat", "connectors/continuacoes/Code.js", "connectors/continuacoes/Tables.js", "connectors/continuacoes/Schemas.js")) {
     Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/$relative"
     Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/$relative"
 }
@@ -379,6 +405,12 @@ Siga a ordem: Weni completa → Planilha, se houver exports → Analytics comple
 
 A arquitetura por perfis permite incluir novos departamentos e segmentos mediante registro, configuração e validação das integrações e regras próprias. Os perfis disponíveis nesta versão são FARMA e PET.
 
+## Nesta atualização
+
+Continuações de planilhas antes de 18 milhões de células alocadas ou 500 mil linhas por parte, com histórico preservado e autorização Google no Meu Drive. A criação exige configurar `comandos/configurar_continuacoes.bat`. O Data Studio exige instalar o conector privado e substituir suas fontes uma vez; o Setup não altera o relatório automaticamente. Consulte [Continuações](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/CONTINUACOES.md).
+
+A compilação suporta assinatura Authenticode com certificado de código confiável, timestamp e validação antes dos hashes. Sem certificado configurado, o pacote permanece sem assinatura; isso não é uma aprovação do Windows nem do antivírus. Consulte `RELATORIO DE SEGURANCA.json` dentro do ZIP.
+
 A publicação é validada por testes no Windows, check-up e testes de instalação e atualização.
 
 [Instalação](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/README%20INSTALACAO.md) · [Guia de operação](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/Documentacao%20NexoFlow.md) · [Histórico de mudanças](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/CHANGELOG.md)
@@ -387,4 +419,4 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.4
+# NexoFlow 1.5.5

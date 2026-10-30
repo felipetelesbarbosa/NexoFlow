@@ -41,4 +41,6 @@ Erros da consulta e decisões finais aparecem separadamente no log e no relatór
 
 A revisão da Recompra é renovada uma vez se atravessar a mudança de dia. Outras falhas de aplicação não são repetidas automaticamente pelo orquestrador. Gravações confirmadas permanecem salvas; respostas incertas continuam sujeitas à reconciliação e ao bloqueio contra duplicidade da Recompra. Não apague arquivos de estado para tentar novamente.
 
-Não execute outras cargas enquanto o Noturno estiver ativo. O executável usa a mesma trava dos demais aplicativos, além do bloqueio próprio da rotina. Os atalhos individuais continuam solicitando revisão humana.
+Desde a 1.5.5, pode executar um Noturno FARMA e outro PET ao mesmo tempo no mesmo computador. Não execute outra carga do mesmo segmento enquanto seu Noturno estiver ativo. Os executáveis e a entrada BAT usam travas por segmento, além do bloqueio próprio da rotina. Instalação e desinstalação exigem os dois segmentos parados. Os atalhos individuais continuam solicitando revisão humana.
+
+Crie duas tarefas separadas no Agendador, uma com `--perfil FARMA` e outra com `--perfil PET`. Mantenha “Não iniciar uma nova instância” em cada tarefa. Versões anteriores ainda usam trava global; atualize a instalação inteira antes de tentar paralelismo. API, proxy e quotas Google continuam compartilhando capacidade e podem reduzir a velocidade quando as cargas coincidem. Não há garantia de ganho proporcional.

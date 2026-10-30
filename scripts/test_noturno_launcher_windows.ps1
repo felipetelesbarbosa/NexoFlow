@@ -92,6 +92,20 @@ raise SystemExit(int(os.environ.get('NEXOFLOW_SYNTHETIC_EXIT', '0')))
     $env:NEXOFLOW_SYNTHETIC_EXIT = '7'
     Invoke-NightCase -Argument '--incremental' -ExpectedMode '--incremental' -ExpectedExit 7
     Remove-Item Env:NEXOFLOW_SYNTHETIC_EXIT
+    $createdSegment = $false
+    $segmentMutex = New-Object Threading.Mutex($false, 'Local\NexoFlowOperationLock_FARMA', [ref]$createdSegment)
+    try {
+        foreach ($entry in @('EXE', 'BAT')) {
+            $script:NightEntry = $entry
+            $env:NEXOFLOW_PERFIL = 'FARMA'
+            Invoke-NightCase -Argument '--incremental' -ExpectedExit 2
+            $env:NEXOFLOW_PERFIL = 'PET'
+            Invoke-NightCase -Argument '--incremental' -ExpectedMode '--incremental' -ExpectedLogs 'logs\PET\noturno\'
+        }
+    } finally {
+        $segmentMutex.Dispose()
+        $env:NEXOFLOW_PERFIL = 'FARMA'
+    }
     $createdMutex = $false
     $operationMutex = New-Object Threading.Mutex($false, 'Local\NexoFlowOperationLock', [ref]$createdMutex)
     try { Invoke-NightCase -Argument '--incremental' -ExpectedExit 2 }

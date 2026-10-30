@@ -41,3 +41,9 @@ logs/duplicados/
 
 # Revisões Delivery arquivadas com dados privados
 logs/delivery_historico/
+
+# Chaves e certificados privados de assinatura
+*.pfx
+*.p12
+*.pem
+*.key

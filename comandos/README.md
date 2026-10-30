@@ -13,3 +13,5 @@ Rotinas BAT para cargas completas e incrementais, importação de planilhas, rev
 Para a ordem de execução e os pré-requisitos, consulte o [guia de operação](../docs/Documentacao%20NexoFlow.md).
 
 `executar_noturno.bat` abre a rotina noturna em script: escolha o segmento e o modo incremental ou completo. O resultado fica visível até um novo ENTER. O Setup usa essa entrada no atalho quando o launcher EXE do Noturno está indisponível.
+
+`configurar_continuacoes.bat` autoriza a criação no Meu Drive por segmento e consulta capacidade. Leia [o guia](../docs/CONTINUACOES.md) antes de migrar as fontes do Data Studio.

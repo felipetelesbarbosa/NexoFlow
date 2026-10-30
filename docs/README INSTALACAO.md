@@ -1,4 +1,4 @@
-# NexoFlow 1.5.4 — Instalação
+# NexoFlow 1.5.5 — Instalação
 
 ## Requisitos
 
@@ -8,11 +8,11 @@
 
 ## Instalar
 
-1. Baixe [NexoFlow-Setup-1.5.4.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.4/NexoFlow-Setup-1.5.4.zip).
+1. Baixe [NexoFlow-Setup-1.5.5.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.5/NexoFlow-Setup-1.5.5.zip).
 2. Extraia todo o pacote e execute **NexoFlow Setup.exe**. Autorize a instalação quando o Windows solicitar.
 3. Conclua o assistente. O destino padrão é `C:\NexoFlow`, com atalhos dos aplicativos na Área de Trabalho e no Menu Iniciar.
 
-O [release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.4) também oferece o projeto completo e o arquivo de hashes dos pacotes.
+O [release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.5) também oferece o projeto completo e o arquivo de hashes dos pacotes.
 
 ## Configurar os acessos
 
@@ -67,7 +67,7 @@ Encerre as rotinas dos dois segmentos e execute o novo **NexoFlow Setup.exe**. Q
 
 Os arquivos de `importacoes/` são preservados nas duas opções. O Setup não exclui dados na Weni ou no Google Sheets. Se a instalação falhar, tenta restaurar a versão anterior com seus dados.
 
-A série atual é 1.5; patches posteriores seguem 1.5.4 até 1.5.99, antes de 1.6. A versão instalada aparece no Terminal e nos metadados dos aplicativos.
+A série atual é 1.5; patches posteriores seguem 1.5.5 até 1.5.99, antes de 1.6. A versão instalada aparece no Terminal e nos metadados dos aplicativos.
 
 Após atualizar, rode o diagnóstico e gere novas revisões antes de aplicar mudanças. Faça carga completa quando precisar revalidar a base ou preencher novos campos. O [histórico de mudanças](../CHANGELOG.md) informa os ajustes de cada publicação.
 
@@ -82,3 +82,9 @@ O desinstalador remove o programa e os atalhos. As importações são preservada
 Consulte o resultado exibido e os arquivos em `logs/`. Na verificação de integridade, o Setup aguarda até 30 segundos por arquivo com bloqueio temporário de leitura. O tempo de espera aparece no terminal; uma leitura que não responde também encerra no prazo. Arquivos abertos com compartilhamento de leitura são verificados sem modificá-los. O Setup reconfere a cópia instalada antes de executar a preparação do Python e não dispensa a validação SHA-256. Se uma pasta ou um arquivo continuar em uso, encerre as rotinas e as janelas abertas nessa instalação antes de tentar novamente. Para alertas do antivírus corporativo, consulte o [guia de confiança](ANTIVIRUS%20E%20CONFIANCA.md).
 
 Se o Windows impedir a leitura ou a cópia do launcher `NexoFlow Noturno.exe`, o Setup usa `comandos/executar_noturno.bat` no mesmo atalho. O motor, os scripts e o ícone continuam obrigatórios e têm sua integridade conferida. O EXE indisponível não é utilizado. Não é necessário desativar o antivírus ou mudar permissões para essa opção.
+
+## Capacidade e confiança na distribuição
+
+Para criar continuações no Meu Drive, configure a autorização Google local e depois as fontes do Data Studio; confira [CONTINUACOES.md](CONTINUACOES.md). O Setup preserva credenciais e não configura fontes do relatório sozinho.
+
+O ZIP contém `RELATORIO DE SEGURANCA.json` com o estado das assinaturas. Certificados autoassinados locais não conferem confiança pública. Veja [assinatura Windows](ASSINATURA%20WINDOWS.md) e [antivírus](ANTIVIRUS%20E%20CONFIANCA.md).

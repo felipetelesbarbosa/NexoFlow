@@ -14,9 +14,12 @@ MUTEX_NAME = r"Local\NexoFlowOperationLock"
 
 
 @contextmanager
-def operation_lock():
+def operation_lock(profile=None):
     if os.name != "nt":
         raise OSError("A entrada de console do Noturno exige Windows.")
+    profile = profile or os.environ.get("NEXOFLOW_PERFIL", "FARMA")
+    if profile not in ("FARMA", "PET"):
+        raise ValueError("Perfil inválido para bloquear a execução.")
     from ctypes import wintypes
 
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -27,14 +30,25 @@ def operation_lock():
     close.argtypes = [wintypes.HANDLE]
     close.restype = wintypes.BOOL
     ctypes.set_last_error(0)
-    handle = create(None, False, MUTEX_NAME)
+    handle = create(None, False, MUTEX_NAME + "_" + profile)
     if not handle:
         raise OSError("Não foi possível obter o bloqueio da execução.")
     try:
         if ctypes.get_last_error() == 183:
+            raise RuntimeError("Existe uma carga deste segmento em andamento.")
+        open_mutex = kernel.OpenMutexW
+        open_mutex.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.LPCWSTR]
+        open_mutex.restype = wintypes.HANDLE
+        ctypes.set_last_error(0)
+        maintenance = open_mutex(0x00100000, False, MUTEX_NAME)
+        error = ctypes.get_last_error()
+        if maintenance:
+            close(maintenance)
             raise RuntimeError(
-                "Existe uma rotina, instalação ou desinstalação do NexoFlow em andamento."
+                "Existe uma instalação/desinstalação ou carga antiga em andamento."
             )
+        if error != 2:
+            raise OSError("Não foi possível conferir o bloqueio de manutenção.")
         yield
     finally:
         close(handle)
