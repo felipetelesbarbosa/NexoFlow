@@ -29,3 +29,5 @@ O Analytics mantém a reconsulta de status dos pedidos já registrados somente a
 ## Diagnóstico de criação na Weni
 
 A auditoria privada distingue a etapa anterior ao POST, rejeição HTTP, tentativa anterior indeterminada e confirmação de campos. O resumo agrupa motivos, sem repetir uma linha por contato. Em HTTP 400/422, preserva a explicação da API com valores conhecidos ocultados, hash da resposta e request ID quando disponível. Se uma execução antiga não preservou a explicação, o total `WeniError` sozinho não determina a causa da rejeição. Não apague o registro de uma tentativa incerta nem repita o POST sem reconciliar os contatos existentes.
+
+A prevenção de duplicados compara também a variação brasileira de celular com/sem o nono dígito, preservando DDD e restringindo a regra aos prefixos móveis de migração. Essa equivalência serve somente para localizar um contato já existente: não autoriza preencher/substituir CPF, fundir ou excluir contatos. CPF ausente/divergente e múltiplos contatos são apresentados separadamente para reconciliação. A conferência é repetida antes de qualquer novo POST, inclusive quando o contato apareceu depois da revisão.

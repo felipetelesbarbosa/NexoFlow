@@ -41,6 +41,19 @@ def phone(value):
     return "55" + digits if len(digits) in (10, 11) and len(set(digits)) > 1 else ""
 
 
+def phone_lookup_keys(value):
+    """Somente busca preventiva: a variação não comprova CPF nem autoriza fusão."""
+    number = phone(value)
+    if not number:
+        return set()
+    keys = {number}
+    if re.fullmatch(r"55[1-9]\d9[6-9]\d{7}", number):
+        keys.add(number[:4] + number[5:])
+    elif re.fullmatch(r"55[1-9]\d[6-9]\d{7}", number):
+        keys.add(number[:4] + "9" + number[4:])
+    return keys
+
+
 def contact_phones(contact):
     values = [
         str(u).split(":", 1)[-1]
@@ -61,11 +74,19 @@ class ContactIndex:
         cpf = normalize_cpf(get_fields(contact).get("cpf"))
         if cpf:
             self.cpfs.setdefault(cpf, []).append(contact)
-        for p in contact_phones(contact):
-            self.phones.setdefault(p, []).append(contact)
+        for number in contact_phones(contact):
+            for key in phone_lookup_keys(number):
+                self.phones.setdefault(key, []).append(contact)
 
     def matches(self, cpf, number):
-        return self.cpfs.get(cpf, []) + self.phones.get(number, [])
+        candidates = list(self.cpfs.get(cpf, []))
+        for key in phone_lookup_keys(number):
+            candidates.extend(self.phones.get(key, []))
+        unique = []
+        for contact in candidates:
+            if contact not in unique:
+                unique.append(contact)
+        return unique
 
 
 def build_new_customer_plans(
@@ -81,7 +102,9 @@ def build_new_customer_plans(
     index = ContactIndex(contacts)
     candidates = list(directory.by_id.values())
     cpf_counts = Counter(normalize_cpf(c["cpf"]) for c in candidates)
-    phone_counts = Counter(phone(c.get("celular")) for c in candidates)
+    phone_counts = Counter(
+        key for c in candidates for key in phone_lookup_keys(c.get("celular"))
+    )
     for customer in candidates:
         cid = str(customer["id"])
         if quarter is not None and int(cid) % 4 != quarter - 1:
@@ -89,13 +112,22 @@ def build_new_customer_plans(
         cpf, number = normalize_cpf(customer["cpf"]), phone(customer.get("celular"))
         matches = index.matches(cpf, number)
         if matches:
-            if not any(normalize_cpf(get_fields(c).get("cpf")) == cpf for c in matches):
-                reasons["CONTATO_EXISTENTE_COM_CPF_DIVERGENTE"] += 1
+            if len(matches) != 1:
+                reasons["IDENTIDADE_AMBIGUA"] += 1
+            elif normalize_cpf(get_fields(matches[0]).get("cpf")) != cpf:
+                stored = normalize_cpf(get_fields(matches[0]).get("cpf"))
+                reasons[
+                    "CONTATO_EXISTENTE_SEM_CPF"
+                    if not stored or not stored.strip("0")
+                    else "CONTATO_EXISTENTE_COM_CPF_DIVERGENTE"
+                ] += 1
             continue
         if not is_valid_cpf(cpf):
             reasons["CPF_SEM_IDENTIDADE_WENI"] += 1
             continue
-        if cpf_counts[cpf] != 1 or (number and phone_counts[number] != 1):
+        if cpf_counts[cpf] != 1 or any(
+            phone_counts[key] != 1 for key in phone_lookup_keys(number)
+        ):
             reasons["IDENTIDADE_AMBIGUA"] += 1
             continue
         if cid not in directory.snapshots:
@@ -228,12 +260,23 @@ class CreationSession:
             )
         matches = self.contacts.matches(cpf, number)
         if number:
-            latest = self.weni.get_contact(urn="whatsapp:" + number)
-            if latest:
-                matches.append(latest)
+            for key in sorted(phone_lookup_keys(number)):
+                latest = self.weni.get_contact(urn="whatsapp:" + key)
+                if latest and latest not in matches:
+                    matches.append(latest)
         if matches:
-            # Uma inclusão concorrente nunca autoriza sobrescrever o outro contato.
-            return "already_exists", matches[0].get("uuid", "")
+            # A variação de telefone evita duplicação; nunca substitui a prova de CPF.
+            if (
+                len(matches) != 1
+                or normalize_cpf(get_fields(matches[0]).get("cpf")) != cpf
+                or not matches[0].get("uuid")
+            ):
+                raise CreationError(
+                    "Contato já existe por CPF/telefone; identidade exige reconciliação, sem novo POST.",
+                    code="CONTATO_EXISTENTE_IDENTIDADE_NAO_CONFIRMADA",
+                    stage="verificar_contato_existente",
+                )
+            return "already_exists", matches[0]["uuid"]
         with connect() as db:
             prior = db.execute(
                 "SELECT status,uuid FROM creations WHERE id=?", (plan.contact_uuid,)

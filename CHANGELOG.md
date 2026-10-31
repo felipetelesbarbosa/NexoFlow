@@ -4,6 +4,7 @@
 
 - FARMA exige pedido_data (Data e hora) e ultimo_pedido (Texto com ID oficial), sem exigir ultima_compra. Weni e Recompra compartilham o contrato; conferência antes/depois do grupo mantém status, pagamento, identidade e agendamento D+25. PET mantém compra_recente e D+30.
 - Pedido sem segmento comprovado é rejeitado como PEDIDO_SEGMENTO_INVALIDO_API, sem pendência de consulta. Null explícito não reconstrói compra anterior. Falhas reais de API, autenticação e resposta malformada continuam protegidas; histórico já armazenado é preservado.
+- Busca preventiva de duplicados reconhece celulares brasileiros com/sem nono dígito, sem alterar o número original nem inferir CPF. Contatos existentes não geram novo POST; CPF ausente/divergente e múltiplos vínculos ficam separados para reconciliação.
 - Criações de contato distinguem fonte alterada, identidade divergente, tentativa anterior indeterminada, rejeição HTTP e persistência incompleta. A auditoria privada registra motivo seguro, etapa, HTTP, mensagem com valores conhecidos ocultados e identificação da resposta, sem spam por contato ou repetição automática do POST.
 
 ## NexoFlow 1.5.9 — 30/10/2026

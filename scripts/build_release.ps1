@@ -409,7 +409,7 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 Corrige o contrato FARMA para pedido_data e ultimo_pedido, preservando D+25 e as guardas de cancelamento, pagamento e identidade. PET mantém compra_recente e D+30. Pedidos sem segmento comprovado ou explicitamente nulos são ignorados sem gerar pendência de consulta; falhas reais continuam revalidáveis.
 
-Melhora a auditoria privada de criação de contatos, separando rejeição HTTP, fonte alterada e resultado indeterminado, sem repetir POSTs às cegas. Uma rejeição antiga sem explicação preservada exige nova conferência; a categoria genérica WeniError não determina sua causa.
+Evita tentar criar novamente contatos já existentes com a variação brasileira de celular com/sem nono dígito. Essa busca não autoriza inferir CPF, fundir ou excluir contatos. CPF ausente/divergente é separado para reconciliação. A auditoria privada distingue rejeição HTTP, fonte alterada e resultado indeterminado, sem repetir POSTs às cegas.
 
 A compilação suporta assinatura Authenticode com certificado de código confiável, timestamp e validação antes dos hashes. Sem certificado configurado, o pacote permanece sem assinatura; isso não é uma aprovação do Windows nem do antivírus. Consulte `RELATORIO DE SEGURANCA.json` dentro do ZIP.
 
