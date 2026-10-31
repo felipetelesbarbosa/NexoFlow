@@ -100,3 +100,42 @@ Assert-True (Restore-PreviousInstall -RollbackPath $rollback) 'Rollback comum fa
 Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir 'original.txt') -Raw) -eq 'original') 'Rollback comum alterou o arquivo.'
 """,
         )
+
+    def test_preserve_update_and_rollback_keep_locked_logs_in_place(self):
+        self.run_harness(
+            "install.ps1",
+            DIRECTORY_LOCK
+            + r"""
+Write-Fixture (Join-Path $InstallDir 'app\original.py') 'codigo anterior'
+Write-Fixture (Join-Path $InstallDir 'secrets_config.py') 'configuracao atual'
+Write-Fixture (Join-Path $InstallDir 'credentials\synthetic.json') 'credencial atual'
+Write-Fixture (Join-Path $InstallDir 'logs\checkpoint.json') 'marco Farma'
+Write-Fixture (Join-Path $InstallDir 'logs\PET\checkpoint.json') 'marco Pets'
+Write-Fixture (Join-Path $InstallDir 'importacoes\original.xlsx') 'export original'
+$backup = Join-Path $root 'backup'
+Backup-PrivateData -Source $InstallDir -Backup (Join-Path $backup 'installed')
+$rootHandle = [NexoFlowTestDirectoryLock]::Open($InstallDir)
+$logsHandle = [NexoFlowTestDirectoryLock]::Open((Join-Path $InstallDir 'logs'))
+try {
+    $rollback = Stage-ExistingInstall -Mode Preserve
+    Assert-True (Test-Path -LiteralPath (Join-Path $InstallDir 'logs\checkpoint.json')) 'Logs foram movidos.'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $rollback 'logs'))) 'Dados privados foram movidos ao rollback.'
+    $PayloadDir = Join-Path $root 'payload'
+    Write-Fixture (Join-Path $PayloadDir 'app\novo.py') 'codigo novo'
+    Write-Fixture (Join-Path $PayloadDir 'logs\checkpoint.json') 'modelo que nao pode sobrescrever estado'
+    Write-Fixture (Join-Path $PayloadDir 'secrets_config.py') 'modelo que nao pode sobrescrever configuracao'
+    Copy-ProgramPayload -Mode Preserve
+    Restore-SetupData -BackupRoot $backup -Target $InstallDir -Mode Preserve -KeepExistingData
+    Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'logs\checkpoint.json')) -ceq 'marco Farma') 'Marco Farma foi sobrescrito.'
+    Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'logs\PET\checkpoint.json')) -ceq 'marco Pets') 'Marco Pets foi sobrescrito.'
+    Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'secrets_config.py')) -ceq 'configuracao atual') 'Configuracao foi sobrescrita.'
+    Assert-True (Restore-PreviousInstall -RollbackPath $rollback) 'Rollback falhou com logs abertos.'
+    Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'app\original.py')) -ceq 'codigo anterior') 'Codigo anterior nao foi recuperado.'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $InstallDir 'app\novo.py'))) 'Codigo incompleto permaneceu.'
+    Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'credentials\synthetic.json')) -ceq 'credencial atual') 'Credencial foi perdida.'
+    Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'logs\checkpoint.json')) -ceq 'marco Farma') 'Rollback apagou logs.'
+    Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'logs\PET\checkpoint.json')) -ceq 'marco Pets') 'Rollback apagou estado Pets.'
+    Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'importacoes\original.xlsx')) -ceq 'export original') 'Export perdido.'
+} finally { $logsHandle.Dispose(); $rootHandle.Dispose() }
+""",
+        )
