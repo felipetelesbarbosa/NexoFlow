@@ -826,6 +826,12 @@ def _ultimo_pedido_locator_id(fields: dict[str, Any]) -> str:
     if isinstance(raw, dict) and "value" in raw:
         raw = raw.get("value")
 
+    # Contrato FARMA: ID textual oficial; JSON legado continua compatível.
+    if isinstance(raw, (str, int)) and not isinstance(raw, bool):
+        text = str(raw).strip()
+        if text.isascii() and text.isdigit():
+            return _positive_id(text)
+
     payload: Any = raw
     if isinstance(raw, str):
         text = raw.strip()

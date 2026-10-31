@@ -297,3 +297,13 @@ class Patch1510Tests(unittest.TestCase):
                 with self.assertRaises(FarmaliderLookupError) as raised:
                     farm.get_cliente_by_cpf(CPF)
                 self.assertEqual(raised.exception.code, "PEDIDO_SEGMENTO_INVALIDO_API")
+
+    def test_official_textual_order_id_remains_a_locator_and_not_purchase_evidence(
+        self,
+    ):
+        from farmalider_integration import _ultimo_pedido_locator_id
+
+        for value in ("123", 123, {"value": "123"}, '{"pedido_id":"123"}'):
+            self.assertEqual(_ultimo_pedido_locator_id({"ultimo_pedido": value}), "123")
+        for value in ("0", "-1", "1.2", True, None, "not-an-id"):
+            self.assertEqual(_ultimo_pedido_locator_id({"ultimo_pedido": value}), "")
