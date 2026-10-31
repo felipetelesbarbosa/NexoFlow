@@ -159,7 +159,7 @@ class PartialSegmentLoadsTests(unittest.TestCase):
                     "2026-10-01T12:00:00+00:00",
                 )
 
-    def test_many_unconfirmed_segments_do_not_discard_healthy_contacts_or_advance_cursor(
+    def test_many_malformed_responses_do_not_discard_healthy_contacts_or_advance_cursor(
         self,
     ):
         farm = Mock()

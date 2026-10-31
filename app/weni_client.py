@@ -119,7 +119,7 @@ class WeniClient:
                 value = re.sub(
                     r"\b(?:Token|Bearer)\s+\S+", "[oculto]", value, flags=re.IGNORECASE
                 )
-                value = re.sub(r"\d(?:[\d .()+/-]*\d){4,}", "[oculto]", value)
+                value = re.sub(r"\d[\d .()+/-]{3,}\d", "[oculto]", value)
                 messages.append(" ".join(value.split())[:240])
             elif isinstance(value, list):
                 for child in value[:8]:
