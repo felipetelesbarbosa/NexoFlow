@@ -86,7 +86,7 @@ TZ = ZoneInfo("America/Belem")
 DAY_EXPRESSION = '@(if(default(datetime_diff(format_date(fields.pedido_data, "YYYY-MM-DD"), today(), "D"), -1) = 25, "D25_OK", "D25_FORA"))'
 REFUSAL_EXPRESSION = '@(if(or(lower(trim(fields.marketing_opt_in)) = "recusado", lower(trim(fields.marketing_opt_in)) = "não", lower(trim(fields.marketing_opt_in)) = "nao", lower(trim(fields.marketing_opt_in)) = "negado"), "MKT_RECUSADO", "MKT_SEM_RECUSA"))'
 # Somente os campos essenciais ao agendamento e ao texto da campanha.
-# ultimo_pedido pertence às demais integrações, nunca à recompra.
+# ultimo_pedido guarda o ID oficial no FARMA; a data é sempre pedido_data.
 CORE_FIELDS = {
     "pedido_data",
     "pedido_produtos",
@@ -97,13 +97,14 @@ CORE_FIELDS = {
 
 
 def campaign_fields(segment):
-    return CORE_FIELDS | {"compra_recente" if segment == "PET" else "ultima_compra"}
+    return CORE_FIELDS | {"compra_recente" if segment == "PET" else "ultimo_pedido"}
 
 
 FIELDS = campaign_fields(active_segment())
 GUARD_FIELDS = CORE_FIELDS | {
     "compra_recente",
     "ultima_compra",
+    "ultimo_pedido",
     "cpf",
     "nome",
     "email",
@@ -803,6 +804,8 @@ def inspect_structure(weni, *, segment="FARMA"):
         errors.append(
             "pedido_produtos precisa ser campo Texto para o conteúdo da campanha."
         )
+    if segment == "FARMA" and fields.get("ultimo_pedido") != "text":
+        errors.append("ultimo_pedido precisa ser campo Texto para o ID oficial.")
     org = weni.get_org()
     if org.get("name") != f"Delivery {profile.brand}":
         errors.append(
@@ -945,6 +948,8 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
     }
     diagnostic = text((order or {}).get("status_confirmacao"))
     plan["order_resolution_status"] = diagnostic
+    if diagnostic == "PEDIDO_SEGMENTO_INVALIDO_API":
+        plan["reason"] = diagnostic
     if diagnostic.startswith(("CPF_", "ERRO_", "CLIENTE_")):
         plan["reason"] = diagnostic
     # A recusa e o cancelamento prevalecem até sobre pedidos que a API
@@ -1087,10 +1092,11 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
                     )
                 ),
                 "pedido_forma_pagamento": str(official_payment),
-                "compra_recente"
-                if profile.segment == "PET"
-                else "ultima_compra": dt.isoformat(),
             }
+            if profile.segment == "PET":
+                proposal["compra_recente"] = dt.isoformat()
+            else:
+                proposal["ultimo_pedido"] = order_id
             for key, value in proposal.items():
                 same = (
                     business_order_datetime(fields.get(key)) == dt
@@ -1190,12 +1196,18 @@ def campaign_field_errors(plan, contact):
     if text(actual.get("pedido_id")) != text(plan.get("order_id")):
         errors.add("pedido_id")
     purchase = business_order_datetime((plan.get("purchase") or {}).get("data_hora"))
-    for key in {
-        "pedido_data",
-        "compra_recente" if profile.segment == "PET" else "ultima_compra",
-    }:
+    date_fields = (
+        ("pedido_data", "compra_recente")
+        if profile.segment == "PET"
+        else ("pedido_data",)
+    )
+    for key in date_fields:
         if purchase is None or business_order_datetime(actual.get(key)) != purchase:
             errors.add(key)
+    if profile.segment == "FARMA" and text(actual.get("ultimo_pedido")) != text(
+        plan.get("order_id")
+    ):
+        errors.add("ultimo_pedido")
     return sorted(errors)
 
 
@@ -1280,7 +1292,7 @@ def write_review(review, path=REVIEW):
     profile = profile_for(review["structure"].get("segment", "FARMA"))
     counts = Counter(plan["reason"] for plan in review["plans"])
     lines = [
-        f"NexoFlow 1.5.9 — Revisão {profile.brand} D+{profile.days}",
+        f"NexoFlow 1.5.10 — Revisão {profile.brand} D+{profile.days}",
         f"Dia local: {review['day']}",
         f"Dados capturados em: {review['created_at']}",
         f"Horários conferidos ao concluir: {review.get('generated_at', review['created_at'])}",

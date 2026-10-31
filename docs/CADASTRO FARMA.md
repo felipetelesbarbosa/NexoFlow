@@ -1,4 +1,4 @@
-# NexoFlow 1.5.9 — Cadastro por segmento
+# NexoFlow 1.5.10 — Cadastro por segmento
 
 Weni, Analytics, Recompra e Planilha compartilham o cliente da API FarmaLíder. O perfil selecionado determina a listagem **`clientes/FARMA`** ou **`clientes/PET`**, sempre em produção, com a mesma seleção de conexão direta/proxy.
 
@@ -25,3 +25,7 @@ A resposta da listagem completa pode aguardar até **600 segundos** por tentativ
 Pedidos completos observados são guardados privadamente e entregues pelo Analytics ao Sheets por ID. Mudanças de pedido mais recente não apagam os anteriores já observados. O histórico comercial fica nas planilhas; a Weni conserva o snapshot mais recente. Compras intermediárias nunca observadas dependem de um endpoint de pedidos por período, ainda não usado pelo NexoFlow.
 
 O Analytics mantém a reconsulta de status dos pedidos já registrados somente até 20 dias. Leituras da simulação não dispensam a conferência exigida pela aplicação. Revise os relatórios e preserve o histórico local ao atualizar.
+
+## Diagnóstico de criação na Weni
+
+A auditoria privada distingue a etapa anterior ao POST, rejeição HTTP, tentativa anterior indeterminada e confirmação de campos. O resumo agrupa motivos, sem repetir uma linha por contato. Em HTTP 400/422, preserva a explicação da API com valores conhecidos ocultados, hash da resposta e request ID quando disponível. Se uma execução antiga não preservou a explicação, o total `WeniError` sozinho não determina a causa da rejeição. Não apague o registro de uma tentativa incerta nem repita o POST sem reconciliar os contatos existentes.

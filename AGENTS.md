@@ -1,6 +1,6 @@
-# NexoFlow 1.5.9
+# NexoFlow 1.5.10
 
-A versão pública atual é **NexoFlow 1.5.9**, autorizada pelo usuário em 30/10/2026.
+A versão pública atual é **NexoFlow 1.5.10**, autorizada pelo usuário em 30/10/2026.
 
 ## Conferência antes da entrega
 
@@ -13,9 +13,9 @@ A versão pública atual é **NexoFlow 1.5.9**, autorizada pelo usuário em 30/1
 
 ## Regras do projeto
 
-- Use mensagens de commit curtas em português que descrevam a área ou a alteração, como `Automação`, `Documentação`, `Instalador` ou `Corrigir revisão da Recompra`. `NexoFlow 1.5.9` identifica a versão, não é uma mensagem obrigatória de commit. Separe alterações por área quando isso tornar a navegação do GitHub mais clara; não reescreva o histórico apenas para mudar os textos exibidos.
+- Use mensagens de commit curtas em português que descrevam a área ou a alteração, como `Automação`, `Documentação`, `Instalador` ou `Corrigir revisão da Recompra`. `NexoFlow 1.5.10` identifica a versão, não é uma mensagem obrigatória de commit. Separe alterações por área quando isso tornar a navegação do GitHub mais clara; não reescreva o histórico apenas para mudar os textos exibidos.
 - A `main` é a única branch de trabalho do repositório. Atualize diretamente a `main`; não crie nem mantenha branches adicionais.
-- O release atual usa `NexoFlow 1.5.9`, tag `v1.5.9` e pacotes com sufixo `1.5.9`. Para cada próxima publicação de atualização/hotfix/patch, incremente uma única vez: 1.5.10, 1.5.11, ... 1.5.99; depois 1.6, 1.6.1, ... 1.6.99. Não incremente por commit ou tentativa de CI da mesma entrega. Preserve tags e releases anteriores; nunca sobrescreva uma versão anterior com um novo patch. Confira `VERSION` e `docs/VERSIONAMENTO.md`.
+- O release atual usa `NexoFlow 1.5.10`, tag `v1.5.10` e pacotes com sufixo `1.5.10`. Para cada próxima publicação de atualização/hotfix/patch, incremente uma única vez: 1.5.11, 1.5.12, ... 1.5.99; depois 1.6, 1.6.1, ... 1.6.99. Não incremente por commit ou tentativa de CI da mesma entrega. Preserve tags e releases anteriores; nunca sobrescreva uma versão anterior com um novo patch. Confira `VERSION` e `docs/VERSIONAMENTO.md`.
 - Cada release deve mostrar a data da sua publicação. Não reutilize uma versão já publicada para código novo.
 - Preserve as credenciais e os diagnósticos privados fora do Git e dos pacotes públicos.
 - Use os nomes de pagamento: 0 Cancelado, 1 Dinheiro, 2 Débito, 3 Crédito, 4 Ticket, 5 Pix por Link de Pagamento, 6 Pix no POS.
@@ -51,3 +51,5 @@ A versão pública atual é **NexoFlow 1.5.9**, autorizada pelo usuário em 30/1
 - Uma resposta válida do cliente com `ultimoPedido: null` representa ausência de pedido, não falha de API ou de segmento. Não buscar pedido antigo da Weni para substituir esse null, criar venda, cancelamento ou admissão na Recompra. Campo omitido não comprova ausência. A identidade do CPF continua verificada; ausência de pedido não comprova vínculo cadastral com o segmento nem autoriza deduplicação/enriquecimento sem evidência própria.
 
 - Anúncios Meta usam eventos CTWA oficiais por período, com vínculo exato à URN nativa. Texto de anúncio e simples resposta HTTP 200 não confirmam atribuição ou venda. Corrigir campos existentes somente com evento correspondente comprovado; preservar campos corretos e atribuições fora da cobertura. Pendências de evento ou gravação conservam cursor próprio para reconsulta. Título/URL não são inventados a partir de eventos que não os retornam.
+
+- FARMA usa pedido_data (Data e hora) e ultimo_pedido (Texto com ID oficial, compatível com localizadores legados), sem exigir/escrever ultima_compra. PET mantém compra_recente. Pedidos sem segmento comprovado ou explicitamente nulos não autorizam venda/admissão/enriquecimento e não geram pendência de consulta; rede, autenticação e respostas malformadas preservam suas classificações.

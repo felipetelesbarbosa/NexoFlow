@@ -135,7 +135,7 @@ class RecompraGroupApiContractTests(unittest.TestCase):
                 "pedido_id",
                 "pedido_status",
                 "pedido_forma_pagamento",
-                "ultima_compra",
+                "ultimo_pedido",
             },
         )
         self.assertEqual(posts[1][0], WENI_CONTACT_ACTIONS_API_URL)

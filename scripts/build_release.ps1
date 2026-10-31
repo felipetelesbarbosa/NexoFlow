@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.9",
+    [string]$Version = "1.5.10",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -407,9 +407,9 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-Reconcilia anúncios Meta com eventos CTWA oficiais em FARMA e PET, mantendo a revisão, auditoria e conferência de alterações concorrentes. Completa campos vazios e corrige divergências com evento comprovado; não inventa título ou URL ausentes na API. Falhas isoladas ficam pendentes em cursor próprio.
+Corrige o contrato FARMA para pedido_data e ultimo_pedido, preservando D+25 e as guardas de cancelamento, pagamento e identidade. PET mantém compra_recente e D+30. Pedidos sem segmento comprovado ou explicitamente nulos são ignorados sem gerar pendência de consulta; falhas reais continuam revalidáveis.
 
-Analytics leva os campos à Base_Contatos, aos pedidos e ao BI_Ads. O Noturno usa as mesmas etapas. Pedidos permanecem sujeitos à confirmação oficial da API FarmaLíder, sem tratar cliques como venda. Consulte [instruções de Oscarzinho e Lili](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/RASTREAMENTO_META.md).
+Melhora a auditoria privada de criação de contatos, separando rejeição HTTP, fonte alterada e resultado indeterminado, sem repetir POSTs às cegas. Uma rejeição antiga sem explicação preservada exige nova conferência; a categoria genérica WeniError não determina sua causa.
 
 A compilação suporta assinatura Authenticode com certificado de código confiável, timestamp e validação antes dos hashes. Sem certificado configurado, o pacote permanece sem assinatura; isso não é uma aprovação do Windows nem do antivírus. Consulte `RELATORIO DE SEGURANCA.json` dentro do ZIP.
 
@@ -421,4 +421,4 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.9
+# NexoFlow 1.5.10

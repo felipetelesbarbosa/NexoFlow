@@ -1,8 +1,8 @@
-# NexoFlow 1.5.9 — Pedidos
+# NexoFlow 1.5.10 — Pedidos
 
-As regras compartilhadas de pedidos atendem **FarmaLíder e Pets Líder**, com organizações e planilhas separadas. Farma usa `ultima_compra`; Pets usa `compra_recente`. A referência dos eventos é `pedido_data`: D+25 na Farma e D+30 no Pets. Veja [segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
+As regras compartilhadas de pedidos atendem **FarmaLíder e Pets Líder**, com organizações e planilhas separadas. Farma usa `pedido_data` e `ultimo_pedido` (Texto com ID oficial); Pets mantém `compra_recente`. A referência dos eventos é `pedido_data`: D+25 na Farma e D+30 no Pets. Veja [segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 
-A FarmaLíder API é a fonte de verdade dos pedidos do NexoFlow 1.5.9.
+A FarmaLíder API é a fonte de verdade dos pedidos do NexoFlow 1.5.10.
 
 Fluxo atual:
 
@@ -30,7 +30,7 @@ pedido_valor
 
 Produtos, quantidades e valores unitários são separados por vírgula e mantêm a mesma ordem posicional. `pedido_valor` é a soma de `itens[].total`. A data é gravada como `DD/MM/YY HH:MM:SS`.
 
-O status efetivo usa o enum atual: -2 Em aberto, -1 Pendente de pagamento, 0 Em processamento, 4 Pronto para rota, 1 Em trânsito, 2 Concluído e 3 Cancelado. Pedidos validados pela API com status efetivo -2, -1, 0, 4, 1 ou 2, sem cancelamento, contam como venda e atualizam `ultima_compra` (Farma) ou `compra_recente` (Pets). Os estados -2, -1, 0, 1 e 4 permanecem em rechecagem até Concluído ou Cancelado.
+O status efetivo usa o enum atual: -2 Em aberto, -1 Pendente de pagamento, 0 Em processamento, 4 Pronto para rota, 1 Em trânsito, 2 Concluído e 3 Cancelado. Pedidos validados pela API com status efetivo -2, -1, 0, 4, 1 ou 2, sem cancelamento, contam como venda e atualizam os campos do pedido na Farma e `compra_recente` no Pets. Os estados -2, -1, 0, 1 e 4 permanecem em rechecagem até Concluído ou Cancelado.
 
 | Código de pagamento | Descrição |
 |---:|---|
@@ -46,6 +46,6 @@ Pagamento 0 ou `_` grava o texto literal `Cancelado` em `pedido_forma_pagamento`
 
 Depois de atualizar ou reinstalar, gere um novo dry-run completo com `comandos/atualizar_weni_carga_completa.bat`, revise o relatório e confirme o apply para revalidar os snapshots com essa política. Em seguida, execute `comandos/executar_carga_completa.bat` para recalcular o Analytics/BI. Não reutilize um snapshot de revisão gerado pela política anterior.
 
-A documentação completa está em [Pedidos no NexoFlow 1.5.9](PEDIDOS.md) e [FarmaLíder API](FARMALIDER%20API.md).
+A documentação completa está em [Pedidos no NexoFlow 1.5.10](PEDIDOS.md) e [FarmaLíder API](FARMALIDER%20API.md).
 
-<!-- NexoFlow 1.5.9 -->
+<!-- NexoFlow 1.5.10 -->

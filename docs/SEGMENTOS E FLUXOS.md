@@ -18,7 +18,7 @@ O NexoFlow identifica pedidos registrados na API **independentemente de terem si
 | Logs, revisões e estado | `logs/` | `logs/PET/` |
 | Recompra | D+25 | D+30 |
 | Referência do evento | `pedido_data` | `pedido_data` |
-| Campo de compra confirmada | `ultima_compra` | `compra_recente` |
+| Campo auxiliar do pedido | `ultimo_pedido`: Texto, ID oficial | `compra_recente`: Data e hora |
 | Campo principal de marketing | `marketing_opt_in` | `opt_in_marketing`: Sim/Não |
 | Maioridade | Regras Farma existentes | Não exigida |
 | Produtos no BI/Recompra | Produtos humanos; pedidos mistos usam os itens humanos | Produtos do segmento PET |
@@ -31,7 +31,7 @@ A instalação e o compartilhamento estão nos guias de [instalação](README%20
 
 Nos dois projetos, configure os campos de canal e `pedido_*` descritos no [guia Weni](README%20WENI.md). **`pedido_data` deve ser Data e hora**. `pedido_id`, `pedido_status`, `pedido_produtos`, `pedido_quantidade_itens`, `pedido_valor_produtos`, `pedido_valor` e `pedido_forma_pagamento` são Texto.
 
-Use Data e hora para `ultima_compra` na Farma e `compra_recente` no Pets. No Pets, mantenha `opt_in_marketing` e `opt_in_lgpd` como Texto, com Sim/Não, sem recriar o campo antigo `marketing_opt_in` nem exigir o campo de maioridade. Grupo Opt-Out Marketing e recusas continuam bloqueando a Recompra.
+Na Farma, use `ultimo_pedido` como Texto para o ID oficial; não crie `ultima_compra`. No Pets, `compra_recente` permanece Data e hora. No Pets, mantenha `opt_in_marketing` e `opt_in_lgpd` como Texto, com Sim/Não, sem recriar o campo antigo `marketing_opt_in` nem exigir o campo de maioridade. Grupo Opt-Out Marketing e recusas continuam bloqueando a Recompra.
 
 ## Campanhas e fluxos de Recompra
 

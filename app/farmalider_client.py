@@ -50,6 +50,7 @@ class FarmaliderLookupError(FarmaliderError):
     CODES = frozenset(
         {
             "CPF_FORA_SEGMENTO_API",
+            "PEDIDO_SEGMENTO_INVALIDO_API",
             "ERRO_SEGMENTO_NAO_CONFIRMADO_API",
             "ERRO_RESPOSTA_CLIENTE_API",
             "ERRO_JSON_CLIENTE_API",
@@ -57,6 +58,10 @@ class FarmaliderLookupError(FarmaliderError):
     )
 
     def __init__(self, code):
+        # Resposta recebida, mas pedido sem segmento comprovado: rejeição final,
+        # não falha de transporte nem motivo para repetir a carga inteira.
+        if code == "ERRO_SEGMENTO_NAO_CONFIRMADO_API":
+            code = "PEDIDO_SEGMENTO_INVALIDO_API"
         if code not in self.CODES:
             raise ValueError("Diagnóstico de cadastro desconhecido.")
         super().__init__(code)
@@ -893,6 +898,13 @@ class FarmaliderClient:
                             raise FarmaliderError(
                                 "FarmaLíder API retornou JSON inválido."
                             ) from None
+                        if (
+                            payload is None
+                            and allow_not_found
+                            and endpoint_label == "pedido"
+                        ):
+                            self._mark_healthy(permit, endpoint_label)
+                            return {"_nexoflow_no_order": True}
                         if not isinstance(payload, dict) and not (
                             allow_customer_list
                             and isinstance(payload, list)
@@ -1106,12 +1118,6 @@ class FarmaliderClient:
                 for part in (record, customer, latest)
                 if isinstance(part, dict) and part.get("segmento") not in (None, "")
             }
-            trusted = False
-            if self.customer_directory is not None:
-                trusted = positive_id(customer.get("id")) in {
-                    positive_id(c.get("id"))
-                    for c in self.customer_directory.candidates(cpf)
-                }
             if markers and markers != {self.customer_segment}:
                 detail = (
                     "MARCADORES_CONFLITANTES"
@@ -1127,7 +1133,7 @@ class FarmaliderClient:
                     else "ERRO_SEGMENTO_NAO_CONFIRMADO_API"
                 )
                 continue
-            if not markers and not trusted:
+            if not markers:
                 self._record_segment_rejection(
                     "SEM_MARCADOR_E_SEM_ID_NO_INDICE"
                     if self.customer_directory is not None
@@ -1171,9 +1177,11 @@ class FarmaliderClient:
             )
 
     def _reject_lookup(self, code):
+        error = FarmaliderLookupError(code)
+        code = error.code
         with self._metrics_lock:
             self._lookup_diagnostics[code] = self._lookup_diagnostics.get(code, 0) + 1
-        raise FarmaliderLookupError(code)
+        raise error
 
     def _record_private_failure(
         self,
@@ -1253,13 +1261,26 @@ class FarmaliderClient:
             self._cached_read(
                 "pedido",
                 str(codigo),
-                lambda: self._request_json(
-                    self._delivery_path(f"pedido/{codigo}"),
-                    allow_not_found=True,
-                    diagnostic_ref=self._diagnostic_ref("pedido", codigo),
-                ),
+                lambda: self._fetch_pedido(codigo),
             ),
         )
+
+    def _fetch_pedido(self, codigo):
+        payload = self._request_json(
+            self._delivery_path(f"pedido/{codigo}"),
+            allow_not_found=True,
+            diagnostic_ref=self._diagnostic_ref("pedido", codigo),
+        )
+        if isinstance(payload, dict) and isinstance(payload.get("capa"), dict):
+            markers = {
+                str(part["segmento"]).strip().upper()
+                for part in (payload, payload["capa"])
+                if part.get("segmento") not in (None, "")
+            }
+            if markers != {self.customer_segment}:
+                self._record_segment_rejection("PEDIDO_SEM_SEGMENTO_COMPATIVEL")
+                return {**payload, "_nexoflow_invalid_segment": True}
+        return payload
 
     def test_connection(self) -> dict[str, Any]:
         """Valida rede/autenticação com a mesma resiliência das consultas reais."""

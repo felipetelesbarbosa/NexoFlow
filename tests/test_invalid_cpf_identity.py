@@ -917,7 +917,7 @@ class InvalidCpfIdentityTests(unittest.TestCase):
                 with self.assertRaises(FarmaliderError):
                     client.get_pedido("201")
                 # O contrato de pedido é objeto ou ausência; nunca lista.
-                pedido_payload = {"capa": {"id": 201}, "itens": []}
+                pedido_payload = {"capa": {"id": 201, "segmento": "FARMA"}, "itens": []}
                 response.json.return_value = pedido_payload
                 self.assertIs(client.get_pedido("201"), pedido_payload)
                 response.status_code = 404

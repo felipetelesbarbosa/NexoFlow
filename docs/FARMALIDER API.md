@@ -153,7 +153,7 @@ De-para usado pela integração:
 
 A Weni armazena o código efetivo em `pedido_status`. O normalizador aceita os códigos -2 a 4 e os nomes oficiais `EmAberto`, `PendenteDePagamento`, `EmProcessamento`, `ProntoParaRota`, `EmTransito`, `Concluido` e `Cancelado`. Cancelamento explícito ou `formaPagamento=0` ou `_` força o código 3, Cancelado. O helper `effective_order_status_code(order)` aplica essa regra para Weni/BI; o Analytics deriva o nome amigável. `Pedidos_FarmaLider` preserva o status bruto retornado pela API em `farmalider_status_pedido`, inclusive quando ele difere do status efetivo.
 
-No Analytics/Data Studio, pedidos validados pela API em estados documentados não cancelados entram nas métricas de venda, incluindo Em processamento (0). A mesma regra vale para `ultima_compra` e Recompra, mantendo as demais validações. Cada nova carga reconsulta os pedidos no escopo selecionado, mesmo sem alteração do contato na Weni. Os estados -2, -1, 0, 1 e 4 permanecem em rechecagem até Concluído ou Cancelado. Os estados -2, -1, 0, 4, 1 e 2 contam como venda no dashboard; estados desconhecidos ficam pendentes. O estado 3 e o pagamento 0 ficam fora das vendas e encerram a rechecagem.
+No Analytics/Data Studio, pedidos validados pela API em estados documentados não cancelados entram nas métricas de venda, incluindo Em processamento (0). A mesma regra vale para a elegibilidade da Recompra, mantendo as demais validações. Cada nova carga reconsulta os pedidos no escopo selecionado, mesmo sem alteração do contato na Weni. Os estados -2, -1, 0, 1 e 4 permanecem em rechecagem até Concluído ou Cancelado. Os estados -2, -1, 0, 4, 1 e 2 contam como venda no dashboard; estados desconhecidos ficam pendentes. O estado 3 e o pagamento 0 ficam fora das vendas e encerram a rechecagem.
 
 ## Forma de pagamento
 
@@ -343,8 +343,12 @@ GET /api/Delivery/pedidos/cpf/{cpf}
 ```
 
 Filtros desejáveis: `inicio`, `fim`, `status`, `pagina` e `tamanhoPagina`. Essa rota é uma proposta de evolução, não uma integração atualmente implementada.
-<!-- NexoFlow 1.5.9 -->
+<!-- NexoFlow 1.5.10 -->
 
 ### Respostas e pendências
 
 A resposta HTTP 200 passa por validação de JSON, CPF, proprietário e segmento. Lista vazia na consulta por CPF significa cliente não localizado nessa resposta; não comprova ausência histórica de compras. Resposta inválida ou segmento não comprovado fica pendente. Outro segmento não autoriza cadastro, pedido nem admissão na campanha atual. O Analytics resume os resultados por lote, sem repetir CPF por CPF.
+
+## Pedidos sem segmento ou explicitamente nulos
+
+Pedidos sem segmento comprovado são ignorados (`PEDIDO_SEGMENTO_INVALIDO_API`), sem gerar erro/pendência de consulta nem autorizar venda ou admissão. A listagem filtrada por segmento continua sendo evidência de seu próprio segmento. JSON `null` explícito no endpoint de pedido e `ultimoPedido: null` não reconstroem compra antiga. Uma resposta 404 pode usar o snapshot completo do mesmo pedido já confirmado no endpoint de cliente; não representa JSON `null` recebido com HTTP 200. Falhas de transporte e JSON malformado continuam sendo falhas reais.

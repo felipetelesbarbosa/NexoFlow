@@ -43,7 +43,7 @@ class PartialSegmentLoadsTests(unittest.TestCase):
                     if cpf == CPF:
                         return deepcopy(snapshot)
                     if incomplete[0]:
-                        raise FarmaliderLookupError("ERRO_SEGMENTO_NAO_CONFIRMADO_API")
+                        raise FarmaliderLookupError("ERRO_RESPOSTA_CLIENTE_API")
                     return {
                         "cliente": {"id": 999, "cpf": int(cpf), "nome": "Sintético"},
                         "ultimoPedido": None,
@@ -174,7 +174,7 @@ class PartialSegmentLoadsTests(unittest.TestCase):
 
         def query(cpf):
             if int(cpf) < 1132:
-                raise FarmaliderLookupError("ERRO_SEGMENTO_NAO_CONFIRMADO_API")
+                raise FarmaliderLookupError("ERRO_RESPOSTA_CLIENTE_API")
             return None
 
         farm.get_cliente_by_cpf.side_effect = query
@@ -200,7 +200,7 @@ class PartialSegmentLoadsTests(unittest.TestCase):
         self.assertEqual(stats.not_found, 68)
         self.assertEqual(len(statuses), 200)
         self.assertEqual(
-            rows[0]["farmalider_cliente_status"], "ERRO_SEGMENTO_NAO_CONFIRMADO_API"
+            rows[0]["farmalider_cliente_status"], "ERRO_RESPOSTA_CLIENTE_API"
         )
         self.assertEqual(rows[-1]["farmalider_cliente_status"], "CPF_NAO_ENCONTRADO")
         self.assertEqual(

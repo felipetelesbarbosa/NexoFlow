@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
 $AppName = 'NexoFlow'
-$AppVersion = '1.5.9'
+$AppVersion = '1.5.10'
 $Publisher = 'Grupo Lider'
 $InstallDir = 'C:\NexoFlow'
 $DataDir = 'C:\NexoFlow Data'
@@ -1603,4 +1603,4 @@ catch {
     exit 1
 }
 finally { Exit-NexoMaintenance }
-# NexoFlow 1.5.9
+# NexoFlow 1.5.10

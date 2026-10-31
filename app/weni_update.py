@@ -122,6 +122,7 @@ ALLOWED_WRITE_FIELDS = {
     "pedido_valor",
     "pedido_forma_pagamento",
     LAST_PURCHASE_FIELD,
+    "ultimo_pedido",
     *GOOGLE_ADS_WRITE_FIELDS,
 }
 
@@ -143,6 +144,7 @@ PURCHASE_FIELDS = {
     "pedido_valor",
     "pedido_forma_pagamento",
     LAST_PURCHASE_FIELD,
+    "ultimo_pedido",
 }
 
 REQUIRED_ORDER_FIELDS = {
@@ -1362,6 +1364,8 @@ def _apply_purchase_candidate(
         "pedido_valor_produtos": serialize_weni_order_list(unit_values),
         "pedido_valor": order_value,
     }
+    if segment() == "FARMA":
+        order_fields_to_write["ultimo_pedido"] = pedido_id
     if payment_code:
         order_fields_to_write["pedido_forma_pagamento"] = payment_code
 
@@ -1373,7 +1377,7 @@ def _apply_purchase_candidate(
             continue
         _set_field_if_changed(plan, current_fields, field_name, value, reason=reason)
 
-    if plan.purchase_confirmed and (
+    if segment() == "PET" and plan.purchase_confirmed and (
         available_weni_fields is None or LAST_PURCHASE_FIELD in available_weni_fields
     ):
         current_last_purchase = business_order_datetime(
@@ -1656,12 +1660,14 @@ def _apply_creation(session, plan, stats):
         _append_audit(event)
     except Exception as exc:
         stats.contacts_failed += 1
-        reason = type(exc).__name__
+        reason = getattr(exc, "code", type(exc).__name__)
         stats.creation_pending[reason] = stats.creation_pending.get(reason, 0) + 1
         event = _audit_plan_event(plan, mode="create", status="pending", error=reason)
         if isinstance(exc, WeniError):
             event["detail"] = str(exc)
             event["validation"] = exc.validation
+            event["http_status"] = exc.status_code
+            event["stage"] = getattr(exc, "stage", "revalidar_ou_criar")
         _append_audit(event)
 
 
@@ -3929,4 +3935,4 @@ def run_update(
             farm.close()
 
 
-# NexoFlow 1.5.9
+# NexoFlow 1.5.10

@@ -1,6 +1,6 @@
-# NexoFlow 1.5.9 — Pedidos na Weni
+# NexoFlow 1.5.10 — Pedidos na Weni
 
-As regras compartilhadas de pedidos atendem **FarmaLíder e Pets Líder**, com organizações e planilhas separadas. Farma usa `ultima_compra`; Pets usa `compra_recente`. A referência dos eventos é `pedido_data`: D+25 na Farma e D+30 no Pets. Veja [segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
+As regras compartilhadas de pedidos atendem **FarmaLíder e Pets Líder**, com organizações e planilhas separadas. Farma usa `pedido_data` e `ultimo_pedido` (Texto com ID oficial); Pets mantém `compra_recente`. A referência dos eventos é `pedido_data`: D+25 na Farma e D+30 no Pets. Veja [segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 
 ## Consulta de CPFs válidos e inválidos
 
@@ -50,7 +50,7 @@ Pagamento 5 é **Pix por Link de Pagamento** e pagamento 6 é **Pix no POS**. Pa
 
 Pagamentos válidos sem de-para a partir de 7 mantêm seu código na Weni e recebem a descrição `Não identificado (código X)` no Google Sheets/BI. Pagamento ausente ou inválido mantém a descrição vazia.
 
-Pedidos validados pela API com status efetivo -2 (Em aberto), -1 (Pendente de pagamento), 0 (Em processamento), 4 (Pronto para rota), 1 (Em trânsito) ou 2 (Concluído) contam como venda e atualizam `ultima_compra` (Farma) ou `compra_recente` (Pets). Entre os estados documentados, somente o status efetivo 3 (Cancelado) exclui a venda; cancelamento explícito ou pagamento 0 força esse status. Os estados -2, -1, 0, 4 e 1 permanecem em rechecagem até Concluído ou Cancelado. Cada nova carga reconsulta os pedidos atuais no seu escopo, mesmo sem modificação do contato na Weni. Estados desconhecidos continuam pendentes de validação.
+Pedidos validados pela API com status efetivo -2 (Em aberto), -1 (Pendente de pagamento), 0 (Em processamento), 4 (Pronto para rota), 1 (Em trânsito) ou 2 (Concluído) contam como venda e atualizam os campos do pedido na Farma e `compra_recente` no Pets. Entre os estados documentados, somente o status efetivo 3 (Cancelado) exclui a venda; cancelamento explícito ou pagamento 0 força esse status. Os estados -2, -1, 0, 4 e 1 permanecem em rechecagem até Concluído ou Cancelado. Cada nova carga reconsulta os pedidos atuais no seu escopo, mesmo sem modificação do contato na Weni. Estados desconhecidos continuam pendentes de validação.
 
 Exemplo:
 
@@ -73,4 +73,4 @@ Os logs de preparação e auditoria precedem as gravações. O total de contatos
 
 Veja [PEDIDOS.md](PEDIDOS.md) para regras completas.
 
-<!-- NexoFlow 1.5.9 -->
+<!-- NexoFlow 1.5.10 -->

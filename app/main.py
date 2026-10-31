@@ -91,11 +91,9 @@ ORDER_API_FAILURES = frozenset(
     {
         "ERRO_API",
         "ERRO_JSON_CLIENTE_API",
-        "ERRO_SEGMENTO_NAO_CONFIRMADO_API",
         "ERRO_RESPOSTA_CLIENTE_API",
         "CLIENTE_ID_INVALIDO_API",
         "CLIENTE_ID_DIVERGENTE_API",
-        "PEDIDO_NAO_ENCONTRADO_API",
         "ERRO_RESPOSTA_PEDIDO_API",
         "PEDIDO_ID_INVALIDO_API",
         "PEDIDO_ID_DIVERGENTE_API",
@@ -1616,4 +1614,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-# NexoFlow 1.5.9
+# NexoFlow 1.5.10

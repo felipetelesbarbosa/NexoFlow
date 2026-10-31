@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import logging
+import re
 import time
 from collections.abc import Iterator
 from datetime import UTC, datetime
@@ -64,7 +66,7 @@ class WeniClient:
         )
 
     @staticmethod
-    def _validation_summary(response, body):
+    def _validation_summary(response, body, *, sensitive_values=()):
         try:
             data = response.json()
         except ValueError:
@@ -86,7 +88,58 @@ class WeniClient:
         affected = sorted(key for key in submitted if key in text)
         if isinstance(data, dict):
             affected += [key for key in ("name", "urns", "fields") if key in data]
-        return {"reason": reason, "fields": sorted(set(affected))}
+        # A auditoria privada precisa distinguir uma validação global de campo.
+        # Não imprimir corpo bruto nem valores pessoais no terminal.
+        secrets = list(sensitive_values)
+
+        def collect(value):
+            if isinstance(value, dict):
+                for child in value.values():
+                    collect(child)
+            elif isinstance(value, list):
+                for child in value:
+                    collect(child)
+            elif isinstance(value, str) and len(value.strip()) >= 4:
+                secrets.append(value.strip())
+
+        collect(body or {})
+        name = str((body or {}).get("name") or "")
+        secrets.extend(word for word in name.split() if len(word) >= 3)
+        messages = []
+
+        def extract(value):
+            if isinstance(value, str):
+                value = value[:4000]
+                for secret in sorted(set(secrets), key=len, reverse=True):
+                    if secret:
+                        value = re.sub(
+                            re.escape(secret), "[oculto]", value, flags=re.IGNORECASE
+                        )
+                value = re.sub(r"https?://\S+|[\w.+-]+@[\w.-]+\.\w+", "[oculto]", value)
+                value = re.sub(
+                    r"\b(?:Token|Bearer)\s+\S+", "[oculto]", value, flags=re.IGNORECASE
+                )
+                value = re.sub(r"\d(?:[\d .()+/-]*\d){4,}", "[oculto]", value)
+                messages.append(" ".join(value.split())[:240])
+            elif isinstance(value, list):
+                for child in value[:8]:
+                    extract(child)
+            elif isinstance(value, dict):
+                for child in list(value.values())[:12]:
+                    extract(child)
+
+        if isinstance(data, (dict, list)):
+            extract(data)
+        request_id = response.headers.get("X-Request-ID", "")
+        if not re.fullmatch(r"[a-fA-F0-9-]{16,64}", request_id):
+            request_id = ""
+        return {
+            "reason": reason,
+            "fields": sorted(set(affected)),
+            "messages": messages[:12],
+            "response_sha256": hashlib.sha256(response.content).hexdigest(),
+            "request_id": request_id,
+        }
 
     def _request_json(
         self,
@@ -158,7 +211,15 @@ class WeniClient:
                     continue
 
                 if response.status_code in (400, 422):
-                    validation = self._validation_summary(response, json_body)
+                    validation = self._validation_summary(
+                        response,
+                        json_body,
+                        sensitive_values=(
+                            self.session.headers.get("Authorization", "").removeprefix(
+                                "Token "
+                            ),
+                        ),
+                    )
                     raise WeniError(
                         f"Weni recusou os dados: HTTP {response.status_code}; motivo={validation['reason']}; campos={','.join(validation['fields']) or 'não informado'}. Operação: {operation}.",
                         status_code=response.status_code,
@@ -671,4 +732,4 @@ class WeniClient:
         }
 
 
-# NexoFlow 1.5.9
+# NexoFlow 1.5.10

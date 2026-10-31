@@ -1,4 +1,4 @@
-# NexoFlow 1.5.9 — Recompra FarmaLíder e Pets Líder
+# NexoFlow 1.5.10 — Recompra FarmaLíder e Pets Líder
 
 O NexoFlow mantém a elegibilidade dos grupos; a **campanha Weni envia as mensagens**. Use o mesmo executável Recompra e escolha o segmento. Cada marca mantém sua organização, template, campanha, fluxo, evento, revisão e estado.
 
@@ -11,7 +11,7 @@ O NexoFlow mantém a elegibilidade dos grupos; a **campanha Weni envia as mensag
 | Campo principal de marketing | `marketing_opt_in` | `opt_in_marketing`, Sim/Não |
 | Produtos | Somente humanos | Produtos do segmento PET |
 
-Configure os campos, o template aprovado e o evento na organização correta, conforme [segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md). `pedido_data` é **Data e hora** e a referência do evento nos dois perfis. `ultima_compra` (Farma) e `compra_recente` (Pets) não substituem essa referência. Pets não exige maioridade.
+Configure os campos, o template aprovado e o evento na organização correta, conforme [segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md). `pedido_data` é **Data e hora** e a referência do evento nos dois perfis. `ultimo_pedido` é Texto e recebe o ID oficial no FARMA; `compra_recente` é Data e hora no PET. Nenhum deles substitui a referência `pedido_data`. Não é necessário criar `ultima_compra` na Farma. Pets não exige maioridade.
 
 ## Regras de elegibilidade
 
@@ -36,7 +36,7 @@ Conversa indicando compra posterior ainda não confirmada pela API mantém a ref
 
 O BAT principal é `comandos/atualizar_recompra.bat`; `comandos/atualizar_recompra_pets.bat` fixa o perfil Pets. `RECOMPRA_ENABLED` controla a integração da etapa nas outras rotinas. No Noturno, a revisão é automática, mantendo as validações.
 
-A aplicação sincroniza os campos essenciais do pedido (`pedido_id`, `pedido_data`, `pedido_produtos`, `pedido_status`, `pedido_forma_pagamento`) e a última compra (`ultima_compra` na Farma; `compra_recente` no Pets). O evento continua usando somente `pedido_data`. Confere a persistência antes da admissão e novamente depois de confirmar a inclusão. Se os campos ou a elegibilidade mudarem após o POST, remove preventivamente o grupo, confirma a remoção e deixa o contato pendente; os demais continuam. O estado preservado impede repetir uma admissão que pode ter sido observada pela campanha.
+A aplicação sincroniza os campos essenciais do pedido (`pedido_id`, `pedido_data`, `pedido_produtos`, `pedido_status`, `pedido_forma_pagamento`) e o campo auxiliar (`ultimo_pedido` com ID textual na Farma; `compra_recente` com data no Pets). O evento continua usando somente `pedido_data`. Confere a persistência antes da admissão e novamente depois de confirmar a inclusão. Se os campos ou a elegibilidade mudarem após o POST, remove preventivamente o grupo, confirma a remoção e deixa o contato pendente; os demais continuam. O estado preservado impede repetir uma admissão que pode ter sido observada pela campanha.
 
 No Pets, os campos antigos de rótulo **Pedido** e **Ultima_compra** são distintos de `pedido_data` e **Compra recente**. Não os use para conferir o agendamento atual.
 
@@ -56,3 +56,5 @@ Código **0** indica conclusão; **3** indica pendências; outros códigos indic
 Os arquivos ficam em `logs/` para Farma e `logs/PET/` para Pets. Preserve-os nas atualizações. Pendência local não comprova envio de mensagem; o histórico da campanha deve ser conferido na Weni.
 
 Consulte também [Noturno](NOTURNO.md), [pedidos](PEDIDOS.md) e [API](FARMALIDER%20API.md).
+
+Pedido sem segmento comprovado é inelegível, sem pendência de consulta. `ultimoPedido: null` não admite contato nem reconstrói pedido antigo. Rede/timeout e respostas malformadas continuam pendentes.

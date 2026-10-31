@@ -1454,6 +1454,14 @@ def parse_ultimo_pedido(
         captured_at=captured_at,
     )
 
+    # Contrato FARMA atual: ultimo_pedido pode conter o ID textual oficial.
+    # Ele não contém produtos e não deve ser interpretado como JSON de compra.
+    if (
+        raw.isascii()
+        and raw.isdigit()
+        and raw == normalize_value(fields.get("pedido_id")).strip()
+    ):
+        raw = ""
     original_order, original_items = parse_ultimo_pedido_raw(raw, **context)
     original_valid = original_order is not None and not str(
         original_order.get("status_validacao") or ""
@@ -2207,4 +2215,4 @@ def build_bi_ads_rows(
     return rows
 
 
-# NexoFlow 1.5.9
+# NexoFlow 1.5.10

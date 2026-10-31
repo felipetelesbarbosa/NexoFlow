@@ -253,7 +253,7 @@ class ObservedOrdersTests(unittest.TestCase):
                     farm.get_pedido.return_value = error
                 result = self.run_refresh([old], farm)
                 self.assertEqual((result.orders, result.items), ([], []))
-                self.assertEqual(result.api_errors, 1)
+                self.assertEqual(result.api_errors, 0 if error is None else 1)
                 store = memory_store([old], old_items)
                 orders, items = store.upsert_pharmacy_orders(
                     result.orders, result.items

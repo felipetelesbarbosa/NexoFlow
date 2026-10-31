@@ -262,6 +262,13 @@ def revalidate_observed_orders(
                 confirmed_at=captured_at,
             )
             result.checked += 1
+            if order.get("status_confirmacao") in {
+                "PEDIDO_SEGMENTO_INVALIDO_API",
+                "PEDIDO_NAO_ENCONTRADO_API",
+            }:
+                # Ignorar resposta inválida/ausente sem apagar o histórico nem
+                # criar uma pendência de consulta. Falhas de rede seguem abaixo.
+                continue
             complete = order.get("status_validacao") == "OK" and bool(items)
             if not complete:
                 if not verified_order_cancellation(order):

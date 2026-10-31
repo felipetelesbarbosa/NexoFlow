@@ -1,4 +1,4 @@
-# NexoFlow 1.5.9 — Instalação
+# NexoFlow 1.5.10 — Instalação
 
 ## Requisitos
 
@@ -8,11 +8,11 @@
 
 ## Instalar
 
-1. Baixe [NexoFlow-Setup-1.5.9.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.9/NexoFlow-Setup-1.5.9.zip).
+1. Baixe [NexoFlow-Setup-1.5.10.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.10/NexoFlow-Setup-1.5.10.zip).
 2. Extraia todo o pacote e execute **NexoFlow Setup.exe**. Autorize a instalação quando o Windows solicitar.
 3. Conclua o assistente. O destino padrão é `C:\NexoFlow`, com atalhos dos aplicativos na Área de Trabalho e no Menu Iniciar.
 
-O [release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.9) também oferece o projeto completo e o arquivo de hashes dos pacotes.
+O [release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.10) também oferece o projeto completo e o arquivo de hashes dos pacotes.
 
 ## Configurar os acessos
 
@@ -37,7 +37,7 @@ Configure os campos em cada projeto Weni, respeitando os tipos:
 | Texto — canais | `contact_urn_whatsapp`, `contact_urn_instagram`, `contact_urn_facebook`, `contact_canal_principal` |
 | Texto — pedidos | `pedido_id`, `pedido_status`, `pedido_produtos`, `pedido_quantidade_itens`, `pedido_valor_produtos`, `pedido_valor`, `pedido_forma_pagamento` |
 
-`pedido_data` é **Data e hora** nos dois projetos. `ultima_compra` (Farma) e `compra_recente` (Pets) também são Data e hora. No Pets, use `opt_in_marketing` e `opt_in_lgpd` como Texto, com Sim/Não; não há exigência de maioridade.
+`pedido_data` é **Data e hora** nos dois projetos. Na Farma, `ultimo_pedido` é Texto para o ID oficial; não é exigido `ultima_compra`. No Pets, `compra_recente` é Data e hora. No Pets, use `opt_in_marketing` e `opt_in_lgpd` como Texto, com Sim/Não; não há exigência de maioridade.
 
 Confira também os grupos operacionais e os campos opcionais no [guia Weni](README%20WENI.md). As campanhas [Farma D+25 e Pets D+30](README%20RECOMPRA.md) têm grupo, fluxo, template e evento próprios, usando `pedido_data`.
 
@@ -67,7 +67,7 @@ Encerre as rotinas dos dois segmentos e execute o novo **NexoFlow Setup.exe**. Q
 
 Os arquivos de `importacoes/` são preservados nas duas opções. O Setup não exclui dados na Weni ou no Google Sheets. Se a instalação falhar, tenta restaurar a versão anterior com seus dados.
 
-A série atual é 1.5; patches posteriores seguem 1.5.9 até 1.5.99, antes de 1.6. A versão instalada aparece no Terminal e nos metadados dos aplicativos.
+A série atual é 1.5; patches posteriores seguem 1.5.10 até 1.5.99, antes de 1.6. A versão instalada aparece no Terminal e nos metadados dos aplicativos.
 
 Após atualizar, rode o diagnóstico e gere novas revisões antes de aplicar mudanças. Faça carga completa quando precisar revalidar a base ou preencher novos campos. O [histórico de mudanças](../CHANGELOG.md) informa os ajustes de cada publicação.
 

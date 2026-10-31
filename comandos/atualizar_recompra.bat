@@ -10,7 +10,7 @@ if /i "%NEXOFLOW_PERFIL%"=="PET" set "PROFILE_LOG=logs\PET"
 if /i "%NEXOFLOW_PERFIL%"=="PET" set "IMPORT_DIR=importacoes\PET"
 set "STRICT_ARG="
 cd /d "%NEXOFLOW_HOME%\"
-title NexoFlow 1.5.9 - Recompra FarmaLíder
+title NexoFlow 1.5.10 - Recompra FarmaLíder
 set "PROFILE=FARMA"
 if /i "%NEXOFLOW_PERFIL%"=="PET" set "PROFILE=PET"
 set "PROFILE_LOG=logs"
@@ -18,8 +18,8 @@ if /i "%NEXOFLOW_PERFIL%"=="PET" set "PROFILE_LOG=logs\PET"
 if /i "%~1"=="PET" set "PROFILE=PET"
 if /i "%~1"=="PET" set "NEXOFLOW_PERFIL=PET"
 if /i "%~1"=="PET" set "PROFILE_LOG=logs\PET"
-if /i "%~1"=="PET" title NexoFlow 1.5.9 - Recompra Pets Líder
-if /i "%PROFILE%"=="PET" title NexoFlow 1.5.9 - Recompra Pets Líder
+if /i "%~1"=="PET" title NexoFlow 1.5.10 - Recompra Pets Líder
+if /i "%PROFILE%"=="PET" title NexoFlow 1.5.10 - Recompra Pets Líder
 set "REVIEW_JSON=%PROFILE_LOG%\recompra_review.json"
 set "REVIEW_TXT=%PROFILE_LOG%\recompra_review.txt"
 set "REVIEW_REFRESHES=0"

@@ -147,7 +147,10 @@ def weni_fixture(segment, contacts):
         for key, kind in (
             ("pedido_data", "datetime"),
             ("pedido_id", "text"),
-            ("compra_recente" if segment == "PET" else "ultima_compra", "datetime"),
+            (
+                "compra_recente" if segment == "PET" else "ultimo_pedido",
+                "datetime" if segment == "PET" else "text",
+            ),
             ("pedido_produtos", "text"),
             ("pedido_status", "text"),
             ("pedido_forma_pagamento", "text"),
@@ -341,9 +344,8 @@ class PetProfileTests(unittest.TestCase):
             patch.object(
                 client, "_request_json", return_value={"capa": {"segmento": "FARMA"}}
             ),
-            self.assertRaises(FarmaliderError),
         ):
-            client.get_pedido(99)
+            self.assertTrue(client.get_pedido(99)["_nexoflow_invalid_segment"])
         with (
             patch.object(client, "_request_json", return_value={"segmento": "FARMA"}),
             self.assertRaises(FarmaliderError),

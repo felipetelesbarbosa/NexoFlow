@@ -12,6 +12,17 @@ from analytics import get_fields, is_valid_cpf, normalize_cpf
 from customer_observations import connect
 from farmalider_customers import directory_for, matching_order_address
 from runtime_profile import segment
+from weni_client import WeniError
+
+
+class CreationError(WeniError):
+    """Motivo e etapa estáveis; diagnóstico sem CPF, telefone ou nome."""
+
+    def __init__(self, message, *, code, stage, status_code=None, validation=None):
+        super().__init__(message, status_code=status_code, validation=validation)
+        self.code = code
+        self.stage = stage
+
 
 PREFIX = "novo-api:"
 GUARD = "__new_api_customer"
@@ -191,8 +202,6 @@ class CreationSession:
         self.contacts = ContactIndex(weni.list_contacts(after=None))
 
     def apply(self, plan):
-        from weni_client import WeniError
-
         audit_creation(plan)
         data = plan.guards[GUARD]
         directory = directory_for(self.farm)
@@ -202,16 +211,20 @@ class CreationSession:
             else None
         )
         if fresh is None or snapshot_digest(fresh) != data.get("source_sha256"):
-            raise WeniError(
-                "Cadastro ou pedido mudou após a revisão; nova revisão necessária."
+            raise CreationError(
+                "Cadastro ou pedido mudou após a revisão; nova revisão necessária.",
+                code="FONTE_ALTERADA_APOS_REVISAO",
+                stage="revalidar_fonte",
             )
         number = phone((data.get("urns") or [""])[0].split(":")[-1])
         cpf = plan.fields["cpf"]
         if cpf != normalize_cpf(fresh["cliente"]["cpf"]) or number != phone(
             fresh["cliente"].get("celular")
         ):
-            raise WeniError(
-                "CPF ou telefone do novo cadastro diverge da fonte oficial."
+            raise CreationError(
+                "CPF ou telefone do novo cadastro diverge da fonte oficial.",
+                code="IDENTIDADE_DIVERGENTE",
+                stage="revalidar_identidade",
             )
         matches = self.contacts.matches(cpf, number)
         if number:
@@ -226,8 +239,10 @@ class CreationSession:
                 "SELECT status,uuid FROM creations WHERE id=?", (plan.contact_uuid,)
             ).fetchone()
             if prior:
-                raise WeniError(
-                    "Criação anterior já tentada; reconciliação pendente, sem novo POST."
+                raise CreationError(
+                    "Criação anterior já tentada; reconciliação pendente, sem novo POST.",
+                    code="CRIACAO_ANTERIOR_INDETERMINADA",
+                    stage="reconciliar_tentativa",
                 )
             db.execute(
                 "INSERT INTO creations(id,status) VALUES(?,?)",
@@ -245,14 +260,25 @@ class CreationSession:
             if exc.status_code in {400, 401, 403, 404, 422}:
                 with connect() as db:
                     db.execute("DELETE FROM creations WHERE id=?", (plan.contact_uuid,))
-            raise
+            reason = str(exc.validation.get("reason") or "SEM_DETALHE")
+            raise CreationError(
+                "Weni recusou ou não confirmou a criação do contato.",
+                code=f"WENI_HTTP_{exc.status_code}_{reason}"
+                if exc.status_code
+                else "WENI_RESULTADO_INDETERMINADO",
+                stage="criar_contato",
+                status_code=exc.status_code,
+                validation=exc.validation,
+            ) from None
         if (
             not isinstance(response, dict)
             or not response.get("uuid")
             or normalize_cpf(get_fields(response).get("cpf")) != cpf
         ):
-            raise WeniError(
-                "A criação não teve persistência confirmada; revalidar na próxima carga."
+            raise CreationError(
+                "A criação não teve persistência confirmada; revalidar na próxima carga.",
+                code="CRIACAO_NAO_CONFIRMADA",
+                stage="confirmar_resposta",
             )
         from weni_update import _same_value
 
@@ -261,8 +287,10 @@ class CreationSession:
             not _same_value(key, get_fields(response).get(key), value)
             for key, value in expected.items()
         ):
-            raise WeniError(
-                "A criação não confirmou todos os campos; reconciliação pendente."
+            raise CreationError(
+                "A criação não confirmou todos os campos; reconciliação pendente.",
+                code="CAMPOS_NAO_CONFIRMADOS",
+                stage="confirmar_campos",
             )
         with connect() as db:
             db.execute(

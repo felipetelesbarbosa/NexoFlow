@@ -122,15 +122,7 @@ class PetRecompraClient(FarmaliderClient):
             snapshot = directory.order_by_id(str(codigo))
             if snapshot is not None:
                 return snapshot
-        response = super().get_pedido(codigo)
-        if (
-            not isinstance(response, dict)
-            or str((response.get("capa") or {}).get("segmento", "")).upper() != "PET"
-        ):
-            raise FarmaliderError(
-                "Segmento PET do pedido não confirmado; contato pendente."
-            )
-        return response
+        return super().get_pedido(codigo)
 
 
 CANCEL_EXPRESSION = '@(if(or(lower(trim(default(fields.pedido_status, ""))) = "3", lower(trim(default(fields.pedido_status, ""))) = "3.0", lower(trim(default(fields.pedido_status, ""))) = "cancelado", lower(trim(default(fields.pedido_status, ""))) = "cancelada", lower(trim(default(fields.pedido_forma_pagamento, ""))) = "0", lower(trim(default(fields.pedido_forma_pagamento, ""))) = "0.0", lower(trim(default(fields.pedido_forma_pagamento, ""))) = "_", lower(trim(default(fields.pedido_forma_pagamento, ""))) = "cancelado", lower(trim(default(fields.pedido_forma_pagamento, ""))) = "cancelada"), "CANCELADO", "CONTINUAR"))'

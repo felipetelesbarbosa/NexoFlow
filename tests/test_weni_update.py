@@ -181,7 +181,7 @@ class WeniUpdateTests(unittest.TestCase):
             {"key": "pedido_quantidade_itens"},
             {"key": "pedido_valor_produtos"},
             {"key": "pedido_valor"},
-            {"key": "ultima_compra"},
+            {"key": "ultimo_pedido"},
         ]
         client.list_groups.return_value = [
             {"uuid": "g-in", "name": "Opt-In LGPD"},
@@ -685,7 +685,8 @@ class WeniUpdateTests(unittest.TestCase):
         self.assertEqual(plan.fields["pedido_quantidade_itens"], "2, 1")
         self.assertEqual(plan.fields["pedido_valor_produtos"], "10, 5.5")
         self.assertEqual(plan.fields["pedido_valor"], 25.5)
-        self.assertEqual(plan.fields["ultima_compra"], "2026-10-03T09:00:00-03:00")
+        self.assertEqual(plan.fields["ultimo_pedido"], "123")
+        self.assertNotIn("ultima_compra", plan.fields)
         audit_plans([plan], opt_out_group_available=True)
 
     def test_api_first_ignores_legacy_ultimo_pedido(self) -> None:
@@ -1127,8 +1128,8 @@ class WeniUpdateTests(unittest.TestCase):
                 )
                 if status in (-2, -1, 0, 4, 1, 2):
                     self.assertEqual(
-                        plan.fields["ultima_compra"],
-                        "2026-10-03T09:00:00-03:00",
+                        plan.fields["ultimo_pedido"],
+                        "123",
                     )
                 else:
                     self.assertNotIn("ultima_compra", plan.fields)
@@ -1169,7 +1170,7 @@ class WeniUpdateTests(unittest.TestCase):
                 saved_fields = client.update_contact_fields.call_args.args[1]
                 self.assertEqual(saved_fields["pedido_status"], str(status))
                 if status in (-2, -1, 0, 4, 1, 2):
-                    self.assertIn("ultima_compra", saved_fields)
+                    self.assertIn("ultimo_pedido", saved_fields)
                 else:
                     self.assertNotIn("ultima_compra", saved_fields)
                 self.assertEqual(
@@ -1190,7 +1191,8 @@ class WeniUpdateTests(unittest.TestCase):
         farm.get_pedido.return_value["capa"]["emissao"] = "2026-10-04T01:30:00Z"
         plan = self._purchase_plan(contact, farm)
         self.assertEqual(plan.fields["pedido_data"], "03/10/26 22:30:00")
-        self.assertEqual(plan.fields["ultima_compra"], "2026-10-03T22:30:00-03:00")
+        self.assertEqual(plan.fields["ultimo_pedido"], "123")
+        self.assertNotIn("ultima_compra", plan.fields)
 
     def test_same_order_corrects_future_weni_date_and_current_status(self) -> None:
         for current_id in ("123", "000123", {"value": "123"}):
@@ -2515,4 +2517,4 @@ class GoogleAdsWeniUpdateTests(unittest.TestCase):
         self.assertNotIn("ultimo_anuncio_canal_destino", plan.fields)
 
 
-# NexoFlow 1.5.9
+# NexoFlow 1.5.10

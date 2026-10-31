@@ -422,8 +422,9 @@ def _failure(
     message: str,
 ) -> tuple[dict[str, str], list[dict[str, str]]]:
     order["status_confirmacao"] = status
-    order["status_validacao"] = "ERRO"
-    order["farmalider_erro"] = message
+    ignored = status in {"PEDIDO_SEGMENTO_INVALIDO_API", "PEDIDO_NAO_ENCONTRADO_API"}
+    order["status_validacao"] = "IGNORADO" if ignored else "ERRO"
+    order["farmalider_erro"] = "" if ignored else message
     return order, items
 
 
@@ -498,9 +499,24 @@ def apply_pedido_api_confirmation(
         return _failure(
             order, [], "PEDIDO_NAO_ENCONTRADO_API", "Pedido não encontrado na API."
         )
+    if isinstance(pedido_api, dict) and pedido_api.get("_nexoflow_no_order"):
+        return _failure(
+            order,
+            [],
+            "PEDIDO_NAO_ENCONTRADO_API",
+            "Pedido nulo na resposta oficial; ignorado.",
+        )
     if not isinstance(pedido_api, dict) or not isinstance(pedido_api.get("capa"), dict):
         return _failure(
             order, [], "ERRO_RESPOSTA_PEDIDO_API", "Resposta sem objeto capa."
+        )
+
+    if pedido_api.get("_nexoflow_invalid_segment"):
+        return _failure(
+            order,
+            [],
+            "PEDIDO_SEGMENTO_INVALIDO_API",
+            "Pedido sem segmento compatível comprovado; ignorado.",
         )
 
     capa = pedido_api["capa"]
@@ -932,8 +948,8 @@ def resolve_contact_order(
         expected_cliente_id: str = "",
     ) -> tuple[dict[str, str] | None, list[dict[str, str]]]:
         # pedido_id é um campo do próprio NexoFlow e tem precedência.
-        # ultimo_pedido vem de outra integração e é deliberadamente o último
-        # recurso para descobrir um ID que depois será validado via GET pedido.
+        # ultimo_pedido aceita JSON legado ou ID textual oficial. Continua sendo
+        # apenas o último localizador; a API precisa validar o pedido.
         tried: set[str] = set()
         for order_id, source in (
             (current_pedido_id, "FARMALIDER_PEDIDO_ID_WENI"),
@@ -973,6 +989,7 @@ def resolve_contact_order(
         return None, []
     if cliente_lookup_status in {
         "CPF_FORA_SEGMENTO_API",
+        "PEDIDO_SEGMENTO_INVALIDO_API",
         "ERRO_SEGMENTO_NAO_CONFIRMADO_API",
         "ERRO_JSON_CLIENTE_API",
         "ERRO_RESPOSTA_CLIENTE_API",
@@ -1196,6 +1213,10 @@ def resolve_contact_order(
                 )
         return fallback_order, fallback_items
 
+    if isinstance(response, dict) and response.get("_nexoflow_no_order"):
+        # JSON null explícito não reaviva o snapshot anterior.
+        return None, []
+
     if isinstance(response, dict):
         order = _empty_order(contact, captured_at)
         order["pedido_id"] = pedido_id
@@ -1232,4 +1253,4 @@ def resolve_contact_order(
     return fallback_order, fallback_items
 
 
-# NexoFlow 1.5.9
+# NexoFlow 1.5.10

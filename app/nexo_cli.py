@@ -151,7 +151,7 @@ def _show_weni_contact(contact: dict[str, Any]) -> None:
     _print_kv("Idade", _field(fields, "idade"))
     _print_kv("Maior de 18", _field(fields, "maior_de_18_anos"))
     _print_kv("LGPD", _field(fields, "opt_in_lgpd"))
-    _print_kv("Última compra", _field(fields, "ultima_compra"))
+    _print_kv("Data do pedido", _field(fields, "pedido_data"))
     _print_kv("Criado em", contact.get("created_on"))
     _print_kv("Modificado em", contact.get("modified_on"))
     print()

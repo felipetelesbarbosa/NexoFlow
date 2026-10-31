@@ -72,7 +72,7 @@ class ApiResponseDiagnosticsTests(unittest.TestCase):
             self.addCleanup(client.close)
             for marker, expected in (
                 (rejected, "CPF_FORA_SEGMENTO_API"),
-                (None, "ERRO_SEGMENTO_NAO_CONFIRMADO_API"),
+                (None, "PEDIDO_SEGMENTO_INVALIDO_API"),
             ):
                 payload = customer_snapshot()
                 payload["ultimoPedido"].pop("segmento", None)
@@ -102,22 +102,22 @@ class ApiResponseDiagnosticsTests(unittest.TestCase):
     def test_analytics_preserves_typed_incomplete_response(self):
         farm = Mock()
         farm.get_cliente_by_cpf.side_effect = FarmaliderLookupError(
-            "ERRO_SEGMENTO_NAO_CONFIRMADO_API"
+            "ERRO_RESPOSTA_CLIENTE_API"
         )
         self.assertEqual(
-            _query_cliente(CPF, farm)[0], "ERRO_SEGMENTO_NAO_CONFIRMADO_API"
+            _query_cliente(CPF, farm)[0], "ERRO_RESPOSTA_CLIENTE_API"
         )
 
     def test_recompra_pet_keeps_failed_contact_pending_without_admission(self):
         farm = Mock()
         farm.get_cliente_by_cpf.side_effect = FarmaliderLookupError(
-            "ERRO_SEGMENTO_NAO_CONFIRMADO_API"
+            "ERRO_RESPOSTA_CLIENTE_API"
         )
         structure = {**STRUCTURE, "segment": "PET"}
         plans = build_plans(
             [fixture()[0]], farm, structure, {"schema": 1, "contacts": {}}, now=NOW
         )
-        self.assertEqual(plans[0]["reason"], "ERRO_SEGMENTO_NAO_CONFIRMADO_API")
+        self.assertEqual(plans[0]["reason"], "ERRO_RESPOSTA_CLIENTE_API")
         self.assertFalse(plans[0]["action"] == "add")
 
     def test_analytics_many_failures_are_logged_by_batch_without_contact_spam(self):
@@ -126,7 +126,7 @@ class ApiResponseDiagnosticsTests(unittest.TestCase):
         rows = [{"contact_uuid": "contact-one", "cpf": CPF}]
         farm = Mock()
         farm.get_cliente_by_cpf.side_effect = FarmaliderLookupError(
-            "ERRO_SEGMENTO_NAO_CONFIRMADO_API"
+            "ERRO_RESPOSTA_CLIENTE_API"
         )
         farm.metrics_snapshot.return_value = {
             "total_requests": 1,
