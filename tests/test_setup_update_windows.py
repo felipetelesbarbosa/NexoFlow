@@ -130,7 +130,10 @@ try {
     Copy-ProgramPayload -Mode Preserve
     $ManifestPath = Join-Path $PayloadDir 'payload manifest.json'
     $entries = foreach ($path in @('app/novo.py', 'logs/checkpoint.json', 'secrets_config.py')) {
-        @{ path = $path; sha256 = (Get-FileHash -LiteralPath (Join-Path $PayloadDir $path) -Algorithm SHA256).Hash.ToLowerInvariant() }
+        $sha = [Security.Cryptography.SHA256]::Create()
+        try { $hash = [BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes((Join-Path $PayloadDir $path)))).Replace('-', '').ToLowerInvariant() }
+        finally { $sha.Dispose() }
+        @{ path = $path; sha256 = $hash }
     }
     @{ files = @($entries) } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $ManifestPath -Encoding UTF8
     Validate-InstalledPayload
@@ -175,6 +178,11 @@ try {
     Restore-SetupData -BackupRoot $backup -Target $InstallDir -Mode Preserve -KeepExistingData
     Restore-SetupData -BackupRoot $backup -Target $InstallDir -Mode Preserve -KeepExistingData
     Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'logs\checkpoint.json')) -ceq 'estado em uso') 'Marco atual foi sobrescrito.'
+    if (-not (Test-Path -LiteralPath (Join-Path $InstallDir 'logs\PET\checkpoint.json'))) {
+        Write-Host ('[DIAGNOSTICO SINTETICO] backup=' + $backup)
+        Get-ChildItem -LiteralPath $root -Recurse -File | ForEach-Object { Write-Host ('[ARQUIVO SINTETICO] ' + $_.FullName) }
+        Write-Host ('[FUNCAO] ' + (Get-Command Restore-SetupData).Definition)
+    }
     Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'logs\PET\checkpoint.json')) -ceq 'estado Pets migrado') 'Estado Pets ausente nao foi recuperado.'
     Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'credentials\synthetic.json')) -ceq 'credencial atual') 'Credencial atual foi sobrescrita.'
     Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'secrets_config.py')) -ceq 'configuracao instalada') 'Prioridade do backup instalado foi invertida.'
