@@ -51,7 +51,7 @@ Write-Fixture (Join-Path $InstallDir 'credentials\synthetic.json') 'credencial s
 Write-Fixture (Join-Path $InstallDir 'logs\checkpoint.json') 'estado anterior'
 $handle = [NexoFlowTestDirectoryLock]::Open($InstallDir)
 try {
-    $rollback = Stage-ExistingInstall
+    $rollback = Stage-ExistingInstall -Mode Clean
     Assert-True $script:RollbackUsesExistingRoot 'Nao acionou a preservacao da raiz bloqueada.'
     Assert-True (Test-Path -LiteralPath $InstallDir) 'A pasta principal foi removida.'
     Assert-True (@(Get-ChildItem -LiteralPath $InstallDir -Force).Count -eq 0) 'A preparacao deixou arquivos antigos no destino.'
@@ -93,7 +93,7 @@ Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir 'b-bloqueado.txt')
             "install.ps1",
             r"""
 Write-Fixture (Join-Path $InstallDir 'original.txt') 'original'
-$rollback = Stage-ExistingInstall
+$rollback = Stage-ExistingInstall -Mode Clean
 Assert-True (-not $script:RollbackUsesExistingRoot) 'Atualizacao comum usou modo alternativo.'
 Assert-True (-not (Test-Path -LiteralPath $InstallDir)) 'A pasta anterior nao foi movida.'
 Assert-True (Restore-PreviousInstall -RollbackPath $rollback) 'Rollback comum falhou.'
@@ -116,6 +116,9 @@ $backup = Join-Path $root 'backup'
 Backup-PrivateData -Source $InstallDir -Backup (Join-Path $backup 'installed')
 $rootHandle = [NexoFlowTestDirectoryLock]::Open($InstallDir)
 $logsHandle = [NexoFlowTestDirectoryLock]::Open((Join-Path $InstallDir 'logs'))
+$credentialsHandle = [NexoFlowTestDirectoryLock]::Open((Join-Path $InstallDir 'credentials'))
+$importsHandle = [NexoFlowTestDirectoryLock]::Open((Join-Path $InstallDir 'importacoes'))
+$secretHandle = [IO.File]::Open((Join-Path $InstallDir 'secrets_config.py'), 'Open', 'Read', 'Read')
 try {
     $rollback = Stage-ExistingInstall -Mode Preserve
     Assert-True (Test-Path -LiteralPath (Join-Path $InstallDir 'logs\checkpoint.json')) 'Logs foram movidos.'
@@ -125,6 +128,16 @@ try {
     Write-Fixture (Join-Path $PayloadDir 'logs\checkpoint.json') 'modelo que nao pode sobrescrever estado'
     Write-Fixture (Join-Path $PayloadDir 'secrets_config.py') 'modelo que nao pode sobrescrever configuracao'
     Copy-ProgramPayload -Mode Preserve
+    $ManifestPath = Join-Path $PayloadDir 'payload manifest.json'
+    $entries = foreach ($path in @('app/novo.py', 'logs/checkpoint.json', 'secrets_config.py')) {
+        @{ path = $path; sha256 = (Get-FileHash -LiteralPath (Join-Path $PayloadDir $path) -Algorithm SHA256).Hash.ToLowerInvariant() }
+    }
+    @{ files = @($entries) } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $ManifestPath -Encoding UTF8
+    Validate-InstalledPayload
+    Write-Fixture (Join-Path $InstallDir 'app\novo.py') 'codigo corrompido'
+    $integrityFailed = $false
+    try { Validate-InstalledPayload } catch { $integrityFailed = $true }
+    Assert-True $integrityFailed 'Preservar dados desativou a validacao dos arquivos de programa.'
     Restore-SetupData -BackupRoot $backup -Target $InstallDir -Mode Preserve -KeepExistingData
     Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'logs\checkpoint.json')) -ceq 'marco Farma') 'Marco Farma foi sobrescrito.'
     Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'logs\PET\checkpoint.json')) -ceq 'marco Pets') 'Marco Pets foi sobrescrito.'
@@ -136,6 +149,58 @@ try {
     Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'logs\checkpoint.json')) -ceq 'marco Farma') 'Rollback apagou logs.'
     Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'logs\PET\checkpoint.json')) -ceq 'marco Pets') 'Rollback apagou estado Pets.'
     Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'importacoes\original.xlsx')) -ceq 'export original') 'Export perdido.'
+} finally { $secretHandle.Dispose(); $importsHandle.Dispose(); $credentialsHandle.Dispose(); $logsHandle.Dispose(); $rootHandle.Dispose() }
+""",
+        )
+
+    def test_preserve_merges_missing_data_without_overwriting_and_archives_imports(
+        self,
+    ):
+        self.run_harness(
+            "install.ps1",
+            DIRECTORY_LOCK
+            + r"""
+$backup = Join-Path $root 'backup'
+Write-Fixture (Join-Path $InstallDir 'logs\checkpoint.json') 'estado em uso'
+Write-Fixture (Join-Path $InstallDir 'credentials\synthetic.json') 'credencial atual'
+Write-Fixture (Join-Path $InstallDir 'importacoes\original.xlsx') 'export atual'
+Write-Fixture (Join-Path $backup 'installed\secrets_config.py') 'configuracao instalada'
+Write-Fixture (Join-Path $backup 'preserved\secrets_config.py') 'configuracao antiga'
+Write-Fixture (Join-Path $backup 'preserved\logs\checkpoint.json') 'nao sobrescrever'
+Write-Fixture (Join-Path $backup 'preserved\logs\PET\checkpoint.json') 'estado Pets migrado'
+Write-Fixture (Join-Path $backup 'preserved\credentials\synthetic.json') 'credencial antiga'
+Write-Fixture (Join-Path $backup 'preserved\importacoes\original.xlsx') 'export antigo diferente'
+$logsHandle = [NexoFlowTestDirectoryLock]::Open((Join-Path $InstallDir 'logs'))
+try {
+    Restore-SetupData -BackupRoot $backup -Target $InstallDir -Mode Preserve -KeepExistingData
+    Restore-SetupData -BackupRoot $backup -Target $InstallDir -Mode Preserve -KeepExistingData
+    Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'logs\checkpoint.json')) -ceq 'estado em uso') 'Marco atual foi sobrescrito.'
+    Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'logs\PET\checkpoint.json')) -ceq 'estado Pets migrado') 'Estado Pets ausente nao foi recuperado.'
+    Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'credentials\synthetic.json')) -ceq 'credencial atual') 'Credencial atual foi sobrescrita.'
+    Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'secrets_config.py')) -ceq 'configuracao instalada') 'Prioridade do backup instalado foi invertida.'
+    Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'importacoes\original.xlsx')) -ceq 'export atual') 'Export atual foi sobrescrito.'
+    $archives = @(Get-ChildItem -LiteralPath (Join-Path $InstallDir 'importacoes\historico_preservado') -Recurse -File)
+    Assert-True ($archives.Count -eq 1) 'Export antigo foi perdido ou duplicado na retomada.'
+    Assert-True ((Get-Content -Raw -LiteralPath $archives[0].FullName) -ceq 'export antigo diferente') 'Arquivo antigo foi corrompido.'
+} finally { $logsHandle.Dispose() }
+""",
+        )
+
+    def test_clean_mode_with_locked_logs_aborts_without_changing_previous_install(self):
+        self.run_harness(
+            "install.ps1",
+            DIRECTORY_LOCK
+            + r"""
+Write-Fixture (Join-Path $InstallDir 'app\original.py') 'codigo original'
+Write-Fixture (Join-Path $InstallDir 'logs\checkpoint.json') 'estado original'
+$rootHandle = [NexoFlowTestDirectoryLock]::Open($InstallDir)
+$logsHandle = [NexoFlowTestDirectoryLock]::Open((Join-Path $InstallDir 'logs'))
+try {
+    $failed = $false
+    try { Stage-ExistingInstall -Mode Clean | Out-Null } catch { $failed = $true }
+    Assert-True $failed 'Instalacao limpa ignorou bloqueio nos dados que seriam removidos.'
+    Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'app\original.py')) -ceq 'codigo original') 'Instalacao limpa perdeu codigo anterior.'
+    Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'logs\checkpoint.json')) -ceq 'estado original') 'Instalacao limpa perdeu estado bloqueado.'
 } finally { $logsHandle.Dispose(); $rootHandle.Dispose() }
 """,
         )

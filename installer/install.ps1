@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
 $AppName = 'NexoFlow'
-$AppVersion = '1.5.10'
+$AppVersion = '1.5.11'
 $Publisher = 'Grupo Lider'
 $InstallDir = 'C:\NexoFlow'
 $DataDir = 'C:\NexoFlow Data'
@@ -23,6 +23,8 @@ $script:OptionalUninstallerValidated = $true
 $script:OptionalNightValidated = $true
 $script:RollbackInstallDir = $null
 $script:RollbackUsesExistingRoot = $false
+$script:PreservedDataInPlace = $false
+$script:PreservedInstallNames = @()
 
 # Caminhos da instalação anterior, usados somente para migração para a marca NexoFlow.
 $LegacyInstallDir = 'C:\Weni\WeniWhatsAppAnalytics'
@@ -879,6 +881,8 @@ function Validate-InstalledPayload {
     foreach ($entry in $manifest.files) {
         $relative = [string]$entry.path
         if ($relative -in @('payload manifest.json', 'NexoFlow Uninstall.exe', 'NexoFlow Noturno.exe')) { continue }
+        $top = ($relative -split '[\\/]')[0]
+        if ($script:PreservedInstallNames -contains $top) { continue }
         $target = Join-Path $InstallDir $relative
         if (-not (Test-Path -LiteralPath $target -PathType Leaf)) {
             throw "Arquivo obrigatório ausente após a cópia: $relative"
@@ -1075,12 +1079,74 @@ function Restore-PrivateData([string]$Backup, [string]$Target) {
     }
 }
 
+function Test-PrivateInstallEntry([string]$Name) {
+    return $Name -in @('secrets_config.py', 'credentials', 'logs', 'importacoes')
+}
+
+function Copy-ProgramPayload {
+    param([ValidateSet('Preserve', 'Clean')][string]$Mode = 'Preserve')
+    foreach ($entry in (Get-ChildItem -LiteralPath $PayloadDir -Force)) {
+        if ($entry.Name -in @('payload manifest.json', 'NexoFlow Uninstall.exe', 'NexoFlow Noturno.exe')) { continue }
+        $destination = Join-Path $InstallDir $entry.Name
+        if ($Mode -eq 'Preserve' -and (Test-PrivateInstallEntry $entry.Name) -and (Test-Path -LiteralPath $destination)) { continue }
+        Copy-Item -LiteralPath $entry.FullName -Destination $InstallDir -Recurse -Force -ErrorAction Stop
+    }
+}
+
+function Restore-MissingPrivateData([string]$Backup, [string]$Target) {
+    if (-not (Test-Path -LiteralPath $Backup -PathType Container)) { return }
+    foreach ($name in @('secrets_config.py', 'credentials', 'logs', 'importacoes')) {
+        $source = Join-Path $Backup $name
+        if (-not (Test-Path -LiteralPath $source)) { continue }
+        $entry = Get-Item -LiteralPath $source -Force -ErrorAction Stop
+        if ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Backup privado contém link/junção; recuperação automática interrompida.' }
+        $files = if ($entry.PSIsContainer) { @(Get-ChildItem -LiteralPath $source -Recurse -Force -File -ErrorAction Stop) } else { @($entry) }
+        foreach ($file in $files) {
+            if ($file.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Backup privado contém arquivo vinculado; recuperação automática interrompida.' }
+            $relative = $file.FullName.Substring($Backup.TrimEnd('\').Length).TrimStart('\')
+            $destination = Join-Path $Target $relative
+            # Não apagar/recriar diretórios, nem sobrescrever estado, mesmo com handles abertos.
+            if (Test-Path -LiteralPath $destination) {
+                if ($name -ne 'importacoes') { continue }
+                $sourceHash = Get-Sha256File -Path $file.FullName
+                if ((Get-Sha256File -Path $destination) -eq $sourceHash) { continue }
+                $withinImports = $file.FullName.Substring($source.TrimEnd('\').Length).TrimStart('\')
+                $destination = Join-Path (Join-Path (Join-Path $Target 'importacoes\historico_preservado') $sourceHash) $withinImports
+                if (Test-Path -LiteralPath $destination) {
+                    if ((Get-Sha256File -Path $destination) -ne $sourceHash) { throw 'Histórico de importações inconsistente; cópias anteriores preservadas.' }
+                    continue
+                }
+            }
+            $parent = Split-Path -Parent $destination
+            $check = $parent
+            while ($check -and $check.Length -ge $Target.TrimEnd('\').Length) {
+                if (Test-Path -LiteralPath $check) {
+                    $existing = Get-Item -LiteralPath $check -Force -ErrorAction Stop
+                    if ($existing.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Destino privado contém link/junção; recuperação automática interrompida.' }
+                }
+                if ($check -eq $Target.TrimEnd('\')) { break }
+                $check = Split-Path -Parent $check
+            }
+            New-Item -ItemType Directory -Force -Path $parent | Out-Null
+            [IO.File]::Copy($file.FullName, $destination, $false)
+        }
+    }
+}
+
 function Restore-SetupData {
     param(
         [string]$BackupRoot,
         [string]$Target,
-        [ValidateSet('Preserve', 'Clean')][string]$Mode
+        [ValidateSet('Preserve', 'Clean')][string]$Mode,
+        [switch]$KeepExistingData
     )
+    if ($Mode -eq 'Preserve' -and $KeepExistingData) {
+        # Prioridade: instalação atual, dados migrados e, por último, estrutura legada.
+        foreach ($name in @('installed', 'preserved', 'legacy installed', 'legacy preserved')) {
+            Restore-MissingPrivateData -Backup (Join-Path $BackupRoot $name) -Target $Target
+        }
+        return
+    }
     foreach ($name in @('legacy preserved', 'legacy installed', 'preserved', 'installed')) {
         $backup = Join-Path $BackupRoot $name
         if ($Mode -eq 'Preserve') {
@@ -1177,26 +1243,35 @@ function Move-InstallEntry([string]$Source, [string]$Destination) {
 }
 
 function Stage-ExistingInstall {
+    param([ValidateSet('Preserve', 'Clean')][string]$Mode = 'Preserve')
+    $script:PreservedDataInPlace = $Mode -eq 'Preserve'
+    $script:PreservedInstallNames = @()
     if (-not (Test-Path -LiteralPath $InstallDir -PathType Container)) { return $null }
 
     $rollback = "$InstallDir.__rollback__.$([guid]::NewGuid().ToString('N'))"
     $lastError = $null
     $script:RollbackUsesExistingRoot = $false
 
-    for ($attempt = 1; $attempt -le 3; $attempt++) {
-        try {
-            [IO.Directory]::Move($InstallDir, $rollback)
-            Write-Host "[OK] Instalação anterior preservada para rollback seguro." -ForegroundColor Green
-            return $rollback
-        } catch {
-            $lastError = $_.Exception.Message
-            Start-Sleep -Milliseconds 300
+    if ($Mode -eq 'Clean') {
+        for ($attempt = 1; $attempt -le 3; $attempt++) {
+            try {
+                [IO.Directory]::Move($InstallDir, $rollback)
+                Write-Host "[OK] Instalação anterior preservada para rollback seguro." -ForegroundColor Green
+                return $rollback
+            } catch {
+                $lastError = $_.Exception.Message
+                Start-Sleep -Milliseconds 300
+            }
         }
     }
 
     # Um terminal/Explorer pode manter um handle na raiz, sem bloquear os arquivos.
     # Preservar a raiz evita exigir sua renomeação, mantendo rollback completo.
-    Write-Host '[INFO] A pasta principal não pode ser renomeada. Preparando atualização sem movê-la.' -ForegroundColor DarkYellow
+    if ($Mode -eq 'Preserve') {
+        Write-Host '[INFO] Dados locais mantidos no lugar; preparando rollback dos arquivos do programa.' -ForegroundColor DarkYellow
+    } else {
+        Write-Host '[INFO] A pasta principal não pode ser renomeada. Preparando atualização sem movê-la.' -ForegroundColor DarkYellow
+    }
     $moved = New-Object 'System.Collections.Generic.List[string]'
     $probe = Join-Path $InstallDir ('.nexoflow-write-probe-' + [guid]::NewGuid().ToString('N'))
     try {
@@ -1208,6 +1283,10 @@ function Stage-ExistingInstall {
         [IO.File]::Delete($probe)
         New-Item -ItemType Directory -Path $rollback -ErrorAction Stop | Out-Null
         foreach ($entry in (Get-ChildItem -LiteralPath $InstallDir -Force | Sort-Object Name)) {
+            if ($Mode -eq 'Preserve' -and (Test-PrivateInstallEntry $entry.Name)) {
+                $script:PreservedInstallNames += $entry.Name
+                continue
+            }
             Move-InstallEntry -Source $entry.FullName -Destination (Join-Path $rollback $entry.Name)
             $moved.Add($entry.Name)
         }
@@ -1246,6 +1325,7 @@ function Restore-PreviousInstall {
         try {
             New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
             foreach ($entry in (Get-ChildItem -LiteralPath $InstallDir -Force)) {
+                if ($script:PreservedDataInPlace -and (Test-PrivateInstallEntry $entry.Name)) { continue }
                 if (-not (Remove-DirectoryWithRetry -Path $entry.FullName -Attempts 3)) { return $false }
             }
             foreach ($entry in (Get-ChildItem -LiteralPath $RollbackPath -Force)) {
@@ -1411,18 +1491,14 @@ try {
     Backup-PrivateData -Source $InstallDir -Backup (Join-Path $backupDir 'installed')
 
     Write-Step "Instalando arquivos em $InstallDir"
-    $script:RollbackInstallDir = Stage-ExistingInstall
+    $script:RollbackInstallDir = Stage-ExistingInstall -Mode $selectedMode
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-    # O launcher NexoFlow Uninstall.exe é opcional e pode ser bloqueado por EDR/antivírus.
-    # Ele é copiado separadamente em modo tolerante para nunca reprovar o Setup.
-    Get-ChildItem -LiteralPath $PayloadDir -Force | Where-Object { $_.Name -notin @('payload manifest.json','NexoFlow Uninstall.exe','NexoFlow Noturno.exe') } | ForEach-Object {
-        Copy-Item -LiteralPath $_.FullName -Destination $InstallDir -Recurse -Force
-    }
+    Copy-ProgramPayload -Mode $selectedMode
 
     Write-Step 'Conferindo integridade dos arquivos copiados'
     Validate-InstalledPayload
 
-    Restore-SetupData -BackupRoot $backupDir -Target $InstallDir -Mode $selectedMode
+    Restore-SetupData -BackupRoot $backupDir -Target $InstallDir -Mode $selectedMode -KeepExistingData:($selectedMode -eq 'Preserve')
     New-Item -ItemType Directory -Force -Path (Join-Path $InstallDir 'importacoes') | Out-Null
 
     Write-Step 'Preparando ambiente Python e dependências'
@@ -1603,4 +1679,4 @@ catch {
     exit 1
 }
 finally { Exit-NexoMaintenance }
-# NexoFlow 1.5.10
+# NexoFlow 1.5.11
