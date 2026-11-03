@@ -1095,15 +1095,21 @@ function Copy-ProgramPayload {
 
 function Restore-MissingPrivateData([string]$Backup, [string]$Target) {
     if (-not (Test-Path -LiteralPath $Backup -PathType Container)) { return }
+    # TEMP pode usar RUNNER~1 enquanto o provider expande para runneradmin.
+    # O prefixo e os arquivos precisam usar a mesma representação antes do Substring.
+    $Backup = (Get-Item -LiteralPath $Backup -Force -ErrorAction Stop).FullName.TrimEnd('\')
+    $backupPrefix = $Backup + '\'
     foreach ($name in @('secrets_config.py', 'credentials', 'logs', 'importacoes')) {
         $source = Join-Path $Backup $name
         if (-not (Test-Path -LiteralPath $source)) { continue }
         $entry = Get-Item -LiteralPath $source -Force -ErrorAction Stop
         if ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Backup privado contém link/junção; recuperação automática interrompida.' }
+        $source = $entry.FullName
         $files = if ($entry.PSIsContainer) { @(Get-ChildItem -LiteralPath $source -Recurse -Force -File -ErrorAction Stop) } else { @($entry) }
         foreach ($file in $files) {
             if ($file.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Backup privado contém arquivo vinculado; recuperação automática interrompida.' }
-            $relative = $file.FullName.Substring($Backup.TrimEnd('\').Length).TrimStart('\')
+            if (-not $file.FullName.StartsWith($backupPrefix, [StringComparison]::OrdinalIgnoreCase)) { throw 'Arquivo privado fora do backup normalizado; recuperação interrompida.' }
+            $relative = $file.FullName.Substring($backupPrefix.Length)
             $destination = Join-Path $Target $relative
             # Não apagar/recriar diretórios, nem sobrescrever estado, mesmo com handles abertos.
             if (Test-Path -LiteralPath $destination) {

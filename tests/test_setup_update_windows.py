@@ -186,6 +186,9 @@ try {
     Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'logs\PET\checkpoint.json')) -ceq 'estado Pets migrado') 'Estado Pets ausente nao foi recuperado.'
     Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'credentials\synthetic.json')) -ceq 'credencial atual') 'Credencial atual foi sobrescrita.'
     Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'secrets_config.py')) -ceq 'configuracao instalada') 'Prioridade do backup instalado foi invertida.'
+    $unexpected = @(Get-ChildItem -LiteralPath $InstallDir -Force | Where-Object { $_.Name -notin @('secrets_config.py', 'credentials', 'logs', 'importacoes') })
+    Assert-True ($unexpected.Count -eq 0) 'Caminho curto/expandido gerou uma pasta indevida na recuperacao.'
+
     Assert-True ((Get-Content -Raw -LiteralPath (Join-Path $InstallDir 'importacoes\original.xlsx')) -ceq 'export atual') 'Export atual foi sobrescrito.'
     $archives = @(Get-ChildItem -LiteralPath (Join-Path $InstallDir 'importacoes\historico_preservado') -Recurse -File)
     Assert-True ($archives.Count -eq 1) 'Export antigo foi perdido ou duplicado na retomada.'
