@@ -1,6 +1,6 @@
-# NexoFlow 1.5.10
+# NexoFlow 1.5.11
 
-A versão pública atual é **NexoFlow 1.5.10**, autorizada pelo usuário em 30/10/2026.
+A versão desta entrega é **NexoFlow 1.5.11**. O usuário autorizou a atualização do GitHub e a publicação em **03/11/2026**. Publicar somente depois dos checks exigidos do mesmo commit; não incrementar novamente em tentativas de validação desta entrega.
 
 ## Conferência antes da entrega
 
@@ -13,9 +13,9 @@ A versão pública atual é **NexoFlow 1.5.10**, autorizada pelo usuário em 30/
 
 ## Regras do projeto
 
-- Use mensagens de commit curtas em português que descrevam a área ou a alteração, como `Automação`, `Documentação`, `Instalador` ou `Corrigir revisão da Recompra`. `NexoFlow 1.5.10` identifica a versão, não é uma mensagem obrigatória de commit. Separe alterações por área quando isso tornar a navegação do GitHub mais clara; não reescreva o histórico apenas para mudar os textos exibidos.
+- Use mensagens de commit curtas em português que descrevam a área ou a alteração, como `Automação`, `Documentação`, `Instalador` ou `Corrigir revisão da Recompra`. `NexoFlow 1.5.11` identifica a versão, não é uma mensagem obrigatória de commit. Separe alterações por área quando isso tornar a navegação do GitHub mais clara; não reescreva o histórico apenas para mudar os textos exibidos.
 - A `main` é a única branch de trabalho do repositório. Atualize diretamente a `main`; não crie nem mantenha branches adicionais.
-- O release atual usa `NexoFlow 1.5.10`, tag `v1.5.10` e pacotes com sufixo `1.5.10`. Para cada próxima publicação de atualização/hotfix/patch, incremente uma única vez: 1.5.11, 1.5.12, ... 1.5.99; depois 1.6, 1.6.1, ... 1.6.99. Não incremente por commit ou tentativa de CI da mesma entrega. Preserve tags e releases anteriores; nunca sobrescreva uma versão anterior com um novo patch. Confira `VERSION` e `docs/VERSIONAMENTO.md`.
+- A entrega autorizada usa `NexoFlow 1.5.11`, tag `v1.5.11` e pacotes com sufixo `1.5.11`, somente após autorização e validação. Para cada próxima publicação de atualização/hotfix/patch, incremente uma única vez: 1.5.12, 1.5.13, ... 1.5.99; depois 1.6, 1.6.1, ... 1.6.99. Não incremente por commit ou tentativa de CI da mesma entrega. Preserve tags e releases anteriores; nunca sobrescreva uma versão anterior com um novo patch. Confira `VERSION` e `docs/VERSIONAMENTO.md`.
 - Cada release deve mostrar a data da sua publicação. Não reutilize uma versão já publicada para código novo.
 - Preserve as credenciais e os diagnósticos privados fora do Git e dos pacotes públicos.
 - Use os nomes de pagamento: 0 Cancelado, 1 Dinheiro, 2 Débito, 3 Crédito, 4 Ticket, 5 Pix por Link de Pagamento, 6 Pix no POS.
@@ -34,7 +34,7 @@ A versão pública atual é **NexoFlow 1.5.10**, autorizada pelo usuário em 30/
 
 - Lançamento com `codProduto=0` e descrição vazia representa frete somente quando a soma desses lançamentos coincide com o frete oficial do cabeçalho. Validar vínculo e valores; não incluir em produtos, quantidades, Recompra ou valor dos produtos e não somar o frete duas vezes.
 
-- `clientes/FARMA` pode retornar `cliente`, `ultimoPedido` e `itens`. Guardar snapshots completos e verificados em memória por CPF/ID durante a execução. Pedido/cliente/itens precisam pertencer à mesma identidade; respostas ausentes, incompletas ou ambíguas usam consulta individual, sem concluir ausência de compra. Cadastro só preenche campos vazios e mantém evidência na revisão. Endereço exige correspondência única com o último pedido (CEP, cidade/UF, logradouro, número e complemento), inclusive quando o endereço correspondente não é o principal. Leituras de preparação não podem autorizar uma aplicação posterior: Recompra e deduplicação reiniciam as leituras antes do apply. O arquivo PET usado como referência de formato não alimenta a operação FARMA.
+- `clientes/FARMA` pode retornar `cliente`, `ultimoPedido` e `itens`. Guardar snapshots completos e verificados em memória por CPF/ID durante a execução. Pedido/cliente/itens precisam pertencer à mesma identidade; respostas ausentes, incompletas ou ambíguas usam consulta individual, sem concluir ausência de compra, exceto na Recompra FARMA: essa rotina usa exclusivamente a consulta geral por fase e deixa evidências insuficientes pendentes, sem HTTP individual. O histórico é observado uma vez por índice carregado, inclusive fora da Recompra; falha de gravação não marca a observação como concluída. `CPF_NAO_CONFIRMADO_BASE_GERAL` e `PEDIDO_NAO_CONFIRMADO_BASE_GERAL` são pendências explícitas, nunca ausência de compra comprovada. Regra autorizada: contato no grupo com consulta incompleta é removido preventivamente quando `pedido_data` físico da Weni completa sete dias (168 horas, America/Belem); vale para FARMA e PET. Data ausente, inválida ou futura não permite inferir o prazo. Manter cadastro, campos, estado de admissões e auditoria; revalidar nas próximas cargas. Antes de remover, consultar novamente a fonte e reler o contato, bloqueando alterações posteriores à revisão. Remoção confirmada não encerra a pendência de validação. Cancelamento, pagamento inválido e recusa já comprovados na Weni continuam autorizando a remoção prevista, sem depender de consulta de pedido. Cadastro só preenche campos vazios e mantém evidência na revisão. Endereço exige correspondência única com o último pedido (CEP, cidade/UF, logradouro, número e complemento), inclusive quando o endereço correspondente não é o principal. Leituras de preparação não podem autorizar uma aplicação posterior: Recompra e deduplicação reiniciam as leituras antes do apply. O arquivo PET usado como referência de formato não alimenta a operação FARMA.
 
 ## Perfis de segmento
 
@@ -55,3 +55,5 @@ A versão pública atual é **NexoFlow 1.5.10**, autorizada pelo usuário em 30/
 - FARMA usa pedido_data (Data e hora) e ultimo_pedido (Texto com ID oficial, compatível com localizadores legados), sem exigir/escrever ultima_compra. PET mantém compra_recente. Pedidos sem segmento comprovado ou explicitamente nulos não autorizam venda/admissão/enriquecimento e não geram pendência de consulta; rede, autenticação e respostas malformadas preservam suas classificações.
 
 - Variantes brasileiras de celular com/sem nono dígito servem somente para impedir criação duplicada. Não comprovam identidade/CPF nem autorizam fusão, exclusão ou alteração do telefone. CPF ausente/divergente e múltiplos contatos exigem reconciliação; a busca é repetida antes do POST.
+
+- Atualização Preserve mantém secrets_config.py, credentials, logs e importacoes no lugar, inclusive no rollback. Não renomear/apagar esses dados para contornar handles de diretório; cópias do payload não os sobrescrevem. Validar no Windows com raiz/logs/credenciais/importações abertos, rollback e hashes de programa. Clean preserva suas regras próprias e aborta com dados anteriores intactos se houver bloqueio.
