@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.10",
+    [string]$Version = "1.5.11",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -407,9 +407,15 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-Corrige o contrato FARMA para pedido_data e ultimo_pedido, preservando D+25 e as guardas de cancelamento, pagamento e identidade. PET mantém compra_recente e D+30. Pedidos sem segmento comprovado ou explicitamente nulos são ignorados sem gerar pendência de consulta; falhas reais continuam revalidáveis.
+Recompra FARMA usa exclusivamente a base geral por fase, sem consultas individuais por CPF ou pedido. O histórico é observado uma vez por índice carregado; os logs distinguem HTTP de leituras locais. Dados insuficientes permanecem pendentes sem descartar os contatos válidos.
 
-Evita tentar criar novamente contatos já existentes com a variação brasileira de celular com/sem nono dígito. Essa busca não autoriza inferir CPF, fundir ou excluir contatos. CPF ausente/divergente é separado para reconciliação. A auditoria privada distingue rejeição HTTP, fonte alterada e resultado indeterminado, sem repetir POSTs às cegas.
+Na Farma e no Pets, pedido sem validação por sete dias completos desde pedido_data na Weni gera retirada preventiva do grupo, mantendo cadastro e revalidação posterior. Antes de retirar, a aplicação reconfere a fonte e o contato. Cancelamento, pagamento inválido ou recusa já comprovados na Weni permitem retirada imediata.
+
+**Gere uma nova revisão após atualizar.** Revisões anteriores à política atual não são reaplicadas; não apague estado ou auditoria. Reentrada exige validação, evento D+25/D+30 futuro e proteção contra repetição. Uma retirada confirmada pode manter código 3 enquanto a compra continua sem validação; o Noturno prossegue com os demais e o Analytics final.
+
+Corrige o Setup ao atualizar uma instalação com logs ou diretórios privados abertos. A opção de preservar mantém configurações, credenciais, logs, estado FARMA/PET e importações no lugar; somente os arquivos do programa vão para o rollback. A restauração após falha também preserva essas pastas.
+
+A integridade dos arquivos do programa e as travas de manutenção continuam obrigatórias. Instalação limpa permanece separada e aborta com a instalação anterior preservada se os dados estiverem bloqueados. Não é necessário apagar logs, credenciais ou estado para atualizar.
 
 A compilação suporta assinatura Authenticode com certificado de código confiável, timestamp e validação antes dos hashes. Sem certificado configurado, o pacote permanece sem assinatura; isso não é uma aprovação do Windows nem do antivírus. Consulte `RELATORIO DE SEGURANCA.json` dentro do ZIP.
 
@@ -421,4 +427,4 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.10
+# NexoFlow 1.5.11
