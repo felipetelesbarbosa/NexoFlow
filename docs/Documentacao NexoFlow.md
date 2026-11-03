@@ -1,4 +1,4 @@
-# NexoFlow 1.5.10 — Guia de operação
+# NexoFlow 1.5.11 — Guia de operação
 
 O NexoFlow integra Weni e a API FarmaLíder para **FarmaLíder e Pets Líder**, mantendo dados separados por perfil. O objetivo é manter contatos e pedidos atualizados e alimentar o Google Sheets e os painéis do Data Studio.
 
@@ -15,9 +15,15 @@ O NexoFlow identifica pedidos registrados na API **independentemente de terem si
 | **Noturno** | Executar Weni, Analytics e Recompra na marca escolhida sem confirmações durante a carga. |
 | **Terminal** | Executar comandos, consultar dados e diagnosticar a instalação. |
 
+## Atualização 1.5.11
+
+O Setup preserva configurações, credenciais, logs, estado e importações sem mover essas pastas. A Recompra FARMA usa a base geral por fase e registra o histórico uma vez por índice. Nos dois segmentos, integrante sem pedido validado após sete dias completos de `pedido_data` na Weni é retirado preventivamente do grupo, mantendo cadastro, histórico e revalidação. Datas ausentes ou inválidas não autorizam inferir prazo.
+
+Gere nova revisão após atualizar; preserve estado e auditoria. A aplicação reconfere a fonte e o contato antes da remoção, e a reentrada mantém as proteções de evento futuro e repetição. Consulte o [guia de Recompra](README%20RECOMPRA.md). As campanhas continuam enviando exclusivamente no D+25 Farma e D+30 Pets.
+
 ## Antes de começar
 
-Instale pelo [Setup oficial](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.10), configure suas próprias credenciais e compartilhe as planilhas com a conta de serviço Google. O diretório padrão é `C:\NexoFlow`. Confira os requisitos e os campos necessários no [guia de instalação](README%20INSTALACAO.md).
+Instale pelo [Setup oficial](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.11), configure suas próprias credenciais e compartilhe as planilhas com a conta de serviço Google. O diretório padrão é `C:\NexoFlow`. Confira os requisitos e os campos necessários no [guia de instalação](README%20INSTALACAO.md).
 
 Abra o mesmo aplicativo e escolha **FarmaLíder** ou **Pets Líder** antes da carga. Configure tokens Weni e três destinos Sheets em cada perfil. A credencial Google pode ser compartilhada. Veja [configuração dos segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 

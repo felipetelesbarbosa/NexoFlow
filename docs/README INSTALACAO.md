@@ -1,4 +1,4 @@
-# NexoFlow 1.5.10 — Instalação
+# NexoFlow 1.5.11 — Instalação
 
 ## Requisitos
 
@@ -8,11 +8,11 @@
 
 ## Instalar
 
-1. Baixe [NexoFlow-Setup-1.5.10.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.10/NexoFlow-Setup-1.5.10.zip).
+1. Baixe [NexoFlow-Setup-1.5.11.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.11/NexoFlow-Setup-1.5.11.zip).
 2. Extraia todo o pacote e execute **NexoFlow Setup.exe**. Autorize a instalação quando o Windows solicitar.
 3. Conclua o assistente. O destino padrão é `C:\NexoFlow`, com atalhos dos aplicativos na Área de Trabalho e no Menu Iniciar.
 
-O [release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.10) também oferece o projeto completo e o arquivo de hashes dos pacotes.
+O [release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.11) também oferece o projeto completo e o arquivo de hashes dos pacotes.
 
 ## Configurar os acessos
 
@@ -67,7 +67,7 @@ Encerre as rotinas dos dois segmentos e execute o novo **NexoFlow Setup.exe**. Q
 
 Os arquivos de `importacoes/` são preservados nas duas opções. O Setup não exclui dados na Weni ou no Google Sheets. Se a instalação falhar, tenta restaurar a versão anterior com seus dados.
 
-A série atual é 1.5; patches posteriores seguem 1.5.10 até 1.5.99, antes de 1.6. A versão instalada aparece no Terminal e nos metadados dos aplicativos.
+A série atual é 1.5; patches posteriores seguem 1.5.11 até 1.5.99, antes de 1.6. A versão instalada aparece no Terminal e nos metadados dos aplicativos.
 
 Após atualizar, rode o diagnóstico e gere novas revisões antes de aplicar mudanças. Faça carga completa quando precisar revalidar a base ou preencher novos campos. O [histórico de mudanças](../CHANGELOG.md) informa os ajustes de cada publicação.
 
@@ -88,3 +88,9 @@ Se o Windows impedir a leitura ou a cópia do launcher `NexoFlow Noturno.exe`, o
 Para criar continuações no Meu Drive, configure a autorização Google local e depois as fontes do Data Studio; confira [CONTINUACOES.md](CONTINUACOES.md). O Setup preserva credenciais e não configura fontes do relatório sozinho.
 
 O ZIP contém `RELATORIO DE SEGURANCA.json` com o estado das assinaturas. Certificados autoassinados locais não conferem confiança pública. Veja [assinatura Windows](ASSINATURA%20WINDOWS.md) e [antivírus](ANTIVIRUS%20E%20CONFIANCA.md).
+
+## Atualização com dados locais abertos
+
+Na opção de atualizar mantendo dados, o Setup conserva `secrets_config.py`, `credentials`, `logs` e `importacoes` no lugar. Um handle de Explorer/terminal que impede renomear essas pastas não exige apagar logs ou estado. O backup privado continua obrigatório; apenas o programa é preparado para rollback. Se a instalação falhar, o programa anterior é restaurado sem remover os dados preservados. Arquivos novos do programa continuam sujeitos à validação de integridade; bloqueios de leitura/gravação não são ignorados. Encerre as cargas FARMA e PET antes de instalar.
+
+A instalação limpa reinicia configuração/estado e precisa conseguir mover os dados anteriores para a recuperação. Se houver bloqueio, ela aborta preservando a instalação anterior; não é convertida silenciosamente em atualização.

@@ -1,4 +1,4 @@
-# NexoFlow 1.5.10 — Recompra FarmaLíder e Pets Líder
+# NexoFlow 1.5.11 — Recompra FarmaLíder e Pets Líder
 
 O NexoFlow mantém a elegibilidade dos grupos; a **campanha Weni envia as mensagens**. Use o mesmo executável Recompra e escolha o segmento. Cada marca mantém sua organização, template, campanha, fluxo, evento, revisão e estado.
 
@@ -26,6 +26,30 @@ Recusa no campo de marketing ou associação ao **Opt-Out Marketing** bloqueia a
 Na Farma, pedidos apenas pet/veterinários são excluídos. Nos pedidos mistos, a mensagem considera somente os itens humanos; no dashboard, somente o valor desses itens, sem o frete do pedido inteiro. No Pets, os itens PET são preservados.
 
 Conversa indicando compra posterior ainda não confirmada pela API mantém a referência antiga bloqueada. O campo opcional Texto `pedido_revisao_pendente` preserva essa pendência entre instalações. A data da conversa não substitui a emissão oficial.
+
+## Consulta geral na Recompra FarmaLíder
+
+A Recompra FARMA carrega `clientes/FARMA` uma vez por fase e consulta o índice em memória por CPF e ID do pedido. A preparação não regrava o histórico da base inteira para cada contato. As métricas `leituras_base_geral` e `pendencias_base_geral` representam leituras locais; o diagnóstico HTTP mostra as requisições reais.
+
+As pendências da base geral são separadas no relatório `.txt` e no resumo de aplicação:
+
+| Código | Significado | Tratamento |
+| --- | --- | --- |
+| `CPF_NAO_CONFIRMADO_BASE_GERAL` | O CPF consultável não consta da base geral carregada. | Reavaliar na próxima leitura; não concluir que o cliente ou a compra não existem. |
+| `PEDIDO_NAO_CONFIRMADO_BASE_GERAL` | Há cadastro, mas o pedido/itens não formam um snapshot completo e inequívoco. | Não admitir nem substituir referência; reavaliar na próxima leitura. |
+| `ERRO_BASE_GERAL_INCOMPLETA` | A consulta geral não produziu um índice utilizável, por falha de consulta/formato. | Preservar a pendência e as retentativas da consulta geral; sem HTTP individual. |
+
+Os demais contatos continuam sendo aplicados. Um `ultimoPedido: null` explícito representa ausência de pedido; campo omitido não comprova ausência. Autenticação inválida e circuito aberto continuam críticos.
+
+**Contato já no grupo:** enquanto o pedido continuar sem validação, a partir de **sete dias completos (168 horas) de `pedido_data` registrado na Weni**, o NexoFlow propõe retirar o contato do grupo. A regra vale para FARMA e PET; o motivo é `PEDIDO_PENDENTE_7_DIAS`. O prazo não parte da primeira falha nem do início da execução. Antes de sete dias, ou sem data válida, o contato permanece pendente. Não inferir data a partir de `ultimo_pedido`, `compra_recente` ou de uma compra antiga do estado.
+
+A aplicação reconsulta a fonte e relê o contato imediatamente antes da remoção. Se o pedido for validado ou a referência mudar, a proposta antiga fica bloqueada para nova revisão. A retirada não apaga o contato, seus pedidos, campos ou histórico de admissões; continua sendo revalidado nas próximas cargas. Uma reentrada precisa cumprir as guardas existentes, inclusive evento D+25/D+30 futuro e proteção contra repetição de admissão. A regra de sete dias não antecipa o disparo da campanha.
+
+O relatório `.txt` mostra integrantes pendentes e remoções propostas. A auditoria confirma a retirada e preserva a pendência de consulta. Assim, o resultado ainda pode ser parcial (código 3): `aplicados` e `consultas_pendentes` podem contar o mesmo contato quando a remoção foi aplicada, mas a compra continua sem validação. As guardas do fluxo Weni continuam necessárias. Cancelamento, pagamento inválido ou recusa já comprovados na Weni permitem remoção imediata, sem esperar sete dias.
+
+O histórico observado é gravado uma vez por índice carregado, sem regravar todos os pedidos a cada contato. A marca de observação só é confirmada após a gravação bem-sucedida.
+
+Antes da aplicação, uma nova consulta geral substitui a base usada na simulação. Identidade, status, pagamento, itens, recusa, janela D+25 e alterações concorrentes continuam sendo validados. A política exclusiva da base geral aplica-se à Recompra FARMA; os demais módulos e o perfil PET mantêm seus contratos de consulta.
 
 ## Executar
 
@@ -58,3 +82,16 @@ Os arquivos ficam em `logs/` para Farma e `logs/PET/` para Pets. Preserve-os nas
 Consulte também [Noturno](NOTURNO.md), [pedidos](PEDIDOS.md) e [API](FARMALIDER%20API.md).
 
 Pedido sem segmento comprovado é inelegível, sem pendência de consulta. `ultimoPedido: null` não admite contato nem reconstrói pedido antigo. Rede/timeout e respostas malformadas continuam pendentes.
+
+## Medir antes de publicar
+
+Execute uma simulação FARMA sem `--apply`, preservando estado e auditoria existentes:
+
+```powershell
+cd C:\NexoFlow
+.\.venv\Scripts\python.exe app\run_recompra.py --perfil FARMA --dry-run --full --review-out logs\privado\recompra_medicao_farma.json
+```
+
+Confira o `HTTP=` real nos logs, a duração, as leituras locais e as contagens dos três motivos acima. A preparação e a aplicação usam leituras separadas, portanto uma leitura HTTP na simulação não comprova toda a execução. Retentativas da consulta geral podem elevar o HTTP sem haver consulta individual.
+
+Se a proporção de pendências for alta, compare uma amostra somente por leitura entre a base geral e a consulta individual, fora da rotina operacional. Não use essa comparação para autorizar inclusão ou alterar campos sem uma nova revisão. Os resultados dos testes sintéticos não comprovam equivalência dos endpoints em produção nem substituem os testes Windows e do pacote instalado.

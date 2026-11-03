@@ -46,7 +46,7 @@ https://api.farmalider.net.br:3200/farmalider
 
 ## Cadastro de clientes por segmento
 
-A listagem completa pode aguardar 600 segundos por tentativa; consultas individuais mantêm 90 segundos. Se a listagem não fornecer um snapshot utilizável, a consulta por CPF continua disponível, exigindo confirmação do segmento.
+A listagem completa pode aguardar 600 segundos por tentativa; consultas individuais mantêm 90 segundos. Se a listagem não fornecer um snapshot utilizável, a consulta por CPF continua disponível nos módulos que autorizam esse fallback, exigindo confirmação do segmento. **Exceção: Recompra FARMA usa somente a base geral por fase**, inclusive em cargas pequenas ou quando o índice não está disponível; a insuficiência fica pendente.
 
 ```text
 GET /api/Delivery/clientes/{segmento}?token={token}
@@ -54,7 +54,7 @@ GET /api/Delivery/clientes/{segmento}?token={token}
 
 Pode retornar uma lista de objetos com `cliente`, `ultimoPedido` e `itens`. O objeto `cliente` contém ID, CPF, nome, celular, e-mail, sexo, nascimento, data de cadastro e endereços. O perfil selecionado usa `FARMA` ou `PET`. Os dois segmentos têm carga automática própria, em produção. Clientes e pedidos de outra marca não autorizam vínculos, exclusões ou gravações no perfil atual. O filtro de produtos humanos continua exclusivo da Farma.
 
-O índice preserva todos os candidatos de um CPF, bloqueia IDs repetidos com dados divergentes e mantém a seleção única conforme as regras abaixo. Snapshots completos e coerentes atendem às consultas de CPF e pedido em memória durante a execução. Dados apenas cadastrais, ausentes ou incompletos usam as consultas individuais. O endereço cadastral usado para preencher localização precisa corresponder ao último pedido. Consulte [Cadastro por segmento](CADASTRO%20FARMA.md).
+O índice preserva todos os candidatos de um CPF, bloqueia IDs repetidos com dados divergentes e mantém a seleção única conforme as regras abaixo. Snapshots completos e coerentes atendem às consultas de CPF e pedido em memória durante a execução. Nos módulos Analytics, Update Weni e tickets, dados apenas cadastrais, ausentes ou incompletos podem usar as consultas individuais. Na Recompra FARMA não há esse fallback: `CPF_NAO_CONFIRMADO_BASE_GERAL` indica CPF ausente do índice e `PEDIDO_NAO_CONFIRMADO_BASE_GERAL` indica pedido sem snapshot suficiente. `ERRO_BASE_GERAL_INCOMPLETA` indica que a consulta geral não produziu índice utilizável. Nenhum desses códigos comprova ausência de compra. Na Recompra, após sete dias completos desde `pedido_data` na Weni, a falta de validação pode gerar remoção preventiva do grupo (`PEDIDO_PENDENTE_7_DIAS`), sem apagar cliente, pedidos ou pendências de revalidação. O prazo depende de data válida e é conferido antes da gravação. O histórico é registrado uma vez por índice carregado, com nova observação após reset e nova leitura. O endereço cadastral usado para preencher localização precisa corresponder ao último pedido. Consulte [Cadastro por segmento](CADASTRO%20FARMA.md).
 
 ## Cliente por CPF
 
@@ -109,7 +109,7 @@ capa -> dados do pedido
 itens -> produtos do pedido
 ```
 
-Se o GET por pedido falhar temporariamente e o GET por CPF trouxe `ultimoPedido + itens` válidos, o NexoFlow pode usar esse primeiro retorno como fallback completo.
+Nos módulos que usam consultas individuais, se o GET por pedido falhar temporariamente e o GET por CPF trouxe `ultimoPedido + itens` válidos, o NexoFlow pode usar esse primeiro retorno como fallback completo.
 
 Se o GET por CPF não puder ser usado, a recuperação segue a ordem `pedido_id` da Weni e, por último, o ID extraído de `ultimo_pedido`. Esses campos servem apenas como **localizadores**. O conteúdo oficial do pedido ainda precisa vir de `GET /api/Delivery/pedido/{codigo}`.
 
@@ -343,7 +343,7 @@ GET /api/Delivery/pedidos/cpf/{cpf}
 ```
 
 Filtros desejáveis: `inicio`, `fim`, `status`, `pagina` e `tamanhoPagina`. Essa rota é uma proposta de evolução, não uma integração atualmente implementada.
-<!-- NexoFlow 1.5.10 -->
+<!-- NexoFlow 1.5.11 -->
 
 ### Respostas e pendências
 

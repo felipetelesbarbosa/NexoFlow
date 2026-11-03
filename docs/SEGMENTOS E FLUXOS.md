@@ -45,6 +45,10 @@ Configure ou importe o fluxo na organização correspondente, selecione-o no eve
 
 Antes do template, o fluxo deve bloquear status 3/Cancelado, pagamento cancelado ou não elegível, recusa/Opt-Out e data fora do D+25 ou D+30. O NexoFlow Recompra faz a validação preventiva antes de alimentar o grupo. O envio das mensagens pertence à campanha Weni.
 
+Na Recompra FARMA, a consulta geral `clientes/FARMA` é a fonte exclusiva por fase. CPF ausente ou pedido insuficiente geram `CPF_NAO_CONFIRMADO_BASE_GERAL` ou `PEDIDO_NAO_CONFIRMADO_BASE_GERAL`; indisponibilidade do índice gera `ERRO_BASE_GERAL_INCOMPLETA`. O relatório mostra os motivos sem agrupá-los como outro motivo. Nos dois segmentos, integrante com consulta incompleta e sete dias completos desde `pedido_data` na Weni é retirado preventivamente do grupo, mantendo cadastro, dados e revalidação posterior. Sem data válida ou antes do prazo, permanece pendente. Referência alterada ou validação posterior bloqueiam a remoção do plano antigo; a aplicação relê o contato antes do POST. A remoção não encerra a pendência nem autoriza repetir uma admissão. Bloqueios já comprovados na Weni permitem retirada imediata. A guarda do fluxo continua necessária antes do disparo.
+
+PET mantém sua política de consulta atual, D+30 e estado separado. Analytics, Update Weni e tickets preservam as consultas individuais quando necessárias à confirmação; a exclusividade da base geral não se estende automaticamente a esses módulos.
+
 No fluxo Pets, **Comprar novamente** encaminha para a fila de Atendimento do Delivery Pets Líder; **Não preciso** encerra essa oferta; **SAIR** registra Não em `opt_in_marketing` e mantém o bloqueio de marketing. Cada organização usa seu próprio template e seus próprios vínculos de atendimento.
 
 Depois de conferir grupo, campanha, fluxo, evento e template, habilite `RECOMPRA_ENABLED` no perfil desejado. Use o executável Recompra para gerar a revisão ou `comandos/auditar_grupo_recompra.bat` para conferir os integrantes sem alterar dados. Consulte [Recompra](README%20RECOMPRA.md).
