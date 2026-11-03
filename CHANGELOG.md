@@ -1,4 +1,15 @@
-# NexoFlow 1.5.10 — Changelog
+# NexoFlow 1.5.11 — Changelog
+
+## NexoFlow 1.5.11 — 03/11/2026
+
+- Recompra FARMA usa somente snapshots suficientes da consulta geral por fase, sem fallback HTTP por CPF/pedido e sem regravar todo o histórico por contato. Casos incompletos ficam pendentes; aplicação usa base nova e mantém as guardas de identidade, pagamento, cancelamento e D+25.
+- Histórico observado é registrado uma vez por índice carregado, com nova observação após reset; falha de armazenamento não marca uma gravação como concluída. Logs separam HTTP real de leituras locais; CPF e pedido não confirmados na base geral têm motivos próprios.
+- Nos dois segmentos, contato com consulta incompleta é removido preventivamente do grupo quando pedido_data na Weni completa sete dias. Mantém cadastro, campos, histórico, proteção de admissões e revalidação posterior. Sem data válida não inventa prazo; cancelamento, pagamento inválido e recusa já comprovados na Weni permitem remoção imediata.
+- A aplicação recarrega a base e relê o contato antes da retirada; validação ou mudança posterior bloqueiam a proposta antiga. Remoção aplicada não encerra pendência de validação, mantendo resultado parcial e continuidade do Analytics no Noturno. Gere uma nova revisão; revisões da política anterior são recusadas.
+- Atualização com preservação mantém secrets_config.py, credentials, logs e importacoes no lugar. O rollback inclui apenas arquivos do programa e restaura a versão anterior sem apagar/recriar os dados locais.
+- Cópia do payload não substitui dados preservados; a validação SHA-256 continua obrigatória para os arquivos de programa. Cópias privadas antigas recuperam somente arquivos ausentes, respeitando a configuração atual e arquivando exports divergentes por conteúdo.
+- Instalação limpa conserva seu comportamento e aborta sem perder a instalação anterior quando os dados não podem ser movidos.
+- Regressão reproduzida no Windows antes da correção com handle real em logs. Cobertura de instalação/rollback com raiz e pastas privadas bloqueadas para renomeação, segredo aberto para leitura e checagem de arquivos de programa corrompidos.
 
 ## NexoFlow 1.5.10 — 30/10/2026
 
