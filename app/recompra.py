@@ -70,6 +70,8 @@ from recompra_profiles import (
     profile_for,
 )
 from recompra_review_audit import (
+    GENERAL_BASE_PENDING,
+    PENDING_GROUP_REMOVAL_REASON,
     has_incomplete_query,
     incomplete_query_summary,
     public_review_lines,
@@ -174,6 +176,10 @@ class RecompraReadCache:
         self._responses = OrderedDict()
         self._hits = 0
         self._misses = 0
+        self._prepare_lock = Lock()
+        self._prepared = False
+        self._bulk_reads = 0
+        self._bulk_pending = 0
 
     def _read(self, kind, key, fetch):
         cache_key = (kind, str(key))
@@ -224,19 +230,72 @@ class RecompraReadCache:
     def customer_directory(self):
         return directory_for(self.farm)
 
+    def bulk_only(self):
+        from farmalider_client import FarmaliderClient
+
+        return (
+            isinstance(self.farm, FarmaliderClient)
+            and self.farm.customer_segment == "FARMA"
+        )
+
+    def prepare_directory(self, expected_contacts=None):
+        with self._prepare_lock:
+            if self._prepared:
+                return
+            if self.bulk_only():
+                prepare_customers(self.farm, expected_contacts, force=True)
+                logging.info(
+                    "Recompra FARMA: consulta geral exclusiva; dados insuficientes ficam pendentes, sem HTTP individual. Consultas do cache não representam requisições HTTP."
+                )
+            else:
+                prepare_customers(self.farm, expected_contacts)
+            self._prepared = True
+
     def get_cliente_by_cpf(self, cpf):
+        self.prepare_directory()
+        if self.bulk_only():
+            directory = self.customer_directory
+            snapshot, pending = (
+                directory.general_base_payload(cpf)
+                if directory is not None
+                else (None, "ERRO_BASE_GERAL_INCOMPLETA")
+            )
+            with self._lock:
+                self._bulk_reads += 1
+                self._bulk_pending += int(bool(pending))
+            if pending:
+                raise FarmaliderLookupError(pending)
+            return snapshot
         return self._read("cpf", cpf, lambda: self.farm.get_cliente_by_cpf(cpf))
 
     def get_pedido(self, order_id):
+        self.prepare_directory()
+        if self.bulk_only():
+            directory = self.customer_directory
+            snapshot = (
+                directory.order_by_id(str(order_id)) if directory is not None else None
+            )
+            with self._lock:
+                self._bulk_reads += 1
+                self._bulk_pending += int(snapshot is None)
+            if snapshot is None:
+                raise FarmaliderLookupError("PEDIDO_NAO_CONFIRMADO_BASE_GERAL")
+            return snapshot
         return self._read("pedido", order_id, lambda: self.farm.get_pedido(order_id))
 
     def metrics(self):
         with self._lock:
-            return {
+            metrics = {
                 "consultas": self._misses,
                 "reusos": self._hits,
                 "entradas": len(self._responses),
             }
+            if self.bulk_only():
+                metrics.update(
+                    leituras_base_geral=self._bulk_reads,
+                    pendencias_base_geral=self._bulk_pending,
+                )
+            return metrics
 
 
 class _ConflictingPaginationContact(dict):
@@ -329,6 +388,16 @@ def iter_prioritized_contacts(contacts, *, pagination_stats=None):
             database.close()
 
 
+def http_requests(farm):
+    from farmalider_client import FarmaliderClient
+
+    return (
+        farm.metrics_snapshot()["total_requests"]
+        if isinstance(farm, FarmaliderClient)
+        else "n/d"
+    )
+
+
 def build_plans(
     contacts,
     farm,
@@ -375,14 +444,12 @@ def build_plans(
                 "campaign_products": [],
             }
         saved = _saved_with_purchase_check(state, contact["uuid"])
-        if refused(contact, segment=structure.get("segment", "FARMA")) or member(
-            contact, structure["opt_out_uuid"], OPT_OUT
-        ):
+        if local_blocking_reason(contact, structure):
             # Uma recusa já impede a campanha independentemente do pedido;
             # a remoção não precisa consultar ou validar uma compra na API.
             return propose(contact, None, [], structure, saved, now=now)
         if not cpf_cadastro_status(get_fields(contact).get("cpf")):
-            prepare_customers(farm, expected_contacts)
+            reads.prepare_directory(expected_contacts)
         try:
             order, items = _resolve_checked_contact(
                 contact, reads, now.isoformat(), saved
@@ -412,21 +479,23 @@ def build_plans(
                         if len(plans) % PROGRESS_LOG_EVERY_CONTACTS == 0:
                             elapsed = max(monotonic() - started, 0.001)
                             logging.info(
-                                "Recompra: contatos=%s; velocidade=%.1f/s; resultados=%s; cache=%s.",
+                                "Recompra: contatos=%s; velocidade=%.1f/s; resultados=%s; cache=%s; HTTP=%s.",
                                 len(plans),
                                 len(plans) / elapsed,
                                 dict(results),
                                 reads.metrics(),
+                                http_requests(farm),
                             )
     finally:
         prioritized.close()
     elapsed = max(monotonic() - started, 0.001)
     logging.info(
-        "Recompra: contatos=%s; duração=%.1fs; resultados=%s; cache=%s.",
+        "Recompra: contatos=%s; duração=%.1fs; resultados=%s; cache=%s; HTTP=%s.",
         len(plans),
         elapsed,
         dict(results),
         reads.metrics(),
+        http_requests(farm),
     )
     return plans
 
@@ -490,6 +559,28 @@ def refused(contact, *, segment="FARMA"):
             else ("marketing_opt_in", "opt_in_marketing")
         )
     )
+
+
+def local_blocking_reason(contact, structure):
+    """Bloqueios vigentes comprovados no contato; independem de nova consulta."""
+    if refused(contact, segment=structure.get("segment", "FARMA")) or member(
+        contact, structure["opt_out_uuid"], OPT_OUT
+    ):
+        return "RECUSA_MARKETING"
+    cancelled = cancelled_order_reason(None, contact)
+    if cancelled:
+        return cancelled
+    payment = text(get_fields(contact).get("pedido_forma_pagamento"))
+    if payment and normalize_farmalider_payment_code(payment) not in {
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+    }:
+        return "PAGAMENTO_INVALIDO"
+    return ""
 
 
 def cancelled_order_reason(order, contact=None):
@@ -671,7 +762,7 @@ def _saved_with_purchase_check(state, uid):
 def _resolve_checked_contact(contact, farm, captured_at, saved):
     try:
         return resolve_latest(contact, farm, captured_at, saved=saved)
-    except FarmaliderLookupError:
+    except (FarmaliderLookupError, FarmaliderAuthError, FarmaliderUnavailableError):
         raise
     except FarmaliderError:
         if contact_pending_purchase_check(contact, saved.get("pending_purchase_check")):
@@ -889,11 +980,11 @@ def resolve_latest(contact, farm, captured_at, lookup_cache=None, saved=None):
             cache[cpf] = farm.get_cliente_by_cpf(cpf)
         except FarmaliderBadRequestError:
             cache[cpf] = {"_nexoflow_lookup": "CPF_REJEITADO_API"}
-    if (
-        isinstance(cache[cpf], dict)
-        and cache[cpf].get("_nexoflow_lookup") == "CPF_REJEITADO_API"
-    ):
-        return {"status_confirmacao": "CPF_REJEITADO_API"}, []
+    lookup = (
+        cache[cpf].get("_nexoflow_lookup") if isinstance(cache[cpf], dict) else None
+    )
+    if lookup == "CPF_REJEITADO_API" or lookup in GENERAL_BASE_PENDING:
+        return {"status_confirmacao": lookup}, []
     payload = cache[cpf]
     result, selected = select_cliente_response(
         cpf,
@@ -919,6 +1010,23 @@ def resolve_latest(contact, farm, captured_at, lookup_cache=None, saved=None):
         captured_at=captured_at,
         linked_cliente_id=result[1],
         cliente_response=payload,
+    )
+
+
+def pending_group_removal_due(plan, now):
+    """Somente remoção revisada, sem campos, com data física conhecida na Weni."""
+    date = business_order_datetime(
+        (plan.get("guard", {}).get("fields") or {}).get("pedido_data")
+    )
+    return bool(
+        plan.get("reason") == PENDING_GROUP_REMOVAL_REASON
+        and plan.get("action") == "remove"
+        and plan.get("in_group")
+        and not plan.get("fields")
+        and not plan.get("purchase")
+        and has_incomplete_query(plan)
+        and date is not None
+        and now.astimezone(TZ) >= date + timedelta(days=7)
     )
 
 
@@ -948,7 +1056,10 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
     }
     diagnostic = text((order or {}).get("status_confirmacao"))
     plan["order_resolution_status"] = diagnostic
-    if diagnostic == "PEDIDO_SEGMENTO_INVALIDO_API":
+    if (
+        diagnostic == "PEDIDO_SEGMENTO_INVALIDO_API"
+        or diagnostic in GENERAL_BASE_PENDING
+    ):
         plan["reason"] = diagnostic
     if diagnostic.startswith(("CPF_", "ERRO_", "CLIENTE_")):
         plan["reason"] = diagnostic
@@ -1006,6 +1117,21 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
             if in_group:
                 plan["action"] = "remove"
             return plan
+    if has_incomplete_query(plan):
+        date = business_order_datetime(fields.get("pedido_data"))
+        if in_group and date is not None and now >= date + timedelta(days=7):
+            plan["reason"] = PENDING_GROUP_REMOVAL_REASON
+            plan["action"] = "remove"
+            plan["warnings"].append(
+                "Pedido sem validação há pelo menos sete dias da data registrada na Weni; "
+                "proposta de remoção preventiva do grupo, mantendo cadastro e revalidação."
+            )
+        elif diagnostic in GENERAL_BASE_PENDING:
+            plan["warnings"].append(
+                "A base geral FARMA não confirmou o último pedido; nenhuma alteração foi proposta. "
+                "O prazo preventivo depende de sete dias completos desde pedido_data."
+            )
+        return plan
     dt = business_order_datetime((order or {}).get("data_hora"))
     eligible_items = pharmacy_items(items) if profile.segment == "FARMA" else items
     names = [text(item.get("produto_nome")) for item in eligible_items]
@@ -1219,6 +1345,21 @@ def audit_plan(plan):
         raise RuntimeError("Plano tenta alterar campo fora da recompra.")
     if plan["action"] not in {"", "add", "remove", "replace"}:
         raise RuntimeError("Ação de grupo inválida.")
+    if plan.get("reason") == PENDING_GROUP_REMOVAL_REASON:
+        date = business_order_datetime(
+            (plan.get("guard", {}).get("fields") or {}).get("pedido_data")
+        )
+        if (
+            plan["action"] != "remove"
+            or not plan.get("in_group")
+            or plan["fields"]
+            or plan.get("purchase")
+            or date is None
+            or not has_incomplete_query(plan)
+        ):
+            raise RuntimeError(
+                "Remoção por pendência sem evidência de prazo e consulta incompleta."
+            )
     if plan["action"] in {"add", "replace"} and (
         not plan["within_window"]
         or not plan.get("scheduled_future")
@@ -1292,7 +1433,7 @@ def write_review(review, path=REVIEW):
     profile = profile_for(review["structure"].get("segment", "FARMA"))
     counts = Counter(plan["reason"] for plan in review["plans"])
     lines = [
-        f"NexoFlow 1.5.10 — Revisão {profile.brand} D+{profile.days}",
+        f"NexoFlow 1.5.11 — Revisão {profile.brand} D+{profile.days}",
         f"Dia local: {review['day']}",
         f"Dados capturados em: {review['created_at']}",
         f"Horários conferidos ao concluir: {review.get('generated_at', review['created_at'])}",
@@ -1512,18 +1653,21 @@ def apply_review(
     def check_day():
         ensure_review_current(review, now_fn(), allow_refresh=not writes_started)
 
-    def defer_query(uid, stage, *, error=None, plan=None):
+    def defer_query(uid, stage, *, error=None, plan=None, group_removed=False):
         summary["consultas_pendentes"] += 1
         record_event(
             {
                 "contact_uuid": uid,
                 "status": "CONSULTA_PENDENTE",
                 "stage": stage,
+                **({"group_removal_confirmed": True} if group_removed else {}),
                 "error_type": type(error).__name__
                 if error is not None
                 else "CONSULTA_INCOMPLETA",
                 "motivos_consulta": incomplete_query_summary([plan])["motivos_consulta"]
                 if plan is not None
+                else {error.code: 1}
+                if isinstance(error, FarmaliderLookupError)
                 else {},
                 "at": now_fn().isoformat(),
             },
@@ -1543,30 +1687,25 @@ def apply_review(
 
         if isinstance(farm, FarmaliderClient):
             farm.reset_execution_reads()
-            if any(
-                not has_incomplete_query(plan)
-                and plan_needs_apply(
-                    plan, _saved_with_purchase_check(state, plan["contact_uuid"])
-                )
-                for plan in review["plans"]
-            ):
-                prepare_customers(farm, len(review["plans"]))
         reads = RecompraReadCache(farm)
         for index, reviewed in enumerate(review["plans"], 1):
             check_day()
             if index > 1 and (index - 1) % PROGRESS_LOG_EVERY_CONTACTS == 0:
                 logging.info(
-                    "Recompra aplicação: contatos=%s/%s; resultados=%s; cache=%s.",
+                    "Recompra aplicação: contatos=%s/%s; resultados=%s; cache=%s; HTTP=%s.",
                     index - 1,
                     len(review["plans"]),
                     dict(summary),
                     reads.metrics(),
+                    http_requests(farm),
                 )
             if reviewed.get("segment", "FARMA") != profile.segment:
                 raise RuntimeError("Plano de outro perfil; aplicação bloqueada.")
             audit_plan(reviewed)
             uid = reviewed["contact_uuid"]
-            if has_incomplete_query(reviewed):
+            if has_incomplete_query(reviewed) and not pending_group_removal_due(
+                reviewed, now_fn()
+            ):
                 defer_query(uid, "consulta_da_revisao", plan=reviewed)
                 continue
             saved = _saved_with_purchase_check(state, uid)
@@ -1605,23 +1744,33 @@ def apply_review(
                     }
                 )
                 continue
-            if refused(current, segment=profile.segment) or member(
-                current, structure["opt_out_uuid"], OPT_OUT
-            ):
+            if local_blocking_reason(current, structure):
                 order, items = None, []
             else:
                 try:
                     order, items = _resolve_checked_contact(
                         current, reads, now_fn().isoformat(), saved
                     )
+                except (FarmaliderAuthError, FarmaliderUnavailableError):
+                    raise
                 except (FarmaliderError, RequestException) as exc:
                     check_day()
-                    defer_query(uid, "reconsultar_pedido", error=exc)
-                    continue
+                    if pending_group_removal_due(reviewed, now_fn()):
+                        code = (
+                            exc.code
+                            if isinstance(exc, FarmaliderLookupError)
+                            else "ERRO_API"
+                        )
+                        order, items = {"status_confirmacao": code}, []
+                    else:
+                        defer_query(uid, "reconsultar_pedido", error=exc)
+                        continue
             check_day()
             fresh = propose(current, order, items, structure, saved, now=now_fn())
             check_day()
-            if has_incomplete_query(fresh):
+            if has_incomplete_query(fresh) and not pending_group_removal_due(
+                fresh, now_fn()
+            ):
                 defer_query(uid, "reconsultar_pedido", plan=fresh)
                 continue
             if any(
@@ -1678,6 +1827,14 @@ def apply_review(
                     }
                 )
                 continue
+            # A passagem do relógio não pode antecipar uma remoção para antes do prazo.
+            if fresh.get(
+                "reason"
+            ) == PENDING_GROUP_REMOVAL_REASON and not pending_group_removal_due(
+                fresh, now_fn()
+            ):
+                defer_query(uid, "prazo_de_remocao_nao_confirmado", plan=fresh)
+                continue
             action = fresh["action"]
             if not plan_needs_apply(fresh, saved):
                 summary["sem_mudanca"] += 1
@@ -1709,6 +1866,22 @@ def apply_review(
             persisted_state = deepcopy(contact_state)
             stage = "preparacao"
             try:
+                if fresh.get("reason") == PENDING_GROUP_REMOVAL_REASON:
+                    stage = "reler_antes_remocao_por_pendencia"
+                    try:
+                        latest = weni.get_contact(uuid=uid)
+                    except (WeniError, RequestException) as exc:
+                        defer_query(uid, stage, error=exc)
+                        continue
+                    check_day()
+                    if (
+                        not latest
+                        or guard(latest) != fresh["guard"]
+                        or not pending_group_removal_due(fresh, now_fn())
+                    ):
+                        raise PreAdmissionConflict(
+                            "Contato ou prazo mudou antes da remoção por pendência."
+                        )
                 if action in {"remove", "replace"}:
                     stage = "remover_grupo"
                     check_day()
@@ -1892,9 +2065,30 @@ def apply_review(
                         "action": action,
                         "reason": fresh["reason"],
                         "group_confirmed": action in {"add", "replace"},
+                        **(
+                            {
+                                "group_removal_confirmed": True,
+                                "revalidation_pending": True,
+                                "order_date": fresh["guard"]["fields"].get(
+                                    "pedido_data", ""
+                                ),
+                                "query_status": fresh.get(
+                                    "order_resolution_status", ""
+                                ),
+                            }
+                            if fresh.get("reason") == PENDING_GROUP_REMOVAL_REASON
+                            else {}
+                        ),
                         "at": now_fn().isoformat(),
                     },
                 )
+                if fresh.get("reason") == PENDING_GROUP_REMOVAL_REASON:
+                    defer_query(
+                        uid,
+                        "aguardando_revalidacao_apos_remocao",
+                        plan=fresh,
+                        group_removed=True,
+                    )
             except CampaignFieldsPending as exc:
                 summary["conflitos"] += 1
                 record_event(
@@ -1918,7 +2112,10 @@ def apply_review(
                     atomic_json(state_path, state)
                 summary["conflitos"] += 1
                 logging.warning(
-                    "Recompra: conflito antes da inclusão; etapa=%s; contato=%s; motivo=%s.",
+                    "Recompra: conflito antes da %s; etapa=%s; contato=%s; motivo=%s.",
+                    "remoção"
+                    if fresh.get("reason") == PENDING_GROUP_REMOVAL_REASON
+                    else "inclusão",
                     stage,
                     uid,
                     str(exc),
@@ -1927,7 +2124,9 @@ def apply_review(
                     {
                         "contact_uuid": uid,
                         "pedido_id": fresh["order_id"],
-                        "status": "CONFLITO_PRE_INCLUSAO",
+                        "status": "CONFLITO_PRE_REMOCAO"
+                        if fresh.get("reason") == PENDING_GROUP_REMOVAL_REASON
+                        else "CONFLITO_PRE_INCLUSAO",
                         "stage": stage,
                         "reason": str(exc),
                         "at": now_fn().isoformat(),
@@ -2007,10 +2206,11 @@ def apply_review(
             dict(Counter(event["status"] for event in pending_events)),
         )
     logging.info(
-        "Recompra aplicação: contatos=%s; duração=%.1fs; resultados=%s; cache=%s.",
+        "Recompra aplicação: contatos=%s; duração=%.1fs; resultados=%s; cache=%s; HTTP=%s.",
         len(review["plans"]),
         monotonic() - started,
         dict(summary),
         reads.metrics(),
+        http_requests(farm),
     )
     return dict(summary)

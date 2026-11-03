@@ -12,9 +12,10 @@ from unittest.mock import patch
 
 import run_noturno
 from config import WENI_CONTACT_ACTIONS_API_URL, WENI_CONTACTS_API_URL
-from farmalider_client import FarmaliderError
+from farmalider_client import FarmaliderClient, FarmaliderError
 from recompra import load_state
 from run_recompra import main as recompra_cli
+from tests.test_farmalider_customers import customer_snapshot
 from tests.test_pedido_resolution import cliente_payload, pedido_payload
 from tests.test_recompra import NOW, STRUCTURE, fixture
 from tests.test_recompra_group_api_contract import FakeResponse, FakeWeniTransport
@@ -66,7 +67,17 @@ class NoturnoRecompraIntegrationTests(unittest.TestCase):
             bad = deepcopy(good)
             bad["uuid"] = "synthetic-broken"
             bad["urns"] = ["tel:+5591988888888"]
-            bad["fields"].update(cpf="11144477735", pedido_status="3")
+            # Um cancelamento já comprovado na Weni dispensa consulta da API.
+            # A fixture de falha isolada precisa realmente consultar os itens.
+            bad["fields"].update(cpf="11144477735")
+            if mode == "general_pending_expired":
+                from datetime import timedelta
+
+                bad["fields"]["pedido_data"] = (NOW - timedelta(days=8)).isoformat()
+                bad["groups"] = [
+                    {"uuid": STRUCTURE["group_uuid"], "name": "Recompra FarmaLíder"}
+                ]
+
             transports = {
                 good["uuid"]: FakeWeniTransport(
                     good, make_add_visible=mode != "uncertain_post"
@@ -106,6 +117,30 @@ class NoturnoRecompraIntegrationTests(unittest.TestCase):
                 )
                 return client
 
+            def farm_factory():
+                if mode not in {"general_pending", "general_pending_expired"}:
+                    return SimulatedFarmalider(scenario)
+                client = FarmaliderClient("synthetic")
+                good_snapshot = customer_snapshot()
+                good_snapshot["ultimoPedido"]["id"] = 100
+                good_snapshot["itens"][0]["codPedido"] = 100
+                partial = deepcopy(good_snapshot)
+                partial["cliente"].update(id=199, cpf=11144477735)
+                partial["ultimoPedido"].update(id=456, codCliente=199)
+                partial.pop("itens")
+
+                def bulk_only(path, **kwargs):
+                    self.assertTrue(
+                        path.endswith("/clientes/FARMA"),
+                        "HTTP individual não autorizado na Recompra FARMA",
+                    )
+                    return deepcopy([good_snapshot, partial])
+
+                patches.enter_context(
+                    patch.object(client, "_request_json", side_effect=bulk_only)
+                )
+                return client
+
             def runner(arguments, **kwargs):
                 calls.append(arguments)
                 if arguments[0] != "app/run_recompra.py":
@@ -133,7 +168,7 @@ class NoturnoRecompraIntegrationTests(unittest.TestCase):
                 patch("weni_client.WeniClient", side_effect=client_factory),
                 patch(
                     "weni_update._open_farmalider",
-                    side_effect=lambda: SimulatedFarmalider(scenario),
+                    side_effect=farm_factory,
                 ),
                 patch("recompra.inspect_structure", return_value=STRUCTURE),
                 patch("recompra.datetime", FixedDateTime),
@@ -152,7 +187,13 @@ class NoturnoRecompraIntegrationTests(unittest.TestCase):
                 reports = list(
                     (root / "logs/noturno").glob("*/privado/*_aplicacao.json")
                 )
-                if mode in {"success", "partial_queries", "source_changed"}:
+                if mode in {
+                    "success",
+                    "partial_queries",
+                    "source_changed",
+                    "general_pending",
+                    "general_pending_expired",
+                }:
                     self.assertEqual(len(reports), 1)
                     application = json.loads(reports[0].read_text(encoding="utf-8"))
                     self.assertTrue(application["aplicacao_concluida"])
@@ -217,6 +258,54 @@ class NoturnoRecompraIntegrationTests(unittest.TestCase):
                 self.assertNotIn("synthetic-broken", state["contacts"])
                 self.assertTrue(state["contacts"]["u1"]["orders"]["100"]["admitted"])
                 self.assertEqual(len(posts), 2)
+
+    def test_general_base_pending_runs_final_analytics_and_keeps_partial_exit_code(
+        self,
+    ):
+        for full in (False, True):
+            with self.subTest(full=full):
+                code, result, state, calls, posts, _ = self.run_scenario(
+                    "general_pending", full=full
+                )
+                self.assertEqual(code, 3)
+                self.assertTrue(result["fluxo_completo"])
+                self.assertEqual(calls[-1], ["app/run_main.py"])
+                self.assertEqual(result["etapas"][-2]["codigo"], 3)
+                self.assertEqual(result["etapas"][-1]["codigo"], 0)
+                self.assertEqual(
+                    result["etapas"][7]["consultas_incompletas"]["motivos_consulta"],
+                    {"PEDIDO_NAO_CONFIRMADO_BASE_GERAL": 1},
+                )
+                self.assertTrue(state["contacts"]["u1"]["orders"]["100"]["admitted"])
+                self.assertNotIn("synthetic-broken", state["contacts"])
+                self.assertEqual(len(posts), 2)
+
+    def test_pending_after_seven_days_is_removed_without_stopping_final_analytics(self):
+        for full in (False, True):
+            with self.subTest(full=full):
+                code, result, state, calls, posts, events = self.run_scenario(
+                    "general_pending_expired", full=full
+                )
+                self.assertEqual(code, 3)
+                self.assertTrue(result["fluxo_completo"])
+                self.assertEqual(calls[-1], ["app/run_main.py"])
+                self.assertTrue(state["contacts"]["u1"]["orders"]["100"]["admitted"])
+                self.assertEqual(state["contacts"]["synthetic-broken"]["orders"], {})
+                self.assertEqual(
+                    len(posts), 3
+                )  # Campos + admissão válida + remoção preventiva.
+                applied = [
+                    e for e in events if e.get("reason") == "PEDIDO_PENDENTE_7_DIAS"
+                ]
+                self.assertEqual(len(applied), 1)
+                self.assertTrue(applied[0]["group_removal_confirmed"])
+                self.assertTrue(applied[0]["revalidation_pending"])
+                self.assertTrue(
+                    any(
+                        e.get("stage") == "aguardando_revalidacao_apos_remocao"
+                        for e in events
+                    )
+                )
 
     def test_live_order_change_is_not_applied_from_the_old_review(self):
         code, result, state, calls, posts, _ = self.run_scenario("source_changed")

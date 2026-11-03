@@ -52,7 +52,7 @@ def record_directory(directory, at):
     with connect() as db:
         for cid, snapshot in directory.snapshots.items():
             oid = str(snapshot["ultimoPedido"]["id"])
-            if directory.order_by_id(oid) is None:
+            if not directory.has_order(oid):
                 continue
             raw = json.dumps(snapshot, ensure_ascii=False, sort_keys=True)
             digest = hashlib.sha256(raw.encode()).hexdigest()

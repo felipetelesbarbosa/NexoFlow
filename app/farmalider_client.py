@@ -54,6 +54,9 @@ class FarmaliderLookupError(FarmaliderError):
             "ERRO_SEGMENTO_NAO_CONFIRMADO_API",
             "ERRO_RESPOSTA_CLIENTE_API",
             "ERRO_JSON_CLIENTE_API",
+            "ERRO_BASE_GERAL_INCOMPLETA",
+            "CPF_NAO_CONFIRMADO_BASE_GERAL",
+            "PEDIDO_NAO_CONFIRMADO_BASE_GERAL",
         }
     )
 
@@ -949,7 +952,9 @@ class FarmaliderClient:
 
         raise FarmaliderError("Falha inesperada ao consultar a FarmaLíder API.")
 
-    def prepare_customer_directory(self, *, expected_contacts: int | None) -> bool:
+    def prepare_customer_directory(
+        self, *, expected_contacts: int | None, force: bool = False
+    ) -> bool:
         import sqlite3
 
         from farmalider_customers import CustomerDirectory, ExecutionReadCache
@@ -977,10 +982,13 @@ class FarmaliderClient:
                     logging.warning(
                         "FarmaLíder: cache privado indisponível; consultas diretas preservadas."
                     )
-            if mode == "off" or (
-                mode == "auto"
-                and expected_contacts is not None
-                and expected_contacts < minimum
+            if not force and (
+                mode == "off"
+                or (
+                    mode == "auto"
+                    and expected_contacts is not None
+                    and expected_contacts < minimum
+                )
             ):
                 return False
             if self._directory_attempted:
@@ -1007,8 +1015,11 @@ class FarmaliderClient:
                 raise
             except (FarmaliderError, ValueError) as exc:
                 logging.warning(
-                    "FarmaLíder: índice FARMA indisponível (%s); consultas individuais continuam.",
+                    "FarmaLíder: índice FARMA indisponível (%s); %s.",
                     type(exc).__name__,
+                    "Recompra mantém os casos incompletos pendentes"
+                    if force
+                    else "consultas individuais continuam",
                 )
             return self.customer_directory is not None
 

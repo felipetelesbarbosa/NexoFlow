@@ -34,7 +34,7 @@ class RecompraProfile:
             if self.segment == "FARMA"
             else "BASE_PET"
         )
-        return f"JANELA_0_A_{self.days}_SEM_RECUSA_{scope}_EXECUCAO_V5"
+        return f"JANELA_0_A_{self.days}_SEM_RECUSA_{scope}_EXECUCAO_V6"
 
     @property
     def directory(self):

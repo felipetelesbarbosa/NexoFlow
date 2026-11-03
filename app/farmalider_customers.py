@@ -110,8 +110,11 @@ class CustomerDirectory:
         self.by_id: dict[str, dict] = {}
         self.conflicted_ids: set[str] = set()
         self.snapshots: dict[str, dict] = {}
+        self.no_order_snapshots: dict[str, dict] = {}
         self.orders: dict[str, dict] = {}
         self.conflicted_orders: set[str] = set()
+        self._observation_lock = Lock()
+        self._observed = False
         self.segment = segment
         self.source = f"FARMALIDER_CLIENTES_{segment}"
         self.address_results: dict[str, int] = defaultdict(int)
@@ -147,6 +150,8 @@ class CustomerDirectory:
                 if isinstance(addresses, list)
                 else []
             )
+            if "ultimoPedido" in raw and raw["ultimoPedido"] is None:
+                record["_nexoflow_explicit_no_order"] = True
             latest = raw.get("ultimoPedido")
             if isinstance(latest, dict):
                 record["_ultimo_pedido_endereco"] = {
@@ -180,6 +185,12 @@ class CustomerDirectory:
                 self.by_numeric_cpf[key.lstrip("0")].append(record)
             if cid not in self.conflicted_ids:
                 self.by_id[cid] = record
+                if record.get("_nexoflow_explicit_no_order"):
+                    self.no_order_snapshots[cid] = {
+                        "cliente": record,
+                        "ultimoPedido": None,
+                        "itens": [],
+                    }
                 result, _ = matching_order_address(record, segment=self.segment)
                 self.address_results[result] += 1
                 if snapshot is not None:
@@ -252,6 +263,46 @@ class CustomerDirectory:
         ):
             return None
         return snapshots
+
+    def has_order(self, order_id: str) -> bool:
+        """Presença do pedido verificado, sem copiar capa e itens."""
+        return positive_id(order_id) in self.orders
+
+    def record_observations_once(self, record) -> bool:
+        """Executa ``record(self)`` uma única vez por índice carregado.
+
+        A marca só é gravada após o sucesso: uma falha de armazenamento continua
+        visível na chamada seguinte, em vez de ser tratada como já registrada.
+        """
+        with self._observation_lock:
+            if self._observed:
+                return False
+            record(self)
+            self._observed = True
+            return True
+
+    def general_base_payload(self, cpf: str) -> tuple[list[dict] | None, str]:
+        """Snapshots verificados ou null explícito; nunca infere ausência pelo índice."""
+        records = self._candidate_records(cpf)
+        if not records:
+            return None, "CPF_NAO_CONFIRMADO_BASE_GERAL"
+        ids = sorted({positive_id(record["id"]) for record in records})
+        if set(ids) & self.conflicted_ids:
+            # A seleção normal mantém o diagnóstico de identidade ambígua.
+            return deepcopy([{"cliente": record} for record in records]), ""
+        snapshots = []
+        for cid in ids:
+            snapshot = self.snapshots.get(cid) or self.no_order_snapshots.get(cid)
+            if snapshot is None:
+                return None, "PEDIDO_NAO_CONFIRMADO_BASE_GERAL"
+            latest = snapshot.get("ultimoPedido")
+            if (
+                latest is not None
+                and positive_id(latest.get("id")) in self.conflicted_orders
+            ):
+                return None, "PEDIDO_NAO_CONFIRMADO_BASE_GERAL"
+            snapshots.append(snapshot)
+        return deepcopy(snapshots), ""
 
     def has_latest_snapshot(self, cpf: str) -> bool:
         return self._latest_by_cpf(cpf) is not None
@@ -501,18 +552,26 @@ def directory_for(farm) -> CustomerDirectory | None:
     return directory if isinstance(directory, CustomerDirectory) else None
 
 
-def prepare_customers(farm, expected_contacts: int | None):
+def prepare_customers(farm, expected_contacts: int | None, *, force: bool = False):
     from farmalider_client import FarmaliderClient
 
     if isinstance(farm, FarmaliderClient):
-        farm.prepare_customer_directory(expected_contacts=expected_contacts)
+        if force:
+            farm.prepare_customer_directory(
+                expected_contacts=expected_contacts, force=True
+            )
+        else:
+            farm.prepare_customer_directory(expected_contacts=expected_contacts)
         directory = directory_for(farm)
         if directory is not None:
             from datetime import UTC, datetime
 
             from customer_observations import record_directory
 
-            record_directory(directory, datetime.now(UTC).isoformat())
+            observed_at = datetime.now(UTC).isoformat()
+            directory.record_observations_once(
+                lambda current: record_directory(current, observed_at)
+            )
 
 
 def selected_customer(farm, contact: dict) -> dict | None:

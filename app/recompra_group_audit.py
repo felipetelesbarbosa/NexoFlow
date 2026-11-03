@@ -14,7 +14,6 @@ from farmalider_client import (
     FarmaliderError,
     FarmaliderUnavailableError,
 )
-from farmalider_customers import prepare_customers
 from recompra import (
     RecompraReadCache,
     atomic_json,
@@ -31,8 +30,8 @@ def audit_group(weni, farm, structure, path, *, now=None):
     contacts = list(
         iter_prioritized_contacts(weni.iter_group_contacts(structure["group_uuid"]))
     )
-    prepare_customers(farm, len(contacts))
     reads = RecompraReadCache(farm)
+    reads.prepare_directory(len(contacts))
 
     def check(contact):
         fields = contact.get("fields") or {}

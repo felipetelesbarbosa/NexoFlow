@@ -274,7 +274,15 @@ class CustomerDirectoryFlowTests(unittest.TestCase):
         with (
             tempfile.TemporaryDirectory() as folder,
             patch.object(
-                self.client, "_request_json", side_effect=self.response
+                self.client,
+                "_request_json",
+                side_effect=lambda path, **kwargs: (
+                    [deepcopy(self.full_payload)]
+                    if path.endswith("/clientes/FARMA")
+                    else self.fail(
+                        "Recompra não deve consultar CPF ou pedido individual"
+                    )
+                ),
             ) as get,
         ):
             path = Path(folder) / "state.json"
@@ -304,7 +312,7 @@ class CustomerDirectoryFlowTests(unittest.TestCase):
             weni.update_contact_fields.assert_not_called()
             paths = [call.args[0] for call in get.call_args_list]
             self.assertEqual(sum("/clientes/FARMA" in p for p in paths), 2)
-            self.assertEqual(sum("/cliente/cpf/" in p for p in paths), 2)
+            self.assertEqual(sum("/cliente/cpf/" in p for p in paths), 0)
 
     def test_cadastral_date_is_never_used_as_purchase_date(self):
         self.api_customer["cadastro"] = "2026-10-08T10:00:00"

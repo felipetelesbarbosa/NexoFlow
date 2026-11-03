@@ -7,8 +7,15 @@ from collections import Counter
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+PENDING_GROUP_REMOVAL_REASON = "PEDIDO_PENDENTE_7_DIAS"
+
+GENERAL_BASE_PENDING = frozenset(
+    {"CPF_NAO_CONFIRMADO_BASE_GERAL", "PEDIDO_NAO_CONFIRMADO_BASE_GERAL"}
+)
+
 _KNOWN_REASONS = frozenset(
     {
+        PENDING_GROUP_REMOVAL_REASON,
         "CLIENTE_ID_DIVERGENTE_API",
         "CLIENTE_ID_INVALIDO_API",
         "CONTATO_DUPLICADO_DIVERGENTE",
@@ -19,11 +26,13 @@ _KNOWN_REASONS = frozenset(
         "CPF_IDENTIDADE_INSUFICIENTE",
         "CPF_INVALIDO_CADASTRO",
         "CPF_INVALIDO_ENCONTRADO",
+        "CPF_NAO_CONFIRMADO_BASE_GERAL",
         "CPF_NAO_ENCONTRADO",
         "CPF_NAO_INFORMADO",
         "CPF_NAO_INFORMADO_API",
         "CPF_REJEITADO_API",
         "ERRO_API",
+        "ERRO_BASE_GERAL_INCOMPLETA",
         "ERRO_JSON_CLIENTE_API",
         "ERRO_SEGMENTO_NAO_CONFIRMADO_API",
         "CPF_FORA_SEGMENTO_API",
@@ -49,6 +58,7 @@ _KNOWN_REASONS = frozenset(
         "PEDIDO_ID_INVALIDO_API",
         "PEDIDO_INCOMPLETO",
         "PEDIDO_JA_ADMITIDO_OU_INDETERMINADO",
+        "PEDIDO_NAO_CONFIRMADO_BASE_GERAL",
         "PEDIDO_NAO_ENCONTRADO_API",
         "PEDIDO_POSTERIOR_PENDENTE_API",
         "PEDIDO_SOMENTE_PRODUTOS_ANIMAIS",
@@ -64,6 +74,7 @@ _PENDING_REASONS = frozenset(
     if reason.startswith(("ERRO_", "CPF_", "CLIENTE_"))
     and reason not in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO"}
 ) | {
+    PENDING_GROUP_REMOVAL_REASON,
     "CONTATO_DUPLICADO_DIVERGENTE",
     "PEDIDO_ANTIGO_BLOQUEADO",
     "PEDIDO_CLIENTE_DIVERGENTE_API",
@@ -72,6 +83,7 @@ _PENDING_REASONS = frozenset(
     "PEDIDO_ID_DIVERGENTE_API",
     "PEDIDO_ID_INVALIDO_API",
     "PEDIDO_INCOMPLETO",
+    "PEDIDO_NAO_CONFIRMADO_BASE_GERAL",
     "PEDIDO_NAO_ENCONTRADO_API",
     "PEDIDO_POSTERIOR_PENDENTE_API",
 }
@@ -166,6 +178,10 @@ def _warning_classes(plan: Mapping[str, Any]) -> set[str]:
             classes.add("PEDIDO_MISTO")
         elif warning.startswith("Compra posterior identificada;"):
             classes.add("COMPRA_POSTERIOR_PENDENTE")
+        elif warning.startswith("Pedido sem validação há pelo menos sete dias"):
+            classes.add("REMOCAO_PREVENTIVA_PENDENCIA_7_DIAS")
+        elif warning.startswith("A base geral FARMA não confirmou"):
+            classes.add("BASE_GERAL_INSUFICIENTE")
         elif warning.startswith("O mesmo UUID veio com cadastros divergentes"):
             classes.add("CONTATO_DUPLICADO_DIVERGENTE")
         else:
@@ -266,7 +282,10 @@ def build_review_audit(
 
 def has_incomplete_query(plan: Mapping[str, Any]) -> bool:
     return any(
-        _text(plan.get(field)).startswith("ERRO_")
+        (
+            _text(plan.get(field)).startswith("ERRO_")
+            or _text(plan.get(field)) in GENERAL_BASE_PENDING
+        )
         for field in ("reason", "order_resolution_status")
     )
 
@@ -280,7 +299,10 @@ def incomplete_query_summary(plans: Iterable[Mapping[str, Any]]) -> dict[str, An
         codes = {
             code if code in _KNOWN_REASONS else "ERRO_NAO_CLASSIFICADO"
             for field in ("reason", "order_resolution_status")
-            if (code := _text(plan.get(field))).startswith("ERRO_")
+            if (
+                (code := _text(plan.get(field))).startswith("ERRO_")
+                or code in GENERAL_BASE_PENDING
+            )
         }
         if not codes:
             continue
@@ -353,6 +375,25 @@ def public_review_lines(review: Mapping[str, Any]) -> list[str]:
             f"motivos da consulta={incomplete['motivos_consulta']}; "
             f"decisões finais={incomplete['decisoes']}. "
             "A decisão final pode ocultar um erro da consulta nos totais de resultados."
+        )
+    held = sum(
+        bool(plan.get("in_group")) and has_incomplete_query(plan)
+        for plan in review.get("plans", [])
+    )
+    if held:
+        lines.append(
+            f"Contatos já no grupo com consulta pendente: {held}. "
+            "A elegibilidade não foi revalidada. Pedido com data conhecida e sete dias completos "
+            "sem validação autoriza proposta de remoção preventiva; o cadastro continua para revalidação."
+        )
+    expired = sum(
+        plan.get("reason") == PENDING_GROUP_REMOVAL_REASON
+        and plan.get("action") == "remove"
+        for plan in review.get("plans", [])
+    )
+    if expired:
+        lines.append(
+            f"Remoções preventivas propostas por pendência após sete dias do pedido: {expired}."
         )
     if audit["warning_classes"]:
         lines.append(

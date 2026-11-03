@@ -108,9 +108,16 @@ class NullLatestOrderTests(unittest.TestCase):
                 structure = {**STRUCTURE, "segment": segment}
                 path, audit = Path(folder) / "state.json", Path(folder) / "audit.jsonl"
                 with (
-                    patch.object(farm, "_request_json", return_value=no_order()),
+                    patch.object(
+                        farm,
+                        "_request_json",
+                        side_effect=lambda path, **kwargs: (
+                            [no_order()] if "/clientes/" in path else no_order()
+                        ),
+                    ),
                     patch("recompra.inspect_structure", return_value=structure),
                 ):
+                    farm.reset_execution_reads()
                     state = load_state(path)
                     plans = build_plans([person], farm, structure, state, now=NOW)
                     self.assertEqual(plans[0]["action"], "remove")
@@ -213,7 +220,13 @@ class NullLatestOrderTests(unittest.TestCase):
     def test_analytics_weni_recompra_do_not_queue_or_admit_null_order(self):
         for segment in ("FARMA", "PET"):
             client = self.client(segment)
-            with patch.object(client, "_request_json", return_value=no_order()):
+            with patch.object(
+                client,
+                "_request_json",
+                side_effect=lambda path, **kwargs: (
+                    [no_order()] if "/clientes/" in path else no_order()
+                ),
+            ):
                 rows = [{"contact_uuid": contact()["uuid"], "cpf": CPF}]
                 statuses, responses = {}, {}
                 stats = validate_contacts(
@@ -238,6 +251,7 @@ class NullLatestOrderTests(unittest.TestCase):
                 self.assertEqual(
                     (order_stats.api_errors, order_stats.parse_errors), (0, 0)
                 )
+                client.reset_execution_reads()
                 plans = build_plans(
                     [contact()],
                     client,

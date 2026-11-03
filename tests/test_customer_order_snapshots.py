@@ -374,7 +374,7 @@ class BulkOrderFlowTests(unittest.TestCase):
                     self.assertNotEqual(plans[0]["action"], "add")
                     self.assertEqual(get.call_count, 1)
 
-    def test_incomplete_bulk_reuses_complete_individual_cpf_order(self):
+    def test_recompra_incomplete_bulk_remains_pending_without_individual_http(self):
         incomplete = deepcopy(self.payload)
         incomplete.pop("itens")
         with patch.object(
@@ -393,5 +393,6 @@ class BulkOrderFlowTests(unittest.TestCase):
                 {"contacts": {}},
                 now=datetime.fromisoformat(NOW),
             )
-            self.assertEqual(plans[0]["action"], "add")
-            self.assertEqual(get.call_count, 2)
+            self.assertEqual(plans[0]["reason"], "PEDIDO_NAO_CONFIRMADO_BASE_GERAL")
+            self.assertNotEqual(plans[0]["action"], "add")
+            self.assertEqual(get.call_count, 1)

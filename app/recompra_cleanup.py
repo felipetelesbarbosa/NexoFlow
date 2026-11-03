@@ -10,7 +10,6 @@ from farmalider_client import (
     FarmaliderError,
     FarmaliderUnavailableError,
 )
-from farmalider_customers import prepare_customers
 from recompra import (
     RecompraReadCache,
     append_audit,
@@ -56,10 +55,9 @@ def cancellation_evidence(contact, farm, now):
     if local:
         return {"reason": local, "order_id": "", "date": ""}
     try:
-        prepare_customers(
-            farm.farm if isinstance(farm, RecompraReadCache) else farm, None
-        )
-        order, _ = resolve_latest(contact, farm, now.isoformat())
+        reads = farm if isinstance(farm, RecompraReadCache) else RecompraReadCache(farm)
+        reads.prepare_directory()
+        order, _ = resolve_latest(contact, reads, now.isoformat())
     except (FarmaliderAuthError, FarmaliderUnavailableError):
         raise
     except (FarmaliderError, RequestException):
@@ -80,6 +78,7 @@ def make_cleanup_review(weni, farm, segment, *, now_fn=now_local):
     profile = profile_for(segment)
     now = now_fn()
     plans = []
+    reads = RecompraReadCache(farm)
     # Consolidar UUIDs antes de consultar ou propor remoções.
     contacts = iter_prioritized_contacts(weni.iter_contacts())
     with TaskProgress(
@@ -90,7 +89,7 @@ def make_cleanup_review(weni, farm, segment, *, now_fn=now_local):
                 if not member(contact, structure["group_uuid"], profile.group):
                     progress.advance()
                     continue
-                evidence = cancellation_evidence(contact, farm, now)
+                evidence = cancellation_evidence(contact, reads, now)
                 if evidence["reason"]:
                     plans.append(
                         {
