@@ -145,7 +145,8 @@ class CompleteQueriesTests(unittest.TestCase):
             ("CPF_REJEITADO_API", "CPF_REJEITADO_API", 0),
         ):
             with self.subTest(reason=reason), ExitStack() as stack:
-                stack.enter_context(patch("weni_client.WeniClient"))
+                weni = stack.enter_context(patch("weni_client.WeniClient"))
+                weni.return_value.iter_contacts.return_value = iter([])
                 stack.enter_context(patch("weni_update._open_farmalider"))
                 stack.enter_context(
                     patch("recompra.inspect_structure", return_value={"errors": []})
@@ -155,7 +156,7 @@ class CompleteQueriesTests(unittest.TestCase):
                     patch(
                         "recompra.build_plans",
                         return_value=[
-                            {"reason": reason, "order_resolution_status": diagnostic}
+                            {"contact_uuid": "synthetic", "reason": reason, "order_resolution_status": diagnostic}
                         ],
                     )
                 )

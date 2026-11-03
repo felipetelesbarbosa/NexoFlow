@@ -84,15 +84,30 @@ def history_rows(
 ):
     """Sem novas chamadas HTTP. Uma compra externa não vira atribuição à Weni."""
     from analytics import get_fields, is_valid_cpf, normalize_cpf
-    from farmalider_integration import resolve_contact_order
+    from contact_dedup_guard import customer_phones, native_phones, refs
+    from farmalider_integration import (
+        _positive_id,
+        cpf_cadastro_status,
+        resolve_contact_order,
+    )
     from pedido_utils import business_order_datetime
 
     by_cpf = {}
     for contact in contacts:
-        by_cpf.setdefault(normalize_cpf(get_fields(contact).get("cpf")), []).append(
-            contact
+        physical_cpf = get_fields(contact).get("cpf")
+        # Texto misturado a dígitos não comprova um vínculo Weni. O pedido
+        # oficial ainda poderá entrar sem UUID; nunca corrigir o CPF daqui.
+        if not cpf_cadastro_status(physical_cpf):
+            by_cpf.setdefault(normalize_cpf(physical_cpf), []).append(contact)
+    old = {_positive_id(r.get("pedido_id")): r for r in existing_orders}
+    prior_owners = {}
+    for row in existing_orders:
+        oid = _positive_id(row.get("pedido_id"))
+        prior_owners.setdefault(oid, set()).update(
+            _positive_id(row.get(key))
+            for key in ("farmalider_cliente_id", "farmalider_cod_cliente")
+            if _positive_id(row.get(key))
         )
-    old = {r.get("pedido_id"): r for r in existing_orders}
     orders, items, receipts = [], [], []
     with connect() as db:
         records = db.execute(
@@ -101,14 +116,39 @@ def history_rows(
     for oid, owner, cpf, raw, digest, first, synced, linked in records:
         if quarter is not None and int(owner) % 4 != quarter - 1:
             continue
-        matches = by_cpf.get(cpf, [])
-        if len(matches) > 1:
+        snapshot = json.loads(raw)
+        customer = snapshot["cliente"]
+        header = snapshot["ultimoPedido"]
+        if (
+            _positive_id(customer.get("id")) != owner
+            or _positive_id(header.get("id")) != oid
+            or _positive_id(header.get("codCliente")) != owner
+            or normalize_cpf(customer.get("cpf")) != cpf
+            or prior_owners.get(oid, set()) - {owner}
+            or str(header.get("segmento") or segment()).strip().upper() != segment()
+            or snapshot.get("_nexoflow_source", f"FARMALIDER_CLIENTES_{segment()}")
+            != f"FARMALIDER_CLIENTES_{segment()}"
+        ):
+            # Um ID existente de outro dono não pode ser reatribuído nem
+            # preservado como se o snapshot atual o tivesse confirmado.
             continue
+        matches = by_cpf.get(cpf, [])
         contact = matches[0] if matches else None
+        if len(matches) > 1:
+            order_matches = [c for c in matches if oid in refs(c)]
+            phone_matches = [
+                c for c in matches if native_phones(c) & customer_phones(customer)
+            ]
+            contact = (
+                order_matches[0]
+                if len(order_matches) == 1
+                else phone_matches[0]
+                if len(phone_matches) == 1
+                else None
+            )
         uuid = str((contact or {}).get("uuid") or "")
         if synced == digest and linked == uuid:
             continue
-        snapshot = json.loads(raw)
         if contact is None:
             if not is_valid_cpf(cpf):
                 continue
@@ -117,7 +157,6 @@ def history_rows(
                 "name": snapshot["cliente"].get("nome", ""),
                 "fields": {"cpf": cpf, "telefone": snapshot["cliente"].get("celular")},
             }
-        header = snapshot["ultimoPedido"]
         adapter = SimpleNamespace(
             customer_directory=None,
             get_cliente_by_cpf=lambda value, s=snapshot: s,

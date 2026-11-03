@@ -17,6 +17,7 @@ from contact_dedup_guard import contact_refusals, customer_phones, native_phones
 from dedup_io import DedupHTTPClient, digest, save_private
 from farmalider_integration import _positive_id
 from google_sheets import GoogleSheetsStore, column_letter
+from runtime_profile import segment
 from sheets_storage import STORAGE_SHEET, SheetsStorage, configured_storage
 from task_progress import TaskProgress, request_progress
 
@@ -114,9 +115,10 @@ def requests_for(tables, pairs, canonicals):
                     and any(p["canonical_uuid"] == uid for p in pairs.values())
                     and contact_refusals(canonicals[uid])["lgpd_refused"]
                 ):
-                    if row.get("opt_in_lgpd") != "recusado":
+                    refusal = "Não" if segment() == "PET" else "recusado"
+                    if row.get("opt_in_lgpd") != refusal:
                         updates.append(
-                            cell_request(table, number, "opt_in_lgpd", "recusado")
+                            cell_request(table, number, "opt_in_lgpd", refusal)
                         )
                 continue
             pair = pairs[uid]
@@ -157,15 +159,17 @@ def requests_for(tables, pairs, canonicals):
                         "Pedido já vinculado a outro cliente; limpeza bloqueada."
                     )
                 matches = sorted(customer_phones(pair["customer"]) & native_phones(can))
-                if not matches:
+                if not matches and not pair.get("order_partition"):
                     raise ValueError(
                         "Telefone do contato correto não está mais comprovado."
                     )
                 changes = {
                     "contact_uuid": pair["canonical_uuid"],
-                    "telefone": "+55" + matches[0],
                     "cliente": pair["customer"].get("nome") or can.get("name", ""),
                 }
+                phones = matches or sorted(native_phones(can))
+                if len(phones) == 1:
+                    changes["telefone"] = "+55" + phones[0]
                 if title == "Pedidos_FarmaLider":
                     changes.update(
                         cpf=pair["cpf"],

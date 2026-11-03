@@ -47,6 +47,7 @@ class WeniClient:
     def __init__(self, token: str, *, retry_mutations: bool = True) -> None:
         self._profile_verified = False
         self.retry_mutations = retry_mutations
+        self._http_metrics: dict[str, float] = {}
         self.session = requests.Session()
         self.session.headers.update(
             {
@@ -58,6 +59,26 @@ class WeniClient:
 
     def close(self) -> None:
         self.session.close()
+
+    def metrics_snapshot(self) -> dict[str, float]:
+        return dict(self._http_metrics)
+
+    def _http_request(self, method, url, **kwargs):
+        """Conta tentativas HTTP reais, sem guardar URL, corpo ou identificadores."""
+        counts = self._http_metrics
+        key = method.upper()
+        counts[key] = counts.get(key, 0) + 1
+        started = time.monotonic()
+        try:
+            response = self.session.request(method, url, **kwargs)
+            status = "HTTP_" + str(response.status_code)
+            counts[status] = counts.get(status, 0) + 1
+            return response
+        except requests.RequestException:
+            counts["network_errors"] = counts.get("network_errors", 0) + 1
+            raise
+        finally:
+            counts["seconds"] = counts.get("seconds", 0) + time.monotonic() - started
 
     @staticmethod
     def format_datetime(dt: datetime) -> str:
@@ -169,9 +190,11 @@ class WeniClient:
         )
 
         for attempt in range(1, max_attempts + 1):
+            if attempt > 1:
+                self._http_metrics["retries"] = self._http_metrics.get("retries", 0) + 1
             started = time.monotonic()
             try:
-                response = self.session.request(
+                response = self._http_request(
                     method,
                     url,
                     params=params,
@@ -555,6 +578,20 @@ class WeniClient:
         finally:
             self.retry_mutations = retry
 
+    def rename_contact(self, contact_uuid: str, name: str) -> Any:
+        if not contact_uuid or not name.strip():
+            raise ValueError("UUID e nome são obrigatórios para renomear o contato.")
+        retry = self.retry_mutations
+        self.retry_mutations = False
+        try:
+            return self._post_json(
+                WENI_CONTACTS_API_URL,
+                params={"uuid": contact_uuid},
+                json_body={"name": name.strip()},
+            )
+        finally:
+            self.retry_mutations = retry
+
     def update_contact_fields(
         self,
         contact_uuid: str,
@@ -732,4 +769,4 @@ class WeniClient:
         }
 
 
-# NexoFlow 1.5.11
+# NexoFlow 1.5.12

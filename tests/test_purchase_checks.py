@@ -450,6 +450,9 @@ class PurchaseChecksTests(unittest.TestCase):
         self.assertTrue(review["plans"][0]["purchase_check_resolved"])
         weni = Mock()
         weni.get_contact.return_value = contact
+        weni.update_contact_fields.side_effect = lambda uid, fields: contact[
+            "fields"
+        ].update(fields)
         with (
             patch("recompra.inspect_structure", return_value=STRUCTURE),
             patch("recompra.resolve_latest", return_value=(order, items)),

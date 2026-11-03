@@ -15,7 +15,7 @@ def build_parser():
     from config import FARMALIDER_MAX_WORKERS
 
     parser = argparse.ArgumentParser(
-        description="NexoFlow 1.5.11 — Recompra FarmaLíder D+25 / Pets Líder D+30"
+        description="NexoFlow 1.5.12 — Recompra FarmaLíder D+25 / Pets Líder D+30"
     )
     parser.add_argument(
         "--perfil",
@@ -307,16 +307,44 @@ def main(argv=None):
             return 3 if partial else 0
         state = load_state(state_path if args.perfil == "PET" else STATE)
         now = now_local()
+        from recompra_incremental import (
+            annotate_plans,
+            collect_contacts,
+            select_contacts,
+        )
+
         if args.contact:
             contact = weni.get_contact(uuid=args.contact)
             if not contact:
                 raise RuntimeError("Contato não localizado.")
             contacts = [contact]
+            loading = {"complete": False, "weni_loaded": 1}
         else:
-            # O relógio e a API FarmaLíder podem mudar sem modified_on na Weni.
-            # Uma varredura de contatos é necessária para detectar D+26, novas
-            # compras e recusas em todos os membros, mesmo no incremental.
-            contacts = weni.iter_contacts()
+            # Ler a base não significa resolver/aplicar todos os contatos:
+            # a seleção abaixo compara o índice local, compras e prazos.
+            contacts, loading = collect_contacts(
+                weni, state, now, full=args.full, segment=args.perfil
+            )
+
+        contacts, sources, selection = select_contacts(
+            contacts, farm, structure, state, now, full=args.full
+        )
+        selection.update(loading)
+        if loading.get("full_refresh"):
+            selection["contact_uuids"] = sorted(sources)
+        logging.info(
+            "Recompra seleção: modo=%s; carregados=%s; selecionados=%s; sem mudança=%s.",
+            selection["mode"],
+            selection["loaded"],
+            selection["selected"],
+            selection["unchanged"],
+        )
+        logging.info(
+            "Recompra custos: Weni recebidos nesta leitura=%s; consulta geral=%.3fs; comparação local=%.3fs.",
+            selection["weni_loaded"],
+            selection["directory_seconds"],
+            selection["comparison_seconds"],
+        )
         pagination = {}
         plans = build_plans(
             contacts,
@@ -327,7 +355,9 @@ def main(argv=None):
             workers=args.workers,
             pagination_stats=pagination,
         )
+        annotate_plans(plans, sources, selection)
         review = make_review(plans, structure, now=now, state=state)
+        review["selection"] = selection
         review["pagination"] = pagination
         # Os planos usam o relógio capturado antes da varredura. Não publicar
         # esses planos sob a data nova se a geração atravessou a meia-noite.
@@ -392,6 +422,10 @@ def main(argv=None):
         if farm:
             farm.close()
         if weni:
+            logging.info(
+                "Weni: diagnóstico HTTP desta etapa (tentativas reais): %s.",
+                weni.metrics_snapshot(),
+            )
             weni.close()
 
 

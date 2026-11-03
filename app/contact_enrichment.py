@@ -527,6 +527,9 @@ def infer_contact_fields(
     de sessão configurada. Continuidade não substitui uma recusa registrada.
     Para CPF, somente documentos com 11 dígitos e dígitos verificadores válidos são aceitos.
     """
+    from runtime_profile import segment
+
+    uses_majority = segment() == "FARMA"
     views = [_view(message) for message in context_messages]
     views.sort(key=lambda item: (_parse_datetime(item.created_on), item.message_id))
 
@@ -545,8 +548,6 @@ def infer_contact_fields(
     }
 
     def save(field: str, value: str | int, current: MessageView, reason: str) -> None:
-        from runtime_profile import segment
-
         if segment() == "PET" and field == "maior_de_18_anos":
             return
         if (
@@ -584,14 +585,15 @@ def infer_contact_fields(
         direct_age = _extract_direct_age(current.text)
         if direct_age is not None:
             save("idade", direct_age, current, "idade explícita na mensagem")
-            save(
-                "maior_de_18_anos",
-                "sim" if direct_age >= 18 else "não",
-                current,
-                "maioridade calculada a partir da idade explícita",
-            )
+            if uses_majority:
+                save(
+                    "maior_de_18_anos",
+                    "sim" if direct_age >= 18 else "não",
+                    current,
+                    "maioridade calculada a partir da idade explícita",
+                )
 
-        direct_majority = _direct_majority(current.text)
+        direct_majority = _direct_majority(current.text) if uses_majority else None
         if direct_majority is not None:
             save(
                 "maior_de_18_anos",
@@ -628,15 +630,16 @@ def infer_contact_fields(
                 current,
                 "idade informada em resposta a pergunta de idade",
             )
-            save(
-                "maior_de_18_anos",
-                "sim" if standalone_age >= 18 else "não",
-                current,
-                "maioridade calculada a partir da idade informada",
-            )
+            if uses_majority:
+                save(
+                    "maior_de_18_anos",
+                    "sim" if standalone_age >= 18 else "não",
+                    current,
+                    "maioridade calculada a partir da idade informada",
+                )
 
         yes_no = _yes_no(current.text)
-        if _is_majority_question(previous.text):
+        if uses_majority and _is_majority_question(previous.text):
             if _is_lgpd_context(previous.text):
                 current_dt = _parse_datetime(current.created_on)
                 previous_dt = _parse_datetime(previous.created_on)

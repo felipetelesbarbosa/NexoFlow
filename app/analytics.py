@@ -2215,4 +2215,4 @@ def build_bi_ads_rows(
     return rows
 
 
-# NexoFlow 1.5.11
+# NexoFlow 1.5.12

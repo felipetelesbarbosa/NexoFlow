@@ -37,7 +37,7 @@ class Fixtures(unittest.TestCase):
             "uuid": CAN,
             "name": "🙂",
             "urns": ["whatsapp:+5591999998888"],
-            "fields": {"cpf": CPF},
+            "fields": {"cpf": CPF, "pedido_id": "123"},
             "groups": [],
         }
         self.duplicate = {
@@ -164,6 +164,7 @@ class Fixtures(unittest.TestCase):
 
     def test_without_orders_still_requires_cpf_and_unique_native_phone(self):
         self.duplicate["fields"].pop("pedido_id")
+        self.canonical["fields"].pop("pedido_id")
         self.tables = {"Base_Contatos": self.tables["Base_Contatos"]}
         self.store.capture.return_value = (self.tables, set())
         self.assertEqual(len(self.prepare()["pairs"]), 1)

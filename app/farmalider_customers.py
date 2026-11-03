@@ -618,17 +618,21 @@ def enrichment(fields: dict, customer: dict, as_of: date) -> dict[str, str]:
     except ValueError:
         age = 0
     if 1 <= age <= 120:
-        majority = "Sim" if age >= 18 else "Não"
         old_age = str(fields.get("idade") or "").strip()
-        old_majority = str(fields.get("maior_de_18_anos") or "").strip().casefold()
-        if (not old_age or old_age == str(age)) and (
-            not old_majority or old_majority == majority.casefold()
-        ):
+        if active_segment() == "PET":
             if not old_age:
                 result["idade"] = str(age)
-            if not old_majority:
-                result["maior_de_18_anos"] = majority
-    address_status, address = matching_order_address(customer)
+        else:
+            majority = "Sim" if age >= 18 else "Não"
+            old_majority = str(fields.get("maior_de_18_anos") or "").strip().casefold()
+            if (not old_age or old_age == str(age)) and (
+                not old_majority or old_majority == majority.casefold()
+            ):
+                if not old_age:
+                    result["idade"] = str(age)
+                if not old_majority:
+                    result["maior_de_18_anos"] = majority
+    address_status, address = matching_order_address(customer, segment=active_segment())
     if address_status == "ENDERECO_CONFIRMADO" and address is not None:
         candidate = normalize_geography(
             {

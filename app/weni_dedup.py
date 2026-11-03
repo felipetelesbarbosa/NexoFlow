@@ -16,6 +16,7 @@ from contact_dedup_guard import (
     contact_uuid,
     customer_phones,
     native_phones,
+    partition_cpf_contacts,
     refs,
     validate_pair,
 )
@@ -32,7 +33,7 @@ from runtime_profile import segment as active_segment
 from task_progress import TaskProgress
 from weni_client import WeniClient, WeniError
 
-SCHEMA = 1
+SCHEMA = 2
 DIRECTORY = LOG_DIR / "duplicados"
 PRESERVABLE = {"RECUSA_LGPD_NAO_PRESERVADA", "RECUSA_MARKETING_NAO_PRESERVADA"}
 
@@ -131,7 +132,9 @@ def preview_refusals(canonical, pair):
     preview = deepcopy(canonical)
     preview["fields"] = dict(get_fields(preview))
     if pair["refusals"]["lgpd_refused"]:
-        preview["fields"]["opt_in_lgpd"] = "recusado"
+        preview["fields"]["opt_in_lgpd"] = (
+            "Não" if active_segment() == "PET" else "recusado"
+        )
     return preview
 
 
@@ -140,7 +143,7 @@ def prepare(contacts, farm, store_factory, *, scope=None):
     from farmalider_customers import prepare_customers
 
     groups = candidate_groups(contacts, scope)
-    pending, pairs = [], []
+    pending, pairs, renames = [], [], []
     valid = {cpf: cs for cpf, cs in groups.items() if is_valid_cpf(cpf)}
     if valid:
         prepare_customers(farm, len(valid))
@@ -169,7 +172,7 @@ def prepare(contacts, farm, store_factory, *, scope=None):
                 }
             )
     if not valid:
-        return {"pairs": pairs, "pending": pending}
+        return {"pairs": pairs, "pending": pending, "renames": renames}
     if farm is None:
         pending.extend(
             {
@@ -178,7 +181,7 @@ def prepare(contacts, farm, store_factory, *, scope=None):
             }
             for cs in valid.values()
         )
-        return {"pairs": pairs, "pending": pending}
+        return {"pairs": pairs, "pending": pending, "renames": renames}
     store = store_factory()
     try:
         targets = {c["uuid"] for cs in valid.values() for c in cs}
@@ -209,29 +212,82 @@ def prepare(contacts, farm, store_factory, *, scope=None):
                     if normalize_cpf(get_fields(c).get("cpf")) == cpf
                     or native_phones(c) & customer_phones(customer)
                 ]
-                matched = [
-                    c for c in related if native_phones(c) & customer_phones(customer)
-                ]
-                if len(matched) != 1 or matched[0]["uuid"] not in {
-                    c["uuid"] for c in cs
-                }:
+                contexts = {
+                    c["uuid"]: store.context_for(tables, c["uuid"], cpf, ledger)
+                    for c in cs
+                }
+                source_reasons = {
+                    reason for _, _, reasons in contexts.values() for reason in reasons
+                }
+                if any(
+                    owners - {_positive_id(customer["id"])}
+                    for _, owners, _ in contexts.values()
+                ):
+                    source_reasons.add("HISTORICO_DE_OUTRO_CLIENTE")
+                if source_reasons:
                     pending.append(
                         {
-                            "reason": "TELEFONE_SEM_CONTATO_CORRETO_UNICO",
+                            "reason": ";".join(sorted(source_reasons)),
                             "contacts": [c["uuid"] for c in cs],
                         }
                     )
                     continue
-                canonical = matched[0]
-                for duplicate in cs:
-                    uid = duplicate["uuid"]
-                    if uid == canonical["uuid"] or (
-                        scope is not None and uid not in scope
-                    ):
-                        continue
-                    recorded, owners, reasons = store.context_for(
-                        tables, uid, cpf, ledger
+                order_sets = {c["uuid"]: refs(c) | contexts[c["uuid"]][0] for c in cs}
+                all_ids = set().union(*order_sets.values())
+                orders = {}
+                for oid in sorted(all_ids, key=int):
+                    if oid not in api_orders:
+                        try:
+                            api_orders[oid] = farm.get_pedido(oid)
+                        except FarmaliderError:
+                            api_orders[oid] = None
+                    orders[oid] = api_orders[oid]
+                if any(
+                    _positive_id(((orders[oid] or {}).get("capa") or {}).get("id"))
+                    != oid
+                    or _positive_id(
+                        ((orders[oid] or {}).get("capa") or {}).get("codCliente")
                     )
+                    != _positive_id(customer["id"])
+                    for oid in all_ids
+                ):
+                    pending.append(
+                        {
+                            "reason": "PEDIDO_NAO_COMPROVADO_DO_MESMO_CLIENTE",
+                            "contacts": [c["uuid"] for c in cs],
+                        }
+                    )
+                    continue
+                proposed, named = partition_cpf_contacts(cs, customer, order_sets)
+                for contact, new_name in named:
+                    if contact.get("name") != new_name and (
+                        scope is None or contact["uuid"] in scope
+                    ):
+                        renames.append(
+                            {
+                                "contact_uuid": contact["uuid"],
+                                "cpf": cpf,
+                                "customer_id": _positive_id(customer["id"]),
+                                "before_name": contact.get("name", ""),
+                                "name": new_name,
+                                "refs": sorted(refs(contact), key=int),
+                                "orders": sorted(order_sets[contact["uuid"]], key=int),
+                                "peers": {
+                                    c["uuid"]: sorted(refs(c), key=int)
+                                    for c, _ in named
+                                },
+                                "peer_orders": {
+                                    c["uuid"]: sorted(order_sets[c["uuid"]], key=int)
+                                    for c, _ in named
+                                },
+                            }
+                        )
+                for canonical, duplicate in proposed:
+                    uid = duplicate["uuid"]
+                    if scope is not None and uid not in scope:
+                        continue
+                    recorded, owners, reasons = contexts[uid]
+                    reasons = list(reasons) + list(contexts[canonical["uuid"]][2])
                     if (
                         sum(
                             record(tables["Base_Contatos"], r)["contact_uuid"]
@@ -241,15 +297,14 @@ def prepare(contacts, farm, store_factory, *, scope=None):
                         != 1
                     ):
                         reasons.append("CONTATO_CORRETO_SEM_BASE_ANALYTICS_UNICA")
-                    order_ids = refs(duplicate) | recorded
-                    orders = {}
-                    for oid in sorted(order_ids, key=int):
-                        if oid not in api_orders:
-                            try:
-                                api_orders[oid] = farm.get_pedido(oid)
-                            except FarmaliderError:
-                                api_orders[oid] = None
-                        orders[oid] = api_orders[oid]
+                    partition = {
+                        "canonical_orders": sorted(
+                            order_sets[canonical["uuid"]], key=int
+                        ),
+                        "duplicate_orders": sorted(order_sets[uid], key=int),
+                        "canonical_refs": sorted(refs(canonical), key=int),
+                        "duplicate_refs": sorted(refs(duplicate), key=int),
+                    }
                     reasons += validate_pair(
                         canonical,
                         duplicate,
@@ -257,7 +312,9 @@ def prepare(contacts, farm, store_factory, *, scope=None):
                         related_contacts=related,
                         orders=orders,
                         recorded_order_ids=recorded,
-                        history_owner_ids=owners,
+                        history_owner_ids=owners | contexts[canonical["uuid"]][1],
+                        order_partition=partition,
+                        canonical_recorded_ids=contexts[canonical["uuid"]][0],
                     )
                     if set(reasons) - PRESERVABLE:
                         pending.append(
@@ -275,8 +332,13 @@ def prepare(contacts, farm, store_factory, *, scope=None):
                         "cpf": cpf,
                         "customer_id": _positive_id(customer["id"]),
                         "customer": customer,
-                        "orders": orders,
+                        "orders": {
+                            oid: orders[oid]
+                            for oid in set(partition["canonical_orders"])
+                            | set(partition["duplicate_orders"])
+                        },
                         "recorded_order_ids": sorted(recorded, key=int),
+                        "order_partition": partition,
                         "refusals": contact_refusals(duplicate),
                         "before_duplicate": duplicate,
                     }
@@ -298,7 +360,7 @@ def prepare(contacts, farm, store_factory, *, scope=None):
                     pairs.append(pair)
     finally:
         store.close()
-    return {"pairs": pairs, "pending": pending}
+    return {"pairs": pairs, "pending": pending, "renames": renames}
 
 
 def write_review(path, result, *, full, quarter, campaign_id):
@@ -322,6 +384,7 @@ def write_review(path, result, *, full, quarter, campaign_id):
         "DEDUPLICAÇÃO DE CONTATOS",
         f"Exclusões propostas: {len(result['pairs'])}",
         f"Pendências preservadas: {len(result['pending'])}",
+        f"Nomes a numerar por pedidos diferentes: {len(result.get('renames', []))}",
         "Os pedidos reais serão vinculados ao contato correto; os valores serão preservados.",
         "A aplicação interromperá fluxos e excluirá da Weni os contatos listados abaixo.",
         f"Plano de duplicados SHA-256: {payload['sha256']}",
@@ -333,6 +396,8 @@ def write_review(path, result, *, full, quarter, campaign_id):
             f"Cliente oficial {pair['customer_id']}; pedidos comprovados: {', '.join(sorted(pair['orders'], key=int)) or 'sem pedido'}.",
             f"Proteções a preservar: {', '.join(pair['refusals']['reasons']) or 'nenhuma recusa identificada'}.",
         ]
+    for change in result.get("renames", []):
+        lines.append(f"Renomear: {change['contact_uuid']} → {change['name']}")
     for reason, count in sorted(
         Counter(p["reason"] for p in result["pending"]).items()
     ):
@@ -391,9 +456,11 @@ def preserve_refusals(weni, canonical, duplicate, names):
         return canonical
     fields = {}
     if lgpd:
-        fields["opt_in_lgpd"] = "recusado"
+        fields["opt_in_lgpd"] = "Não" if active_segment() == "PET" else "recusado"
     if marketing:
-        fields["marketing_opt_in"] = "recusado"
+        fields[
+            "opt_in_marketing" if active_segment() == "PET" else "marketing_opt_in"
+        ] = "Não" if active_segment() == "PET" else "recusado"
     uid = canonical["uuid"]
     if fields:
         weni.update_contact_fields(uid, fields)
@@ -403,6 +470,7 @@ def preserve_refusals(weni, canonical, duplicate, names):
             weni.contact_group_action(uid, action="add", group=dg[name])
     for name in (
         "Recompra FarmaLíder",
+        "Recompra Pets Líder",
         "Opt-In Marketing",
         *(["Opt-In LGPD"] if old["lgpd_refused"] or current["lgpd_refused"] else []),
     ):
@@ -416,7 +484,10 @@ def preserve_refusals(weni, canonical, duplicate, names):
     if (
         (lgpd and not flags["lgpd_refused"])
         or (marketing and not flags["marketing_refused"])
-        or "Recompra FarmaLíder" in groups_index(canonical, names)
+        or any(
+            g in groups_index(canonical, names)
+            for g in ("Recompra FarmaLíder", "Recompra Pets Líder")
+        )
     ):
         raise ValueError(
             "Recusa não confirmada no contato correto; exclusão bloqueada."
@@ -435,7 +506,10 @@ def verify_retired_canonical(pair, canonical, contacts, deleted, names):
         and customer_phones(pair["customer"]) & native_phones(c)
     }
     matching.discard(pair["canonical_uuid"])
-    if matching or not customer_phones(pair["customer"]) & native_phones(canonical):
+    if pair.get("order_partition"):
+        if refs(canonical) != set(pair["order_partition"]["canonical_refs"]):
+            raise ValueError("Pedido do contato preservado mudou durante a retomada.")
+    elif matching or not customer_phones(pair["customer"]) & native_phones(canonical):
         raise ValueError("Telefone correto deixou de ser único durante a retomada.")
     current = contact_refusals(canonical)
     if any(
@@ -443,9 +517,10 @@ def verify_retired_canonical(pair, canonical, contacts, deleted, names):
         for k in ("lgpd_refused", "marketing_refused", "blocked", "stopped")
     ):
         raise ValueError("Proteção do contato mudou durante a retomada; exige revisão.")
-    if (
-        current["lgpd_refused"] or current["marketing_refused"]
-    ) and "Recompra FarmaLíder" in groups_index(canonical, names):
+    if (current["lgpd_refused"] or current["marketing_refused"]) and any(
+        g in groups_index(canonical, names)
+        for g in ("Recompra FarmaLíder", "Recompra Pets Líder")
+    ):
         raise ValueError("Contato com recusa voltou à Recompra; exige revisão.")
 
 
@@ -521,6 +596,15 @@ def apply_batch(payload, weni, farm, store, contacts, names, directory):
                 "Exclusão anterior sem confirmação; não será repetida automaticamente."
             )
         recorded, owners, reasons = store.context_for(tables, uid, pair["cpf"], ledger)
+        canonical_recorded, canonical_owners, canonical_reasons = store.context_for(
+            tables, cid, pair["cpf"], ledger
+        )
+        reasons += canonical_reasons
+        if not pair.get("order_partition"):
+            # Não retomar exclusões revisadas sob a política anterior, que
+            # permitia consolidar pedidos diferentes no mesmo contato.
+            state["skipped"].append(uid)
+            continue
         fresh_refusals = contact_refusals(duplicate)
         if any(
             fresh_refusals[k] != pair["refusals"][k]
@@ -559,7 +643,11 @@ def apply_batch(payload, weni, farm, store, contacts, names, directory):
             orders=orders,
             recorded_order_ids=recorded,
             history_owner_ids=owners,
+            order_partition=pair.get("order_partition"),
+            canonical_recorded_ids=canonical_recorded,
         )
+        if canonical_owners - {pair["customer_id"]}:
+            reasons.append("HISTORICO_DE_OUTRO_CLIENTE")
         if (
             set(reasons) - PRESERVABLE
             or not refs(duplicate) <= set(pair["orders"])
@@ -578,6 +666,8 @@ def apply_batch(payload, weni, farm, store, contacts, names, directory):
             orders=orders,
             recorded_order_ids=recorded,
             history_owner_ids=owners,
+            order_partition=pair.get("order_partition"),
+            canonical_recorded_ids=canonical_recorded,
         ):
             raise ValueError("Proteções não preservadas; exclusão bloqueada.")
         canonicals[cid] = canonical
@@ -595,7 +685,11 @@ def apply_batch(payload, weni, farm, store, contacts, names, directory):
         state["deletions"][uid] = "interrupting"
         save_private(state_path, state)
         weni.interrupt_contact_flows(uid)
-        recompra_group = groups_index(duplicate, names).get("Recompra FarmaLíder")
+        recompra_group = groups_index(duplicate, names).get(
+            "Recompra Pets Líder"
+            if active_segment() == "PET"
+            else "Recompra FarmaLíder"
+        )
         if recompra_group:
             weni.contact_group_action(uid, action="remove", group=recompra_group)
         state["deletions"][uid] = "sending"
@@ -632,6 +726,65 @@ def apply_batch(payload, weni, farm, store, contacts, names, directory):
     state["done"] = True
     save_private(state_path, state)
     return set(state["deleted"]), len(state["skipped"])
+
+
+def apply_renames(changes, weni, farm, directory):
+    """Nomes revisados e idempotentes, sem editar CPF, pedidos ou consentimentos."""
+    renamed, pending = 0, 0
+    for change in changes:
+        uid = change["contact_uuid"]
+        proof = Path(directory) / ("nome-" + uid + ".json")
+        try:
+            current = exact_contact(weni, uid)
+            if (
+                current is None
+                or normalize_cpf(get_fields(current).get("cpf")) != change["cpf"]
+            ):
+                raise ValueError("Contato ou CPF mudou após a revisão.")
+            peers = [exact_contact(weni, peer) for peer in change["peers"]]
+            if any(
+                c is None
+                or normalize_cpf(get_fields(c).get("cpf")) != change["cpf"]
+                or refs(c) != set(change["peers"][c["uuid"]])
+                for c in peers
+            ):
+                raise ValueError(
+                    "Contatos ou pedidos diferentes mudaram após a revisão."
+                )
+            customer = unique_customer(farm, change["cpf"])
+            if (
+                customer is None
+                or _positive_id(customer.get("id")) != change["customer_id"]
+            ):
+                raise ValueError("Cliente oficial não confirmado.")
+            order_ids = set(change["orders"])
+            for ids in change.get("peer_orders", {}).values():
+                order_ids.update(ids)
+            for oid in sorted(order_ids, key=int):
+                header = (farm.get_pedido(oid) or {}).get("capa") or {}
+                if (
+                    _positive_id(header.get("id")) != oid
+                    or _positive_id(header.get("codCliente")) != change["customer_id"]
+                ):
+                    raise ValueError("Pedido não confirmado para renomear.")
+            if current.get("name") == change["name"]:
+                continue
+            if current.get("name", "") != change["before_name"]:
+                raise ValueError("Nome alterado depois da revisão.")
+            save_private(proof, {"change": change, "status": "enviando", "at": now()})
+            weni.rename_contact(uid, change["name"])
+            confirmed = exact_contact(weni, uid)
+            if confirmed is None or confirmed.get("name") != change["name"]:
+                raise ValueError("Novo nome não confirmado na Weni.")
+            save_private(proof, {"change": change, "status": "confirmado", "at": now()})
+            renamed += 1
+        except Exception as exc:
+            pending += 1
+            logging.warning(
+                "Deduplicação: renomeação pendente (%s); sem interromper a carga.",
+                type(exc).__name__,
+            )
+    return renamed, pending
 
 
 def run_with_dedup(*, apply, full, quarter, review_path, update):
@@ -811,13 +964,31 @@ def run_with_dedup(*, apply, full, quarter, review_path, update):
                         "Deduplicação indisponível (%s); lotes preservados para a próxima incremental. A carga Weni continuará.",
                         type(exc).__name__,
                     )
+            renamed, name_pending = 0, 0
+            if payload.get("renames"):
+                try:
+                    if farm is None:
+                        farm = _open_farmalider()
+                    if farm is None:
+                        raise ValueError("API indisponível para conferir os nomes.")
+                    renamed, name_pending = apply_renames(
+                        payload["renames"], weni, farm, root
+                    )
+                except Exception as exc:
+                    name_pending = len(payload["renames"])
+                    logging.warning(
+                        "Deduplicação: nomes pendentes (%s); carga preservada.",
+                        type(exc).__name__,
+                    )
             stats = update(removed, None)
             return stats, {
                 "proposed": len(payload["pairs"]),
-                "pending": len(payload["pending"]),
+                "pending": len(payload["pending"]) + name_pending,
                 "deleted": len(removed),
                 "skipped": skipped,
                 "failed_batches": failed_batches,
+                "renamed": renamed,
+                "name_pending": name_pending,
             }
         finally:
             weni.close()

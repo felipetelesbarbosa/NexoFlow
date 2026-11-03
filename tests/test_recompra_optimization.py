@@ -592,7 +592,7 @@ class RecompraApplyOptimizationTests(unittest.TestCase):
             patch("recompra.resolve_latest", return_value=(order, items)),
             patch("recompra.atomic_json", wraps=atomic_json) as writer,
         ):
-            self.assertEqual(self.apply(review, weni, farm), {"aplicados": 1})
+            self.assertEqual(self.apply(review, weni, farm), {"estado_local": 1})
             writer.assert_called_once()
         persisted = load_state(self.state_path)
         self.assertEqual(persisted["contacts"]["u1"]["purchase"], plan["purchase"])
@@ -600,7 +600,7 @@ class RecompraApplyOptimizationTests(unittest.TestCase):
         with patch("recompra.atomic_json", wraps=atomic_json) as writer:
             self.assertEqual(self.apply(repeated, weni, farm), {"sem_mudanca": 1})
             writer.assert_not_called()
-        weni.get_contact.assert_called_once_with(uuid="u1")
+        weni.get_contact.assert_not_called()
         weni.update_contact_fields.assert_not_called()
         weni.contact_group_action.assert_not_called()
 
@@ -672,10 +672,11 @@ class RecompraRunnerOptimizationTests(unittest.TestCase):
                 plan = (
                     {
                         "reason": "PEDIDO_STATUS_3_CANCELADO_WENI",
+                        "contact_uuid": "u1",
                         "order_resolution_status": "ERRO_ITENS_PEDIDO_API",
                     }
                     if incomplete
-                    else {"synthetic": "plan"}
+                    else {"synthetic": "plan", "contact_uuid": "u1"}
                 )
                 review = {"synthetic": "review", "day": NOW.date().isoformat()}
                 stack.enter_context(patch("proxy_config.configure_proxy"))
@@ -711,7 +712,7 @@ class RecompraRunnerOptimizationTests(unittest.TestCase):
                     expected,
                 )
                 planner.assert_called_once_with(
-                    contacts,
+                    [contact],
                     farm,
                     STRUCTURE,
                     state,

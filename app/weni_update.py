@@ -1135,6 +1135,8 @@ def _apply_customer_enrichment(plan, contact, farm, captured_at, available_field
         "cep",
         *GEOGRAPHY_FIELDS,
     }
+    if segment() == "PET":
+        preserved.discard("maior_de_18_anos")
     source_contact = {
         "uuid": contact["uuid"],
         "name": contact.get("name"),
@@ -1152,7 +1154,10 @@ def _apply_customer_enrichment(plan, contact, farm, captured_at, available_field
     if not is_valid_cpf(normalize_cpf(effective.get("cpf"))):
         plan.guards["__invalid_cpf_identity"] = weni_identity_guard(contact)
         plan.guards["__native_urns"] = sorted(native_contact_urns(contact))
-    for key in {"cpf", "idade", "maior_de_18_anos", "genero", "cep", *GEOGRAPHY_FIELDS}:
+    guarded_fields = {"cpf", "idade", "genero", "cep", *GEOGRAPHY_FIELDS}
+    if segment() != "PET":
+        guarded_fields.add("maior_de_18_anos")
+    for key in guarded_fields:
         plan.guards.setdefault(key, original_fields.get(key))
     for key, value in additions.items():
         _set_field_if_changed(
@@ -1418,6 +1423,7 @@ def _build_contact_plan(
     available_weni_fields: set[str] | None = None,
     pending_purchase_check: dict[str, str] | None = None,
     ads_history_complete: bool = True,
+    preserve_distinct_orders: bool = False,
 ) -> ContactUpdatePlan:
     contact_uuid = str(contact.get("uuid") or "").strip()
     fields = get_fields(contact)
@@ -1533,13 +1539,20 @@ def _build_contact_plan(
         plan, contact, farm_client, captured_at, available_weni_fields
     )
 
-    _apply_purchase_candidate(
-        plan,
-        contact,
-        farm_client=farm_client,
-        captured_at=captured_at,
-        available_weni_fields=available_weni_fields,
-    )
+    if preserve_distinct_orders:
+        # O mesmo CPF pode conservar perfis com pedidos diferentes por regra
+        # explícita. O último pedido cadastral não pode substituir todos eles.
+        plan.order_resolution_status = 'CPF_IDENTIDADE_AMBIGUA'
+        for key in PURCHASE_FIELDS:
+            plan.guards.setdefault(key, fields.get(key))
+    else:
+        _apply_purchase_candidate(
+            plan,
+            contact,
+            farm_client=farm_client,
+            captured_at=captured_at,
+            available_weni_fields=available_weni_fields,
+        )
     observed_check = infer_pending_purchase_check(
         context_messages, captured_at=captured_at
     )
@@ -1789,14 +1802,17 @@ def audit_plans(
             age = _safe_number(plan.fields["idade"])
             if not isinstance(age, int) or not 1 <= age <= 120:
                 errors.append(f"{plan.contact_uuid}: idade fora da faixa segura")
-            expected = "sim" if isinstance(age, int) and age >= 18 else "não"
-            majority = (
-                str(plan.fields.get("maior_de_18_anos", expected)).strip().casefold()
-            )
-            if age is not None and majority != expected:
-                errors.append(f"{plan.contact_uuid}: idade e maioridade inconsistentes")
+            if segment() != "PET":
+                expected = "sim" if isinstance(age, int) and age >= 18 else "não"
+                majority = (
+                    str(plan.fields.get("maior_de_18_anos", expected)).strip().casefold()
+                )
+                if age is not None and majority != expected:
+                    errors.append(f"{plan.contact_uuid}: idade e maioridade inconsistentes")
 
         if "maior_de_18_anos" in plan.fields:
+            if segment() == "PET":
+                errors.append(f"{plan.contact_uuid}: maioridade não se aplica ao PET")
             if str(plan.fields["maior_de_18_anos"]).strip().casefold() not in {
                 "sim",
                 "não",
@@ -2919,6 +2935,7 @@ def check_update_connections() -> dict[str, Any]:
         return result
     finally:
         _close_audit_handles()
+        logging.info('Weni: diagnóstico HTTP da atualização: %s.', weni.metrics_snapshot())
         weni.close()
         if farm is not None:
             farm.close()
@@ -3376,6 +3393,11 @@ def run_update(
             dedup_contacts.extend(
                 all_contacts if quarter is not None else modified_contacts
             )
+        from contact_dedup_guard import distinct_order_contacts
+
+        distinct_orders = distinct_order_contacts(
+            all_contacts if quarter is not None else modified_contacts
+        )
 
         incoming_all = weni.list_messages(
             after=window.after,
@@ -3674,6 +3696,7 @@ def run_update(
                         opt_in_group_name=WENI_UPDATE_OPT_IN_GROUP,
                         opt_in_group_uuid=opt_in_uuid,
                         available_weni_fields=available_weni_fields,
+                        preserve_distinct_orders=contact_uuid in distinct_orders,
                         pending_purchase_check=pending_purchase_checks.get(
                             contact_uuid
                         ),
@@ -3935,4 +3958,4 @@ def run_update(
             farm.close()
 
 
-# NexoFlow 1.5.11
+# NexoFlow 1.5.12

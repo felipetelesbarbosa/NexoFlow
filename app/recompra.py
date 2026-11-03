@@ -253,13 +253,13 @@ class RecompraReadCache:
 
     def get_cliente_by_cpf(self, cpf):
         self.prepare_directory()
-        if self.bulk_only():
-            directory = self.customer_directory
-            snapshot, pending = (
-                directory.general_base_payload(cpf)
-                if directory is not None
-                else (None, "ERRO_BASE_GERAL_INCOMPLETA")
-            )
+        directory = self.customer_directory
+        snapshot, pending = (
+            directory.general_base_payload(cpf)
+            if directory is not None
+            else (None, "ERRO_BASE_GERAL_INCOMPLETA")
+        )
+        if not pending or self.bulk_only():
             with self._lock:
                 self._bulk_reads += 1
                 self._bulk_pending += int(bool(pending))
@@ -270,11 +270,11 @@ class RecompraReadCache:
 
     def get_pedido(self, order_id):
         self.prepare_directory()
-        if self.bulk_only():
-            directory = self.customer_directory
-            snapshot = (
-                directory.order_by_id(str(order_id)) if directory is not None else None
-            )
+        directory = self.customer_directory
+        snapshot = (
+            directory.order_by_id(str(order_id)) if directory is not None else None
+        )
+        if snapshot is not None or self.bulk_only():
             with self._lock:
                 self._bulk_reads += 1
                 self._bulk_pending += int(snapshot is None)
@@ -290,7 +290,7 @@ class RecompraReadCache:
                 "reusos": self._hits,
                 "entradas": len(self._responses),
             }
-            if self.bulk_only():
+            if self.bulk_only() or self._bulk_reads:
                 metrics.update(
                     leituras_base_geral=self._bulk_reads,
                     pendencias_base_geral=self._bulk_pending,
@@ -518,6 +518,34 @@ def plan_needs_apply(plan, saved=None):
 
 def now_local():
     return datetime.now(TZ)
+
+
+def _local_purchase_only(plan):
+    return bool(
+        not plan["fields"]
+        and not plan["action"]
+        and not plan["in_group"]
+        and plan["purchase"]
+        and not plan.get("purchase_check_resolved")
+    )
+
+
+def _confirm_written_fields(weni, uid, fields, response):
+    contact = (
+        response
+        if isinstance(response, dict) and response.get("uuid") == uid
+        else weni.get_contact(uuid=uid)
+    )
+    written = get_fields(contact) if isinstance(contact, dict) else {}
+    missing = [
+        key
+        for key, value in fields.items()
+        if field_guard(key, written.get(key)) != field_guard(key, value)
+    ]
+    if missing:
+        raise PreAdmissionConflict(
+            "Campos não confirmados pela Weni: " + ",".join(sorted(missing))
+        )
 
 
 def text(value):
@@ -1055,6 +1083,8 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
         "campaign_products": [],
     }
     diagnostic = text((order or {}).get("status_confirmacao"))
+    if contact.get("_distinct_order_refs"):
+        plan["_distinct_order_refs"] = contact["_distinct_order_refs"]
     plan["order_resolution_status"] = diagnostic
     if (
         diagnostic == "PEDIDO_SEGMENTO_INVALIDO_API"
@@ -1153,6 +1183,22 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
     )
     if valid and dt is not None:
         order_id = text(order.get("pedido_id"))
+        partition = contact.get("_distinct_order_refs")
+        if partition and order_id not in partition:
+            previous_date = business_order_datetime(fields.get("pedido_data"))
+            if previous_date is not None and dt > previous_date:
+                plan["reason"] = "PEDIDO_ANTIGO_BLOQUEADO"
+                if in_group:
+                    plan["action"] = "remove"
+                return plan
+            return propose(
+                contact,
+                {"status_confirmacao": "PEDIDO_NAO_CONFIRMADO_BASE_GERAL"},
+                [],
+                structure,
+                saved,
+                now=now,
+            )
         # Para a cronologia do agendamento, somente pedido_data é consultado.
         # Uma data posterior não pode ser substituída por pedido mais antigo.
         current_order = business_order_datetime(fields.get("pedido_data"))
@@ -1433,7 +1479,7 @@ def write_review(review, path=REVIEW):
     profile = profile_for(review["structure"].get("segment", "FARMA"))
     counts = Counter(plan["reason"] for plan in review["plans"])
     lines = [
-        f"NexoFlow 1.5.11 — Revisão {profile.brand} D+{profile.days}",
+        f"NexoFlow 1.5.12 — Revisão {profile.brand} D+{profile.days}",
         f"Dia local: {review['day']}",
         f"Dados capturados em: {review['created_at']}",
         f"Horários conferidos ao concluir: {review.get('generated_at', review['created_at'])}",
@@ -1638,6 +1684,7 @@ def apply_review(
     if structure != review["structure"]:
         raise RuntimeError("Campanha ou campos mudaram depois da revisão.")
     summary = Counter()
+    write_metrics = Counter()
     started = monotonic()
     writes_started = False
     execution_id = uuid4().hex
@@ -1647,7 +1694,7 @@ def apply_review(
         event = {**event, "execution_id": execution_id}
         event.setdefault("at", now_fn().isoformat())
         append_audit(event, audit_path)
-        if event["status"] != "APLICADO":
+        if event["status"] not in {"APLICADO", "ESTADO_LOCAL_ATUALIZADO"}:
             pending_events.append(event)
 
     def check_day():
@@ -1688,6 +1735,9 @@ def apply_review(
         if isinstance(farm, FarmaliderClient):
             farm.reset_execution_reads()
         reads = RecompraReadCache(farm)
+        from recompra_incremental import remember_plan
+
+        state_dirty = False
         for index, reviewed in enumerate(review["plans"], 1):
             check_day()
             if index > 1 and (index - 1) % PROGRESS_LOG_EVERY_CONTACTS == 0:
@@ -1703,6 +1753,9 @@ def apply_review(
                 raise RuntimeError("Plano de outro perfil; aplicação bloqueada.")
             audit_plan(reviewed)
             uid = reviewed["contact_uuid"]
+            state_dirty |= remember_plan(
+                state, reviewed, structure, now_fn(), confirmed=False, retry=True
+            )
             if has_incomplete_query(reviewed) and not pending_group_removal_due(
                 reviewed, now_fn()
             ):
@@ -1713,6 +1766,19 @@ def apply_review(
             # depois da revisão; elas serão propostas no próximo dry-run.
             if not plan_needs_apply(reviewed, saved):
                 summary["sem_mudanca"] += 1
+                state_dirty |= remember_plan(state, reviewed, structure, now_fn())
+                continue
+            if _local_purchase_only(reviewed):
+                # A revisão já comprovou a compra. Persistir somente esse
+                # snapshot não escreve/admite ninguém na Weni e não precisa
+                # de GET remoto. Checkpoint único para este trabalho local;
+                # interrupção antes dele somente repete cálculo, nunca POST.
+                local = state["contacts"].setdefault(uid, {"orders": {}})
+                local["purchase"] = deepcopy(reviewed["purchase"])
+                state_dirty = True
+                remember_plan(state, reviewed, structure, now_fn())
+                summary["estado_local"] += 1
+                record_event({"contact_uuid": uid, "status": "ESTADO_LOCAL_ATUALIZADO"})
                 continue
             try:
                 current = weni.get_contact(uuid=uid)
@@ -1766,6 +1832,8 @@ def apply_review(
                         defer_query(uid, "reconsultar_pedido", error=exc)
                         continue
             check_day()
+            if reviewed.get("_distinct_order_refs"):
+                current["_distinct_order_refs"] = reviewed["_distinct_order_refs"]
             fresh = propose(current, order, items, structure, saved, now=now_fn())
             check_day()
             if has_incomplete_query(fresh) and not pending_group_removal_due(
@@ -1861,8 +1929,11 @@ def apply_review(
                 )
             if contact_state != previous_state:
                 check_day()
-                writes_started = True
-                atomic_json(state_path, state)
+                if action in {"add", "replace"}:
+                    writes_started = True
+                    atomic_json(state_path, state)
+                else:
+                    state_dirty = True
             persisted_state = deepcopy(contact_state)
             stage = "preparacao"
             try:
@@ -1901,7 +1972,10 @@ def apply_review(
                     stage = "atualizar_campos"
                     check_day()
                     writes_started = True
-                    weni.update_contact_fields(uid, fresh["fields"])
+                    response = weni.update_contact_fields(uid, fresh["fields"])
+                    if action not in {"add", "replace"}:
+                        stage = "confirmar_campos"
+                        _confirm_written_fields(weni, uid, fresh["fields"], response)
                 if action in {"add", "replace"}:
                     stage = "reler_antes_inclusao"
                     if check_path is not None:
@@ -2053,9 +2127,19 @@ def apply_review(
                     atomic_json(state_path, state)
                 if contact_state != persisted_state:
                     stage = "persistir_confirmacao"
-                    writes_started = True
-                    atomic_json(state_path, state)
+                    if action in {"add", "replace"}:
+                        writes_started = True
+                        atomic_json(state_path, state)
+                    else:
+                        state_dirty = True
                 summary["aplicados"] += 1
+                write_metrics["contatos_com_escrita_weni"] += int(
+                    bool(action or fresh["fields"])
+                )
+                write_metrics["campos_enviados"] += len(fresh["fields"])
+                # O plano fresco mantém as provas incrementais da revisão.
+                fresh["_incremental"] = reviewed.get("_incremental")
+                state_dirty |= remember_plan(state, fresh, structure, now_fn())
                 stage = "registrar_auditoria"
                 record_event(
                     {
@@ -2179,6 +2263,21 @@ def apply_review(
             # Se uma chamada concluída atravessou a meia-noite, seus resultados
             # conhecidos já estão persistidos antes de interromper a execução.
             check_day()
+        selection = review.get("selection") or {}
+        if selection.get("complete"):
+            index_state = state.setdefault("incremental", {})
+            state["segment"] = profile.segment
+            if selection.get("full_refresh"):
+                live_ids = set(selection["contact_uuids"])
+                index_state["contacts"] = {
+                    uid: data
+                    for uid, data in index_state.get("contacts", {}).items()
+                    if uid in live_ids
+                }
+            index_state.update({"ready": True, "cursor": selection["cursor"]})
+            state_dirty = True
+        if state_dirty:
+            atomic_json(state_path, state)
     if pending_report_path is not None:
         report_path = Path(pending_report_path)
         report_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -2205,6 +2304,11 @@ def apply_review(
             len(pending_events),
             dict(Counter(event["status"] for event in pending_events)),
         )
+    logging.info(
+        "Recompra escritas confirmadas: %s; estado local=%s.",
+        dict(write_metrics),
+        summary.get("estado_local", 0),
+    )
     logging.info(
         "Recompra aplicação: contatos=%s; duração=%.1fs; resultados=%s; cache=%s; HTTP=%s.",
         len(review["plans"]),
