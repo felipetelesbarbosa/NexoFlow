@@ -153,7 +153,7 @@ De-para usado pela integração:
 
 A Weni armazena o código efetivo em `pedido_status`. O normalizador aceita os códigos -2 a 4 e os nomes oficiais `EmAberto`, `PendenteDePagamento`, `EmProcessamento`, `ProntoParaRota`, `EmTransito`, `Concluido` e `Cancelado`. Cancelamento explícito ou `formaPagamento=0` ou `_` força o código 3, Cancelado. O helper `effective_order_status_code(order)` aplica essa regra para Weni/BI; o Analytics deriva o nome amigável. `Pedidos_FarmaLider` preserva o status bruto retornado pela API em `farmalider_status_pedido`, inclusive quando ele difere do status efetivo.
 
-No Analytics/Data Studio, pedidos validados pela API em estados documentados não cancelados entram nas métricas de venda, incluindo Em processamento (0). A mesma regra vale para a elegibilidade da Recompra, mantendo as demais validações. Cada nova carga reconsulta os pedidos no escopo selecionado, mesmo sem alteração do contato na Weni. Os estados -2, -1, 0, 1 e 4 permanecem em rechecagem até Concluído ou Cancelado. Os estados -2, -1, 0, 4, 1 e 2 contam como venda no dashboard; estados desconhecidos ficam pendentes. O estado 3 e o pagamento 0 ficam fora das vendas e encerram a rechecagem.
+No Analytics/Data Studio, pedidos validados pela API em estados documentados não cancelados entram nas métricas de venda, incluindo Em processamento (0). A mesma regra vale para a elegibilidade da Recompra, mantendo as demais validações. Compras e status podem mudar sem alteração do contato na Weni. No Analytics, pedidos já registrados são reconsultados somente quando sua data está entre hoje e 20 dias atrás, inclusive; pedidos anteriores são preservados. Pedidos novos ainda exigem validação inicial. A Recompra usa a seleção e a fonte atual descritas no seu guia. Os estados -2, -1, 0, 1 e 4 permanecem em rechecagem até Concluído ou Cancelado. Os estados -2, -1, 0, 4, 1 e 2 contam como venda no dashboard; estados desconhecidos ficam pendentes. O estado 3 e o pagamento 0 ficam fora das vendas e encerram a rechecagem.
 
 ## Forma de pagamento
 
@@ -309,17 +309,11 @@ antigo não é apresentado como resultado da consulta atual. O Controle registra
 separadamente quantos detalhes anteriores foram mantidos. A etapa de pedidos
 não repete o GET por CPF que já terminou em `404` ou erro nesta mesma execução;
 um pedido identificado na Weni ainda pode ser confirmado pelo endpoint por
-código. A taxa de falhas é avaliada após sublotes completos de até 100 CPFs,
-para que respostas `500` mais rápidas não distorçam a amostra. Se a taxa
-atingir o limite configurado, a carga é interrompida antes de gravar contatos
-e pedidos no Google Sheets.
+código. A taxa de falhas é acompanhada por lote, sem descartar os contatos e pedidos válidos por um percentual de erros individuais. Autenticação inválida, circuito aberto e falha estrutural continuam impedindo gravações inseguras.
 
-Se alguns CPFs ou consultas de pedido falharem abaixo desse limite, a
-execução é marcada `parcial` nas abas de status e controle e termina com
-código de saída `3`. O marco de sincronização incremental anterior permanece
-inalterado, de modo que esses contatos voltem a ser considerados na próxima
-execução. A nova tentativa pode repetir parte da consulta à Weni e da API
-FarmaLíder, pois o cache de clientes não armazena o payload do pedido.
+Falhas individuais concluem o Analytics como `parcial`, com código de saída `3`, preservando o marco incremental anterior para nova tentativa. Os dados validados são salvos. O índice em memória guarda snapshots suficientes do cadastro e do último pedido durante a execução; quando esse snapshot existe, consultar cliente e pedido não exige dois GETs individuais. Uma nova fase de aplicação mantém sua conferência da fonte; o estado persistente não transforma uma confirmação antiga em resposta atual.
+
+Na Recompra, o cache incremental seleciona contatos novos/alterados, prazos e retentativas por segmento; o cursor de alterações Weni não substitui a comparação com a base atual da API. A consulta geral ainda pode ser necessária em cada fase, mas os registros suficientes são indexados em vez de consultados individualmente. `ultimoPedido: null` explícito também é reaproveitado no PET. A carga completa conserva a validação de toda a base e o mesmo reaproveitamento. Consulte [Recompra](README%20RECOMPRA.md) e [relatório técnico](RELATORIO%20OTIMIZACAO%201.5.12.md).
 
 Essas medidas reduzem a carga e preservam informações. Elas podem reduzir
 erros causados por sobrecarga, mas o Swagger e os logs de status não comprovam
@@ -343,7 +337,7 @@ GET /api/Delivery/pedidos/cpf/{cpf}
 ```
 
 Filtros desejáveis: `inicio`, `fim`, `status`, `pagina` e `tamanhoPagina`. Essa rota é uma proposta de evolução, não uma integração atualmente implementada.
-<!-- NexoFlow 1.5.11 -->
+<!-- NexoFlow 1.5.12 -->
 
 ### Respostas e pendências
 

@@ -1,4 +1,15 @@
-# NexoFlow 1.5.11 — Changelog
+# NexoFlow 1.5.12 — Changelog
+
+## NexoFlow 1.5.12 — Em validação
+
+- Corrige o KeyError de maioridade na criação/enriquecimento PET. O perfil não calcula, exige ou grava `maior_de_18_anos`; idade permanece informativa e a FarmaLíder mantém suas validações. Endereços são conferidos contra o segmento correto do pedido.
+- Recompra incremental reutiliza o estado por segmento: contatos Weni modificados desde o cursor com sobreposição de 15 minutos, hashes locais da base geral atual e seleção de novos/alterados, prazos e pendências. Primeira execução e carga completa mantêm cobertura integral. O dry-run não confirma checkpoint.
+- Atualizações somente do estado local deixam de gerar GET Weni por contato e regravação integral do JSON a cada compra; são contabilizadas como `estado_local` e confirmadas em checkpoint atômico. Inclusões/alterações reais preservam revalidação, intenção durável antes do POST e proteção contra repetição.
+- PET reutiliza também snapshots explícitos de `ultimoPedido: null` da base geral, sem uma consulta individual redundante para cada cliente. Null, campo omitido, ausência no índice e falha de API continuam sendo situações distintas.
+- Logs separam seleção, comparação local, HTTP real por serviço, persistência local, campos enviados, pendências e conflitos. Não registram CPF ou resposta completa no terminal.
+- Deduplicação por CPF preserva contatos com pedidos diferentes, numerando nomes; consolida conjuntos de pedidos iguais e mantém o contato com pedido quando os demais não têm. Propriedade dos pedidos, recusas, auditoria, revalidação e retomada continuam obrigatórias.
+- Histórico observado pode incorporar pedidos sem UUID Weni, mantendo a identidade oficial e sem inferir canal WhatsApp. Nos logs anexados, sete pedidos de outubro observados, mas ausentes do Sheets, somavam R$ 1.741,02: seis envolvendo CPFs com contatos duplicados (R$ 1.550,03) e um com CPF físico malformado (R$ 190,99). A correção recuperou sete de sete em uma cópia temporária do diário; a repetição após confirmação não entregou novos registros. Nenhum dado de produção foi alterado nessa validação.
+- Benchmarks sintéticos e limites de validação estão no [relatório técnico](docs/RELATORIO%20OTIMIZACAO%201.5.12.md). Não representam promessa de tempo em produção. Publicação e execução Windows do pacote ainda dependem da validação do mesmo commit.
 
 ## NexoFlow 1.5.11 — 03/11/2026
 

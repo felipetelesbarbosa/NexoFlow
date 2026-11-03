@@ -1,6 +1,6 @@
-# NexoFlow 1.5.11
+# NexoFlow 1.5.12
 
-A versão desta entrega é **NexoFlow 1.5.11**. O usuário autorizou a atualização do GitHub e a publicação em **03/11/2026**. Publicar somente depois dos checks exigidos do mesmo commit; não incrementar novamente em tentativas de validação desta entrega.
+A versão em preparação é **NexoFlow 1.5.12**, posterior à 1.5.11 já publicada. Não anunciar nem publicar antes dos checks exigidos do mesmo commit. Novas tentativas de validação desta entrega não incrementam novamente a versão.
 
 ## Conferência antes da entrega
 
@@ -13,9 +13,9 @@ A versão desta entrega é **NexoFlow 1.5.11**. O usuário autorizou a atualiza�
 
 ## Regras do projeto
 
-- Use mensagens de commit curtas em português que descrevam a área ou a alteração, como `Automação`, `Documentação`, `Instalador` ou `Corrigir revisão da Recompra`. `NexoFlow 1.5.11` identifica a versão, não é uma mensagem obrigatória de commit. Separe alterações por área quando isso tornar a navegação do GitHub mais clara; não reescreva o histórico apenas para mudar os textos exibidos.
+- Use mensagens de commit curtas em português que descrevam a área ou a alteração, como `Automação`, `Documentação`, `Instalador` ou `Corrigir revisão da Recompra`. `NexoFlow 1.5.12` identifica a versão, não é uma mensagem obrigatória de commit. Separe alterações por área quando isso tornar a navegação do GitHub mais clara; não reescreva o histórico apenas para mudar os textos exibidos.
 - A `main` é a única branch de trabalho do repositório. Atualize diretamente a `main`; não crie nem mantenha branches adicionais.
-- A entrega autorizada usa `NexoFlow 1.5.11`, tag `v1.5.11` e pacotes com sufixo `1.5.11`, somente após autorização e validação. Para cada próxima publicação de atualização/hotfix/patch, incremente uma única vez: 1.5.12, 1.5.13, ... 1.5.99; depois 1.6, 1.6.1, ... 1.6.99. Não incremente por commit ou tentativa de CI da mesma entrega. Preserve tags e releases anteriores; nunca sobrescreva uma versão anterior com um novo patch. Confira `VERSION` e `docs/VERSIONAMENTO.md`.
+- A entrega autorizada usa `NexoFlow 1.5.12`, tag `v1.5.12` e pacotes com sufixo `1.5.12`, somente após autorização e validação. Para cada próxima publicação de atualização/hotfix/patch, incremente uma única vez: 1.5.13, 1.5.14, ... 1.5.99; depois 1.6, 1.6.1, ... 1.6.99. Não incremente por commit ou tentativa de CI da mesma entrega. Preserve tags e releases anteriores; nunca sobrescreva uma versão anterior com um novo patch. Confira `VERSION` e `docs/VERSIONAMENTO.md`.
 - Cada release deve mostrar a data da sua publicação. Não reutilize uma versão já publicada para código novo.
 - Preserve as credenciais e os diagnósticos privados fora do Git e dos pacotes públicos.
 - Use os nomes de pagamento: 0 Cancelado, 1 Dinheiro, 2 Débito, 3 Crédito, 4 Ticket, 5 Pix por Link de Pagamento, 6 Pix no POS.
@@ -57,3 +57,8 @@ A versão desta entrega é **NexoFlow 1.5.11**. O usuário autorizou a atualiza�
 - Variantes brasileiras de celular com/sem nono dígito servem somente para impedir criação duplicada. Não comprovam identidade/CPF nem autorizam fusão, exclusão ou alteração do telefone. CPF ausente/divergente e múltiplos contatos exigem reconciliação; a busca é repetida antes do POST.
 
 - Atualização Preserve mantém secrets_config.py, credentials, logs e importacoes no lugar, inclusive no rollback. Não renomear/apagar esses dados para contornar handles de diretório; cópias do payload não os sobrescrevem. Validar no Windows com raiz/logs/credenciais/importações abertos, rollback e hashes de programa. Clean preserva suas regras próprias e aborta com dados anteriores intactos se houver bloqueio.
+
+- PET não calcula, exige nem grava maior_de_18_anos. Idade continua informativa; o endereço cadastral usa o mesmo segmento do pedido na conferência. Não aceitar evidência de campo que não foi produzido pela política do perfil.
+- Recompra incremental mantém cache e índice por segmento no estado existente. Após uma coleta completa confirmada, consultar contatos Weni modificados desde o cursor com 15 minutos de sobreposição, comparar hashes da base geral atual, reavaliar novos/alterados, prazos e pendências. O modified_on da Weni não representa atualização de pedido na API. Primeira execução, índice incompatível e --full cobrem toda a base. Dry-run não avança checkpoint; estado/recusas/guardas e resultados incertos continuam protegidos.
+- Persistência de compra somente local não é POST Weni: contabilizar separadamente, acumular e salvar com checkpoint atômico. Intenção de inclusão no grupo permanece durável antes do POST. Nenhuma aceleração autoriza reaplicar admissão incerta. A janela de preparação 0..25/30 dias permanece distinta do envio D+25/30; não admitir retroativamente.
+- Deduplicação por CPF válido e cliente oficial único considera conjuntos de pedidos comprovados, incluindo histórico. Preservar o contato com pedido, consolidar conjuntos iguais e manter conjuntos diferentes com nomes numerados estáveis após revisão. Sem pedido, conservar a identificação por telefone nativo único. Não apagar apenas por coincidência de nome/telefone, não transferir Opt-In e não reutilizar revisões destrutivas anteriores à nova política.

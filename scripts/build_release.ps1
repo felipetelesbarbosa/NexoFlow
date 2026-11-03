@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.11",
+    [string]$Version = "1.5.12",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -407,15 +407,15 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-Recompra FARMA usa exclusivamente a base geral por fase, sem consultas individuais por CPF ou pedido. O histórico é observado uma vez por índice carregado; os logs distinguem HTTP de leituras locais. Dados insuficientes permanecem pendentes sem descartar os contatos válidos.
+Corrige o enriquecimento e a criação de clientes Pets sem maioridade; mantém idade informativa e a conferência de endereço no segmento correto. FarmaLíder conserva suas regras cadastrais.
 
-Na Farma e no Pets, pedido sem validação por sete dias completos desde pedido_data na Weni gera retirada preventiva do grupo, mantendo cadastro e revalidação posterior. Antes de retirar, a aplicação reconfere a fonte e o contato. Cancelamento, pagamento inválido ou recusa já comprovados na Weni permitem retirada imediata.
+A Recompra incremental reutiliza cache e estado por segmento, busca contatos Weni modificados desde o cursor com sobreposição de 15 minutos e compara os dados atuais da base geral para revalidar mudanças, prazos e pendências. Primeira execução e carga completa mantêm cobertura integral. O índice em memória da API foi preservado; dados suficientes evitam consultas individuais redundantes, inclusive ultimoPedido null explícito no PET.
 
-**Gere uma nova revisão após atualizar.** Revisões anteriores à política atual não são reaplicadas; não apague estado ou auditoria. Reentrada exige validação, evento D+25/D+30 futuro e proteção contra repetição. Uma retirada confirmada pode manter código 3 enquanto a compra continua sem validação; o Noturno prossegue com os demais e o Analytics final.
+Persistência somente local aparece separada das escritas Weni e não exige GET por contato. Checkpoint, revalidação antes de alterações e proteção contra repetição de inclusão permanecem ativos. As campanhas preparam referências futuras entre 0 e 25/30 dias e enviam somente D+25/D+30, sem retroativos. Recusas, cancelamentos e pagamentos inválidos continuam bloqueados.
 
-Corrige o Setup ao atualizar uma instalação com logs ou diretórios privados abertos. A opção de preservar mantém configurações, credenciais, logs, estado FARMA/PET e importações no lugar; somente os arquivos do programa vão para o rollback. A restauração após falha também preserva essas pastas.
+Deduplicação por CPF preserva contatos com pedidos diferentes e numera seus nomes; conjuntos iguais podem ser consolidados após revisão. Pedidos observados podem alimentar o histórico sem UUID Weni quando a identidade oficial estiver comprovada, sem atribuir canal WhatsApp à compra.
 
-A integridade dos arquivos do programa e as travas de manutenção continuam obrigatórias. Instalação limpa permanece separada e aborta com a instalação anterior preservada se os dados estiverem bloqueados. Não é necessário apagar logs, credenciais ou estado para atualizar.
+Benchmarks sintéticos, causas identificadas e limites estão no relatório técnico da documentação. Não representam garantia de tempo na máquina do cliente. As configurações, credenciais, logs e histórico existentes continuam preservados no Setup de atualização.
 
 A compilação suporta assinatura Authenticode com certificado de código confiável, timestamp e validação antes dos hashes. Sem certificado configurado, o pacote permanece sem assinatura; isso não é uma aprovação do Windows nem do antivírus. Consulte `RELATORIO DE SEGURANCA.json` dentro do ZIP.
 
@@ -427,4 +427,4 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.11
+# NexoFlow 1.5.12

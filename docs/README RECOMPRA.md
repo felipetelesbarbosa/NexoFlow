@@ -1,4 +1,4 @@
-# NexoFlow 1.5.11 — Recompra FarmaLíder e Pets Líder
+# NexoFlow 1.5.12 — Recompra FarmaLíder e Pets Líder
 
 O NexoFlow mantém a elegibilidade dos grupos; a **campanha Weni envia as mensagens**. Use o mesmo executável Recompra e escolha o segmento. Cada marca mantém sua organização, template, campanha, fluxo, evento, revisão e estado.
 
@@ -50,6 +50,32 @@ O relatório `.txt` mostra integrantes pendentes e remoções propostas. A audit
 O histórico observado é gravado uma vez por índice carregado, sem regravar todos os pedidos a cada contato. A marca de observação só é confirmada após a gravação bem-sucedida.
 
 Antes da aplicação, uma nova consulta geral substitui a base usada na simulação. Identidade, status, pagamento, itens, recusa, janela D+25 e alterações concorrentes continuam sendo validados. A política exclusiva da base geral aplica-se à Recompra FARMA; os demais módulos e o perfil PET mantêm seus contratos de consulta.
+
+## Carga completa e incremental
+
+O índice em memória da base geral já existia. A versão 1.5.12 conserva essa implementação: uma consulta geral por fase carrega o JSON e permite leituras por CPF/ID sem GET individual quando o snapshot suficiente está disponível. `leituras_base_geral` contabiliza acesso local, não requisições HTTP. A aplicação mantém uma leitura nova, independente da simulação; não reutiliza a preparação como autorização para gravar.
+
+| Modo | Coleta e processamento |
+| --- | --- |
+| Primeira execução ou estado sem índice compatível | Lê toda a base Weni, valida os contatos e prepara o cache do segmento. |
+| Completa (`--full`) | Cobre todos os contatos e valida as regras; compartilha o índice da API e não escreve campos idênticos. Reconstrói o índice de contatos ativos sem apagar o histórico de admissões. |
+| Incremental | Busca na Weni alterações desde o cursor confirmado com **15 minutos de sobreposição**. Reaproveita snapshots dos demais contatos e compara a base geral atual localmente. Seleciona novos/alterados, compras/status divergentes, prazos da campanha e pendências. |
+
+`modified_on` da Weni é confiável para o cursor de contatos, mas não comprova alteração de compra na API FarmaLíder. Por isso, a base geral ainda pode ser carregada integralmente na incremental; comparar seus hashes localmente não equivale a consultar ou atualizar todos os clientes pela rede. Não foi criado um endpoint redundante nem um `updated_at` fictício da API.
+
+Estado, cache, cursor e auditoria permanecem separados em FARMA/PET. A simulação não avança o checkpoint. A aplicação registra resultados confirmados e conserva as falhas como retentativas explícitas; uma falha isolada não faz perder o trabalho dos demais. Interrupção crítica não confirma um cursor incompleto. CPF não encontrado pode ser rechecado no próximo dia; fonte ausente/incompleta não se torna prova permanente de ausência de compra.
+
+A janela continua sendo **0 a 25 dias** para preparar a campanha FARMA e **0 a 30 dias** no PET. Os envios são responsabilidade da Weni e ocorrem somente no D+25/D+30. A passagem do dia reavalia os prazos; não cria envio retroativo e não repete admissão confirmada ou indeterminada. Recusa/Opt-Out e pedido cancelado permanecem bloqueantes.
+
+No PET, uma resposta geral explícita e válida com `ultimoPedido: null` também é reutilizada: não exige uma consulta individual para confirmar o mesmo null. Campo omitido, cliente ausente, identidade ambígua e erro HTTP continuam tendo tratamento próprio.
+
+## Escritas, confirmação e métricas
+
+O contador `estado_local` identifica compras que precisavam apenas ser salvas no estado privado. Esse caminho não faz GET ou POST Weni por contato; acumula o trabalho local e confirma o checkpoint atomicamente. Não representa agendamento ou disparo. A intenção de inclusão/alteração de grupo continua persistida antes do POST para impedir repetição após resposta incerta.
+
+Alterações reais enviam somente campos diferentes. Uma resposta de atualização que confirma o UUID e todos os campos esperados pode comprovar uma alteração apenas de campos; resposta insuficiente exige releitura. Admissões e remoções mantêm as conferências próprias de grupo e de prazo. O cache só registra o resultado após sua confirmação.
+
+Os logs separam contatos carregados, selecionados e sem mudança; tempo da base e comparação local; estado local; campos enviados; HTTP real GET/POST por serviço; retries, erros, conflitos, velocidade e duração. Nenhum contador de acesso local deve ser apresentado como requisição HTTP. Escritas remotas seguem o controle de estado e de confirmação por contato; não se presume suporte da API a batch de campos individuais.
 
 ## Executar
 

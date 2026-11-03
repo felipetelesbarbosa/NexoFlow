@@ -1,4 +1,4 @@
-# Documentação do NexoFlow 1.5.11
+# Documentação do NexoFlow 1.5.12
 
 O NexoFlow atende **FarmaLíder e Pets Líder**, com dados separados. Confira [segmentos, campos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 
@@ -22,6 +22,8 @@ Comece pela [instalação](README%20INSTALACAO.md) e pelo [guia de operação](D
 - [Regras de pedidos](PEDIDOS.md), [campos de pedido na Weni](PEDIDOS%20WENI.md) e [API FarmaLíder](FARMALIDER%20API.md).
 - [Cadastro por segmento](CADASTRO%20FARMA.md), [localização](geografia.md) e [contatos duplicados](deduplicacao_weni.md).
 - [Google Ads](GOOGLE%20ADS.md).
+
+[Relatório técnico da otimização 1.5.12](RELATORIO%20OTIMIZACAO%201.5.12.md) — causas, benchmarks e limites da validação.
 
 ## Suporte e desenvolvimento
 

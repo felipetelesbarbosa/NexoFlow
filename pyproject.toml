@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nexoflow"
-version = "1.5.11"
+version = "1.5.12"
 description = "Sincronização de contatos e pedidos entre Weni, a API FarmaLíder e Google Sheets nos segmentos FarmaLíder e Pets Líder."
 requires-python = ">=3.11"
 dynamic = ["dependencies", "optional-dependencies"]
@@ -56,6 +56,7 @@ py-modules = [
   "runtime_profile",
   "recompra_group_audit",
   "recompra",
+  "recompra_incremental",
   "recompra_cleanup",
   "recompra_profiles",
   "run_checkup_tests",

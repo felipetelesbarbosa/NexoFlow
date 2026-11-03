@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>NexoFlow 1.5.11 - Documentação</title>
+  <title>NexoFlow 1.5.12 - Documentação</title>
   <style>
     html {
       color: #1a1a1a;
@@ -170,9 +170,9 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">NexoFlow 1.5.11 - Documentação</h1>
+<h1 class="title">NexoFlow 1.5.12 - Documentação</h1>
 </header>
-<h1 id="nexoflow-1511--guia-de-operação">NexoFlow 1.5.11 — Guia de
+<h1 id="nexoflow-1512--guia-de-operação">NexoFlow 1.5.12 — Guia de
 operação</h1>
 <p>O NexoFlow integra Weni e a API FarmaLíder para <strong>FarmaLíder e
 Pets Líder</strong>, mantendo dados separados por perfil. O objetivo é
@@ -227,22 +227,27 @@ confirmações durante a carga.</td>
 </tr>
 </tbody>
 </table>
-<h2 id="atualização-1511">Atualização 1.5.11</h2>
-<p>O Setup preserva configurações, credenciais, logs, estado e
-importações sem mover essas pastas. A Recompra FARMA usa a base geral
-por fase e registra o histórico uma vez por índice. Nos dois segmentos,
-integrante sem pedido validado após sete dias completos de
-<code>pedido_data</code> na Weni é retirado preventivamente do grupo,
-mantendo cadastro, histórico e revalidação. Datas ausentes ou inválidas
-não autorizam inferir prazo.</p>
-<p>Gere nova revisão após atualizar; preserve estado e auditoria. A
-aplicação reconfere a fonte e o contato antes da remoção, e a reentrada
-mantém as proteções de evento futuro e repetição. Consulte o <a
-href="README%20RECOMPRA.md">guia de Recompra</a>. As campanhas continuam
-enviando exclusivamente no D+25 Farma e D+30 Pets.</p>
+<h2 id="atualização-1512">Atualização 1.5.12</h2>
+<p>O Pets deixa de calcular ou exigir maioridade na criação e no
+enriquecimento; idade continua informativa. A conferência do endereço
+acompanha o segmento do pedido. A FarmaLíder mantém suas regras
+cadastrais.</p>
+<p>Na Recompra, a primeira carga e a completa continuam cobrindo todos
+os contatos. As incrementais seguintes reutilizam o estado por segmento,
+buscam os contatos alterados na Weni e comparam a base geral atual para
+identificar novas compras, cancelamentos, prazos e pendências.
+Persistência somente local não gera GET Weni nem POST por contato.
+Cargas completas reutilizam o mesmo índice da API e enviam somente
+diferenças reais.</p>
+<p>Preserve estado e auditoria e gere nova revisão após atualizar. A
+campanha continua preparando referências futuras e enviando
+exclusivamente no D+25 Farma ou D+30 Pets, sem retroativos. Confira as
+<a href="README%20RECOMPRA.md">regras da Recompra</a> e o <a
+href="RELATORIO%20OTIMIZACAO%201.5.12.md">relatório de otimização</a>,
+que distingue benchmarks sintéticos de validação em produção.</p>
 <h2 id="antes-de-começar">Antes de começar</h2>
 <p>Instale pelo <a
-href="https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.11">Setup
+href="https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.12">Setup
 oficial</a>, configure suas próprias credenciais e compartilhe as
 planilhas com a conta de serviço Google. O diretório padrão é
 <code>C:\NexoFlow</code>. Confira os requisitos e os campos necessários
@@ -421,4 +426,4 @@ href="RASTREAMENTO_META.md">regras e instruções de Oscarzinho e
 Lili</a>.</p>
 </body>
 </html>
-<!-- NexoFlow documentation: source-sha256=5100434926b52d14b1e852840e68e213053048e68709a7304886d5389b316ad2 content-sha256=31404a600c5bfae91464a41d957d263d1d653444cd4ab26e6216a6d5e7c0d999 -->
+<!-- NexoFlow documentation: source-sha256=cc624af383032651d5a1cb8a3bd0bacea17d121e903f030ec765c2e770a40a76 content-sha256=c8847fc8d209461b9cfac04a9057ee2acdf280b3044eecd1329b177375f4d749 -->

@@ -8,7 +8,7 @@ Os snapshots são gerados novamente a cada execução e aplicados sem abrir Bloc
 
 Na Weni, tanto a incremental quanto a carga completa aplicam o snapshot auditado sem recalcular o plano. Cada contato é relido antes da gravação; conflitos e falhas isoladas ficam pendentes para a próxima incremental, sem cancelar os demais. O checkpoint fica no corte da simulação para recuperar mensagens e mudanças posteriores.
 
-Os modos incrementais ainda percorrem a base para descobrir novas compras e mudanças que não alteram a data do contato. A opção completa usa 100% da base; o Analytics final permanece incremental para refletir a Recompra. O programa não importa arquivos XLSX e não configura o agendamento automaticamente.
+Na Recompra 1.5.12, a incremental usa o cache do segmento, contatos Weni alterados desde o cursor com 15 minutos de sobreposição, hashes da base geral atual e os próximos prazos. Reavalia pendências sem cancelar os demais contatos; sem cache compatível, faz a coleta inicial completa. A consulta geral pode continuar integral para descobrir compras que não mudam `modified_on` da Weni, mas isso não obriga milhares de GET/POST individuais. A opção completa cobre 100% da base e conserva o reaproveitamento das consultas. O Analytics final permanece incremental para refletir a Recompra. O programa não importa arquivos XLSX e não configura o agendamento automaticamente.
 
 ## Agendar no Windows
 
@@ -33,7 +33,7 @@ Tarefas agendadas sem console interativo encerram ao terminar e preservam o cód
 
 Cada execução preserva seus arquivos em `logs/noturno/<execução>/` (Farma) ou `logs/PET/noturno/<execução>/` (Pets): `resultado.json`, `execucao.log` e os snapshots de Weni e Recompra. Os relatórios são privados e podem conter dados de contatos; não os publique.
 
-Código **0** indica sequência concluída; **3**, resultado com pendências; outros códigos indicam interrupção. O resumo registra a etapa e o código de saída. Falha crítica ou Analytics parcial impede as etapas seguintes. Pendências isoladas da Weni ficam para a próxima incremental.
+Código **0** indica sequência concluída; **3**, resultado com pendências; outros códigos indicam interrupção. O resumo registra a etapa e o código de saída. Falha crítica impede as etapas seguintes; pendências individuais seguem o tratamento específico de cada etapa. Pendências isoladas da Weni ficam para a próxima incremental.
 
 Na Recompra, contatos com erro de consulta não recebem alterações nem nova inclusão. Os demais são revalidados e aplicados, e o Analytics final continua mesmo com pendências isoladas. O resultado permanece com código **3**, sem apresentar a execução como totalmente concluída. A próxima carga gera uma nova revisão e reconsulta os pendentes. Estado/auditoria indisponível, revisão inválida e resultado incerto após POST continuam interrompendo a rotina.
 
@@ -52,3 +52,7 @@ Na 1.5.7, falhas individuais de consulta no Analytics permanecem pendentes sem i
 Na 1.5.8, `ultimoPedido: null` é tratado como cliente sem pedido, sem erro de consulta ou validação de segmento de um pedido inexistente. Não gera venda ou inclusão na Recompra, não tenta substituir o null por um pedido antigo da Weni e não apaga o histórico armazenado. O próximo carregamento consulta novamente a fonte oficial.
 
 Na 1.5.9, a etapa Weni consulta eventos CTWA e reconcilia anúncios; o Analytics seguinte leva os campos aos destinos do segmento. A Recompra não usa clique como prova de venda. Pendências Meta conservam cursor separado. Veja [Anúncios Meta](RASTREAMENTO_META.md).
+
+## Correções da 1.5.12
+
+A preparação PET não exige, calcula ou grava maioridade. O endereço deve corresponder ao pedido do mesmo segmento. A etapa Recompra separa persistência somente local de escrita remota e usa a seleção incremental descrita no [guia de Recompra](README%20RECOMPRA.md). A política de D+25/D+30, recusas, cancelamentos, auditoria e proteção contra repetição permanece ativa. Benchmarks e limites da validação estão no [relatório técnico](RELATORIO%20OTIMIZACAO%201.5.12.md).

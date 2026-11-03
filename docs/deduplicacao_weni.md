@@ -11,12 +11,14 @@ Antes da aplicação, encerre outras cargas de Analytics, Planilhas e Recompra. 
 
 ## Critérios
 
-- O mesmo CPF matematicamente válido, inclusive após reposição comprovada de zeros à esquerda, deve identificar um único cliente na API.
-- O telefone **nativo** da Weni deve identificar um único contato correto entre todos os contatos, incluindo o DDD. Campos copiados de telefone, nomes iguais, emojis e sobrenomes não decidem uma exclusão.
-- Todos os pedidos referenciados pelo duplicado, inclusive nas planilhas e no histórico, precisam ter o mesmo proprietário no endpoint de pedido por ID. Essas consultas comprovam propriedade para a exclusão; não alteram status, produtos ou valores de pedidos antigos.
-- Contatos sem pedido também podem ser deduplicados pelo CPF válido e pelo telefone nativo único.
-- CPF inválido ou genérico, telefone ambíguo, pedido de outro cliente, histórico conflitante e falha de API permanecem pendentes. Compartilhar `0` não comprova duplicidade.
-- Recusas de LGPD e marketing são preservadas no contato correto. Não há transferência automática de Opt-In. Bloqueio ou parada sem proteção equivalente no contato correto impede a exclusão.
+- O mesmo CPF matematicamente válido, inclusive após reposição comprovada de zeros à esquerda, deve identificar um único cliente oficial na API. Nome igual, sobrenome, emoji ou CPF genérico não comprovam duplicidade.
+- Os pedidos considerados incluem referências da Weni e do histórico registrado. Cada pedido precisa ter o mesmo proprietário comprovado na API; a conferência não altera produtos, status ou valores financeiros antigos.
+- Se apenas um contato tem pedidos comprovados, esse contato é preservado e os contatos sem pedido podem ser consolidados nele após a auditoria.
+- Contatos com o **mesmo conjunto de pedidos** podem ser deduplicados. Se os conjuntos são diferentes, inclusive por um pedido histórico adicional, ambos são preservados. O critério não é somente a semelhança de produtos ou do valor.
+- Havendo contatos preservados com pedidos diferentes, os nomes recebem numeração estável, como `Nome completo 1`, `Nome completo 2`. A mudança tem revisão e nova conferência de identidade/referências; não altera CPF, consentimento ou pedido. Perfis com pedidos distintos não têm a referência sobrescrita para transformar todos no mesmo último pedido; um pedido oficial posterior retira a referência antiga da Recompra quando aplicável, preservando o cadastro.
+- Sem pedidos em todos os contatos, permanece a exigência de CPF válido e telefone **nativo** único para identificar o contato correto. Telefone copiado para um campo personalizado não substitui essa comprovação.
+- CPF inválido/genérico, proprietário divergente, histórico conflitante, identidade oficial ambígua e falha de API permanecem pendentes. A identificação de CPF com vários contatos Weni não deve ser confundida com vários candidatos da própria API.
+- Recusas de LGPD e marketing são preservadas no contato correto, inclusive `opt_in_marketing` no PET. Não há transferência automática de Opt-In. Bloqueio ou parada sem proteção equivalente impede a exclusão.
 
 Esses critérios para **apagar um contato** não alteram as regras para validar vendas: CPF válido continua dispensando comparação de nome, telefone e e-mail; CPF inválido mantém a validação por primeiro nome ou número local.
 
@@ -28,7 +30,7 @@ Os pedidos e itens reais são vinculados ao contato correto, preservando seus ID
 
 A rotina descobre os arquivos de Operação, Histórico e dashboard pela configuração `NexoFlow_Arquivos`; também aceita instalações com um único arquivo. Não altera as fontes do Data Studio, os períodos dos indicadores nem os marcos incrementais do Analytics.
 
-O snapshot complementar `*_duplicados.json` acompanha a revisão da Weni. Novas instalações exigem um novo dry-run: uma revisão antiga não autoriza exclusões.
+O snapshot complementar `*_duplicados.json` acompanha a revisão da Weni. A política da 1.5.12 exige um novo dry-run: uma revisão destrutiva anterior não autoriza exclusões ou renomeações sob a regra nova.
 
 Os comprovantes e backups ficam em `logs/duplicados/`, fora dos pacotes e do Git. Preserve-os durante uma recuperação. Lotes incompletos já revisados são retomados antes de novos lotes, sem repetir uma exclusão de contato confirmada. Resultados incertos de exclusões de linhas não são reenviados automaticamente: a rotina confere o estado e, se não conseguir comprová-lo, mantém apenas o lote pendente para nova conferência, sem cancelar a carga Weni. Não apague comprovantes ou arquivos de lock com uma execução ativa.
 
