@@ -1259,4 +1259,4 @@ def resolve_contact_order(
     return fallback_order, fallback_items
 
 
-# NexoFlow 1.5.10
+# NexoFlow 1.5.11
