@@ -40,3 +40,10 @@ class CheckupOutputTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("FALHA_SINTETICA_VISIVEL", error)
         self.assertIn("FLUXO_SIMULADO_DO_TESTE", output + error)
+
+    def test_opt_in_verbose_mode_identifies_tests_but_still_buffers_mock_output(self):
+        with patch.dict("os.environ", {"NEXOFLOW_CHECKUP_VERBOSE": "1"}):
+            code, output, error = self.invoke(False)
+        self.assertEqual(code, 0)
+        self.assertIn("runTest", error)
+        self.assertNotIn("FLUXO_SIMULADO_DO_TESTE", output + error)

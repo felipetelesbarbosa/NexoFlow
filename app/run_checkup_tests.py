@@ -26,7 +26,10 @@ def main() -> int:
             suite = unittest.defaultTestLoader.discover(
                 "tests", pattern="test_*.py", top_level_dir="."
             )
-            result = unittest.TextTestRunner(verbosity=0, buffer=True).run(suite)
+            runner = unittest.TextTestRunner(verbosity=0, buffer=True)
+            if os.environ.get("NEXOFLOW_CHECKUP_VERBOSE") == "1":
+                runner.verbosity = 2
+            result = runner.run(suite)
     return 0 if result.wasSuccessful() else 1
 
 

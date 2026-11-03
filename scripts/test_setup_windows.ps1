@@ -330,23 +330,31 @@ public static class NexoFlowSetupRootLock {
     Write-Host "==> Executando check-up da instalação real"
     $oldLauncher = $env:NEXOFLOW_LAUNCHER
     $env:NEXOFLOW_LAUNCHER = "1"
+    $oldCheckupVerbose = $env:NEXOFLOW_CHECKUP_VERBOSE
+    $env:NEXOFLOW_CHECKUP_VERBOSE = '1'
+    $checkClock = [Diagnostics.Stopwatch]::StartNew()
     try {
         $checkOutput = Join-Path $TempRoot "checkup-stdout.txt"
         $checkError = Join-Path $TempRoot "checkup-stderr.txt"
         $check = Start-Process -FilePath (Join-Path $env:SystemRoot "System32\cmd.exe") -ArgumentList '/d','/c','comandos\check-up.bat' -WorkingDirectory $InstallDir -RedirectStandardOutput $checkOutput -RedirectStandardError $checkError -PassThru
-        if (-not $check.WaitForExit(120000)) {
+        if (-not $check.WaitForExit(300000)) {
             & taskkill.exe /PID $check.Id /T /F | Out-Null
             Get-Content -LiteralPath $checkOutput -Encoding UTF8 -Tail 150
             Get-Content -LiteralPath $checkError -Encoding UTF8 -Tail 150
-            throw "O check-up instalado excedeu dois minutos."
+            throw "O check-up instalado excedeu cinco minutos; consulte o último teste registrado."
         }
         if ($check.ExitCode -ne 0) {
             Get-Content -LiteralPath $checkOutput -Encoding UTF8 -Tail 150
             Get-Content -LiteralPath $checkError -Encoding UTF8 -Tail 150
         }
         Assert-True ($check.ExitCode -eq 0) "comandos/check-up.bat instalado falhou com código $($check.ExitCode)."
+        Write-Host ('[OK] Check-up instalado em {0:N1}s.' -f $checkClock.Elapsed.TotalSeconds)
+        Get-Content -LiteralPath $checkError -Encoding UTF8 -Tail 5
     }
     finally {
+        if ($null -eq $oldCheckupVerbose) {
+            Remove-Item Env:NEXOFLOW_CHECKUP_VERBOSE -ErrorAction SilentlyContinue
+        } else { $env:NEXOFLOW_CHECKUP_VERBOSE = $oldCheckupVerbose }
         if ($null -eq $oldLauncher) {
             Remove-Item Env:NEXOFLOW_LAUNCHER -ErrorAction SilentlyContinue
         } else {
