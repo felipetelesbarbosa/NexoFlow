@@ -104,3 +104,20 @@ O plano de reutilização direta do cliente pelo Analytics, com grão diário, m
 Foram executados 19 testes offline do conector com o SDK MCP instalado em ambiente separado, incluindo initialize/tools/list/tools/call por STDIO; 1.575 testes do projeto passaram (68 específicos de ambiente ignorados). Lint e auditoria de consistência passaram. Nenhum token real foi lido e nenhuma consulta à Meta ou escrita de produção foi executada. A instalação PowerShell/Python 3.14 é conferida pelo workflow dedicado e ainda precisa ser executada no computador do usuário. O registro real no Codex desse computador permanece pendente.
 
 Commits preparatórios usam `[skip release]`: verificações continuam ativas, mas o workflow operacional não empacota nem publica essas alterações. A versão permanece 1.5.12.
+
+## Codex CLI durante o Setup
+
+O Codex CLI é necessário para usar este MCP no Codex local. O cliente MetaAdsClient poderá ser reutilizado pelo Analytics sem Codex. O Setup oferece a integração opcional: em Preserve, valida e reaproveita instalações compatíveis; em Clean, reinstala os componentes selecionados, recriando somente o ambiente virtual MCP. A opção interativa Clean vem afirmativa, e Preserve exige seleção; instalações não interativas só executam o extra com `-InstallMetaAdsMcp`.
+
+O instalador detecta capacidades do Codex CLI antes de baixar software. Quando necessário, utiliza o instalador standalone oficial em `https://chatgpt.com/codex/install.ps1`, documentado no [README oficial do Codex](https://github.com/openai/codex/blob/main/README.md). Não exige Node.js para esse método. O processo preserva configurações e autenticação do Codex e os demais servidores MCP. Login e token Meta são configurados manualmente, na sessão do usuário final. Se o Setup estiver sob outra identidade administrativa, a integração fica pendente para execução pelo usuário correto.
+
+Auxiliares para uma instalação local já existente:
+
+```powershell
+cd C:\NexoFlow
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\instalar_meta_ads_mcp.ps1 -InstalarCodex
+# Reinstalar explicitamente a integração, preservando credenciais existentes do auxiliar:
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\instalar_meta_ads_mcp.ps1 -InstalarCodex -Reinstall
+```
+
+Uma falha opcional não desfaz o NexoFlow básico: o resultado é registrado em `logs/meta_ads_mcp_instalacao.json`, sem token. Configuração MCP divergente é preservada e exige conferência; não é sobrescrita automaticamente. Os novos auxiliares estão no código GitHub; o Setup 1.5.12 já publicado não foi substituído. A disponibilização em um novo pacote depende de autorização de release.

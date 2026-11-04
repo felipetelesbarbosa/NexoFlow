@@ -1,6 +1,7 @@
 ﻿[CmdletBinding()]
 param(
     [switch]$NonInteractive,
+    [switch]$InstallMetaAdsMcp,
     [ValidateSet('Preserve', 'Clean', 'Cancel')][string]$InstallMode = 'Preserve'
 )
 
@@ -58,6 +59,36 @@ function Exit-NexoMaintenance {
     if ($script:NexoMaintenanceHandles) {
         foreach ($handle in $script:NexoMaintenanceHandles) { $handle.Dispose() }
         $script:NexoMaintenanceHandles.Clear()
+    }
+}
+
+function Invoke-OptionalMetaAdsSetup {
+    param([switch]$Selected, [switch]$Unattended, [string]$Mode = 'Preserve')
+    $requested = [bool]$Selected
+    if (-not $requested -and -not $Unattended) {
+        if ($Mode -eq 'Clean') {
+            $answer = Read-Host 'A instalação limpa inclui reinstalar Codex CLI e Meta Ads MCP local. Continuar integração? [S/n]'
+            $requested = ($answer.Trim().ToLowerInvariant() -notin @('n','não','nao'))
+        } else {
+            $answer = Read-Host 'Instalar/validar Codex CLI e Meta Ads MCP local (somente leitura)? [s/N]'
+            $requested = ($answer.Trim().ToLowerInvariant() -in @('s','sim'))
+        }
+    }
+    if (-not $requested) { return }
+    $statusFile = Join-Path $InstallDir 'logs/meta_ads_mcp_instalacao.json'
+    try {
+        $helper = Join-Path $InstallDir 'scripts/instalar_meta_ads_mcp.ps1'
+        if (-not (Test-Path -LiteralPath $helper -PathType Leaf)) { throw 'Auxiliar Meta Ads MCP não encontrado na instalação.' }
+        & $helper -InstalarCodex -Reinstall:($Mode -eq 'Clean')
+        $status = @{ componente = 'Meta Ads MCP'; status = 'instalado'; codex_login = 'manual'; acesso_meta = 'nao_validado'; atualizado_em = (Get-Date).ToUniversalTime().ToString('o') }
+        $status | ConvertTo-Json | Set-Content -LiteralPath $statusFile -Encoding UTF8
+        Write-Host '[OK] Codex CLI e Meta Ads MCP instalados/validados. Login e token são configurados localmente pelo usuário.' -ForegroundColor Green
+    } catch {
+        # O programa principal já foi instalado. Não restaurar/apagar NexoFlow
+        # nem credenciais porque uma integração opcional ficou pendente.
+        $status = @{ componente = 'Meta Ads MCP'; status = 'pendente'; proxima_acao = 'Executar scripts/instalar_meta_ads_mcp.ps1 -InstalarCodex na sessão Windows do usuário final'; atualizado_em = (Get-Date).ToUniversalTime().ToString('o') }
+        try { $status | ConvertTo-Json | Set-Content -LiteralPath $statusFile -Encoding UTF8 } catch { }
+        Write-Warning 'NexoFlow instalado. Codex/Meta Ads MCP ficaram pendentes. Execute o auxiliar na sessão Windows do usuário final; confira logs/meta_ads_mcp_instalacao.json. Configurações existentes foram preservadas.'
     }
 }
 
@@ -751,7 +782,7 @@ function Show-InstallModeDialog {
         $label = New-Object System.Windows.Forms.Label
         $label.Location = New-Object System.Drawing.Point(20, 20)
         $label.Size = New-Object System.Drawing.Size(620, 185)
-        $label.Text = "Já existem arquivos do NexoFlow neste computador.`n`nAtualizar mantendo dados: mantém configurações, credenciais, logs e estado local.`n`nInstalação limpa: reinicia esses dados para FarmaLíder e Pets Líder. Será necessário configurar os acessos novamente.`n`nOs arquivos de importacoes são preservados nas duas opções."
+        $label.Text = "Já existem arquivos do NexoFlow neste computador.`n`nAtualizar mantendo dados: mantém configurações, credenciais, logs e estado local.`n`nInstalação limpa: reinicia esses dados para FarmaLíder e Pets Líder; a integração opcional selecionada reinstala Codex CLI e MCP local. Será necessário configurar os acessos novamente.`n`nOs arquivos de importacoes são preservados nas duas opções."
         $form.Controls.Add($label)
 
         foreach ($choice in @(
@@ -780,7 +811,7 @@ function Show-InstallModeDialog {
 function Read-InstallModeFromConsole {
     while ($true) {
         Write-Host '[1] Atualizar mantendo configurações, credenciais, logs e estado local'
-        Write-Host '[2] Instalação limpa — reiniciar esses dados nos dois segmentos'
+        Write-Host '[2] Instalação limpa — reiniciar dados; reinstalar Codex/MCP se selecionados'
         Write-Host '[0] Cancelar'
         Write-Host 'Os arquivos de importacoes serão preservados.'
         switch ((Read-Host 'Escolha uma opção')) {
@@ -1640,6 +1671,7 @@ try {
     $hasSecrets = Test-Path -LiteralPath (Join-Path $InstallDir 'secrets_config.py') -PathType Leaf
     $hasGoogle = Test-Path -LiteralPath (Join-Path $InstallDir 'credentials\google_credentials.json') -PathType Leaf
     Write-Host "`n[OK] $AppName instalado com sucesso." -ForegroundColor Green
+    Invoke-OptionalMetaAdsSetup -Selected:$InstallMetaAdsMcp -Unattended:$NonInteractive -Mode $selectedMode
     if ($hasSecrets -and $hasGoogle) {
         Show-Info "NexoFlow foi instalado/atualizado com sucesso.`n`nOs atalhos NexoFlow Analytics, NexoFlow Weni, NexoFlow Terminal, NexoFlow Planilha e NexoFlow Noturno foram criados na Área de Trabalho.`n`nNexoFlow Weni executa check-up, teste de conexões, dry-run/auditoria obrigatória e somente depois permite aplicar as alterações."
     } else {

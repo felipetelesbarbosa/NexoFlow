@@ -63,8 +63,8 @@ class StdioProtocolTests(unittest.IsolatedAsyncioTestCase):
                 )
             )
             bootstrap = (
-                "import runpy,socket; "
-                "socket.socket.connect=lambda *a,**k: (_ for _ in ()).throw(RuntimeError('FAKE_SECRET_NEVER_RETURN')); "
+                "import runpy,requests; "
+                "requests.Session.request=lambda *a,**k: (_ for _ in ()).throw(RuntimeError('FAKE_SECRET_NEVER_RETURN')); "
                 f"runpy.run_path({str(target / 'server.py')!r},run_name='__main__')"
             )
             params = StdioServerParameters(
