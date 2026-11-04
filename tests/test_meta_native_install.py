@@ -82,6 +82,11 @@ Assert-Native ([IO.File]::ReadAllText((Join-Path $target $meta)) -eq 'credencial
 """)
 
     def test_build_guard_rejects_private_meta_file_without_reading_it(self):
+        # O pacote operacional não distribui o script de build. A proteção é
+        # exercitada no checkout de desenvolvimento e pelos jobs de release;
+        # no check-up da instalação não há arquivo a validar.
+        if not (ROOT / "scripts" / "build_release.ps1").is_file():
+            self.skipTest("Script de build não integra o pacote operacional.")
         self.run_ps(r"""
 $tokens=$null;$errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'scripts/build_release.ps1'),[ref]$tokens,[ref]$errors)
