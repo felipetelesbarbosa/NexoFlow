@@ -98,3 +98,7 @@ Os três IDs de planilha podem ser configurados em cada perfil do `secrets_confi
 ## Anúncios Meta e IA Manager
 
 O Weni consulta eventos oficiais CTWA para completar e conferir os campos de anúncios de FARMA e PET. Oscarzinho e Lili podem tentar o preenchimento imediato; o NexoFlow reconcilia os dados disponíveis sem depender da decisão do agente. Analytics leva os campos à Base_Contatos e aos pedidos, e atualiza BI_Ads; o Noturno usa as mesmas etapas. Confira [regras, limites e instruções dos agentes](docs/RASTREAMENTO_META.md).
+
+### Meta Ads MCP local (opcional)
+
+O [conector Meta Ads](docs/META%20ADS%20MCP%20LOCAL.md) oferece seis ferramentas somente de leitura ao Codex por STDIO. A credencial fica exclusivamente no arquivo privado `credentials/mcp/meta_ads_credentials.json`. A integração de relatórios ao Analytics está [planejada separadamente](docs/PLANO%20META%20ADS%20ANALYTICS.md); não altera campanhas, planilhas ou dashboards automaticamente.

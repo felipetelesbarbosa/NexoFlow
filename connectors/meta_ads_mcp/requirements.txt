@@ -1,0 +1,3 @@
+# SDK MCP v1 compatível com FastMCP. Atualizar para v2 exige migração da API.
+mcp>=1.28,<2
+requests>=2.33,<3

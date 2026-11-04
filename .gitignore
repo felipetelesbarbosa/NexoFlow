@@ -47,3 +47,9 @@ logs/delivery_historico/
 *.p12
 *.pem
 *.key
+
+# MCP Meta: somente metadados públicos; nenhum JSON/token local.
+!credentials/mcp/
+credentials/mcp/*
+!credentials/mcp/.gitignore
+!credentials/mcp/README.md

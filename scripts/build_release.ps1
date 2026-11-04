@@ -39,6 +39,8 @@ function Assert-PublicTrackedFiles {
         "configuracao/secrets_config.example_webhook.txt",
         "app/secrets_config.pyi",
         "credentials/coloque_a_credencial_google_aqui.txt",
+        "credentials/mcp/.gitignore",
+        "credentials/mcp/README.md",
         "logs/.gitkeep"
     )
     $privatePatterns = @(

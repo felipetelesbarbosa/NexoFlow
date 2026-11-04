@@ -116,6 +116,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Os testes de leitura com a codificação padrão do Windows falharam." }
 
   validar-e-publicar:
+    # Integrações preparatórias explicitamente autorizadas sem release.
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip release]')
     needs: [qualidade, verificar-segredos, validar-python]
     runs-on: windows-latest
     permissions:
