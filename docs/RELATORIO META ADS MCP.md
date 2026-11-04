@@ -1,5 +1,7 @@
 # Integração Meta Ads MCP local — conferência técnica
 
+**Contexto:** este documento registra a fase preparatória que manteve a versão 1.5.12. A entrega 1.5.13 foi autorizada em 04/11/2026 e aguarda os checks do mesmo commit antes da publicação, preservando o release anterior. Para a operação nativa, consulte o [relatório atual](RELATORIO%20META%20ADS%20NATIVO.md).
+
 ## Alterações
 
 Conector opcional em `connectors/meta_ads_mcp`, com cliente reutilizável sem dependência do servidor MCP ou do Codex no futuro Analytics. Transporte STDIO, seis ferramentas de leitura, GET com host/caminhos fixos, allowlist de contas, verificação de ads_read e bloqueio de ads_management. Credenciais somente em `credentials/mcp/meta_ads_credentials.json`, ignoradas pelo Git; token fora de URL, cadastro Codex, exemplos e mensagens de erro.

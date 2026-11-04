@@ -388,7 +388,7 @@ class NativeSyncTests(unittest.TestCase):
                 )
             self.assertEqual(result["status"], "simulacao", result)
             loader.assert_called_once_with(
-                path / "credentials/mcp/meta_ads_credentials.json"
+                path.resolve() / "credentials/mcp/meta_ads_credentials.json"
             )
             self.assertFalse((path / "state").exists())
 

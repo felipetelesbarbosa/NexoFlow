@@ -189,6 +189,23 @@ class MetaNativePackagingTests(unittest.TestCase):
             )
         )
 
+    def test_build_toolchain_is_prepared_in_ci_and_installed_checkup(self):
+        # Python 3.14 não traz setuptools; versões antigas não atendem ao
+        # backend declarado. O check-up instalado executa o mesmo wheeltest.
+        bootstrap = (ROOT / "instalar.bat").read_text(encoding="utf-8")
+        command = 'app\\run_pip.py install "setuptools>=77" wheel'
+        self.assertIn(command, bootstrap)
+        self.assertLess(
+            bootstrap.index(command),
+            bootstrap.index("app\\run_pip.py install -r requirements.txt"),
+        )
+        workflow = ROOT / ".github/workflows/release-v1.yml"
+        if workflow.is_file():
+            text = workflow.read_text(encoding="utf-8")
+            self.assertEqual(
+                text.count('python -m pip install "setuptools>=77" wheel'), 2
+            )
+
     def test_wheel_offline_contains_native_modules_and_imports_client_without_sdk(self):
         with tempfile.TemporaryDirectory(prefix="nexo_native_wheel_") as temp:
             temp = Path(temp)

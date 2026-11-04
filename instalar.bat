@@ -112,6 +112,11 @@ echo Atualizando pip...
 if errorlevel 1 goto :erro_proxy
 
 echo.
+echo Preparando ferramentas do check-up e empacotamento...
+".venv\Scripts\python.exe" app\run_pip.py install "setuptools>=77" wheel
+if errorlevel 1 goto :erro_proxy
+
+echo.
 echo Instalando dependências...
 ".venv\Scripts\python.exe" app\run_pip.py install -r requirements.txt
 if errorlevel 1 goto :erro_proxy

@@ -1,4 +1,4 @@
-# NexoFlow 1.5.12 — Recompra FarmaLíder e Pets Líder
+# NexoFlow 1.5.13 — Recompra FarmaLíder e Pets Líder
 
 O NexoFlow mantém a elegibilidade dos grupos; a **campanha Weni envia as mensagens**. Use o mesmo executável Recompra e escolha o segmento. Cada marca mantém sua organização, template, campanha, fluxo, evento, revisão e estado.
 

@@ -103,7 +103,7 @@ O plano de reutilização direta do cliente pelo Analytics, com grão diário, m
 
 Foram executados 19 testes offline do conector com o SDK MCP instalado em ambiente separado, incluindo initialize/tools/list/tools/call por STDIO; 1.575 testes do projeto passaram (68 específicos de ambiente ignorados). Lint e auditoria de consistência passaram. Nenhum token real foi lido e nenhuma consulta à Meta ou escrita de produção foi executada. A instalação PowerShell/Python 3.14 é conferida pelo workflow dedicado e ainda precisa ser executada no computador do usuário. O registro real no Codex desse computador permanece pendente.
 
-Commits preparatórios usam `[skip release]`: verificações continuam ativas, mas o workflow operacional não empacota nem publica essas alterações. A versão permanece 1.5.12.
+Na fase preparatória, os commits usaram `[skip release]` e preservaram a versão 1.5.12. A entrega **1.5.13**, autorizada em 04/11/2026, distribui a integração nativa e os auxiliares opcionais somente após validar o pacote do mesmo commit. Não substitui o release anterior.
 
 ## Codex CLI durante o Setup
 
@@ -120,4 +120,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\instalar_meta_ads_
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\instalar_meta_ads_mcp.ps1 -InstalarCodex -Reinstall
 ```
 
-Uma falha opcional não desfaz o NexoFlow básico: o resultado é registrado em `logs/meta_ads_mcp_instalacao.json`, sem token. Configuração MCP divergente é preservada e exige conferência; não é sobrescrita automaticamente. Os novos auxiliares estão no código GitHub; o Setup 1.5.12 já publicado não foi substituído. A disponibilização em um novo pacote depende de autorização de release.
+Uma falha opcional não desfaz o NexoFlow básico: o resultado é registrado em `logs/meta_ads_mcp_instalacao.json`, sem token. Configuração MCP divergente é preservada e exige conferência; não é sobrescrita automaticamente. O Setup 1.5.12 publicado não foi substituído. Os auxiliares integram a entrega 1.5.13 autorizada, sujeita aos checks e à validação do pacote antes de ser anunciada como disponível.

@@ -1,6 +1,6 @@
 # Plano de integração Meta Ads com Analytics
 
-Estado: a implementação nativa está disponível no código, com ativação explícita e fontes independentes dos schemas legados. Veja o [guia operacional](META%20ADS%20NATIVO.md) e o [relatório técnico](RELATORIO%20META%20ADS%20NATIVO.md). Nenhuma planilha ou dashboard de produção foi alterado nesta entrega. A versão permanece 1.5.12, sem novo release.
+Estado: a implementação nativa está disponível no código, com ativação explícita e fontes independentes dos schemas legados. Veja o [guia operacional](META%20ADS%20NATIVO.md) e o [relatório técnico](RELATORIO%20META%20ADS%20NATIVO.md). Nenhuma planilha ou dashboard de produção foi alterado nesta entrega. A entrega 1.5.13 foi autorizada e aguarda os checks do pacote antes da publicação.
 
 ## Contratos existentes conferidos no código
 
@@ -74,7 +74,7 @@ Não declarar causalidade ou atribuição individual usando apenas o ID de anún
 
 ## Pendências desta fase
 
-A operação nativa não exige registro STDIO nem Codex. A instalação final no computador do usuário e a ativação das novas fontes ainda precisam ser conferidas. Foi validada uma consulta real limitada de leitura à Meta; testes de escrita usam Sheets simulado. Não houve escrita em planilhas, edição de campanhas ou publicação de release para esta integração.
+A operação nativa não exige registro STDIO nem Codex. A instalação final no computador do usuário e a ativação das novas fontes ainda precisam ser conferidas. Foi validada uma consulta real limitada de leitura à Meta; testes de escrita usam Sheets simulado. Não houve escrita em planilhas nem edição de campanhas nos testes. A publicação 1.5.13 foi autorizada, mas só será anunciada depois da validação do mesmo commit.
 
 ## Dashboard de referência informado
 

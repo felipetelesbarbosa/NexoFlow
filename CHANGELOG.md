@@ -1,11 +1,12 @@
-# NexoFlow 1.5.12 — Changelog
+# NexoFlow 1.5.13 — Changelog
 
-## Alterações posteriores — sem novo release
+## NexoFlow 1.5.13 — 04/11/2026
 
 - Integração nativa Meta Ads no Analytics e no Noturno, reutilizando o cliente Python somente de leitura, sem depender de Codex CLI ou servidor MCP.
 - Novas fontes diárias e catálogos preservam os schemas anteriores. Evidências Weni separam FARMA/PET e impedem atribuição integral duplicada de custos compartilhados.
 - Simulação, revisão de destinos/schemas, upsert idempotente, retomada, checkpoints próprios e invalidação de conversões canceladas. Credencial Meta preservada também no modo Clean do Setup.
-- Consulte o [relatório técnico](docs/RELATORIO%20META%20ADS%20NATIVO.md) e o [guia de ativação](docs/META%20ADS%20NATIVO.md). Não houve escrita em planilhas ou edição dos dashboards de produção; a versão permanece inalterada.
+- Confirmação explícita de schemas e destinos, credencial/allowlist mantidas no arquivo local e importação do wheel sem SDK MCP. O ambiente de validação e o check-up instalado preparam setuptools/wheel, sem tornar MCP uma dependência da integração nativa.
+- Consulte o [relatório técnico](docs/RELATORIO%20META%20ADS%20NATIVO.md) e o [guia de ativação](docs/META%20ADS%20NATIVO.md). Não houve escrita em planilhas ou edição dos dashboards de produção durante os testes. A publicação 1.5.13 foi autorizada e exige validação própria do mesmo commit, sem substituir o release 1.5.12.
 
 ## NexoFlow 1.5.12 — Em validação
 

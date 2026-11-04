@@ -55,10 +55,16 @@ Siga [Meta Ads nativo](META%20ADS%20NATIVO.md). Faça primeiro uma simulação, 
 
 As fontes estão preparadas para as páginas Anúncios e Pedidos dos Anúncios. A edição dos relatórios Data Studio, seus gráficos e filtros ainda depende de acesso à configuração do relatório. Nenhum dashboard foi anunciado como atualizado. O detalhe deve manter data da compra separada da exposição e evitar junção que replique investimento por item/pedido.
 
-Não foi alterada a versão nem publicado novo release. A instalação operacional do novo código depende de um futuro pacote autorizado; não copiar módulos manualmente sobre a instalação como substituto do processo de distribuição.
+A publicação **NexoFlow 1.5.13** foi autorizada em **04/11/2026**. A versão está preparada e aguarda a conclusão dos checks e do pacote Windows do mesmo commit antes de ser anunciada como disponível. O release 1.5.12 não será substituído. Use o novo pacote validado; não copie módulos manualmente sobre a instalação como substituto da distribuição.
 
-## Verificações locais concluídas
+## Verificações locais da fase preparatória
 
 A regressão completa executou **1.673 testes**, com **70 ignorados** por requisitos de plataforma/ambiente, sem falhas. A suíte do cliente/MCP executou **27 testes**, sem falhas. O fluxo integrado em memória passou para FARMA e PET, incluindo simulação sem escrita, aplicação, repetição sem nova gravação e cancelamento com invalidação do vínculo. Os leitores JavaScript do Data Studio passaram em **20 testes**. Ruff, auditoria de consistência, correspondência da documentação HTML e verificação de segredos passaram; a auditoria de dependências principais não encontrou vulnerabilidades conhecidas.
 
 O wheel foi compilado e instalado em diretório temporário; os módulos nativos importaram sem SDK MCP a partir de outro diretório. A execução do Setup no computador do usuário e a ativação de fontes reais continuam distintas desses testes. As novas abas Meta não fazem continuação automática: ao faltar capacidade, preservam dados, registram pendência e não avançam checkpoint; continuações existentes das fontes de contatos/pedidos/itens são lidas normalmente.
+
+## Correções encontradas na validação Windows
+
+A primeira execução da matriz Windows identificou duas falhas no ambiente de teste: Python 3.11 tinha setuptools antigo sem o comando `bdist_wheel`, e Python 3.14 não tinha setuptools. O workflow agora prepara explicitamente `setuptools>=77` e `wheel`; o check-up da instalação nova recebe as mesmas ferramentas durante a preparação do ambiente. O teste de wheel permanece ativo, sem download de dependências dentro da fixture offline.
+
+Uma comparação de caminho no teste também precisava tratar o nome Windows curto `RUNNER~1` e o caminho expandido como o mesmo local. Essa conferência usa resolução de caminho; não altera token, seleção de conta ou permissões. A validação Windows deve ser repetida no commit final antes da publicação.

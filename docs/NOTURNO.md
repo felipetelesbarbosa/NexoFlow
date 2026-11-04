@@ -56,3 +56,7 @@ Na 1.5.9, a etapa Weni consulta eventos CTWA e reconcilia anúncios; o Analytics
 ## Correções da 1.5.12
 
 A preparação PET não exige, calcula ou grava maioridade. O endereço deve corresponder ao pedido do mesmo segmento. A etapa Recompra separa persistência somente local de escrita remota e usa a seleção incremental descrita no [guia de Recompra](README%20RECOMPRA.md). A política de D+25/D+30, recusas, cancelamentos, auditoria e proteção contra repetição permanece ativa. Benchmarks e limites da validação estão no [relatório técnico](RELATORIO%20OTIMIZACAO%201.5.12.md).
+
+## Integração Meta Ads da 1.5.13
+
+A etapa Analytics também executa a integração nativa Meta quando habilitada no perfil, sem iniciar Codex CLI ou servidor MCP. A simulação, revisão de schemas/destinos e os checkpoints por conta e segmento continuam obrigatórios. Nenhuma campanha é alterada. Veja o [guia Meta nativo](META%20ADS%20NATIVO.md) antes de ativar a primeira coleta.

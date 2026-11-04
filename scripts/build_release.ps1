@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.12",
+    [string]$Version = "1.5.13",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -413,15 +413,15 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-Corrige o enriquecimento e a criação de clientes Pets sem maioridade; mantém idade informativa e a conferência de endereço no segmento correto. FarmaLíder conserva suas regras cadastrais.
+Integração nativa Meta Ads no Analytics e no Noturno, sem exigir Codex CLI, servidor MCP ou SDK MCP na operação. O cliente consulta dados diários por anúncio e preserva moeda, fuso, contas permitidas e janela do relatório. Classificação FARMA/PET usa evidência oficial Weni; nomes não determinam o segmento e custos compartilhados não são duplicados integralmente.
 
-A Recompra incremental reutiliza cache e estado por segmento, busca contatos Weni modificados desde o cursor com sobreposição de 15 minutos e compara os dados atuais da base geral para revalidar mudanças, prazos e pendências. Primeira execução e carga completa mantêm cobertura integral. O índice em memória da API foi preservado; dados suficientes evitam consultas individuais redundantes, inclusive ultimoPedido null explícito no PET.
+As novas fontes Meta e conversões confirmadas são aditivas, com simulação, revisão explícita dos destinos/schemas, upsert idempotente, retomada e checkpoints por conta/perfil. Falha não vira investimento zero; a integração não altera campanhas. A credencial e a allowlist continuam somente no arquivo local e são preservadas também no Clean do Setup. Codex/MCP permanecem opcionais.
 
-Persistência somente local aparece separada das escritas Weni e não exige GET por contato. Checkpoint, revalidação antes de alterações e proteção contra repetição de inclusão permanecem ativos. As campanhas preparam referências futuras entre 0 e 25/30 dias e enviam somente D+25/D+30, sem retroativos. Recusas, cancelamentos e pagamentos inválidos continuam bloqueados.
+O ambiente de validação e o check-up instalado preparam as ferramentas de build declaradas, incluindo setuptools/wheel. A validação Windows cobre a mesma distribuição que será disponibilizada. O relatório técnico diferencia leitura real limitada da Meta, testes simulados de escrita e ativação ainda necessária das novas fontes; nenhum dashboard de produção é anunciado como editado.
 
-Deduplicação por CPF preserva contatos com pedidos diferentes e numera seus nomes; conjuntos iguais podem ser consolidados após revisão. Pedidos observados podem alimentar o histórico sem UUID Weni quando a identidade oficial estiver comprovada, sem atribuir canal WhatsApp à compra.
+As correções PET, a seleção incremental da Recompra, a deduplicação por pedidos e a preservação de histórico da 1.5.12 continuam mantidas. Os envios permanecem exclusivamente D+25 Farma e D+30 Pets, sem retroativos. O Setup mantém as configurações e dados locais na opção de atualização.
 
-Benchmarks sintéticos, causas identificadas e limites estão no relatório técnico da documentação. Não representam garantia de tempo na máquina do cliente. As configurações, credenciais, logs e histórico existentes continuam preservados no Setup de atualização.
+[Guia Meta nativo](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/META%20ADS%20NATIVO.md) · [Relatório técnico](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/RELATORIO%20META%20ADS%20NATIVO.md)
 
 A compilação suporta assinatura Authenticode com certificado de código confiável, timestamp e validação antes dos hashes. Sem certificado configurado, o pacote permanece sem assinatura; isso não é uma aprovação do Windows nem do antivírus. Consulte `RELATORIO DE SEGURANCA.json` dentro do ZIP.
 
@@ -433,4 +433,4 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.12
+# NexoFlow 1.5.13
