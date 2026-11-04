@@ -10,11 +10,17 @@ requires-python = ">=3.11"
 dynamic = ["dependencies", "optional-dependencies"]
 
 [tool.setuptools]
-package-dir = {"" = "app"}
+package-dir = {"" = "app", "connectors.meta_ads_mcp" = "connectors/meta_ads_mcp"}
+packages = ["connectors.meta_ads_mcp"]
 # Módulos públicos explícitos: configuração privada e pastas de dados ficam fora.
 py-modules = [
   "ad_attribution",
   "meta_events",
+  "meta_ads_native",
+  "meta_ads_evidence",
+  "run_meta_ads",
+  "meta_ads_model",
+  "meta_ads_sheets",
   "analytics",
   "versioning",
   "auditar_consistencia",

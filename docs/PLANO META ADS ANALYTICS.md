@@ -1,6 +1,6 @@
 # Plano de integração Meta Ads com Analytics
 
-Estado: proposta de evolução; nenhuma aba, esquema ou carga de produção foi alterada. O conector local pode ser reutilizado sem sessão Codex, mas sua instalação não ativa sincronização no Analytics ou no Noturno. A versão operacional permanece 1.5.12.
+Estado: a implementação nativa está disponível no código, com ativação explícita e fontes independentes dos schemas legados. Veja o [guia operacional](META%20ADS%20NATIVO.md) e o [relatório técnico](RELATORIO%20META%20ADS%20NATIVO.md). Nenhuma planilha ou dashboard de produção foi alterado nesta entrega. A versão permanece 1.5.12, sem novo release.
 
 ## Contratos existentes conferidos no código
 
@@ -14,9 +14,9 @@ Estado: proposta de evolução; nenhuma aba, esquema ou carga de produção foi 
 
 Os pedidos de `BI_Ads` passam por `_bi_valid_orders()` e excluem atribuição comprovadamente posterior à compra. A receita é a receita de pedidos confirmados da API FarmaLíder, não `action_values` ou `purchase_roas` da Meta.
 
-## Modelo proposto, sem migração automática
+## Modelo implementado, sem migração destrutiva
 
-Manter os schemas atuais e acrescentar futuramente uma tabela de fatos independente, mediante revisão de esquema e autorização. Nome sugerido: `Meta_Ads_Diario`. O nome e as colunas ainda não são contratos operacionais.
+Os schemas atuais são preservados. Os novos contratos estão em `app/meta_ads_model.py`: `Meta_Ads_Diario`, `Meta_Ads_Campanhas`, `Meta_Ads_Anuncios`, `BI_Meta_Resultados` e `BI_Meta_Conversoes`. A ativação exige conferir os destinos e revisar os novos schemas.
 
 Grão de uma linha: **conta + anúncio + dia na zona da conta + especificação de atribuição/relatório**. Chave idempotente sugerida: hash desses valores, com versão da política e dimensões de breakdown, se houver. IDs são texto; valores monetários usam decimal, com moeda explícita.
 
@@ -29,7 +29,7 @@ Campos mínimos propostos:
 - ações e valores atribuídos pela Meta, separados dos pedidos e receitas confirmados;
 - chave do fato, instante da consulta, completude/paginação e hash dos dados normalizados, sem token.
 
-O MCP atual permite consultas agregadas por período. Para produzir fatos diários, o futuro adaptador deve solicitar dias explicitamente ou introduzir `time_increment=1` com regressões. Nunca rotular um total mensal como dado diário. Se a janela efetiva de atribuição não estiver comprovada na consulta/resposta, registrar desconhecida e manter indicadores que a exigem indisponíveis.
+O cliente compartilhado mantém consultas agregadas e oferece `daily_insights` com `time_increment=1`, usado pela operação nativa. Nunca rotular um total mensal como dado diário. Se a janela efetiva de atribuição não estiver comprovada na consulta/resposta, registrar desconhecida e manter indicadores que a exigem indisponíveis.
 
 Alcance e frequência não podem ser somados entre anúncios ou dias para representar audiência única. Não somar moedas diferentes. O dia da conta Meta não equivale automaticamente ao dia operacional America/Belem: declarar a origem e reconciliar períodos/fusos antes dos cruzamentos.
 
@@ -39,7 +39,7 @@ A conta inicialmente permitida é `898435729140540`. A allowlist concede somente
 
 Não usar nome da campanha, telefone, idioma ou permissão pessoal para inferir segmento. Uma conta técnica com acesso a outras contas não amplia a allowlist. Reutilizar os destinos e estados isolados dos perfis existentes.
 
-## Fluxo proposto para implementação futura
+## Fluxo nativo e ativação
 
 1. Analytics importa `MetaAdsClient` diretamente; não inicia o servidor MCP e não precisa do Codex. Credenciais continuam exclusivamente no JSON privado local já definido.
 2. Executar uma simulação por conta/período autorizado. Validar permissão de leitura, paginação completa, IDs, moeda, fuso, período e mapeamento do segmento. Resposta parcial não confirma cobertura completa.
@@ -74,7 +74,7 @@ Não declarar causalidade ou atribuição individual usando apenas o ID de anún
 
 ## Pendências desta fase
 
-Validar instalação/registro STDIO no computador Windows do usuário, autorização efetiva do usuário do sistema e consulta somente de leitura à conta permitida. O ambiente de desenvolvimento não representa o Codex instalado em `C:\NexoFlow`; testes offline não comprovam acesso real à Meta. Não houve escrita em planilhas, edição de campanhas ou publicação de release para esta integração.
+A operação nativa não exige registro STDIO nem Codex. A instalação final no computador do usuário e a ativação das novas fontes ainda precisam ser conferidas. Foi validada uma consulta real limitada de leitura à Meta; testes de escrita usam Sheets simulado. Não houve escrita em planilhas, edição de campanhas ou publicação de release para esta integração.
 
 ## Dashboard de referência informado
 

@@ -1,5 +1,12 @@
 # NexoFlow 1.5.12 — Changelog
 
+## Alterações posteriores — sem novo release
+
+- Integração nativa Meta Ads no Analytics e no Noturno, reutilizando o cliente Python somente de leitura, sem depender de Codex CLI ou servidor MCP.
+- Novas fontes diárias e catálogos preservam os schemas anteriores. Evidências Weni separam FARMA/PET e impedem atribuição integral duplicada de custos compartilhados.
+- Simulação, revisão de destinos/schemas, upsert idempotente, retomada, checkpoints próprios e invalidação de conversões canceladas. Credencial Meta preservada também no modo Clean do Setup.
+- Consulte o [relatório técnico](docs/RELATORIO%20META%20ADS%20NATIVO.md) e o [guia de ativação](docs/META%20ADS%20NATIVO.md). Não houve escrita em planilhas ou edição dos dashboards de produção; a versão permanece inalterada.
+
 ## NexoFlow 1.5.12 — Em validação
 
 - Corrige o KeyError de maioridade na criação/enriquecimento PET. O perfil não calcula, exige ou grava `maior_de_18_anos`; idade permanece informativa e a FarmaLíder mantém suas validações. Endereços são conferidos contra o segmento correto do pedido.

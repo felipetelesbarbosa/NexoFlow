@@ -782,7 +782,7 @@ function Show-InstallModeDialog {
         $label = New-Object System.Windows.Forms.Label
         $label.Location = New-Object System.Drawing.Point(20, 20)
         $label.Size = New-Object System.Drawing.Size(620, 185)
-        $label.Text = "Já existem arquivos do NexoFlow neste computador.`n`nAtualizar mantendo dados: mantém configurações, credenciais, logs e estado local.`n`nInstalação limpa: reinicia esses dados para FarmaLíder e Pets Líder; a integração opcional selecionada reinstala Codex CLI e MCP local. Será necessário configurar os acessos novamente.`n`nOs arquivos de importacoes são preservados nas duas opções."
+        $label.Text = "Já existem arquivos do NexoFlow neste computador.`n`nAtualizar mantendo dados: conserva configurações, credenciais, logs e estado local.`n`nInstalação limpa: reinicia esses dados para FarmaLíder e Pets Líder, mas mantém a credencial Meta (token e contas permitidas). Os demais acessos precisam ser configurados novamente. Codex/MCP são opcionais e serão reinstalados se selecionados.`n`nImportações são preservadas nas duas opções."
         $form.Controls.Add($label)
 
         foreach ($choice in @(
@@ -811,7 +811,7 @@ function Show-InstallModeDialog {
 function Read-InstallModeFromConsole {
     while ($true) {
         Write-Host '[1] Atualizar mantendo configurações, credenciais, logs e estado local'
-        Write-Host '[2] Instalação limpa — reiniciar dados; reinstalar Codex/MCP se selecionados'
+        Write-Host '[2] Instalação limpa — reiniciar dados, mantendo token/contas Meta; Codex/MCP opcionais'
         Write-Host '[0] Cancelar'
         Write-Host 'Os arquivos de importacoes serão preservados.'
         switch ((Read-Host 'Escolha uma opção')) {
@@ -1110,6 +1110,33 @@ function Restore-PrivateData([string]$Backup, [string]$Target) {
     }
 }
 
+function Restore-MetaAdsCredentials([string]$Backup, [string]$Target) {
+    # A credencial contém token e allowlist. Copiar bytes privados não exige
+    # interpretar, imprimir ou validar o token durante a instalação.
+    $relative = 'credentials\mcp\meta_ads_credentials.json'
+    $source = Join-Path $Backup $relative
+    if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { return }
+    foreach ($path in @((Join-Path $Backup 'credentials'), (Join-Path $Backup 'credentials\mcp'), $source)) {
+        $item = Get-Item -LiteralPath $path -Force -ErrorAction Stop
+        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            throw 'Credencial Meta vinculada externamente; recuperação automática interrompida.'
+        }
+    }
+    $destination = Join-Path $Target $relative
+    if (Test-Path -LiteralPath $destination -PathType Leaf) { return }
+    if (Test-Path -LiteralPath $destination) { throw 'Destino da credencial Meta não é um arquivo.' }
+    foreach ($path in @($Target, (Join-Path $Target 'credentials'), (Join-Path $Target 'credentials\mcp'))) {
+        if (Test-Path -LiteralPath $path) {
+            $item = Get-Item -LiteralPath $path -Force -ErrorAction Stop
+            if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+                throw 'Destino da credencial Meta contém link/junção; recuperação interrompida.'
+            }
+        }
+    }
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
+    [IO.File]::Copy($source, $destination, $false)
+}
+
 function Test-PrivateInstallEntry([string]$Name) {
     return $Name -in @('secrets_config.py', 'credentials', 'logs', 'importacoes')
 }
@@ -1183,6 +1210,13 @@ function Restore-SetupData {
             Restore-MissingPrivateData -Backup (Join-Path $BackupRoot $name) -Target $Target
         }
         return
+    }
+    if ($Mode -eq 'Clean') {
+        # Exceção explícita da instalação limpa: conservar token e contas Meta.
+        # Priorizar a instalação atual; nunca sobrescrever uma credencial presente.
+        foreach ($name in @('installed', 'preserved', 'legacy installed', 'legacy preserved')) {
+            Restore-MetaAdsCredentials -Backup (Join-Path $BackupRoot $name) -Target $Target
+        }
     }
     foreach ($name in @('legacy preserved', 'legacy installed', 'preserved', 'installed')) {
         $backup = Join-Path $BackupRoot $name
@@ -1503,7 +1537,7 @@ try {
         exit 2
     }
     if ($selectedMode -eq 'Clean') {
-        Write-Host '[INFO] Instalação limpa: configurações, credenciais, logs e estado local serão reiniciados; importacoes será preservada.'
+        Write-Host '[INFO] Instalação limpa: configurações, credenciais Google, logs e estado serão reiniciados; importacoes e a credencial Meta (token/contas permitidas) serão preservados.'
     } else {
         Write-Host '[INFO] Atualização mantendo configurações, credenciais, logs e estado local.'
     }

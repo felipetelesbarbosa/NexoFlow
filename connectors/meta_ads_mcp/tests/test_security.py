@@ -18,7 +18,9 @@ TOKEN = "TOKEN_FICTICIO"
 class SecurityTests(unittest.TestCase):
     def client(self, responses):
         return MetaAdsClient(
-            MetaSettings(TOKEN, "v26.0", (ACCOUNT,)), FakeSession(responses)
+            MetaSettings(TOKEN, "v26.0", (ACCOUNT,)),
+            FakeSession(responses),
+            sleep_fn=lambda _: None,
         )
 
     def test_missing_or_management_permission_blocks_before_account(self):
@@ -35,7 +37,7 @@ class SecurityTests(unittest.TestCase):
 
     def test_errors_sanitized_for_each_status_and_200_error(self):
         for code in (400, 401, 403, 429, 500, 302, 399):
-            cli = self.client([FakeResponse({"error": {"message": TOKEN}}, code)])
+            cli = self.client([FakeResponse({"error": {"message": TOKEN}}, code)] * 3)
             with self.assertRaises(MetaReadError) as err:
                 cli.ads(ACCOUNT)
             self.assertNotIn(TOKEN, str(err.exception))

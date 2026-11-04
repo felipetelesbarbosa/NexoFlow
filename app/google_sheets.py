@@ -170,6 +170,284 @@ class GoogleSheetsStore:
         finally:
             self.client.http_client.session.close()
 
+    @classmethod
+    def open_native_readonly(cls, spreadsheet_id: str):
+        """Abre fontes existentes da Meta sem inicializar/migrar abas legadas."""
+        from sheets_storage import configured_storage
+
+        store = cls.__new__(cls)
+        store.client = gspread.service_account(filename=str(GOOGLE_CREDENTIALS_FILE))
+        store.client.set_timeout(
+            (
+                float(GOOGLE_SHEETS_CONNECT_TIMEOUT_SECONDS),
+                float(GOOGLE_SHEETS_READ_TIMEOUT_SECONDS),
+            )
+        )
+        store._hub_id = spreadsheet_id
+        store._headers_cache = {}
+        store._control_values_cache = None
+        store._last_write_started_at = 0.0
+        store._read_requests = store._write_requests = 0
+        store._continuity = None
+        store._storage_books = {}
+        try:
+            store.book = store._read_with_retry(
+                "abrir Dashboard Meta somente leitura",
+                lambda: store.client.open_by_key(spreadsheet_id),
+            )
+            configured = configured_storage(spreadsheet_id)
+            try:
+                mapping = store._read_with_retry(
+                    "localizar mapa de arquivos Meta",
+                    lambda: store.book.worksheet(STORAGE_SHEET),
+                )
+            except WorksheetNotFound:
+                layout = configured
+            else:
+                layout = SheetsStorage.from_values(
+                    store._read_with_retry(
+                        "ler mapa de arquivos Meta", lambda: mapping.get("A1:B5")
+                    ),
+                    spreadsheet_id,
+                )
+                if configured is not None and configured != layout:
+                    raise ValueError(
+                        "Os arquivos Meta divergem da configuração do perfil."
+                    )
+            if layout is None:
+                raise ValueError(
+                    "A integração Meta exige os três arquivos Google já configurados."
+                )
+            store._storage_layout = layout
+            store._storage_books = {layout.dashboard: store.book}
+            for destination in (layout.operations, layout.history):
+                store._storage_books[destination] = store._read_with_retry(
+                    "abrir fonte Meta existente",
+                    lambda destination=destination: store.client.open_by_key(
+                        destination
+                    ),
+                )
+            from sheets_continuation import INDEX_TITLE
+            from sheets_partitions import RolloverManager
+
+            try:
+                index_sheet = store._read_with_retry(
+                    "localizar índice de continuações Meta",
+                    lambda: store.book.worksheet(INDEX_TITLE),
+                )
+            except WorksheetNotFound:
+                index_sheet = None
+            store._continuity = RolloverManager.attach(store, index_sheet)
+            store.native_meta_context()
+            return store
+        except Exception:
+            store.close()
+            raise
+
+    def native_meta_context(self):
+        """Revalida o roteamento autorizado antes de tocar nas novas abas."""
+        from runtime_profile import segment, validate_sheet_destinations
+        from sheets_storage import configured_storage
+
+        layout = self._storage_layout
+        if (
+            layout is None
+            or len({layout.dashboard, layout.operations, layout.history}) != 3
+        ):
+            raise ValueError("Meta exige Dashboard, Operação e Histórico separados.")
+        if self._hub_id != layout.dashboard or self.book.id != layout.dashboard:
+            raise ValueError("Dashboard Meta divergente da fonte autorizada.")
+        if any(
+            self._storage_books.get(book_id) is None
+            or self._storage_books[book_id].id != book_id
+            for book_id in (layout.dashboard, layout.operations, layout.history)
+        ):
+            raise ValueError("Fonte Meta não corresponde ao mapa de arquivos.")
+        validate_sheet_destinations(layout.dashboard, layout.operations, layout.history)
+        configured = configured_storage(self._hub_id)
+        if configured is not None and configured != layout:
+            raise ValueError("Os destinos Meta mudaram na configuração local.")
+        try:
+            mapping = self._read_with_retry(
+                "revalidar mapa dos arquivos Meta",
+                lambda: self.book.worksheet(STORAGE_SHEET),
+            )
+        except WorksheetNotFound:
+            if configured is None:
+                raise ValueError(
+                    "Mapa Meta ausente e sem destinos locais autorizados."
+                ) from None
+        else:
+            current = SheetsStorage.from_values(
+                self._read_with_retry(
+                    "conferir mapa dos arquivos Meta", lambda: mapping.get("A1:B5")
+                ),
+                self._hub_id,
+            )
+            if current != layout:
+                raise ValueError(
+                    "O mapa de arquivos mudou após abrir a integração Meta."
+                )
+        return {
+            "segment": segment(),
+            "dashboard": layout.dashboard,
+            "operations": layout.operations,
+            "history": layout.history,
+        }
+
+    @staticmethod
+    def _native_meta_headers(title, headers):
+        from meta_ads_model import SCHEMAS
+
+        if title not in SCHEMAS or headers != SCHEMAS[title]:
+            raise ValueError("A integração nativa não pode modificar uma aba legada.")
+
+    def native_meta_read(self, title, headers):
+        self._native_meta_headers(title, headers)
+        layout = self._storage_layout
+        if layout is None:
+            raise ValueError("Fontes Meta não configuradas.")
+        book_id = layout.destination(title)
+        book = self._storage_books[book_id]
+        try:
+            ws = self._read_with_retry(
+                f"localizar aba nativa {title}", lambda: book.worksheet(title)
+            )
+        except WorksheetNotFound:
+            return {
+                "exists": False,
+                "book_id": book_id,
+                "worksheet_id": None,
+                "values": [],
+            }
+        values = self._read_with_retry(
+            f"ler aba nativa {title}",
+            lambda: ws.get_all_values(value_render_option="UNFORMATTED_VALUE"),
+        )
+        return {
+            "exists": True,
+            "book_id": book_id,
+            "worksheet_id": ws.id,
+            "values": values,
+        }
+
+    def native_meta_inputs(self):
+        """Lê contatos/pedidos/itens existentes e suas continuações, sem criá-los."""
+        self.native_meta_context()
+        records = {}
+        for name, title in (
+            ("contacts", SHEET_BASE_CONTATOS),
+            ("orders", SHEET_PEDIDOS),
+            ("items", SHEET_ITENS_PEDIDOS),
+        ):
+            if self._continuity is not None and self._continuity.index.table_parts(
+                title
+            ):
+                ws = self._continuity.worksheet(
+                    self._continuity.index.table_parts(title)[0]
+                )
+            else:
+                ws = self._read_with_retry(
+                    f"localizar fonte existente {title}",
+                    lambda title=title: self._book_for_title(title).worksheet(title),
+                )
+            values = self._read_with_retry(
+                f"ler fonte de atribuição Meta {title}",
+                lambda ws=ws: self._table_values(ws),
+            )
+            values = self._validated_table_values(values, title)
+            records[name] = self._values_to_records(values)
+        return records
+
+    def native_meta_upsert_chunk(self, title, headers, records, *, expected_snapshot):
+        self._native_meta_headers(title, headers)
+        self.native_meta_context()
+        current = self.native_meta_read(title, headers)
+        if current != expected_snapshot:
+            raise ValueError(
+                "A aba Meta mudou após a conferência; nenhuma gravação deste lote."
+            )
+        layout = self._storage_layout
+        if layout is None:
+            raise ValueError("Fontes Meta não configuradas.")
+        book = self._storage_books[layout.destination(title)]
+        if not current["exists"]:
+            ws = self._write_with_retry(
+                f"criar aba nativa {title}",
+                lambda: book.add_worksheet(
+                    title=title, rows=max(1000, len(records) + 1), cols=len(headers)
+                ),
+            )
+            self._write_with_retry(
+                f"cabeçalho nativo {title}",
+                lambda: ws.update(
+                    range_name=f"A1:{column_letter(len(headers))}1",
+                    values=[headers],
+                    value_input_option="RAW",
+                ),
+            )
+            current["values"] = [headers]
+        else:
+            ws = self._read_with_retry(
+                f"reabrir aba nativa {title}", lambda: book.worksheet(title)
+            )
+            if not current["values"] or current["values"][0] != headers:
+                raise ValueError(
+                    "Schema Meta divergente; migração automática bloqueada."
+                )
+        return self._upsert_records_detailed(
+            ws,
+            records,
+            headers[0],
+            existing_values=current["values"],
+            ignore_compare_fields={"atualizado_em"},
+            value_input_option="RAW",
+            preserve_types=True,
+            _physical=True,
+        )
+
+    def native_meta_confirm(self, title, headers, records, *, expected_snapshot):
+        """Confirma só o cabeçalho e as posições das chaves enviadas neste lote."""
+        self._native_meta_headers(title, headers)
+        values = expected_snapshot.get("values", [])
+        positions = {
+            str(row[0]): number
+            for number, row in enumerate(values[1:], 2)
+            if row and str(row[0])
+        }
+        next_row = max(2, len(values) + 1)
+        for row in records:
+            if row[headers[0]] not in positions:
+                positions[row[headers[0]]] = next_row
+                next_row += 1
+        last_col = column_letter(len(headers))
+        ranges = [f"A1:{last_col}1"] + [
+            f"A{positions[row[headers[0]]]}:{last_col}{positions[row[headers[0]]]}"
+            for row in records
+        ]
+        ws = self._read_with_retry(
+            f"localizar confirmação Meta {title}",
+            lambda: self._book_for_title(title).worksheet(title),
+        )
+        batches = self._read_with_retry(
+            f"confirmar chaves Meta {title}",
+            lambda: ws.batch_get(ranges, value_render_option="UNFORMATTED_VALUE"),
+        )
+        if (
+            not batches
+            or not batches[0]
+            or batches[0][0] != headers
+            or len(batches) != len(ranges)
+        ):
+            raise ValueError("Cabeçalho ou posições Meta mudaram antes da confirmação.")
+        confirmed = []
+        for batch in batches[1:]:
+            if len(batch) != 1:
+                raise ValueError("Registro Meta ausente na confirmação.")
+            values = list(batch[0]) + [""] * (len(headers) - len(batch[0]))
+            confirmed.append(dict(zip(headers, values, strict=False)))
+        return confirmed
+
     @staticmethod
     def _schema_map() -> dict[str, list[str]]:
         return {

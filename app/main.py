@@ -78,6 +78,65 @@ from weni_client import WeniClient
 
 secrets = load_private_settings()
 
+
+def _sync_optional_native_meta(
+    store, settings, contacts, orders, items, weni_contacts=None
+):
+    """Meta tem cursor próprio; falha isolada não invalida os pedidos confirmados."""
+    if not getattr(settings, "META_ADS_ENABLED", False):
+        return {"status": "desativado"}
+    from runtime_profile import scoped_path, segment
+
+    result: dict[str, Any]
+    try:
+        from meta_ads_native import sync_native_meta
+
+        result = sync_native_meta(
+            store,
+            settings,
+            segment=segment(),
+            contacts=contacts,
+            orders=orders,
+            items=items,
+            weni_contacts=weni_contacts,
+        )
+    except Exception as exc:
+        # Não registrar str(exc): erros externos podem conter URLs e dados privados.
+        logging.error("Meta Ads: etapa isolada falhou; tipo=%s.", type(exc).__name__)
+        result = {"status": "falha", "error_type": type(exc).__name__}
+    logging.info("Meta Ads: resultado da etapa nativa=%s.", result.get("status"))
+    if result.get("critical"):
+        logging.error(
+            "Meta Ads: falha crítica de autenticação/permissão; "
+            "confira a credencial local e ads_read. Demais etapas preservadas."
+        )
+    for error in result.get("errors", []):
+        logging.warning(
+            "Meta Ads: conta=%s; etapa=%s; tipo=%s; HTTP=%s; crítico=%s.",
+            error.get("account_id", ""),
+            error.get("stage", ""),
+            error.get("error_type", ""),
+            error.get("status_code"),
+            error.get("critical", False),
+        )
+    try:
+        from pathlib import Path
+
+        from dedup_io import save_private
+
+        save_private(
+            Path(__file__).resolve().parents[1]
+            / scoped_path("logs/privado/meta_ads_ultima_execucao.json"),
+            result,
+        )
+    except Exception as exc:
+        logging.warning(
+            "Meta Ads: não foi possível salvar diagnóstico; tipo=%s.",
+            type(exc).__name__,
+        )
+    return result
+
+
 Contact = dict[str, Any]
 Row = dict[str, str]
 ClienteResult = tuple[str, str, str]
@@ -1336,6 +1395,15 @@ def main() -> int:
         # The ordinary Analytics load does not create these tabs or infer new ticket tags.
         sheets.refresh_delivery_bi(all_order_records, create=False)
 
+        native_meta_result = _sync_optional_native_meta(
+            sheets,
+            secrets,
+            contact_result.final_records,
+            all_order_records,
+            all_item_records,
+            all_weni_contacts,
+        )
+
         # O status é gravado por último para refletir a própria execução do BI.
         completion_status, completion_controls = _completion_controls(
             sync_started,
@@ -1585,7 +1653,19 @@ def main() -> int:
         else:
             logging.info("Sincronização concluída com sucesso em %.2fs.", total_elapsed)
         acknowledge(history_receipts)
-        return PARTIAL_SYNC_EXIT_CODE if completion_status == "parcial" else 0
+        native_partial = bool(native_meta_result.get("partial")) or (
+            native_meta_result.get("status") == "falha"
+        )
+        if native_partial:
+            logging.warning(
+                "Meta Ads ficou pendente; sincronização principal preservada. "
+                "Confira o diagnóstico privado da etapa nativa."
+            )
+        return (
+            PARTIAL_SYNC_EXIT_CODE
+            if completion_status == "parcial" or native_partial
+            else 0
+        )
 
     except Exception as exc:
         logging.exception("Falha na sincronização: %s", exc)

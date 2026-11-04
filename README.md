@@ -101,4 +101,4 @@ O Weni consulta eventos oficiais CTWA para completar e conferir os campos de an�
 
 ### Meta Ads MCP local (opcional)
 
-O [conector Meta Ads](docs/META%20ADS%20MCP%20LOCAL.md) oferece seis ferramentas somente de leitura ao Codex por STDIO. A credencial fica exclusivamente no arquivo privado `credentials/mcp/meta_ads_credentials.json`. A integração de relatórios ao Analytics está [planejada separadamente](docs/PLANO%20META%20ADS%20ANALYTICS.md); não altera campanhas, planilhas ou dashboards automaticamente.
+O [conector Meta Ads](docs/META%20ADS%20MCP%20LOCAL.md) oferece seis ferramentas somente de leitura ao Codex por STDIO. A credencial fica exclusivamente no arquivo privado `credentials/mcp/meta_ads_credentials.json`. A [integração nativa Meta Ads](docs/META%20ADS%20NATIVO.md) reutiliza esse cliente diretamente no Analytics e no Noturno, sem exigir Codex ou servidor MCP. A ativação é explícita, mantém as fontes existentes e não altera campanhas. Novas tabelas e o procedimento de revisão estão documentados no guia.
