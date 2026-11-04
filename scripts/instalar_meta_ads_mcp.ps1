@@ -13,7 +13,7 @@ $credExample = Join-Path $raiz 'configuracao\meta_ads_credentials.example.json'
 
 function Test-MetaAdsEnvironment {
     if (-not (Test-Path -LiteralPath $venvPython -PathType Leaf)) { return $false }
-    & $venvPython -c 'import re,sys; from importlib.metadata import version; from mcp.server.fastmcp import FastMCP; v=lambda n: tuple(int(x) for x in re.match(r"^([0-9]+)\.([0-9]+)",version(n)).groups()); raise SystemExit(0 if sys.version_info[:2]==(3,14) and (1,28)<=v("mcp")<(2,0) and (2,33)<=v("requests")<(3,0) else 1)' *> $null
+    & $venvPython (Join-Path $mcpDir 'validate_environment.py') *> $null
     if ($LASTEXITCODE -ne 0) { return $false }
     & $venvPython -m pip check *> $null
     return ($LASTEXITCODE -eq 0)
@@ -25,8 +25,15 @@ function Install-MetaAdsEnvironment {
         return
     }
     $backup = $null
+    $refreshEnvironment = [bool]$Force
+    if (Test-Path -LiteralPath $venvDir) {
+        if (Test-Path -LiteralPath $venvPython -PathType Leaf) {
+            & $venvPython (Join-Path $mcpDir 'validate_environment.py') --python-only *> $null
+            if ($LASTEXITCODE -ne 0) { $refreshEnvironment = $true }
+        } else { $refreshEnvironment = $true }
+    }
     try {
-        if ($Force -and (Test-Path -LiteralPath $venvDir)) {
+        if ($refreshEnvironment -and (Test-Path -LiteralPath $venvDir)) {
             $backup = $venvDir + '.recuperacao-' + [Guid]::NewGuid().ToString('N')
             Move-Item -LiteralPath $venvDir -Destination $backup
         }
@@ -34,14 +41,14 @@ function Install-MetaAdsEnvironment {
             if (Get-Command py -ErrorAction SilentlyContinue) {
                 & py -3.14 -m venv $venvDir
             } elseif (Get-Command python -ErrorAction SilentlyContinue) {
-                & python -c 'import sys; raise SystemExit(0 if sys.version_info[:2] == (3,14) else 1)'
+                & python (Join-Path $mcpDir 'validate_environment.py') --python-only
                 if ($LASTEXITCODE -ne 0) { throw 'É necessário Python 3.14 para este conector.' }
                 & python -m venv $venvDir
             } else { throw 'Python 3.14 não encontrado.' }
             if ($LASTEXITCODE -ne 0) { throw 'Falha ao criar ambiente virtual MCP.' }
         }
-        & $venvPython -c 'import sys; raise SystemExit(0 if sys.version_info[:2] == (3,14) else 1)' *> $null
-        if ($LASTEXITCODE -ne 0) { throw 'O ambiente MCP existente não usa Python 3.14. Preserve-o ou escolha reinstalação explícita do conector.' }
+        & $venvPython (Join-Path $mcpDir 'validate_environment.py') --python-only *> $null
+        if ($LASTEXITCODE -ne 0) { throw 'O ambiente MCP recriado não usa Python 3.14. A instalação anterior será recuperada.' }
         & $venvPython -m pip install -r (Join-Path $mcpDir 'requirements.txt')
         if ($LASTEXITCODE -ne 0 -or -not (Test-MetaAdsEnvironment)) { throw 'As dependências MCP não puderam ser instaladas e validadas.' }
         if ($backup) { Remove-Item -LiteralPath $backup -Recurse -Force }

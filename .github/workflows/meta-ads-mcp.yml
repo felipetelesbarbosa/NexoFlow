@@ -8,6 +8,7 @@ on:
       - 'scripts/instalar_codex_cli.ps1'
       - 'installer/install.ps1'
       - 'tests/test_meta_optional_install.py'
+      - 'tests/test_meta_environment_validator.py'
       - 'configuracao/meta_ads_credentials.example.json'
       - 'credentials/mcp/.gitignore'
       - '.github/workflows/meta-ads-mcp.yml'
@@ -35,5 +36,5 @@ jobs:
       - run: python -m unittest discover -s connectors/meta_ads_mcp/tests -v
       - name: Validar instaladores opcionais com comandos simulados
         if: runner.os == 'Windows'
-        run: python -m unittest tests.test_meta_optional_install -v
+        run: python -m unittest tests.test_meta_optional_install tests.test_meta_environment_validator -v
       - run: python -m pip check

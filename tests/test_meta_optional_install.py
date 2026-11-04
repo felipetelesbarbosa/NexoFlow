@@ -195,6 +195,29 @@ try{
 """
         )
 
+    def test_mcp_wrong_python_refreshes_only_its_environment(self):
+        self.run_ps(r"""
+. (Join-Path $repo 'scripts/instalar_meta_ads_mcp.ps1') -FunctionsOnly
+$folder=Join-Path ([IO.Path]::GetTempPath()) ('nexo-python-refresh-'+[Guid]::NewGuid().ToString('N'))
+$venvDir=Join-Path $folder '.venv'
+$venvPython=Join-Path $venvDir 'python.ps1'
+New-Item -ItemType Directory -Force -Path $venvDir|Out-Null
+'$global:LASTEXITCODE=1'|Set-Content -LiteralPath $venvPython
+$script:created=0
+function py {
+ $script:created++
+ New-Item -ItemType Directory -Force -Path $venvDir|Out-Null
+ '$global:LASTEXITCODE=0'|Set-Content -LiteralPath $venvPython
+ $global:LASTEXITCODE=0
+}
+try{
+ Install-MetaAdsEnvironment
+ if($script:created -ne 1){throw 'Python incompatível não reconstruído.'}
+ if(-not (Test-Path -LiteralPath $venvPython)){throw 'Python novo ausente.'}
+ if(@(Get-ChildItem -LiteralPath $folder -Filter '.venv.recuperacao-*').Count){throw 'Backup não finalizado.'}
+}finally{Remove-Item -LiteralPath $folder -Recurse -Force}
+""")
+
     def test_scripts_have_bom_and_no_version_change(self):
         for name in [
             "installer/install.ps1",
