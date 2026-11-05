@@ -9,6 +9,11 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: Publicar release após validação
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -293,7 +298,7 @@ jobs:
             --mode packages --repo "$GITHUB_WORKSPACE" --assets-dir "$GITHUB_WORKSPACE/dist"
 
   publicar:
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.publish_release)
     needs: [verificar-segredos, validar-e-publicar, verificar-pacotes]
     runs-on: windows-latest
     permissions:
