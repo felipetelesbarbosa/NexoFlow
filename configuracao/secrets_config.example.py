@@ -38,6 +38,8 @@ WEBHOOK_SHARED_SECRET = "TROQUE_POR_UM_SEGREDO_FORTE"
 # on   = força o proxy
 # off  = nunca configura o proxy pelo projeto
 PROXY_MODE = "auto"
+# Habilitar somente com autorização da TI para alternar automaticamente à rota direta.
+PROXY_ALLOW_DIRECT_FALLBACK = False
 
 # Exemplo fictício: substitua pelo endereço autorizado da sua rede.
 PROXY_HOST = "proxy.exemplo.invalid"

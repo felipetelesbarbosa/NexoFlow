@@ -176,3 +176,7 @@ cooldowns são globais.
 
 Se a rede/API começar a responder com 429 ou apresentar falhas transitórias, o
 cliente reduz a pressão por meio de cooldown, retry e throttle adaptativo.
+
+## Rota corporativa e homologação
+
+Com proxy configurado e modo auto, uma falha TCP mantém a rota proxy. A alternativa direta automática exige `PROXY_ALLOW_DIRECT_FALLBACK = True`, somente após autorização da TI. O padrão é False; modo off continua sendo escolha explícita de conexão direta. Proxy ativo significa rota selecionada, não comprovação de CONNECT ou TLS. Consulte [auditoria e homologação Windows](AUDITORIA%20SEGURANCA%20WINDOWS.md) para 407/503, CA corporativa, Kaspersky e coleta de evidências.

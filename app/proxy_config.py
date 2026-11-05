@@ -255,12 +255,9 @@ def configure_proxy(
     Configura proxy somente para o processo Python atual.
 
     auto:
-      1. Se host:porta responder, ativa o proxy autenticado.
-      2. Se o teste TCP falhar, testa internet DIRETA ignorando o proxy
-         configurado no Windows.
-      3. Se a internet direta funcionar, força conexão direta de verdade.
-      4. Se a internet direta NÃO funcionar e há credenciais, ativa o
-         proxy mesmo que o teste TCP tenha dado falso negativo.
+      Se host:porta responder, seleciona o proxy (HTTPS não comprovado).
+      Se TCP falhar, mantém proxy configurado. Somente com autorização
+      PROXY_ALLOW_DIRECT_FALLBACK=True permite sondar e selecionar rota direta.
 
     on:
       força o proxy configurado.
@@ -362,7 +359,17 @@ def configure_proxy(
             host=host,
             port=port,
             has_credentials=has_credentials,
-            reason="proxy detectado automaticamente e ativado",
+            reason="proxy selecionado por resposta TCP; HTTPS ainda não comprovado",
+        )
+
+    # Uma falha TCP não autoriza sair da rota corporativa. A seleção direta
+    # automática exige aprovação explícita na configuração local.
+    if getattr(secrets, "PROXY_ALLOW_DIRECT_FALLBACK", False) is not True:
+        _activate_proxy(host=host, port=port, user=user, password=password, bypass=bypass)
+        return ProxyStatus(
+            mode=mode, configured=True, reachable=False, active=True,
+            host=host, port=port, has_credentials=has_credentials,
+            reason="sondagem TCP falhou; rota proxy mantida, sem autorização para alternativa direta; HTTPS ainda não comprovado",
         )
 
     # O teste TCP pode dar falso negativo em algumas redes corporativas.

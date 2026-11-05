@@ -37,10 +37,23 @@ class OptionalInstallTests(unittest.TestCase):
                 result.returncode, 0, (result.stdout + result.stderr)[-4000:]
             )
 
+    def test_changed_remote_installer_is_rejected_before_execution(self):
+        self.run_ps(r"""
+. (Join-Path $repo 'scripts/instalar_codex_cli.ps1') -FunctionsOnly
+$fixture=Join-Path ([IO.Path]::GetTempPath()) ('nexo-hash-'+[Guid]::NewGuid().ToString('N'))
+try {
+ 'untrusted-script'|Set-Content -LiteralPath $fixture
+ $blocked=$false
+ try{Assert-NexoCodexInstallerIntegrity -Path $fixture}catch{$blocked=$true}
+ if(-not $blocked){throw 'Script alterado foi aceito.'}
+}finally{Remove-Item -LiteralPath $fixture -Force}
+""")
+
     def test_codex_compatible_twice_never_downloads_or_installs(self):
         self.run_ps(r"""
 . (Join-Path $repo 'scripts/instalar_codex_cli.ps1') -FunctionsOnly
 function Assert-NexoCodexInteractiveUser { }
+function Assert-NexoCodexInstallerIntegrity { }
 function codex {
  if ($args -contains '--version') { 'codex-cli 0.100.0' }
  elseif ($args -contains 'get') { '--json' }
@@ -56,6 +69,7 @@ Install-NexoCodexCli
         self.run_ps(r"""
 . (Join-Path $repo 'scripts/instalar_codex_cli.ps1') -FunctionsOnly
 function Assert-NexoCodexInteractiveUser { }
+function Assert-NexoCodexInstallerIntegrity { }
 function Test-NexoCodexCompatible { return $true }
 function Update-NexoCodexPath { }
 function Get-NexoCodexReleasesPath { return (Join-Path ([IO.Path]::GetTempPath()) ('nexo-codex-no-releases-'+[Guid]::NewGuid().ToString('N'))) }
@@ -165,6 +179,7 @@ if(-not $failed){throw 'Configuração diferente não foi bloqueada.'}
             + r"""
 . (Join-Path $repo 'scripts/instalar_codex_cli.ps1') -FunctionsOnly
 function Assert-NexoCodexInteractiveUser { }
+function Assert-NexoCodexInstallerIntegrity { }
 function Test-NexoCodexCompatible { return $true }
 function Update-NexoCodexPath { }
 $testRoot=Join-Path ([IO.Path]::GetTempPath()) ('nexo-codex-clean-'+[Guid]::NewGuid().ToString('N'))

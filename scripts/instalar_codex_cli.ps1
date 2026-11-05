@@ -46,6 +46,16 @@ function Assert-NexoCodexProgramPath {
         $candidate = $parent
     }
 }
+function Assert-NexoCodexInstallerIntegrity {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    # Snapshot do script oficial consultado em 04/11/2026. Mudança remota
+    # exige nova revisão no repositório; nunca aceitar o hash vindo do download.
+    $expected = 'b3664171771ff083ee95f74030070cf23fd13797472d84e387653c0df36042c3'
+    $actual = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($actual -cne $expected) {
+        throw 'O instalador Codex divergiu do snapshot aprovado. Nenhum script baixado foi executado; solicite revisão da integração opcional.'
+    }
+}
 function Install-NexoCodexCli {
     param([switch]$Force)
     Assert-NexoCodexInteractiveUser
@@ -60,6 +70,7 @@ function Install-NexoCodexCli {
     try {
         $scriptFile = Join-Path $folder 'install-codex.ps1'
         Invoke-WebRequest -Uri 'https://chatgpt.com/codex/install.ps1' -OutFile $scriptFile -UseBasicParsing
+        Assert-NexoCodexInstallerIntegrity -Path $scriptFile
         $tokens = $null; $parseErrors = $null
         [void][Management.Automation.Language.Parser]::ParseFile($scriptFile,[ref]$tokens,[ref]$parseErrors)
         if ($parseErrors.Count -gt 0) { throw 'O instalador oficial baixado não é um script PowerShell válido.' }

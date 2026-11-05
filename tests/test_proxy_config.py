@@ -28,6 +28,7 @@ class ProxyConfigTests(unittest.TestCase):
         fake = types.ModuleType("secrets_config")
         defaults = {
             "PROXY_MODE": "auto",
+            "PROXY_ALLOW_DIRECT_FALLBACK": True,
             "PROXY_HOST": "proxy.test.invalid",
             "PROXY_PORT": 8020,
             "PROXY_USER": "usuario",
@@ -54,6 +55,26 @@ class ProxyConfigTests(unittest.TestCase):
             "WENI_PROXY_ACTIVE",
         ):
             os.environ.pop(name, None)
+
+    def test_unreachable_corporate_proxy_never_probes_direct_without_authorization(
+        self,
+    ):
+        for credentials in (True, False):
+            module = self.load_module(
+                PROXY_ALLOW_DIRECT_FALLBACK=False,
+                PROXY_USER="user" if credentials else "",
+                PROXY_PASSWORD="password" if credentials else "",
+            )
+            with (
+                patch.object(module, "_is_reachable", return_value=False),
+                patch.object(module, "_direct_internet_available") as direct,
+                patch.object(module.time, "sleep"),
+            ):
+                status = module.configure_proxy()
+                self.assertTrue(status.active)
+                self.assertFalse(status.reachable)
+                direct.assert_not_called()
+                self.assertNotIn("password", status.safe_summary)
 
     def test_auto_uses_direct_when_proxy_unreachable(self) -> None:
         module = self.load_module()

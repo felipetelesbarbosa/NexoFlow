@@ -448,7 +448,7 @@ class MetaAdsClient:
         start_date,
         end_date,
         limit=100,
-        pages=10,
+        pages: int | None = 10,
         *,
         action_report_time="impression",
         action_attribution_windows=("7d_click", "1d_view"),

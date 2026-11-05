@@ -30,6 +30,7 @@ class NetworkDiagnosticTests(unittest.TestCase):
             (407, "PROXY_AUTENTICACAO"),
             (403, "PROXY_ACESSO_NEGADO"),
             (502, "PROXY_CONEXAO"),
+            (503, "PROXY_CONEXAO"),
         ):
             with self.subTest(code=code):
                 secret = "SENSITIVE_TEST_MARKER"
@@ -49,7 +50,7 @@ class NetworkDiagnosticTests(unittest.TestCase):
                 self.assertEqual(result.status, code)
                 self.assertNotIn(secret, result.summary)
                 self.assertNotIn("test.invalid", result.summary)
-                self.assertEqual(result.retryable, code == 502)
+                self.assertEqual(result.retryable, code in (502, 503))
 
     def test_tls_timeout_dns_and_refused_connections_are_distinct(self):
         for error, category in (
