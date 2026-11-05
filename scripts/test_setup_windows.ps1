@@ -5,6 +5,9 @@
 $ErrorActionPreference = "Stop"
 $env:NEXOFLOW_PERFIL = "FARMA"
 $ProgressPreference = "SilentlyContinue"
+$previousTestNetworkMode = $env:NEXOFLOW_NETWORK_MODE
+# Rede direta explicitamente autorizada no runner público isolado do CI.
+$env:NEXOFLOW_NETWORK_MODE = "personal"
 
 $InstallDir = "C:\NexoFlow"
 $UninstallKey = "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\NexoFlow"
@@ -369,6 +372,8 @@ public static class NexoFlowSetupRootLock {
     Write-Host "[OK] Smoke test do NexoFlow Setup 1.5.13 concluído."
 }
 finally {
+    if ($null -eq $previousTestNetworkMode) { Remove-Item Env:NEXOFLOW_NETWORK_MODE -ErrorAction SilentlyContinue }
+    else { $env:NEXOFLOW_NETWORK_MODE = $previousTestNetworkMode }
     Remove-Item Env:NEXOFLOW_SETUP_INSTALL_MODE -ErrorAction SilentlyContinue
     Remove-Item Env:NEXOFLOW_SETUP_NONINTERACTIVE -ErrorAction SilentlyContinue
     Remove-Item Env:NEXOFLOW_PYTHON_EXE -ErrorAction SilentlyContinue
