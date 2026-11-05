@@ -17,6 +17,9 @@ import run_mcp_pip as mcp
 
 class McpPipTests(unittest.TestCase):
     def setUp(self):
+        route = patch.dict(os.environ, {"NEXOFLOW_NETWORK_MODE": "auto"})
+        route.start()
+        self.addCleanup(route.stop)
         guard = patch('pip_network.preflight')
         guard.start()
         self.addCleanup(guard.stop)

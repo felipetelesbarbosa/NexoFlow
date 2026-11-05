@@ -12,7 +12,7 @@ class ProxyConfigTests(unittest.TestCase):
         self._module_snapshot = {
             name: sys.modules.get(name) for name in ("secrets_config", "proxy_config")
         }
-        self._environment_patch = patch.dict(os.environ)
+        self._environment_patch = patch.dict(os.environ, {"NEXOFLOW_NETWORK_MODE": "auto"})
         self._environment_patch.start()
         self.addCleanup(self._environment_patch.stop)
         self.addCleanup(self._restore_modules)
