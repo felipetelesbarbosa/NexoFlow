@@ -77,10 +77,27 @@ def main() -> int:
     # Não exibimos o comando completo porque argumentos futuros podem
     # eventualmente conter informações sensíveis.
     try:
-        completed = subprocess.run(command, cwd=ROOT)
+        completed = subprocess.run(
+            command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=300,
+        )
+        if completed.returncode:
+            print(
+                "[ERRO] pip não concluiu a etapa. Saída bruta omitida para proteger URLs e credenciais; nenhuma etapa seguinte será iniciada."
+            )
+        else:
+            print("[OK] Etapa pip concluída.")
         return completed.returncode
-    except OSError as exc:
-        print(f"[ERRO] Falha ao executar o pip: {exc}")
+    except (OSError, subprocess.TimeoutExpired):
+        print(
+            "[ERRO] Não foi possível concluir o pip no prazo; confira rede e ambiente. Nenhuma etapa seguinte será iniciada."
+        )
         return 1
 
 

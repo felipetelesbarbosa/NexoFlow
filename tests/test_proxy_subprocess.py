@@ -46,3 +46,21 @@ class ProxySubprocessTests(unittest.TestCase):
                     ):
                         self.assertEqual(run_pip.main(), 0)
                     self.assertNotIn("secret", output.getvalue())
+
+    def test_uncontrolled_pip_output_is_never_logged(self):
+        output = io.StringIO()
+        with (
+            patch.object(run_pip, "_configure_proxy"),
+            patch.object(run_pip.sys, "argv", ["run_pip.py", "install", "synthetic"]),
+            patch.object(
+                run_pip.subprocess,
+                "run",
+                return_value=Mock(
+                    returncode=1,
+                    stdout="https://user:SECRET_MARKER@private.invalid/?token=SECRET_MARKER",
+                ),
+            ),
+            contextlib.redirect_stdout(output),
+        ):
+            self.assertEqual(run_pip.main(), 1)
+        self.assertNotIn("SECRET_MARKER", output.getvalue())
