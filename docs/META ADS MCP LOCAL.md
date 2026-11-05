@@ -87,8 +87,7 @@ Execute na instalação local do Windows:
 
 ```powershell
 cd C:\NexoFlow
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\instalar_meta_ads_mcp.ps1
-codex mcp get nexoflow-meta-read
+powershell -NoProfile -File .\scripts\instalar_meta_ads_mcp.ps1 -Perfil FARMA
 ```
 
 O cadastro esperado usa o Python isolado `connectors\meta_ads_mcp\.venv\Scripts\python.exe` e o argumento absoluto `connectors\meta_ads_mcp\server.py`. O token não participa do cadastro e não deve ser passado por `--env`. Preserve servidores Codex já existentes; um registro divergente precisa de diagnóstico antes de qualquer substituição.
@@ -105,19 +104,31 @@ Foram executados 19 testes offline do conector com o SDK MCP instalado em ambien
 
 Na fase preparatória, os commits usaram `[skip release]` e preservaram a versão 1.5.12. A entrega **1.5.13**, autorizada em 04/11/2026, distribui a integração nativa e os auxiliares opcionais somente após validar o pacote do mesmo commit. Não substitui o release anterior.
 
-## Codex CLI durante o Setup
+## Instalação MCP independente de Codex
 
-O Codex CLI é necessário para usar este MCP no Codex local. O cliente MetaAdsClient poderá ser reutilizado pelo Analytics sem Codex. O Setup oferece a integração opcional: em Preserve, valida e reaproveita instalações compatíveis; em Clean, reinstala os componentes selecionados, recriando somente o ambiente virtual MCP. A opção interativa Clean vem afirmativa, e Preserve exige seleção; instalações não interativas só executam o extra com `-InstallMetaAdsMcp`.
-
-O instalador detecta capacidades do Codex CLI antes de baixar software. Quando necessário, utiliza o instalador standalone oficial em `https://chatgpt.com/codex/install.ps1`, documentado no [README oficial do Codex](https://github.com/openai/codex/blob/main/README.md). Não exige Node.js para esse método. O processo preserva configurações e autenticação do Codex e os demais servidores MCP. Login e token Meta são configurados manualmente, na sessão do usuário final. Se o Setup estiver sob outra identidade administrativa, a integração fica pendente para execução pelo usuário correto.
-
-Auxiliares para uma instalação local já existente:
+O Setup oferece somente o ambiente opcional **Meta Ads MCP**, por `-InstallMetaAdsMcp` no modo não interativo. Preserve valida/reutiliza ambientes compatíveis; Clean reinstala somente o ambiente MCP selecionado, com recuperação se falhar. Não instala, consulta, valida, registra nem remove Codex CLI e não altera seus arquivos de autenticação/configuração. O registro em um cliente de IA é uma operação manual separada e opcional. Analytics/Noturno continuam usando Meta nativa sem MCP ou cliente de IA.
 
 ```powershell
 cd C:\NexoFlow
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\instalar_meta_ads_mcp.ps1 -InstalarCodex
-# Reinstalar explicitamente a integração, preservando credenciais existentes do auxiliar:
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\instalar_meta_ads_mcp.ps1 -InstalarCodex -Reinstall
+powershell -NoProfile -File .\scripts\instalar_meta_ads_mcp.ps1 -Perfil FARMA
+# Ou -Perfil PET. Para recriar apenas o ambiente MCP: adicionar -Reinstall.
 ```
 
-Uma falha opcional não desfaz o NexoFlow básico: o resultado é registrado em `logs/meta_ads_mcp_instalacao.json`, sem token. Configuração MCP divergente é preservada e exige conferência; não é sobrescrita automaticamente. O Setup 1.5.12 publicado não foi substituído. Os auxiliares integram a entrega 1.5.13 autorizada, sujeita aos checks e à validação do pacote antes de ser anunciada como disponível.
+O perfil é escolhido antes dos imports de rede. O Setup utiliza NEXOFLOW_PERFIL herdado ou FARMA quando não definido. O helper explícito permite testar PET separadamente. Não reutiliza credenciais de aplicação FARMA para PET; usa o seletor existente. Os parâmetros antigos `-InstalarCodex` e `-SemRegistroCodex` são aceitos apenas para compatibilidade, com aviso e sem executar Codex ou registro. As orientações novas não os utilizam.
+
+### Proxy, certificados e erro 407
+
+O script anterior chamava o pip do venv MCP diretamente, sem carregar a configuração NexoFlow. O novo `app/run_mcp_pip.py`, executado pelo Python principal já instalado, carrega a mesma política de proxy do NexoFlow, com o perfil selecionado. O pip MCP recebe a rota no ambiente, nunca em argumentos ou logs. Não é criada alternativa direta por falha de autenticação. Configuração ausente/inválida bloqueia a instalação de dependências e deixa a integração pendente.
+
+Somente no subprocesso pip, configurações globais/locais pip.ini são desconsideradas para impedir sobreposição da rota do NexoFlow. Índices HTTPS e certificados podem ser definidos por variáveis de ambiente aprovadas pela TI. Não são alterados pip.ini, registro do Windows ou arquivos de configuração privados. A CA explícita é selecionada na ordem REQUESTS_CA_BUNDLE, CURL_CA_BUNDLE, PIP_CERT, SSL_CERT_FILE e propagada para PIP_CERT/REQUESTS_CA_BUNDLE; arquivo inexistente bloqueia a operação. Sem CA explícita, mantém o comportamento TLS padrão do pip/Python, incluindo seu suporte ao repositório de certificados do sistema quando disponível. Não importa certificados nem desativa TLS. Políticas PAC/NTLM/Kerberos não são implementadas pelo simples par usuário/senha: confirmar com a TI.
+
+A saída bruta do pip não é impressa nem gravada. Mensagens são classificadas em categorias seguras. 407 não é repetido pelo wrapper e não comprova ausência de uma distribuição MCP. Credencial ausente, rejeitada, método incompatível e regra de proxy exigem evidências distintas. CONNECT 502/503 e timeouts podem ter até três tentativas com backoff, sem mudar rota; TLS e erros não reconhecidos encerram a etapa. A validação offline continua obrigatória após instalação. O JSON `logs/meta_ads_mcp_instalacao.json` indica instalado/pendente e orienta executar o helper por perfil, sem `-InstalarCodex`. Status instalado comprova dependências/testes offline, não autenticação Meta ou registro em cliente de IA.
+
+### Homologação
+
+1. PC pessoal: pacote do commit validado, atualização Preserve, backup privado e Kaspersky ativo. Conferir preservação de secrets, credentials, logs e ambientes. Confirmar que a oferta menciona somente MCP e que o Codex existente não é consultado/modificado. Não reduzir ExecutionPolicy nem remover bloqueios de origem para prosseguir.
+2. Nesse PC, executar o helper primeiro com FARMA, depois PET em processos separados. Confirmar conclusão offline e a coleta Meta nativa independentemente. Preservar JSON/relatório sem tokens. Se não houver configuração válida de rede, corrigir localmente antes de repetir.
+3. PC corporativo: mesmo pacote e Preserve, proxy obrigatório conforme TI, fallback direto desabilitado. Conferir rota e indicação de credenciais configuradas; isso não comprova autenticação. Em 407 parar e solicitar à TI correlação do horário, domínio/porta e método de autenticação. Em TLS solicitar a CA aprovada; em 502/503 solicitar logs CONNECT/upstream. Não enviar secrets_config.py ou o JSON Meta como evidência.
+4. Só após sucesso local, registrar manualmente o servidor STDIO no cliente de IA escolhido, se desejado. Configurações já existentes não são sobrescritas pelo instalador. O token permanece exclusivamente em credentials/mcp/meta_ads_credentials.json.
+
+Os testes sintéticos não aprovam Kaspersky, proxy corporativo ou autenticação real. Não houve consulta de credenciais reais nem escrita de produção para demonstrar funcionamento desta correção.

@@ -6,7 +6,7 @@
 
 Conector opcional em `connectors/meta_ads_mcp`, com cliente reutilizável sem dependência do servidor MCP ou do Codex no futuro Analytics. Transporte STDIO, seis ferramentas de leitura, GET com host/caminhos fixos, allowlist de contas, verificação de ads_read e bloqueio de ads_management. Credenciais somente em `credentials/mcp/meta_ads_credentials.json`, ignoradas pelo Git; token fora de URL, cadastro Codex, exemplos e mensagens de erro.
 
-Setup opcional instala/valida Codex CLI pelo instalador standalone oficial. Preserve reaproveita instalações compatíveis; Clean reinstala os componentes selecionados. O ambiente MCP usa Python 3.14 isolado e se reconstrói com recuperação quando incompatível. Instalação opcional falha de forma explícita e registra pendência sem desfazer o NexoFlow básico. Configurações e autenticação do Codex e outros servidores MCP são preservados. Versão NexoFlow permanece 1.5.12; commits desta integração usam [skip release].
+Registro histórico da implementação inicial: o Setup então instalava/validava Codex CLI. Essa etapa foi retirada; o comportamento atual está em [Meta Ads MCP local](META%20ADS%20MCP%20LOCAL.md). Preserve reaproveita instalações compatíveis; Clean reinstala os componentes selecionados. O ambiente MCP usa Python 3.14 isolado e se reconstrói com recuperação quando incompatível. Instalação opcional falha de forma explícita e registra pendência sem desfazer o NexoFlow básico. Configurações e autenticação do Codex e outros servidores MCP são preservados. Versão NexoFlow permanece 1.5.12; commits desta integração usam [skip release].
 
 ## Testes executados
 

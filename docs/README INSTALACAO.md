@@ -94,3 +94,7 @@ O ZIP contém `RELATORIO DE SEGURANCA.json` com o estado das assinaturas. Certif
 Na opção de atualizar mantendo dados, o Setup conserva `secrets_config.py`, `credentials`, `logs` e `importacoes` no lugar. Um handle de Explorer/terminal que impede renomear essas pastas não exige apagar logs ou estado. O backup privado continua obrigatório; apenas o programa é preparado para rollback. Se a instalação falhar, o programa anterior é restaurado sem remover os dados preservados. Arquivos novos do programa continuam sujeitos à validação de integridade; bloqueios de leitura/gravação não são ignorados. Encerre as cargas FARMA e PET antes de instalar.
 
 A instalação limpa reinicia configuração/estado e precisa conseguir mover os dados anteriores para a recuperação. Se houver bloqueio, ela aborta preservando a instalação anterior; não é convertida silenciosamente em atualização.
+
+## Meta Ads MCP opcional
+
+A oferta do Setup prepara somente o MCP, sem instalar, validar ou registrar Codex CLI. A coleta Meta nativa é independente. O MCP carrega a configuração de rede NexoFlow para instalar suas dependências; HTTP 407 indica falha de autenticação no proxy, sem comprovar ausência de uma versão do pacote. Confira [instalação MCP e homologação pessoal/corporativa](META%20ADS%20MCP%20LOCAL.md).

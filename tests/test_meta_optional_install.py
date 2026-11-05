@@ -109,7 +109,9 @@ try{
  $status=Join-Path $InstallDir 'logs/meta_ads_mcp_instalacao.json'
  if(Test-Path -LiteralPath $status){throw 'Não deveria tentar a integração sem a flag.'}
  Invoke-OptionalMetaAdsSetup -Selected -Unattended
- if((Get-Content -LiteralPath $status -Raw|ConvertFrom-Json).status -ne 'pendente'){throw 'Falha opcional sem pendência.'}
+ $record=Get-Content -LiteralPath $status -Raw|ConvertFrom-Json
+ if($record.status -ne 'pendente'){throw 'Falha opcional sem pendência.'}
+ if($record.proxima_acao -match 'InstalarCodex'){throw 'Orientação legada no JSON.'}
 }finally{Remove-Item -LiteralPath $InstallDir -Recurse -Force}
 """)
 
@@ -138,32 +140,46 @@ try{
 }finally{Remove-Item -LiteralPath $InstallDir -Recurse -Force}
 """)
 
-    def test_registration_compatible_twice_never_adds_or_overwrites(self):
-        self.run_ps(r"""
-. (Join-Path $repo 'scripts/instalar_meta_ads_mcp.ps1') -FunctionsOnly
-$script:getCalls=0
-function codex {
- if($args -contains 'add'){throw 'Cadastro existente não deve ser substituído.'}
- $script:getCalls++
- @{enabled=$true;transport=@{type='stdio';command=$venvPython;args=@($server);env=@{};env_vars=@()}}|ConvertTo-Json -Depth 4
- $global:LASTEXITCODE=0
-}
-if(-not (Confirm-McpRegistration)){throw 'Registro não confirmado.'}
-if(-not (Confirm-McpRegistration)){throw 'Registro não confirmado na repetição.'}
-if($script:getCalls -ne 2){throw 'Quantidade inesperada de consultas locais.'}
-""")
+    def test_mcp_installer_has_no_codex_execution_or_registration(self):
+        helper = (ROOT / "scripts/instalar_meta_ads_mcp.ps1").read_text(encoding="utf-8-sig")
+        setup = (ROOT / "installer/install.ps1").read_text(encoding="utf-8-sig")
+        for forbidden in ("Install-NexoCodexCli", "Assert-NexoCodexInteractiveUser", "Get-Command codex", "& codex", "instalar_codex_cli.ps1"):
+            self.assertNotIn(forbidden, helper)
+        self.assertNotIn("'-InstalarCodex'", setup)
+        self.assertNotIn("codex_login", setup)
+        self.assertNotIn("Codex CLI e Meta Ads MCP", setup)
 
-    def test_registration_different_command_is_rejected_without_overwrite(self):
+    def test_full_mcp_path_ignores_legacy_codex_flag_and_preserves_credentials(self):
         self.run_ps(r"""
 . (Join-Path $repo 'scripts/instalar_meta_ads_mcp.ps1') -FunctionsOnly
-function codex {
- if($args -contains 'add'){throw 'Não deve alterar cadastro divergente.'}
- @{enabled=$true;transport=@{type='stdio';command='outra-conta.exe';args=@($server)}}|ConvertTo-Json -Depth 4
- $global:LASTEXITCODE=0
-}
-$failed=$false
-try{[void](Confirm-McpRegistration)}catch{$failed=$true}
-if(-not $failed){throw 'Configuração diferente não foi bloqueada.'}
+$fixture=Join-Path ([IO.Path]::GetTempPath()) ('nexo-mcp-independent-'+[Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $fixture|Out-Null
+try {
+ $raiz=$fixture
+ $credDir=$fixture
+ $credFile=Join-Path $fixture 'credentials.json'
+ 'SYNTHETIC_META_CREDENTIAL'|Set-Content -LiteralPath $credFile
+ $before=(Get-FileHash -LiteralPath $credFile).Hash
+ $venvPython=Join-Path $fixture 'offline.ps1'
+ '$global:LASTEXITCODE=0'|Set-Content -LiteralPath $venvPython
+ function Install-MetaAdsEnvironment { $script:mcpAttempted=$true }
+ function codex { throw 'Não pode iniciar Codex.' }
+ $InstalarCodex=$true; $SemRegistroCodex=$false; $FunctionsOnly=$false
+ $source=Get-Content -LiteralPath (Join-Path $repo 'scripts/instalar_meta_ads_mcp.ps1') -Raw
+ $body=$source.Substring($source.IndexOf('if ($FunctionsOnly) { return }'))
+ Invoke-Expression $body
+ if(-not $script:mcpAttempted){throw 'MCP não foi instalado independentemente.'}
+ if((Get-FileHash -LiteralPath $credFile).Hash -ne $before){throw 'Credencial alterada.'}
+ $status=Get-Content -LiteralPath (Join-Path $fixture 'logs/meta_ads_mcp_instalacao.json') -Raw|ConvertFrom-Json
+ if($status.status -ne 'instalado'){throw 'Reexecução manual não atualizou status.'}
+ function Install-MetaAdsEnvironment { throw 'SYNTHETIC_PRIVATE_ERROR' }
+ $failed=$false
+ try{Invoke-Expression $body}catch{ $failed=$true; if($_.Exception.Message -match 'SYNTHETIC_PRIVATE_ERROR'){throw 'Erro privado exposto.'} }
+ if(-not $failed){throw 'Falha independente foi ignorada.'}
+ $status=Get-Content -LiteralPath (Join-Path $fixture 'logs/meta_ads_mcp_instalacao.json') -Raw|ConvertFrom-Json
+ if($status.status -ne 'pendente' -or $status.proxima_acao -match 'InstalarCodex'){throw 'Pendência independente inválida.'}
+ if((Get-FileHash -LiteralPath $credFile).Hash -ne $before){throw 'Falha alterou credencial.'}
+}finally{Remove-Item -LiteralPath $fixture -Recurse -Force}
 """)
 
     def test_clean_codex_fresh_releases_preserves_authentication(self):
@@ -228,6 +244,7 @@ $venvPython=Join-Path $venvDir 'python.ps1'
 New-Item -ItemType Directory -Force -Path $venvDir|Out-Null
 '$global:LASTEXITCODE=1'|Set-Content -LiteralPath $venvPython
 $script:created=0
+function Invoke-MetaAdsDependencyInstall { $global:LASTEXITCODE=0 }
 function py {
  $script:created++
  New-Item -ItemType Directory -Force -Path $venvDir|Out-Null

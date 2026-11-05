@@ -343,7 +343,7 @@ foreach ($relative in @("VERSION", "app/versioning.py", "app/sheets_continuation
     Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/$relative"
     Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/$relative"
 }
-foreach ($relative in @('connectors/meta_ads_mcp/__init__.py', 'connectors/meta_ads_mcp/client.py', 'connectors/meta_ads_mcp/settings.py', 'configuracao/meta_ads_credentials.example.json', 'scripts/instalar_meta_ads_mcp.ps1', 'scripts/instalar_codex_cli.ps1')) {
+foreach ($relative in @('app/run_mcp_pip.py', 'connectors/meta_ads_mcp/__init__.py', 'connectors/meta_ads_mcp/client.py', 'connectors/meta_ads_mcp/settings.py', 'configuracao/meta_ads_credentials.example.json', 'scripts/instalar_meta_ads_mcp.ps1', 'scripts/instalar_codex_cli.ps1')) {
     Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/$relative"
     Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/$relative"
 }

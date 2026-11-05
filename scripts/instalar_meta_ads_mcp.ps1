@@ -1,12 +1,12 @@
 ﻿[CmdletBinding()]
-param([switch]$SemRegistroCodex, [switch]$InstalarCodex, [switch]$Reinstall, [switch]$FunctionsOnly)
+param([switch]$SemRegistroCodex, [switch]$InstalarCodex, [switch]$Reinstall, [switch]$FunctionsOnly,
+      [ValidateSet('FARMA','PET')][string]$Perfil = $(if ($env:NEXOFLOW_PERFIL) { $env:NEXOFLOW_PERFIL } else { 'FARMA' }))
 
 $ErrorActionPreference = 'Stop'
 $raiz = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $mcpDir = Join-Path $raiz 'connectors\meta_ads_mcp'
 $venvDir = Join-Path $mcpDir '.venv'
 $venvPython = Join-Path $venvDir 'Scripts\python.exe'
-$server = Join-Path $mcpDir 'server.py'
 $credDir = Join-Path $raiz 'credentials\mcp'
 $credFile = Join-Path $credDir 'meta_ads_credentials.json'
 $credExample = Join-Path $raiz 'configuracao\meta_ads_credentials.example.json'
@@ -49,7 +49,7 @@ function Install-MetaAdsEnvironment {
         }
         & $venvPython (Join-Path $mcpDir 'validate_environment.py') --python-only *> $null
         if ($LASTEXITCODE -ne 0) { throw 'O ambiente MCP recriado não usa Python 3.14. A instalação anterior será recuperada.' }
-        & $venvPython -m pip install -r (Join-Path $mcpDir 'requirements.txt')
+        Invoke-MetaAdsDependencyInstall
         if ($LASTEXITCODE -ne 0 -or -not (Test-MetaAdsEnvironment)) { throw 'As dependências MCP não puderam ser instaladas e validadas.' }
         if ($backup) { Remove-Item -LiteralPath $backup -Recurse -Force }
     } catch {
@@ -60,31 +60,35 @@ function Install-MetaAdsEnvironment {
         throw
     }
 }
-function Confirm-McpRegistration {
-    $previousErrorAction = $ErrorActionPreference
-    try {
-        $ErrorActionPreference = 'Continue'
-        $raw = & codex mcp get nexoflow-meta-read --json 2>$null
-        $code = $LASTEXITCODE
-    } finally { $ErrorActionPreference = $previousErrorAction }
-    if ($code -ne 0) { return $false }
-    try { $record = ($raw -join "`n") | ConvertFrom-Json } catch { throw 'Cadastro MCP ilegível. Nenhum servidor foi alterado.' }
-    $transport = $record.transport
-    $argumentos = @($transport.args)
-    if ($record.enabled -eq $false -or $transport.type -ne 'stdio' -or $transport.command -ne $venvPython -or
-        $argumentos.Count -ne 1 -or $argumentos[0] -ne $server -or
-        ($transport.env -and @($transport.env.PSObject.Properties).Count -gt 0) -or
-        ($transport.env_vars -and @($transport.env_vars).Count -gt 0)) {
-        throw 'nexoflow-meta-read já existe com configuração diferente. Nada foi sobrescrito. Confira comando, argumento e ausência de credenciais no cadastro antes de ajustá-lo manualmente.'
+function Invoke-MetaAdsDependencyInstall {
+    $nativePython = Join-Path $raiz '.venv/Scripts/python.exe'
+    $runner = Join-Path $raiz 'app/run_mcp_pip.py'
+    if (-not (Test-Path -LiteralPath $nativePython -PathType Leaf) -or -not (Test-Path -LiteralPath $runner -PathType Leaf)) {
+        throw 'Ambiente principal do NexoFlow ou auxiliar de rede ausente. Conclua o Setup antes de instalar o MCP.'
     }
-    return $true
+    & $nativePython $runner --python $venvPython --perfil $Perfil
+    if ($LASTEXITCODE -ne 0) { throw 'Instalação MCP pendente. Confira a categoria de rede acima; falha do índice não comprova ausência do pacote.' }
 }
 
+function Write-MetaAdsInstallStatus {
+    param([ValidateSet('instalado','pendente')][string]$Status)
+    $folder = Join-Path $raiz 'logs'
+    New-Item -ItemType Directory -Force -Path $folder | Out-Null
+    $record = @{ componente = 'Meta Ads MCP'; status = $Status; perfil_rede = $Perfil;
+        acesso_meta = 'nao_validado'; registro_cliente = 'manual_opcional';
+        atualizado_em = (Get-Date).ToUniversalTime().ToString('o') }
+    if ($Status -eq 'pendente') {
+        $record.proxima_acao = "Executar scripts/instalar_meta_ads_mcp.ps1 -Perfil $Perfil após conferir a configuração de rede"
+    }
+    $record | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $folder 'meta_ads_mcp_instalacao.json') -Encoding UTF8
+}
 
 if ($FunctionsOnly) { return }
-. (Join-Path $PSScriptRoot 'instalar_codex_cli.ps1') -FunctionsOnly
-Assert-NexoCodexInteractiveUser
-if ($InstalarCodex) { Install-NexoCodexCli -Force:$Reinstall }
+# Compatibilidade: aceitar chamadas antigas, sem instalar/validar/registrar Codex.
+if ($InstalarCodex -or $SemRegistroCodex) {
+    Write-Warning 'Parâmetro legado ignorado. Este auxiliar instala somente o MCP e não acessa configurações de clientes de IA.'
+}
+try {
 Write-Host 'Instalando/validando NexoFlow Meta Ads MCP local — somente leitura.'
 Install-MetaAdsEnvironment -Force:$Reinstall
 
@@ -106,15 +110,10 @@ try {
 } finally { Pop-Location }
 
 
-if (-not $SemRegistroCodex) {
-    if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {
-        throw 'Codex não encontrado no PATH. O MCP foi instalado, mas ainda não foi registrado. Execute novamente após configurar o Codex.'
-    }
-    if (-not (Confirm-McpRegistration)) {
-        & codex mcp add nexoflow-meta-read -- $venvPython $server
-        if ($LASTEXITCODE -ne 0) { throw 'Falha ao registrar o MCP no Codex.' }
-        if (-not (Confirm-McpRegistration)) { throw 'O registro criado não pôde ser confirmado.' }
-    }
-    Write-Host 'Cadastro nexoflow-meta-read confirmado: STDIO, Python isolado e server.py, sem credenciais no registro.'
-}
 Write-Host 'Conector instalado e testes offline concluídos. Acesso real à Meta ainda exige token ads_read e confirmação da conta autorizada.'
+
+    Write-MetaAdsInstallStatus -Status instalado
+} catch {
+    try { Write-MetaAdsInstallStatus -Status pendente } catch { }
+    throw 'Meta Ads MCP pendente. Confira o diagnóstico sanitizado acima e logs/meta_ads_mcp_instalacao.json; a instalação principal foi preservada.'
+}

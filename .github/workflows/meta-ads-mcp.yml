@@ -6,6 +6,8 @@ on:
       - 'connectors/meta_ads_mcp/**'
       - 'app/meta_ads_*.py'
       - 'app/run_meta_ads.py'
+      - 'app/run_mcp_pip.py'
+      - 'tests/test_mcp_pip.py'
       - 'tests/test_meta_ads_*.py'
       - 'tests/test_meta_native_install.py'
       - 'tests/test_meta_native_pipeline.py'
@@ -23,6 +25,8 @@ on:
       - 'connectors/meta_ads_mcp/**'
       - 'app/meta_ads_*.py'
       - 'app/run_meta_ads.py'
+      - 'app/run_mcp_pip.py'
+      - 'tests/test_mcp_pip.py'
       - 'scripts/instalar_meta_ads_mcp.ps1'
       - '.github/workflows/meta-ads-mcp.yml'
   workflow_dispatch:
@@ -46,5 +50,5 @@ jobs:
         run: python -m unittest tests.test_meta_ads_model tests.test_meta_ads_evidence tests.test_meta_ads_sheets tests.test_meta_ads_native tests.test_meta_native_pipeline tests.test_meta_analytics_hook tests.test_run_meta_ads -v
       - name: Validar instaladores opcionais com comandos simulados
         if: runner.os == 'Windows'
-        run: python -m unittest tests.test_meta_optional_install tests.test_meta_environment_validator -v
+        run: python -m unittest tests.test_meta_optional_install tests.test_meta_environment_validator tests.test_mcp_pip -v
       - run: python -m pip check

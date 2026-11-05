@@ -67,10 +67,10 @@ function Invoke-OptionalMetaAdsSetup {
     $requested = [bool]$Selected
     if (-not $requested -and -not $Unattended) {
         if ($Mode -eq 'Clean') {
-            $answer = Read-Host 'A instalação limpa inclui reinstalar Codex CLI e Meta Ads MCP local. Continuar integração? [S/n]'
+            $answer = Read-Host 'Reinstalar o ambiente Meta Ads MCP local opcional (somente leitura)? [S/n]'
             $requested = ($answer.Trim().ToLowerInvariant() -notin @('n','não','nao'))
         } else {
-            $answer = Read-Host 'Instalar/validar Codex CLI e Meta Ads MCP local (somente leitura)? [s/N]'
+            $answer = Read-Host 'Instalar/validar Meta Ads MCP local (somente leitura)? [s/N]'
             $requested = ($answer.Trim().ToLowerInvariant() -in @('s','sim'))
         }
     }
@@ -79,7 +79,7 @@ function Invoke-OptionalMetaAdsSetup {
     try {
         $helper = Join-Path $InstallDir 'scripts/instalar_meta_ads_mcp.ps1'
         if (-not (Test-Path -LiteralPath $helper -PathType Leaf)) { throw 'Auxiliar Meta Ads MCP não encontrado na instalação.' }
-        # Codex e o SDK MCP são componentes opcionais e executam ferramentas
+        # O SDK MCP é um componente opcional e executa ferramentas
         # nativas de terceiros. Mantenha-os fora do processo do Setup: uma
         # terminação fatal do filho (por exemplo 0x40000015) não pode encerrar
         # a instalação principal depois que o NexoFlow já foi instalado.
@@ -92,21 +92,21 @@ function Invoke-OptionalMetaAdsSetup {
             try { $powershellExe = [Diagnostics.Process]::GetCurrentProcess().MainModule.FileName } catch { }
         }
         if (-not $powershellExe) { $powershellExe = 'powershell.exe' }
-        $helperArguments = @('-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f $helper), '-InstalarCodex')
+        $helperArguments = @('-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f $helper))
         if ($Mode -eq 'Clean') { $helperArguments += '-Reinstall' }
         $helperProcess = Start-Process -FilePath $powershellExe -ArgumentList $helperArguments -Wait -PassThru -NoNewWindow -ErrorAction Stop
         if ($helperProcess.ExitCode -ne 0) {
-            throw "A instalação opcional Codex/MCP foi encerrada com o código $($helperProcess.ExitCode)."
+            throw "A instalação opcional MCP foi encerrada com o código $($helperProcess.ExitCode)."
         }
-        $status = @{ componente = 'Meta Ads MCP'; status = 'instalado'; codex_login = 'manual'; acesso_meta = 'nao_validado'; atualizado_em = (Get-Date).ToUniversalTime().ToString('o') }
+        $status = @{ componente = 'Meta Ads MCP'; status = 'instalado'; registro_cliente = 'manual_opcional'; acesso_meta = 'nao_validado'; atualizado_em = (Get-Date).ToUniversalTime().ToString('o') }
         $status | ConvertTo-Json | Set-Content -LiteralPath $statusFile -Encoding UTF8
-        Write-Host '[OK] Codex CLI e Meta Ads MCP instalados/validados. Login e token são configurados localmente pelo usuário.' -ForegroundColor Green
+        Write-Host '[OK] Meta Ads MCP instalado/validado. Registro em cliente de IA é manual e opcional.' -ForegroundColor Green
     } catch {
         # O programa principal já foi instalado. Não restaurar/apagar NexoFlow
         # nem credenciais porque uma integração opcional ficou pendente.
-        $status = @{ componente = 'Meta Ads MCP'; status = 'pendente'; proxima_acao = 'Executar scripts/instalar_meta_ads_mcp.ps1 -InstalarCodex na sessão Windows do usuário final'; atualizado_em = (Get-Date).ToUniversalTime().ToString('o') }
+        $status = @{ componente = 'Meta Ads MCP'; status = 'pendente'; proxima_acao = 'Executar scripts/instalar_meta_ads_mcp.ps1 -Perfil FARMA ou PET, após conferir a configuração de rede'; atualizado_em = (Get-Date).ToUniversalTime().ToString('o') }
         try { $status | ConvertTo-Json | Set-Content -LiteralPath $statusFile -Encoding UTF8 } catch { }
-        Write-Warning 'NexoFlow instalado. Codex/Meta Ads MCP ficaram pendentes. Execute o auxiliar na sessão Windows do usuário final; confira logs/meta_ads_mcp_instalacao.json. Configurações existentes foram preservadas.'
+        Write-Warning 'NexoFlow instalado. Meta Ads MCP ficou pendente. Execute o auxiliar na sessão Windows do usuário final; confira logs/meta_ads_mcp_instalacao.json. Configurações existentes foram preservadas.'
     }
 }
 
@@ -800,7 +800,7 @@ function Show-InstallModeDialog {
         $label = New-Object System.Windows.Forms.Label
         $label.Location = New-Object System.Drawing.Point(20, 20)
         $label.Size = New-Object System.Drawing.Size(620, 185)
-        $label.Text = "Já existem arquivos do NexoFlow neste computador.`n`nAtualizar mantendo dados: conserva configurações, credenciais, logs e estado local.`n`nInstalação limpa: reinicia esses dados para FarmaLíder e Pets Líder, mas mantém a credencial Meta (token e contas permitidas). Os demais acessos precisam ser configurados novamente. Codex/MCP são opcionais e serão reinstalados se selecionados.`n`nImportações são preservadas nas duas opções."
+        $label.Text = "Já existem arquivos do NexoFlow neste computador.`n`nAtualizar mantendo dados: conserva configurações, credenciais, logs e estado local.`n`nInstalação limpa: reinicia esses dados para FarmaLíder e Pets Líder, mas mantém a credencial Meta (token e contas permitidas). Os demais acessos precisam ser configurados novamente. Meta Ads MCP é opcional e será reinstalado se selecionado; clientes de IA são administrados separadamente.`n`nImportações são preservadas nas duas opções."
         $form.Controls.Add($label)
 
         foreach ($choice in @(
@@ -829,7 +829,7 @@ function Show-InstallModeDialog {
 function Read-InstallModeFromConsole {
     while ($true) {
         Write-Host '[1] Atualizar mantendo configurações, credenciais, logs e estado local'
-        Write-Host '[2] Instalação limpa — reiniciar dados, mantendo token/contas Meta; Codex/MCP opcionais'
+        Write-Host '[2] Instalação limpa — reiniciar dados, mantendo token/contas Meta; MCP opcional'
         Write-Host '[0] Cancelar'
         Write-Host 'Os arquivos de importacoes serão preservados.'
         switch ((Read-Host 'Escolha uma opção')) {
