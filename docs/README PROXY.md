@@ -180,3 +180,25 @@ cliente reduz a pressão por meio de cooldown, retry e throttle adaptativo.
 ## Rota corporativa e homologação
 
 Com proxy configurado e modo auto, uma falha TCP mantém a rota proxy. A alternativa direta automática exige `PROXY_ALLOW_DIRECT_FALLBACK = True`, somente após autorização da TI. O padrão é False; modo off continua sendo escolha explícita de conexão direta. Proxy ativo significa rota selecionada, não comprovação de CONNECT ou TLS. Consulte [auditoria e homologação Windows](AUDITORIA%20SEGURANCA%20WINDOWS.md) para 407/503, CA corporativa, Kaspersky e coleta de evidências.
+
+## Escolha da rede por sessão (desenvolvimento)
+
+O Setup pergunta qual rede será usada antes da instalação: pessoal com conexão direta autorizada ou corporativa com proxy obrigatório. Não altera secrets_config.py nem apaga as credenciais preservadas. A escolha é herdada por BAT, pip e MCP; o processo do Setup restaura seu ambiente ao encerrar. Instalações não interativas podem fornecer `-NetworkMode Personal` ou `-NetworkMode Corporate`. Sem escolha, Auto mantém a política existente; se a sondagem falhar, o modo sem interação encerra por REDE_AMBIGUA.
+
+Nos aplicativos, `PROXY_MODE=off` é uma escolha explícita de conexão direta; `on` exige proxy. Em auto, a porta acessível indica apenas um proxy candidato, não HTTPS validado. Se o proxy não responder e não houver autorização explícita de fallback, a execução interativa exige escolha; o modo sem interação falha. Falha TCP nunca identifica rede pessoal. A seleção explícita fica em NEXOFLOW_NETWORK_MODE apenas na sessão e nos filhos. Por exemplo, no PowerShell do PC pessoal autorizado: `$env:NEXOFLOW_NETWORK_MODE='personal'`; no trabalho: `'corporate'`. Remover com `Remove-Item Env:NEXOFLOW_NETWORK_MODE` ao trocar de ambiente. Não usar escolha pessoal para contornar política corporativa. Sem sinal confiável, o programa não tenta adivinhar a rede por SSID/IP privado.
+
+Pip principal e MCP compartilham preparação da rota/CA e preflight HTTPS HEAD do índice, com limite de 10 segundos e sem redirecionamentos. CONNECT 407/503, TLS ou timeout bloqueiam a etapa antes de solicitar dependências; não iniciam fallback direto. O preflight não comprova acesso aos hosts de todos os wheels. O pip principal limita retries a zero e timeout a 15 segundos; o BAT para na primeira etapa com erro. O MCP mantém seu limite de tentativas já documentado para falhas transitórias, sem trocar rota. Índices/CA fornecidos apenas em pip.ini exigem configuração de ambiente aprovada pela TI, pois a rota da sessão não pode ser sobrescrita por pip.ini.
+
+O Setup não executa mais upgrade automático do pip. Mantém o fornecido pelo Python/venv; eventual incompatibilidade deve ser diagnosticada e resolvida em manutenção versionada e validada. Setuptools/wheel e requisitos da aplicação continuam explícitos. Avisos de versão nova não autorizam upgrade.
+
+### Homologação pessoal e corporativa
+
+1. PC pessoal: pacote do commit correto, backup privado, atualização Preserve e escolha Personal. Manter Kaspersky/SmartScreen/TLS ativos. Confirmar que as credenciais antigas do proxy continuam no arquivo, mas não são utilizadas nessa sessão. Conferir o preflight, instalação e tentativa MCP separada; validar PET e FARMA em processos próprios.
+2. Fechar a sessão antes de trocar rede. PC corporativo: Preserve e escolha Corporate, sem fallback. Confirmar CONNECT/TLS para os destinos necessários. Se o proxy estiver indisponível, a instalação deve parar rapidamente com diagnóstico, sem tentativas por dependência. Em 407, solicitar à TI método/credenciais; em TLS, cadeia de CA aprovada. Guardar horário, categoria e código, sem valores privados.
+3. Sem interação e sem escolha: simular falha TCP e confirmar REDE_AMBIGUA. A rotina agendada precisa de uma rota explicitamente autorizada, não de um fallback silencioso. Não usar Noturno para testar apenas conexão: ele pode gravar dados.
+
+### Procedência e SmartScreen
+
+O workflow oficial compila a partir do commit e verifica hashes/segredos. Os builds padrão não recebem certificado Authenticode; o suporte a certificado legítimo existe, mas não equivale a assinatura efetivamente aplicada. Isso é evidência sobre a distribuição, não prova da causa exata do alerta. Um aviso SmartScreen não comprova malware nem falso positivo. O pacote pode manter Zone.Identifier e executável sem reputação conhecida. Sem acesso ao evento/arquivo exato no Windows, a decisão permanece pendente.
+
+No Windows, registrar `Get-FileHash -Algorithm SHA256 -LiteralPath '{arquivo}'` e `Get-AuthenticodeSignature -LiteralPath '{exe}'`, comparar procedência/commit e hash com o workflow. Não remover marca de origem nem desligar proteções. Se houver bloqueio, interromper, guardar captura com editor exibido, horário e hash e encaminhar à TI/fabricante. Não restaurar uma amostra detectada para executá-la. Não há nova assinatura, release ou aprovação SmartScreen nesta correção.

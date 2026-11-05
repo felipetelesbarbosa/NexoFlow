@@ -107,9 +107,7 @@ if exist "secrets_config.py" (
     echo.
 )
 
-echo Atualizando pip...
-".venv\Scripts\python.exe" app\run_pip.py install --upgrade pip
-if errorlevel 1 goto :erro_proxy
+echo Mantendo o pip fornecido pelo ambiente Python; sem atualização automática.
 
 echo.
 echo Preparando ferramentas do check-up e empacotamento...

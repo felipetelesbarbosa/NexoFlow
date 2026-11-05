@@ -49,6 +49,22 @@ try {
 }finally{Remove-Item -LiteralPath $fixture -Force}
 """)
 
+    def test_setup_network_choice_propagates_to_children_without_settings_write(self):
+        self.run_ps(r"""
+$tokens=$null;$errors=$null
+$ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'installer/install.ps1'),[ref]$tokens,[ref]$errors)
+$f=$ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Select-SetupNetwork'},$true)
+. ([scriptblock]::Create($f.Extent.Text))
+$NonInteractive=$true
+function Read-Host { throw 'Não deveria solicitar entrada.' }
+$NetworkMode='Personal'
+Select-SetupNetwork
+if($env:NEXOFLOW_NETWORK_MODE -ne 'personal'){throw 'Rota pessoal não propagada.'}
+$NetworkMode='Corporate'
+Select-SetupNetwork
+if($env:NEXOFLOW_NETWORK_MODE -ne 'corporate'){throw 'Rota corporativa não propagada.'}
+""")
+
     def test_codex_compatible_twice_never_downloads_or_installs(self):
         self.run_ps(r"""
 . (Join-Path $repo 'scripts/instalar_codex_cli.ps1') -FunctionsOnly

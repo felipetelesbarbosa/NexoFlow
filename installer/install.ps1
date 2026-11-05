@@ -2,6 +2,7 @@
 param(
     [switch]$NonInteractive,
     [switch]$InstallMetaAdsMcp,
+    [ValidateSet('Auto','Personal','Corporate')][string]$NetworkMode = 'Auto',
     [ValidateSet('Preserve', 'Clean', 'Cancel')][string]$InstallMode = 'Preserve'
 )
 
@@ -110,6 +111,22 @@ function Invoke-OptionalMetaAdsSetup {
     }
 }
 
+function Select-SetupNetwork {
+    if ($NetworkMode -ne 'Auto') { $env:NEXOFLOW_NETWORK_MODE = $NetworkMode.ToLowerInvariant(); return }
+    if ($env:NEXOFLOW_NETWORK_MODE -in @('personal','corporate')) { return }
+    if ($NonInteractive) { return }
+    Write-Host 'Escolha a rede desta sessão. A escolha não altera secrets_config.py.'
+    Write-Host '[1] PC pessoal / conexão direta autorizada'
+    Write-Host '[2] Rede corporativa / proxy obrigatório'
+    $answer = Read-Host 'Rede [1/2; outro valor cancela]'
+    switch ($answer) {
+        '1' { $env:NEXOFLOW_NETWORK_MODE = 'personal' }
+        '2' { $env:NEXOFLOW_NETWORK_MODE = 'corporate' }
+        default { throw 'Seleção de rede cancelada antes da instalação.' }
+    }
+    Write-Host '[INFO] Rede selecionada para Setup, pip e MCP; credenciais preservadas.'
+}
+
 function Write-Step([string]$Text) { Write-Host "`n==> $Text" -ForegroundColor Cyan }
 
 function Test-Admin {
@@ -130,7 +147,7 @@ function Ensure-Administrator {
         $powershellExe = 'powershell.exe'
     }
 
-    $argumentLine = '-NoLogo -NoProfile -ExecutionPolicy Bypass -File "{0}"' -f $PSCommandPath
+    $argumentLine = '-NoLogo -NoProfile -ExecutionPolicy Bypass -File "{0}" -NetworkMode {1}' -f $PSCommandPath, $NetworkMode
     try {
         $process = Start-Process -FilePath $powershellExe -ArgumentList $argumentLine -Verb RunAs -Wait -PassThru -ErrorAction Stop
         exit $process.ExitCode
@@ -1536,12 +1553,14 @@ function Remove-LegacyBrand {
 }
 
 $backupDir = $null
+$previousNetworkMode = $env:NEXOFLOW_NETWORK_MODE
 try {
     Write-Host '==========================================================' -ForegroundColor DarkCyan
     Write-Host ' NexoFlow - Instalador' -ForegroundColor Cyan
     Write-Host '==========================================================' -ForegroundColor DarkCyan
     Ensure-Administrator
     Enter-NexoMaintenance
+    Select-SetupNetwork
 
     Write-Step 'Validando integridade do pacote'
     Validate-Payload
@@ -1768,5 +1787,9 @@ catch {
     try { Stop-Transcript | Out-Null } catch { }
     exit 1
 }
-finally { Exit-NexoMaintenance }
+finally {
+    Exit-NexoMaintenance
+    if ($null -eq $previousNetworkMode) { Remove-Item Env:NEXOFLOW_NETWORK_MODE -ErrorAction SilentlyContinue }
+    else { $env:NEXOFLOW_NETWORK_MODE = $previousNetworkMode }
+}
 # NexoFlow 1.5.13

@@ -16,6 +16,11 @@ import run_mcp_pip as mcp
 
 
 class McpPipTests(unittest.TestCase):
+    def setUp(self):
+        guard = patch('pip_network.preflight')
+        guard.start()
+        self.addCleanup(guard.stop)
+
     def status(self, active=True, credentials=True):
         return types.SimpleNamespace(active=active, has_credentials=credentials)
 

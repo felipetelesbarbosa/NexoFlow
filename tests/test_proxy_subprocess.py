@@ -17,6 +17,7 @@ class ProxySubprocessTests(unittest.TestCase):
                     os.environ,
                     {
                         "NEXOFLOW_PERFIL": profile,
+                        "NEXOFLOW_NETWORK_MODE": "corporate" if proxy else "personal",
                         "HTTPS_PROXY": proxy,
                         "REQUESTS_CA_BUNDLE": "corporate-approved.pem",
                     },
@@ -24,6 +25,10 @@ class ProxySubprocessTests(unittest.TestCase):
 
                     def child(command, proxy=proxy, profile=profile, **kwargs):
                         self.assertNotIn("env", kwargs)
+                        self.assertEqual(
+                            os.environ["NEXOFLOW_NETWORK_MODE"],
+                            "corporate" if proxy else "personal",
+                        )
                         self.assertEqual(os.environ["HTTPS_PROXY"], proxy)
                         self.assertEqual(os.environ["NEXOFLOW_PERFIL"], profile)
                         self.assertEqual(

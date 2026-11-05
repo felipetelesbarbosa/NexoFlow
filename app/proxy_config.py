@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import socket
+import sys
 import threading
 import time
 import urllib.request
@@ -276,6 +277,14 @@ def configure_proxy(
         timeout,
     ) = _read_settings()
 
+    choice = os.environ.get("NEXOFLOW_NETWORK_MODE", "auto").strip().lower()
+    if choice not in {"auto", "personal", "corporate"}:
+        raise ValueError("NEXOFLOW_NETWORK_MODE deve ser auto, personal ou corporate.")
+    if choice == "personal":
+        mode = "off"
+    elif choice == "corporate":
+        mode = "on"
+
     configured = bool(host and port)
     has_credentials = bool(user and password)
 
@@ -324,6 +333,10 @@ def configure_proxy(
             time.sleep(PROXY_RETRY_DELAY_SECONDS)
 
     if mode == "on":
+        if not reachable:
+            raise ValueError(
+                "PROXY_INDISPONIVEL: a rede corporativa exige o proxy, mas a sondagem TCP falhou. Confira VPN/rede/TI; a rota direta não foi tentada."
+            )
         _activate_proxy(
             host=host,
             port=port,
@@ -365,11 +378,19 @@ def configure_proxy(
     # Uma falha TCP não autoriza sair da rota corporativa. A seleção direta
     # automática exige aprovação explícita na configuração local.
     if getattr(secrets, "PROXY_ALLOW_DIRECT_FALLBACK", False) is not True:
-        _activate_proxy(host=host, port=port, user=user, password=password, bypass=bypass)
-        return ProxyStatus(
-            mode=mode, configured=True, reachable=False, active=True,
-            host=host, port=port, has_credentials=has_credentials,
-            reason="sondagem TCP falhou; rota proxy mantida, sem autorização para alternativa direta; HTTPS ainda não comprovado",
+        if sys.stdin.isatty():
+            answer = input(
+                "Rede não confirmada: proxy sem resposta TCP. [1] Pessoal/direta autorizada [2] Corporativa/proxy [0] Cancelar: "
+            ).strip()
+            if answer == "1":
+                os.environ["NEXOFLOW_NETWORK_MODE"] = "personal"
+                return configure_proxy(detection_attempts=1)
+            if answer == "2":
+                raise ValueError(
+                    "PROXY_INDISPONIVEL: rede corporativa escolhida; aguarde o proxy ou confira VPN/TI."
+                )
+        raise ValueError(
+            "REDE_AMBIGUA: falha TCP não identifica rede pessoal. Escolha no Setup ou defina NEXOFLOW_NETWORK_MODE=personal (somente rede direta autorizada) ou corporate. Nenhuma sondagem direta foi realizada."
         )
 
     # O teste TCP pode dar falso negativo em algumas redes corporativas.

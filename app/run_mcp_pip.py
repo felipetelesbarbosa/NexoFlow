@@ -51,31 +51,19 @@ def dependency_environment() -> dict[str, str]:
         f"credenciais={'configuradas' if status.has_credentials else 'ausentes'}; HTTPS ainda não comprovado.",
         flush=True,
     )
-    env = dict(os.environ)
-    # Não deixar pip.ini/PIP_PROXY sobrepor a rota escolhida. A mudança vale
-    # só para o filho; índices e certificados fornecidos por ambiente permanecem.
-    env["PIP_CONFIG_FILE"] = os.devnull
-    env["PIP_PROXY"] = env.get("HTTPS_PROXY", "") if status.active else ""
-    env["PIP_TRUSTED_HOST"] = ""
-    # pip tem configuração própria de CA; usar a mesma CA explícita do requests.
-    bundle = (
-        env.get("REQUESTS_CA_BUNDLE")
-        or env.get("CURL_CA_BUNDLE")
-        or env.get("PIP_CERT")
-        or env.get("SSL_CERT_FILE")
-    )
-    if bundle:
-        if not Path(bundle).is_file():
-            raise ValueError("CA configurada indisponível")
-        env["PIP_CERT"] = bundle
-        env["REQUESTS_CA_BUNDLE"] = bundle
+    from pip_network import pip_environment, preflight
+
+    env = pip_environment(status.active)
+    preflight(env)
     return env
 
 
 def install(python: Path, *, run=subprocess.run, sleep=time.sleep) -> int:
     try:
         env = dependency_environment()
-    except Exception:
+    except Exception as exc:
+        if isinstance(exc, ValueError) and str(exc).startswith(("PROXY_", "REDE_", "TLS_")):
+            print(str(exc))
         print(
             "[ERRO] CONFIGURACAO_REDE_MCP: confira secrets_config.py, perfil e CA aprovada; detalhes privados não são exibidos."
         )

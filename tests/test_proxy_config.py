@@ -70,11 +70,10 @@ class ProxyConfigTests(unittest.TestCase):
                 patch.object(module, "_direct_internet_available") as direct,
                 patch.object(module.time, "sleep"),
             ):
-                status = module.configure_proxy()
-                self.assertTrue(status.active)
-                self.assertFalse(status.reachable)
+                with patch.object(module.sys.stdin, "isatty", return_value=False):
+                    with self.assertRaisesRegex(ValueError, "REDE_AMBIGUA"):
+                        module.configure_proxy()
                 direct.assert_not_called()
-                self.assertNotIn("password", status.safe_summary)
 
     def test_auto_uses_direct_when_proxy_unreachable(self) -> None:
         module = self.load_module()
