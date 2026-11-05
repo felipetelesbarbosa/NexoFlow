@@ -1,10 +1,15 @@
 """Ambiente sintético da suíte, instalado antes dos módulos do projeto."""
 
+import os
 import socket
 import sys
 import tempfile
 from pathlib import Path
 from types import ModuleType
+
+# A suíte usa rede/configurações sintéticas. A escolha da sessão real não
+# pode impor proxy corporativo aos mocks; testes de seleção definem sua rota.
+os.environ["NEXOFLOW_NETWORK_MODE"] = "auto"
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app"))
 
