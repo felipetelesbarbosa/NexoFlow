@@ -133,7 +133,7 @@ class PrivateDiagnosticsTests(unittest.TestCase):
             1,
         )
 
-    def test_operational_checkup_isolates_synthetic_customer_records(self):
+    def test_development_checkup_isolates_synthetic_customer_records(self):
         import private_diagnostics
         import run_checkup_tests
 
@@ -167,7 +167,7 @@ class PrivateDiagnosticsTests(unittest.TestCase):
                 "run_checkup_tests.unittest.TextTestRunner.run", side_effect=fake_run
             ),
         ):
-            self.assertEqual(run_checkup_tests.main(), 0)
+            self.assertEqual(run_checkup_tests.main(["--development-tests"]), 0)
         self.assertFalse(captured[0].exists())
         self.assertEqual(list(self.folder.iterdir()), [])
 

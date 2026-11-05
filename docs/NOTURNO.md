@@ -4,6 +4,8 @@ Execute **NexoFlow Noturno.exe** para atualizar Weni, Analytics e Recompra sem c
 
 A sequência é: check-up → Weni no modo escolhido (simulação, auditoria e aplicação) → Analytics no modo escolhido → Recompra (simulação, validação e aplicação) → Analytics incremental para refletir as mudanças finais.
 
+O [check-up operacional](CHECK-UP.md) verifica componentes, sintaxe pública e dependências locais, seguido da auditoria de consistência. Não executa testes de instaladores/Codex/MCP; a suíte completa permanece no CI. Os diagnósticos de conexão e as guardas de cada integração continuam obrigatórios.
+
 Os snapshots são gerados novamente a cada execução e aplicados sem abrir Bloco de Notas ou pedir autorização. A Weni também pode excluir duplicados comprovados pelas regras existentes. Identidade, recusa de marketing, escopo dos produtos de cada segmento, propriedade dos pedidos, conflitos e validade do evento D+25/D+30 continuam sendo conferidos. A campanha Weni continua responsável pelo envio das mensagens.
 
 Na Weni, tanto a incremental quanto a carga completa aplicam o snapshot auditado sem recalcular o plano. Cada contato é relido antes da gravação; conflitos e falhas isoladas ficam pendentes para a próxima incremental, sem cancelar os demais. O checkpoint fica no corte da simulação para recuperar mensagens e mudanças posteriores.

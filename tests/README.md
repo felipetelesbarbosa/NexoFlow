@@ -17,7 +17,7 @@ Os testes cobrem, entre outros pontos:
 - preparação dos webhooks opcionais.
 - integração da Recompra no Noturno, com CLI real, revisão, estado e transporte HTTP simulado.
 
-A suíte integra o `comandos/check-up.bat` e o fluxo de publicação do NexoFlow 1.5.13.
+A suíte completa integra o CI e o fluxo de publicação do NexoFlow 1.5.13. O `comandos/check-up.bat` realiza a pré-verificação operacional e a auditoria de consistência, sem iniciar testes de desenvolvimento nem scripts opcionais. Veja [Check-up](../docs/CHECK-UP.md).
 
 Na raiz do repositório, com as dependências instaladas, execute:
 
@@ -25,7 +25,7 @@ Na raiz do repositório, com as dependências instaladas, execute:
 python -m unittest discover -s tests -t . -p "test_*.py" -v
 ```
 
-Use `-t .` para carregar `tests/__init__.py` antes dos módulos do projeto. A suíte injeta configuração fictícia em memória, sem ler `secrets_config.py`, e bloqueia conexões reais de rede; clientes e planilhas são simulados. O `conftest.py` aplica o mesmo ambiente ao pytest. O check-up e o GitHub Actions usam esse modo de descoberta.
+Use `-t .` para carregar `tests/__init__.py` antes dos módulos do projeto. A suíte injeta configuração fictícia em memória, sem ler `secrets_config.py`, e bloqueia conexões reais de rede; clientes e planilhas são simulados. O `conftest.py` aplica o mesmo ambiente ao pytest. O GitHub Actions usa esse modo de descoberta. A alternativa com saída resumida é `python app/run_checkup_tests.py --development-tests`; falhas dos testes opcionais continuam reprovando essa execução. O check-up operacional não importa a suíte nem troca o perfil/rede da sessão.
 
 Os testes de pedidos verificam a normalização dos enums oficiais e a preservação dos valores brutos da API. Pagamento 0 ou `_` grava `pedido_forma_pagamento=Cancelado` e status efetivo 3 na Weni; pagamento 5 é **Pix por Link de Pagamento** e 6 é **Pix no POS**. A leitura e a auditoria continuam aceitando o literal legado `CANCELADO`, sem distinguir maiúsculas de minúsculas. Códigos numéricos Int32 desconhecidos a partir de 7 usam `Não identificado (código X)`. Pedidos validados pela API com status efetivo -2, -1, 0, 4, 1 ou 2 entram nas vendas e atualizam `ultima_compra`; entre os estados documentados, somente 3 exclui a venda, incluindo cancelamento explícito ou pagamento 0. Os estados -2, -1, 0, 4 e 1 permanecem em rechecagem a cada nova carga.
 

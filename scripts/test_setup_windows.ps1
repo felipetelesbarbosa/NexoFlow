@@ -344,13 +344,17 @@ public static class NexoFlowSetupRootLock {
             & taskkill.exe /PID $check.Id /T /F | Out-Null
             Get-Content -LiteralPath $checkOutput -Encoding UTF8 -Tail 150
             Get-Content -LiteralPath $checkError -Encoding UTF8 -Tail 150
-            throw "O check-up instalado excedeu cinco minutos; consulte o último teste registrado."
+            throw "O check-up instalado excedeu cinco minutos; consulte a última verificação registrada."
         }
         if ($check.ExitCode -ne 0) {
             Get-Content -LiteralPath $checkOutput -Encoding UTF8 -Tail 150
             Get-Content -LiteralPath $checkError -Encoding UTF8 -Tail 150
         }
         Assert-True ($check.ExitCode -eq 0) "comandos/check-up.bat instalado falhou com código $($check.ExitCode)."
+        $checkText = Get-Content -LiteralPath $checkOutput -Encoding UTF8 -Raw
+        Assert-True ($checkText.Contains('Pré-verificação local:')) 'O BAT instalado não executou o preflight real.'
+        Assert-True ($checkText.Contains('[2/2]')) 'O BAT instalado não concluiu a auditoria operacional.'
+        Assert-True ($checkText -notmatch 'Ran \d+ tests') 'O check-up operacional iniciou a suíte de desenvolvimento.'
         Write-Host ('[OK] Check-up instalado em {0:N1}s.' -f $checkClock.Elapsed.TotalSeconds)
         Get-Content -LiteralPath $checkError -Encoding UTF8 -Tail 5
     }

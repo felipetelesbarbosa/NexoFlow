@@ -22,25 +22,18 @@ if not exist ".venv\Scripts\python.exe" (
     exit /b 1
 )
 
-echo [1/3] Verificando sintaxe...
-".venv\Scripts\python.exe" -m compileall -q -x "(\.venv|webhook_eventos|webhook_pedidos)" .
-if errorlevel 1 goto :erro
-
-echo [OK] Sintaxe.
-echo.
-echo [2/3] Executando testes...
+echo [1/2] Verificando componentes e dependências locais...
 ".venv\Scripts\python.exe" app\run_checkup_tests.py
 if errorlevel 1 goto :erro
 
 echo.
-echo [OK] Testes.
-echo.
-echo [3/3] Auditando consistência entre arquivos...
+echo [2/2] Auditando consistência entre arquivos...
 ".venv\Scripts\python.exe" app\auditar_consistencia.py
 if errorlevel 1 goto :erro
 
 echo.
-echo [OK] Código, testes e auditoria passaram.
+echo [OK] Componentes locais e auditoria passaram.
+echo [INFO] Testes completos de desenvolvimento são executados separadamente no CI.
 if not defined NEXOFLOW_LAUNCHER pause
 exit /b 0
 

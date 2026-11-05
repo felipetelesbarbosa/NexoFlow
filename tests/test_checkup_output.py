@@ -26,7 +26,7 @@ class CheckupOutputTests(unittest.TestCase):
             redirect_stdout(output),
             redirect_stderr(error),
         ):
-            code = run_checkup_tests.main()
+            code = run_checkup_tests.main(["--development-tests"])
         return code, output.getvalue(), error.getvalue()
 
     def test_successful_mock_output_is_not_presented_as_an_operational_load(self):

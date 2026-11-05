@@ -23,10 +23,11 @@ Evite abrir apenas um arquivo `.py` isolado. O workspace deve ser a pasta raiz d
 `comandos/check-up.bat` executa:
 
 ```text
-[1/3] sintaxe
-[2/3] testes automatizados
-[3/3] auditoria de consistência
+[1/2] componentes, sintaxe pública e dependências locais
+[2/2] auditoria de consistência
 ```
+
+A suíte completa de desenvolvimento é executada separadamente no CI ou com `python app/run_checkup_tests.py --development-tests`. O check-up operacional não inicia scripts opcionais do instalador/Codex/MCP e não comprova conexão às APIs. Veja [Check-up](CHECK-UP.md).
 
 A auditoria verifica, entre outros pontos:
 

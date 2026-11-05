@@ -352,6 +352,11 @@ def check_farmalider_runtime() -> None:
     quiet_runner = read("app/run_checkup_tests.py")
     required_quiet_runner = [
         "app/run_checkup_tests.py",
+        "def operational_checkup(",
+        "def development_tests(",
+        '"--development-tests"',
+        "if args.development_tests:",
+        "return operational_checkup(",
         "logging.disable(logging.CRITICAL)",
         'warnings.simplefilter("ignore")',
         "TextTestRunner(verbosity=0, buffer=True)",
@@ -361,11 +366,13 @@ def check_farmalider_runtime() -> None:
     missing_quiet = [item for item in required_quiet_runner if item not in quiet_source]
     if missing_quiet:
         fail(
-            "Check-up não está usando o runner silencioso de testes: "
+            "Check-up não mantém a separação operacional/desenvolvimento: "
             + ", ".join(missing_quiet)
         )
     else:
-        ok("Check-up oculta ruído esperado dos mocks e mantém falhas reais visíveis.")
+        ok(
+            "Check-up local separado da suíte completa; falhas de desenvolvimento continuam visíveis."
+        )
 
     active_docs = ["README.md", "docs/README VSCODE.md"]
     stale_docs: list[str] = []
