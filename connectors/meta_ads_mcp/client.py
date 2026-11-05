@@ -7,6 +7,7 @@ para URLs arbitrárias. Cada conta exige inclusão explícita na allowlist local
 from __future__ import annotations
 
 import json
+import logging
 import math
 import time
 from datetime import UTC, date, datetime
@@ -104,7 +105,7 @@ class MetaAdsClient:
         return number
 
     @staticmethod
-    def _limits(limit: int, pages: int) -> tuple[int, int]:
+    def _limits(limit: int, pages: int | None) -> tuple[int, int]:
         if type(limit) is not int or not 1 <= limit <= 100:
             raise MetaReadError("Limite deve ser inteiro entre 1 e 100.")
         if type(pages) is not int or not 1 <= pages <= 10:
@@ -260,14 +261,15 @@ class MetaAdsClient:
         return value
 
     def _pages(
-        self, path: str, params: dict[str, Any], limit: int, pages: int
+        self, path: str, params: dict[str, Any], limit: int, pages: int | None
     ) -> dict[str, Any]:
-        limit, pages = self._limits(limit, pages)
+        self._limits(limit, 1 if pages is None else pages)
         local = {**params, "limit": limit}
         result: list[dict[str, Any]] = []
         seen_cursors = set()
         truncated = False
-        for current in range(pages):
+        current = 0
+        while pages is None or current < pages:
             body = self._get(path, local)
             items = body.get("data")
             if not isinstance(items, list) or not all(
@@ -277,6 +279,10 @@ class MetaAdsClient:
             if len(items) > limit:
                 raise MetaReadError("Resposta Meta excedeu o limite solicitado.")
             result.extend(items)
+            current += 1
+            logging.getLogger(__name__).info(
+                "Meta %s: páginas=%d; registros=%d", path.split("/")[-1], current, len(result)
+            )
             paging = body.get("paging") or {}
             cursors = paging.get("cursors") if isinstance(paging, dict) else None
             after = cursors.get("after") if isinstance(cursors, dict) else None
@@ -288,7 +294,7 @@ class MetaAdsClient:
             if after in seen_cursors:
                 raise MetaReadError("Paginação Meta retornou cursor repetido.")
             seen_cursors.add(after)
-            if current == pages - 1:
+            if pages is not None and current == pages:
                 truncated = True
             else:
                 local["after"] = after
@@ -302,7 +308,7 @@ class MetaAdsClient:
         )
 
     def campaigns(
-        self, account_id: str, limit: int = 50, pages: int = 2
+        self, account_id: str, limit: int = 50, pages: int | None = 2
     ) -> dict[str, Any]:
         account_id = self._account(account_id)
         return self._pages(
@@ -315,7 +321,7 @@ class MetaAdsClient:
         )
 
     def adsets(
-        self, account_id: str, limit: int = 50, pages: int = 2
+        self, account_id: str, limit: int = 50, pages: int | None = 2
     ) -> dict[str, Any]:
         account_id = self._account(account_id)
         return self._pages(
@@ -327,7 +333,7 @@ class MetaAdsClient:
             pages,
         )
 
-    def ads(self, account_id: str, limit: int = 50, pages: int = 2) -> dict[str, Any]:
+    def ads(self, account_id: str, limit: int = 50, pages: int | None = 2) -> dict[str, Any]:
         account_id = self._account(account_id)
         return self._pages(
             f"act_{account_id}/ads",
@@ -343,7 +349,7 @@ class MetaAdsClient:
         end_date: str,
         level: str = "campaign",
         limit: int = 100,
-        pages: int = 3,
+        pages: int | None = 3,
         *,
         time_increment: int | None = None,
         action_report_time: str | None = None,

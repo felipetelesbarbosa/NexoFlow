@@ -326,10 +326,12 @@ def sync_native_meta(
                     ("adsets", client.adsets),
                     ("ads", client.ads),
                 ]:
+                    stage = "coleta_meta_" + name
                     local_catalogs[name] = [
                         dict(row, account_id=account)
-                        for row in _rows(method(account, limit=100, pages=10))
+                        for row in _rows(method(account, limit=100, pages=None))
                     ]
+                stage = "coleta_meta_insights"
                 local_facts = []
                 cursor = since
                 while cursor <= end:
@@ -339,7 +341,7 @@ def sync_native_meta(
                         cursor.isoformat(),
                         stop.isoformat(),
                         limit=100,
-                        pages=10,
+                        pages=None,
                     )
                     rows = _rows(response)
                     attribution = response.get("attribution")

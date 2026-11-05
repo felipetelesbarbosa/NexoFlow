@@ -31,6 +31,19 @@ class NativeClientTests(unittest.TestCase):
         )
         return cli, sleep
 
+    def test_native_catalog_exhausts_more_than_ten_pages(self):
+        responses = [
+            FakeResponse({"data": [{"id": str(i)}], "paging": {
+                "next": "https://graph.facebook.com/ignored",
+                "cursors": {"after": str(i + 1)},
+            }}) for i in range(12)
+        ]
+        responses.append(FakeResponse({"data": [{"id": "last"}]}))
+        cli, _ = self.client(responses)
+        result = cli.campaigns(ACCOUNT, pages=None)
+        self.assertFalse(result["parcial"])
+        self.assertEqual(result["total_retornado"], 13)
+
     def test_daily_ad_contract_fields_attribution_and_missing_values(self):
         data = {
             "date_start": "2026-11-01",

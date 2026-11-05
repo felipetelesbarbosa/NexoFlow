@@ -79,7 +79,25 @@ function Invoke-OptionalMetaAdsSetup {
     try {
         $helper = Join-Path $InstallDir 'scripts/instalar_meta_ads_mcp.ps1'
         if (-not (Test-Path -LiteralPath $helper -PathType Leaf)) { throw 'Auxiliar Meta Ads MCP não encontrado na instalação.' }
-        & $helper -InstalarCodex -Reinstall:($Mode -eq 'Clean')
+        # Codex e o SDK MCP são componentes opcionais e executam ferramentas
+        # nativas de terceiros. Mantenha-os fora do processo do Setup: uma
+        # terminação fatal do filho (por exemplo 0x40000015) não pode encerrar
+        # a instalação principal depois que o NexoFlow já foi instalado.
+        $powershellExe = $null
+        if (-not [string]::IsNullOrWhiteSpace($env:SystemRoot)) {
+            $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+            if (Test-Path -LiteralPath $windowsPowerShell -PathType Leaf) { $powershellExe = $windowsPowerShell }
+        }
+        if (-not $powershellExe) {
+            try { $powershellExe = [Diagnostics.Process]::GetCurrentProcess().MainModule.FileName } catch { }
+        }
+        if (-not $powershellExe) { $powershellExe = 'powershell.exe' }
+        $helperArguments = @('-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f $helper), '-InstalarCodex')
+        if ($Mode -eq 'Clean') { $helperArguments += '-Reinstall' }
+        $helperProcess = Start-Process -FilePath $powershellExe -ArgumentList $helperArguments -Wait -PassThru -NoNewWindow -ErrorAction Stop
+        if ($helperProcess.ExitCode -ne 0) {
+            throw "A instalação opcional Codex/MCP foi encerrada com o código $($helperProcess.ExitCode)."
+        }
         $status = @{ componente = 'Meta Ads MCP'; status = 'instalado'; codex_login = 'manual'; acesso_meta = 'nao_validado'; atualizado_em = (Get-Date).ToUniversalTime().ToString('o') }
         $status | ConvertTo-Json | Set-Content -LiteralPath $statusFile -Encoding UTF8
         Write-Host '[OK] Codex CLI e Meta Ads MCP instalados/validados. Login e token são configurados localmente pelo usuário.' -ForegroundColor Green

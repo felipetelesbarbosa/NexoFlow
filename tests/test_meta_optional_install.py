@@ -79,7 +79,7 @@ Install-MetaAdsEnvironment
 Install-MetaAdsEnvironment
 """)
 
-    def test_setup_optional_failure_is_pending_and_noninteractive_default_skips(self):
+    def test_setup_optional_fatal_child_exit_is_pending_and_does_not_abort(self):
         self.run_ps(r"""
 $tokens=$null;$errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'installer/install.ps1'),[ref]$tokens,[ref]$errors)
@@ -89,7 +89,8 @@ $InstallDir=Join-Path ([IO.Path]::GetTempPath()) ('nexo-optional-test-'+[Guid]::
 New-Item -ItemType Directory (Join-Path $InstallDir 'logs'),(Join-Path $InstallDir 'scripts') -Force|Out-Null
 try{
  $helper=Join-Path $InstallDir 'scripts/instalar_meta_ads_mcp.ps1'
- "param([switch]`$InstalarCodex,[switch]`$Reinstall); throw 'falha sintética'" | Set-Content -LiteralPath $helper
+ "param([switch]`$InstalarCodex,[switch]`$Reinstall)" | Set-Content -LiteralPath $helper
+ function Start-Process { [pscustomobject]@{ExitCode=1073741845} }
  Invoke-OptionalMetaAdsSetup -Unattended
  $status=Join-Path $InstallDir 'logs/meta_ads_mcp_instalacao.json'
  if(Test-Path -LiteralPath $status){throw 'Não deveria tentar a integração sem a flag.'}
@@ -107,11 +108,19 @@ Invoke-Expression $function.Extent.Text
 $InstallDir=Join-Path ([IO.Path]::GetTempPath()) ('nexo-optional-test-'+[Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory (Join-Path $InstallDir 'logs'),(Join-Path $InstallDir 'scripts') -Force|Out-Null
 try{
- "param([switch]`$InstalarCodex,[switch]`$Reinstall); `$global:requestedReinstall=[bool]`$Reinstall" | Set-Content -LiteralPath (Join-Path $InstallDir 'scripts/instalar_meta_ads_mcp.ps1')
+ "param([switch]`$InstalarCodex,[switch]`$Reinstall)" | Set-Content -LiteralPath (Join-Path $InstallDir 'scripts/instalar_meta_ads_mcp.ps1')
+ $script:helperArguments=@()
+ function Start-Process {
+  param($FilePath,$ArgumentList,[switch]$Wait,[switch]$PassThru,[switch]$NoNewWindow,$ErrorAction)
+  $script:helperArguments=@($ArgumentList)
+  [pscustomobject]@{ExitCode=0}
+ }
  Invoke-OptionalMetaAdsSetup -Selected -Unattended -Mode Preserve
- if($global:requestedReinstall){throw 'Preserve não deve forçar reinstalação.'}
+ if($script:helperArguments -contains '-Reinstall'){throw 'Preserve não deve forçar reinstalação.'}
  Invoke-OptionalMetaAdsSetup -Selected -Unattended -Mode Clean
- if(-not $global:requestedReinstall){throw 'Clean selecionado deve forçar reinstalação.'}
+ if($script:helperArguments -notcontains '-Reinstall'){throw 'Clean selecionado deve forçar reinstalação.'}
+ $status=Get-Content -LiteralPath (Join-Path $InstallDir 'logs/meta_ads_mcp_instalacao.json') -Raw|ConvertFrom-Json
+ if($status.status -ne 'instalado'){throw 'Sucesso isolado não foi registrado.'}
 }finally{Remove-Item -LiteralPath $InstallDir -Recurse -Force}
 """)
 
