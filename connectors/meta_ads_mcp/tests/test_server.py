@@ -23,18 +23,20 @@ TOOLS = {
 
 
 class InstallerContractTests(unittest.TestCase):
-    def test_registration_preserves_others_and_never_embeds_credentials(self):
+    def test_independent_install_never_touches_client_or_embeds_credentials(self):
         path = ROOT / "scripts/instalar_meta_ads_mcp.ps1"
         self.assertTrue(path.read_bytes().startswith(b"\xef\xbb\xbf"))
         code = path.read_text(encoding="utf-8-sig")
-        self.assertIn("codex mcp get nexoflow-meta-read --json", code)
-        self.assertIn("codex mcp add nexoflow-meta-read -- $venvPython $server", code)
+        self.assertNotIn("codex mcp get", code)
+        self.assertNotIn("codex mcp add", code)
         self.assertNotIn("codex mcp remove", code)
         self.assertNotIn("codex mcp list", code)
         self.assertNotIn("--env", code)
         self.assertNotIn("Get-Content", code)
         self.assertIn("3.14", code)
-        self.assertIn("Confirm-McpRegistration", code)
+        self.assertNotIn("Confirm-McpRegistration", code)
+        self.assertNotIn("Install-NexoCodexCli", code)
+        self.assertIn("app/run_mcp_pip.py", code)
 
 
 @unittest.skipUnless(
