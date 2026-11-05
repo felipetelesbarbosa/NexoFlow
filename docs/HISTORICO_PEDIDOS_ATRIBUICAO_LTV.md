@@ -186,3 +186,12 @@ Se o contrato não comprovar determinada capacidade, registrar **indisponível**
 6. **Proteção contínua:** GitHub como fonte única, credenciais fora do Git, backups, validação da mesma versão nos dois ambientes.
 
 **Critério de entrega:** somente declarar histórico completo, LTV realizado e atribuição confiável quando contrato, execução, cobertura e testes tiverem evidência verificável. Esta documentação, sozinha, **não** ativa a nova coleta.
+
+## 13. Convenção pública de endpoints estáveis
+
+- **Não incluir número de versão, data ou tecnologia no caminho público** (por exemplo, evitar `/v1/execucoes`, `/api2026/pedidos` e `/python/clientes`).
+- Preferir **substantivos claros, em português brasileiro, minúsculos e sem acentos**, com segmentos e identificadores explícitos, quando necessário: `/execucoes`, `/execucoes/{id}`, `/segmentos/{segmento}/pedidos`, `/segmentos/{segmento}/clientes/{id}/ltv`, `/anuncios/resultados`, `/sistema/status`.
+- Não presumir que esses exemplos já estejam implementados. A especificação OpenAPI e a implementação deverão definir caminhos consistentes e manter a semântica estável.
+- Versionar o **contrato** separadamente do endereço, em metadados OpenAPI, histórico de mudanças e testes de compatibilidade. Para mudanças incompatíveis inevitáveis, planejar negociação explícita, período de transição, rotas antigas preservadas ou um novo recurso, sem quebrar clientes existentes silenciosamente.
+- Não renomear automaticamente os webhooks legados existentes `/weni/meta-event` e `/weni/pedido` por motivo estético: preservar compatibilidade e migrar apenas mediante autorização, testes e comunicação aos consumidores.
+- A estabilidade da URL não implica ausência de autenticação: manter escopos de token, autorização por segmento, paginação e limites de consulta.
