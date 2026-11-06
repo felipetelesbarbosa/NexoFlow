@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from psycopg.types.json import Jsonb
 
@@ -16,7 +16,7 @@ from order_history import (
 from pedido_utils import business_order_datetime
 
 
-def validate_parameters(segment, parameters):
+def validate_parameters(segment, parameters, *, reference=None):
     if set(parameters) != {
         "inicio",
         "fim",
@@ -45,6 +45,14 @@ def validate_parameters(segment, parameters):
         or type(parameters["reiniciar"]) is not bool
     ):
         raise HistoryError("MODO_INVALIDO")
+    if parameters["modo"] == "incremental":
+        current = business_order_datetime(reference or datetime.now(UTC))
+        assert current is not None
+        if (
+            query.start != (current.date() - timedelta(days=20)).isoformat()
+            or query.end != current.date().isoformat()
+        ):
+            raise HistoryError("INCREMENTAL_USA_HOJE_MENOS_20_DIAS")
     return query
 
 
@@ -316,12 +324,18 @@ class PgHistory:
 
 def run_history(store, task, *, source=None, interrupt_after=None):
     parameters = task["parametros"]
-    query = validate_parameters(task["segmento"], parameters)
+    query = validate_parameters(
+        task["segmento"], parameters, reference=task["criada_em"]
+    )
     history = PgHistory(store, task)
     saved = store.checkpoints(task)
     # Reinício explícito uma vez por tarefa; crash não apaga cursor confirmado.
     if not saved:
-        state = history.begin(query, restart=parameters["reiniciar"])
+        state = history.begin(query)
+        if parameters["reiniciar"] or (
+            parameters["modo"] == "incremental" and state["status"] == "extraida"
+        ):
+            state = history.begin(query, restart=True)
         store.checkpoint(task, 0, {"janela": query.key})
     else:
         state = history.begin(query)

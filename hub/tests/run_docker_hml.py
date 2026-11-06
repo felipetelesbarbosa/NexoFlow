@@ -211,6 +211,12 @@ def main():
                     flush=True,
                 )
             command([*compose, "run", "--rm", "migracao"])
+            # A suíte pode terminar com fixtures válidas de outra janela.
+            # A prova entre processos começa vazia neste banco UUID descartável.
+            with store.connect() as db:
+                db.execute(
+                    "TRUNCATE hub.historico_ltv,hub.historico_revisoes,hub.historico_pendencias,hub.historico_pedidos,hub.historico_recebidos,hub.historico_janelas,hub.auditoria,hub.checkpoints,hub.tentativas,hub.coordenacao,hub.tarefas,hub.cobertura"
+                )
             command([*compose, "up", "-d", "api", "worker"])
             first = store.create("FARMA", "teste", "persistencia", "normal")
 

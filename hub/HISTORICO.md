@@ -14,6 +14,8 @@ A resposta é 202 e informa a tarefa persistida. Consulte as rotas existentes `/
 
 Com 205 registros/limite 100/orçamento duas páginas, a primeira tarefa termina parcial com 200. Uma nova chave, mesmos parâmetros de janela e `reiniciar=false`, retoma na página 3 e fecha em 205. Repetir a mesma chave é idempotente. Alterar parâmetros da mesma chave retorna 409. `reiniciar=true` reabre explicitamente a faixa, mantendo os fatos deduplicados. Trocar limite usa outra chave de cursor e começa na página 1.
 
+O modo incremental exige a faixa de hoje até D−20 em America/Belem, reconsulta janelas concluídas e retoma as incompletas. Datas arbitrárias são recusadas nesse modo.
+
 O worker desta fase usa exclusivamente `SyntheticHistorySource`, com `httpx.MockTransport`, GET e query serializados para domínio `.invalid`; zero chamadas comerciais. A interface `get_pedidos_history(query,page)` é compatível com o cliente Windows. A futura conexão comercial requer injeção do cliente/credenciais por segmento e homologação de rede; não está ativada. A lógica de validação financeira e de paginação não é duplicada no n8n.
 
 ## Persistência e retomada

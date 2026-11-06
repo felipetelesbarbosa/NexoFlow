@@ -196,3 +196,42 @@ def test_upgrade_existing_v1_preserves_tasks_and_rollback_refuses_history(store)
     run_once(store)
     with pytest.raises(Conflict):
         store.migrate(down=True)
+
+
+def test_incremental_window_and_recheck_completed_window(store):
+    from datetime import UTC, datetime, timedelta
+
+    from pedido_utils import business_order_datetime
+
+    current = business_order_datetime(datetime.now(UTC)).date()
+    changes = dict(
+        modo="incremental",
+        inicio=(current - timedelta(days=20)).isoformat(),
+        fim=current.isoformat(),
+        quantidade_sintetica=1,
+    )
+    with pytest.raises(HistoryError, match="INCREMENTAL_USA"):
+        validate_parameters("PET", {**parameters(), **changes, "inicio": "2020-01-01"})
+    # A retomada usa o dia de criação da tarefa, mesmo após mudar o calendário.
+    old = {**parameters(), "modo": "incremental", "inicio": "2026-10-17"}
+    assert validate_parameters("PET", old, reference="2026-11-06T23:30:00-03:00")
+    first = create(store, changes=changes)
+    run_once(store)
+    assert store.get("PET", first["id"])["estado"] == "concluida"
+    second = create(store, changes=changes)
+    run_once(store)
+    assert store.get("PET", second["id"])["estado"] == "concluida"
+    with store.connect() as db:
+        assert (
+            db.execute("SELECT count(*) AS n FROM hub.historico_pedidos").fetchone()[
+                "n"
+            ]
+            == 1
+        )
+        assert (
+            db.execute(
+                "SELECT count(*) AS n FROM hub.checkpoints WHERE tarefa_id=%s",
+                (second["id"],),
+            ).fetchone()["n"]
+            >= 1
+        )

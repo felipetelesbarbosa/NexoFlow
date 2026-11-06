@@ -7,4 +7,5 @@ useDefault = true
 [allowlist]
 description = "URL pública da API FarmaLíder (porta e caminho), sem credencial"
 regexTarget = "secret"
-regexes = ['''^3200/farmalider$''']
+# A URL interna do workflow sintético também não contém senha/token.
+regexes = ['''^3200/farmalider$''', '''^8000/tarefas/historico$''']

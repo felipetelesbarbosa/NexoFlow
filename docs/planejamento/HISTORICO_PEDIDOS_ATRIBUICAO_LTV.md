@@ -1,10 +1,12 @@
 # NexoFlow Hub | Histórico de pedidos, atribuição e LTV
 
-**Estado:** contrato paginado recebido; marco Windows implementado com estado local, conciliação e LTV observado. Consulte [operação e limites](../HISTORICO%20PEDIDOS.md). O marco Hub recebe o mesmo contrato somente após regressão Windows; a implantação VPS e escrita comercial continuam não autorizadas.
-**Código operacional de referência:** `felipetelesbarbosa/NexoFlow`. O planejamento não define um repositório de implantação do Hub.
-**Contrato recebido:** `GET /api/Delivery/pedidos/{segmento}`, query `dataInicio`, `dataFim`, `pagina`, `limite`, `token`; envelope `pedidos`, `pagina`, `limite`, `totalRegistros`, `totalPaginas`. Limite ajustável, incluindo 500 e 1.000. Inclusividade temporal, ordenação estável, descontos e estornos ainda não comprovados. As seções abaixo preservam o planejamento histórico; o guia operacional prevalece para o que já foi implementado.
+**Estado atual:** histórico Windows implementado, seguido pelo Hub em homologação Linux. Consulte o [guia operacional Windows](../HISTORICO%20PEDIDOS.md) e o [guia Hub](../../hub/HISTORICO.md). O Windows permanece autônomo. Não houve implantação VPS nem escrita comercial do Hub.
 
-O Hub considera **VPS, Docker e n8n** como alternativas de implantação e orquestração futuras. Este documento não entrega containers, API pública, banco ou workflows n8n. O NexoFlow Windows continua operacional e autônomo, com seus executáveis, credenciais, guardas, agendamentos e destinos existentes. Qualquer integração entre ambos exige contrato, homologação e autorização próprios; a versão 1.5.15 não passa a depender do Hub.
+**Contrato recebido:** `GET /api/Delivery/pedidos/{segmento}`, query `dataInicio`, `dataFim`, `pagina`, `limite`, `token`; envelope `pedidos`, `pagina`, `limite`, `totalRegistros`, `totalPaginas`. Limite ajustável, incluindo 500 e 1.000. Inclusividade temporal, ordenação estável, descontos e estornos ainda não comprovados.
+
+O código e a documentação operacional estão no repositório oficial `felipetelesbarbosa/NexoFlow`, `main`. A API interna, worker, PostgreSQL temporário e Docker já possuem implementação sintética testada. O n8n dispõe de exports inativos; sua importação real e a infraestrutura VPS continuam pendentes.
+
+**Planejamento original preservado abaixo:** as seções conceituais registram a proposta anterior, não o estado atual de execução. Os dois guias operacionais acima prevalecem sobre referências a componentes “propostos” ou contratos ainda não recebidos. Atribuição comercial, integração com a VPS e novas publicações de dashboards continuam exigindo homologação própria.
 
 ## 1. Diretrizes e compatibilidade
 
