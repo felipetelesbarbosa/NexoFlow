@@ -59,7 +59,7 @@ class VersionPolicyTests(unittest.TestCase):
         from nexo_cli import VERSION
 
         metadata = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-        self.assertEqual(CURRENT_VERSION, "1.5.15")
+        self.assertEqual(CURRENT_VERSION, "1.5.16")
         self.assertEqual(APP_VERSION, CURRENT_VERSION)
         self.assertEqual(VERSION, CURRENT_VERSION)
         self.assertEqual(metadata["project"]["version"], CURRENT_VERSION)

@@ -1,5 +1,14 @@
 # NexoFlow — Changelog
 
+## NexoFlow 1.5.16 — Histórico paginado e LTV observado (em validação)
+
+- Nova coleta `pedidos/{segmento}` no Terminal: período, limite ajustável, uma/todas as páginas, janelas controladas e retomada. Estado mínimo no SQLite privado, transações por página e contagem de IDs antes dos filtros comerciais.
+- Conciliação por pedido/cliente oficial, preservando compras sem Weni. Vínculo com CPF válido único ou CPF inválido com nome e telefone/e-mail concordantes; nenhuma alteração automática de contatos ou disparo de Recompra.
+- LTV observado em centavos, receita mensal separada, cancelamento por status 3 ou pagamento 0, frete contado uma vez. Descontos não demonstrados e conflitos permanecem pendentes. Reabertura de fechamento antigo exige reconciliação explícita.
+- Fontes aditivas Histórico/LTV/Cobertura com revisão de destino, backup, confirmação e idempotência. Omissão local de compra remota bloqueia a aplicação. Analytics reutiliza o histórico local; coleta automática hoje..D−20 depende de ativação explícita por perfil.
+- Mesmas regras puras disponíveis no Hub em homologação Docker/PostgreSQL, sem release Hub ou escrita comercial. O pacote Windows não inclui o Hub nem depende da VPS.
+- Versão 1.5.15 e anteriores preservadas. A data efetiva será registrada nas notas do release após os checks do mesmo commit. Homologação real da rota, datas finais, descontos e planilhas ainda é necessária.
+
 ## NexoFlow 1.5.15 — Diagnóstico da instalação MCP
 
 - Diagnóstico sanitizado da etapa pip do MCP diferencia autenticação e CONNECT, erros HTTP de índice/download, TLS, timeout, incompatibilidade Python, dependências, permissão, arquivo em uso, espaço e compilação. Uma falha desconhecida mantém seu código de saída sem atribuir causa não comprovada.

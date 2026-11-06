@@ -16,7 +16,7 @@ set "FINAL_RC=0"
 
 if not exist "%NEXOFLOW_HOME%\scripts\confirmar_revisao_weni.ps1" (
     echo [ERRO] Componente de confirmação ausente: scripts\confirmar_revisao_weni.ps1
-    echo Reinstale o Setup atualizado do NexoFlow 1.5.15 antes de continuar.
+    echo Reinstale o Setup atualizado do NexoFlow 1.5.16 antes de continuar.
     call :aguardar_saida
     exit /b 1
 )

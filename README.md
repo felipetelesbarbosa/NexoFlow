@@ -1,10 +1,10 @@
-# NexoFlow 1.5.15
+# NexoFlow 1.5.16
 
 Aplicativos operacionais e autônomos para Windows que integram **Weni e a API FarmaLíder nos segmentos FarmaLíder e Pets Líder**, atualizam contatos e pedidos e organizam os dados no **Google Sheets** para análise no **Data Studio**.
 
 O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
 
-[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.15/NexoFlow-Setup-1.5.15.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
+[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.16/NexoFlow-Setup-1.5.16.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
 
 ## Componentes
 
@@ -17,7 +17,7 @@ O NexoFlow identifica pedidos registrados na API **independentemente de terem si
 | **NexoFlow Recompra** | Mantém a elegibilidade da Recompra FarmaLíder D+25 e Pets Líder D+30; os envios ficam na campanha Weni. |
 | **NexoFlow Terminal** | Oferece comandos, consultas e diagnóstico pelo comando `nexo`. |
 
-## Atualização 1.5.15
+## Atualização 1.5.16
 
 A instalação opcional do Meta Ads MCP passa a registrar diagnóstico sanitizado em `logs/meta_ads_mcp_dependencias.json`: categoria, código de saída, perfil, rota e tentativas, sem expor credenciais ou a saída bruta do pip. Setup e auxiliar orientam onde consultar a falha. Erros recuperáveis mantêm tentativas limitadas, sem trocar a rota de rede.
 
@@ -82,7 +82,7 @@ As continuações automáticas no Meu Drive exigem autorização Google local. O
 
 ## Versões e atualizações
 
-A versão desta entrega é **1.5.15**. Os pacotes públicos são disponibilizados após a validação do mesmo commit. As próximas correções seguem **1.5.15, 1.5.16, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
+A versão desta entrega é **1.5.16**. Os pacotes públicos são disponibilizados após a validação do mesmo commit. As próximas correções seguem **1.5.16, 1.5.16, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
 
 ## NexoFlow Hub: projeto paralelo futuro
 
@@ -111,3 +111,7 @@ O Weni consulta eventos oficiais CTWA para completar e conferir os campos de an�
 ### Meta Ads MCP local (opcional)
 
 O [conector Meta Ads](docs/META%20ADS%20MCP%20LOCAL.md) oferece seis ferramentas somente de leitura ao Codex por STDIO. A credencial fica exclusivamente no arquivo privado `credentials/mcp/meta_ads_credentials.json`. A [integração nativa Meta Ads](docs/META%20ADS%20NATIVO.md) reutiliza esse cliente diretamente no Analytics e no Noturno, sem exigir Codex ou servidor MCP. A ativação é explícita, mantém as fontes existentes e não altera campanhas. Novas tabelas e o procedimento de revisão estão documentados no guia.
+
+## Histórico paginado e LTV observado
+
+No Terminal, use `nexo historico` ou a opção 10. Consulte [operação, retomada e limites](docs/HISTORICO%20PEDIDOS.md). A coleta preserva compras oficiais sem Weni e não dispara Recompra; o vínculo com contatos exige prova de identidade. [Hub histórico](hub/HISTORICO.md) permanece exclusivamente em homologação, fora do pacote Windows.

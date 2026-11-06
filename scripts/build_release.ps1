@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.15",
+    [string]$Version = "1.5.16",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -414,9 +414,11 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-Diagnóstico sanitizado da instalação opcional MCP: distingue falhas de autenticação/CONNECT, HTTP de índice/download, TLS, timeout, Python incompatível, conflitos, acesso negado, arquivos em uso, espaço e compilação. Erros desconhecidos preservam o código de saída sem concluir uma causa não comprovada.
+Histórico paginado FARMA/PET no Terminal: período, tamanho de página ajustável, retomada e reconciliação por ID oficial. SQLite privado grava página e checkpoint juntos; LTV observado usa centavos e mantém receita mensal separada.
 
-O relatório local `logs/meta_ads_mcp_dependencias.json` registra perfil, rota, preflight e tentativas, sem saída bruta, URLs ou credenciais. Setup e auxiliar apontam o relatório, com gravação atômica e diagnósticos ignorados pelo Git. Falhas recuperáveis mantêm tentativas limitadas sem mudar rota; a instalação principal e as credenciais são preservadas quando o MCP opcional falha.
+Compras oficiais sem Weni permanecem no histórico. O vínculo cadastral exige CPF válido único ou CPF inválido com nome e telefone/e-mail concordantes, sem criar ou modificar contatos. Backfill não dispara Recompra. Fontes adicionais no Google Sheets exigem revisão, backup e conferência; não houve escrita comercial nos testes. Inclusividade da data final e descontos ainda requerem homologação da API.
+
+A coleta automática recente no Analytics é opcional por perfil (hoje até D−20). O Hub recebe apenas código e homologação isolada, sem release ou ativação comercial. [Guia do histórico](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/HISTORICO%20PEDIDOS.md).
 
 Analytics e Noturno usam a integração Meta nativa, sem exigir MCP ou Codex CLI. As rotinas FARMA/PET e as funcionalidades da versão anterior permanecem preservadas. A atualização Preserve mantém configurações e dados. Esta versão não comprova autenticação no proxy corporativo ou aprovação pelo antivírus no PC do usuário; consulte os relatórios e o guia de homologação.
 
@@ -432,4 +434,4 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.15
+# NexoFlow 1.5.16
