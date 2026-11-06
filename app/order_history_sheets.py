@@ -248,8 +248,15 @@ class HistorySheets:
                 ):
                     raise HistoryError("REGISTRO_INVALIDO")
                 incoming[row["chave"]] = normalized_cells(row)
-            # Retém linhas anteriores como inativas, nunca apaga histórico.
-            for key in old.keys() - incoming.keys():
+            # Ausência local não autoriza apagar/inativar uma compra remota.
+            missing = old.keys() - incoming.keys()
+            if title == "Historico_Pedidos" and any(
+                old[k].get("vigente") != "Não" for k in missing
+            ):
+                raise HistoryError("BASE_LOCAL_INCOMPLETA_RECONCILIAR")
+            for key in missing:
+                # Itens/LTV derivados só ficam inativos após conhecer todos os
+                # pedidos remotos no preflight da primeira tabela.
                 incoming[key] = dict(old[key], vigente="Não")
             changes[title] = [r for k, r in incoming.items() if r != old.get(k)]
             snapshots[title] = snapshot

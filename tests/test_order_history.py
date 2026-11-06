@@ -461,3 +461,34 @@ class HistoryIntegrationTests(unittest.TestCase):
                 ("2026-11-05", "2026-11-06"),
             ],
         )
+
+    def test_remote_valid_orders_missing_locally_block_publication(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+
+        from order_history_sheets import HistorySheets, google_store_type, tables
+        from tests.test_meta_ads_sheets import MemoryStore
+
+        class Store(MemoryStore):
+            _native_meta_headers = staticmethod(
+                google_store_type()._native_meta_headers
+            )
+
+        remote = Store()
+        remote.profile = "PET"
+        db = sqlite3.connect(":memory:")
+        self.addCleanup(db.close)
+        local = HistoryStore(db, "PET")
+        collect(
+            Source([order()]),
+            local,
+            HistoryQuery("PET", "2026-11-01", "2026-11-06"),
+            now=NOW,
+        )
+        with TemporaryDirectory() as tmp:
+            adapter = HistorySheets(remote, "PET", Path(tmp))
+            data = tables(local)
+            adapter.apply(data, adapter.plan(data))
+            empty = {k: [] for k in data}
+            with self.assertRaisesRegex(HistoryError, "BASE_LOCAL_INCOMPLETA"):
+                adapter.plan(empty)
