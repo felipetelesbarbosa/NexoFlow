@@ -29,6 +29,11 @@ def run_once(store: Store, *, interrupt_after=None):
         flush=True,
     )
     try:
+        if task.get("tipo") == "historico":
+            from .history import run_history
+
+            run_history(store, task, interrupt_after=interrupt_after)
+            return True
         saved = store.checkpoints(task)
         for step in (1, 2):
             if step in saved:

@@ -39,7 +39,7 @@ def store(settings):
     # Banco temporário exclusivo desta suíte. Não executar em paralelo com VPS.
     with db.connect() as connection:
         connection.execute(
-            "TRUNCATE hub.auditoria,hub.checkpoints,hub.tentativas,hub.coordenacao,hub.tarefas,hub.cobertura"
+            "TRUNCATE hub.historico_ltv,hub.historico_revisoes,hub.historico_pendencias,hub.historico_pedidos,hub.historico_recebidos,hub.historico_janelas,hub.auditoria,hub.checkpoints,hub.tentativas,hub.coordenacao,hub.tarefas,hub.cobertura"
         )
     return db
 

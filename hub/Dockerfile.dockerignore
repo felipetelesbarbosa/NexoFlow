@@ -14,3 +14,4 @@
 !app/product_scope.py
 !app/pet_catalog.py
 !app/runtime_profile.py
+!app/order_history.py

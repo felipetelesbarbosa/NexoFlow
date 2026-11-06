@@ -21,7 +21,7 @@ CPF inválido preenchido só passa com identidade independente e vínculo único
 
 D+25 FARMA/D+30 PET: mesma função pura de calendário, sem retroativos; recusa e Opt-Out prevalecem. Ausência de opt-in não vira recusa. PET não calcula nem grava maioridade. O núcleo ainda não migra todo o enriquecimento cadastral/guardas de escrita dos aplicativos: essas operações não estão habilitadas no Hub. Nenhum resultado desta API autoriza aplicação em Weni.
 
-O detector de anúncio reconhece evidência estruturada; conversa/clique não comprovam venda. Não há coleta Google Ads, custos, LTV completo ou histórico oficial nesta fase. `cobertura` prepara persistência, mas não recebe declarações de completude sem contrato. A API histórica (incluindo até 100 pedidos/página, parâmetros e encerramento) permanece pendente. Os conectores futuros não inventam rotas nem compartilham tokens Windows/Meta.
+O detector de anúncio reconhece evidência estruturada; conversa/clique não comprovam venda. Não há coleta Google Ads nem ativação comercial. O histórico/LTV observado está disponível com fonte HTTP simulada nesta fase. `cobertura` prepara persistência, mas não recebe declarações de completude sem contrato. O contrato histórico paginado foi recebido e implementado em homologação; veja [histórico](HISTORICO.md). O tamanho de página é ajustável, sem teto fixo de 100. Os conectores futuros não inventam rotas nem compartilham tokens Windows/Meta.
 
 ## Contrato da API / n8n
 
@@ -82,3 +82,7 @@ Rollback de aplicação: parar API/worker Hub e voltar ao SHA anterior, preserva
 ## Limites de coordenação / ativação futura
 
 Locks PostgreSQL protegem **somente participantes Hub**. Win32 não participa desse contrato. A escrita real do Hub permanece bloqueada mesmo com lease; Windows continua autônomo. Antes de migração comercial: definir proprietário único por destino/segmento, revisão/aplicação equivalente ao Windows, reconciliação de respostas incertas, identidade e direitos dos conectores, observabilidade e rollback; só então solicitar ativação específica. Nenhum lock local ou PostgreSQL sozinho garante exclusividade Windows/VPS.
+
+## Marco histórico
+
+Contrato e migração 002 implementados após a regressão Windows: [histórico paginado](HISTORICO.md). A API aceita tarefas históricas parametrizadas de homologação, sem credenciais/destinos comerciais.

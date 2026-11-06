@@ -40,47 +40,58 @@ class Store:
         connection.row_factory = dict_row
         return connection
 
-    def migrate(self, *, down=False):
+    def migrate(self, *, down=False, target=2):
+        root = Path(__file__).resolve().parents[1] / "migrations"
         with self.connect() as db:
             db.execute("SELECT pg_advisory_xact_lock(812631)")
             found = db.execute("SELECT to_regclass('hub.migracoes') AS t").fetchone()
             assert found is not None
             exists = found["t"]
+            versions = (
+                [
+                    r["versao"]
+                    for r in db.execute(
+                        "SELECT versao FROM hub.migracoes ORDER BY versao"
+                    )
+                ]
+                if exists
+                else []
+            )
+            if versions not in ([], [1], [1, 2]) or target not in (1, 2):
+                raise Conflict("SCHEMA_INCOMPATIVEL")
             if down:
                 if not exists:
                     return
-                # A reversão de schema nunca descarta tarefas nem cobertura.
                 count = db.execute(
                     "SELECT (SELECT count(*) FROM hub.tarefas)+(SELECT count(*) FROM hub.cobertura) AS n"
                 ).fetchone()
                 assert count is not None
                 if count["n"]:
                     raise Conflict("ROLLBACK_COM_DADOS_BLOQUEADO")
-            elif exists:
-                versions = db.execute(
-                    "SELECT versao FROM hub.migracoes ORDER BY versao"
-                ).fetchall()
-                if versions != [{"versao": 1}]:
-                    raise Conflict("SCHEMA_INCOMPATIVEL")
+                if 2 in versions:
+                    db.execute((root / "002_down.sql").read_bytes())
+                db.execute((root / "001_down.sql").read_bytes())
                 return
-            path = (
-                Path(__file__).resolve().parents[1]
-                / "migrations"
-                / ("001_down.sql" if down else "001_up.sql")
-            )
-            db.execute(path.read_bytes())
+            for version in range(1, target + 1):
+                if version not in versions:
+                    db.execute((root / f"{version:03d}_up.sql").read_bytes())
 
     def ready(self):
         with self.connect() as db:
-            return db.execute("SELECT versao FROM hub.migracoes").fetchall() == [
-                {"versao": 1}
-            ]
+            return db.execute(
+                "SELECT versao FROM hub.migracoes ORDER BY versao"
+            ).fetchall() == [{"versao": 1}, {"versao": 2}]
 
-    def create(self, segment, origin, key, scenario):
+    def create(self, segment, origin, key, scenario, *, history=None):
         if scenario not in SCENARIOS:
             raise ValueError("CENARIO_NAO_HABILITADO")
         digest = hashlib.sha256(
-            json.dumps({"cenario": scenario}, sort_keys=True).encode()
+            json.dumps(
+                {"cenario": scenario}
+                if history is None
+                else {"cenario": scenario, "historico": history},
+                sort_keys=True,
+            ).encode()
         ).hexdigest()
         with self.connect() as db:
             row = db.execute(
@@ -98,6 +109,15 @@ class Store:
                 if row["pedido_hash"] != digest:
                     raise Conflict("IDEMPOTENCIA_CONFLITANTE")
             else:
+                if history is not None:
+                    from .history import validate_parameters
+
+                    validate_parameters(segment, history)
+                    row = db.execute(
+                        "UPDATE hub.tarefas SET tipo='historico',parametros=%s WHERE id=%s RETURNING *",
+                        (Jsonb(history), row["id"]),
+                    ).fetchone()
+                    assert row is not None
                 self.audit(db, row, "CRIADA")
             return row
 

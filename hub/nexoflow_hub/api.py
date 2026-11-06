@@ -24,6 +24,20 @@ class TaskRequest(BaseModel):
     cenario: Scenario = "normal"
 
 
+class HistoryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    segmento: Literal["FARMA", "PET"]
+    origem: Literal["manual", "n8n", "teste"] = "manual"
+    chave: str = Field(min_length=1, max_length=96, pattern=r"^[a-zA-Z0-9_-]+$")
+    inicio: str
+    fim: str
+    limite: int = Field(default=500, ge=1, le=2147483647)
+    max_paginas: int = Field(default=100, ge=1, le=10000)
+    modo: Literal["historica", "incremental", "reconciliacao"] = "historica"
+    reiniciar: bool = False
+    quantidade_sintetica: int = Field(default=205, ge=0, le=1200)
+
+
 def public(task):
     return {
         key: task[key]
@@ -96,6 +110,25 @@ def create_app(settings: Settings | None = None):
             raise HTTPException(403, "SEGMENTO_NAO_AUTORIZADO")
         try:
             return public(store.create(segment, body.origem, body.chave, body.cenario))
+        except Conflict:
+            raise HTTPException(409, "IDEMPOTENCIA_CONFLITANTE") from None
+
+    @app.post("/tarefas/historico", status_code=202)
+    def history(body: HistoryRequest, segment=dependency):
+        if body.segmento != segment:
+            raise HTTPException(403, "SEGMENTO_NAO_AUTORIZADO")
+        from .history import validate_parameters
+
+        parameters = body.model_dump(exclude={"segmento", "origem", "chave"})
+        try:
+            validate_parameters(segment, parameters)
+            return public(
+                store.create(
+                    segment, body.origem, body.chave, "normal", history=parameters
+                )
+            )
+        except ValueError:
+            raise HTTPException(422, "PARAMETROS_HISTORICO_INVALIDOS") from None
         except Conflict:
             raise HTTPException(409, "IDEMPOTENCIA_CONFLITANTE") from None
 

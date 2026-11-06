@@ -184,6 +184,7 @@ def main():
                         "pytest",
                         "hub/tests/test_hub.py",
                         "hub/tests/test_orders.py",
+                        "hub/tests/test_history.py",
                         "-q",
                     ],
                     cwd=ROOT,
@@ -193,6 +194,15 @@ def main():
                     timeout=120,
                 )
                 if result.returncode:
+                    # Somente nomes de testes sintéticos; sem tracebacks/DSNs.
+                    import re
+
+                    names = re.findall(
+                        r"^(?:FAILED|ERROR) ([A-Za-z0-9_./:\[\]-]+)",
+                        result.stdout,
+                        re.MULTILINE,
+                    )
+                    print(json.dumps({"testes_reprovados": names}), flush=True)
                     raise RuntimeError("PYTEST_HUB_FALHOU")
                 print(
                     json.dumps(
@@ -212,6 +222,34 @@ def main():
             request = "import json,urllib.request;from pathlib import Path;op=urllib.request.build_opener(urllib.request.ProxyHandler({}));r=urllib.request.Request('http://127.0.0.1:8000/prontidao',headers={'Authorization':'Bearer '+Path('/run/secrets/farma').read_text().strip()});assert json.load(op.open(r,timeout=3))['estado']=='pronto'"
             command([*docker, "exec", api, "python", "-c", request])
             print('{"teste":"api_http_autenticada","estado":"aprovado"}', flush=True)
+            history_body = {
+                "segmento": "PET",
+                "chave": "historico-http",
+                "inicio": "2026-11-01",
+                "fim": "2026-11-06",
+                "limite": 100,
+                "max_paginas": 10,
+                "quantidade_sintetica": 205,
+            }
+            history_request = (
+                "import json,urllib.request;from pathlib import Path;op=urllib.request.build_opener(urllib.request.ProxyHandler({}));body="
+                + repr(history_body)
+                + ";r=urllib.request.Request('http://127.0.0.1:8000/tarefas/historico',data=json.dumps(body).encode(),headers={'Content-Type':'application/json','Authorization':'Bearer '+Path('/run/secrets/pet').read_text().strip()});assert op.open(r,timeout=5).status==202"
+            )
+            command([*docker, "exec", api, "python", "-c", history_request])
+            history_task = next(
+                t for t in store.list("PET") if t["chave"] == "historico-http"
+            )
+            wait(
+                lambda: completed(history_task, "PET"),
+                "historico_api_worker_postgresql",
+            )
+            assert (
+                store.get("PET", history_task["id"])["resultado"][
+                    "faturamento_centavos"
+                ]
+                == 1640000
+            )
             command([*compose, "stop", "worker"])
             crashed = store.create("FARMA", "teste", "interrupcao", "normal")
             command(
@@ -238,6 +276,8 @@ def main():
             wait(pg_ready, "postgresql_reiniciado")
             wait(lambda: store.ready(), "schema_persistido")
             assert completed(first) and completed(crashed)
+            assert completed(history_task, "PET")
+            assert store.get("PET", history_task["id"])["resultado"]["received"] == 205
             other = store.create("PET", "n8n", "recuperacao", "normal")
             wait(lambda: completed(other, "PET"), "pet_apos_reinicio")
             for service in ("api", "worker", "postgres-hml"):

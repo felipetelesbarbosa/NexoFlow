@@ -2,9 +2,9 @@ name: Homologar NexoFlow Hub Linux
 on:
   push:
     branches: [main]
-    paths: ['hub/**', 'app/business_*.py', 'app/pedido_utils.py', 'app/ad_attribution.py', 'app/product_scope.py', '.github/workflows/hub.yml']
+    paths: ['hub/**', 'app/business_*.py', 'app/order_history.py', 'app/pedido_utils.py', 'app/ad_attribution.py', 'app/product_scope.py', '.github/workflows/hub.yml']
   pull_request:
-    paths: ['hub/**', 'app/business_*.py', 'app/pedido_utils.py', '.github/workflows/hub.yml']
+    paths: ['hub/**', 'app/business_*.py', 'app/order_history.py', 'app/pedido_utils.py', '.github/workflows/hub.yml']
   workflow_dispatch:
 permissions:
   contents: read

@@ -43,3 +43,7 @@ A regressão Windows local manteve a suíte de **1.770 testes aprovada**, com 73
 - As ressalvas da Etapa 1 (backup natural de 07/11, Monarx, kernel, retenção e webhooks) permanecem fora desta mudança.
 
 Próxima etapa: o Work confere o SHA e a infraestrutura real, executa o ensaio isolado e registra evidências. Só depois conectar fontes gradualmente, em leitura primeiro, com contratos de identidade/cobertura e revisão de escrita. O [guia](README.md) detalha variáveis, endpoints, comandos, backup e rollback.
+
+## Evolução: histórico paginado
+
+O marco seguinte adiciona contrato histórico compartilhado, migração 002, entrada autenticada, worker sintético HTTP e LTV persistido por cliente/segmento. O marco Windows anterior é `465ce50`. Consulte [contrato, retomada e limitações](HISTORICO.md). Homologação comercial/VPS permanece pendente.
