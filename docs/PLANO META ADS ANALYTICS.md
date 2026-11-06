@@ -1,6 +1,6 @@
 # Plano de integração Meta Ads com Analytics
 
-Estado: a implementação nativa está disponível no código, com ativação explícita e fontes independentes dos schemas legados. Veja o [guia operacional](META%20ADS%20NATIVO.md) e o [relatório técnico](RELATORIO%20META%20ADS%20NATIVO.md). Nenhuma planilha ou dashboard de produção foi alterado nesta entrega. A integração foi distribuída na 1.5.13, que permanece preservada. A 1.5.14 tem validação própria do pacote e amplia o bootstrap aditivo; confira o [changelog](../CHANGELOG.md).
+Estado: a implementação nativa está disponível no código, com ativação explícita e fontes independentes dos schemas legados. Veja o [guia operacional](META%20ADS%20NATIVO.md) e o [relatório técnico](RELATORIO%20META%20ADS%20NATIVO.md). Nenhuma planilha ou dashboard de produção foi alterado nesta entrega. A integração foi distribuída na 1.5.13, que permanece preservada. A 1.5.15 tem validação própria do pacote e amplia o bootstrap aditivo; confira o [changelog](../CHANGELOG.md).
 
 ## Contratos existentes conferidos no código
 
@@ -74,7 +74,7 @@ Não declarar causalidade ou atribuição individual usando apenas o ID de anún
 
 ## Pendências desta fase
 
-A operação nativa não exige registro STDIO nem Codex. A instalação final no computador do usuário e a ativação das novas fontes ainda precisam ser conferidas. Foi validada uma consulta real limitada de leitura à Meta; testes de escrita usam Sheets simulado. Não houve escrita em planilhas nem edição de campanhas nos testes. A versão 1.5.13 permanece no histórico público; esta descrição preparatória não substitui os checks exigidos da entrega 1.5.14.
+A operação nativa não exige registro STDIO nem Codex. A instalação final no computador do usuário e a ativação das novas fontes ainda precisam ser conferidas. Foi validada uma consulta real limitada de leitura à Meta; testes de escrita usam Sheets simulado. Não houve escrita em planilhas nem edição de campanhas nos testes. A versão 1.5.13 permanece no histórico público; esta descrição preparatória não substitui os checks exigidos da entrega 1.5.15.
 
 ## Dashboard de referência informado
 

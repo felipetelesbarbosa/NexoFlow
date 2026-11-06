@@ -63,7 +63,7 @@ A preparação PET não exige, calcula ou grava maioridade. O endereço deve cor
 
 A etapa Analytics também executa a integração nativa Meta quando habilitada no perfil, sem iniciar Codex CLI ou servidor MCP. A simulação, revisão de schemas/destinos e os checkpoints por conta e segmento continuam obrigatórios. Nenhuma campanha é alterada. Veja o [guia Meta nativo](META%20ADS%20NATIVO.md) antes de ativar a primeira coleta.
 
-## Atualização 1.5.14
+## Atualização 1.5.15
 
 Com Meta habilitada, o Analytics prepara ou retoma as cinco abas adicionais de cada segmento nos arquivos Sheets já configurados, somente com cabeçalhos canônicos. Divergências exigem revisão manual; históricos e destinos existentes são preservados. O resumo final identifica gravações confirmadas, pendências, causa e checkpoint de cada fonte. Uma etapa parcial mantém código 3 e não apaga as operações concluídas. A Recompra distingue planos aplicados, estado local e escritas reais na Weni.
 

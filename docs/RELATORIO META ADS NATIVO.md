@@ -55,7 +55,7 @@ Siga [Meta Ads nativo](META%20ADS%20NATIVO.md). Faça primeiro uma simulação, 
 
 As fontes estão preparadas para as páginas Anúncios e Pedidos dos Anúncios. A edição dos relatórios Data Studio, seus gráficos e filtros ainda depende de acesso à configuração do relatório. Nenhum dashboard foi anunciado como atualizado. O detalhe deve manter data da compra separada da exposição e evitar junção que replique investimento por item/pedido.
 
-A versão **NexoFlow 1.5.13** já foi publicada e permanece preservada. Este relatório registra a implementação e os testes daquela entrega. A próxima publicação usa **1.5.14**, com validação própria do mesmo commit; confira o [changelog](../CHANGELOG.md) e o [guia atualizado](META%20ADS%20NATIVO.md). Use o novo pacote validado; não copie módulos manualmente sobre a instalação como substituto da distribuição.
+A versão **NexoFlow 1.5.13** já foi publicada e permanece preservada. Este relatório registra a implementação e os testes daquela entrega. A próxima publicação usa **1.5.15**, com validação própria do mesmo commit; confira o [changelog](../CHANGELOG.md) e o [guia atualizado](META%20ADS%20NATIVO.md). Use o novo pacote validado; não copie módulos manualmente sobre a instalação como substituto da distribuição.
 
 ## Verificações locais da fase preparatória
 
@@ -69,8 +69,8 @@ A primeira execução da matriz Windows identificou duas falhas no ambiente de t
 
 Uma comparação de caminho no teste também precisava tratar o nome Windows curto `RUNNER~1` e o caminho expandido como o mesmo local. Essa conferência usa resolução de caminho; não altera token, seleção de conta ou permissões. A validação Windows deve ser repetida no commit final antes da publicação.
 
-## Preparação da estrutura 1.5.14
+## Preparação da estrutura 1.5.15
 
 Foram preparadas e conferidas **dez abas Meta**, cinco por segmento: três no arquivo de Operação e duas no Dashboard de FARMA, com a mesma divisão em PET. Os arquivos permanecem nas pastas de cada segmento, com os mesmos IDs e as 54 abas anteriores preservadas. Nenhum ID privado ou token faz parte deste relatório.
 
-A 1.5.14 automatiza o bootstrap aditivo e a retomada de abas ausentes ou vazias com cabeçalhos canônicos; divergências continuam bloqueadas para revisão manual. A preparação comprova a estrutura, sem anunciar carga real de métricas ou edição das páginas do Data Studio. As verificações do pacote Windows e os resultados finais pertencem ao commit que será publicado.
+A 1.5.15 automatiza o bootstrap aditivo e a retomada de abas ausentes ou vazias com cabeçalhos canônicos; divergências continuam bloqueadas para revisão manual. A preparação comprova a estrutura, sem anunciar carga real de métricas ou edição das páginas do Data Studio. As verificações do pacote Windows e os resultados finais pertencem ao commit que será publicado.

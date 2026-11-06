@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.14",
+    [string]$Version = "1.5.15",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -413,15 +413,11 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-O Analytics com Meta habilitada prepara ou retoma automaticamente as cinco abas adicionais por segmento, nos arquivos Sheets já configurados e com cabeçalhos canônicos. A operação é aditiva e preserva históricos e schemas anteriores; divergências continuam exigindo revisão manual. São mantidos os IDs e a divisão entre Operação, Histórico e Dashboard.
+Diagnóstico sanitizado da instalação opcional MCP: distingue falhas de autenticação/CONNECT, HTTP de índice/download, TLS, timeout, Python incompatível, conflitos, acesso negado, arquivos em uso, espaço e compilação. Erros desconhecidos preservam o código de saída sem concluir uma causa não comprovada.
 
-Os resumos distinguem alterações aplicadas, pendências e POSTs reais. Uma etapa parcial mantém o código 3, identifica a causa e conserva os checkpoints separados de Meta e Farma. Na Recompra, a contagem de aplicações também pode incluir persistência local e não equivale à quantidade de POSTs Weni.
+O relatório local `logs/meta_ads_mcp_dependencias.json` registra perfil, rota, preflight e tentativas, sem saída bruta, URLs ou credenciais. Setup e auxiliar apontam o relatório, com gravação atômica e diagnósticos ignorados pelo Git. Falhas recuperáveis mantêm tentativas limitadas sem mudar rota; a instalação principal e as credenciais são preservadas quando o MCP opcional falha.
 
-A seleção inicial da rede oferece pessoal, corporativa ou sair. Uma opção inválida solicita nova escolha; três falhas recuperáveis de transporte abrem a escolha da rota. O check-up e as etapas seguintes preservam a rota escolhida.
-
-Analytics e Noturno consultam a Meta diretamente com o token/allowlist local, sem exigir Codex CLI ou servidor MCP. MCP continua opcional. O Windows segue operacional e autônomo; o NexoFlow Hub é um projeto paralelo futuro para VPS, Docker e n8n, documentado separadamente, sem infraestrutura implantada nesta entrega.
-
-As correções PET, a seleção incremental da Recompra, a deduplicação por pedidos e o histórico observado continuam mantidos. Os envios permanecem D+25 Farma e D+30 Pets, sem retroativos. O Setup preserva configurações e dados no modo de atualização e a credencial Meta também no modo Clean.
+Analytics e Noturno usam a integração Meta nativa, sem exigir MCP ou Codex CLI. As rotinas FARMA/PET e as funcionalidades da versão anterior permanecem preservadas. A atualização Preserve mantém configurações e dados. Esta versão não comprova autenticação no proxy corporativo ou aprovação pelo antivírus no PC do usuário; consulte os relatórios e o guia de homologação.
 
 [Guia Meta nativo](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/META%20ADS%20NATIVO.md) · [Planejamento Hub](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/planejamento/README.md)
 
@@ -435,4 +431,4 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.14
+# NexoFlow 1.5.15

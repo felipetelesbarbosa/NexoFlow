@@ -1,4 +1,4 @@
-# Instalador do NexoFlow 1.5.14
+# Instalador do NexoFlow 1.5.15
 
 Scripts de instalação, atualização e desinstalação para Windows.
 

@@ -1,5 +1,12 @@
 # NexoFlow — Changelog
 
+## NexoFlow 1.5.15 — Diagnóstico da instalação MCP
+
+- Diagnóstico sanitizado da etapa pip do MCP diferencia autenticação e CONNECT, erros HTTP de índice/download, TLS, timeout, incompatibilidade Python, dependências, permissão, arquivo em uso, espaço e compilação. Uma falha desconhecida mantém seu código de saída sem atribuir causa não comprovada.
+- Relatório local `logs/meta_ads_mcp_dependencias.json` registra perfil, rota, preflight e tentativas com gravação atômica, sem saída bruta, URLs ou credenciais. Setup e auxiliar referenciam o relatório sem sobrescrevê-lo; os diagnósticos locais ficam fora do Git.
+- Retentativas limitadas a falhas recuperáveis, sem trocar a rota. Falha opcional preserva a instalação principal, credenciais e configurações; Analytics e Noturno continuam usando Meta nativa sem Codex ou MCP obrigatório.
+- Pacotes e versão próprios preservam o release 1.5.14 e anteriores. A data real de publicação consta nas notas do release. Testes automatizados não comprovam autenticação no proxy corporativo ou aprovação do antivírus no computador do usuário.
+
 ## NexoFlow 1.5.14 — Meta Ads e clareza operacional
 
 - Bootstrap aditivo Meta no Analytics habilitado: prepara ou retoma as cinco abas adicionais por segmento com cabeçalhos canônicos nos destinos existentes. Divergências exigem revisão manual; os schemas e históricos anteriores são preservados.

@@ -45,7 +45,7 @@ A primeira coleta usa a data inicial configurada; incrementais reaproveitam o es
 
 ## Estrutura aditiva e revisão
 
-A partir da 1.5.14, o Analytics habilitado prepara ou retoma automaticamente as cinco abas Meta nos arquivos já configurados do segmento:
+A partir da 1.5.15, o Analytics habilitado prepara ou retoma automaticamente as cinco abas Meta nos arquivos já configurados do segmento:
 
 | Arquivo | Abas |
 | --- | --- |

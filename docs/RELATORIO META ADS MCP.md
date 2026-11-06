@@ -1,6 +1,6 @@
 # Integração Meta Ads MCP local — conferência técnica
 
-**Contexto:** este documento registra a fase preparatória que manteve a versão 1.5.12. A versão 1.5.13 já foi publicada e permanece preservada. A entrega atual usa 1.5.14 e exige validação própria do pacote. Para a operação nativa, consulte o [relatório atual](RELATORIO%20META%20ADS%20NATIVO.md).
+**Contexto:** este documento registra a fase preparatória que manteve a versão 1.5.12. A versão 1.5.13 já foi publicada e permanece preservada. A entrega atual usa 1.5.15 e exige validação própria do pacote. Para a operação nativa, consulte o [relatório atual](RELATORIO%20META%20ADS%20NATIVO.md).
 
 ## Alterações
 

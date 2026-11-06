@@ -102,7 +102,7 @@ O plano de reutilização direta do cliente pelo Analytics, com grão diário, m
 
 Foram executados 19 testes offline do conector com o SDK MCP instalado em ambiente separado, incluindo initialize/tools/list/tools/call por STDIO; 1.575 testes do projeto passaram (68 específicos de ambiente ignorados). Lint e auditoria de consistência passaram. Nenhum token real foi lido e nenhuma consulta à Meta ou escrita de produção foi executada. A instalação PowerShell/Python 3.14 é conferida pelo workflow dedicado e ainda precisa ser executada no computador do usuário. O registro real no Codex desse computador permanece pendente.
 
-Na fase preparatória, os commits usaram `[skip release]` e preservaram a versão 1.5.12. A entrega **1.5.13** distribuiu a integração nativa e os auxiliares opcionais e permanece preservada. A **1.5.14** tem seus próprios pacotes e validação do mesmo commit; MCP e Codex não são requisitos da integração nativa.
+Na fase preparatória, os commits usaram `[skip release]` e preservaram a versão 1.5.12. A entrega **1.5.13** distribuiu a integração nativa e os auxiliares opcionais e permanece preservada. A **1.5.14** tem seus próprios pacotes e permanece preservada. A **1.5.15** distribui os diagnósticos sanitizados da instalação MCP, com validação e pacotes próprios; MCP e Codex não são requisitos da integração nativa.
 
 ## Instalação MCP independente de Codex
 

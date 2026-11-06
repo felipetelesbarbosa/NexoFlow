@@ -4,7 +4,7 @@
 **Código operacional de referência:** `felipetelesbarbosa/NexoFlow`. O planejamento não define um repositório de implantação do Hub.
 **Premissa obrigatória:** o novo endpoint de histórico da API FarmaLíder ainda **não possui contrato oficial completo**. Não presumir rota, parâmetros, autenticação, paginação ou estrutura de resposta.
 
-O Hub considera **VPS, Docker e n8n** como alternativas de implantação e orquestração futuras. Este documento não entrega containers, API pública, banco ou workflows n8n. O NexoFlow Windows continua operacional e autônomo, com seus executáveis, credenciais, guardas, agendamentos e destinos existentes. Qualquer integração entre ambos exige contrato, homologação e autorização próprios; a versão 1.5.14 não passa a depender do Hub.
+O Hub considera **VPS, Docker e n8n** como alternativas de implantação e orquestração futuras. Este documento não entrega containers, API pública, banco ou workflows n8n. O NexoFlow Windows continua operacional e autônomo, com seus executáveis, credenciais, guardas, agendamentos e destinos existentes. Qualquer integração entre ambos exige contrato, homologação e autorização próprios; a versão 1.5.15 não passa a depender do Hub.
 
 ## 1. Diretrizes e compatibilidade
 

@@ -337,7 +337,7 @@ GET /api/Delivery/pedidos/cpf/{cpf}
 ```
 
 Filtros desejáveis: `inicio`, `fim`, `status`, `pagina` e `tamanhoPagina`. Essa rota é uma proposta de evolução, não uma integração atualmente implementada.
-<!-- NexoFlow 1.5.14 -->
+<!-- NexoFlow 1.5.15 -->
 
 ### Respostas e pendências
 
