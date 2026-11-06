@@ -1,8 +1,8 @@
 # NexoFlow Hub | Histórico de pedidos, atribuição e LTV
 
-**Estado:** histórico, atribuição histórica e LTV seguem em planejamento. O [núcleo Hub](../../hub/README.md) de API/fila/worker/PostgreSQL está implementado para homologação Linux sintética; a integração histórica continua **não implementada**.
+**Estado:** contrato paginado recebido; marco Windows implementado com estado local, conciliação e LTV observado. Consulte [operação e limites](../HISTORICO%20PEDIDOS.md). O marco Hub recebe o mesmo contrato somente após regressão Windows; a implantação VPS e escrita comercial continuam não autorizadas.
 **Código operacional de referência:** `felipetelesbarbosa/NexoFlow`. O planejamento não define um repositório de implantação do Hub.
-**Premissa obrigatória:** o novo endpoint de histórico da API FarmaLíder ainda **não possui contrato oficial completo**. Não presumir rota, parâmetros, autenticação, paginação ou estrutura de resposta.
+**Contrato recebido:** `GET /api/Delivery/pedidos/{segmento}`, query `dataInicio`, `dataFim`, `pagina`, `limite`, `token`; envelope `pedidos`, `pagina`, `limite`, `totalRegistros`, `totalPaginas`. Limite ajustável, incluindo 500 e 1.000. Inclusividade temporal, ordenação estável, descontos e estornos ainda não comprovados. As seções abaixo preservam o planejamento histórico; o guia operacional prevalece para o que já foi implementado.
 
 O Hub considera **VPS, Docker e n8n** como alternativas de implantação e orquestração futuras. Este documento não entrega containers, API pública, banco ou workflows n8n. O NexoFlow Windows continua operacional e autônomo, com seus executáveis, credenciais, guardas, agendamentos e destinos existentes. Qualquer integração entre ambos exige contrato, homologação e autorização próprios; a versão 1.5.15 não passa a depender do Hub.
 
@@ -40,7 +40,7 @@ Os nomes `/processar`, `/status` e quaisquer URLs da futura API do NexoFlow Hub 
 7. Confirmar completude por período e segmento **antes** de publicar números rotulados como históricos completos.
 8. Ordenar cronologicamente para análise, independentemente da ordem retornada pela API.
 
-**Nota:** 100 pedidos por página é uma característica informada, **não** uma regra técnica já verificada. Tamanho real, cursor, paginação e encerramento aguardam contrato.
+**Atualização do contrato:** 100 é o limite da amostra, não teto fixo. O cliente solicita página 1..totalPaginas e reconcilia IDs únicos com totalRegistros. Alterar o limite reinicia o cursor da faixa com deduplicação.
 
 ### 3.2 Operação incremental e reconciliação
 
@@ -168,9 +168,9 @@ Fixtures sintéticas e testes de integração, incluindo:
 - concorrência VPS/Windows, filas de webhook, operação manual durante incremental e retorno da conexão;
 - preservação do Noturno, Recompra e schemas anteriores, sem migração destrutiva.
 
-## 11. Contrato externo ainda pendente
+## 11. Lacunas restantes do contrato externo
 
-Solicitar a documentação oficial **antes de qualquer implementação definitiva**:
+Rota, parâmetros, autenticação e envelope acima estão recebidos. Continuam pendentes de homologação os detalhes não demonstrados pela amostra:
 - endpoint, verbo, autenticação e permissões; intervalo histórico realmente coberto;
 - parâmetros de período, inclusividade dos limites, fuso, formato de datas;
 - paginação, totalizadores e critério inequívoco de encerramento;

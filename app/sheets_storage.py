@@ -62,7 +62,7 @@ class SheetsStorage:
         return layout
 
     def destination(self, title: str) -> str:
-        if title == SHEET_HISTORICO:
+        if title == SHEET_HISTORICO or title in {"Historico_Pedidos", "Historico_Itens"}:
             return self.history
         if title.startswith("BI_"):
             return self.dashboard

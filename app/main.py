@@ -1349,6 +1349,28 @@ def main() -> int:
                 "Histórico observado da API: %s pedidos recuperados; canal de compra não inferido.",
                 len(order_rows) - before,
             )
+        from order_history_store import analytics_history
+
+        order_rows, item_rows, paginated_history = analytics_history(
+            farm_client,
+            all_weni_contacts,
+            order_rows,
+            item_rows,
+            now=sync_time,
+            settings=secrets,
+        )
+        if paginated_history is not None:
+            logging.info(
+                "Histórico paginado: recebidos=%s; pendências=%s; extração=%s.",
+                paginated_history["received"],
+                paginated_history["pendencias"],
+                paginated_history["status"],
+            )
+            if (
+                paginated_history["status"] != "extraida"
+                or paginated_history["pendencias"]
+            ):
+                order_stats.api_errors += 1
         order_stats.api_errors += observed.api_errors
         order_stats.pending_without_items = len(
             {

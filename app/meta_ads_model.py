@@ -472,6 +472,7 @@ def build_native_tables(
             or unique in conflicting_orders
             or unique in seen_orders
             or not _sales_order_is_valid(order)
+            or order.get("origem_pedido") == "FARMALIDER_PEDIDOS_PAGINADOS"
         ):
             continue
         seen_orders.add(unique)

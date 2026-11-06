@@ -517,6 +517,8 @@ class FarmaliderClient:
             return "clientes/segmento"
         if "/pedido/" in path:
             return "pedido"
+        if "/pedidos/" in path:
+            return "pedidos/segmento"
         return "delivery"
 
     def _diagnostic_ref(self, kind: str, identity: str | int) -> str:
@@ -760,8 +762,16 @@ class FarmaliderClient:
         allow_customer_list: bool = False,
         diagnostic_ref: str = "-",
         private_cpf: str | None = None,
+        query: dict[str, str | int] | None = None,
     ) -> dict[str, Any] | list[dict[str, Any]] | None:
         endpoint_label = self._endpoint_label(path)
+        if query is not None and (
+            endpoint_label != "pedidos/segmento"
+            or set(query) != {"dataInicio", "dataFim", "pagina", "limite"}
+        ):
+            raise ValueError("Parâmetros não autorizados para a rota.")
+        request_params: dict[str, str | int] = dict(query) if query is not None else {}
+        request_params["token"] = self.token
         last_server_response: requests.Response | None = None
 
         for attempt in range(1, FARMALIDER_MAX_RETRIES + 1):
@@ -778,7 +788,7 @@ class FarmaliderClient:
                 try:
                     response = self._get_session().get(
                         url,
-                        params={"token": self.token},
+                        params=request_params,
                         timeout=(
                             FARMALIDER_CONNECT_TIMEOUT_SECONDS,
                             FARMALIDER_DIRECTORY_TIMEOUT_SECONDS
@@ -824,6 +834,8 @@ class FarmaliderClient:
                         endpoint_label=endpoint_label,
                     )
                     status = response.status_code
+                    if 300 <= status < 400:
+                        raise FarmaliderError("Redirecionamento da API recusado.")
                     if status in {401, 403}:
                         self._mark_unhealthy()
                         logging.error(
@@ -1040,6 +1052,22 @@ class FarmaliderClient:
             self._delivery_path(f"clientes/{segmento}"),
             allow_not_found=True,
             allow_customer_list=True,
+        )
+
+    def get_pedidos_history(self, query, page: int):
+        """Uma página do contrato oficial; token codificado apenas pelo requests."""
+        if query.segment != self.customer_segment:
+            raise ValueError("Histórico pertence a outro segmento.")
+        if type(page) is not int or not 1 <= page <= 2147483647:
+            raise ValueError("Página inválida.")
+        return self._request_json(
+            self._delivery_path(f"pedidos/{query.segment.lower()}"),
+            query={
+                "dataInicio": query.start,
+                "dataFim": query.end,
+                "pagina": page,
+                "limite": query.limit,
+            },
         )
 
     def get_cliente_cadastro_by_cpf(self, cpf: str):

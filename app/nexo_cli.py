@@ -518,6 +518,7 @@ def _menu() -> int:
         print("7. Executar Analytics")
         print("8. Ver log Weni")
         print("9. Listar todos os comandos")
+        print("10. Importar histórico de pedidos / LTV observado")
         print("0. Sair")
         choice = input("\nEscolha uma opção: ").strip()
         try:
@@ -542,6 +543,10 @@ def _menu() -> int:
                     print(line)
             elif choice == "9":
                 _print_commands()
+            elif choice == "10":
+                from run_order_history import interactive
+
+                interactive()
             else:
                 print("Opção inválida.")
         except Exception as exc:
@@ -575,6 +580,14 @@ def build_parser() -> argparse.ArgumentParser:
         epilog='Use "nexo ajuda" para ver exemplos práticos.',
     )
     sub = parser.add_subparsers(dest="command")
+    from run_order_history import parser as history_parser
+
+    sub.add_parser(
+        "historico",
+        parents=[history_parser()],
+        add_help=False,
+        help="histórico paginado e LTV observado",
+    )
 
     sub.add_parser(
         "ajuda", aliases=["help", "comandos"], help="lista todos os comandos"
@@ -710,6 +723,10 @@ def run(argv: list[str] | None = None) -> int:
         if args.command in {"versao", "version"}:
             print(f"NexoFlow {VERSION}")
             return 0
+        if args.command == "historico":
+            from run_order_history import run as history_run
+
+            return history_run(args_list[1:])
         if args.command == "status":
             return _status(args.local)
         if args.command in {"diagnostico", "doctor", "check"}:
