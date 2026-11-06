@@ -6,7 +6,7 @@ O Windows 1.5.15 foi publicado antes desta implementação, no commit `07dc391af
 
 O núcleo Linux implementa API, fila e worker sobre PostgreSQL **real**, com fontes comerciais **simuladas**. O ensaio Docker local construiu a imagem, subiu PostgreSQL 18.6 em rede interna sem portas, aplicou migrações, iniciou API/worker e confirmou resultados persistidos. Depois interrompeu um processo após checkpoint, aguardou a lease real, retomou sem repetir a etapa e reiniciou API/worker/PostgreSQL, comprovando persistência e novo processamento PET. Os três serviços passaram nos healthchecks; o papel da aplicação não tem superuser. Nenhuma chamada ou gravação comercial ocorreu.
 
-A suíte de integração verifica concorrência de produtores/workers, payload conflitante com mesma chave, separação FARMA/PET, fencing do proprietário antigo, checkpoint idempotente, rollback transacional, recuperação, pendências, autenticação, proibição de escrita, API e exports n8n inativos. Variações do contrato normalizado incluem estados documentados, frete, valores divergentes, proprietário/CPF/identidade, itens ausentes e diferentes políticas de recompra por segmento.
+A suíte de 38 testes de integração verifica concorrência de produtores/workers, payload conflitante com mesma chave, separação FARMA/PET, fencing do proprietário antigo, checkpoint idempotente, rollback transacional, recuperação, pendências, autenticação, proibição de escrita, API e exports n8n inativos. Variações do contrato normalizado incluem estados documentados, frete, valores divergentes, proprietário/CPF/identidade, itens ausentes e diferentes políticas de recompra por segmento.
 
 A regressão Windows local manteve a suíte de **1.770 testes aprovada**, com 73 específicos de ambiente ignorados; três regressões adicionais protegem a extração de regras puras. A extração das funções puras preserva as interfaces de CPF e Recompra. Os testes Windows no GitHub e o workflow Hub ficam ligados ao SHA do commit, sem alterar o produto distribuído já publicado. O CI dedicado repete build, PostgreSQL, HTTP, interrupção e reinício, além de lint/tipos/auditoria. Consulte o resultado do workflow do commit final antes de homologar outra instalação.
 
@@ -29,6 +29,8 @@ A regressão Windows local manteve a suíte de **1.770 testes aprovada**, com 73
 - Nova linha no arquivo da senha sintética gerou autenticação divergente. O bootstrap agora remove explicitamente CR/LF/espaços das bordas, alinhado à leitura da configuração.
 - Uma lista YAML de tmpfs interpretava a vírgula como outro mount. O ensaio real detectou o problema; o item foi cotado e o teste completo passou.
 - Tipagem de rows/cursor e SQL de migração corrigida explicitamente. SQL vem de recursos versionados, nunca do corpo da API. O token de lease também é conferido na coordenação transacional para bloquear confirmações antigas.
+
+- A revisão final também bloqueou cenários desconhecidos na fila interna e tornou a confirmação de fonte explicitamente obrigatória, com regressões reproduzidas antes da correção.
 
 ## Limitações e pendências
 

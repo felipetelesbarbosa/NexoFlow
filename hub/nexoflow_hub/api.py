@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from .config import Settings
+from .contracts import Scenario
 from .store import Conflict, Store
 
 
@@ -20,25 +21,7 @@ class TaskRequest(BaseModel):
     segmento: Literal["FARMA", "PET"]
     origem: Literal["manual", "n8n", "teste"] = "manual"
     chave: str = Field(min_length=1, max_length=96, pattern=r"^[a-zA-Z0-9_-]+$")
-    cenario: Literal[
-        "normal",
-        "dados_incompletos",
-        "sem_pedido",
-        "segmento_desconhecido",
-        "segmento_divergente",
-        "cancelado",
-        "pagamento_cancelado",
-        "itens_vazios",
-        "frete_divergente",
-        "identidade_divergente",
-        "recusa",
-        "optout",
-        "compra_recente",
-        "retroativo",
-        "rede_temporaria",
-        "autenticacao",
-        "resposta_incerta",
-    ] = "normal"
+    cenario: Scenario = "normal"
 
 
 def public(task):

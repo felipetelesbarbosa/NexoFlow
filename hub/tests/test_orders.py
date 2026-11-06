@@ -32,6 +32,7 @@ def order():
             Item("i1", "Produto", Decimal(2), Decimal("48.50")),
             Item("0", "", Decimal(1), Decimal("7.25")),
         ),
+        confirmed=True,
     )
 
 
@@ -51,6 +52,19 @@ def test_values_shipping_units_and_no_double_freight(order):
         replace(order, billed=Decimal("54.00")), "FARMA", at_day(order)
     )
     assert divergent["faturamento"] == "54.00" and divergent["alerta_total_divergente"]
+
+
+def test_source_confirmation_is_explicit_and_not_assumed(order):
+    from dataclasses import fields
+
+    without_proof = {
+        f.name: getattr(order, f.name)
+        for f in fields(OrderEvidence)
+        if f.name != "confirmed"
+    }
+    unconfirmed = OrderEvidence(**without_proof)
+    result = evaluate_order(unconfirmed, "FARMA", at_day(order))
+    assert result["estado"] == "pendente" and result["venda"] is False
 
 
 @pytest.mark.parametrize("status", [-2, -1, 0, 4, 1, 2, 3, 999])

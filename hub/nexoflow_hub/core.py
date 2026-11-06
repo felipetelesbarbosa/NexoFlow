@@ -14,6 +14,8 @@ from pedido_utils import (
     BUSINESS_TIMEZONE,
 )
 
+from .contracts import SCENARIOS
+
 SEGMENTS = DAYS
 
 
@@ -54,6 +56,9 @@ def evaluate(segment, scenario):
     """Fixtures geram evidências; decisões usam o núcleo normalizado."""
     from .orders import Item, OrderEvidence, evaluate_order
 
+    if scenario not in SCENARIOS:
+        raise ValueError("CENARIO_NAO_HABILITADO")
+
     purchase = datetime(2026, 1, 1, 12, tzinfo=BUSINESS_TIMEZONE)
     now = purchase + timedelta(days=SEGMENTS[segment], hours=-1)
     if scenario == "compra_recente":
@@ -64,6 +69,7 @@ def evaluate(segment, scenario):
         segment=None
         if scenario == "segmento_desconhecido"
         else ("OUTRO" if scenario == "segmento_divergente" else segment),
+        confirmed=True,
         order_id="fixture-order",
         customer_id="fixture-client",
         owner_id="outro" if scenario == "identidade_divergente" else "fixture-client",

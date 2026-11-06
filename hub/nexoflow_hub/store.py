@@ -13,6 +13,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from .config import Settings
+from .contracts import SCENARIOS
 
 
 class Conflict(Exception):
@@ -76,6 +77,8 @@ class Store:
             ]
 
     def create(self, segment, origin, key, scenario):
+        if scenario not in SCENARIOS:
+            raise ValueError("CENARIO_NAO_HABILITADO")
         digest = hashlib.sha256(
             json.dumps({"cenario": scenario}, sort_keys=True).encode()
         ).hexdigest()

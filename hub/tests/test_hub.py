@@ -115,6 +115,13 @@ def test_queue_idempotency_payload_conflict_and_segments(store):
         store.create("FARMA", "n8n", "same-key", "cancelado")
 
 
+def test_unknown_internal_scenario_never_reports_normal_success(store):
+    with pytest.raises(ValueError, match="CENARIO_NAO_HABILITADO"):
+        store.create("FARMA", "teste", "unknown", "inexistente")
+    with pytest.raises(ValueError, match="CENARIO_NAO_HABILITADO"):
+        evaluate("FARMA", "inexistente")
+
+
 def test_concurrent_workers_single_owner_per_segment(store):
     for _ in range(5):
         task(store)

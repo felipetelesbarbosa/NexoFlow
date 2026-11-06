@@ -43,7 +43,7 @@ class OrderEvidence:
     freight: Decimal
     billed: Decimal
     items: tuple[Item, ...] | None
-    confirmed: bool = True
+    confirmed: bool = False
     identity_matches: int = 1
     refusal_fields: dict[str, str] = field(default_factory=dict)
     opt_out: bool = False
