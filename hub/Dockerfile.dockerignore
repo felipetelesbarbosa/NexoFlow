@@ -1,0 +1,16 @@
+**
+!hub/
+!hub/requirements.lock
+!hub/nexoflow_hub/
+!hub/nexoflow_hub/*.py
+!hub/migrations/
+!hub/migrations/*.sql
+!app/
+!app/pedido_utils.py
+!app/business_identity.py
+!app/business_recompra.py
+!app/ad_attribution.py
+!app/urn_utils.py
+!app/product_scope.py
+!app/pet_catalog.py
+!app/runtime_profile.py

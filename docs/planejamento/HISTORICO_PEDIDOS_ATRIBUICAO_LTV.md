@@ -1,6 +1,6 @@
 # NexoFlow Hub | Histórico de pedidos, atribuição e LTV
 
-**Estado:** planejamento de um projeto paralelo futuro; NexoFlow Hub e integração histórica **não implementados**.
+**Estado:** histórico, atribuição histórica e LTV seguem em planejamento. O [núcleo Hub](../../hub/README.md) de API/fila/worker/PostgreSQL está implementado para homologação Linux sintética; a integração histórica continua **não implementada**.
 **Código operacional de referência:** `felipetelesbarbosa/NexoFlow`. O planejamento não define um repositório de implantação do Hub.
 **Premissa obrigatória:** o novo endpoint de histórico da API FarmaLíder ainda **não possui contrato oficial completo**. Não presumir rota, parâmetros, autenticação, paginação ou estrutura de resposta.
 

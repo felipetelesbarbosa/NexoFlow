@@ -23,6 +23,10 @@ A instalação opcional do Meta Ads MCP passa a registrar diagnóstico sanitizad
 
 Falha do MCP preserva a instalação principal. Analytics e Noturno continuam com a coleta Meta nativa, sem exigir Codex CLI ou MCP. A autenticação na rede corporativa e eventuais bloqueios locais precisam ser conferidos no computador do usuário. Consulte o [guia MCP](docs/META%20ADS%20MCP%20LOCAL.md) e o [histórico](CHANGELOG.md).
 
+## NexoFlow Hub em homologação
+
+O [núcleo Linux do Hub](hub/README.md) possui API interna, worker e PostgreSQL para tarefas sintéticas em Docker. Escrita real e implantação comercial continuam desabilitadas. O Windows permanece autônomo. Consulte o [relatório técnico](hub/RELATORIO.md).
+
 ## Instalar e configurar
 
 1. Baixe e extraia todo o ZIP do instalador. Execute **NexoFlow Setup.exe**.

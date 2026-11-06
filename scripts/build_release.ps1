@@ -85,6 +85,7 @@ function Copy-TrackedFiles {
         foreach ($relative in $tracked) {
             if (-not $relative) { continue }
             if ($relative -like "releases/*") { continue }
+            if ($relative -like "hub/*") { continue }
             if ($relative -like "native_launcher/prebuilt/*") { continue }
             if ($relative -like ".github/*") { continue }
             if ($relative -like "scripts/*" -and $relative -notin @("scripts/confirmar_revisao_weni.ps1", "scripts/resultado_carga_weni.ps1", "scripts/check_release_secrets.py", "scripts/build_documentation.py", "scripts/instalar_meta_ads_mcp.ps1", "scripts/instalar_codex_cli.ps1")) { continue }

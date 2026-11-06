@@ -1,0 +1,33 @@
+name: Homologar NexoFlow Hub Linux
+on:
+  push:
+    branches: [main]
+    paths: ['hub/**', 'app/business_*.py', 'app/pedido_utils.py', 'app/ad_attribution.py', 'app/product_scope.py', '.github/workflows/hub.yml']
+  pull_request:
+    paths: ['hub/**', 'app/business_*.py', 'app/pedido_utils.py', '.github/workflows/hub.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  homologacao:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Instalar dependências fixadas sem atualizar pip
+        run: python -m pip --disable-pip-version-check install -r hub/requirements.lock -r hub/requirements-dev.lock
+      - name: Ferramentas de qualidade
+        run: python -m pip --disable-pip-version-check install -r dependencias/requirements-dev.txt
+      - name: Lint e tipos do Hub
+        run: |
+          ruff check hub app/business_identity.py app/business_recompra.py
+          pyright --project hub/pyrightconfig.json --pythonpath "$(which python)"
+      - name: Auditar dependências
+        run: pip-audit -r hub/requirements.lock
+      - name: Build, PostgreSQL real, API, worker e reinício sem integrações comerciais
+        env:
+          PYTHONPATH: 'hub:app'
+        run: python hub/tests/run_docker_hml.py --build --pytest
