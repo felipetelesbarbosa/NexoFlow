@@ -252,6 +252,51 @@ def _activate_proxy(
 def configure_proxy(
     *, detection_attempts: int | None = None, preserve_active_proxy: bool = False
 ) -> ProxyStatus:
+    from network_session import read_choice, save_choice
+
+    choice = read_choice()
+    if choice:
+        os.environ["NEXOFLOW_NETWORK_MODE"] = choice
+    if sys.stdin.isatty():
+        detection_attempts = max(3, detection_attempts or PROXY_DETECTION_ATTEMPTS)
+    while True:
+        try:
+            status = _configure_proxy(
+                detection_attempts=detection_attempts,
+                preserve_active_proxy=preserve_active_proxy,
+            )
+            break
+        except ValueError as exc:
+            if not str(exc).startswith("PROXY_INDISPONIVEL") or not sys.stdin.isatty():
+                raise
+            choice = _ask_route()
+            os.environ["NEXOFLOW_NETWORK_MODE"] = choice
+            save_choice(choice)
+    save_choice("corporate" if status.active else "personal")
+    return status
+
+
+def _ask_route(current_choice: str = "corporate") -> str:
+    try:
+        answer = input(
+            "A conexão falhou em três tentativas na rota atual. "
+            "[1] Pessoal/direta autorizada [2] Corporativa/proxy "
+            "[3] Tentar novamente na mesma rota [0] Cancelar: "
+        ).strip()
+    except EOFError:
+        answer = "0"
+    if answer not in ("1", "2", "3"):
+        raise ValueError(
+            "Troca de rede cancelada; confira o relatório antes de retomar."
+        )
+    if answer == "3":
+        return current_choice
+    return "personal" if answer == "1" else "corporate"
+
+
+def _configure_proxy(
+    *, detection_attempts: int | None = None, preserve_active_proxy: bool = False
+) -> ProxyStatus:
     """
     Configura proxy somente para o processo Python atual.
 
@@ -501,7 +546,9 @@ def _proxy_active_from_env() -> bool | None:
     return None
 
 
-def refresh_network_route(*, reason: str = "falha de rede") -> NetworkRouteRefresh:
+def refresh_network_route(
+    *, reason: str = "falha de rede", attempt: int = 1
+) -> NetworkRouteRefresh:
     """
     Redetecta a rota durante uma execução já em andamento.
 
@@ -512,6 +559,27 @@ def refresh_network_route(*, reason: str = "falha de rede") -> NetworkRouteRefre
     """
     with _ROUTE_REFRESH_LOCK:
         previous_active = _proxy_active_from_env()
+        from network_session import read_choice, save_choice
+
+        choice = read_choice() or os.environ.get("NEXOFLOW_NETWORK_MODE", "auto")
+        if attempt < 3 and choice in ("personal", "corporate"):
+            mode, host, port, user, password, _bypass, _timeout = _read_settings()
+            active = choice == "corporate"
+            status = ProxyStatus(
+                mode=mode,
+                configured=bool(host and port),
+                reachable=False,
+                active=active,
+                host=host,
+                port=port,
+                has_credentials=bool(user and password),
+                reason="tentativa recuperável; mantendo a rota escolhida",
+            )
+            return NetworkRouteRefresh(status, False, previous_active, active)
+        if attempt >= 3 and sys.stdin.isatty() and choice in ("personal", "corporate"):
+            choice = _ask_route(choice)
+            save_choice(choice)
+            os.environ["NEXOFLOW_NETWORK_MODE"] = choice
         status = configure_proxy(preserve_active_proxy=previous_active is True)
         current_active = bool(status.active)
         changed = previous_active is not None and previous_active != current_active

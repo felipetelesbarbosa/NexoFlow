@@ -792,7 +792,8 @@ class GoogleSheetsStore:
                         raise
 
                     refresh_network_route(
-                        reason=f"falha recuperável no Google Sheets ({description})"
+                        reason=f"falha recuperável no Google Sheets ({description})",
+                        attempt=attempt if failure.phase != "resposta" else 1,
                     )
                     wait = min(2**attempt, 30)
                     logging.warning(
@@ -933,7 +934,8 @@ class GoogleSheetsStore:
                         raise
 
                     refresh_network_route(
-                        reason=f"falha recuperável na escrita Google Sheets ({description})"
+                        reason=f"falha recuperável na escrita Google Sheets ({description})",
+                        attempt=attempt if failure.phase != "resposta" else 1,
                     )
                     wait = min(2**attempt, 30)
                     logging.warning(

@@ -217,12 +217,12 @@ class FarmaliderClient:
         )
         return True
 
-    def _refresh_network_route(self, *, reason: str) -> bool:
+    def _refresh_network_route(self, *, reason: str, attempt: int = 1) -> bool:
         """Redetecta direta/proxy e atualiza a URL FarmaLíder sem reiniciar a carga."""
         from proxy_config import refresh_network_route
 
         previous_base_url = self.base_url
-        result = refresh_network_route(reason=reason)
+        result = refresh_network_route(reason=reason, attempt=attempt)
         self._sync_base_url_from_environment()
         changed = result.changed or self.base_url != previous_base_url
         if changed:
@@ -812,7 +812,8 @@ class FarmaliderClient:
                     )
                     if attempt < FARMALIDER_MAX_RETRIES:
                         self._refresh_network_route(
-                            reason=f"falha recuperável em {endpoint_label}"
+                            reason=f"falha recuperável em {endpoint_label}",
+                            attempt=attempt if failure.phase != "resposta" else 1,
                         )
 
                 if response is not None:
@@ -1347,7 +1348,8 @@ class FarmaliderClient:
                     )
                     if attempt < FARMALIDER_MAX_RETRIES:
                         self._refresh_network_route(
-                            reason="falha recuperável no preflight FarmaLíder"
+                            reason="falha recuperável no preflight FarmaLíder",
+                            attempt=attempt if failure.phase != "resposta" else 1,
                         )
                     logging.warning(
                         "FarmaLíder %s [preflight]: %s Tentativa %s/%s.",

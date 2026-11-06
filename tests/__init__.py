@@ -10,6 +10,7 @@ from types import ModuleType
 # A suíte usa rede/configurações sintéticas. A escolha da sessão real não
 # pode impor proxy corporativo aos mocks; testes de seleção definem sua rota.
 os.environ["NEXOFLOW_NETWORK_MODE"] = "auto"
+os.environ.pop("NEXOFLOW_NETWORK_SESSION", None)
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app"))
 

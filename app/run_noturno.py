@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
+from network_session import session_scope
 from recompra import atomic_json, read_review
 from recompra_lock import execution_file_lock
 from recompra_review_audit import incomplete_query_summary
@@ -186,11 +187,15 @@ def execute(root: Path = ROOT, *, runner=run_step, full: bool = False) -> int:
 
     code = 1
     try:
-        with execution_file_lock(
+        with session_scope(), execution_file_lock(
             root / profile_path("logs") / "noturno.lock",
             protocol="nexoflow-noturno-v1",
             operation="NexoFlow Noturno",
         ):
+            if runner is run_step:
+                from proxy_config import configure_proxy
+
+                configure_proxy()
             code = run_flow()
     except KeyboardInterrupt:
         code = 130

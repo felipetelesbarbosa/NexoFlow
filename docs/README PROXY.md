@@ -202,3 +202,7 @@ O Setup não executa mais upgrade automático do pip. Mantém o fornecido pelo P
 O workflow oficial compila a partir do commit e verifica hashes/segredos. Os builds padrão não recebem certificado Authenticode; o suporte a certificado legítimo existe, mas não equivale a assinatura efetivamente aplicada. Isso é evidência sobre a distribuição, não prova da causa exata do alerta. Um aviso SmartScreen não comprova malware nem falso positivo. O pacote pode manter Zone.Identifier e executável sem reputação conhecida. Sem acesso ao evento/arquivo exato no Windows, a decisão permanece pendente.
 
 No Windows, registrar `Get-FileHash -Algorithm SHA256 -LiteralPath '{arquivo}'` e `Get-AuthenticodeSignature -LiteralPath '{exe}'`, comparar procedência/commit e hash com o workflow. Não remover marca de origem nem desligar proteções. Se houver bloqueio, interromper, guardar captura com editor exibido, horário e hash e encaminhar à TI/fabricante. Não restaurar uma amostra detectada para executá-la. Não há nova assinatura, release ou aprovação SmartScreen nesta correção.
+
+## Sessão entre etapas
+
+A escolha de rede é compartilhada entre os processos da mesma execução, inclusive dry-run e aplicação. Uma queda recuperável mantém a rota por pelo menos três tentativas antes de oferecer troca explícita no console. Consulte [Sessão de rede](SESSAO%20DE%20REDE.md) para os limites das gravações, tarefas sem console e homologação. Não há fallback direto automático para contornar o proxy corporativo.

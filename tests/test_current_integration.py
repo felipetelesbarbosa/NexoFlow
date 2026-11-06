@@ -284,8 +284,9 @@ class CurrentIntegrationTests(unittest.TestCase):
         response_404 = Mock(status_code=404, headers={})
         initial_base = client.base_url
 
-        def switch_route(*, reason: str) -> bool:
+        def switch_route(*, reason: str, attempt: int = 1) -> bool:
             self.assertTrue(reason)
+            self.assertGreaterEqual(attempt, 1)
             os.environ["WENI_PROXY_ACTIVE"] = "1"
             return client._sync_base_url_from_environment()
 

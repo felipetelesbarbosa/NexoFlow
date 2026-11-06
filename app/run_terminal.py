@@ -64,6 +64,8 @@ def _prepare_environment() -> dict[str, str]:
                 "NO_PROXY",
                 "no_proxy",
                 "WENI_PROXY_ACTIVE",
+                "NEXOFLOW_NETWORK_MODE",
+                "NEXOFLOW_NETWORK_SESSION",
             }
         }
     )

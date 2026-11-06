@@ -265,7 +265,10 @@ class WeniClient:
                         break
                     if attempt < max_attempts:
                         refresh_network_route(
-                            reason="falha recuperável ao acessar Weni"
+                            reason="falha recuperável ao acessar Weni",
+                            attempt=attempt
+                            if isinstance(exc, requests.exceptions.ConnectionError)
+                            else 1,
                         )
                 else:
                     last_error = (
