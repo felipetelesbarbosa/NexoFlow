@@ -492,3 +492,23 @@ class HistoryIntegrationTests(unittest.TestCase):
             empty = {k: [] for k in data}
             with self.assertRaisesRegex(HistoryError, "BASE_LOCAL_INCOMPLETA"):
                 adapter.plan(empty)
+
+    def test_history_cache_cannot_undo_newer_confirmation_and_wrong_directory(self):
+        from order_history_store import merge_canonical
+
+        db = sqlite3.connect(":memory:")
+        self.addCleanup(db.close)
+        store = HistoryStore(db, "PET")
+        collect(
+            Source([order()]),
+            store,
+            HistoryQuery("PET", "2026-11-01", "2026-11-06"),
+            now=NOW,
+        )
+        current = canonical(normalize_order(order(status=3), "PET", NOW))
+        current["farmalider_confirmado_em"] = "2026-11-06T21:00:00-03:00"
+        orders, items = merge_canonical(store, [current], [])
+        self.assertEqual(orders, [current])
+        self.assertEqual(items, [])
+        with self.assertRaisesRegex(HistoryError, "CADASTRO_DE_OUTRO_SEGMENTO"):
+            store.link(Mock(segment="FARMA"), [])

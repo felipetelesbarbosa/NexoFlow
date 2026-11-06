@@ -206,6 +206,8 @@ class HistoryStore:
     def link(self, directory, contacts):
         from order_history import IdentityIndex
 
+        if directory.segment != self.segment:
+            raise HistoryError("CADASTRO_DE_OUTRO_SEGMENTO")
         index = IdentityIndex(contacts)
         counts = {"vinculados": 0, "sem_vinculo": 0}
         # Impede que a mesma identidade Weni seja concedida a dois clientes oficiais.
@@ -328,7 +330,13 @@ def collect(
 def merge_canonical(store, orders, items):
     """Concilia por ID; nada é atribuído a anúncio por contato sozinho."""
     from analytics import _item_key
+    from pedido_utils import business_order_datetime
 
+    checked_at = dict(
+        store.db.execute(
+            "SELECT id,updated FROM history_orders WHERE segment=?", (store.segment,)
+        )
+    )
     by_id = {str(o.get("pedido_id")): o for o in orders}
     replacement_items = {}
     for record in store.records():
@@ -345,8 +353,18 @@ def merge_canonical(store, orders, items):
             != record["owner"]
         ):
             continue
+        historical_time = business_order_datetime(checked_at.get(record["id"]))
+        current_time = (
+            business_order_datetime(old.get("farmalider_confirmado_em"))
+            if old
+            else None
+        )
+        if current_time and historical_time and current_time > historical_time:
+            # Um cache antigo não desfaz uma confirmação/cancelamento recente.
+            continue
         # Fonte histórica já reconcilia fechamentos; não altera metadados de anúncio.
         row = canonical(record)
+        row["farmalider_confirmado_em"] = checked_at.get(record["id"], "")
         if old:
             row = dict(old, **row)
         by_id[record["id"]] = row

@@ -20,7 +20,7 @@ Faixas longas são divididas em janelas de até 31 dias entre extremos, comparti
 
 A coleta incremental consulta hoje até D−20, inclusive no calendário solicitado, e retoma primeiro janelas incompletas. A importação histórica não ativa Recompra nem atualiza contatos, campos ou grupos Weni. O vínculo Weni é uma leitura, não criação/fusão de contato. A consulta geral cadastral e a listagem Weni são indexadas uma vez nessa fase; não há GET individual por pedido/CPF.
 
-Analytics incorpora os fatos locais já importados, deduplicando pela chave oficial existente. Para habilitar também a **coleta automática recente**, configure no perfil privado:
+Analytics incorpora os fatos locais já importados, deduplicando pela chave oficial existente. Uma confirmação mais recente da API tem precedência sobre o cache histórico antigo. Para habilitar também a **coleta automática recente**, configure no perfil privado:
 
 ```python
 FARMALIDER_HISTORY_ENABLED = True
@@ -51,7 +51,7 @@ nexo historico --planilhas preparar --revisao logs\privado\historico_revisao.jso
 nexo historico --planilhas aplicar --revisao logs\privado\historico_revisao.json
 ```
 
-Homologue primeiro com três planilhas **de teste** configuradas em uma instalação de teste, não nas planilhas comerciais. Nenhuma escrita real foi executada durante o desenvolvimento. A aplicação exige revisão com os mesmos dados, IDs, schemas e snapshots. Backup privado antecede cada lote; respostas são relidas. Falha parcial exige preparar novamente e aplicar o restante, sem duplicação. Linhas substituídas permanecem com `vigente=Não`; filtros usam `vigente=Sim`.
+Homologue primeiro com três planilhas **de teste** configuradas em uma instalação de teste, não nas planilhas comerciais. Nenhuma escrita real foi executada durante o desenvolvimento. A aplicação exige revisão com os mesmos dados, IDs, schemas e snapshots. Pedido ativo remoto ausente da base local bloqueia a aplicação para reconciliação. Backup privado antecede cada lote; respostas são relidas. Falha parcial exige preparar novamente e aplicar o restante, sem duplicação. Linhas substituídas permanecem com `vigente=Não`; filtros usam `vigente=Sim`.
 
 | Arquivo | Abas novas | Grão |
 |---|---|---|
@@ -70,4 +70,4 @@ Rollback Windows: fechar as rotinas, fazer backup privado do SQLite e dos arquiv
 
 ## Evidência e limites
 
-A amostra PET particular confirmou 52 IDs, 73 itens, status 2/1/3 em 33/7/12 pedidos; todos os cancelados tinham pagamento diferente de zero. Dados não foram copiados para fixtures. Múltiplas páginas, identidade, valores, falhas e retomada são testados com dados sintéticos. Rotas reais em ambas as redes, dados FARMA, inclusividade da data final e semântica de descontos permanecem para homologação autorizada.
+A análise local da amostra PET classificou 40 pedidos válidos e 12 cancelados, sem pendências financeiras. Confirmou 52 IDs, 73 itens, status 2/1/3 em 33/7/12 pedidos; todos os cancelados tinham pagamento diferente de zero. Dados não foram copiados para fixtures. Múltiplas páginas, identidade, valores, falhas e retomada são testados com dados sintéticos. Rotas reais em ambas as redes, dados FARMA, inclusividade da data final e semântica de descontos permanecem para homologação autorizada.
