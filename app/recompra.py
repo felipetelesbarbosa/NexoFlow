@@ -617,28 +617,15 @@ def norm(value):
 
 
 def refused(contact, *, segment="FARMA"):
-    return any(
-        norm(get_fields(contact).get(key))
-        in {
-            "recusado",
-            "nao",
-            "negado",
-            "inativo",
-            "recusa",
-            "opt-out",
-            "opt out",
-            "false",
-            "0",
-            "cancelado",
-            "nao autorizado",
-            "nao quero receber",
-        }
-        for key in (
-            ("opt_in_marketing",)
-            if segment == "PET"
-            else ("marketing_opt_in", "opt_in_marketing")
-        )
+    from business_recompra import refused_normalized
+
+    fields = get_fields(contact)
+    keys = (
+        ("opt_in_marketing",)
+        if segment == "PET"
+        else ("marketing_opt_in", "opt_in_marketing")
     )
+    return refused_normalized({key: norm(fields.get(key)) for key in keys}, segment)
 
 
 def local_blocking_reason(contact, structure):
@@ -1329,17 +1316,11 @@ def propose(contact, order, items, structure, saved=None, *, now=None):
                 )
                 if not same:
                     plan["fields"][key] = value
-            event_at = dt + timedelta(days=profile.days)
-            hour = structure.get("delivery_hour", -1)
-            if isinstance(hour, int) and 0 <= hour <= 23:
-                event_at = event_at.replace(
-                    hour=hour, minute=0, second=0, microsecond=0
-                )
-            plan["event_at"] = event_at.isoformat()
-            age_days = (now.date() - dt.date()).days
-            plan["due_today"] = age_days == profile.days
-            plan["within_window"] = 0 <= age_days <= profile.days
-            plan["scheduled_future"] = event_at > now
+            from business_recompra import timing
+
+            plan.update(
+                timing(dt, now, profile.days, structure.get("delivery_hour", -1))
+            )
             plan["reason"] = (
                 f"JANELA_0_A_{profile.days}"
                 if plan["within_window"]

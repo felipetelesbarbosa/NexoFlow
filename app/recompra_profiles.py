@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+from business_recompra import DAYS
 from farmalider_client import (
     FarmaliderAuthError,
     FarmaliderClient,
@@ -43,9 +44,9 @@ class RecompraProfile:
 
 def profile_for(segment="FARMA"):
     if segment == "FARMA":
-        return RecompraProfile("FARMA", 25, "FarmaLíder")
+        return RecompraProfile("FARMA", DAYS["FARMA"], "FarmaLíder")
     if segment == "PET":
-        return RecompraProfile("PET", 30, "Pets Líder")
+        return RecompraProfile("PET", DAYS["PET"], "Pets Líder")
     raise ValueError("Perfil deve ser FARMA ou PET.")
 
 

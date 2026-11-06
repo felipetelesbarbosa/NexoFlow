@@ -635,18 +635,9 @@ def normalize_cpf(value: Any, pad_to_11: bool = False) -> str:
 
 
 def _cpf_checksum_valid(cpf: str) -> bool:
-    if len(cpf) != 11 or not cpf.isascii() or not cpf.isdecimal() or cpf == cpf[0] * 11:
-        return False
+    from business_identity import cpf_checksum_valid
 
-    def digit(base: str, factor: int) -> str:
-        total = sum(
-            int(n) * weight
-            for n, weight in zip(base, range(factor, 1, -1), strict=False)
-        )
-        result = (total * 10) % 11
-        return "0" if result == 10 else str(result)
-
-    return cpf[9] == digit(cpf[:9], 10) and cpf[10] == digit(cpf[:10], 11)
+    return cpf_checksum_valid(cpf)
 
 
 def is_valid_cpf(value: Any) -> bool:

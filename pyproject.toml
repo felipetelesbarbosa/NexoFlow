@@ -15,6 +15,8 @@ packages = ["connectors.meta_ads_mcp"]
 # Módulos públicos explícitos: configuração privada e pastas de dados ficam fora.
 py-modules = [
   "ad_attribution",
+  "business_identity",
+  "business_recompra",
   "meta_events",
   "meta_ads_native",
   "meta_ads_evidence",
