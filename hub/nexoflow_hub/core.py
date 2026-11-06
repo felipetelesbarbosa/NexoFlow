@@ -121,7 +121,7 @@ def evaluate(segment, scenario):
                 "direction": "in",
                 "referral": {
                     "source_type": "ad",
-                    "source_id": "fixture-ad",
+                    "source_id": "123456789012345",
                     "ctwa_clid": "fixture-click",
                 },
             }

@@ -76,6 +76,7 @@ def test_native_rules(segment, days):
     assert normal["frete"] == "10.00"
     assert normal["maioridade_exigida"] == (segment == "FARMA")
     assert not normal["venda_atribuida"]
+    assert normal["anuncio_identificado"]
     for case in (
         "cancelado",
         "pagamento_cancelado",
