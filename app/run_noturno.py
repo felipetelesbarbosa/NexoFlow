@@ -182,15 +182,18 @@ def execute(root: Path = ROOT, *, runner=run_step, full: bool = False) -> int:
         analytics_code = step(
             "Analytics: refletir alterações da Recompra", ["app/run_main.py"]
         )
-        summary["fluxo_completo"] = analytics_code == 0
+        summary["fluxo_completo"] = analytics_code in {0, 3}
         return analytics_code or (3 if partial_recompra or partial_load else 0)
 
     code = 1
     try:
-        with session_scope(), execution_file_lock(
-            root / profile_path("logs") / "noturno.lock",
-            protocol="nexoflow-noturno-v1",
-            operation="NexoFlow Noturno",
+        with (
+            session_scope(),
+            execution_file_lock(
+                root / profile_path("logs") / "noturno.lock",
+                protocol="nexoflow-noturno-v1",
+                operation="NexoFlow Noturno",
+            ),
         ):
             if runner is run_step:
                 from proxy_config import configure_proxy
@@ -216,6 +219,17 @@ def execute(root: Path = ROOT, *, runner=run_step, full: bool = False) -> int:
             if code == 3 and summary["fluxo_completo"]
             else summary["status"]
         )
+        completed_steps = sum(item["codigo"] in {0, 3} for item in summary["etapas"])
+        partial_steps = sum(item["codigo"] == 3 for item in summary["etapas"])
+        print("\n=== Resultado NexoFlow Noturno ===", flush=True)
+        print(f"Etapas concluídas: {completed_steps}", flush=True)
+        print(f"Etapas com pendências: {partial_steps}", flush=True)
+        if summary["fluxo_completo"] and code == 3:
+            print(
+                "Alterações confirmadas preservadas. Consulte os resumos de cada etapa "
+                "e revalide as pendências na próxima carga.",
+                flush=True,
+            )
         print(
             f"[RESULTADO] {result_label} — código {code}. Relatório: {summary_path}",
             flush=True,

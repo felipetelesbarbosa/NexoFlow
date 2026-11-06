@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.13",
+    [string]$Version = "1.5.14",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -413,15 +413,17 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-Integração nativa Meta Ads no Analytics e no Noturno, sem exigir Codex CLI, servidor MCP ou SDK MCP na operação. O cliente consulta dados diários por anúncio e preserva moeda, fuso, contas permitidas e janela do relatório. Classificação FARMA/PET usa evidência oficial Weni; nomes não determinam o segmento e custos compartilhados não são duplicados integralmente.
+O Analytics com Meta habilitada prepara ou retoma automaticamente as cinco abas adicionais por segmento, nos arquivos Sheets já configurados e com cabeçalhos canônicos. A operação é aditiva e preserva históricos e schemas anteriores; divergências continuam exigindo revisão manual. São mantidos os IDs e a divisão entre Operação, Histórico e Dashboard.
 
-As novas fontes Meta e conversões confirmadas são aditivas, com simulação, revisão explícita dos destinos/schemas, upsert idempotente, retomada e checkpoints por conta/perfil. Falha não vira investimento zero; a integração não altera campanhas. A credencial e a allowlist continuam somente no arquivo local e são preservadas também no Clean do Setup. Codex/MCP permanecem opcionais.
+Os resumos distinguem alterações aplicadas, pendências e POSTs reais. Uma etapa parcial mantém o código 3, identifica a causa e conserva os checkpoints separados de Meta e Farma. Na Recompra, a contagem de aplicações também pode incluir persistência local e não equivale à quantidade de POSTs Weni.
 
-O ambiente de validação e o check-up instalado preparam as ferramentas de build declaradas, incluindo setuptools/wheel. A validação Windows cobre a mesma distribuição que será disponibilizada. O relatório técnico diferencia leitura real limitada da Meta, testes simulados de escrita e ativação ainda necessária das novas fontes; nenhum dashboard de produção é anunciado como editado.
+A seleção inicial da rede oferece pessoal, corporativa ou sair. Uma opção inválida solicita nova escolha; três falhas recuperáveis de transporte abrem a escolha da rota. O check-up e as etapas seguintes preservam a rota escolhida.
 
-As correções PET, a seleção incremental da Recompra, a deduplicação por pedidos e a preservação de histórico da 1.5.12 continuam mantidas. Os envios permanecem exclusivamente D+25 Farma e D+30 Pets, sem retroativos. O Setup mantém as configurações e dados locais na opção de atualização.
+Analytics e Noturno consultam a Meta diretamente com o token/allowlist local, sem exigir Codex CLI ou servidor MCP. MCP continua opcional. O Windows segue operacional e autônomo; o NexoFlow Hub é um projeto paralelo futuro para VPS, Docker e n8n, documentado separadamente, sem infraestrutura implantada nesta entrega.
 
-[Guia Meta nativo](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/META%20ADS%20NATIVO.md) · [Relatório técnico](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/RELATORIO%20META%20ADS%20NATIVO.md)
+As correções PET, a seleção incremental da Recompra, a deduplicação por pedidos e o histórico observado continuam mantidos. Os envios permanecem D+25 Farma e D+30 Pets, sem retroativos. O Setup preserva configurações e dados no modo de atualização e a credencial Meta também no modo Clean.
+
+[Guia Meta nativo](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/META%20ADS%20NATIVO.md) · [Planejamento Hub](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/planejamento/README.md)
 
 A compilação suporta assinatura Authenticode com certificado de código confiável, timestamp e validação antes dos hashes. Sem certificado configurado, o pacote permanece sem assinatura; isso não é uma aprovação do Windows nem do antivírus. Consulte `RELATORIO DE SEGURANCA.json` dentro do ZIP.
 
@@ -433,4 +435,4 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.13
+# NexoFlow 1.5.14

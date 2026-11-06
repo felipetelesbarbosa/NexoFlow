@@ -191,22 +191,29 @@ def main() -> int:
         print("\n=== Resumo NexoFlow Weni ===")
         if args.quarter is not None:
             print(f"Carga completa 25%: Parte {args.quarter}/4")
+        print("\n--- LEITURA E ALTERAÇÕES PROPOSTAS ---")
         print(f"Mensagens recebidas analisadas: {stats.messages_incoming}")
         print(f"Contatos modificados consultados: {stats.contacts_modified}")
         print(f"Contatos considerados: {stats.contacts_considered}")
-        print(f"Contatos com alterações: {stats.plans_with_changes}")
+        print(f"Contatos com alterações propostas: {stats.plans_with_changes}")
         print(f"Campos propostos: {stats.field_changes}")
         meta = stats.meta_events_report
         if meta:
             print(
                 f"Anúncios Meta: eventos={meta.get('read', 0)}; vinculados={meta.get('linked', 0)}; lotes pendentes={meta.get('failed_batches', 0)}"
             )
-        print(f"Novos contatos criados a partir da API: {stats.contacts_created}")
-        if stats.creation_pending:
+        if args.apply:
+            print("\n--- CONFIRMADO NESTA CARGA ---")
             print(
-                f"Novos cadastros pendentes: {stats.creation_pending}. Motivos detalhados na auditoria privada."
+                f"Contatos com plano de gravação concluído, total: {stats.contacts_updated}"
             )
-        print(f"Ações de grupo: {stats.group_actions}")
+            print(f"Novos contatos criados nesta carga: {stats.contacts_created}")
+            print(
+                "Contatos existentes atualizados: "
+                f"{max(0, stats.contacts_updated - stats.contacts_created)}"
+            )
+            print("Os novos contatos já estão incluídos no total de planos concluídos.")
+        print(f"Ações de grupo propostas: {stats.group_actions}")
         print(f"Pedidos confirmados pela FarmaLíder: {stats.purchase_confirmed}")
         print(
             f"Contatos com pedido validado (inclusive sem alteração): {stats.orders_validated}"
@@ -238,7 +245,6 @@ def main() -> int:
                 if args.full:
                     print("Revise o relatório antes de autorizar a carga completa.")
         else:
-            print(f"Contatos atualizados: {stats.contacts_updated}")
             if stats.contacts_conflicted:
                 print(f"Contatos ignorados por conflito: {stats.contacts_conflicted}")
             if stats.contacts_already_satisfied:
@@ -252,16 +258,43 @@ def main() -> int:
                 )
             else:
                 print("Modo: APPLY. Alterações auditadas e gravadas.")
+        print("\n--- PARA REVALIDAR NA PRÓXIMA CARGA ---")
+        if stats.creation_pending:
+            print(
+                f"Novos cadastros para revalidar: {sum(stats.creation_pending.values())}; "
+                f"motivos={stats.creation_pending}. Detalhes na auditoria privada."
+            )
+        if stats.orders_api_failed:
+            print(f"FarmaLíder: consultas para revalidar={stats.orders_api_failed}.")
+        if stats.contacts_failed or stats.contacts_conflicted:
+            print(
+                "Weni: contatos para revalidar="
+                f"{stats.contacts_failed}; conflitos para revisar={stats.contacts_conflicted}."
+            )
+            if args.apply:
+                print(
+                    "Contatos pendentes podem ter escritas parciais; "
+                    "confira as confirmações na auditoria desta carga."
+                )
+        if meta.get("pending_from") or meta.get("failed_batches", 0):
+            print(
+                "Meta Ads: eventos pendentes de reconsulta; "
+                "o cursor de eventos é separado das consultas FarmaLíder."
+            )
         if (
             stats.orders_api_failed
             or stats.contacts_conflicted
             or stats.contacts_failed
+            or stats.creation_pending
             or stats.meta_events_report.get("pending_from")
             or dedup["skipped"]
+            or dedup["pending"]
             or dedup.get("failed_batches", 0)
         ):
             print(
-                "[AVISO] Carga Weni concluída com pendências. Os contatos que falharam serão revalidados na próxima incremental."
+                "[AVISO] "
+                + ("Simulação concluída" if args.dry_run else "Carga Weni concluída")
+                + " com pendências. Na próxima carga, revalide as consultas e os conflitos indicados acima."
             )
         return 0
     except Exception as exc:

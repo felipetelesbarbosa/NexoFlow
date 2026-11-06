@@ -1,7 +1,8 @@
-# Meta Marketing API: evolução futura
+# Meta Marketing API: contexto e evolução
 
-A Weni entrega `source_id`, `headline`, `source_url` e `ctwa_clid`.
-O `source_id` poderá ser usado para enriquecer a base com a Meta Marketing API.
+A integração nativa Meta Ads está disponível no NexoFlow Windows. Consulte o [guia operacional](META%20ADS%20NATIVO.md) para ativação, bootstrap, revisão e limites; este documento preserva o contexto do planejamento anterior. Ela funciona sem Codex ou MCP e não depende do NexoFlow Hub futuro.
+
+A Weni pode entregar `source_id`, `headline`, `source_url` e `ctwa_clid`. Campos ausentes não são inventados; IDs e eventos oficiais sustentam o vínculo com anúncios.
 
 A aba `Campanhas_Meta` já está preparada para:
 
@@ -12,9 +13,9 @@ A aba `Campanhas_Meta` já está preparada para:
 - impressões
 - cliques
 
-Isso permitirá no Data Studio métricas como campanhas que mais trouxeram clientes, custo por contato e, com `Eventos_Anuncios`, custo por conversa.
+A integração nativa utiliza fontes adicionais, preservando os contratos legados. Indicadores do Data Studio dependem da cobertura e dos vínculos comprovados. Custo por conversa exige IDs oficiais de conversa; eventos CTWA e cliques não comprovam, sozinhos, conversas distintas.
 
-Nenhuma credencial da Meta é necessária para a primeira fase.
+A reconciliação dos eventos Weni usa o acesso Weni configurado. A consulta à Marketing API exige a credencial Meta local e uma allowlist autorizada, conforme o guia nativo.
 ## Separação entre anúncio e canal
 
 A origem de anúncio nunca deve ser usada para fabricar `contact_urn`. Se um anúncio do Instagram abrir WhatsApp, a URN continua sendo de WhatsApp e a origem do anúncio permanece nos campos `primeiro_anuncio_*`/`ultimo_anuncio_*`. Se a conversa ocorrer no Instagram ou Facebook/Messenger, o canal é determinado exclusivamente pela URN que a Weni retornar.

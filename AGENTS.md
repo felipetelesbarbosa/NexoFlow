@@ -1,6 +1,6 @@
-# NexoFlow 1.5.13
+# NexoFlow 1.5.14
 
-A versão em preparação é **NexoFlow 1.5.13**, autorizada para nova publicação em **04/11/2026**, com integração nativa Meta Ads. Preserve a tag e o release 1.5.12 e os anteriores. Publique somente após os checks exigidos do mesmo commit e confirme os arquivos disponibilizados. Novas tentativas desta entrega não incrementam novamente a versão.
+A versão em preparação é **NexoFlow 1.5.14**, autorizada para nova publicação após a validação do mesmo commit. A versão 1.5.13 já foi publicada: preserve sua tag, seu release e todos os anteriores. Confirme os arquivos disponibilizados antes de anunciar a entrega. Novas tentativas desta entrega não incrementam novamente a versão. A data pública deve refletir a publicação real em `America/Fortaleza`; não antecipar a data enquanto a entrega estiver em validação.
 
 ## Conferência antes da entrega
 
@@ -13,10 +13,11 @@ A versão em preparação é **NexoFlow 1.5.13**, autorizada para nova publicaç
 
 ## Regras do projeto
 
-- Use mensagens de commit curtas em português que descrevam a área ou a alteração, como `Automação`, `Documentação`, `Instalador` ou `Corrigir revisão da Recompra`. `NexoFlow 1.5.13` identifica a versão, não é uma mensagem obrigatória de commit. Separe alterações por área quando isso tornar a navegação do GitHub mais clara; não reescreva o histórico apenas para mudar os textos exibidos.
+- Use mensagens de commit curtas em português que descrevam a área ou a alteração, como `Automação`, `Documentação`, `Instalador` ou `Corrigir revisão da Recompra`. `NexoFlow 1.5.14` identifica a versão, não é uma mensagem obrigatória de commit. Separe alterações por área quando isso tornar a navegação do GitHub mais clara; não reescreva o histórico apenas para mudar os textos exibidos.
 - A `main` é a única branch de trabalho do repositório. Atualize diretamente a `main`; não crie nem mantenha branches adicionais.
-- A entrega autorizada usa `NexoFlow 1.5.13`, tag `v1.5.13` e pacotes com sufixo `1.5.13`, somente após autorização e validação. Para cada próxima publicação de atualização/hotfix/patch, incremente uma única vez: 1.5.14, 1.5.15, ... 1.5.99; depois 1.6, 1.6.1, ... 1.6.99. Não incremente por commit ou tentativa de CI da mesma entrega. Preserve tags e releases anteriores; nunca sobrescreva uma versão anterior com um novo patch. Confira `VERSION` e `docs/VERSIONAMENTO.md`.
+- A entrega autorizada usa `NexoFlow 1.5.14`, tag `v1.5.14` e pacotes com sufixo `1.5.14`, somente após autorização e validação. Para cada próxima publicação de atualização/hotfix/patch, incremente uma única vez: 1.5.15, 1.5.16, ... 1.5.99; depois 1.6, 1.6.1, ... 1.6.99. Não incremente por commit ou tentativa de CI da mesma entrega. Preserve tags e releases anteriores; nunca sobrescreva uma versão anterior com um novo patch. Confira `VERSION` e `docs/VERSIONAMENTO.md`.
 - Cada release deve mostrar a data da sua publicação. Não reutilize uma versão já publicada para código novo.
+- O NexoFlow Windows é operacional e autônomo; Analytics e Noturno usam a integração Meta nativa, sem exigir Codex ou MCP. MCP é opcional. O **NexoFlow Hub** é um projeto paralelo futuro para VPS, Docker e n8n, limitado ao [planejamento](docs/planejamento/README.md). Não transformar o Windows em cliente dependente do Hub nem implementar infraestrutura Hub nesta entrega.
 - Preserve as credenciais e os diagnósticos privados fora do Git e dos pacotes públicos.
 - Use os nomes de pagamento: 0 Cancelado, 1 Dinheiro, 2 Débito, 3 Crédito, 4 Ticket, 5 Pix por Link de Pagamento, 6 Pix no POS.
 - Horários operacionais usam `America/Belem` (UTC-3).

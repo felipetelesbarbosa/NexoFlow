@@ -1,6 +1,6 @@
 # Webhook de pedidos - preparado, não ativado
 
-O webhook de pedidos é futuro e permanece desativado. A operação atual dos perfis Farma e Pets usa consultas à API FarmaLíder, sincronização Weni e histórico observado no Sheets.
+O webhook de pedidos é futuro e permanece desativado. Sua preparação não implanta o NexoFlow Hub nem cria dependência de VPS, Docker ou n8n; consulte o [planejamento separado](planejamento/README.md). A operação atual dos perfis Farma e Pets usa consultas à API FarmaLíder, sincronização Weni e histórico observado no Sheets.
 
 ## Situação atual
 

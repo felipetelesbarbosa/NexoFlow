@@ -21,6 +21,6 @@ if not exist ".venv\Scripts\python.exe" (
 set "EXIT_CODE=%ERRORLEVEL%"
 echo.
 echo Código de saída: %EXIT_CODE%
-if "%EXIT_CODE%"=="3" echo [AVISO] Sincronização parcial; consulte logs\nexoflow.log.
+if "%EXIT_CODE%"=="3" echo [AVISO] Analytics concluído com pendências; gravações confirmadas preservadas. Consulte as causas e os checkpoints no resumo em %PROFILE_LOG%\nexoflow.log.
 if not defined NEXOFLOW_LAUNCHER pause
 exit /b %EXIT_CODE%

@@ -29,3 +29,10 @@ def launcher_path(root: Path, name: str) -> Path:
     if installed.is_file():
         return installed
     return root / "native_launcher" / "prebuilt" / name
+
+
+def launcher_version(root: Path, name: str) -> str:
+    """Versão exigida para o executável instalado ou a referência preservada."""
+    reference = root / "native_launcher" / "prebuilt"
+    version_file = root / "VERSION" if (root / name).is_file() else reference / "VERSION"
+    return version_file.read_text(encoding="ascii").strip()

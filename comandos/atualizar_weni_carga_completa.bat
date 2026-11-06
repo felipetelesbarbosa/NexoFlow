@@ -66,7 +66,7 @@ set "REVIEW_TXT=%PROFILE_LOG%\weni_update_review_full_25_parte_%PART%.txt"
 :configurado
 if not exist "%NEXOFLOW_HOME%\scripts\confirmar_revisao_weni.ps1" (
     echo [ERRO] Componente de revisão ausente: scripts\confirmar_revisao_weni.ps1
-    echo Reinstale o Setup atualizado do NexoFlow 1.5.13 antes de continuar.
+    echo Reinstale o Setup atualizado do NexoFlow 1.5.14 antes de continuar.
     set "RC=3"
     goto :erro
 )
@@ -82,7 +82,7 @@ if defined PART (
     echo [INFO] Carga completa Weni tradicional - 100%%.
 )
 echo.
-echo SEGURANÇA NexoFlow 1.5.13 - ATENDIMENTO 24H:
+echo SEGURANÇA NexoFlow 1.5.14 - ATENDIMENTO 24H:
 echo   1. check-up
 echo   2. teste de acesso
 echo   3. dry-run + auditoria + snapshot congelado
@@ -166,7 +166,9 @@ echo ----------------------------------------------------------
 ".venv\Scripts\python.exe" app\run_update_weni.py --apply --full %PART_ARG% %STRICT_ARG% --require-review "%REVIEW_JSON%"
 set "RC=%ERRORLEVEL%"
 "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -STA -ExecutionPolicy Bypass -File "%NEXOFLOW_HOME%\scripts\resultado_carga_weni.ps1" -RecordOnly -Stage "APPLY_RETORNOU" -ResultCode %RC% -Snapshot "%REVIEW_JSON%"
-if not "%RC%"=="0" goto :erro
+set "FINAL_RC=0"
+if "%RC%"=="3" set "FINAL_RC=3"
+if not "%RC%"=="0" if not "%RC%"=="3" goto :erro
 
 echo.
 if defined WORKFLOW_MODE goto :recompra_fim
@@ -175,7 +177,12 @@ rem Recompra é uma etapa independente, com auditoria e revisão próprias.
 ".venv\Scripts\python.exe" -c "import sys,secrets_config as s; sys.exit(0 if getattr(s,'RECOMPRA_ENABLED',False) else 10)"
 if not "%ERRORLEVEL%"=="0" goto :recompra_fim
 call "%NEXOFLOW_HOME%\comandos\atualizar_recompra.bat"
-if errorlevel 1 echo [AVISO] Carga Weni concluída; recompra pendente. Consulte logs\nexoflow_recompra.log.
+set "RC=%ERRORLEVEL%"
+if "%RC%"=="3" (
+    set "FINAL_RC=3"
+    echo [AVISO] Carga Weni concluída; Recompra com pendências. Alterações confirmadas preservadas.
+)
+if not "%RC%"=="0" if not "%RC%"=="3" goto :erro
 :recompra_fim
 echo [ETAPA 6/6] Carga concluída
 echo ==========================================================
@@ -190,10 +197,12 @@ echo Relatório: %REVIEW_TXT%
 echo Snapshot:  %REVIEW_JSON%
 echo Manifesto 25%%: logs\full_load_25_manifest.json
 echo ==========================================================
-set "RC=0"
+set "RC=%FINAL_RC%"
 set "RESULT_STAGE=CONCLUIDO"
+if "%RC%"=="3" set "RESULT_STAGE=PARCIAL"
+if "%RC%"=="3" echo [AVISO] Revalide as pendências indicadas nos resumos na próxima carga.
 call :resultado
-exit /b 0
+exit /b %RC%
 
 :cancelado
 echo.

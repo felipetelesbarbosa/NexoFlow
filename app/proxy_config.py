@@ -267,31 +267,41 @@ def configure_proxy(
             )
             break
         except ValueError as exc:
-            if not str(exc).startswith("PROXY_INDISPONIVEL") or not sys.stdin.isatty():
+            ambiguous = str(exc).startswith("REDE_AMBIGUA")
+            unavailable = str(exc).startswith("PROXY_INDISPONIVEL")
+            if not (ambiguous or unavailable) or not sys.stdin.isatty():
                 raise
-            choice = _ask_route()
+            choice = _ask_route(initial_ambiguity=ambiguous)
             os.environ["NEXOFLOW_NETWORK_MODE"] = choice
             save_choice(choice)
     save_choice("corporate" if status.active else "personal")
     return status
 
 
-def _ask_route(current_choice: str = "corporate") -> str:
-    try:
-        answer = input(
-            "A conexão falhou em três tentativas na rota atual. "
-            "[1] Pessoal/direta autorizada [2] Corporativa/proxy "
-            "[3] Tentar novamente na mesma rota [0] Cancelar: "
-        ).strip()
-    except EOFError:
-        answer = "0"
-    if answer not in ("1", "2", "3"):
-        raise ValueError(
-            "Troca de rede cancelada; confira o relatório antes de retomar."
-        )
-    if answer == "3":
-        return current_choice
-    return "personal" if answer == "1" else "corporate"
+def _ask_route(*, initial_ambiguity: bool = False) -> str:
+    reason = (
+        "Rede não confirmada: proxy sem resposta TCP. "
+        if initial_ambiguity
+        else "A conexão falhou em três tentativas na rota atual. "
+    )
+    prompt = (
+        reason + "[1] Pessoal/direta autorizada [2] Corporativa/proxy [0] Cancelar: "
+    )
+    while True:
+        try:
+            answer = input(prompt).strip()
+        except EOFError:
+            raise ValueError(
+                "Entrada de rede encerrada; nenhuma troca foi autorizada. "
+                "Selecione a rede explicitamente antes de retomar."
+            ) from None
+        if answer == "0":
+            raise ValueError(
+                "Troca de rede cancelada; confira o relatório antes de retomar."
+            )
+        if answer in ("1", "2"):
+            return "personal" if answer == "1" else "corporate"
+        print("Opção inválida. Digite 1, 2 ou 0.")
 
 
 def _configure_proxy(
@@ -423,17 +433,6 @@ def _configure_proxy(
     # Uma falha TCP não autoriza sair da rota corporativa. A seleção direta
     # automática exige aprovação explícita na configuração local.
     if getattr(secrets, "PROXY_ALLOW_DIRECT_FALLBACK", False) is not True:
-        if sys.stdin.isatty():
-            answer = input(
-                "Rede não confirmada: proxy sem resposta TCP. [1] Pessoal/direta autorizada [2] Corporativa/proxy [0] Cancelar: "
-            ).strip()
-            if answer == "1":
-                os.environ["NEXOFLOW_NETWORK_MODE"] = "personal"
-                return configure_proxy(detection_attempts=1)
-            if answer == "2":
-                raise ValueError(
-                    "PROXY_INDISPONIVEL: rede corporativa escolhida; aguarde o proxy ou confira VPN/TI."
-                )
         raise ValueError(
             "REDE_AMBIGUA: falha TCP não identifica rede pessoal. Escolha no Setup ou defina NEXOFLOW_NETWORK_MODE=personal (somente rede direta autorizada) ou corporate. Nenhuma sondagem direta foi realizada."
         )
@@ -577,7 +576,7 @@ def refresh_network_route(
             )
             return NetworkRouteRefresh(status, False, previous_active, active)
         if attempt >= 3 and sys.stdin.isatty() and choice in ("personal", "corporate"):
-            choice = _ask_route(choice)
+            choice = _ask_route()
             save_choice(choice)
             os.environ["NEXOFLOW_NETWORK_MODE"] = choice
         status = configure_proxy(preserve_active_proxy=previous_active is True)

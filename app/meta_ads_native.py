@@ -579,18 +579,10 @@ def sync_native_meta(
         if not apply:
             report.update(status="simulacao", partial=bool(report["errors"]))
             return report
-        approved = (
-            schema_approved
-            or _setting(settings, segment, "META_ADS_SCHEMA_APPROVED", False) is True
-        )
-        if (
-            any(
-                not table.get("exists") for table in manifest.get("tables", {}).values()
-            )
-            and not approved
-        ):
-            report.update(status="schema_pendente", partial=True)
-            return report
+        # A carga habilitada autoriza o bootstrap aditivo das cinco abas nativas.
+        # O adapter reconfere destinos, conteúdo e manifesto antes de escrever;
+        # abas vazias podem receber cabeçalho, schemas divergentes não são migrados.
+        # schema_approved permanece compatível com a CLI e revisões já existentes.
         stage = "aplicar_planilhas"
         applied = adapter.apply_tables(
             tables, expected_manifest=expected_manifest or manifest

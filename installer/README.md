@@ -1,4 +1,4 @@
-# Instalador do NexoFlow 1.5.13
+# Instalador do NexoFlow 1.5.14
 
 Scripts de instalação, atualização e desinstalação para Windows.
 
@@ -8,3 +8,5 @@ Para instalar ou atualizar, use o [Setup oficial](../releases/README.md) e siga 
 - `uninstall.ps1`: remove o programa e os atalhos; preserva as importações em `C:\NexoFlow Data\importacoes` e oferece preservar as demais configurações e os logs.
 
 O **NexoFlow Uninstall.exe** é opcional. A desinstalação também está disponível pelo Windows e por `desinstalar_nexoflow.cmd`.
+
+Este diretório pertence ao **NexoFlow Windows**, que executa suas rotinas de forma autônoma. O projeto futuro NexoFlow Hub (VPS, Docker e n8n) fica no [planejamento](../docs/planejamento/README.md).

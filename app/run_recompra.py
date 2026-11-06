@@ -9,13 +9,50 @@ from uuid import uuid4
 from requests import RequestException
 
 from runtime_profile import segment as active_segment
+from versioning import CURRENT_VERSION
+
+
+def print_application_summary(result, report):
+    """Exibe confirmações separadas de escrita remota e revalidação."""
+    print("\n=== Resultado da aplicação Recompra ===")
+    print("\n--- CONFIRMADO NESTA CARGA ---")
+    writes = report.get("escritas_confirmadas")
+    if isinstance(writes, dict):
+        remote = writes.get("contatos_com_escrita_weni", 0)
+        print(f"Contatos com escrita na Weni: {remote}")
+        print(
+            f"Inclusões confirmadas no grupo: {writes.get('inclusoes_confirmadas', 0)}"
+        )
+        print(f"Remoções confirmadas do grupo: {writes.get('remocoes_confirmadas', 0)}")
+        print(
+            f"Inclusões revertidas preventivamente: {writes.get('inclusoes_revertidas', 0)}"
+        )
+        print(f"Campos confirmados nesta execução: {writes.get('campos_enviados', 0)}")
+        print(
+            "Confirmações sem escrita na Weni: "
+            f"{writes.get('confirmacoes_sem_escrita_weni', max(0, result.get('aplicados', 0) - remote))}"
+        )
+    else:
+        print("Escritas na Weni: confira as confirmações na auditoria desta aplicação.")
+    print(f"Atualizações somente no estado local: {result.get('estado_local', 0)}")
+    print(f"Contatos sem mudança: {result.get('sem_mudanca', 0)}")
+    print(
+        f"Planos concluídos: {result.get('aplicados', 0)}; "
+        "não representam POSTs nem mensagens enviadas."
+    )
+    print("\n--- PARA REVALIDAR NA PRÓXIMA CARGA ---")
+    print(f"Consultas para revalidar: {result.get('consultas_pendentes', 0)}")
+    print(f"Conflitos para revisar: {result.get('conflitos', 0)}")
+    if result.get("consultas_pendentes") or result.get("conflitos"):
+        print("Próxima carga: gere uma nova revisão; não reaplique a revisão antiga.")
+    print("O envio de mensagens permanece na campanha Weni.")
 
 
 def build_parser():
     from config import FARMALIDER_MAX_WORKERS
 
     parser = argparse.ArgumentParser(
-        description="NexoFlow 1.5.13 — Recompra FarmaLíder D+25 / Pets Líder D+30"
+        description=f"NexoFlow {CURRENT_VERSION} — Recompra FarmaLíder D+25 / Pets Líder D+30"
     )
     parser.add_argument(
         "--perfil",
@@ -299,6 +336,20 @@ def main(argv=None):
                 + str(result)
             )
             print("[INFO] Relatório desta aplicação: " + str(pending_report))
+            try:
+                application_report = (
+                    json.loads(pending_report.read_text(encoding="utf-8"))
+                    if pending_report.is_file()
+                    else {}
+                )
+            except (OSError, ValueError):
+                application_report = {}
+                logging.warning(
+                    "Recompra: resumo de escritas indisponível; confira o relatório e a auditoria da aplicação concluída."
+                )
+            if not isinstance(application_report, dict):
+                application_report = {}
+            print_application_summary(result, application_report)
             if partial:
                 print(
                     "[INFO] Alterações confirmadas preservadas. Gere uma nova revisão para "

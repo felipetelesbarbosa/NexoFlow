@@ -57,7 +57,7 @@ assert proxy_config.configure_proxy().active is False
                 result = subprocess.run(
                     [sys.executable, "-c", code, phase],
                     env=env,
-                    input="1\n" if phase == "first" else "",
+                    input="3\n\ntexto\n1\n" if phase == "first" else "",
                     capture_output=True,
                     text=True,
                     encoding="utf-8",
@@ -66,8 +66,46 @@ assert proxy_config.configure_proxy().active is False
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(
                     result.stdout.count("Rede não confirmada"),
-                    1 if phase == "first" else 0,
+                    4 if phase == "first" else 0,
                 )
+
+    def test_eof_in_interactive_child_exits_without_an_input_loop(self):
+        root = Path(__file__).resolve().parents[1]
+        code = """
+import sys, types
+settings = types.ModuleType('secrets_config')
+settings.PROXY_MODE = 'auto'
+settings.PROXY_HOST = 'proxy.example.invalid'
+settings.PROXY_PORT = 8020
+sys.modules['secrets_config'] = settings
+import proxy_config
+proxy_config._is_reachable = lambda *args: False
+proxy_config.time.sleep = lambda *args: None
+sys.stdin.isatty = lambda: True
+try:
+    proxy_config.configure_proxy()
+except ValueError as error:
+    assert str(error).startswith('Entrada de rede encerrada')
+    raise SystemExit(3)
+raise SystemExit('Rota escolhida sem entrada')
+"""
+        env = {
+            **os.environ,
+            "NEXOFLOW_NETWORK_MODE": "auto",
+            "PYTHONPATH": os.pathsep.join([str(root), str(root / "app")]),
+        }
+        env.pop("NEXOFLOW_NETWORK_SESSION", None)
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            env=env,
+            input="",
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=15,
+        )
+        self.assertEqual(result.returncode, 3, result.stderr)
+        self.assertEqual(result.stdout.count("Rede não confirmada"), 1)
 
     def test_sibling_steps_reuse_choice_without_new_prompt(self):
         module = self.load_module(PROXY_ALLOW_DIRECT_FALLBACK=False)
@@ -112,6 +150,74 @@ assert proxy_config.configure_proxy().active is False
             self.assertTrue(module.refresh_network_route(attempt=3).changed)
             self.assertEqual(network_session.read_choice(), "corporate")
             ask.assert_called_once()
+
+    def test_third_failure_repeats_invalid_answers_and_keeps_session_until_choice(self):
+        for answer, expected in (("1", "personal"), ("2", "corporate"), ("0", None)):
+            with self.subTest(answer=answer):
+                module = self.load_module(PROXY_ALLOW_DIRECT_FALLBACK=False)
+                answers = iter(["3", "", "texto", "12", answer])
+
+                def choose(_prompt, answers=answers):
+                    self.assertEqual(network_session.read_choice(), "personal")
+                    self.assertEqual(os.environ["NEXOFLOW_NETWORK_MODE"], "personal")
+                    return next(answers)
+
+                with (
+                    tempfile.TemporaryDirectory() as directory,
+                    patch.dict(
+                        os.environ, {"NEXOFLOW_NETWORK_SESSION": "synthetic-session"}
+                    ),
+                    patch.object(
+                        network_session.tempfile, "gettempdir", return_value=directory
+                    ),
+                    patch.object(module.sys.stdin, "isatty", return_value=True),
+                    patch.object(module, "_is_reachable", return_value=True) as tcp,
+                    patch("builtins.input", side_effect=choose) as ask,
+                    patch("builtins.print") as output,
+                ):
+                    network_session.save_choice("personal")
+                    module.configure_proxy()
+                    for attempt in (1, 2):
+                        self.assertFalse(
+                            module.refresh_network_route(attempt=attempt).changed
+                        )
+                    ask.assert_not_called()
+                    tcp.assert_not_called()
+                    if expected is None:
+                        with self.assertRaisesRegex(ValueError, "cancelada"):
+                            module.refresh_network_route(attempt=3)
+                    else:
+                        result = module.refresh_network_route(attempt=3)
+                        self.assertEqual(result.changed, expected == "corporate")
+                    self.assertEqual(
+                        network_session.read_choice(), expected or "personal"
+                    )
+                    self.assertEqual(ask.call_count, 5)
+                    self.assertEqual(output.call_count, 4)
+                    for prompt in ask.call_args_list:
+                        self.assertNotIn("[3]", prompt.args[0])
+
+    def test_eof_after_third_failure_preserves_the_saved_route(self):
+        module = self.load_module(PROXY_ALLOW_DIRECT_FALLBACK=False)
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(os.environ, {"NEXOFLOW_NETWORK_SESSION": "synthetic-session"}),
+            patch.object(
+                network_session.tempfile, "gettempdir", return_value=directory
+            ),
+            patch.object(module.sys.stdin, "isatty", return_value=True),
+            patch.object(module, "_is_reachable") as tcp,
+            patch("builtins.input", side_effect=EOFError) as ask,
+        ):
+            network_session.save_choice("personal")
+            module.configure_proxy()
+            with self.assertRaisesRegex(ValueError, "Entrada de rede encerrada"):
+                module.refresh_network_route(attempt=3)
+            self.assertEqual(network_session.read_choice(), "personal")
+            self.assertEqual(os.environ["NEXOFLOW_NETWORK_MODE"], "personal")
+            self.assertEqual(os.environ["WENI_PROXY_ACTIVE"], "0")
+            ask.assert_called_once()
+            tcp.assert_not_called()
 
     def test_session_scope_cleans_its_own_file_and_leaves_no_global_choice(self):
         with (

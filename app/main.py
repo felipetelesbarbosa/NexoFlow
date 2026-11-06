@@ -293,6 +293,97 @@ def _completion_controls(
     }
 
 
+def _log_final_summary(
+    *,
+    total_elapsed,
+    contact_counts,
+    order_counts,
+    item_counts,
+    cliente_stats,
+    order_stats,
+    completion_controls,
+    full_quarter,
+    native_meta_result,
+):
+    """Apresenta resultados confirmados e a retomada de cada fonte separadamente."""
+    native_partial = bool(native_meta_result.get("partial")) or (
+        native_meta_result.get("status") == "falha"
+    )
+    primary_partial = bool(cliente_stats.api_errors or order_stats.api_errors)
+    log_result = logging.warning if primary_partial or native_partial else logging.info
+    log_result("=== Resumo final Analytics | duração=%.2fs ===", total_elapsed)
+    logging.info("--- CONFIRMADO NESTA CARGA ---")
+    logging.info(
+        "Contatos gravados: novos=%s; atualizados=%s; sem mudança=%s.",
+        *contact_counts,
+    )
+    logging.info("Pedidos gravados: novos=%s; atualizados=%s.", *order_counts)
+    logging.info("Itens gravados: novos=%s; atualizados=%s.", *item_counts)
+    logging.info("--- STATUS E PRÓXIMA CARGA ---")
+    if primary_partial:
+        logging.warning(
+            "FarmaLíder para revalidar: consultas de clientes=%s; pedidos=%s. "
+            "As gravações confirmadas foram preservadas.",
+            cliente_stats.api_errors,
+            order_stats.api_errors,
+        )
+    else:
+        logging.info(
+            "Analytics principal: concluído; consultas FarmaLíder sem falhas pendentes."
+        )
+    if "ultima_sincronizacao_sucesso_utc" in completion_controls:
+        logging.info("Checkpoint principal: avançado; próxima carga segue incremental.")
+    elif primary_partial:
+        logging.warning(
+            "Checkpoint principal: mantido para a próxima carga revalidar as consultas pendentes."
+        )
+    elif full_quarter is not None:
+        logging.info(
+            "Checkpoint principal: mantido até concluir as quatro partes da carga completa."
+        )
+    if native_meta_result.get("status") == "desativado":
+        logging.info("Meta Ads: desativado nesta carga.")
+    elif native_partial:
+        if native_meta_result.get("status") == "schema_pendente":
+            logging.warning(
+                "Meta Ads: estrutura da planilha pendente; confira o diagnóstico privado da etapa."
+            )
+        elif native_meta_result.get("critical"):
+            logging.error(
+                "Meta Ads: falha crítica da etapa; confira credenciais, permissões e diagnóstico privado."
+            )
+        else:
+            logging.warning(
+                "Meta Ads: consulta ou gravação pendente; confira o diagnóstico privado da etapa."
+            )
+        logging.warning(
+            "Meta Ads usa cursor próprio; as contas e etapas pendentes serão revalidadas na próxima carga."
+        )
+    else:
+        logging.info("Meta Ads: etapa concluída.")
+    meta_writes = native_meta_result.get("summary") or {}
+    if meta_writes:
+        logging.info(
+            "Meta Ads gravado em abas concluídas: novas linhas=%s; atualizadas=%s; sem mudança=%s.",
+            meta_writes.get("inserted", 0),
+            meta_writes.get("updated", 0),
+            meta_writes.get("unchanged", 0),
+        )
+        pending_confirmed = sum(
+            table.get("confirmed_rows", 0)
+            for table in meta_writes.get("tables", {}).values()
+            if table.get("pending")
+        )
+        if pending_confirmed:
+            logging.info(
+                "Meta Ads: linhas confirmadas em abas ainda pendentes=%s; a próxima carga revalida o restante.",
+                pending_confirmed,
+            )
+    if not primary_partial and not native_partial:
+        logging.info("Sincronização concluída com sucesso em %.2fs.", total_elapsed)
+    return primary_partial or native_partial
+
+
 def contact_has_cpf(contact: Contact) -> bool:
     fields = contact.get("fields")
     if not isinstance(fields, dict):
@@ -1641,31 +1732,19 @@ def main() -> int:
                 "20 dias da data do pedido. A pendência não bloqueia esta parte.",
                 order_stats.pending_without_items,
             )
-        if completion_status == "parcial":
-            logging.warning(
-                "Sincronização parcial em %.2fs: %s erro(s) em consulta de "
-                "clientes e %s em pedido(s). O marco incremental anterior foi mantido "
-                "para nova tentativa na próxima execução.",
-                total_elapsed,
-                cliente_stats.api_errors,
-                order_stats.api_errors,
-            )
-        else:
-            logging.info("Sincronização concluída com sucesso em %.2fs.", total_elapsed)
         acknowledge(history_receipts)
-        native_partial = bool(native_meta_result.get("partial")) or (
-            native_meta_result.get("status") == "falha"
+        partial = _log_final_summary(
+            total_elapsed=total_elapsed,
+            contact_counts=(inserted, updated, contact_result.unchanged),
+            order_counts=(orders_inserted, orders_updated),
+            item_counts=(items_inserted, items_updated),
+            cliente_stats=cliente_stats,
+            order_stats=order_stats,
+            completion_controls=completion_controls,
+            full_quarter=full_quarter,
+            native_meta_result=native_meta_result,
         )
-        if native_partial:
-            logging.warning(
-                "Meta Ads ficou pendente; sincronização principal preservada. "
-                "Confira o diagnóstico privado da etapa nativa."
-            )
-        return (
-            PARTIAL_SYNC_EXIT_CODE
-            if completion_status == "parcial" or native_partial
-            else 0
-        )
+        return PARTIAL_SYNC_EXIT_CODE if partial else 0
 
     except Exception as exc:
         logging.exception("Falha na sincronização: %s", exc)

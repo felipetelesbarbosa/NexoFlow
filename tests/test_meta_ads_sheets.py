@@ -35,7 +35,7 @@ class MemoryWorksheet:
         self.id = len(book.tabs) + 1
         self.row_count, self.col_count = (
             1000,
-            max((len(r) for r in values), default=100),
+            max((len(r) for r in values), default=26),
         )
 
     def get_all_values(self, **kwargs):
@@ -51,6 +51,15 @@ class MemoryWorksheet:
     def update(self, *, range_name, values, value_input_option):
         if self.title in self.book.store.fail_titles:
             raise RuntimeError("simulated API failure")
+        last_col = re.findall(r"[A-Z]+", range_name)[-1]
+        column = 0
+        for letter in last_col:
+            column = column * 26 + ord(letter) - ord("A") + 1
+        if (
+            column > self.col_count
+            or max(map(int, re.findall(r"\d+", range_name))) > self.row_count
+        ):
+            raise RuntimeError("Range exceeds grid limits")
         self.book.store.options.append(value_input_option)
         self.book.store.writes += 1
         start = int(re.match(r"[A-Z]+(\d+)", range_name).group(1)) - 1
@@ -209,6 +218,196 @@ class NativeMetaSheetsTests(unittest.TestCase):
             {"old", "new"},
         )
         self.assertEqual(legacy.values, baseline)
+
+    def test_apply_adopts_only_empty_native_tabs_and_replay_does_not_write(self):
+        title = "Meta_Ads_Diario"
+        book = self.store._storage_books["ops"]
+        sheet = MemoryWorksheet(title, book, [[], [""]])
+        book.tabs[title] = sheet
+        before_id = sheet.id
+        self.assertTrue(self.apply({title: [row()]})["applied"])
+        self.assertEqual(book.tabs[title].id, before_id)
+        self.assertEqual(len(self.native.load_tables()[title]), 1)
+        writes = self.store.writes
+        self.assertTrue(self.apply({title: [row()]})["applied"])
+        self.assertEqual(self.store.writes, writes)
+
+    def test_empty_default_grid_expands_before_header_and_never_shrinks(self):
+        for title in ("Meta_Ads_Diario", "BI_Meta_Resultados"):
+            for columns in (26, len(SCHEMAS[title]) + 10):
+                with self.subTest(title=title, columns=columns):
+                    store = MemoryStore()
+                    native = NativeMetaSheets(store, "FARMA", account_ids=(ACCOUNT,))
+                    book = store._storage_books[
+                        store._storage_layout.destination(title)
+                    ]
+                    sheet = MemoryWorksheet(title, book)
+                    sheet.row_count, sheet.col_count = 1000, columns
+                    book.tabs[title] = sheet
+                    tables = {title: []}
+                    plan = native.plan_tables(tables)
+                    result = native.apply_tables(
+                        tables, expected_manifest=plan["schema_manifest"]
+                    )
+                    self.assertTrue(result["applied"], result)
+                    self.assertEqual(sheet.col_count, max(columns, len(SCHEMAS[title])))
+                    self.assertEqual(sheet.row_count, 1000)
+                    writes = store.writes
+                    plan = native.plan_tables(tables)
+                    self.assertTrue(
+                        native.apply_tables(
+                            tables, expected_manifest=plan["schema_manifest"]
+                        )["applied"]
+                    )
+                    self.assertEqual(store.writes, writes)
+
+    def test_formula_rendering_preserves_empty_result_formula_without_bootstrap(self):
+        title = "Meta_Ads_Diario"
+        book = self.store._storage_books["ops"]
+        sheet = MemoryWorksheet(title, book, [['=""']])
+        book.tabs[title] = sheet
+        rendered = []
+
+        def read_formula(**kwargs):
+            rendered.append(kwargs.get("value_render_option"))
+            return (
+                deepcopy(sheet.values)
+                if kwargs.get("value_render_option") == "FORMULA"
+                else [[""]]
+            )
+
+        with patch.object(sheet, "get_all_values", side_effect=read_formula):
+            result = self.apply({title: []})
+        self.assertFalse(result["applied"])
+        self.assertEqual(sheet.values, [['=""']])
+        self.assertEqual(set(rendered), {"FORMULA"})
+        self.assertEqual(self.store.writes, 0)
+
+    def test_content_added_during_grid_expansion_blocks_header_without_data_loss(self):
+        title = "Meta_Ads_Diario"
+        book = self.store._storage_books["ops"]
+        sheet = MemoryWorksheet(title, book)
+        sheet.col_count = 26
+        book.tabs[title] = sheet
+        resize = sheet.resize
+
+        def changed_after_resize(**kwargs):
+            resize(**kwargs)
+            sheet.values = [["concurrent data"]]
+
+        with patch.object(sheet, "resize", side_effect=changed_after_resize):
+            result = self.apply({title: []})
+        self.assertFalse(result["applied"])
+        self.assertEqual(sheet.values, [["concurrent data"]])
+        self.assertEqual(sheet.col_count, len(SCHEMAS[title]))
+        self.assertEqual(self.store.writes, 1, "Somente a expansão foi autorizada")
+
+    def test_failed_initial_header_recovers_without_recreating_sheet(self):
+        title = "Meta_Ads_Diario"
+        book = self.store._storage_books["ops"]
+        create = book.add_worksheet
+
+        def create_then_fail_header(**kwargs):
+            sheet = create(**kwargs)
+            sheet.update = Mock(side_effect=RuntimeError("header write failed"))
+            return sheet
+
+        with patch.object(book, "add_worksheet", side_effect=create_then_fail_header):
+            first = self.apply({title: [row()]})
+        self.assertFalse(first["applied"])
+        sheet = book.tabs[title]
+        self.assertEqual(sheet.values, [])
+        del sheet.update
+        with patch.object(
+            book, "add_worksheet", side_effect=AssertionError("duplicate")
+        ):
+            retry = self.apply({title: [row()]})
+        self.assertTrue(retry["applied"], retry)
+        self.assertEqual(len(self.native.load_tables()[title]), 1)
+
+    def test_lost_create_or_header_response_retries_without_duplicate_creation(self):
+        title = "Meta_Ads_Diario"
+        for lost in ("create", "header"):
+            with self.subTest(lost=lost):
+                store = MemoryStore()
+                native = NativeMetaSheets(store, "FARMA", account_ids=(ACCOUNT,))
+                book = store._storage_books["ops"]
+                create = book.add_worksheet
+                header_calls = []
+
+                def lost_response_create(
+                    create=create, lost=lost, header_calls=header_calls, **kwargs
+                ):
+                    sheet = create(**kwargs)
+                    if lost == "create":
+                        raise RuntimeError("creation response lost")
+                    update = sheet.update
+
+                    def lost_response_header(**update_kwargs):
+                        result = update(**update_kwargs)
+                        if update_kwargs["values"] == [SCHEMAS[title]]:
+                            header_calls.append(True)
+                            raise RuntimeError("header response lost")
+                        return result
+
+                    sheet.update = lost_response_header
+                    return sheet
+
+                def retry_once(description, func):
+                    try:
+                        return func()
+                    except RuntimeError:
+                        return func()
+
+                tables = {title: [row()]}
+                plan = native.plan_tables(tables)
+                with (
+                    patch.object(
+                        book, "add_worksheet", side_effect=lost_response_create
+                    ) as added,
+                    patch.object(store, "_write_with_retry", side_effect=retry_once),
+                ):
+                    result = native.apply_tables(
+                        tables, expected_manifest=plan["schema_manifest"]
+                    )
+                self.assertTrue(result["applied"], result)
+                self.assertEqual(added.call_count, 1)
+                self.assertEqual(len(native.load_tables()[title]), 1)
+                if lost == "header":
+                    self.assertEqual(len(header_calls), 1)
+
+    def test_concurrent_content_before_header_is_preserved(self):
+        title = "Meta_Ads_Diario"
+        book = self.store._storage_books["ops"]
+        sheet = MemoryWorksheet(title, book)
+        book.tabs[title] = sheet
+        write = self.store._write_with_retry
+
+        def changed_before_header(description, func):
+            if description == f"cabeçalho nativo {title}":
+                sheet.values = [["concurrent data"]]
+            return write(description, func)
+
+        with patch.object(
+            self.store, "_write_with_retry", side_effect=changed_before_header
+        ):
+            result = self.apply({title: [row()]})
+        self.assertFalse(result["applied"])
+        self.assertEqual(sheet.values, [["concurrent data"]])
+        self.assertEqual(self.store.writes, 0)
+
+    def test_empty_tab_changed_after_review_is_never_initialized(self):
+        title = "Meta_Ads_Diario"
+        book = self.store._storage_books["ops"]
+        sheet = MemoryWorksheet(title, book)
+        book.tabs[title] = sheet
+        tables = {title: [row()]}
+        plan = self.native.plan_tables(tables)
+        sheet.values = [["preserve this data"]]
+        with self.assertRaisesRegex(NativeMetaSchemaError, "mudaram"):
+            self.native.apply_tables(tables, expected_manifest=plan["schema_manifest"])
+        self.assertEqual(sheet.values, [["preserve this data"]])
+        self.assertEqual(self.store.writes, 0)
 
     def test_schema_mismatch_isolated_and_never_repaired(self):
         bad = self.store.put("Meta_Ads_Diario", headers=["wrong", "header"])

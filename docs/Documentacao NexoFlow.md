@@ -1,4 +1,4 @@
-# NexoFlow 1.5.13 — Guia de operação
+# NexoFlow 1.5.14 — Guia de operação
 
 O NexoFlow integra Weni e a API FarmaLíder para **FarmaLíder e Pets Líder**, mantendo dados separados por perfil. O objetivo é manter contatos e pedidos atualizados e alimentar o Google Sheets e os painéis do Data Studio.
 
@@ -15,16 +15,17 @@ O NexoFlow identifica pedidos registrados na API **independentemente de terem si
 | **Noturno** | Executar Weni, Analytics e Recompra na marca escolhida sem confirmações durante a carga. |
 | **Terminal** | Executar comandos, consultar dados e diagnosticar a instalação. |
 
-## Atualização 1.5.13
+## Atualização 1.5.14
 
-O Analytics e o Noturno podem consultar Meta Ads diretamente, sem Codex CLI ou servidor MCP. A conta é limitada pela allowlist local; a classificação de FarmaLíder e Pets Líder exige evidência Weni. Dados diários, catálogos e conversões confirmadas têm fontes próprias, sem substituir as tabelas existentes.
+Quando habilitada, a integração nativa Meta no Analytics prepara ou retoma cinco abas adicionais por segmento com cabeçalhos canônicos, nos arquivos Sheets já configurados. Divergências de schema seguem para revisão manual; os históricos e os arquivos existentes são preservados. Confira [Meta Ads nativo](META%20ADS%20NATIVO.md).
 
-Ative explicitamente, faça a simulação e confira os novos schemas e destinos antes de aplicar. Credenciais permanecem no computador e o Setup preserva o JSON Meta também na instalação limpa. As correções PET e a seleção incremental da Recompra continuam preservadas. Consulte [Meta Ads nativo](META%20ADS%20NATIVO.md) e o [relatório técnico](RELATORIO%20META%20ADS%20NATIVO.md).
+Os resumos distinguem aplicação, pendências e chamadas remotas. Uma etapa parcial mantém código 3 e o seu checkpoint próprio. A escolha inicial da rede aceita pessoal, corporativa ou sair; uma opção inválida abre a escolha novamente e três falhas recuperáveis de transporte abrem a escolha da rota.
 
+A operação Windows usa Python e suas credenciais locais, inclusive no Noturno, sem exigir Codex CLI ou servidor MCP. O **NexoFlow Hub**, planejado separadamente para VPS, Docker e n8n, permanece futuro. Consulte o [planejamento](planejamento/README.md).
 
 ## Antes de começar
 
-Instale pelo [Setup oficial](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.13), configure suas próprias credenciais e compartilhe as planilhas com a conta de serviço Google. O diretório padrão é `C:\NexoFlow`. Confira os requisitos e os campos necessários no [guia de instalação](README%20INSTALACAO.md).
+Instale pelo [Setup oficial](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.14), configure suas próprias credenciais e compartilhe as planilhas com a conta de serviço Google. O diretório padrão é `C:\NexoFlow`. Confira os requisitos e os campos necessários no [guia de instalação](README%20INSTALACAO.md).
 
 Abra o mesmo aplicativo e escolha **FarmaLíder** ou **Pets Líder** antes da carga. Configure tokens Weni e três destinos Sheets em cada perfil. A credencial Google pode ser compartilhada. Veja [configuração dos segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 

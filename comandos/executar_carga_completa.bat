@@ -75,8 +75,9 @@ set "FULL_SYNC_QUARTER="
 echo.
 echo Código de saída: %EXIT_CODE%
 if "%EXIT_CODE%"=="3" (
-    echo [AVISO] Sincronização parcial. A parte NÃO foi marcada como concluída.
-    echo Execute novamente a mesma parte depois de consultar logs\nexoflow.log.
+    echo [AVISO] Analytics concluiu com pendências. As gravações confirmadas foram preservadas.
+    echo Consulte o resumo para distinguir consultas FarmaLíder, etapa Meta Ads e o checkpoint de cada uma.
+    echo Revalide as pendências na próxima carga conforme o resumo em %PROFILE_LOG%\nexoflow.log.
 )
 if "%EXIT_CODE%"=="0" echo [OK] Carga concluída.
 if not defined WORKFLOW_MODE pause

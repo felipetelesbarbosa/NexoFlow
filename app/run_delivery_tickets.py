@@ -1,4 +1,4 @@
-"""NexoFlow 1.5.13: pedidos de clientes de atendimentos marcados no Weni Chats."""
+"""NexoFlow: pedidos de clientes de atendimentos marcados no Weni Chats."""
 
 from __future__ import annotations
 

@@ -78,6 +78,7 @@ from recompra_review_audit import (
 )
 from runtime_profile import scoped_path as profile_path
 from runtime_profile import segment as active_segment
+from versioning import CURRENT_VERSION
 from weni_client import WeniError
 
 GROUP = "Recompra FarmaLíder"
@@ -530,13 +531,64 @@ def _local_purchase_only(plan):
     )
 
 
-def _confirm_written_fields(weni, uid, fields, response):
+class RecompraWriteMetrics:
+    """Conta observações confirmadas, inclusive antes de conflitos posteriores."""
+
+    def __init__(self):
+        self._counts = Counter(
+            contatos_com_escrita_weni=0,
+            campos_enviados=0,
+            inclusoes_confirmadas=0,
+            remocoes_confirmadas=0,
+            inclusoes_revertidas=0,
+            confirmacoes_sem_escrita_weni=0,
+        )
+        self._contacts = set()
+        self._fields = set()
+
+    def confirm_remote(self, uid):
+        self._contacts.add(uid)
+        self._counts["contatos_com_escrita_weni"] = len(self._contacts)
+
+    def observe_fields(self, uid, fields, contact):
+        if not isinstance(contact, dict) or contact.get("uuid") != uid:
+            return
+        written = get_fields(contact)
+        confirmed = {
+            (uid, key)
+            for key, value in fields.items()
+            if field_guard(key, written.get(key)) == field_guard(key, value)
+        }
+        self._fields.update(confirmed)
+        self._counts["campos_enviados"] = len(self._fields)
+        if confirmed:
+            self.confirm_remote(uid)
+
+    def confirm_removal(self, uid, *, preventive=False):
+        self.confirm_remote(uid)
+        self._counts["remocoes_confirmadas"] += 1
+        self._counts["inclusoes_revertidas"] += int(preventive)
+
+    def confirm_admission(self, uid):
+        self.confirm_remote(uid)
+        self._counts["inclusoes_confirmadas"] += 1
+
+    def complete_plan(self, uid):
+        self._counts["confirmacoes_sem_escrita_weni"] += int(uid not in self._contacts)
+
+    def snapshot(self):
+        return dict(self._counts)
+
+
+def _confirm_written_fields(weni, uid, fields, response, *, write_metrics=None):
     contact = (
         response
         if isinstance(response, dict) and response.get("uuid") == uid
         else weni.get_contact(uuid=uid)
     )
     written = get_fields(contact) if isinstance(contact, dict) else {}
+    if write_metrics is not None:
+        write_metrics.observe_fields(uid, fields, contact)
     missing = [
         key
         for key, value in fields.items()
@@ -1479,7 +1531,7 @@ def write_review(review, path=REVIEW):
     profile = profile_for(review["structure"].get("segment", "FARMA"))
     counts = Counter(plan["reason"] for plan in review["plans"])
     lines = [
-        f"NexoFlow 1.5.13 — Revisão {profile.brand} D+{profile.days}",
+        f"NexoFlow {CURRENT_VERSION} — Revisão {profile.brand} D+{profile.days}",
         f"Dia local: {review['day']}",
         f"Dados capturados em: {review['created_at']}",
         f"Horários conferidos ao concluir: {review.get('generated_at', review['created_at'])}",
@@ -1684,7 +1736,7 @@ def apply_review(
     if structure != review["structure"]:
         raise RuntimeError("Campanha ou campos mudaram depois da revisão.")
     summary = Counter()
-    write_metrics = Counter()
+    write_metrics = RecompraWriteMetrics()
     started = monotonic()
     writes_started = False
     execution_id = uuid4().hex
@@ -1968,14 +2020,22 @@ def apply_review(
                         raise RuntimeError(
                             "Remoção do agendamento anterior não foi confirmada."
                         )
+                    write_metrics.confirm_removal(uid)
                 if fresh["fields"]:
                     stage = "atualizar_campos"
                     check_day()
                     writes_started = True
                     response = weni.update_contact_fields(uid, fresh["fields"])
+                    write_metrics.observe_fields(uid, fresh["fields"], response)
                     if action not in {"add", "replace"}:
                         stage = "confirmar_campos"
-                        _confirm_written_fields(weni, uid, fresh["fields"], response)
+                        _confirm_written_fields(
+                            weni,
+                            uid,
+                            fresh["fields"],
+                            response,
+                            write_metrics=write_metrics,
+                        )
                 if action in {"add", "replace"}:
                     stage = "reler_antes_inclusao"
                     if check_path is not None:
@@ -1990,6 +2050,7 @@ def apply_review(
                     # Releitura imediatamente antes de admitir: recusa concorrente
                     # e mudanças externas não podem ser ignoradas.
                     latest = weni.get_contact(uuid=uid)
+                    write_metrics.observe_fields(uid, fresh["fields"], latest)
                     if not latest:
                         raise PreAdmissionConflict("Contato ausente antes da inclusão.")
                     expected = dict(fresh["guard"])
@@ -2085,6 +2146,8 @@ def apply_review(
                         raise RuntimeError(
                             "POST de inclusão sem confirmação de associação na Weni."
                         )
+                    write_metrics.confirm_remote(uid)
+                    write_metrics.observe_fields(uid, fresh["fields"], verified)
                     if (
                         refused(verified, segment=profile.segment)
                         or member(verified, structure["opt_out_uuid"], OPT_OUT)
@@ -2106,7 +2169,9 @@ def apply_review(
                             raise RuntimeError(
                                 "A remoção preventiva não foi confirmada; preserve o estado para conciliação."
                             )
+                        write_metrics.confirm_removal(uid, preventive=True)
                         raise CampaignFieldsPending(changed)
+                    write_metrics.confirm_admission(uid)
                     entry.update(
                         {
                             "pending": False,
@@ -2133,10 +2198,7 @@ def apply_review(
                     else:
                         state_dirty = True
                 summary["aplicados"] += 1
-                write_metrics["contatos_com_escrita_weni"] += int(
-                    bool(action or fresh["fields"])
-                )
-                write_metrics["campos_enviados"] += len(fresh["fields"])
+                write_metrics.complete_plan(uid)
                 # O plano fresco mantém as provas incrementais da revisão.
                 fresh["_incremental"] = reviewed.get("_incremental")
                 state_dirty |= remember_plan(state, fresh, structure, now_fn())
@@ -2290,6 +2352,7 @@ def apply_review(
                 "finished_at": now_fn().isoformat(),
                 "aplicacao_concluida": True,
                 "resultado": dict(summary),
+                "escritas_confirmadas": write_metrics.snapshot(),
                 "pendencias_por_motivo": dict(
                     Counter(event["status"] for event in pending_events)
                 ),
@@ -2306,7 +2369,7 @@ def apply_review(
         )
     logging.info(
         "Recompra escritas confirmadas: %s; estado local=%s.",
-        dict(write_metrics),
+        write_metrics.snapshot(),
         summary.get("estado_local", 0),
     )
     logging.info(

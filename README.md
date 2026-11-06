@@ -1,10 +1,10 @@
-# NexoFlow 1.5.13
+# NexoFlow 1.5.14
 
-Aplicativos para Windows que integram **Weni e a API FarmaLíder nos segmentos FarmaLíder e Pets Líder**, atualizam contatos e pedidos e organizam os dados no **Google Sheets** para análise no **Data Studio**.
+Aplicativos operacionais e autônomos para Windows que integram **Weni e a API FarmaLíder nos segmentos FarmaLíder e Pets Líder**, atualizam contatos e pedidos e organizam os dados no **Google Sheets** para análise no **Data Studio**.
 
 O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
 
-[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.13/NexoFlow-Setup-1.5.13.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
+[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.14/NexoFlow-Setup-1.5.14.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
 
 ## Componentes
 
@@ -17,9 +17,11 @@ O NexoFlow identifica pedidos registrados na API **independentemente de terem si
 | **NexoFlow Recompra** | Mantém a elegibilidade da Recompra FarmaLíder D+25 e Pets Líder D+30; os envios ficam na campanha Weni. |
 | **NexoFlow Terminal** | Oferece comandos, consultas e diagnóstico pelo comando `nexo`. |
 
-## Atualização 1.5.13
+## Atualização 1.5.14
 
-Integração nativa **Meta Ads** no Analytics e no Noturno, sem depender de Codex CLI ou servidor MCP. Reutiliza o token/allowlist local, consulta dados diários e separa Farma/Pets por evidência oficial Weni. As novas tabelas e destinos exigem revisão explícita, com upsert e checkpoints próprios; campanhas e fontes anteriores são preservadas. O Setup mantém a credencial Meta também na instalação limpa. Confira o [guia de ativação](docs/META%20ADS%20NATIVO.md) e o [relatório técnico](docs/RELATORIO%20META%20ADS%20NATIVO.md).
+O Analytics habilitado para **Meta Ads** prepara e retoma as cinco abas adicionais de cada segmento nos destinos existentes, com cabeçalhos canônicos. Divergência de schema exige revisão manual. O resumo distingue alterações aplicadas, pendências e gravações remotas; falha parcial conserva o código 3 e os checkpoints próprios de Meta e Farma. A escolha de rede oferece pessoal, corporativa ou sair, com nova solicitação para uma opção inválida e escolha de rota após três falhas recuperáveis de transporte.
+
+Analytics e Noturno executam a coleta Meta nativa com o token/allowlist local, sem exigir Codex CLI ou servidor MCP. Campanhas, dados históricos e os arquivos Sheets existentes são preservados. Confira o [guia de ativação](docs/META%20ADS%20NATIVO.md) e o [histórico](CHANGELOG.md).
 
 
 ## Instalar e configurar
@@ -77,7 +79,11 @@ As continuações automáticas no Meu Drive exigem autorização Google local. O
 
 ## Versões e atualizações
 
-A versão atual é **1.5.13**. As próximas correções seguem **1.5.14, 1.5.15, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
+A versão desta entrega é **1.5.14**. Os pacotes públicos são disponibilizados após a validação do mesmo commit. As próximas correções seguem **1.5.15, 1.5.16, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
+
+## NexoFlow Hub: projeto paralelo futuro
+
+O **NexoFlow Hub** é o planejamento de uma solução futura para VPS, Docker e n8n. O Windows continua executando suas rotinas, guardas e agendamentos locais de forma autônoma. O Hub não é requisito desta distribuição. O [catálogo de planejamento](docs/planejamento/README.md) reúne o escopo e as dependências ainda pendentes; nenhuma infraestrutura Hub é implantada por este Setup.
 
 ## Referências
 

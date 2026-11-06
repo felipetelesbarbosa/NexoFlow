@@ -49,6 +49,84 @@ class NetworkChoiceTests(unittest.TestCase):
             self.assertFalse(module.configure_proxy().active)
             self.assertEqual(module.os.environ["NEXOFLOW_NETWORK_MODE"], "personal")
 
+    def test_ambiguity_repeats_invalid_answers_until_explicit_choice(self):
+        for answer, expected in (("1", "personal"), ("2", "corporate"), ("0", None)):
+            with self.subTest(answer=answer):
+                module = self.load_module(PROXY_ALLOW_DIRECT_FALLBACK=False)
+                with (
+                    patch.dict(module.os.environ, {"NEXOFLOW_NETWORK_MODE": "auto"}),
+                    patch.object(
+                        module, "_is_reachable", side_effect=[False, False, False, True]
+                    ) as tcp,
+                    patch.object(module, "_direct_internet_available") as direct,
+                    patch.object(module.sys.stdin, "isatty", return_value=True),
+                    patch(
+                        "builtins.input", side_effect=["3", "", "texto", "12", answer]
+                    ) as ask,
+                    patch("builtins.print") as output,
+                    patch.object(module.time, "sleep"),
+                ):
+                    if expected is None:
+                        with self.assertRaisesRegex(ValueError, "cancelada"):
+                            module.configure_proxy()
+                        self.assertEqual(
+                            module.os.environ["NEXOFLOW_NETWORK_MODE"], "auto"
+                        )
+                    else:
+                        self.assertEqual(
+                            module.configure_proxy().active, expected == "corporate"
+                        )
+                        self.assertEqual(
+                            module.os.environ["NEXOFLOW_NETWORK_MODE"], expected
+                        )
+                    self.assertEqual(ask.call_count, 5)
+                    self.assertEqual(output.call_count, 4)
+                    for warning in output.call_args_list:
+                        self.assertIn("Opção inválida", warning.args[0])
+                    self.assertEqual(
+                        tcp.call_count, 4 if expected == "corporate" else 3
+                    )
+                    direct.assert_not_called()
+
+    def test_eof_ends_ambiguity_without_authorizing_a_route(self):
+        module = self.load_module(PROXY_ALLOW_DIRECT_FALLBACK=False)
+        with (
+            patch.object(module, "_is_reachable", return_value=False) as tcp,
+            patch.object(module, "_direct_internet_available") as direct,
+            patch.object(module.sys.stdin, "isatty", return_value=True),
+            patch("builtins.input", side_effect=["", EOFError]) as ask,
+            patch("builtins.print") as output,
+            patch.object(module.time, "sleep"),
+        ):
+            with self.assertRaisesRegex(ValueError, "Entrada de rede encerrada"):
+                module.configure_proxy()
+            self.assertEqual(module.os.environ["NEXOFLOW_NETWORK_MODE"], "auto")
+            self.assertEqual(ask.call_count, 2)
+            self.assertEqual(output.call_count, 1)
+            self.assertEqual(tcp.call_count, 3)
+            direct.assert_not_called()
+
+    def test_headless_ambiguity_and_corporate_failure_do_not_read_input(self):
+        for mode, category in (
+            ("auto", "REDE_AMBIGUA"),
+            ("corporate", "PROXY_INDISPONIVEL"),
+        ):
+            with self.subTest(mode=mode):
+                module = self.load_module(PROXY_ALLOW_DIRECT_FALLBACK=False)
+                with (
+                    patch.dict(module.os.environ, {"NEXOFLOW_NETWORK_MODE": mode}),
+                    patch.object(module, "_is_reachable", return_value=False) as tcp,
+                    patch.object(module, "_direct_internet_available") as direct,
+                    patch.object(module.sys.stdin, "isatty", return_value=False),
+                    patch("builtins.input") as ask,
+                    patch.object(module.time, "sleep"),
+                ):
+                    with self.assertRaisesRegex(ValueError, category):
+                        module.configure_proxy()
+                    self.assertEqual(tcp.call_count, 3)
+                    ask.assert_not_called()
+                    direct.assert_not_called()
+
 
 class PipPreflightTests(unittest.TestCase):
     def test_direct_and_proxy_use_explicit_handler_tls_and_timeout(self):

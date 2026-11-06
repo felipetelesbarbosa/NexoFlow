@@ -1,6 +1,6 @@
 # Meta Ads no NexoFlow Analytics
 
-A integração nativa consulta a Marketing API da Meta pelo próprio NexoFlow. **Não exige Codex CLI, SDK MCP, servidor MCP ou ChatGPT para executar a carga.** Usa o cliente HTTP compartilhado de `connectors/meta_ads_mcp/client.py`, sem importar o servidor. O nome dessa pasta não torna o SDK MCP uma dependência da operação nativa.
+A integração nativa consulta a Marketing API da Meta pelo próprio NexoFlow Windows, de forma autônoma. **Não exige Codex CLI, SDK MCP, servidor MCP ou ChatGPT para executar a carga.** Usa o cliente HTTP compartilhado de `connectors/meta_ads_mcp/client.py`, sem importar o servidor. O nome dessa pasta não torna o SDK MCP uma dependência da operação nativa.
 
 Use a instalação normal em `C:\NexoFlow`, com o Python e as dependências principais preparados pelo Setup. Não é necessário manter uma segunda instalação em `C:\NexoFlow-Codigo` nem executar o programa a partir de uma pasta específica. O pacote Python também inclui os módulos nativos e o cliente compartilhado.
 
@@ -28,7 +28,7 @@ A configuração fica no `secrets_config.py` local e usa:
 
 | Chave | Regra |
 | --- | --- |
-| `META_ADS_ENABLED` | Padrão `False`; habilitar com `True` quando credencial, contas e destinos estiverem preparados. |
+| `META_ADS_ENABLED` | Padrão `False`; habilitar com `True` após conferir credencial, contas e os arquivos de destino. Autoriza preparar as cinco abas Meta ausentes ou vazias com o schema canônico. |
 | `META_ADS_START_DATE` | Data inicial histórica desejada, no formato ISO `AAAA-MM-DD`. |
 | `META_ADS_OVERLAP_DAYS` | Sobreposição da incremental; padrão **7 dias**, para reconciliar indicadores que a Meta pode atualizar após a primeira coleta. |
 
@@ -43,16 +43,27 @@ cd C:\NexoFlow
 
 A primeira coleta usa a data inicial configurada; incrementais reaproveitam o estado e reconsultam a sobreposição. Um token ausente, acesso negado ou consulta incompleta precisa aparecer como diagnóstico da etapa, sem ser confundido com investimento zero ou apagamento dos dados anteriores. Preserve o estado e os relatórios privados para revalidar a etapa.
 
-## Conferir a estrutura antes da primeira gravação
+## Estrutura aditiva e revisão
 
-A integração usa tabelas Meta próprias, sem substituir as fontes existentes. A criação/adequação aditiva depende de uma revisão de schema. O comando dedicado simula por padrão; para registrar a revisão e depois aplicar no mesmo perfil/período, por exemplo:
+A partir da 1.5.14, o Analytics habilitado prepara ou retoma automaticamente as cinco abas Meta nos arquivos já configurados do segmento:
+
+| Arquivo | Abas |
+| --- | --- |
+| Operação | `Meta_Ads_Diario`, `Meta_Ads_Campanhas`, `Meta_Ads_Anuncios` |
+| Dashboard | `BI_Meta_Resultados`, `BI_Meta_Conversoes` |
+
+Na preparação desta entrega, foram conferidas **dez abas Meta**, cinco em FARMA e cinco em PET, nos arquivos existentes e nas pastas de cada segmento. Os IDs dos arquivos permanecem os mesmos e as 54 abas previamente existentes foram preservadas. Essa conferência comprova a estrutura preparada; não comprova que métricas reais já tenham sido carregadas nem que páginas do Data Studio tenham sido editadas.
+
+O bootstrap cria uma aba ausente ou inicializa uma aba realmente vazia com o cabeçalho canônico. Uma aba existente com schema correto é reutilizada; os dados, históricos, IDs dos arquivos e as demais abas são preservados. Cabeçalho divergente, conteúdo inesperado ou mudança após a leitura bloqueiam a gravação e exigem revisão manual. Uma retomada reconfere a estrutura antes de continuar e não transforma falha em investimento zero.
+
+O comando dedicado mantém a simulação por padrão e exige revisão e `--confirm-schema` para aplicar no mesmo perfil/período, por exemplo:
 
 ```powershell
 .\.venv\Scripts\python.exe app\run_meta_ads.py --perfil PET --start 2026-10-01 --end 2026-10-31 --dry-run --review logs\PET\privado\meta_ads_review.json
 .\.venv\Scripts\python.exe app\run_meta_ads.py --perfil PET --start 2026-10-01 --end 2026-10-31 --apply --confirm-schema --review logs\PET\privado\meta_ads_review.json
 ```
 
-Revise o resultado da simulação antes do segundo comando. Confirmação de schema não autoriza apagar dados, migrar uma aba divergente nem trocar o destino de outra marca. Arquivos fornecidos por `--input` são fixtures de simulação offline e nunca autorizam aplicação em produção. Uma configuração local de aprovação da estrutura deve ser adotada somente após conferir as tabelas e destinos no perfil correto.
+Revise o resultado da simulação antes do segundo comando. Confirmação de schema não autoriza apagar dados, migrar uma aba divergente nem trocar o destino de outra marca. Arquivos fornecidos por `--input` são fixtures de simulação offline e nunca autorizam aplicação em produção. Confira as tabelas e os destinos do perfil antes de habilitar a carga. O bootstrap aditivo do Analytics não autoriza migração destrutiva nem correção automática de schemas divergentes.
 
 ## Separação de FarmaLíder e Pets Líder
 

@@ -1,9 +1,11 @@
 """Contrato da versão pública e sequência de patches autorizada."""
 
+import tempfile
 import tomllib
 import unittest
 from pathlib import Path
 
+from project_paths import launcher_version
 from versioning import CURRENT_VERSION, next_version, parts, windows_version
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -39,12 +41,25 @@ class VersionPolicyTests(unittest.TestCase):
         self.assertEqual(windows_version("1.5.99"), "1.5.99.0")
         self.assertEqual(windows_version("1.6"), "1.6.0.0")
 
+    def test_installed_launchers_require_current_version_and_reference_is_separate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            reference = root / "native_launcher" / "prebuilt"
+            reference.mkdir(parents=True)
+            (root / "VERSION").write_text(CURRENT_VERSION, encoding="ascii")
+            (reference / "VERSION").write_text("1.5.13", encoding="ascii")
+            name = "NexoFlow Analytics.exe"
+            (reference / name).write_bytes(b"MZ-reference")
+            self.assertEqual(launcher_version(root, name), "1.5.13")
+            (root / name).write_bytes(b"MZ-installed")
+            self.assertEqual(launcher_version(root, name), CURRENT_VERSION)
+
     def test_runtime_installer_package_share_current_version(self):
         from main import APP_VERSION
         from nexo_cli import VERSION
 
         metadata = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-        self.assertEqual(CURRENT_VERSION, "1.5.13")
+        self.assertEqual(CURRENT_VERSION, "1.5.14")
         self.assertEqual(APP_VERSION, CURRENT_VERSION)
         self.assertEqual(VERSION, CURRENT_VERSION)
         self.assertEqual(metadata["project"]["version"], CURRENT_VERSION)

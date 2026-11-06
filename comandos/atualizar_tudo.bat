@@ -14,10 +14,10 @@ set "NEXOFLOW_FULL_WORKFLOW=1"
 set "FORCE_FULL_SYNC="
 set "FULL_SYNC_QUARTER="
 cd /d "%NEXOFLOW_HOME%\"
-title NexoFlow 1.5.13 - Atualização completa
+title NexoFlow 1.5.14 - Atualização completa
 
 echo ==========================================================
-echo NexoFlow 1.5.13 - Atualização completa em ordem
+echo NexoFlow 1.5.14 - Atualização completa em ordem
 echo ==========================================================
 echo As cargas integrais serão executadas com 100%% da base.
 echo Cada aplicação Weni, Planilhas e Recompra exige sua revisão.
@@ -83,9 +83,15 @@ echo [ERRO] Coloque Conversas_Delivery.xlsx e Contatos_Delivery.xlsx em %IMPORT_
 goto :interrompido
 :interrompido
 echo.
+if "%RC%"=="3" goto :parcial
 echo [INTERROMPIDO] %ETAPA% - código de saída: %RC%.
 echo As próximas etapas não foram executadas.
 echo Confira os logs e o snapshot revisado antes de retomar uma aplicação parcial.
+goto :fim
+:parcial
+echo [PENDÊNCIAS] %ETAPA% - código de saída: %RC%.
+echo As alterações confirmadas foram preservadas. As próximas etapas desta sequência não foram executadas.
+echo Consulte o resumo da etapa para conferir o que foi gravado e o que precisa de nova revisão.
 :fim
 echo.
 pause

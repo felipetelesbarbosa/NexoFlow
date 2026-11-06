@@ -209,19 +209,19 @@ class NativeSyncTests(unittest.TestCase):
             self.assertEqual(store.writes, 0)
             self.assertNotIn("TOKEN_MUST_NOT_LEAK", json.dumps(result))
 
-    def test_missing_tabs_require_approval_and_manifest_change_blocks_write(self):
+    def test_missing_tabs_bootstrap_and_manifest_change_still_blocks_write(self):
         with tempfile.TemporaryDirectory() as tmp:
             store = Store(exists=False)
             result = self.run_sync(
                 store, Client(), Path(tmp), settings={"META_ADS_ENABLED": True}
             )
-            self.assertEqual(result["status"], "schema_pendente")
-            self.assertEqual(store.writes, 0)
+            self.assertEqual(result["status"], "concluido", result)
+            self.assertEqual(store.writes, 1)
             result = self.run_sync(
                 store, Client(), Path(tmp), expected_manifest={"changed": True}
             )
             self.assertEqual(result["status"], "erro")
-            self.assertEqual(store.writes, 0)
+            self.assertEqual(store.writes, 1)
 
     def test_incomplete_or_auth_failed_weni_coverage_does_not_invalidate_old_sales(
         self,

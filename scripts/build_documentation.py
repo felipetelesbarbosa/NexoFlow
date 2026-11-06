@@ -45,7 +45,7 @@ def generate_documentation(source: Path, output: Path) -> None:
             "--to=html5",
             "--standalone",
             "--metadata=lang:pt-BR",
-            "--metadata=title:NexoFlow 1.5.13 - Documentação",
+            f"--metadata=title:NexoFlow {(ROOT / 'VERSION').read_text(encoding='ascii').strip()} - Documentação",
         ],
         input=markdown,
         text=True,

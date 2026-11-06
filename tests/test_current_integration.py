@@ -23,7 +23,8 @@ from main import (
     split_contacts,
     validate_contacts,
 )
-from project_paths import launcher_path
+from project_paths import launcher_path, launcher_version
+from versioning import CURRENT_VERSION, windows_version
 from weni_client import WeniClient
 
 
@@ -837,7 +838,10 @@ class CurrentIntegrationTests(unittest.TestCase):
             data = optional_exe.read_bytes()
             self.assertTrue(data.startswith(b"MZ"))
             self.assertIn(b"NexoFlowNativeLauncher=1.5", data)
-            self.assertIn("1.5.13.0".encode("utf-16le"), data)
+            self.assertIn(
+                windows_version(launcher_version(root, "NexoFlow Uninstall.exe")).encode("utf-16le"),
+                data,
+            )
 
     def test_installer_repairs_and_validates_required_components(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -1125,7 +1129,7 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn("NexoFlow Console.lnk", uninstall)
         self.assertIn("NexoFlow - Update Weni.lnk", install)
         self.assertIn("NexoFlow Console.lnk", install)
-        self.assertIn("$AppVersion = '1.5.13'", install)
+        self.assertIn(f"$AppVersion = '{CURRENT_VERSION}'", install)
         self.assertIn("${exePath}: $($_.Exception.Message)", install)
         self.assertNotIn("$exePath: $($_.Exception.Message)", install)
 

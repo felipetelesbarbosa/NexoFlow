@@ -1,6 +1,6 @@
-# Documentação do NexoFlow 1.5.13
+# Documentação do NexoFlow 1.5.14
 
-O NexoFlow atende **FarmaLíder e Pets Líder**, com dados separados. Confira [segmentos, campos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
+O **NexoFlow Windows** atende **FarmaLíder e Pets Líder**, com aplicativos operacionais autônomos e dados separados. Confira [segmentos, campos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 
 Comece pela [instalação](README%20INSTALACAO.md) e pelo [guia de operação](Documentacao%20NexoFlow.md).
 
@@ -31,6 +31,10 @@ O código fica em `app/`, as rotinas em `comandos/` e os modelos em `configuraca
 
 [Proxy e rede](README%20PROXY.md) · [Antivírus](ANTIVIRUS%20E%20CONFIANCA.md) · [Ambiente de desenvolvimento](README%20VSCODE.md) · [Testes](../tests/README.md) · [Histórico de mudanças](../CHANGELOG.md) · [Versionamento](VERSIONAMENTO.md)
 
-Os guias de [webhook Weni](WENI%20WEBHOOK.md), [webhook de pedidos](WEBHOOK%20PEDIDOS%20FUTURO.md) e [Meta Ads](META%20FUTURO.md) descrevem recursos opcionais ou futuros.
+## Operação atual e planejamento
+
+A [integração Meta nativa](META%20ADS%20NATIVO.md) funciona diretamente no Analytics e no Noturno quando habilitada. O [MCP local](META%20ADS%20MCP%20LOCAL.md) é opcional e não torna Codex um requisito das cargas. [Webhook Weni](WENI%20WEBHOOK.md) e [webhook de pedidos](WEBHOOK%20PEDIDOS%20FUTURO.md) mantêm seus estados e requisitos específicos.
+
+O [catálogo de planejamento](planejamento/README.md) separa o **NexoFlow Hub futuro**, para VPS, Docker e n8n, da operação Windows distribuída. O plano de [histórico, atribuição e LTV](planejamento/HISTORICO_PEDIDOS_ATRIBUICAO_LTV.md) não representa uma integração implantada.
 
 A fonte do guia de operação é `docs/Documentacao NexoFlow.md`; seu [HTML](Documentacao%20NexoFlow.html) é gerado por `python scripts/build_documentation.py`. Edite o Markdown e regenere o HTML.

@@ -1,4 +1,13 @@
-# NexoFlow 1.5.13 — Changelog
+# NexoFlow — Changelog
+
+## NexoFlow 1.5.14 — Meta Ads e clareza operacional
+
+- Bootstrap aditivo Meta no Analytics habilitado: prepara ou retoma as cinco abas adicionais por segmento com cabeçalhos canônicos nos destinos existentes. Divergências exigem revisão manual; os schemas e históricos anteriores são preservados.
+- Preparadas e conferidas dez abas Meta, cinco de cada segmento, nos arquivos existentes e nas pastas correspondentes; IDs preservados e 54 abas anteriores mantidas. A conferência da estrutura não representa carga real de métricas nem edição dos dashboards.
+- Resumos distinguem alterações aplicadas, pendências e POSTs reais. Falha parcial mantém código 3 e identifica a etapa, a causa e os checkpoints separados de Meta e Farma. A contagem de aplicações da Recompra pode incluir persistência local e não representa a contagem de POSTs Weni.
+- Escolha de rede limitada a pessoal, corporativa ou sair; entrada inválida solicita nova escolha. Após três falhas recuperáveis de transporte, o console permite escolher novamente a rota. A execução preserva a rota selecionada no check-up e nas etapas seguintes.
+- Windows mantém operação autônoma, integração Meta nativa e MCP opcional, sem Codex obrigatório. Catálogo e planejamento separam o NexoFlow Hub futuro (VPS, Docker e n8n) dos aplicativos distribuídos.
+- Nova versão e pacotes próprios preservam a publicação 1.5.13. A data real de publicação consta nas notas do release, após validação do mesmo commit.
 
 ## NexoFlow 1.5.13 — 04/11/2026
 
@@ -6,9 +15,9 @@
 - Novas fontes diárias e catálogos preservam os schemas anteriores. Evidências Weni separam FARMA/PET e impedem atribuição integral duplicada de custos compartilhados.
 - Simulação, revisão de destinos/schemas, upsert idempotente, retomada, checkpoints próprios e invalidação de conversões canceladas. Credencial Meta preservada também no modo Clean do Setup.
 - Confirmação explícita de schemas e destinos, credencial/allowlist mantidas no arquivo local e importação do wheel sem SDK MCP. O ambiente de validação e o check-up instalado preparam setuptools/wheel, sem tornar MCP uma dependência da integração nativa.
-- Consulte o [relatório técnico](docs/RELATORIO%20META%20ADS%20NATIVO.md) e o [guia de ativação](docs/META%20ADS%20NATIVO.md). Não houve escrita em planilhas ou edição dos dashboards de produção durante os testes. A publicação 1.5.13 foi autorizada e exige validação própria do mesmo commit, sem substituir o release 1.5.12.
+- Consulte o [relatório técnico](docs/RELATORIO%20META%20ADS%20NATIVO.md) e o [guia de ativação](docs/META%20ADS%20NATIVO.md). Não houve escrita em planilhas ou edição dos dashboards de produção durante os testes. A publicação 1.5.13 mantém o release 1.5.12 e os anteriores preservados.
 
-## NexoFlow 1.5.12 — Em validação
+## NexoFlow 1.5.12 — 03/11/2026
 
 - Corrige o KeyError de maioridade na criação/enriquecimento PET. O perfil não calcula, exige ou grava `maior_de_18_anos`; idade permanece informativa e a FarmaLíder mantém suas validações. Endereços são conferidos contra o segmento correto do pedido.
 - Recompra incremental reutiliza o estado por segmento: contatos Weni modificados desde o cursor com sobreposição de 15 minutos, hashes locais da base geral atual e seleção de novos/alterados, prazos e pendências. Primeira execução e carga completa mantêm cobertura integral. O dry-run não confirma checkpoint.

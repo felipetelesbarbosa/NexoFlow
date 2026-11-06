@@ -322,7 +322,9 @@ class GoogleSheetsStore:
             }
         values = self._read_with_retry(
             f"ler aba nativa {title}",
-            lambda: ws.get_all_values(value_render_option="UNFORMATTED_VALUE"),
+            # Uma fórmula como ="" é conteúdo físico, mesmo sem valor visível.
+            # O snapshot precisa preservá-la e impedir adoção como aba vazia.
+            lambda: ws.get_all_values(value_render_option="FORMULA"),
         )
         return {
             "exists": True,
@@ -360,6 +362,8 @@ class GoogleSheetsStore:
         return records
 
     def native_meta_upsert_chunk(self, title, headers, records, *, expected_snapshot):
+        from meta_ads_sheets import native_values_empty
+
         self._native_meta_headers(title, headers)
         self.native_meta_context()
         current = self.native_meta_read(title, headers)
@@ -372,29 +376,99 @@ class GoogleSheetsStore:
             raise ValueError("Fontes Meta não configuradas.")
         book = self._storage_books[layout.destination(title)]
         if not current["exists"]:
+            creation_attempted = False
+
+            def create_missing():
+                nonlocal creation_attempted
+                self.native_meta_context()
+                observed = self.native_meta_read(title, headers)
+                if observed != expected_snapshot:
+                    # Uma resposta perdida pode ter criado a aba. A retomada
+                    # desta tentativa aceita somente a mesma aba ainda vazia.
+                    if (
+                        not creation_attempted
+                        or observed.get("book_id") != expected_snapshot["book_id"]
+                        or not observed.get("exists")
+                        or not native_values_empty(observed.get("values"))
+                    ):
+                        raise ValueError("A fonte Meta mudou antes da criação.")
+                    return book.worksheet(title)
+                creation_attempted = True
+                return book.add_worksheet(
+                    title=title, rows=max(1000, len(records) + 1), cols=len(headers)
+                )
+
             ws = self._write_with_retry(
                 f"criar aba nativa {title}",
-                lambda: book.add_worksheet(
-                    title=title, rows=max(1000, len(records) + 1), cols=len(headers)
-                ),
+                create_missing,
             )
-            self._write_with_retry(
-                f"cabeçalho nativo {title}",
-                lambda: ws.update(
-                    range_name=f"A1:{column_letter(len(headers))}1",
-                    values=[headers],
-                    value_input_option="RAW",
-                ),
-            )
-            current["values"] = [headers]
+            current = self.native_meta_read(title, headers)
+            if (
+                not current.get("exists")
+                or current.get("worksheet_id") != ws.id
+                or current.get("book_id") != expected_snapshot["book_id"]
+                or not native_values_empty(current.get("values"))
+            ):
+                raise ValueError("A aba Meta mudou durante a criação.")
         else:
             ws = self._read_with_retry(
                 f"reabrir aba nativa {title}", lambda: book.worksheet(title)
             )
-            if not current["values"] or current["values"][0] != headers:
-                raise ValueError(
-                    "Schema Meta divergente; migração automática bloqueada."
+            if ws.id != current.get("worksheet_id"):
+                raise ValueError("A aba Meta foi substituída antes da gravação.")
+        if native_values_empty(current["values"]):
+            empty_snapshot = current
+            header_attempted = False
+
+            def initialize_empty():
+                nonlocal header_attempted, ws
+                self.native_meta_context()
+                observed = self.native_meta_read(title, headers)
+                if observed != empty_snapshot:
+                    if (
+                        header_attempted
+                        and observed.get("book_id") == empty_snapshot["book_id"]
+                        and observed.get("worksheet_id") == ws.id
+                        and observed.get("values")
+                        and observed["values"][0] == headers
+                        and native_values_empty(observed["values"][1:])
+                    ):
+                        return None
+                    raise ValueError("A aba Meta vazia mudou antes do cabeçalho.")
+                ws = self._read_with_retry(
+                    f"conferir grade nativa {title}", lambda: book.worksheet(title)
                 )
+                if ws.id != empty_snapshot["worksheet_id"]:
+                    raise ValueError("A aba Meta foi substituída antes do cabeçalho.")
+                required_rows = 1 if ws.row_count < 1 else None
+                required_cols = len(headers) if ws.col_count < len(headers) else None
+                if required_rows is not None or required_cols is not None:
+                    # Abas criadas manualmente costumam ter só 26 colunas.
+                    # Ampliar a grade não altera conteúdo nem reduz dimensões.
+                    ws.resize(rows=required_rows, cols=required_cols)
+                    self.native_meta_context()
+                    if self.native_meta_read(title, headers) != empty_snapshot:
+                        raise ValueError("A aba Meta mudou ao ampliar a grade.")
+                header_attempted = True
+                return ws.update(
+                    range_name=f"A1:{column_letter(len(headers))}1",
+                    values=[headers],
+                    value_input_option="RAW",
+                )
+
+            self._write_with_retry(f"cabeçalho nativo {title}", initialize_empty)
+            current = self.native_meta_read(title, headers)
+            if (
+                current.get("book_id") != empty_snapshot["book_id"]
+                or current.get("worksheet_id") != ws.id
+                or not current.get("values")
+                or current["values"][0] != headers
+                or not native_values_empty(current["values"][1:])
+            ):
+                raise ValueError("Cabeçalho Meta sem confirmação após a criação.")
+            current = dict(current, values=[headers])
+        elif current["values"][0] != headers:
+            raise ValueError("Schema Meta divergente; migração automática bloqueada.")
         return self._upsert_records_detailed(
             ws,
             records,
@@ -408,8 +482,12 @@ class GoogleSheetsStore:
 
     def native_meta_confirm(self, title, headers, records, *, expected_snapshot):
         """Confirma só o cabeçalho e as posições das chaves enviadas neste lote."""
+        from meta_ads_sheets import native_values_empty
+
         self._native_meta_headers(title, headers)
         values = expected_snapshot.get("values", [])
+        if native_values_empty(values):
+            values = []
         positions = {
             str(row[0]): number
             for number, row in enumerate(values[1:], 2)

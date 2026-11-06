@@ -58,6 +58,14 @@ class NativeMetaSchemaError(ValueError):
     """Aba, destino ou revisão incompatível; não autoriza migração ou exclusão."""
 
 
+def native_values_empty(values):
+    """Somente células realmente vazias autorizam inicializar um cabeçalho."""
+    return isinstance(values, list) and all(
+        isinstance(row, list) and all(cell in ("", None) for cell in row)
+        for row in values
+    )
+
+
 def _schemas():
     from meta_ads_model import SCHEMAS
 
@@ -170,7 +178,7 @@ class NativeMetaSheets:
             raise NativeMetaSchemaError("Aba Meta no arquivo Google errado.")
         values = snapshot.get("values", [])
         records = {}
-        if snapshot.get("exists"):
+        if snapshot.get("exists") and not native_values_empty(values):
             if not values or values[0] != headers:
                 raise NativeMetaSchemaError(
                     "Cabeçalho Meta divergente; migração automática proibida."
@@ -362,12 +370,20 @@ class NativeMetaSheets:
                     raise NativeMetaSchemaError(
                         "A fonte Meta mudou antes de iniciar a tabela."
                     )
-                if not initial["exists"] and not plan["rows"]:
+                if native_values_empty(initial.get("values", [])) and not plan["rows"]:
                     self._backup(title, initial, [], current_manifest)
                     self.store.native_meta_upsert_chunk(
                         title, _schemas()[title], [], expected_snapshot=initial
                     )
-                    self._read(title, current_manifest["sources"])
+                    checked, _ = self._read(title, current_manifest["sources"])
+                    if (
+                        not checked.get("exists")
+                        or not checked.get("values")
+                        or checked["values"][0] != _schemas()[title]
+                    ):
+                        raise NativeMetaSchemaError(
+                            "Cabeçalho Meta sem confirmação após a inicialização."
+                        )
                 for start in range(0, len(plan["rows"]), 200):
                     batch = plan["rows"][start : start + 200]
                     self._context()
