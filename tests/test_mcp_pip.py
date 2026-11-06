@@ -3,6 +3,7 @@
 import contextlib
 import importlib
 import io
+import json
 import os
 import subprocess
 import sys
@@ -17,10 +18,16 @@ import run_mcp_pip as mcp
 
 class McpPipTests(unittest.TestCase):
     def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        root = patch.object(mcp, "ROOT", self.root)
+        root.start()
+        self.addCleanup(root.stop)
         route = patch.dict(os.environ, {"NEXOFLOW_NETWORK_MODE": "auto"})
         route.start()
         self.addCleanup(route.stop)
-        guard = patch('pip_network.preflight')
+        guard = patch("pip_network.preflight")
         guard.start()
         self.addCleanup(guard.stop)
 
@@ -100,7 +107,217 @@ class McpPipTests(unittest.TestCase):
             code = mcp.install(Path("synthetic-python"), run=runner, sleep=sleep)
         self.assertNotIn("SENSITIVE_MARKER", output.getvalue())
         self.assertNotIn("private.invalid", output.getvalue())
+        report = self.report()
+        serialized = json.dumps(report)
+        self.assertNotIn("SENSITIVE_MARKER", serialized)
+        self.assertNotIn("private.invalid", serialized)
+        self.assertNotIn("secret", serialized)
         return code, runner, sleep, output.getvalue()
+
+    def report(self):
+        return json.loads(
+            (self.root / "logs/meta_ads_mcp_dependencias.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+    def test_permission_failure_is_specific_and_reported_without_private_output(self):
+        code, run, sleep, output = self.execute(
+            [
+                types.SimpleNamespace(
+                    returncode=1,
+                    stdout="Installing collected packages: mcp\nERROR: Could not install packages due to an OSError: [WinError 5] Access is denied: 'SENSITIVE_MARKER' https://private.invalid/secret",
+                )
+            ]
+        )
+        self.assertEqual(code, 1)
+        run.assert_called_once()
+        sleep.assert_not_called()
+        self.assertIn("PIP_PERMISSAO", output)
+        report = self.report()
+        self.assertEqual(report["status"], "falha")
+        self.assertEqual(report["preflight_https"], "aprovado")
+        self.assertEqual(report["tentativas"][0]["codigo_saida"], 1)
+        self.assertEqual(report["tentativas"][0]["categoria"], "PIP_PERMISSAO")
+        self.assertEqual(
+            report["tentativas"][0]["ultima_etapa_reportada"], "instalacao"
+        )
+
+    def test_unknown_failure_preserves_exit_code_without_claiming_proxy_cause(self):
+        _, _, _, output = self.execute(
+            [types.SimpleNamespace(returncode=1073741845, stdout="SENSITIVE_MARKER")]
+        )
+        report = self.report()
+        self.assertEqual(report["tentativas"][0]["codigo_saida"], 1073741845)
+        self.assertEqual(report["tentativas"][0]["categoria"], "PIP_INSTALACAO")
+        self.assertEqual(
+            report["tentativas"][0]["ultima_etapa_reportada"], "indeterminada"
+        )
+        self.assertNotIn("PROXY_AUTENTICACAO", output)
+
+    def test_download_http_failure_is_not_misreported_as_no_distribution(self):
+        bad = types.SimpleNamespace(
+            returncode=1,
+            stdout="ERROR: HTTP error 503 while getting https://private.invalid/SENSITIVE_MARKER\nNo matching distribution found",
+        )
+        code, run, _, output = self.execute([bad, bad, bad])
+        self.assertEqual(code, 1)
+        self.assertEqual(run.call_count, 3)
+        self.assertIn("PIP_HTTP", output)
+        self.assertEqual(self.report()["tentativas"][-1]["http"], 503)
+
+    def test_local_failure_patterns_are_differentiated_without_raw_messages(self):
+        cases = (
+            (
+                "ERROR: Package 'private' requires a different Python: 3.11 not in '>=3.14'",
+                "PIP_PYTHON",
+            ),
+            (
+                "ERROR: ResolutionImpossible: SENSITIVE_MARKER",
+                "PIP_CONFLITO_DEPENDENCIAS",
+            ),
+            ("ERROR: Failed building wheel for SENSITIVE_MARKER", "PIP_COMPILACAO"),
+            (
+                "ERROR: [Errno 28] No space left on device SENSITIVE_MARKER",
+                "PIP_ESPACO",
+            ),
+            ("python.exe: No module named pip SENSITIVE_MARKER", "PIP_AUSENTE"),
+            (
+                "ERROR: [WinError 32] The process cannot access the file SENSITIVE_MARKER",
+                "PIP_ARQUIVO_EM_USO",
+            ),
+        )
+        for message, category in cases:
+            with self.subTest(category=category):
+                code, run, sleep, output = self.execute(
+                    [types.SimpleNamespace(returncode=1, stdout=message)]
+                )
+                self.assertEqual(code, 1)
+                run.assert_called_once()
+                sleep.assert_not_called()
+                self.assertIn(category, output)
+
+    def test_previous_failure_is_replaced_and_retry_history_is_kept(self):
+        self.execute([types.SimpleNamespace(returncode=1, stdout="SENSITIVE_MARKER")])
+        bad = types.SimpleNamespace(
+            returncode=1, stdout="Tunnel connection failed: 503"
+        )
+        self.execute([bad, types.SimpleNamespace(returncode=0)])
+        report = self.report()
+        self.assertEqual(report["status"], "sucesso")
+        self.assertEqual(len(report["tentativas"]), 2)
+        self.assertEqual(report["tentativas"][0]["categoria"], "PROXY_CONEXAO")
+        self.assertEqual(report["tentativas"][1]["codigo_saida"], 0)
+        self.assertEqual(report["tentativas"][1]["categoria"], "OK")
+
+    def test_report_write_failure_does_not_hide_pip_result_or_expose_path(self):
+        with patch.object(
+            Path, "mkdir", side_effect=PermissionError("SENSITIVE_MARKER")
+        ):
+            result = types.SimpleNamespace(
+                returncode=1, stdout="CERTIFICATE_VERIFY_FAILED"
+            )
+            runner = Mock(return_value=result)
+            output = io.StringIO()
+            with (
+                patch.object(mcp, "dependency_environment", return_value={}),
+                contextlib.redirect_stdout(output),
+            ):
+                self.assertEqual(mcp.install(Path("python"), run=runner), 1)
+        self.assertIn("TLS_CERTIFICADO", output.getvalue())
+        self.assertIn("DIAGNOSTICO_MCP_GRAVACAO", output.getvalue())
+        self.assertNotIn("SENSITIVE_MARKER", output.getvalue())
+
+    def test_preflight_error_keeps_safe_category_and_never_launches_pip(self):
+        for prefix, category, status in (
+            ("PROXY_CONNECT_407", "PROXY_AUTENTICACAO", 407),
+            ("PROXY_CONNECT_503", "PROXY_CONEXAO", 503),
+            ("REDE_PIP_HTTP_403", "PIP_HTTP", 403),
+            ("TLS_CERTIFICADO", "TLS_CERTIFICADO", None),
+            ("REDE_AMBIGUA", "REDE_AMBIGUA", None),
+            ("PROXY_INDISPONIVEL", "PROXY_INDISPONIVEL", None),
+            ("REDE_PIP_INDISPONIVEL", "REDE_PIP_INDISPONIVEL", None),
+        ):
+            with self.subTest(prefix=prefix):
+                run = Mock()
+                output = io.StringIO()
+                with (
+                    patch.object(
+                        mcp,
+                        "dependency_environment",
+                        side_effect=ValueError(f"{prefix}: SENSITIVE_MARKER"),
+                    ),
+                    contextlib.redirect_stdout(output),
+                ):
+                    self.assertEqual(mcp.install(Path("python"), run=run), 2)
+                run.assert_not_called()
+                self.assertIn(category, output.getvalue())
+                report = self.report()
+                self.assertEqual(report["categoria_rede"], category)
+                self.assertEqual(report["http_rede"], status)
+                self.assertEqual(report["preflight_https"], "nao_aprovado")
+                self.assertEqual(report["tentativas"], [])
+                self.assertNotIn("SENSITIVE_MARKER", json.dumps(report))
+
+    def test_permanent_connect_error_does_not_retry(self):
+        for status in (400, 401, 403, 404, 407):
+            with self.subTest(status=status):
+                code, run, sleep, _ = self.execute(
+                    [
+                        types.SimpleNamespace(
+                            returncode=1, stdout=f"Tunnel connection failed: {status}"
+                        )
+                    ]
+                )
+                self.assertEqual(code, 1)
+                run.assert_called_once()
+                sleep.assert_not_called()
+
+    def test_package_named_timeout_does_not_hide_file_permission_error(self):
+        code, run, sleep, output = self.execute(
+            [
+                types.SimpleNamespace(
+                    returncode=1,
+                    stdout="Collecting pytest-timeout\nERROR: [WinError 5] SENSITIVE_MARKER",
+                )
+            ]
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("PIP_PERMISSAO", output)
+        run.assert_called_once()
+        sleep.assert_not_called()
+
+    def test_real_child_output_is_captured_and_only_safe_diagnostic_survives(self):
+        fixture = self.root / "pip.py"
+        fixture.write_text(
+            "print('ERROR: HTTP error 403 while getting https://u:SENSITIVE_MARKER@private.invalid/')\nraise SystemExit(1)\n",
+            encoding="utf-8",
+        )
+        output = io.StringIO()
+        with (
+            patch.object(mcp, "dependency_environment", return_value=dict(os.environ)),
+            contextlib.redirect_stdout(output),
+        ):
+            self.assertEqual(mcp.install(Path(sys.executable)), 1)
+        report = self.report()
+        self.assertEqual(report["tentativas"][0]["codigo_saida"], 1)
+        self.assertEqual(report["tentativas"][0]["http"], 403)
+        for text in (output.getvalue(), json.dumps(report)):
+            self.assertNotIn("SENSITIVE_MARKER", text)
+            self.assertNotIn("private.invalid", text)
+        self.assertIn("PIP_HTTP", output.getvalue())
+
+    def test_report_profile_and_route_are_explicit_without_environment_dump(self):
+        for profile in ("FARMA", "PET"):
+            with patch.dict(
+                os.environ,
+                {"NEXOFLOW_PERFIL": profile, "PRIVATE_TEST": "SENSITIVE_MARKER"},
+            ):
+                self.execute([types.SimpleNamespace(returncode=0)])
+                report = self.report()
+                self.assertEqual(report["perfil"], profile)
+                self.assertEqual(report["rota"], "proxy")
+                self.assertEqual(report["status"], "sucesso")
 
     def test_407_is_terminal_and_not_misreported_as_missing_package(self):
         result = types.SimpleNamespace(

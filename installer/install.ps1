@@ -99,15 +99,16 @@ function Invoke-OptionalMetaAdsSetup {
         if ($helperProcess.ExitCode -ne 0) {
             throw "A instalação opcional MCP foi encerrada com o código $($helperProcess.ExitCode)."
         }
-        $status = @{ componente = 'Meta Ads MCP'; status = 'instalado'; registro_cliente = 'manual_opcional'; acesso_meta = 'nao_validado'; atualizado_em = (Get-Date).ToUniversalTime().ToString('o') }
+        $status = @{ componente = 'Meta Ads MCP'; status = 'instalado'; registro_cliente = 'manual_opcional'; acesso_meta = 'nao_validado'; diagnostico_dependencias = 'logs/meta_ads_mcp_dependencias.json'; atualizado_em = (Get-Date).ToUniversalTime().ToString('o') }
         $status | ConvertTo-Json | Set-Content -LiteralPath $statusFile -Encoding UTF8
         Write-Host '[OK] Meta Ads MCP instalado/validado. Registro em cliente de IA é manual e opcional.' -ForegroundColor Green
+        Write-Host '[INFO] Status: logs/meta_ads_mcp_instalacao.json. Diagnóstico da última etapa pip, quando executada: logs/meta_ads_mcp_dependencias.json.'
     } catch {
         # O programa principal já foi instalado. Não restaurar/apagar NexoFlow
         # nem credenciais porque uma integração opcional ficou pendente.
-        $status = @{ componente = 'Meta Ads MCP'; status = 'pendente'; proxima_acao = 'Executar scripts/instalar_meta_ads_mcp.ps1 -Perfil FARMA ou PET, após conferir a configuração de rede'; atualizado_em = (Get-Date).ToUniversalTime().ToString('o') }
+        $status = @{ componente = 'Meta Ads MCP'; status = 'pendente'; proxima_acao = 'Executar scripts/instalar_meta_ads_mcp.ps1 -Perfil FARMA ou PET, após conferir a configuração de rede'; diagnostico_dependencias = 'logs/meta_ads_mcp_dependencias.json'; atualizado_em = (Get-Date).ToUniversalTime().ToString('o') }
         try { $status | ConvertTo-Json | Set-Content -LiteralPath $statusFile -Encoding UTF8 } catch { }
-        Write-Warning 'NexoFlow instalado. Meta Ads MCP ficou pendente. Execute o auxiliar na sessão Windows do usuário final; confira logs/meta_ads_mcp_instalacao.json. Configurações existentes foram preservadas.'
+        Write-Warning 'NexoFlow instalado. Meta Ads MCP ficou pendente. Execute o auxiliar na sessão Windows do usuário final; confira logs/meta_ads_mcp_instalacao.json e logs/meta_ads_mcp_dependencias.json (última etapa pip, quando executada). Configurações existentes foram preservadas.'
     }
 }
 

@@ -67,7 +67,7 @@ function Invoke-MetaAdsDependencyInstall {
         throw 'Ambiente principal do NexoFlow ou auxiliar de rede ausente. Conclua o Setup antes de instalar o MCP.'
     }
     & $nativePython $runner --python $venvPython --perfil $Perfil
-    if ($LASTEXITCODE -ne 0) { throw 'Instalação MCP pendente. Confira a categoria de rede acima; falha do índice não comprova ausência do pacote.' }
+    if ($LASTEXITCODE -ne 0) { throw 'Instalação MCP pendente. Confira o diagnóstico sanitizado em logs/meta_ads_mcp_dependencias.json; falha do índice não comprova ausência do pacote.' }
 }
 
 function Write-MetaAdsInstallStatus {
@@ -76,6 +76,7 @@ function Write-MetaAdsInstallStatus {
     New-Item -ItemType Directory -Force -Path $folder | Out-Null
     $record = @{ componente = 'Meta Ads MCP'; status = $Status; perfil_rede = $Perfil;
         acesso_meta = 'nao_validado'; registro_cliente = 'manual_opcional';
+        diagnostico_dependencias = 'logs/meta_ads_mcp_dependencias.json';
         atualizado_em = (Get-Date).ToUniversalTime().ToString('o') }
     if ($Status -eq 'pendente') {
         $record.proxima_acao = "Executar scripts/instalar_meta_ads_mcp.ps1 -Perfil $Perfil após conferir a configuração de rede"
@@ -111,9 +112,10 @@ try {
 
 
 Write-Host 'Conector instalado e testes offline concluídos. Acesso real à Meta ainda exige token ads_read e confirmação da conta autorizada.'
+Write-Host 'Status: logs/meta_ads_mcp_instalacao.json. Diagnóstico da última etapa pip, quando executada: logs/meta_ads_mcp_dependencias.json.'
 
     Write-MetaAdsInstallStatus -Status instalado
 } catch {
     try { Write-MetaAdsInstallStatus -Status pendente } catch { }
-    throw 'Meta Ads MCP pendente. Confira o diagnóstico sanitizado acima e logs/meta_ads_mcp_instalacao.json; a instalação principal foi preservada.'
+    throw 'Meta Ads MCP pendente. Confira logs/meta_ads_mcp_instalacao.json e logs/meta_ads_mcp_dependencias.json (última etapa pip, quando executada); a instalação principal foi preservada.'
 }

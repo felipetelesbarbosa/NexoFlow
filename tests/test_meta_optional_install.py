@@ -131,6 +131,60 @@ try{
 }finally{Remove-Item -LiteralPath $InstallDir -Recurse -Force}
 """)
 
+    def test_mcp_status_references_separate_report_without_reading_or_changing_it(self):
+        self.run_ps(r"""
+. (Join-Path $repo 'scripts/instalar_meta_ads_mcp.ps1') -FunctionsOnly
+$fixture=Join-Path ([IO.Path]::GetTempPath()) ('nexo-mcp-report-'+[Guid]::NewGuid().ToString('N'))
+$raiz=$fixture
+$Perfil='PET'
+New-Item -ItemType Directory (Join-Path $fixture 'logs') -Force|Out-Null
+try{
+ $report=Join-Path $fixture 'logs/meta_ads_mcp_dependencias.json'
+ 'SYNTHETIC_PRIVATE_DIAGNOSTIC'|Set-Content -LiteralPath $report
+ $before=(Get-FileHash -LiteralPath $report).Hash
+ foreach($expected in @('instalado','pendente')){
+  Write-MetaAdsInstallStatus -Status $expected
+  $text=Get-Content -LiteralPath (Join-Path $fixture 'logs/meta_ads_mcp_instalacao.json') -Raw
+  $record=$text|ConvertFrom-Json
+  if($record.status -ne $expected){throw 'Status do auxiliar incorreto.'}
+  if($record.diagnostico_dependencias -cne 'logs/meta_ads_mcp_dependencias.json'){throw 'Referência do diagnóstico ausente ou não relativa.'}
+  if($text -match 'SYNTHETIC_PRIVATE_DIAGNOSTIC'){throw 'Conteúdo do relatório propagado ao status.'}
+  if((Get-FileHash -LiteralPath $report).Hash -ne $before){throw 'Relatório de dependências alterado pelo auxiliar.'}
+ }
+}finally{Remove-Item -LiteralPath $fixture -Recurse -Force}
+""")
+
+    def test_setup_status_keeps_dependency_report_reference_for_success_and_failure(self):
+        self.run_ps(r"""
+$tokens=$null;$errors=$null
+$ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'installer/install.ps1'),[ref]$tokens,[ref]$errors)
+$function=$ast.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Invoke-OptionalMetaAdsSetup'},$true)
+Invoke-Expression $function.Extent.Text
+$InstallDir=Join-Path ([IO.Path]::GetTempPath()) ('nexo-setup-report-'+[Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory (Join-Path $InstallDir 'logs'),(Join-Path $InstallDir 'scripts'),(Join-Path $InstallDir 'credentials') -Force|Out-Null
+try{
+ 'param()'|Set-Content -LiteralPath (Join-Path $InstallDir 'scripts/instalar_meta_ads_mcp.ps1')
+ $report=Join-Path $InstallDir 'logs/meta_ads_mcp_dependencias.json'
+ 'SYNTHETIC_PRIVATE_DIAGNOSTIC'|Set-Content -LiteralPath $report
+ $credential=Join-Path $InstallDir 'credentials/existing.json'
+ 'SYNTHETIC_META_CREDENTIAL'|Set-Content -LiteralPath $credential
+ $reportBefore=(Get-FileHash -LiteralPath $report).Hash
+ $credentialBefore=(Get-FileHash -LiteralPath $credential).Hash
+ function Start-Process { [pscustomobject]@{ExitCode=$script:helperExitCode} }
+ foreach($case in @(@{Code=0;Status='instalado'},@{Code=1073741845;Status='pendente'})){
+  $script:helperExitCode=$case.Code
+  Invoke-OptionalMetaAdsSetup -Selected -Unattended
+  $text=Get-Content -LiteralPath (Join-Path $InstallDir 'logs/meta_ads_mcp_instalacao.json') -Raw
+  $record=$text|ConvertFrom-Json
+  if($record.status -ne $case.Status){throw 'Status do Setup incorreto.'}
+  if($record.diagnostico_dependencias -cne 'logs/meta_ads_mcp_dependencias.json'){throw 'Setup perdeu a referência relativa do diagnóstico.'}
+  if($text -match 'SYNTHETIC_PRIVATE_DIAGNOSTIC|SYNTHETIC_META_CREDENTIAL'){throw 'Conteúdo privado propagado ao status.'}
+  if((Get-FileHash -LiteralPath $report).Hash -ne $reportBefore){throw 'Setup alterou o relatório de dependências.'}
+  if((Get-FileHash -LiteralPath $credential).Hash -ne $credentialBefore){throw 'Setup alterou credencial existente.'}
+ }
+}finally{Remove-Item -LiteralPath $InstallDir -Recurse -Force}
+""")
+
     def test_clean_selected_forces_reinstall_and_preserve_does_not(self):
         self.run_ps(r"""
 $tokens=$null;$errors=$null

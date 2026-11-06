@@ -16,6 +16,7 @@ diagnosticos_privados/
 farmalider_falhas_*.jsonl
 logs/*.log
 logs/*.log.*
+logs/meta_ads_mcp_*.json
 logs/delivery*review.json
 logs/delivery*review.txt
 
