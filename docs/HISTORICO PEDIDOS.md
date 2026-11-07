@@ -79,3 +79,11 @@ A análise local da amostra PET classificou 40 pedidos válidos e 12 cancelados,
 ## Auditoria da primeira carga FARMA
 
 O resumo da 1.5.16 misturava contagens da última janela com o acumulado. Consulte a [auditoria e correções preparatórias](AUDITORIA%20HISTORICO%20FARMA%201.5.16.md). O código corrigido separa execução, período e acumulado, e oferece `--auditar-banco` somente leitura. Essas correções ainda exigem validação e distribuição de novo patch; não estão nos ZIPs originais da 1.5.16.
+
+## Períodos vazios — ajuste posterior à 1.5.18
+
+GET pontual da primeira janela de 2000 confirmou HTTP 404 com a mensagem exata “Nenhum pedido encontrado para o segmento e período informados.” O cliente reconhece somente essa resposta explícita na página 1 da rota paginada, convertendo-a no envelope local de zero registros. A janela termina vazia e o coletor segue para o próximo período, sem criar vendas, cancelamentos ou remover fatos anteriores. Quando houver pedidos, pagina normalmente e continua até a data final.
+
+Um 404 genérico, mensagem diferente, autenticação inválida, falha de rede ou desaparecimento de página posterior continua sendo erro, conservando o checkpoint parcial. Uma consulta vazia consome uma unidade do orçamento de páginas/consultas; ENTER mantém o orçamento padrão. A retomada reutiliza janelas concluídas e páginas confirmadas. O progresso mostra “sem pedidos nesta janela”, sem sugerir página 1/0.
+
+Esse comportamento foi testado também no transporte sintético do Hub e no PostgreSQL temporário. Não houve carga anual de investigação nem alteração do banco comercial. A release 1.5.18 original permanece intacta e não contém esse ajuste; distribuição exige um novo patch validado.

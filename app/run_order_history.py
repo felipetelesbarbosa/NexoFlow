@@ -117,9 +117,14 @@ def print_progress(state):
     pending = state.get(
         "pending_page", None if state["status"] == "extraida" else state["next_page"]
     )
+    page_label = (
+        "sem pedidos nesta janela"
+        if state["status"] == "extraida" and state["total"] == 0
+        else f"página {state.get('current_page', state['next_page'] - 1)}/{state['pages']}"
+    )
     print(
         f"[Histórico] Janela {state.get('window', 1)}/{state.get('windows', 1)} | "
-        f"página {state.get('current_page', state['next_page'] - 1)}/{state['pages']} | "
+        f"{page_label} | "
         f"recebidos={state['received']}/{state['total']} | "
         + (
             (

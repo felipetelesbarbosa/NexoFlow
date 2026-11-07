@@ -7,9 +7,11 @@ from datetime import UTC, datetime, timedelta
 from psycopg.types.json import Jsonb
 
 from order_history import (
+    HISTORY_EMPTY_MESSAGE,
     HistoryError,
     HistoryQuery,
     digest,
+    empty_history_envelope,
     financial_record_digest,
     normalize_order,
     page_envelope,
@@ -78,6 +80,8 @@ class SyntheticHistorySource:
                 or params["dataFim"] != query.api_end
             ):
                 return httpx.Response(400)
+            if not self.count:
+                return httpx.Response(404, text=HISTORY_EMPTY_MESSAGE)
             first = (int(params["pagina"]) - 1) * int(params["limite"])
             rows = []
             for n in range(first, min(self.count, first + query.limit)):
@@ -131,6 +135,11 @@ class SyntheticHistorySource:
                     "token": "fixture+/&=?%",
                 },
             )
+            empty = empty_history_envelope(
+                response.status_code, response.text, page, query.limit
+            )
+            if empty is not None:
+                return empty
             response.raise_for_status()
             return response.json()
 

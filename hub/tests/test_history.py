@@ -361,3 +361,26 @@ def test_freight_disagreement_is_nonblocking_and_uses_header(store, segment):
         )
     assert history.totals()["faturamento_centavos"] == 8999
     assert history.totals()["avisos_frete"] == 0
+
+
+def test_empty_404_completes_window_and_later_task_finds_orders(store):
+    first = create(
+        store,
+        changes={
+            "inicio": "2000-01-01",
+            "fim": "2000-02-01",
+            "quantidade_sintetica": 0,
+        },
+    )
+    run_once(store)
+    empty = store.get("PET", first["id"])
+    assert empty["estado"] == "concluida"
+    assert empty["resultado"]["received"] == 0
+    assert empty["resultado"]["next_page"] == 2
+    second = create(store, changes={"quantidade_sintetica": 3})
+    run_once(store)
+    found = store.get("PET", second["id"])
+    assert found["estado"] == "concluida"
+    assert found["resultado"]["received"] == 3
+    assert found["resultado"]["faturamento_centavos"] == 24000
+    assert store.get("PET", first["id"])["resultado"]["received"] == 0

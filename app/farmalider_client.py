@@ -867,6 +867,18 @@ class FarmaliderClient:
                             f"FarmaLíder API retornou HTTP {status}. "
                             "Verifique o token e a permissão para esta rota."
                         )
+                    if status == 404 and endpoint_label == "pedidos/segmento" and query:
+                        from order_history import empty_history_envelope
+
+                        empty = empty_history_envelope(
+                            status,
+                            (response.content or b"").decode("utf-8", errors="replace"),
+                            query["pagina"],
+                            query["limite"],
+                        )
+                        if empty is not None:
+                            self._mark_healthy(permit, endpoint_label)
+                            return empty
                     if status == 404 and allow_not_found:
                         self._mark_healthy(permit, endpoint_label)
                         return None

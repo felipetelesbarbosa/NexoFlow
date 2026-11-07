@@ -28,6 +28,18 @@ class HistoryError(ValueError):
     """Somente códigos estáticos, sem payload, URL ou credenciais."""
 
 
+HISTORY_EMPTY_MESSAGE = "Nenhum pedido encontrado para o segmento e período informados."
+
+
+def empty_history_envelope(status, message, page, limit):
+    """Só a ausência explícita oficial na página 1 encerra uma janela vazia."""
+    if status == 404 and page == 1 and message.strip() == HISTORY_EMPTY_MESSAGE:
+        return dict(
+            pedidos=[], pagina=1, limite=limit, totalRegistros=0, totalPaginas=0
+        )
+    return None
+
+
 def identity(value):
     if isinstance(value, bool) or not isinstance(value, (str, int)):
         return ""
