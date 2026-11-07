@@ -1,5 +1,6 @@
 """404 específico de ausência: janela vazia, nunca erro de rota ou página faltante."""
 
+import json
 import sqlite3
 import unittest
 from contextlib import closing
@@ -8,7 +9,7 @@ from unittest.mock import Mock, patch
 import requests
 
 from farmalider_client import FarmaliderClient, FarmaliderError
-from order_history import HistoryQuery
+from order_history import HistoryQuery, empty_history_envelope
 from order_history_store import HistoryStore, collect_windows
 from tests.test_order_history import NOW, Source, order
 
@@ -16,6 +17,58 @@ EMPTY_MESSAGE = "Nenhum pedido encontrado para o segmento e período informados.
 
 
 class EmptyWindowTests(unittest.TestCase):
+    def test_only_the_official_message_in_text_or_json_is_empty(self):
+        for message in (
+            EMPTY_MESSAGE,
+            json.dumps(EMPTY_MESSAGE),
+            json.dumps(EMPTY_MESSAGE, ensure_ascii=False),
+        ):
+            with self.subTest(message=message):
+                self.assertIsNotNone(empty_history_envelope(404, message, 1, 500))
+                for status, page in ((200, 1), (401, 1), (403, 1), (500, 1), (404, 2)):
+                    self.assertIsNone(empty_history_envelope(status, message, page, 500))
+        for message in (
+            None,
+            {},
+            "",
+            "Not Found",
+            json.dumps("Not Found"),
+            json.dumps({"message": EMPTY_MESSAGE}),
+            json.dumps([EMPTY_MESSAGE]),
+            json.dumps(EMPTY_MESSAGE)[:-1],
+            json.dumps(json.dumps(EMPTY_MESSAGE)),
+            f"<html>{EMPTY_MESSAGE}</html>",
+        ):
+            with self.subTest(message=message):
+                self.assertIsNone(empty_history_envelope(404, message, 1, 500))
+
+    def test_json_string_empty_response_with_the_client_accept_header(self):
+        client = FarmaliderClient("TOKEN_SINTETICO")
+        self.addCleanup(client.close)
+        self.assertEqual(client.session.headers["Accept"], "application/json")
+        response = requests.Response()
+        response.status_code = 404
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+        session = Mock()
+        session.get.return_value = response
+        query = HistoryQuery("FARMA", "2000-01-01", "2000-02-01")
+        for ascii_only in (False, True):
+            with (
+                self.subTest(ascii_only=ascii_only),
+                patch.object(client, "_get_session", return_value=session),
+                patch.object(
+                    client, "_request_route", return_value=("https://example.invalid", {})
+                ),
+            ):
+                response._content = json.dumps(
+                    EMPTY_MESSAGE, ensure_ascii=ascii_only
+                ).encode("utf-8")
+                result = client.get_pedidos_history(query, 1)
+                self.assertEqual(result["pedidos"], [])
+                self.assertEqual(result["totalRegistros"], 0)
+                with self.assertRaises(FarmaliderError):
+                    client.get_pedidos_history(query, 2)
+
     def test_exact_empty_response_becomes_zero_envelope_on_first_page_only(self):
         client = FarmaliderClient("TOKEN_SINTETICO")
         self.addCleanup(client.close)
@@ -74,6 +127,50 @@ class EmptyWindowTests(unittest.TestCase):
             self.assertEqual(first["pedidos_validos"], 2)
             again = collect_windows(Windows(), store, q, now=NOW)
             self.assertEqual(calls[-1], ("2026-03-04", 2))
+            self.assertEqual(again["pedidos_validos"], 3)
+            self.assertEqual(again["incomplete_windows"], 0)
+            self.assertEqual(again["faturamento_centavos"], 24000)
+
+    def test_http_json_empty_windows_continue_and_resume_real_collector(self):
+        client = FarmaliderClient("TOKEN_SINTETICO")
+        self.addCleanup(client.close)
+        calls = []
+
+        def get(url, *, params, **kwargs):
+            calls.append((params["dataInicio"], params["pagina"]))
+            response = requests.Response()
+            response.headers["Content-Type"] = "application/json; charset=utf-8"
+            if params["dataInicio"] < "2026-03-04":
+                response.status_code = 404
+                payload = EMPTY_MESSAGE
+            else:
+                response.status_code = 200
+                payload = Source(
+                    [order(i, day=params["dataInicio"], segment="FARMA") for i in (1, 2, 3)]
+                ).get_pedidos_history(query, params["pagina"])
+            response._content = json.dumps(payload).encode("utf-8")
+            return response
+
+        session = Mock()
+        session.get.side_effect = get
+        with (
+            closing(sqlite3.connect(":memory:")) as db,
+            patch.object(client, "_get_session", return_value=session),
+            patch.object(
+                client, "_request_route", return_value=("https://example.invalid", {})
+            ),
+        ):
+            store = HistoryStore(db, "FARMA")
+            query = HistoryQuery("FARMA", "2026-01-01", "2026-03-05", 2)
+            first = collect_windows(client, store, query, now=NOW, max_pages=3)
+            self.assertEqual(
+                calls, [("2026-01-01", 1), ("2026-02-01", 1), ("2026-03-04", 1)]
+            )
+            self.assertEqual(first["pedidos_validos"], 2)
+            self.assertEqual(first["incomplete_windows"], 1)
+            again = collect_windows(client, store, query, now=NOW)
+            self.assertEqual(calls[-1], ("2026-03-04", 2))
+            self.assertEqual(len(calls), 4)
             self.assertEqual(again["pedidos_validos"], 3)
             self.assertEqual(again["incomplete_windows"], 0)
             self.assertEqual(again["faturamento_centavos"], 24000)

@@ -81,7 +81,7 @@ class SyntheticHistorySource:
             ):
                 return httpx.Response(400)
             if not self.count:
-                return httpx.Response(404, text=HISTORY_EMPTY_MESSAGE)
+                return httpx.Response(404, json=HISTORY_EMPTY_MESSAGE)
             first = (int(params["pagina"]) - 1) * int(params["limite"])
             rows = []
             for n in range(first, min(self.count, first + query.limit)):

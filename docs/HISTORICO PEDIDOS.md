@@ -86,4 +86,12 @@ GET pontual da primeira janela de 2000 confirmou HTTP 404 com a mensagem exata �
 
 Um 404 genérico, mensagem diferente, autenticação inválida, falha de rede ou desaparecimento de página posterior continua sendo erro, conservando o checkpoint parcial. Uma consulta vazia consome uma unidade do orçamento de páginas/consultas; ENTER mantém o orçamento padrão. A retomada reutiliza janelas concluídas e páginas confirmadas. O progresso mostra “sem pedidos nesta janela”, sem sugerir página 1/0.
 
+### Correção do formato JSON — 1.5.20
+
+A implementação da 1.5.19 reconhecia apenas o texto puro. Um GET pontual adicional, com o mesmo `Accept: application/json` usado pelo NexoFlow, confirmou HTTP 404 com a mensagem oficial serializada como **string JSON**, entre aspas. A resposta tinha 65 bytes; a sondagem anterior, sem esse cabeçalho, recebeu 63 bytes de texto puro. Isso explica a interrupção na primeira janela de 2000 mesmo com a versão 1.5.19 instalada.
+
+O reconhecimento compartilhado Windows/Hub passa a decodificar uma string JSON antes da comparação exata, incluindo escapes Unicode. Continua restrito à página 1 e à mensagem oficial. Objetos, listas, JSON incompleto, 404 genérico e página posterior não comprovam janela vazia. Não há mudança de cursor, migração, exclusão de pedidos ou flexibilização financeira.
+
+A regressão reproduziu o HTTP 404 antes da correção. O teste de integração usa o cliente e coletor reais com respostas HTTP simuladas: duas janelas JSON vazias, página com pedidos, interrupção por orçamento e retomada na página seguinte, sem duplicar receita. O Hub usa a mesma regra e fixture JSON em PostgreSQL temporário, nos dois segmentos. A consulta real foi mínima e somente leitura; não houve nova carga anual ou alteração do SQLite do operador.
+
 Esse comportamento foi testado também no transporte sintético do Hub e no PostgreSQL temporário. Não houve carga anual de investigação nem alteração do banco comercial. A release 1.5.18 original permanece intacta e não contém esse ajuste. Os pacotes 1.5.19 passam pelo processo oficial de validação Windows antes da publicação.

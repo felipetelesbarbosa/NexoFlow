@@ -32,8 +32,16 @@ HISTORY_EMPTY_MESSAGE = "Nenhum pedido encontrado para o segmento e período inf
 
 
 def empty_history_envelope(status, message, page, limit):
-    """Só a ausência explícita oficial na página 1 encerra uma janela vazia."""
-    if status == 404 and page == 1 and message.strip() == HISTORY_EMPTY_MESSAGE:
+    """Ausência oficial na página 1, em texto puro ou string JSON negociada."""
+    if status != 404 or page != 1 or not isinstance(message, str):
+        return None
+    message = message.strip()
+    if message.startswith('"'):
+        try:
+            message = json.loads(message)
+        except ValueError:
+            return None
+    if message.strip() == HISTORY_EMPTY_MESSAGE:
         return dict(
             pedidos=[], pagina=1, limite=limit, totalRegistros=0, totalPaginas=0
         )
