@@ -33,7 +33,7 @@ def parser():
         "--limite",
         type=int,
         default=500,
-        help="Pedidos por página (padrão 500; 1.000 também permitido)",
+        help="Pedidos por página (padrão 500; outros limites dependem de confirmação da API)",
     )
     result.add_argument(
         "--max-paginas",

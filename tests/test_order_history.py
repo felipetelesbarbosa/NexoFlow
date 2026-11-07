@@ -290,6 +290,46 @@ class HistoryTransportTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             client._request_json("/api/Delivery/pedido/1", query={"token": "forbidden"})
 
+    def test_history_400_explains_rejected_parameters_without_retry_or_cursor_advance(
+        self,
+    ):
+        from contextlib import closing
+        from unittest.mock import patch
+
+        import requests
+
+        from farmalider_client import FarmaliderBadRequestError, FarmaliderClient
+
+        client = FarmaliderClient("TOKEN_PRIVADO_SINTETICO")
+        self.addCleanup(client.close)
+        q = HistoryQuery("FARMA", "2026-11-01", "2026-11-06", 1000)
+        response = requests.Response()
+        response.status_code = 400
+        response._content = b'{"error":"DADO_PRIVADO_NAO_EXIBIR"}'
+        session = Mock()
+        session.get.return_value = response
+        with closing(sqlite3.connect(":memory:")) as db:
+            store = HistoryStore(db, "FARMA")
+            with (
+                patch.object(client, "_get_session", return_value=session),
+                patch.object(
+                    client,
+                    "_request_route",
+                    return_value=("https://example.invalid", {}),
+                ),
+                self.assertRaises(FarmaliderBadRequestError) as error,
+            ):
+                collect(client, store, q, now=NOW)
+            message = str(error.exception)
+            self.assertIn("limite=1000", message)
+            self.assertIn("500", message)
+            self.assertIn("não confirma", message)
+            self.assertNotIn("TOKEN_PRIVADO", message)
+            self.assertNotIn("DADO_PRIVADO", message)
+            self.assertEqual(session.get.call_count, 1)
+            self.assertEqual(store.state(q)["next_page"], 1)
+            self.assertEqual(list(store.records()), [])
+
     def test_timeout_429_retry_and_failure_preserves_cursor(self):
         from unittest.mock import patch
 

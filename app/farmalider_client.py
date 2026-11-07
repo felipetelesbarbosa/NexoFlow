@@ -1077,15 +1077,27 @@ class FarmaliderClient:
             raise ValueError("Histórico pertence a outro segmento.")
         if type(page) is not int or not 1 <= page <= 2147483647:
             raise ValueError("Página inválida.")
-        return self._request_json(
-            self._delivery_path(f"pedidos/{query.segment.lower()}"),
-            query={
-                "dataInicio": query.start,
-                "dataFim": query.end,
-                "pagina": page,
-                "limite": query.limit,
-            },
-        )
+        try:
+            return self._request_json(
+                self._delivery_path(f"pedidos/{query.segment.lower()}"),
+                query={
+                    "dataInicio": query.start,
+                    "dataFim": query.end,
+                    "pagina": page,
+                    "limite": query.limit,
+                },
+            )
+        except FarmaliderBadRequestError:
+            raise FarmaliderBadRequestError(
+                "Histórico: a API recusou a consulta (HTTP 400). "
+                f"Segmento={query.segment}; início={query.start}; fim={query.end}; "
+                f"página={page}; limite={query.limit}. "
+                "O HTTP 400 não confirma qual parâmetro foi recusado. "
+                "O limite 500 já funcionou na carga FARMA anterior; "
+                "se usou outro limite, tente 500 mantendo o período. "
+                "Não houve troca automática de limite nem confirmação desta página. "
+                "Se persistir, conferir com a API os parâmetros aceitos."
+            ) from None
 
     def get_cliente_cadastro_by_cpf(self, cpf: str):
         if self.customer_directory is not None:

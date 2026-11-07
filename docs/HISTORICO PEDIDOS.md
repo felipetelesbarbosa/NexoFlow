@@ -9,12 +9,12 @@ Abra o NexoFlow Terminal, selecione o segmento e use a opção **10** ou os coma
 ```text
 nexo historico --inicio 2026-11-01 --fim 2026-11-06 --limite 500 --max-paginas 2
 nexo historico --inicio 2026-11-01 --fim 2026-11-06 --limite 500
-nexo historico --modo incremental --limite 1000
+nexo historico --modo incremental --limite 500
 nexo historico --inicio 2026-10-01 --fim 2026-10-31 --modo reconciliacao --reiniciar-janela
 nexo historico --somente-resumo
 ```
 
-O segundo comando retoma o primeiro. Uma página: `--max-paginas 1`. Todas: omitir esse parâmetro (orçamento operacional de 10.000 páginas por execução, não máximo da API). Trocar o limite cria um cursor novo pela página 1, mantendo a deduplicação dos fatos existentes. Não há teto arbitrário de 100 ou 1.000 pedidos na API; o parâmetro respeita int32 positivo.
+O segundo comando retoma o primeiro. Uma página: `--max-paginas 1`. Todas: omitir esse parâmetro (orçamento operacional de 10.000 páginas por execução, não máximo da API). Trocar o limite cria um cursor novo pela página 1, mantendo a deduplicação dos fatos existentes. O cliente aceita int32 positivo, mas isso não comprova os limites aceitos pelo servidor. O limite 500 foi usado com sucesso na carga real FARMA. Limites como 1.000 foram testados com fixtures; uma consulta real com 1.000 retornou HTTP 400 sem comprovar o parâmetro responsável. Em caso de 400, não há retry nem troca automática de limite; tentar 500 mantendo o período ajuda a isolar a causa. Se persistir, conferir o contrato da API.
 
 Faixas longas são divididas em janelas de até 31 dias entre extremos, compartilhando a fronteira. A amostra não prova inclusividade de `dataFim`: não se soma um dia automaticamente ao pedido do operador. Datas sem offset são interpretadas em America/Belem pela convenção operacional, nunca UTC. A extração pode concluir todos os IDs declarados e ainda apresentar `LIMITES_DA_API_NAO_HOMOLOGADOS`. Isso não equivale a cobertura temporal completa.
 
