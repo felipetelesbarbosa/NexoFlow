@@ -4,7 +4,13 @@ O publicador foi distribuído na [release Windows 1.5.21](https://github.com/fel
 
 ## Acompanhamento do Work em 07/11/2026
 
-O Work criou três planilhas privadas e vazias para o piloto FARMA, separadas por papel (Dashboard, Operação e Histórico), e conferiu a pasta e as permissões. O kit sintético passou pela auditoria local. O Data Studio reconheceu o conector privado do Apps Script com os quatro arquivos da versão 1.5.21 e o serviço avançado Google Sheets API v4. A interface solicitou o consentimento do titular para concluir a conexão.
+O Work criou três planilhas privadas e vazias para o piloto FARMA, separadas por papel (Dashboard, Operação e Histórico), e conferiu a pasta e as permissões. O kit sintético passou pela auditoria local. O Data Studio reconheceu o conector privado do Apps Script com os quatro arquivos da versão 1.5.21 e o serviço avançado Google Sheets API v4. O titular autorizou o conector e o Work configurou as cinco fontes FARMA de homologação listadas abaixo. Os campos vêm do registro de schemas do conector. A leitura dos valores depende de origens identificadas, manifesto válido e partes confirmadas.
+
+**Bloqueio no preparo da 1.5.21.** Em um ensaio isolado com três planilhas novas simuladas, o configurador criou o índice e marcou apenas o Dashboard. O preparo verificou as três origens e retornou `ORIGEM_DO_ARQUIVO_NAO_COMPROVADA` antes da escrita de fatos. O ensaio avaliou a inicialização dos destinos, separadamente da auditoria do SQLite FARMA. A fixture do teste de transporte já inicia com as três origens marcadas.
+
+**Correção para o Codex.** No configurador, valide primeiro o mapa do perfil, os três IDs e papéis distintos, as pastas, a edição autorizada e todos os marcadores existentes. Uma divergência deve bloquear antes de gravar. Sob a trava oficial, use `stamp_book` para marcar as origens validadas como Dashboard, Operação e Histórico, inclusive ao retomar uma configuração parcial. Preserve os marcadores corretos e recuse conflitos. Não preencha os marcadores manualmente nem desative a guarda do publicador.
+
+**Critério para retomar o piloto.** Testar `configurar → ativar-data-studio → capacidade` com três origens vazias, sem marcadores pré-inseridos pela fixture. Repetir a configuração deve preservar os três marcadores sem duplicação. O preparo deve concluir sem escrita de fatos para o trio correto e bloquear um trio com origem de outro segmento ou papel. Só então prosseguir com o lote piloto e a conferência financeira previstos neste roteiro.
 
 Ainda faltam a confirmação da instalação Windows em modo Preserve após backup privado, a inicialização dos destinos e a conferência do manifesto, a aplicação de um lote piloto no Google e a reconciliação do SQLite com a releitura das planilhas. A publicação comercial FARMA continua pendente. A réplica comercial PET vem após a homologação FARMA.
 
