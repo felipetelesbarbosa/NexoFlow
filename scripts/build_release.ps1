@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.16",
+    [string]$Version = "1.5.17",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -414,11 +414,13 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-Histórico paginado FARMA/PET no Terminal: período, tamanho de página ajustável, retomada e reconciliação por ID oficial. SQLite privado grava página e checkpoint juntos; LTV observado usa centavos e mantém receita mensal separada.
+Histórico com resumo separado por execução, período solicitado e acumulado; contagens distinguem pedidos e clientes. Terminal mostra origens dos fatos e pendências, valores em reais e janelas concluídas sem sugerir páginas inexistentes.
 
-Compras oficiais sem Weni permanecem no histórico. O vínculo cadastral exige CPF válido único ou CPF inválido com nome e telefone/e-mail concordantes, sem criar ou modificar contatos. Backfill não dispara Recompra. Fontes adicionais no Google Sheets exigem revisão, backup e conferência; não houve escrita comercial nos testes. Inclusividade da data final e descontos ainda requerem homologação da API.
+Corrige cancelamento e entradas inválidas no menu e fecha efetivamente a conexão da auditoria SQLite somente leitura. Recebimentos das novas execuções são persistidos com a página, sem inventar a origem de dados antigos. Reduz recálculos de LTV entre janelas e regravações de vínculos idênticos. Incorpora f1da4f7, 7d06041 e 0ba9ed7. Regras financeiras e de identidade permanecem preservadas.
 
-A coleta automática recente no Analytics é opcional por perfil (hoje até D−20). O Hub recebe apenas código e homologação isolada, sem release ou ativação comercial. [Guia do histórico](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/HISTORICO%20PEDIDOS.md).
+**Limitação da auditoria real FARMA:** a cópia SQLite enviada excedeu o limite de transferência de 32 MiB do ambiente de auditoria. A composição dos 43.806 pedidos válidos, do faturamento acumulado e a causa da única pendência real ainda não foram verificadas no banco. Esta release valida correções de software com fixtures e testes Windows; não declara homologação financeira completa. Não foi repetida a carga anual. [Relatório da auditoria](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/AUDITORIA%20FINAL%20HISTORICO%20FARMA.md).
+
+Atualize pelo Setup no modo Preserve, após backup privado consistente e encerramento das rotinas. Mantenha SQLite, logs e checkpoints; não reinicie janelas para atualizar. A tabela de recebimentos é aditiva. O Hub continua somente em homologação, sem implantação ou release comercial nesta entrega.
 
 Analytics e Noturno usam a integração Meta nativa, sem exigir MCP ou Codex CLI. As rotinas FARMA/PET e as funcionalidades da versão anterior permanecem preservadas. A atualização Preserve mantém configurações e dados. Esta versão não comprova autenticação no proxy corporativo ou aprovação pelo antivírus no PC do usuário; consulte os relatórios e o guia de homologação.
 
@@ -434,4 +436,4 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.16
+# NexoFlow 1.5.17

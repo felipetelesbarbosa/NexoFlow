@@ -148,9 +148,9 @@ function Assert-Installed {
 
     Assert-True (Test-Path -LiteralPath $UninstallKey) "Registro de desinstalação não foi criado."
     $installedVersion = (Get-Content -Raw -LiteralPath (Join-Path $InstallDir "VERSION")).Trim()
-    Assert-True ($installedVersion -eq "1.5.16") "Versão instalada inesperada: $installedVersion"
+    Assert-True ($installedVersion -eq "1.5.17") "Versão instalada inesperada: $installedVersion"
     $displayVersion = (Get-ItemProperty -LiteralPath $UninstallKey -Name DisplayVersion -ErrorAction Stop).DisplayVersion
-    Assert-True ($displayVersion -eq "1.5.16") "DisplayVersion inesperada: $displayVersion"
+    Assert-True ($displayVersion -eq "1.5.17") "DisplayVersion inesperada: $displayVersion"
 }
 
 Remove-TestArtifacts
@@ -165,7 +165,7 @@ try {
     $importsPayload = Join-Path $SetupDir 'payload\importacoes'
     Assert-True (Test-Path -LiteralPath $importsPayload -PathType Container) 'Pasta importacoes ausente no ZIP do Setup.'
     Assert-True (@(Get-ChildItem -LiteralPath $importsPayload -Force -Recurse).Count -eq 0) 'O pacote deve conter importacoes vazia, sem exports.'
-    $projectZip = Join-Path (Split-Path -Parent $resolvedZip) 'NexoFlow-1.5.16.zip'
+    $projectZip = Join-Path (Split-Path -Parent $resolvedZip) 'NexoFlow-1.5.17.zip'
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $projectArchive = [IO.Compression.ZipFile]::OpenRead($projectZip)
     try {
@@ -373,7 +373,20 @@ public static class NexoFlowSetupRootLock {
     & python (Join-Path $PSScriptRoot 'test_checkup_active_windows.py') --root $InstallDir
     if ($LASTEXITCODE -ne 0) { throw 'O check-up sob cargas simultâneas falhou.' }
 
-    Write-Host "[OK] Smoke test do NexoFlow Setup 1.5.16 concluído."
+    Write-Host '==> Auditoria e menu do histórico no pacote instalado (somente fixtures)'
+    $previousPythonPath = $env:PYTHONPATH
+    Push-Location $InstallDir
+    try {
+        $env:PYTHONPATH = Join-Path $InstallDir 'app'
+        & (Join-Path $InstallDir '.venv\Scripts\python.exe') -m unittest tests.test_order_history_audit -q
+        if ($LASTEXITCODE -ne 0) { throw 'A regressão do histórico no pacote instalado falhou.' }
+    } finally {
+        Pop-Location
+        if ($null -eq $previousPythonPath) { Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue }
+        else { $env:PYTHONPATH = $previousPythonPath }
+    }
+
+    Write-Host "[OK] Smoke test do NexoFlow Setup 1.5.17 concluído."
 }
 finally {
     if ($null -eq $previousTestNetworkMode) { Remove-Item Env:NEXOFLOW_NETWORK_MODE -ErrorAction SilentlyContinue }
@@ -384,4 +397,4 @@ finally {
     Remove-TestArtifacts
     Remove-Item -LiteralPath $TempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
-# NexoFlow 1.5.16
+# NexoFlow 1.5.17

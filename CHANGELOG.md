@@ -1,13 +1,21 @@
 # NexoFlow — Changelog
 
-## NexoFlow 1.5.16 — Histórico paginado e LTV observado (em validação)
+## NexoFlow 1.5.17 — Auditoria e interação do histórico (em validação)
+
+- Incorpora as correções f1da4f7, 7d06041 e 0ba9ed7: escopos separados, recebimentos atômicos, paginação legível, cancelamento/validação de entradas e fechamento efetivo da conexão SQLite offline.
+- Exibe origens dos fatos e das pendências que eram calculadas mas omitidas do terminal. Preserva fatos anteriores, regras financeiras, identidade, checkpoints e compatibilidade com bancos da 1.5.16.
+- LTV não é recalculado em cada janela; vínculos idênticos evitam regravação. Leituras e métricas permanecem separadas de operações comerciais.
+- A cópia real enviada excedeu o limite de transferência de 32 MiB do ambiente de auditoria. Integridade, composição financeira e causa da única pendência real **não foram homologadas**. Nenhuma carga anual foi repetida nem dado comercial alterado.
+- Setup e pacotes próprios preservam a release 1.5.16 e anteriores. Hub permanece em homologação, sem deploy ou release comercial. Data efetiva nas notas da publicação após checks do mesmo commit.
+
+## NexoFlow 1.5.16 — Histórico paginado e LTV observado — 06/11/2026
 
 - Nova coleta `pedidos/{segmento}` no Terminal: período, limite ajustável, uma/todas as páginas, janelas controladas e retomada. Estado mínimo no SQLite privado, transações por página e contagem de IDs antes dos filtros comerciais.
 - Conciliação por pedido/cliente oficial, preservando compras sem Weni. Vínculo com CPF válido único ou CPF inválido com nome e telefone/e-mail concordantes; nenhuma alteração automática de contatos ou disparo de Recompra.
 - LTV observado em centavos, receita mensal separada, cancelamento por status 3 ou pagamento 0, frete contado uma vez. Descontos não demonstrados e conflitos permanecem pendentes. Reabertura de fechamento antigo exige reconciliação explícita.
 - Fontes aditivas Histórico/LTV/Cobertura com revisão de destino, backup, confirmação e idempotência. Omissão local de compra remota bloqueia a aplicação. Analytics reutiliza o histórico local; coleta automática hoje..D−20 depende de ativação explícita por perfil.
 - Mesmas regras puras disponíveis no Hub em homologação Docker/PostgreSQL, sem release Hub ou escrita comercial. O pacote Windows não inclui o Hub nem depende da VPS.
-- Versão 1.5.15 e anteriores preservadas. A data efetiva será registrada nas notas do release após os checks do mesmo commit. Homologação real da rota, datas finais, descontos e planilhas ainda é necessária.
+- Versão 1.5.15 e anteriores preservadas. A data efetiva consta nas notas do release. Homologação real da rota, datas finais, descontos e planilhas ainda é necessária.
 
 ## NexoFlow 1.5.15 — Diagnóstico da instalação MCP
 
