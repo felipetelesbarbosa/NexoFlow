@@ -58,3 +58,6 @@ Não foi removida imagem de rollback nem volume. Não executar docker volume pru
 
 Fontes: inventários Docker/du/SQL da VPS; métricas Hostinger; [documentação n8n](https://docs.n8n.io/hosting/scaling/execution-data/).
 
+
+## Confirmação do agendamento natural
+O timer diário foi observado disparando em 07/11/2026 às 03h30min02s. O serviço terminou às 03h30min14s com sucesso, snapshot 9956088d; o marcador de dump Hub avançou às 03h30min03s. Próximo disparo: 08/11 às 03h30. Nenhuma retenção destrutiva foi ativada. Essa prova não substitui ensaio de recuperação ou leitura integral do snapshot novo.

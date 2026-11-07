@@ -2,7 +2,7 @@
 07/11/2026 | America/Belem | VPS 2132956 | Ubuntu 24.04 | KVM 4
 
 ## Parecer e escopo
-A infraestrutura operacional está apta à preparação da Etapa 4, com ressalvas. O Hub foi atualizado e homologado com fontes sintéticas. A Etapa 3.5 não deve ser considerada integralmente encerrada enquanto faltarem a validação do cliente Windows/DBeaver, o disparo natural ainda futuro e as lacunas da matriz BI. O desenvolvimento dos conectores reais continua sendo trabalho do Codex. Nenhuma leitura comercial nova foi executada.
+A infraestrutura operacional está apta à preparação da Etapa 4, com ressalvas. O Hub foi atualizado e homologado com fontes sintéticas. A Etapa 3.5 não deve ser considerada integralmente encerrada enquanto faltarem a validação do cliente Windows/DBeaver e as lacunas da matriz BI. O desenvolvimento dos conectores reais continua sendo trabalho do Codex. Nenhuma leitura comercial nova foi executada.
 
 ## Estado inicial
 Sete contêineres saudáveis; Hub no SHA 23f28068b20caaa1af853e6b13af9479d12aae79. Banco Hub separado do n8n, schema 1+2, 24 tarefas e 2.406 pedidos sintéticos. Sete workflows inativos, sem tokens comerciais no Hub. Disco 5,7 GiB/193 GiB, RAM usada aproximadamente 1.204 MiB de 15.992 MiB, sem swap. UFW permite somente SSH público, com política de entrada deny. Nenhuma porta Docker publicada.
@@ -69,7 +69,6 @@ A leitura integral Restic terminou com sucesso às 01h40m53s, com 14 snapshots e
 
 ## Pendências e Etapa 4
 - Instalação e teste do DBeaver no Windows, confirmação das chaves individuais dos demais desenvolvedores e custódia dos novos segredos de consulta.
-- Confirmação do primeiro disparo natural após 03h30; backup manual não substitui a prova.
 - Separação de migrador/runtime antes de ampliar o uso comercial; runtime Hub ainda é dono do seu schema HML.
 - Codex: injeção de clientes reais read-only por segmento, egress restrito, orçamento do ensaio, telemetria de chamadas e autorização backend dos produtos.
 - Reconciliação da pendência antiga FRETE_DIVERGENTE apenas mediante resposta oficial; não foi acessada nem alterada a base privada Windows.
@@ -99,3 +98,8 @@ O navegador autenticado exibiu a tela “Log in to NexoFlow n8n” do Cloudflare
 | Matriz FARMA/PET | 106 linhas; 19 páginas percorridas, com lacunas explícitas de fórmulas/interações |
 
 As pendências não são convertidas em validações aprovadas. Este registro encerra a execução operacional autorizada, sem declarar homologação integral de tudo o que depende do Windows, das fontes reais ou da inspeção BI restante.
+
+## Retomada e primeiro backup natural confirmados
+Em 07/11/2026, o timer disparou às 03h30min02s e o backup concluiu às 03h30min14s, Result=success e ExecMainStatus=0. O marcador Hub avançou às 03h30min03s; snapshot 9956088d. O próximo disparo está previsto para 08/11 às 03h30. Essa prova resolve a pendência de agendamento natural mencionada no registro histórico acima; não equivale a novo teste de restauração ou leitura integral do novo snapshot.
+
+Sete serviços saudáveis na conferência das 03h30min25s. Nesta retomada não houve mudança de serviços ou dados; foram revalidados os leitores por ambos os relays, contagens 27/2406/84/169, dez workflows inativos, rotação 10m x 3, retenção n8n, modo homologacao e escrita_real=false. Inspeção BI complementada e matriz de 106 linhas validada. Ver [complemento da retomada](G_RETOMADA_E_VALIDACOES.md). A Etapa 3.5 continua em validação parcial, sem liberação comercial.

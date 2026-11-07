@@ -10,6 +10,7 @@ Este conjunto distingue execução comprovada de arquitetura futura. O encerrame
 - [Central de Operações e Métricas](E_ARQUITETURA_WEB.md)
 - [Inventário e paridade Data Studio](F_PARIDADE_DATA_STUDIO.md)
 - [Matriz detalhada](matriz_paridade.csv)
+- [Retomada e validações complementares](G_RETOMADA_E_VALIDACOES.md)
 
 Não há autorização de produção, escrita comercial, publicação de novos hostnames ou exclusão de backups neste conjunto.
 
