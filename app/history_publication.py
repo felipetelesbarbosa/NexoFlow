@@ -18,7 +18,7 @@ from uuid import uuid4
 from dedup_io import save_private
 from history_capacity import allocate
 from order_history import HistoryError, digest
-from order_history_sheets import SCHEMAS, normalized_cells
+from order_history_sheets import NUMERIC, SCHEMAS, normalized_cells
 
 FORMAT = "historico_publicacao_v2"
 BATCH_ROWS = 200
@@ -51,6 +51,14 @@ def pack(title, row, segment):
         or not row["chave"]
     ):
         raise HistoryError("LINHA_OU_SEGMENTO_INVALIDO")
+    if any(
+        not isinstance(value, str) for key, value in row.items() if key not in NUMERIC
+    ):
+        raise HistoryError("CAMPO_TEXTO_COM_TIPO_INVALIDO")
+    if row["vigente"] not in ("Sim", "Não") or (
+        title == "Historico_Itens" and row["frete"] not in ("Sim", "Não")
+    ):
+        raise HistoryError("MARCADOR_HISTORICO_INVALIDO")
     return json.dumps(normalized_cells(row), sort_keys=True, ensure_ascii=False)
 
 
@@ -575,16 +583,19 @@ class Publication:
                 ).fetchone()
                 actual = None
                 if any(v not in ("", None) for v in cells):
-                    actual = normalized_cells(
-                        dict(
-                            zip(
-                                SCHEMAS[title],
-                                cells + [""] * (len(SCHEMAS[title]) - len(cells)),
-                                strict=True,
-                            )
+                    actual = json.loads(
+                        pack(
+                            title,
+                            dict(
+                                zip(
+                                    SCHEMAS[title],
+                                    cells + [""] * (len(SCHEMAS[title]) - len(cells)),
+                                    strict=True,
+                                )
+                            ),
+                            self.segment,
                         )
                     )
-                    pack(title, actual, self.segment)
                 before = json.loads(old[0]) if old else None
                 expected = json.loads(op[0]) if op and op[1] == "done" else before
                 if actual != expected and not (

@@ -242,6 +242,12 @@ class PublicationTests(unittest.TestCase):
         with self.assertRaisesRegex(HistoryError, "LINHA_REMOVIDA"):
             self.pub.apply(review)
 
+    def test_numeric_identifier_is_not_silently_accepted_as_text(self):
+        self.pub.apply(self.prepare())
+        self.remote.rows[("Historico_Pedidos", 0)][2]["pedido_id"] = 1
+        with self.assertRaisesRegex(HistoryError, "CAMPO_TEXTO"):
+            self.prepare()
+
     def test_pilot_report_has_explicit_subset_and_no_full_ltv_claim(self):
         review = self.prepare()
         self.pub.apply(review, max_batches=1)
