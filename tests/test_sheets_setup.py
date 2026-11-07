@@ -68,6 +68,38 @@ class StorageSetupTests(unittest.TestCase):
         )
         again.close()
 
+    def test_google_location_type_preserves_existing_origin_and_finishes_roots(self):
+        setup, provider, books = self.make()
+        self.addCleanup(setup.close)
+        stamp_book(
+            books["dashboard"], hub="dashboard", segment="FARMA", role="dashboard"
+        )
+        marker = next(iter(books["dashboard"].metadata.values()))
+        marker["location"]["locationType"] = "SPREADSHEET"
+        original = deepcopy(marker)
+        setup.configure(provider)
+        self.assertIn(original, books["dashboard"].metadata.values())
+        setup.close()
+        again = StorageSetup(setup.client, "dashboard", "FARMA")
+        self.addCleanup(again.close)
+        self.assertFalse(again.configure(provider))
+        for book in books.values():
+            self.assertEqual(
+                sum(
+                    m["metadataKey"] == FILE_MARKER_KEY for m in book.metadata.values()
+                ),
+                1,
+            )
+
+    def test_conflicting_third_origin_does_not_even_acquire_remote_lease(self):
+        setup, provider, books = self.make()
+        self.addCleanup(setup.close)
+        stamp_book(books["history"], hub="dashboard", segment="PET", role="historico")
+        before = {key: book.writes for key, book in books.items()}
+        with self.assertRaises(ContinuationError):
+            setup.configure(provider)
+        self.assertEqual({key: book.writes for key, book in books.items()}, before)
+
     def test_fresh_configuration_proves_all_three_origins(self):
         setup, provider, books = self.make()
         self.addCleanup(setup.close)

@@ -122,7 +122,7 @@ class MyDriveProvisioner:
             self.source,
             f"/files/{source_id}",
             params={
-                "fields": "id,name,mimeType,parents,trashed,driveId,capabilities(canEdit)",
+                "fields": "id,name,mimeType,parents,trashed,driveId,properties,capabilities(canEdit)",
                 "supportsAllDrives": "true",
             },
         )
@@ -132,7 +132,9 @@ class MyDriveProvisioner:
             or result.get("mimeType") != "application/vnd.google-apps.spreadsheet"
             or (result.get("capabilities") or {}).get("canEdit") is not True
         ):
-            raise ContinuationError("A origem precisa ser uma planilha ativa com edição pela conta de serviço.")
+            raise ContinuationError(
+                "A origem precisa ser uma planilha ativa com edição pela conta de serviço."
+            )
         return result
 
     def locate(self, operation: str) -> str | None:
@@ -172,8 +174,22 @@ class MyDriveProvisioner:
         segment: str,
         role: str,
         number: int,
+        primary: bool = False,
     ):
         source = self.source_info(source_id)
+        if primary:
+            properties = source.get("properties", {})
+            if "nexoflow_operation" in properties or any(
+                key in properties and properties[key] != expected
+                for key, expected in (
+                    ("nexoflow_hub", hub),
+                    ("nexoflow_segment", segment),
+                    ("nexoflow_role", role),
+                )
+            ):
+                raise ContinuationError(
+                    "Origem principal possui propriedades de continuação ou de outro contexto; preservar e conferir o manifesto."
+                )
         if source.get("driveId"):
             raise ContinuationError(
                 "Este provisionamento foi configurado para Meu Drive; confira a origem."

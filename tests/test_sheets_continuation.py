@@ -26,7 +26,11 @@ class MetadataBook:
         self.lose_response = False
 
     def fetch_sheet_metadata(self, **kwargs):
-        return {"developerMetadata": list(copy.deepcopy(self.metadata).values())}
+        markers = list(copy.deepcopy(self.metadata).values())
+        for marker in markers:
+            if marker.get("location", {}).get("spreadsheet") is True:
+                marker["location"].setdefault("locationType", "SPREADSHEET")
+        return {"developerMetadata": markers}
 
     def batch_update(self, body):
         proposed = copy.deepcopy(self.metadata)

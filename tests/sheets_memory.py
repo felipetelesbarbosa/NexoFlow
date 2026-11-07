@@ -289,7 +289,9 @@ class Provisioner:
         self.client, self.creations = client, 0
         self.shared = []
 
-    def prepare_intent(self, source_id, operation, *, hub, segment, role, number):
+    def prepare_intent(
+        self, source_id, operation, *, hub, segment, role, number, primary=False
+    ):
         return {
             "operation": operation,
             "source": source_id,

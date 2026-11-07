@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 from contextlib import nullcontext
+from typing import Any
 
 import gspread
 from google.auth.exceptions import GoogleAuthError
@@ -19,6 +20,7 @@ from sheets_continuation import (
     SheetsLease,
     allocated_cells,
     fingerprint,
+    origin_diagnostic,
     stamp_book,
     verify_book_stamp,
 )
@@ -84,10 +86,10 @@ class StorageSetup:
             raise
 
     def configure(self, provider):
-        # A trava protege também o pré-voo de marcadores. Nenhum fato é escrito.
+        # Pré-voo sem escrita; a trava protege a reconferência e a configuração.
         if len(set(self.roots.values())) != 3:
             raise ContinuationError("Os três papéis exigem arquivos diferentes.")
-        self.lease.require()
+        # Pré-voo somente leitura, inclusive antes de adquirir a trava remota.
         # Conferir TODOS os marcadores antes de criar o índice ou marcar origens.
         for role, key in self.roots.items():
             verify_book_stamp(
@@ -95,15 +97,26 @@ class StorageSetup:
             )
         # O provisionador comprova pasta privada e edição nas duas identidades.
         for role, key in self.roots.items():
-            provider.prepare_intent(
-                key,
-                "0" * 32,
-                hub=self.hub_id,
-                segment=self.segment,
-                role=role,
-                number=1,
-            )
+            try:
+                provider.prepare_intent(
+                    key,
+                    "0" * 32,
+                    hub=self.hub_id,
+                    segment=self.segment,
+                    role=role,
+                    number=1,
+                    primary=True,
+                )
+            except ContinuationError as exc:
+                raise ContinuationError(
+                    f"Pré-voo bloqueado: arquivo={key}; papel={role}; {exc}"
+                ) from None
         self.lease.require()
+        # Reconferir sob lease: o pré-voo não autoriza usar marcadores obsoletos.
+        for role, key in self.roots.items():
+            verify_book_stamp(
+                self.books[key], hub=self.hub_id, segment=self.segment, role=role
+            )
         if self.index is not None:
             if self.sheet is None:
                 raise ContinuationError(
@@ -274,10 +287,174 @@ class StorageSetup:
         return result
 
 
+def _read_failure(exc):
+    response = getattr(exc, "response", None)
+    code = getattr(response, "status_code", None)
+    return {
+        "resultado": "LEITURA_NEGADA"
+        if code in (401, 403, 404) or isinstance(exc, PermissionError)
+        else (
+            "CONFIGURACAO_INVALIDA"
+            if isinstance(exc, (ContinuationError, ValueError))
+            else "FALHA_DE_LEITURA"
+        ),
+        "http": code if type(code) is int else None,
+        "orientacao": "Conferir acesso/configuração; não tratar falha de leitura como marcador ausente.",
+    }
+
+
+def diagnose_origins(client, hub_id, segment):
+    """Somente GETs: continua após erro de um arquivo, sem OAuth, lease ou escrita."""
+    from sheets_provisioning import DRIVE
+
+    report = {
+        "diagnostico": "origens_v1",
+        "segmento": segment,
+        "somente_leitura": True,
+        "pasta_e_permissoes_oauth": "NAO_VERIFICADAS_NESTE_DIAGNOSTICO",
+        "origens_compativeis": False,
+        "arquivos": [],
+        "impedimentos": [],
+        "nota": "Diagnóstico de origens não autoriza publicação nem confirma fontes Data Studio. A configuração ainda verifica pasta e permissões OAuth.",
+    }
+    try:
+        hub = client.open_by_key(hub_id)
+        tabs = {ws.title: ws for ws in hub.worksheets()}
+        configured = configured_storage(hub_id)
+        layout = (
+            SheetsStorage.from_values(tabs[STORAGE_SHEET].get("A1:B5"), hub_id)
+            if STORAGE_SHEET in tabs
+            else configured
+        )
+        if layout is None or (configured is not None and configured != layout):
+            raise ContinuationError("Mapa ausente ou divergente")
+        from runtime_profile import validate_sheet_destinations
+
+        validate_sheet_destinations(layout.dashboard, layout.operations, layout.history)
+        roots = dict(
+            dashboard=hub_id, operacao=layout.operations, historico=layout.history
+        )
+        if len(set(roots.values())) != 3:
+            raise ContinuationError("IDs repetidos")
+    except (
+        APIError,
+        RequestException,
+        GoogleAuthError,
+        OSError,
+        ValueError,
+        ContinuationError,
+        gspread.exceptions.SpreadsheetNotFound,
+    ) as exc:
+        report["impedimentos"].append(
+            {"etapa": "mapa_dos_destinos", **_read_failure(exc)}
+        )
+        return report
+    files = [(role, key, "principal") for role, key in roots.items()]
+    try:
+        index = (
+            ContinuationIndex.parse(
+                tabs[INDEX_TITLE].get_all_values(),
+                hub=hub_id,
+                segment=segment,
+                roots=roots,
+            )
+            if INDEX_TITLE in tabs
+            else None
+        )
+        report["indice"] = "APROVADO" if index else "AUSENTE"
+        if index:
+            files.extend(
+                (info["role"], key, "continuacao") for key, info in index.files.items()
+            )
+            report["fontes_data_studio_quantidade"] = len(
+                index.config["connector_tables"]
+            )
+    except (
+        APIError,
+        RequestException,
+        GoogleAuthError,
+        ValueError,
+        ContinuationError,
+    ) as exc:
+        report["indice"] = "NAO_COMPROVADO"
+        report["impedimentos"].append({"etapa": "indice", **_read_failure(exc)})
+    for role, key, kind in files:
+        item: dict[str, Any] = {"papel": role, "planilha_id": key, "tipo": kind}
+        report["arquivos"].append(item)
+        try:
+            book = hub if key == hub_id else client.open_by_key(key)
+            meta = book.fetch_sheet_metadata(params={"fields": "developerMetadata"})
+            item.update(origin_diagnostic(meta, hub=hub_id, segment=segment, role=role))
+            if kind == "continuacao" and item["resultado"] == "AUSENTE":
+                item["resultado"] = "BLOQUEADO"
+                item["campos_divergentes"].append("origem_continuacao_ausente")
+        except (
+            APIError,
+            RequestException,
+            GoogleAuthError,
+            OSError,
+            ValueError,
+            gspread.exceptions.SpreadsheetNotFound,
+            ContinuationError,
+        ) as exc:
+            item.update(_read_failure(exc))
+        try:
+            info = client.http_client.request(
+                "get",
+                DRIVE + "/files/" + key,
+                params={
+                    "fields": "id,mimeType,trashed,properties,capabilities(canEdit),parents",
+                },
+            ).json()
+            props = info.get("properties", {})
+            continuation = "nexoflow_operation" in props
+            valid = (
+                info.get("id") == key
+                and not info.get("trashed")
+                and info.get("mimeType") == "application/vnd.google-apps.spreadsheet"
+            )
+            conflicts = []
+            for field, expected in (
+                ("nexoflow_hub", hub_id),
+                ("nexoflow_role", role),
+                ("nexoflow_segment", segment),
+            ):
+                if (field in props or kind == "continuacao") and props.get(
+                    field
+                ) != expected:
+                    conflicts.append(field)
+            if kind == "principal" and continuation:
+                conflicts.append("principal_tem_intencao_de_continuacao")
+            item["drive"] = {
+                "arquivo_ativo_confirmado": valid,
+                "edicao_conta_servico": info.get("capabilities", {}).get("canEdit")
+                is True,
+                "quantidade_pastas": len(info.get("parents", [])),
+                "intencao_continuacao_presente": continuation,
+                "campos_divergentes": conflicts,
+            }
+            if not valid or conflicts or not item["drive"]["edicao_conta_servico"]:
+                item["resultado"] = "BLOQUEADO"
+        except (
+            APIError,
+            RequestException,
+            GoogleAuthError,
+            OSError,
+            ValueError,
+        ) as exc:
+            item["drive"] = _read_failure(exc)
+            item["resultado"] = "LEITURA_DRIVE_NAO_COMPROVADA"
+    report["origens_compativeis"] = not report["impedimentos"] and all(
+        item["resultado"] in {"APROVADO", "AUSENTE"} for item in report["arquivos"]
+    )
+    return report
+
+
 def run(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "operation", choices=("configurar", "status", "ativar-data-studio")
+        "operation",
+        choices=("configurar", "status", "diagnosticar-origens", "ativar-data-studio"),
     )
     parser.add_argument(
         "--abas",
@@ -313,8 +490,22 @@ def run(argv=None):
         from run_noturno_console import operation_lock
 
         with operation_lock() if os.name == "nt" else nullcontext():
-            client = gspread.service_account(filename=str(GOOGLE_CREDENTIALS_FILE))
+            kwargs = {}
+            if args.operation == "diagnosticar-origens":
+                kwargs["scopes"] = [
+                    "https://www.googleapis.com/auth/spreadsheets.readonly",
+                    "https://www.googleapis.com/auth/drive.metadata.readonly",
+                ]
+            client = gspread.service_account(
+                filename=str(GOOGLE_CREDENTIALS_FILE), **kwargs
+            )
             client.set_timeout((10, 60))
+            if args.operation == "diagnosticar-origens":
+                report = diagnose_origins(
+                    client, settings.GOOGLE_SPREADSHEET_ID, segment()
+                )
+                print(json.dumps(report, ensure_ascii=False, indent=2))
+                return 0 if report["origens_compativeis"] else 3
             setup = StorageSetup(client, settings.GOOGLE_SPREADSHEET_ID, segment())
             if args.operation == "configurar":
                 provider = MyDriveProvisioner(

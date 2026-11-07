@@ -1,5 +1,13 @@
 # NexoFlow — Changelog
 
+## Não publicado — diagnóstico e validação de origens após 1.5.22
+
+- Corrigir falso conflito de origem quando o Google retorna `locationType=SPREADSHEET`; comparar JSON por campos e preservar marcadores válidos.
+- Validar os três destinos antes de adquirir lease/escrever e reconferir sob trava; recusar adoção de continuação como arquivo principal.
+- Adicionar `armazenamento diagnosticar-origens` somente leitura, erros por arquivo/papel/campo e auxiliar controlado para a instalação original 1.5.22 sem substituir módulos.
+- Preservar fontes Data Studio, fatos, SQLite e journals. Nenhuma nova versão/release ou carga comercial nesta correção; ver `docs/CORRECAO ORIGENS 1.5.22.md`.
+
+
 ## NexoFlow 1.5.22 — Correção das três origens
 
 - Corrige o registro das origens Dashboard, Operação e Histórico sob a trava oficial, com pré-validação dos três destinos, papéis, segmento e permissões, recuperação parcial e preservação de marcadores corretos.

@@ -1,5 +1,7 @@
 # Relatório técnico: publicador histórico SQLite / Sheets
 
+> Correção posterior à 1.5.22: [origem Google com locationType e diagnóstico seguro](CORRECAO%20ORIGENS%201.5.22.md). A rejeição comercial foi reproduzida e corrigida no código; release e carga comercial permanecem pausadas nesta missão.
+
 ## Situação operacional verificada pelo Work — 07/11/2026
 
 Consulte o [registro operacional FARMA 1.5.22](OPERACAO%20FARMA%201.5.22%202026-11-07.md). O código/release e os destinos foram conferidos; o Work desta sessão não acessa o SQLite Windows e não aplicou fatos comerciais. O agregado recebido fecha internamente, mas READY, revisão, capacidade real, conciliação SQLite/Sheets/Data Studio e idempotência permanecem pendentes. O início comercial autorizado segue o roteiro 1.5.22 com um lote de segurança e retomada imediata da mesma revisão após aprovação da conferência, sem repetir homologação extensa. PET permanece posterior.

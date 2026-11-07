@@ -42,25 +42,124 @@ def fingerprint(value: Any) -> str:
     ).hexdigest()
 
 
-def verify_book_stamp(book, *, hub: str, segment: str, role: str) -> bool:
-    """Valida origem existente sem gravar; ausência é distinta de conflito."""
-    value = json.dumps({"hub": hub, "segment": segment, "role": role}, sort_keys=True)
-    metadata = book.fetch_sheet_metadata(params={"fields": "developerMetadata"})
+def _origin_json(value):
+    """JSON de origem sem chaves repetidas ou coerções de tipos."""
+
+    def unique(pairs):
+        result = {}
+        for key, item in pairs:
+            if key in result:
+                raise ValueError("Chave repetida")
+            result[key] = item
+        return result
+
+    if not isinstance(value, str) or len(value) > 16384:
+        raise ValueError("Formato de origem inválido")
+    result = json.loads(value, object_pairs_hook=unique)
+    if not isinstance(result, dict):
+        raise ValueError("Origem não é objeto")
+    return result
+
+
+def origin_diagnostic(metadata, *, hub: str, segment: str, role: str) -> dict:
+    """Compara campos, não serialização; nunca devolve valores livres/segredos."""
+    if (
+        not isinstance(metadata, dict)
+        or not isinstance(metadata.get("developerMetadata", []), list)
+        or any(
+            not isinstance(item, dict) for item in metadata.get("developerMetadata", [])
+        )
+    ):
+        raise ContinuationError(
+            "Resposta de metadados inválida; origem não comprovada."
+        )
     found = [
         m
         for m in metadata.get("developerMetadata", [])
         if m.get("metadataKey") == FILE_MARKER_KEY
     ]
-    if found and (
-        len(found) != 1
-        or found[0].get("metadataValue") != value
-        or found[0].get("location") != {"spreadsheet": True}
-        or found[0].get("visibility") != "DOCUMENT"
-    ):
-        raise ContinuationError(
-            "A origem do arquivo diverge do segmento ou papel configurado."
+    reasons = []
+    markers = []
+    if len(found) > 1:
+        reasons.append("quantidade")
+    expected = dict(hub=hub, segment=segment, role=role)
+    for marker in found:
+        fields = []
+        location = marker.get("location", {})
+        # locationType é somente leitura e é acrescentado pelo Google no GET.
+        if not isinstance(location, dict) or (
+            location.get("spreadsheet") is not True
+            or location.get("locationType", "SPREADSHEET") != "SPREADSHEET"
+            or set(location) - {"spreadsheet", "locationType"}
+        ):
+            fields.append("location")
+        if marker.get("visibility") != "DOCUMENT":
+            fields.append("visibility")
+        try:
+            value = _origin_json(marker.get("metadataValue"))
+        except (ValueError, TypeError):
+            value = {}
+            fields.append("metadataValue.json")
+        for key, wanted in expected.items():
+            if type(value.get(key)) is not str or value.get(key) != wanted:
+                fields.append(key)
+        if set(value) != set(expected):
+            fields.append("metadataValue.campos")
+        # Valores desconhecidos são identificados por hash, sem ecoar texto remoto.
+        observed = {}
+        for key in expected:
+            item = value.get(key)
+            allowed = (
+                {hub}
+                if key == "hub"
+                else (
+                    {"FARMA", "PET"}
+                    if key == "segment"
+                    else {"dashboard", "operacao", "historico"}
+                )
+            )
+            observed[key] = (
+                item
+                if isinstance(item, str) and item in allowed
+                else (
+                    "AUSENTE" if item is None else "OUTRO:sha256:" + fingerprint(item)
+                )
+            )
+        markers.append(
+            {
+                "campos": observed,
+                "localizacao_planilha": isinstance(location, dict)
+                and location.get("spreadsheet") is True,
+                "locationType_planilha": isinstance(location, dict)
+                and location.get("locationType", "SPREADSHEET") == "SPREADSHEET",
+                "visibilidade_documento": marker.get("visibility") == "DOCUMENT",
+                "divergencias": fields,
+            }
         )
-    return bool(found)
+        reasons.extend(fields)
+    return {
+        "esperado": expected,
+        "quantidade_marcadores": len(found),
+        "marcadores": markers,
+        "resultado": "BLOQUEADO" if reasons else ("APROVADO" if found else "AUSENTE"),
+        "campos_divergentes": sorted(set(reasons)),
+    }
+
+
+def verify_book_stamp(book, *, hub: str, segment: str, role: str) -> bool:
+    """Valida origem existente sem gravar; ausência é distinta de conflito."""
+    metadata = book.fetch_sheet_metadata(params={"fields": "developerMetadata"})
+    report = origin_diagnostic(metadata, hub=hub, segment=segment, role=role)
+    if report["resultado"] == "BLOQUEADO":
+        key = str(getattr(book, "id", "indisponivel"))
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", key):
+            key = "sha256:" + fingerprint(key)
+        raise ContinuationError(
+            f"Origem bloqueada: arquivo={key}; papel={role}; segmento={segment}; "
+            f"campos={','.join(report['campos_divergentes'])}. "
+            "Execute nexo armazenamento diagnosticar-origens; preserve os marcadores."
+        )
+    return report["quantidade_marcadores"] == 1
 
 
 def stamp_book(book, *, hub: str, segment: str, role: str):
