@@ -129,3 +129,8 @@ test('itens usam pedido oficial e período, com cerca entre as duas fontes',()=>
   assert.equal(ctx.getData(request).rows.length,1);
   indices=0;change=true;assert.throws(()=>ctx.getData(request),/mudou entre as fontes/);
 });
+
+test('orçamento de tempo compartilhado bloqueia a segunda leitura tardia',()=>{
+  const f=fixture();
+  assert.throws(()=>f.run({startedAt:Date.now()-240001}),/tempo de consulta excedido/);
+});

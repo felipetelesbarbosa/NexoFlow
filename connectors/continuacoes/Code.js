@@ -60,13 +60,13 @@ function getData(request) {
     var selected = fields.forIds(names);
     names = selected.asArray().map(function (f) { return f.getId(); });
     var widths = {}; widths[params.tabela] = spec.length;
-    var signature=null, api=api_(), linked=null;
+    var signature=null, api=api_(), linked=null, queryStarted=Date.now();
     function fence(value) { if (signature!==null && signature!==value) throw new Error('Continuações: publicação mudou entre as fontes.'); signature=value; }
     if (params.tabela==='Historico_Itens') {
       if (!request.dateRange) throw new Error('Continuações: selecione um período para o detalhe de itens.');
       linked=new Set();
       NexoTables.read(String(params.spreadsheetId||'').trim(),['Historico_Pedidos'],{
-        api:api,hash:hash_,widths:{Historico_Pedidos:NexoSchemas.Historico_Pedidos.length},schemas:NexoSchemas,date:date_,segment:params.segmento,onManifest:fence,
+        api:api,hash:hash_,widths:{Historico_Pedidos:NexoSchemas.Historico_Pedidos.length},schemas:NexoSchemas,date:date_,segment:params.segmento,onManifest:fence,startedAt:queryStarted,
         accept:function (_title,header,row) {
           var day=date_(row[header.indexOf('data')]);
           if (day && day>=date_(request.dateRange.startDate) && day<=date_(request.dateRange.endDate)) linked.add(String(row[header.indexOf('pedido_id')]));
@@ -75,7 +75,7 @@ function getData(request) {
         }
       });
     }
-    var table = NexoTables.read(String(params.spreadsheetId || '').trim(), [params.tabela], {api: api, hash: hash_, widths: widths, schemas:NexoSchemas,date:date_,onManifest:fence, segment: params.segmento, accept: function (title, header, row) {
+    var table = NexoTables.read(String(params.spreadsheetId || '').trim(), [params.tabela], {api: api, hash: hash_, widths: widths, schemas:NexoSchemas,date:date_,onManifest:fence,startedAt:queryStarted, segment: params.segmento, accept: function (title, header, row) {
       if (linked) return linked.has(String(row[header.indexOf('pedido_id')]));
       if (title==='BI_Historico_Resumo') {
         var cut=params.recorte_historico||'MES';

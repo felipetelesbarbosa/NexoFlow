@@ -9,7 +9,7 @@ var NexoTables = (function () {
   }
   function letter(n) { var text = ''; while (n > 0) { n--; text = String.fromCharCode(65 + n % 26) + text; n = Math.floor(n / 26); } return text; }
   function read(hub, titles, options) {
-    var api = options.api, hash = options.hash, started = Date.now(), consumed = 0, scanned = 0;
+    var api = options.api, hash = options.hash, started = Number.isFinite(options.startedAt) ? options.startedAt : Date.now(), consumed = 0, scanned = 0;
     var idPattern = /^[a-zA-Z0-9_-]{20,100}$/;
     var history = ['Historico_Pedidos','Historico_Itens','BI_LTV_Clientes','BI_Cobertura_Historica','BI_Historico_Resumo'];
     if (!idPattern.test(hub) || !titles.length || titles.some(function (t) { return options.schemas ? !Object.prototype.hasOwnProperty.call(options.schemas,t) : !/^BI_[A-Za-z0-9_]+$/.test(t); })) fail('origem inválida.');
