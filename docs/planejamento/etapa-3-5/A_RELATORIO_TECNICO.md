@@ -64,6 +64,9 @@ Para observabilidade, desabilitar seu timer, preservar as métricas e restaurar 
 ## Conferência complementar
 A leitura integral Restic terminou com sucesso às 01h40m53s, com 14 snapshots e os seis originais preservados. No fechamento intermediário, sete serviços estavam saudáveis, disco com 6.283.657.216 bytes usados (4%) e 200.599.846.912 disponíveis; RAM usada 1.230 MiB e disponível 14.761 MiB. Os relays escutam apenas em 127.0.0.1:15432/15433; exposição externa continua restrita ao SSH.
 
+## Evidência de fechamento
+Às 02h02 de 07/11/2026 (America/Belem), o último backup manual estava concluído com sucesso desde 01h56m48s, snapshot 3e3ecbbf. Há 15 snapshots, com os seis originais preservados. A leitura integral anterior cobriu os 14 snapshots então existentes; não deve ser confundida com nova leitura integral do snapshot final. Sete serviços continuavam saudáveis, logs limitados, nenhuma porta Docker publicada e homologacao/escrita_real=false mantidos. A documentação operacional já estava no GitHub no commit 6c43030801947e7f3d115f53e30a34bc16721da1 e foi incluída nesse backup. O disparo natural das 03h30 permanece pendente.
+
 ## Pendências e Etapa 4
 - Instalação e teste do DBeaver no Windows, confirmação das chaves individuais dos demais desenvolvedores e custódia dos novos segredos de consulta.
 - Confirmação do primeiro disparo natural após 03h30; backup manual não substitui a prova.
