@@ -57,6 +57,8 @@ print("Cópia privada consistente criada.")
 '@ | .\.venv\Scripts\python.exe -
 ```
 
+O primeiro CI Windows encontrou um handle SQLite aberto na nova auditoria: `with sqlite3.connect()` finaliza a transação, mas não fecha a conexão. A rotina e a fixture passaram a usar fechamento explícito (`contextlib.closing`), preservando leitura sem escrita.
+
 A cópia contém dados comerciais e precisa permanecer privada. Não copiar apenas o SQLite enquanto estiver sendo escrito, nem publicar a cópia no GitHub. Não enviar secrets_config.py/credentials. Não é necessária nova carga integral para a auditoria.
 
 ## Testes e performance

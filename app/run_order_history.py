@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from contextlib import closing
 from datetime import datetime, timedelta
 from pathlib import Path
 from time import perf_counter
@@ -206,8 +207,10 @@ def run(argv=None):
             if args.inicio or args.fim
             else None
         )
-        with sqlite3.connect(
-            args.auditar_banco.resolve().as_uri() + "?mode=ro", uri=True
+        with closing(
+            sqlite3.connect(
+                args.auditar_banco.resolve().as_uri() + "?mode=ro", uri=True
+            )
         ) as db:
             db.execute("PRAGMA query_only=ON")
             history = object.__new__(HistoryStore)

@@ -2,7 +2,7 @@ import io
 import json
 import sqlite3
 import unittest
-from contextlib import redirect_stdout
+from contextlib import closing, redirect_stdout
 from unittest.mock import patch
 
 from order_history import HistoryError, HistoryQuery, normalize_order
@@ -173,7 +173,7 @@ class AuditTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "legacy.sqlite"
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db:
                 store = HistoryStore(db, "PET")
                 bad = order()
                 del bad["itens"]
