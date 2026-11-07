@@ -1,20 +1,20 @@
 # NexoFlow — Changelog
 
-## 1.5.22
+## NexoFlow 1.5.22 — Correção das três origens
 
 - Corrige o registro das origens Dashboard, Operação e Histórico sob a trava oficial, com pré-validação dos três destinos, papéis, segmento e permissões, recuperação parcial e preservação de marcadores corretos.
 - Mantém a proteção ORIGEM_DO_ARQUIVO_NAO_COMPROVADA, capacidade global, continuações, piloto limitado, conferência financeira, retomada idempotente e rollback por lote.
 - Reúne reconhecimento local de redes Windows autorizadas e mensagens atualizadas do Setup: seis atalhos, MCP opcional com S/N explícito e resumo de instalação/pendências.
 - Carga comercial FARMA reservada ao Work, começando por um lote. PET comercial e implantação Hub continuam fora desta publicação.
 
-## NexoFlow 1.5.21 — Publicação lógica do histórico (em validação)
+## NexoFlow 1.5.21 — Publicação lógica do histórico — 07/11/2026
 
 - Publicador SQLite → Sheets passa pelo manifesto oficial de continuações, capacidade global e guardas de perfil, schema, chaves, pasta e permissões. Preserva tabelas, arquivos e dados existentes.
 - Acrescenta piloto de até N lotes, retomada da mesma revisão, reconciliação de respostas perdidas e rollback específico de células, bloqueando edições posteriores. Backups limitados ao intervalo do lote e baseline privado compartilhado.
 - Nova BI_Historico_Resumo com meses, anos, TOTAL e SEM_EMISSAO; conferência privada compara SQLite, partes publicadas e LTV ao centavo, sem somar compradores mensais.
 - Leitor Data Studio resolve partes futuras e recusa fonte parcial, ausente ou divergente. Mantém custos e atribuição Meta/Google separados de compras comprovadas.
 - FARMA primeiro piloto; PET somente isolamento com fixtures e réplica comercial posterior. Não há publicação automática de dados comerciais, mudança de relatório ou deploy Hub.
-- Setup Preserve conserva credenciais, configurações, SQLite, logs e checkpoints; novos módulos e testes integram os dois pacotes. Release 1.5.20 e anteriores preservadas. Data efetiva nas notas após validação do mesmo commit.
+- Setup Preserve conserva credenciais, configurações, SQLite, logs e checkpoints; novos módulos e testes integram os dois pacotes. Release 1.5.20 e anteriores preservadas. Publicado em 07/11/2026, commit 29bba747a6cc5dcc57e1c547f94dc3a6af3fb6f1; validações e pacotes conferidos.
 
 ## NexoFlow 1.5.20 — Formato JSON dos períodos vazios — 07/11/2026
 

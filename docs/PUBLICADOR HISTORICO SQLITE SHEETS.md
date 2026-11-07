@@ -1,6 +1,6 @@
 # Histórico SQLite → Sheets → Data Studio: homologação FARMA
 
-O publicador lógico foi inicialmente distribuído na [release Windows 1.5.21](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.21), no commit `29bba747a6cc5dcc57e1c547f94dc3a6af3fb6f1`. A homologação operacional da FARMA deve usar os pacotes dessa release. Não houve alteração de relatório publicado, VPS ou planilha comercial. O Work deverá homologar o mesmo SHA em uma instalação isolada com três planilhas **de teste**. Não substituir manualmente módulos em `C:\NexoFlow` operacional. PET somente foi validado com fixtures; a réplica comercial depende da aprovação de FARMA.
+O publicador lógico foi inicialmente distribuído na [release Windows 1.5.21](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.21), no commit `29bba747a6cc5dcc57e1c547f94dc3a6af3fb6f1`. Esse registro descreve a entrega original; a correção desta missão usa a 1.5.22, conforme o roteiro abaixo. Não houve alteração de relatório publicado, VPS ou planilha comercial. O ensaio em três planilhas de teste foi realizado pelo Work e identificou o bloqueio descrito abaixo. Não substituir manualmente módulos em `C:\NexoFlow` operacional. PET somente foi validado com fixtures; a réplica comercial depende da aprovação de FARMA.
 
 ## Correção 1.5.22 e início comercial FARMA pelo Work
 

@@ -76,7 +76,7 @@ Os workflows Windows/qualidade/segredos e CodeQL do commit final devem ser confe
 
 Não foi fornecido um destino privado de homologação separado e comprovado nesta tarefa. Portanto **nenhuma planilha, dashboard ou SQLite comercial foi lido/alterado para validar esta implementação**. Não se alegou equivalência de snapshots comerciais ou ausência de Google no projeto inteiro a partir da amostra do Work.
 
-A configuração efetiva de OAuth, pastas e compartilhamentos, quotas, ACL Windows, latência, execução no executável distribuído e implantação privada do conector exigem homologação do Work. A publicação autorizada da 1.5.21 exige executar a suíte Windows, os launchers e os testes de instalação Preserve/Clean/rollback no pacote efetivamente gerado. O smoke test instalado inclui os novos testes do publicador. Não substituir arquivos avulsos na operação. Os resultados efetivos dos workflows e os hashes dos pacotes acompanham a entrega; não confundir aprovação do pacote com homologação comercial em Sheets.
+A configuração efetiva de OAuth, pastas e compartilhamentos, quotas, ACL Windows, latência, execução no executável distribuído e implantação privada do conector exigem homologação do Work. A publicação da 1.5.21 executou a suíte Windows, os launchers e os testes de instalação Preserve/Clean/rollback no pacote efetivamente gerado (workflow 42405811308, commit 29bba747a6cc5dcc57e1c547f94dc3a6af3fb6f1). O smoke test instalado inclui os novos testes do publicador. Não substituir arquivos avulsos na operação. Os resultados efetivos dos workflows e os hashes dos pacotes acompanham a entrega; não confundir aprovação do pacote com homologação comercial em Sheets.
 
 O lease coordena escritores que obedecem ao contrato. Sheets não oferece transação ACID abrangendo três arquivos nem compare-and-swap para edições manuais arbitrárias de células. Não editar/ordenar as tabelas durante a carga. As guardas detectam edições nos cortes conferidos e bloqueiam conflitos observados, sem prometer eliminar corridas com terceiros que ignorem a trava. Uma publicação parcial fica indisponível ao leitor até fechar ou reconciliar.
 
@@ -86,7 +86,7 @@ O [roteiro operacional para o Work](PUBLICADOR%20HISTORICO%20SQLITE%20SHEETS.md)
 
 ## Correção durante a validação Windows
 
-O CI de `9f5f03c` comprovou WinError 32 somente no encerramento do teste que altera coordenadas do journal: o contexto SQLite do teste não fechava a conexão. Corrigido com `contextlib.closing` e commit explícito, sem ignorar a falha ou forçar remoção. As conexões do publicador já usavam fechamento explícito. A suíte Windows precisa ser repetida no commit final da 1.5.21 antes da publicação.
+O CI de `9f5f03c` comprovou WinError 32 somente no encerramento do teste que altera coordenadas do journal: o contexto SQLite do teste não fechava a conexão. Corrigido com `contextlib.closing` e commit explícito, sem ignorar a falha ou forçar remoção. As conexões do publicador já usavam fechamento explícito. A suíte Windows foi repetida e aprovada no commit 29bba747a6cc5dcc57e1c547f94dc3a6af3fb6f1, publicado na release 1.5.21 em 07/11/2026.
 
 O orçamento de 240 segundos é compartilhado entre as leituras de pedidos e itens no mesmo getData, evitando reiniciar o prazo ao passar à segunda tabela. Regressão sintética recusa uma segunda leitura que já consumiu o prazo global.
 
