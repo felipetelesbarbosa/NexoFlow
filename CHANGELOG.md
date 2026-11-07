@@ -1,6 +1,14 @@
 # NexoFlow — Changelog
 
-## NexoFlow 1.5.19 — Continuidade do histórico em períodos vazios (em validação)
+## NexoFlow 1.5.20 — Formato JSON dos períodos vazios (em validação)
+
+- Corrige o 404 na primeira janela vazia mesmo com a 1.5.19 instalada: o cliente envia `Accept: application/json` e a API serializa a mensagem oficial como string JSON, entre aspas. A versão anterior reconhecia somente texto puro. Um GET pontual com os cabeçalhos reais confirmou essa diferença, sem carga anual ou alteração comercial.
+- Reconhece somente a mensagem oficial na página 1, em texto puro ou string JSON, inclusive escapes Unicode. Objetos/listas, JSON truncado, 404 genérico, autenticação, rede e desaparecimento de página posterior continuam protegidos.
+- Regressão reproduzida antes da correção; testes do cliente/coletor com duas janelas vazias, pedidos, orçamento, retomada e receita sem duplicidade. Hub usa a mesma regra, com fixture JSON e PostgreSQL temporário em FARMA/PET; não há deploy VPS ou escrita comercial.
+- Separa os workflows de validação automática e publicação manual para evitar cancelamento dos checks do push. Mantém as guardas de commit/tag e os arquivos das versões públicas.
+- Setup Preserve conserva configurações, credenciais, SQLite, logs e checkpoints. Pacotes próprios preservam a release 1.5.19 e anteriores. Data real nas notas da publicação após validação do mesmo commit.
+
+## NexoFlow 1.5.19 — Continuidade do histórico em períodos vazios — 07/11/2026
 
 - A resposta oficial de ausência na primeira página da rota paginada encerra a janela vazia e permite consultar o próximo período, até a data final. Não precisa conhecer a data do primeiro pedido.
 - Outros 404, falhas de rede/autenticação e ausência de página posterior continuam interrompendo com checkpoint preservado. Nenhum fato anterior é excluído e não há criação de venda/cancelamento por janela vazia.

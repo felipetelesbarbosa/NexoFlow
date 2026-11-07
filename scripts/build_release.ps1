@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.19",
+    [string]$Version = "1.5.20",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -414,13 +414,13 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-O histórico segue para o próximo período quando a API confirma que não há pedidos na janela consultada. Quando encontra pedidos, pagina normalmente e continua até a data final escolhida. A retomada mantém as janelas e páginas já concluídas, sem duplicar faturamento.
+Corrige o 404 na primeira janela vazia: a API devolve a mensagem oficial como string JSON quando o NexoFlow envia Accept: application/json. A versão 1.5.19 reconhecia somente texto puro. Agora os dois formatos oficiais são reconhecidos e o histórico segue para o próximo período vazio. Quando encontra pedidos, pagina normalmente e continua até a data final escolhida. A retomada mantém as janelas e páginas já concluídas, sem duplicar faturamento.
 
 Apenas o HTTP 404 com a mensagem específica de ausência, na primeira página da rota paginada, é convertido em janela vazia. Erros genéricos de rota, autenticação, rede e páginas ausentes continuam protegidos. O progresso mostra “sem pedidos nesta janela”. Uma consulta vazia consome uma unidade do orçamento definido pelo operador.
 
 Esta correção permite iniciar antes do primeiro pedido conhecido, sem presumir sua data. A coleta depende dos dados disponíveis na API. Não foi executada nova carga anual, nem alterado o SQLite comercial. Permanecem as correções de data final, limite de 500 por página, posições de itens e frete como aviso da 1.5.18.
 
-Feche as rotinas, faça backup privado consistente e atualize pelo Setup em Preserve. Depois repita o período desejado; as janelas confirmadas são reaproveitadas. A release 1.5.18 permanece intacta. Hub somente código/homologação, sem implantação VPS ou ativação comercial. [Guia do histórico](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/HISTORICO%20PEDIDOS.md).
+Feche as rotinas, faça backup privado consistente e atualize pelo Setup em Preserve. Depois repita o período desejado; as janelas confirmadas são reaproveitadas. A release 1.5.19 e as anteriores permanecem intactas. Hub somente código/homologação, sem implantação VPS ou ativação comercial. [Guia do histórico](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/HISTORICO%20PEDIDOS.md).
 
 Analytics e Noturno usam a integração Meta nativa, sem exigir MCP ou Codex CLI. As rotinas FARMA/PET e as funcionalidades da versão anterior permanecem preservadas. A atualização Preserve mantém configurações e dados. Esta versão não comprova autenticação no proxy corporativo ou aprovação pelo antivírus no PC do usuário; consulte os relatórios e o guia de homologação.
 
@@ -436,4 +436,4 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.19
+# NexoFlow 1.5.20

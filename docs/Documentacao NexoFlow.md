@@ -1,4 +1,4 @@
-# NexoFlow 1.5.19 — Guia de operação
+# NexoFlow 1.5.20 — Guia de operação
 
 O NexoFlow integra Weni e a API FarmaLíder para **FarmaLíder e Pets Líder**, mantendo dados separados por perfil. O objetivo é manter contatos e pedidos atualizados e alimentar o Google Sheets e os painéis do Data Studio.
 
@@ -15,15 +15,15 @@ O NexoFlow identifica pedidos registrados na API **independentemente de terem si
 | **Noturno** | Executar Weni, Analytics e Recompra na marca escolhida sem confirmações durante a carga. |
 | **Terminal** | Executar comandos, consultar dados e diagnosticar a instalação. |
 
-## Atualização 1.5.19
+## Atualização 1.5.20
 
-O histórico avança automaticamente para o próximo período quando a API confirma que não há pedidos na janela consultada. Ao encontrar pedidos, pagina normalmente e continua até a data final. A retomada preserva janelas concluídas, páginas confirmadas e fatos anteriores.
+Corrige a interrupção da 1.5.19 quando a API devolve a mensagem de ausência como string JSON, entre aspas. O histórico reconhece a mensagem oficial em JSON ou texto puro e avança para o próximo período vazio. Ao encontrar pedidos, pagina normalmente e continua até a data final. A retomada preserva janelas concluídas, páginas confirmadas e fatos anteriores.
 
 Somente a resposta específica de ausência na página 1 é aceita como janela vazia. Outros erros 404, autenticação, rede e páginas ausentes continuam protegidos. O progresso mostra “sem pedidos nesta janela”. Não é necessário conhecer previamente a data do primeiro pedido; a coleta recupera o que a API disponibilizar desde a data escolhida.
 
 ## Antes de começar
 
-Instale pelo [Setup oficial](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.19), configure suas próprias credenciais e compartilhe as planilhas com a conta de serviço Google. O diretório padrão é `C:\NexoFlow`. Confira os requisitos e os campos necessários no [guia de instalação](README%20INSTALACAO.md).
+Instale pelo [Setup oficial](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.20), configure suas próprias credenciais e compartilhe as planilhas com a conta de serviço Google. O diretório padrão é `C:\NexoFlow`. Confira os requisitos e os campos necessários no [guia de instalação](README%20INSTALACAO.md).
 
 Abra o mesmo aplicativo e escolha **FarmaLíder** ou **Pets Líder** antes da carga. Configure tokens Weni e três destinos Sheets em cada perfil. A credencial Google pode ser compartilhada. Veja [configuração dos segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 

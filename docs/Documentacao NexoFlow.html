@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>NexoFlow 1.5.19 - Documentação</title>
+  <title>NexoFlow 1.5.20 - Documentação</title>
   <style>
     html {
       color: #1a1a1a;
@@ -170,9 +170,9 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">NexoFlow 1.5.19 - Documentação</h1>
+<h1 class="title">NexoFlow 1.5.20 - Documentação</h1>
 </header>
-<h1 id="nexoflow-1519--guia-de-operação">NexoFlow 1.5.19 — Guia de
+<h1 id="nexoflow-1520--guia-de-operação">NexoFlow 1.5.20 — Guia de
 operação</h1>
 <p>O NexoFlow integra Weni e a API FarmaLíder para <strong>FarmaLíder e
 Pets Líder</strong>, mantendo dados separados por perfil. O objetivo é
@@ -227,11 +227,13 @@ confirmações durante a carga.</td>
 </tr>
 </tbody>
 </table>
-<h2 id="atualização-1519">Atualização 1.5.19</h2>
-<p>O histórico avança automaticamente para o próximo período quando a
-API confirma que não há pedidos na janela consultada. Ao encontrar
-pedidos, pagina normalmente e continua até a data final. A retomada
-preserva janelas concluídas, páginas confirmadas e fatos anteriores.</p>
+<h2 id="atualização-1520">Atualização 1.5.20</h2>
+<p>Corrige a interrupção da 1.5.19 quando a API devolve a mensagem de
+ausência como string JSON, entre aspas. O histórico reconhece a mensagem
+oficial em JSON ou texto puro e avança para o próximo período vazio. Ao
+encontrar pedidos, pagina normalmente e continua até a data final. A
+retomada preserva janelas concluídas, páginas confirmadas e fatos
+anteriores.</p>
 <p>Somente a resposta específica de ausência na página 1 é aceita como
 janela vazia. Outros erros 404, autenticação, rede e páginas ausentes
 continuam protegidos. O progresso mostra “sem pedidos nesta janela”. Não
@@ -239,7 +241,7 @@ continuam protegidos. O progresso mostra “sem pedidos nesta janela”. Não
 recupera o que a API disponibilizar desde a data escolhida.</p>
 <h2 id="antes-de-começar">Antes de começar</h2>
 <p>Instale pelo <a
-href="https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.19">Setup
+href="https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.20">Setup
 oficial</a>, configure suas próprias credenciais e compartilhe as
 planilhas com a conta de serviço Google. O diretório padrão é
 <code>C:\NexoFlow</code>. Confira os requisitos e os campos necessários
@@ -418,4 +420,4 @@ href="RASTREAMENTO_META.md">regras e instruções de Oscarzinho e
 Lili</a>.</p>
 </body>
 </html>
-<!-- NexoFlow documentation: source-sha256=b49f0c20ebe4e54aee7fea4325b4f6c2d6daa38e2b85960fff74fc9643fed543 content-sha256=9fae124c47a916348bf6bdb065b61d438dd81c68c9a810b1d198f45326ed4270 -->
+<!-- NexoFlow documentation: source-sha256=081aec33d2483b9726f6417053cc77c0f25bc44654693fa30846b226dd9b22e8 content-sha256=73d75155f21df15d546ac6dbf4bf98ac7852ae5bf2f1ecf1b0fb12d868ffffcb -->
