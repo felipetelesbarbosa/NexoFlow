@@ -1,6 +1,6 @@
 # Relatório técnico: publicador histórico SQLite / Sheets
 
-Entrega de desenvolvimento em `main`, posterior à 1.5.20, sem incremento de versão nem release. Referência comparada: `c94158d35c40d5f9e424731d672de257a7d78ec4`; main atualizada para `8c068f5` antes da implementação. O SHA final e os resultados dos workflows são informados na entrega e podem ser conferidos no histórico Git. FARMA é o piloto; PET somente isolamento sintético. Não se executou carga comercial, nova consulta FarmaLíder, Weni, Noturno, Recompra, implantação VPS ou edição de relatório publicado.
+Entrega desenvolvida em `main` e incorporada à preparação da **1.5.21**, com publicação Windows posteriormente autorizada pelo usuário, condicionada aos checks e pacotes validados. A release 1.5.20 permanece preservada. Referência comparada: `c94158d35c40d5f9e424731d672de257a7d78ec4`; main atualizada para `8c068f5` antes da implementação. O SHA final e os resultados dos workflows são informados na entrega e podem ser conferidos no histórico Git. FARMA é o piloto; PET somente isolamento sintético. Não se executou carga comercial, nova consulta FarmaLíder, Weni, Noturno, Recompra, implantação VPS ou edição de relatório publicado.
 
 ## Causas confirmadas e mudanças
 
@@ -61,7 +61,7 @@ Ensaio puramente de capacidade com **1.100.000 pedidos + 207.582 linhas de itens
 
 Implementação inicial em `01260749c17c736f4d3e98f4c45d47f5f0e54a36`, complementada pela guarda de tipos em `eb73b575791f07529bb022f00e759b2e34c2c3ba`. Validação local final: **1.851 testes Python, sem falhas, 73 ignorados por condições de plataforma/ambiente**; **29 testes Node aprovados**; Ruff e Pyright sem erros; auditoria de consistência e documentação HTML aprovadas; pip-audit sem vulnerabilidades conhecidas nas dependências principais/webhook. Gitleaks aprovou o histórico Git e a exportação dos arquivos destinados ao commit. Credenciais locais ignoradas não foram incluídas nessa exportação. Testes ignorados não contam como validação real Windows/Google.
 
-Os workflows Windows/qualidade/segredos e CodeQL do commit final devem ser conferidos no GitHub; o resultado efetivo e o SHA final acompanham a entrega. O marcador `[skip release]` impede empacotamento/publicação automática nesta tarefa.
+Os workflows Windows/qualidade/segredos e CodeQL do commit final devem ser conferidos no GitHub; o resultado efetivo e o SHA final acompanham a entrega. Os commits de desenvolvimento/preparação usam `[skip release]`; a publicação autorizada é executada pelo workflow manual no mesmo SHA, após CodeQL e checks aprovados.
 
 - Preparo sem escrita; perfil, schema, permissões, capacidade e ausência de OAuth; SQLite com WAL, query_only e hash original preservado.
 - Comando real `nexo_cli.run` em processo de testes com factories Weni/Farma que falham se acionadas: preparar, piloto, conferir, retomar, conferir mensal e rollback, com códigos 0/3.
@@ -76,10 +76,14 @@ Os workflows Windows/qualidade/segredos e CodeQL do commit final devem ser confe
 
 Não foi fornecido um destino privado de homologação separado e comprovado nesta tarefa. Portanto **nenhuma planilha, dashboard ou SQLite comercial foi lido/alterado para validar esta implementação**. Não se alegou equivalência de snapshots comerciais ou ausência de Google no projeto inteiro a partir da amostra do Work.
 
-A configuração efetiva de OAuth, pastas e compartilhamentos, quotas, ACL Windows, latência, execução no executável distribuído e implantação privada do conector exigem homologação do Work. Esta entrega não gera executável novo, Setup ou release; não instrui substituir arquivos avulsos na operação. Os testes Windows do código não equivalem à execução desse novo caminho em um pacote instalado.
+A configuração efetiva de OAuth, pastas e compartilhamentos, quotas, ACL Windows, latência, execução no executável distribuído e implantação privada do conector exigem homologação do Work. A publicação autorizada da 1.5.21 exige executar a suíte Windows, os launchers e os testes de instalação Preserve/Clean/rollback no pacote efetivamente gerado. O smoke test instalado inclui os novos testes do publicador. Não substituir arquivos avulsos na operação. Os resultados efetivos dos workflows e os hashes dos pacotes acompanham a entrega; não confundir aprovação do pacote com homologação comercial em Sheets.
 
 O lease coordena escritores que obedecem ao contrato. Sheets não oferece transação ACID abrangendo três arquivos nem compare-and-swap para edições manuais arbitrárias de células. Não editar/ordenar as tabelas durante a carga. As guardas detectam edições nos cortes conferidos e bloqueiam conflitos observados, sem prometer eliminar corridas com terceiros que ignorem a trava. Uma publicação parcial fica indisponível ao leitor até fechar ou reconciliar.
 
 Permanece o alerta de cobertura civil da API; não se refaz carga anual para publicar. Recebimentos brutos antigos por mês não são inventados. Detalhe acima dos limites do conector exige recorte ou outra capacidade analítica; a visão anual deve usar resumo.
 
 O [roteiro operacional para o Work](PUBLICADOR%20HISTORICO%20SQLITE%20SHEETS.md) inclui comandos, totais por tabela, ligação de fontes, backups, retomada, rollback e critérios de liberação FARMA antes da futura réplica PET. A execução comercial permanece uma etapa separada.
+
+## Correção durante a validação Windows
+
+O CI de `9f5f03c` comprovou WinError 32 somente no encerramento do teste que altera coordenadas do journal: o contexto SQLite do teste não fechava a conexão. Corrigido com `contextlib.closing` e commit explícito, sem ignorar a falha ou forçar remoção. As conexões do publicador já usavam fechamento explícito. A suíte Windows precisa ser repetida no commit final da 1.5.21 antes da publicação.

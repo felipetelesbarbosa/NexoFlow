@@ -4,6 +4,7 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from copy import deepcopy
 from decimal import Decimal
 from pathlib import Path
@@ -215,8 +216,9 @@ class PublicationTests(unittest.TestCase):
 
     def test_journal_coordinates_and_baseline_cannot_be_changed(self):
         review = self.prepare()
-        with sqlite3.connect(review["journal"]) as db:
+        with closing(sqlite3.connect(review["journal"])) as db:
             db.execute("UPDATE operations SET r=r+100")
+            db.commit()
         with self.assertRaisesRegex(HistoryError, "PLANO_LOCAL_ALTERADO"):
             self.pub.apply(review)
         self.assertEqual(self.remote.writes, 0)

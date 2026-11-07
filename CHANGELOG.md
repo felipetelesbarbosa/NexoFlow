@@ -1,6 +1,15 @@
 # NexoFlow — Changelog
 
-## NexoFlow 1.5.20 — Formato JSON dos períodos vazios (em validação)
+## NexoFlow 1.5.21 — Publicação lógica do histórico (em validação)
+
+- Publicador SQLite → Sheets passa pelo manifesto oficial de continuações, capacidade global e guardas de perfil, schema, chaves, pasta e permissões. Preserva tabelas, arquivos e dados existentes.
+- Acrescenta piloto de até N lotes, retomada da mesma revisão, reconciliação de respostas perdidas e rollback específico de células, bloqueando edições posteriores. Backups limitados ao intervalo do lote e baseline privado compartilhado.
+- Nova BI_Historico_Resumo com meses, anos, TOTAL e SEM_EMISSAO; conferência privada compara SQLite, partes publicadas e LTV ao centavo, sem somar compradores mensais.
+- Leitor Data Studio resolve partes futuras e recusa fonte parcial, ausente ou divergente. Mantém custos e atribuição Meta/Google separados de compras comprovadas.
+- FARMA primeiro piloto; PET somente isolamento com fixtures e réplica comercial posterior. Não há publicação automática de dados comerciais, mudança de relatório ou deploy Hub.
+- Setup Preserve conserva credenciais, configurações, SQLite, logs e checkpoints; novos módulos e testes integram os dois pacotes. Release 1.5.20 e anteriores preservadas. Data efetiva nas notas após validação do mesmo commit.
+
+## NexoFlow 1.5.20 — Formato JSON dos períodos vazios — 07/11/2026
 
 - Corrige o 404 na primeira janela vazia mesmo com a 1.5.19 instalada: o cliente envia `Accept: application/json` e a API serializa a mensagem oficial como string JSON, entre aspas. A versão anterior reconhecia somente texto puro. Um GET pontual com os cabeçalhos reais confirmou essa diferença, sem carga anual ou alteração comercial.
 - Reconhece somente a mensagem oficial na página 1, em texto puro ou string JSON, inclusive escapes Unicode. Objetos/listas, JSON truncado, 404 genérico, autenticação, rede e desaparecimento de página posterior continuam protegidos.

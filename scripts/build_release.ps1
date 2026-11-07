@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.20",
+    [string]$Version = "1.5.21",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -359,7 +359,7 @@ foreach ($relative in @('app/run_noturno_console.py','comandos/executar_noturno.
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/NexoFlow Recompra.exe"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/NexoFlow Recompra.exe"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/weni_update.py"
-foreach ($module in @("meta_ads_native", "meta_ads_model", "meta_ads_sheets", "meta_ads_evidence", "run_meta_ads", "meta_events", "ad_attribution", "weni_dedup", "contact_dedup_guard", "dedup_io", "dedup_sheets", "dedup_bi", "recompra_lock", "recompra_review_audit", "farmalider_customers", "recompra_profiles", "recompra_cleanup", "runtime_profile", "recompra_group_audit")) {
+foreach ($module in @("history_capacity", "history_conference", "history_publication", "history_publish_cli", "history_sheets_transport", "history_snapshot", "order_history_sheets", "run_order_history", "meta_ads_native", "meta_ads_model", "meta_ads_sheets", "meta_ads_evidence", "run_meta_ads", "meta_events", "ad_attribution", "weni_dedup", "contact_dedup_guard", "dedup_io", "dedup_sheets", "dedup_bi", "recompra_lock", "recompra_review_audit", "farmalider_customers", "recompra_profiles", "recompra_cleanup", "runtime_profile", "recompra_group_audit")) {
     Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/$module.py"
     Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/app/$module.py"
 }
@@ -414,13 +414,15 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-Corrige o 404 na primeira janela vazia: a API devolve a mensagem oficial como string JSON quando o NexoFlow envia Accept: application/json. A versão 1.5.19 reconhecia somente texto puro. Agora os dois formatos oficiais são reconhecidos e o histórico segue para o próximo período vazio. Quando encontra pedidos, pagina normalmente e continua até a data final escolhida. A retomada mantém as janelas e páginas já concluídas, sem duplicar faturamento.
+O histórico já coletado pelo Terminal pode ser publicado no Sheets sem nova consulta FarmaLíder e sem executar Weni, Noturno ou Recompra. O publicador usa tabelas lógicas, manifesto de continuidade, capacidade global, revisão e validação dos destinos por segmento. Não apaga ou move o legado.
 
-Apenas o HTTP 404 com a mensagem específica de ausência, na primeira página da rota paginada, é convertido em janela vazia. Erros genéricos de rota, autenticação, rede e páginas ausentes continuam protegidos. O progresso mostra “sem pedidos nesta janela”. Uma consulta vazia consome uma unidade do orçamento definido pelo operador.
+Adiciona piloto limitado por --max-lotes, retomada da mesma revisão, reconciliação de respostas perdidas e rollback específico por lote com proteção contra edições posteriores. Os backups guardam somente intervalos afetados, compartilhando o baseline privado do preparo.
 
-Esta correção permite iniciar antes do primeiro pedido conhecido, sem presumir sua data. A coleta depende dos dados disponíveis na API. Não foi executada nova carga anual, nem alterado o SQLite comercial. Permanecem as correções de data final, limite de 500 por página, posições de itens e frete como aviso da 1.5.18.
+A nova BI_Historico_Resumo fornece meses, anos, TOTAL e SEM_EMISSAO para o Data Studio. O relatório privado historico_conferencia_v1 compara SQLite e partes publicadas, distingue compradores únicos e exige fechamento ao centavo entre pedidos e LTV. IDs numéricos indevidos, schema/segmento divergente e partes ausentes ou em publicação bloqueiam aprovação, sem total parcial silencioso.
 
-Feche as rotinas, faça backup privado consistente e atualize pelo Setup em Preserve. Depois repita o período desejado; as janelas confirmadas são reaproveitadas. A release 1.5.19 e as anteriores permanecem intactas. Hub somente código/homologação, sem implantação VPS ou ativação comercial. [Guia do histórico](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/HISTORICO%20PEDIDOS.md).
+FARMA é o primeiro piloto: homologar em três planilhas de teste antes de qualquer carga comercial. PET foi validado somente com fixtures de isolamento; sua réplica comercial é uma etapa posterior. A atualização não ativa publicação de dados nem troca fontes do relatório. O Work deve atualizar o conector privado e conferir fontes, cortes, permissões e métricas conforme o [roteiro SQLite/Sheets](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/PUBLICADOR%20HISTORICO%20SQLITE%20SHEETS.md).
+
+Feche as rotinas, faça backup privado consistente e atualize pelo Setup em Preserve. Configurações, credenciais, SQLite, logs e checkpoints são preservados. A release 1.5.20 e as anteriores permanecem intactas. Hub permanece independente, sem implantação VPS ou ativação comercial. Não houve nova carga histórica real nem escrita em planilhas comerciais durante o desenvolvimento.
 
 Analytics e Noturno usam a integração Meta nativa, sem exigir MCP ou Codex CLI. As rotinas FARMA/PET e as funcionalidades da versão anterior permanecem preservadas. A atualização Preserve mantém configurações e dados. Esta versão não comprova autenticação no proxy corporativo ou aprovação pelo antivírus no PC do usuário; consulte os relatórios e o guia de homologação.
 
@@ -436,4 +438,4 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.20
+# NexoFlow 1.5.21

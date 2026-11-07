@@ -1,6 +1,6 @@
 # Histórico SQLite → Sheets → Data Studio: homologação FARMA
 
-Esta implementação é código posterior à release 1.5.20. Não houve alteração de versão, release, relatório publicado, VPS ou planilha comercial. O Work deverá homologar o mesmo SHA em uma instalação isolada com três planilhas **de teste**. Não substituir manualmente módulos em `C:\NexoFlow` operacional. PET somente foi validado com fixtures; a réplica comercial depende da aprovação de FARMA.
+Esta implementação integra a preparação da release Windows 1.5.21, cuja publicação foi autorizada após os testes e a validação dos pacotes. A release 1.5.20 permanece preservada. Não houve alteração de relatório publicado, VPS ou planilha comercial. O Work deverá homologar o mesmo SHA em uma instalação isolada com três planilhas **de teste**. Não substituir manualmente módulos em `C:\NexoFlow` operacional. PET somente foi validado com fixtures; a réplica comercial depende da aprovação de FARMA.
 
 ## Diagnóstico e arquitetura
 
@@ -34,13 +34,15 @@ Filtrar `vigente=Sim`. Receita, produtos e frete consideram estado `valido`. Can
 
 `clientes` é distinto por grão: comprador em dois meses conta uma vez no ANO/TOTAL. No Looker, usar um único ANO/TOTAL para um card de clientes, ou detalhar por competência. A agregação MAX não resolve uma soma arbitrária de competências; o conector bloqueia o card sem competência quando existem múltiplos recortes. LTV não é recalculado pelo filtro mensal de receita. No detalhe de produtos, filtrar também `estado=valido` e `frete=Não`; para auditar cancelamentos, manter os estados visíveis na tabela de pedidos. Clientes distintos em um período arbitrário podem exigir `COUNT_DISTINCT(cliente_id)` sobre pedidos válidos do período, dentro dos limites do detalhe, em vez de somar resumos mensais.
 
-## Comandos reais para o Work
+## Atualização Windows e comandos reais para o Work
+
+Após a publicação validada, baixar o Setup **1.5.21**, conferir SHA-256, fechar as rotinas e realizar backup privado consistente de configuração, credenciais, SQLite e comprovantes. Atualizar em **Preserve**. Não iniciar uma publicação nova sobre revisão v2 ainda em andamento com outro código; retomar com o publicador original ou reconciliar explicitamente. A atualização não muda os destinos nem publica dados automaticamente. Testar primeiro numa instalação de homologação com três planilhas de teste.
 
 Usar o Terminal **da cópia de homologação no SHA validado**, selecionando FARMA antes dos imports e conferindo as três planilhas de teste no perfil privado. O comando `nexo historico` encaminha ao Python; não aciona Weni, Analytics, Recompra, Noturno ou nova coleta quando usados os argumentos abaixo. Não omitir `--planilhas` para publicar.
 
 Os caminhos abaixo são exemplos locais privados, não arquivos do repositório. Não executar em PET comercial.
 
-Como não há release nova nesta tarefa, o Work pode executar o código em um checkout **isolado de desenvolvimento/homologação**, com dependências do projeto já instaladas na sua própria `.venv`, configuração privada na raiz desse checkout apontando exclusivamente às três planilhas de teste e credenciais locais protegidas. Não usar a configuração comercial por engano. Em PowerShell aberto na raiz desse checkout, o encaminhamento equivalente é:
+Antes da distribuição validada, ou para ensaios de desenvolvimento, o Work pode executar o código em um checkout **isolado de desenvolvimento/homologação**, com dependências do projeto já instaladas na sua própria `.venv`, configuração privada na raiz desse checkout apontando exclusivamente às três planilhas de teste e credenciais locais protegidas. Não usar a configuração comercial por engano. Em PowerShell aberto na raiz desse checkout, o encaminhamento equivalente é:
 
 ```powershell
 $env:NEXOFLOW_PERFIL = 'FARMA'

@@ -64,9 +64,9 @@ Homologue primeiro com três planilhas **de teste** configuradas em uma instala�
 
 IDs de pedido/cliente/contato são texto. A tabela de pedidos informa estado, motivo, origem, política financeira, vínculo Weni, produtos, frete e faturamento. LTV informa compras, primeira/última compra e cobertura observada. As abas preexistentes não mudam de cabeçalho. A fonte do Data Studio deve usar data do pedido para receita mensal e a tabela LTV independente do filtro mensal. Nenhum dashboard foi editado neste desenvolvimento.
 
-### Publicador lógico em homologação (código posterior à 1.5.20)
+### Publicador lógico em homologação — 1.5.21
 
-Os ZIPs publicados da **1.5.20** ainda usam o caminho físico, com backup e releitura integral por lote, sem piloto limitado. A implementação nova preserva a sintaxe de preparo/aplicação, mas usa o manifesto oficial, capacidade global, índice SQLite privado e partes físicas. Não instalar arquivos avulsos na operação para substituir uma distribuição validada. Esta entrega não publica release nem altera a versão Windows.
+Os ZIPs publicados da **1.5.20** ainda usam o caminho físico, com backup e releitura integral por lote, sem piloto limitado. A implementação da 1.5.21 preserva a sintaxe de preparo/aplicação, mas usa o manifesto oficial, capacidade global, índice SQLite privado e partes físicas. A distribuição Windows foi autorizada após validação completa; atualizar pelo Setup Preserve. Não instalar arquivos avulsos na operação.
 
 Consulte o [roteiro completo SQLite → Sheets → Data Studio para o Work](PUBLICADOR%20HISTORICO%20SQLITE%20SHEETS.md), incluindo comandos reais de capacidade, piloto, conferência, retomada e rollback. FARMA é o piloto; PET permanece restrito a fixtures de isolamento nesta entrega.
 
