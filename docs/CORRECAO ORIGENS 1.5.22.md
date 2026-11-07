@@ -1,5 +1,7 @@
 # Origens Google Sheets: correção após a 1.5.22
 
+> Distribuição corretiva 1.5.23 autorizada, em validação. Após instalar o Setup em **Preserve**, usar diretamente `nexo armazenamento diagnosticar-origens`, `nexo armazenamento configurar` e `nexo armazenamento status`. O auxiliar externo era exclusivo para a instalação original 1.5.22 e não é necessário na 1.5.23. Fontes Data Studio e publicação comercial continuam dependendo de conferência operacional; esta release não aplica fatos comerciais.
+
 ## Ocorrência e evidência — 07/11/2026
 
 Base analisada: tag `v1.5.22` / `cfb382e`, comparada à main `6b56573`.

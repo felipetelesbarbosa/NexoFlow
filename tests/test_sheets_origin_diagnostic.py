@@ -14,7 +14,6 @@ from gspread.exceptions import APIError
 from requests import Response, Timeout
 
 from run_sheets_continuation import diagnose_origins, run
-from scripts.armazenamento_1_5_22 import source_hash, validate_installation
 from sheets_continuation import (
     FILE_MARKER_KEY,
     INDEX_TITLE,
@@ -250,7 +249,15 @@ class OriginTests(unittest.TestCase):
             self.assertEqual(nexo_cli.main(), 0)
         read.assert_called_once()
 
+    @unittest.skipUnless(
+        (
+            Path(__file__).resolve().parents[1] / "scripts/armazenamento_1_5_22.py"
+        ).is_file(),
+        "Auxiliar legado exclusivo do checkout; não distribuído no Setup novo.",
+    )
     def test_auxiliary_refuses_wrong_version_and_changed_installed_modules(self):
+        from scripts.armazenamento_1_5_22 import source_hash, validate_installation
+
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "app").mkdir()

@@ -1,4 +1,4 @@
-# NexoFlow 1.5.22 — Guia de operação
+# NexoFlow 1.5.23 — Guia de operação
 
 O NexoFlow integra Weni e a API FarmaLíder para **FarmaLíder e Pets Líder**, mantendo dados separados por perfil. O objetivo é manter contatos e pedidos atualizados e alimentar o Google Sheets e os painéis do Data Studio.
 
@@ -15,7 +15,7 @@ O NexoFlow identifica pedidos registrados na API **independentemente de terem si
 | **Noturno** | Executar Weni, Analytics e Recompra na marca escolhida sem confirmações durante a carga. |
 | **Terminal** | Executar comandos, consultar dados e diagnosticar a instalação. |
 
-## Atualização 1.5.22
+## Atualização 1.5.23
 
 Publica o histórico já coletado no SQLite em tabelas lógicas de Histórico e Dashboard, com capacidade global, continuações oficiais, revisão, piloto limitado, retomada e rollback por lote. Não exige recolher novamente a API ou executar Weni, Noturno ou Recompra para publicar.
 
@@ -23,7 +23,7 @@ Adiciona resumo mensal/anual/TOTAL para o Data Studio, conferência ao centavo e
 
 ## Antes de começar
 
-Instale pelo [Setup oficial](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.22), configure suas próprias credenciais e compartilhe as planilhas com a conta de serviço Google. O diretório padrão é `C:\NexoFlow`. Confira os requisitos e os campos necessários no [guia de instalação](README%20INSTALACAO.md).
+Instale pelo [Setup oficial](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.23), configure suas próprias credenciais e compartilhe as planilhas com a conta de serviço Google. O diretório padrão é `C:\NexoFlow`. Confira os requisitos e os campos necessários no [guia de instalação](README%20INSTALACAO.md).
 
 Abra o mesmo aplicativo e escolha **FarmaLíder** ou **Pets Líder** antes da carga. Configure tokens Weni e três destinos Sheets em cada perfil. A credencial Google pode ser compartilhada. Veja [configuração dos segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 
@@ -122,10 +122,11 @@ O NexoFlow é distribuído sem chaves, tokens ou credenciais. Configure seus pr�
 A rotina Weni reconcilia eventos CTWA nos dois segmentos, e o Analytics mantém os campos na Base_Contatos, nos pedidos e no BI_Ads do Dashboard correto. O Noturno usa as mesmas etapas. Consulte [regras e instruções de Oscarzinho e Lili](RASTREAMENTO_META.md).
 
 
-### Publicador histórico — correção 1.5.22
+### Publicador histórico — correção 1.5.23
 
-A release 1.5.21 existe e permanece preservada. A atualização 1.5.22 corrige a
-configuração das três origens, inclui reconhecimento de rede e logs do Setup e
+A release 1.5.21 existe e permanece preservada. A atualização 1.5.23 corrige a
+leitura do marcador oficial Google com locationType=SPREADSHEET, acrescenta
+diagnóstico das origens e pré-voo antes de qualquer escrita e
 mantém continuações, piloto, retomada e rollback. Após o pacote aprovado, o Work
 inicia FARMA comercial com um lote e conferência, sem nova carga anual. PET
 comercial permanece posterior. Consulte o [roteiro atualizado](PUBLICADOR%20HISTORICO%20SQLITE%20SHEETS.md).

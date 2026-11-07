@@ -1,5 +1,5 @@
-# Automação de testes, empacotamento e publicação do NexoFlow 1.5.22.
-name: Publicar NexoFlow 1.5.22
+# Automação de testes, empacotamento e publicação do NexoFlow 1.5.23.
+name: Publicar NexoFlow 1.5.23
 
 on:
   push:
@@ -146,7 +146,7 @@ jobs:
         shell: pwsh
         run: |
           if ($env:GITHUB_REF -cne "refs/heads/main") {
-            throw "A publicação do NexoFlow 1.5.22 deve partir da main."
+            throw "A publicação do NexoFlow 1.5.23 deve partir da main."
           }
 
       - name: Go para launcher do Setup
@@ -214,15 +214,15 @@ jobs:
         shell: pwsh
         run: ./scripts/test_segment_lock_windows.ps1
 
-      - name: Gerar pacotes 1.5.22
+      - name: Gerar pacotes 1.5.23
         shell: pwsh
         run: |
-          ./scripts/build_release.ps1 -Version "1.5.22"
+          ./scripts/build_release.ps1 -Version "1.5.23"
 
       - name: Validar ícones incorporados nos executáveis
         shell: pwsh
         run: |
-          ./scripts/test_executable_icons.ps1 -Version "1.5.22"
+          ./scripts/test_executable_icons.ps1 -Version "1.5.23"
 
       - name: Testar Weni com BAT sintético e inspeção durante carga ativa
         shell: pwsh
@@ -238,20 +238,20 @@ jobs:
         run: |
           ./scripts/test_noturno_launcher_windows.ps1
 
-      - name: Smoke test do Setup 1.5.22 no Windows
+      - name: Smoke test do Setup 1.5.23 no Windows
         shell: pwsh
         run: |
-          ./scripts/test_setup_windows.ps1 -SetupZip "dist/NexoFlow-Setup-1.5.22.zip"
+          ./scripts/test_setup_windows.ps1 -SetupZip "dist/NexoFlow-Setup-1.5.23.zip"
 
-      - name: Disponibilizar pacotes do NexoFlow 1.5.22
+      - name: Disponibilizar pacotes do NexoFlow 1.5.23
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: NexoFlow-1.5.22-pacotes
+          name: NexoFlow-1.5.23-pacotes
           path: |
-            dist/NexoFlow-Setup-1.5.22.zip
-            dist/NexoFlow-1.5.22.zip
-            dist/SHA256SUMS-1.5.22.txt
+            dist/NexoFlow-Setup-1.5.23.zip
+            dist/NexoFlow-1.5.23.zip
+            dist/SHA256SUMS-1.5.23.txt
             dist/release-notes.md
           if-no-files-found: error
           retention-days: 7
@@ -259,7 +259,7 @@ jobs:
       - name: Resumo
         shell: pwsh
         run: |
-          Get-Content "dist/SHA256SUMS-1.5.22.txt"
+          Get-Content "dist/SHA256SUMS-1.5.23.txt"
 
   verificar-pacotes:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
@@ -278,7 +278,7 @@ jobs:
       - name: Receber pacotes para análise
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
-          name: NexoFlow-1.5.22-pacotes
+          name: NexoFlow-1.5.23-pacotes
           path: dist
 
       - name: Instalar Gitleaks com SHA-256 conferido
@@ -316,7 +316,7 @@ jobs:
       - name: Receber pacotes validados
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
-          name: NexoFlow-1.5.22-pacotes
+          name: NexoFlow-1.5.23-pacotes
           path: dist
 
       - name: Conferir o commit atual da main
@@ -329,44 +329,44 @@ jobs:
             throw "A main recebeu outro commit. O release deve usar a execução mais recente."
           }
 
-      - name: Preservar ou criar tag v1.5.22
+      - name: Preservar ou criar tag v1.5.23
         shell: pwsh
         run: |
-          $existing = (& git ls-remote origin refs/tags/v1.5.22 | Out-String).Trim()
-          if ($LASTEXITCODE -ne 0) { throw "Falha ao consultar a tag v1.5.22." }
+          $existing = (& git ls-remote origin refs/tags/v1.5.23 | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0) { throw "Falha ao consultar a tag v1.5.23." }
           if ($existing) {
             if (($existing -split '\s+')[0] -cne $env:GITHUB_SHA) {
-              throw "A versão 1.5.22 já foi usada por outro commit. Incremente o patch antes de publicar."
+              throw "A versão 1.5.23 já foi usada por outro commit. Incremente o patch antes de publicar."
             }
           } else {
-            git tag v1.5.22 "$env:GITHUB_SHA"
-            if ($LASTEXITCODE -ne 0) { throw "Falha ao preparar a tag v1.5.22." }
-            git push origin refs/tags/v1.5.22
-            if ($LASTEXITCODE -ne 0) { throw "Falha ao publicar a tag v1.5.22." }
+            git tag v1.5.23 "$env:GITHUB_SHA"
+            if ($LASTEXITCODE -ne 0) { throw "Falha ao preparar a tag v1.5.23." }
+            git push origin refs/tags/v1.5.23
+            if ($LASTEXITCODE -ne 0) { throw "Falha ao publicar a tag v1.5.23." }
           }
 
-      - name: Publicar NexoFlow 1.5.22 no GitHub
+      - name: Publicar NexoFlow 1.5.23 no GitHub
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $isDraft = (& gh release view v1.5.22 --json isDraft --jq '.isDraft' 2>$null | Out-String).Trim()
+          $isDraft = (& gh release view v1.5.23 --json isDraft --jq '.isDraft' 2>$null | Out-String).Trim()
           if ($LASTEXITCODE -eq 0) {
             if ($isDraft -cne 'true') {
-              throw "A versão 1.5.22 já foi publicada. Incremente o patch para entregar novo código; não sobrescreva pacotes públicos."
+              throw "A versão 1.5.23 já foi publicada. Incremente o patch para entregar novo código; não sobrescreva pacotes públicos."
             }
           } else {
-            gh release create v1.5.22 --verify-tag --title "NexoFlow 1.5.22" --notes-file "dist/release-notes.md" --draft
-            if ($LASTEXITCODE -ne 0) { throw "Falha ao criar o rascunho NexoFlow 1.5.22." }
+            gh release create v1.5.23 --verify-tag --title "NexoFlow 1.5.23" --notes-file "dist/release-notes.md" --draft
+            if ($LASTEXITCODE -ne 0) { throw "Falha ao criar o rascunho NexoFlow 1.5.23." }
           }
           # Somente um rascunho da mesma entrega pode receber artefatos novamente.
-          gh release upload v1.5.22 "dist/NexoFlow-Setup-1.5.22.zip" "dist/NexoFlow-1.5.22.zip" "dist/SHA256SUMS-1.5.22.txt" --clobber
-          if ($LASTEXITCODE -ne 0) { throw "Falha ao enviar os pacotes do NexoFlow 1.5.22." }
-          gh release edit v1.5.22 --title "NexoFlow 1.5.22" --notes-file "dist/release-notes.md" --draft=false --latest
-          if ($LASTEXITCODE -ne 0) { throw "Falha ao publicar o NexoFlow 1.5.22." }
+          gh release upload v1.5.23 "dist/NexoFlow-Setup-1.5.23.zip" "dist/NexoFlow-1.5.23.zip" "dist/SHA256SUMS-1.5.23.txt" --clobber
+          if ($LASTEXITCODE -ne 0) { throw "Falha ao enviar os pacotes do NexoFlow 1.5.23." }
+          gh release edit v1.5.23 --title "NexoFlow 1.5.23" --notes-file "dist/release-notes.md" --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { throw "Falha ao publicar o NexoFlow 1.5.23." }
 
           # A data vem do instante publicado pelo GitHub, após a publicação real.
-          $publishedAt = (& gh release view v1.5.22 --json publishedAt --jq '.publishedAt' | Out-String).Trim()
+          $publishedAt = (& gh release view v1.5.23 --json publishedAt --jq '.publishedAt' | Out-String).Trim()
           if ($LASTEXITCODE -ne 0 -or -not $publishedAt) { throw "Falha ao conferir a data real da publicação." }
           try { $publicationZone = [TimeZoneInfo]::FindSystemTimeZoneById('America/Fortaleza') }
           catch { $publicationZone = [TimeZoneInfo]::FindSystemTimeZoneById('SA Eastern Standard Time') }
@@ -375,10 +375,10 @@ jobs:
           $title, $content = $notes -split "\r?\n", 2
           $datedNotes = "$title`n`nPublicado em **$publicationDate** (America/Fortaleza).`n`n" + $content.TrimStart([char[]]"`r`n")
           [IO.File]::WriteAllText((Join-Path $PWD 'dist/release-notes.md'), $datedNotes, (New-Object Text.UTF8Encoding($false)))
-          gh release edit v1.5.22 --notes-file "dist/release-notes.md"
+          gh release edit v1.5.23 --notes-file "dist/release-notes.md"
           if ($LASTEXITCODE -ne 0) { throw "Release publicado, mas não foi possível registrar a data nas notas." }
 
       - name: Resumo
         shell: pwsh
         run: |
-          Get-Content "dist/SHA256SUMS-1.5.22.txt"
+          Get-Content "dist/SHA256SUMS-1.5.23.txt"

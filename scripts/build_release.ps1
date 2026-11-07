@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.22",
+    [string]$Version = "1.5.23",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -440,7 +440,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.22
+# NexoFlow 1.5.23
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"
