@@ -19,8 +19,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: nexoflow-release-${{ github.ref }}
-  cancel-in-progress: true
+  # A publicação manual não deve cancelar os checks disparados pelo push.
+  # Publicações manuais aguardam a anterior; pushes substituem checks antigos.
+  group: nexoflow-release-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 
 jobs:
   qualidade:

@@ -11,3 +11,11 @@ Cada release informa a data real de publicação em **America/Fortaleza**. Enqua
 Os recursos Windows usam quatro componentes: **1.5.0.0** para 1.5, **1.5.19.0** para 1.5.19 e **1.6.0.0** para 1.6. O nome dos aplicativos e a pasta de instalação continuam NexoFlow. Os EXEs preservados em `native_launcher/prebuilt/` têm sua própria versão de referência documentada; os executáveis instalados na raiz devem coincidir com a distribuição atual.
 
 Antes da publicação, alinhe programa, instalador, metadados, pacote Python, documentação, tag e workflow; execute os testes e confira os arquivos publicados do mesmo commit. A numeração menor não dispensa a validação.
+
+## Validação contínua e publicação manual
+
+O workflow separa a concorrência por referência Git e evento. A publicação manual (`workflow_dispatch`) não cancela os testes automáticos do `push`. Novos pushes ainda substituem validações antigas da mesma referência; publicações manuais aguardam uma publicação anterior terminar. As guardas do commit atual da `main`, da tag e dos arquivos já publicados continuam obrigatórias.
+
+Commits com `[skip release]` executam qualidade, testes e análise de segredos, sem empacotar ou publicar. Uma correção apenas de CI não exige incrementar a versão Windows nem substituir os pacotes existentes.
+
+No GitHub, `cancelled` indica execução interrompida e não comprova falha de teste. Confira o workflow, a tentativa e o SHA. Falhas reais permanecem no histórico do commit original; a correção é validada em um novo commit, sem reescrever commits ou remover evidências.
