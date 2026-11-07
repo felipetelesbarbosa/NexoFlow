@@ -1,5 +1,10 @@
 # Histórico SQLite → Sheets → Data Studio: homologação FARMA
 
+## Situação operacional verificada pelo Work — 07/11/2026
+
+Consulte o [registro operacional FARMA 1.5.22](OPERACAO%20FARMA%201.5.22%202026-11-07.md). O código/release e os destinos foram conferidos; o Work desta sessão não acessa o SQLite Windows e não aplicou fatos comerciais. O agregado recebido fecha internamente, mas READY, revisão, capacidade real, conciliação SQLite/Sheets/Data Studio e idempotência permanecem pendentes. O início comercial autorizado segue o roteiro 1.5.22 com um lote de segurança e retomada imediata da mesma revisão após aprovação da conferência, sem repetir homologação extensa. PET permanece posterior.
+
+
 O publicador lógico foi inicialmente distribuído na [release Windows 1.5.21](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.21), no commit `29bba747a6cc5dcc57e1c547f94dc3a6af3fb6f1`. Esse registro descreve a entrega original; a correção desta missão usa a 1.5.22, conforme o roteiro abaixo. Não houve alteração de relatório publicado, VPS ou planilha comercial. O ensaio em três planilhas de teste foi realizado pelo Work e identificou o bloqueio descrito abaixo. Não substituir manualmente módulos em `C:\NexoFlow` operacional. PET somente foi validado com fixtures; a réplica comercial depende da aprovação de FARMA.
 
 ## Correção 1.5.22 e início comercial FARMA pelo Work

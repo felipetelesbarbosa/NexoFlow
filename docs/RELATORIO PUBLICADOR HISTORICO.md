@@ -1,5 +1,10 @@
 # Relatório técnico: publicador histórico SQLite / Sheets
 
+## Situação operacional verificada pelo Work — 07/11/2026
+
+Consulte o [registro operacional FARMA 1.5.22](OPERACAO%20FARMA%201.5.22%202026-11-07.md). O código/release e os destinos foram conferidos; o Work desta sessão não acessa o SQLite Windows e não aplicou fatos comerciais. O agregado recebido fecha internamente, mas READY, revisão, capacidade real, conciliação SQLite/Sheets/Data Studio e idempotência permanecem pendentes. O início comercial autorizado segue o roteiro 1.5.22 com um lote de segurança e retomada imediata da mesma revisão após aprovação da conferência, sem repetir homologação extensa. PET permanece posterior.
+
+
 Entrega desenvolvida em `main` e incorporada à preparação da **1.5.21**, com publicação Windows posteriormente autorizada pelo usuário, condicionada aos checks e pacotes validados. A release 1.5.20 permanece preservada. Referência comparada: `c94158d35c40d5f9e424731d672de257a7d78ec4`; main atualizada para `8c068f5` antes da implementação. O SHA final e os resultados dos workflows são informados na entrega e podem ser conferidos no histórico Git. FARMA é o piloto; PET somente isolamento sintético. Não se executou carga comercial, nova consulta FarmaLíder, Weni, Noturno, Recompra, implantação VPS ou edição de relatório publicado.
 
 ## Causas confirmadas e mudanças
