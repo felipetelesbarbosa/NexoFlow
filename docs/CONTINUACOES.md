@@ -65,3 +65,7 @@ Uma resposta perdida após gravar não autoriza repetir uma inserção às cegas
 Uma criação de arquivo indeterminada fica pendente até ser localizada; não cria outro arquivo automaticamente. Um histórico parcialmente entregue precisa do comprovante local da carga original. Se mudar de computador nessa situação, preserve os dados para revisão.
 
 Falhas isoladas de consulta de contatos/pedidos mantêm o comportamento das rotinas: registros inconclusivos ficam pendentes e os demais podem prosseguir. Uma falha estrutural de armazenamento exige interromper as gravações afetadas para não publicar dados incompletos.
+
+## Histórico SQLite: caminho novo em homologação
+
+O código posterior à 1.5.20 integra o publicador das cinco tabelas históricas ao manifesto oficial e adiciona piloto limitado, retomada da mesma revisão, backup por intervalo e conferência mensal/total. Os ZIPs originais da 1.5.20 não contêm esse caminho. Consulte [comandos e homologação FARMA para o Work](PUBLICADOR%20HISTORICO%20SQLITE%20SHEETS.md). Nenhuma configuração do Data Studio ou publicação comercial é efetuada automaticamente nesta entrega.

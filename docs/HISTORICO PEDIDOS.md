@@ -55,7 +55,7 @@ nexo historico --planilhas preparar --revisao logs\privado\historico_revisao.jso
 nexo historico --planilhas aplicar --revisao logs\privado\historico_revisao.json
 ```
 
-Homologue primeiro com três planilhas **de teste** configuradas em uma instalação de teste, não nas planilhas comerciais. Nenhuma escrita real foi executada durante o desenvolvimento. A aplicação exige revisão com os mesmos dados, IDs, schemas e snapshots. Pedido ativo remoto ausente da base local bloqueia a aplicação para reconciliação. Backup privado antecede cada lote; respostas são relidas. Falha parcial exige preparar novamente e aplicar o restante, sem duplicação. Linhas substituídas permanecem com `vigente=Não`; filtros usam `vigente=Sim`.
+Homologue primeiro com três planilhas **de teste** configuradas em uma instalação de teste, não nas planilhas comerciais. Nenhuma escrita real foi executada durante o desenvolvimento. A aplicação exige revisão com os mesmos dados, IDs, schemas e snapshots. Pedido ativo remoto ausente da base local bloqueia a aplicação para reconciliação. Backup privado antecede cada lote; respostas são relidas. Na nova implementação descrita abaixo, falha parcial exige retomar a mesma revisão, sem duplicação. Não prepare outro plano durante uma publicação em andamento. Linhas substituídas permanecem com `vigente=Não`; filtros usam `vigente=Sim`.
 
 | Arquivo | Abas novas | Grão |
 |---|---|---|
@@ -64,15 +64,15 @@ Homologue primeiro com três planilhas **de teste** configuradas em uma instala�
 
 IDs de pedido/cliente/contato são texto. A tabela de pedidos informa estado, motivo, origem, política financeira, vínculo Weni, produtos, frete e faturamento. LTV informa compras, primeira/última compra e cobertura observada. As abas preexistentes não mudam de cabeçalho. A fonte do Data Studio deve usar data do pedido para receita mensal e a tabela LTV independente do filtro mensal. Nenhum dashboard foi editado neste desenvolvimento.
 
-### Conferir capacidade e publicação
+### Publicador lógico em homologação (código posterior à 1.5.20)
 
-O preparo gera uma revisão local. Para confirmar publicação, confira a aplicação e a releitura das linhas no destino. O publicador desta versão lê e atualiza uma aba física por tabela. Habilitar as [continuações](CONTINUACOES.md) no perfil não faz esse caminho percorrer as partes. A aplicação processa toda a revisão em lotes de 200, sem opção de encerrar após um lote piloto.
+Os ZIPs publicados da **1.5.20** ainda usam o caminho físico, com backup e releitura integral por lote, sem piloto limitado. A implementação nova preserva a sintaxe de preparo/aplicação, mas usa o manifesto oficial, capacidade global, índice SQLite privado e partes físicas. Não instalar arquivos avulsos na operação para substituir uma distribuição validada. Esta entrega não publica release nem altera a versão Windows.
 
-Antes de aplicar, confira a grade alocada de cada arquivo e projete o crescimento por tabela, incluindo cabeçalhos e itens. Se o histórico não couber, interrompa antes da primeira escrita. Para publicar em partes, é necessário homologar o publicador e o leitor do Data Studio com o mesmo manifesto, incluindo a localização das chaves nas partes anteriores. Um resultado parcial deve conservar seu estado de cobertura.
+Consulte o [roteiro completo SQLite → Sheets → Data Studio para o Work](PUBLICADOR%20HISTORICO%20SQLITE%20SHEETS.md), incluindo comandos reais de capacidade, piloto, conferência, retomada e rollback. FARMA é o piloto; PET permanece restrito a fixtures de isolamento nesta entrega.
 
-Na conferência entre SQLite e Sheets, compare por segmento e mês de emissão os pedidos únicos, seus estados, os itens, os produtos, o frete e o faturamento em centavos. Separe pendências sem data válida. Para o total do período, conte clientes distintos sobre todos os pedidos válidos do segmento; somar compradores distintos mensais contaria novamente quem comprou em mais de um mês.
+A nova tabela controlada `BI_Historico_Resumo`, no Dashboard, oferece grãos MES, ANO, TOTAL e SEM_EMISSAO. Clientes distintos são calculados diretamente em cada grão, nunca somados entre meses. O LTV continua acumulado independentemente do filtro mensal de receita. A conferência privada `historico_conferencia_v1` compara SQLite e releitura das partes por mês e total, com valores em centavos.
 
-Na análise de anúncios, conte conversas em uma fonte com unidade e período conhecidos. Os campos de primeiro e último anúncio de um contato registram evidências de origem e não contam as conversas do dia.
+Não usar origem de anúncio como contagem de conversas. Os modelos de primeiro e último toque não são somáveis. O publicador histórico não recolhe eventos, não inventa atribuição e não modifica `Base_Contatos`, `BI_Ads` ou `Eventos_Anuncios`.
 
 ## Persistência, falhas e rollback
 
