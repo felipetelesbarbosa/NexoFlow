@@ -1,5 +1,7 @@
 # Auditoria da primeira importação FARMA 1.5.16
 
+> Registro da análise inicial. A preparação da 1.5.17 e o bloqueio de acesso à cópia real estão no [relatório final](AUDITORIA%20FINAL%20HISTORICO%20FARMA.md).
+
 Referência: release v1.5.16, commit 23f2806. A main conferida não tinha commits posteriores ao marco. A tag/release e a versão instalada foram preservadas; as correções de código são preparatórias, sem nova publicação nesta auditoria.
 
 ## Evidências e limites

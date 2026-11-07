@@ -45,6 +45,13 @@ class AuditTests(unittest.TestCase):
             print_summary(first)
         self.assertIn("R$ 160,00", output.getvalue())
         self.assertIn("PERÍODO SOLICITADO", output.getvalue())
+        self.assertIn("ORIGENS DOS FATOS ARMAZENADOS", output.getvalue())
+        for source, count in first["audit"]["origens"].items():
+            self.assertIn(f"{source}: {count} pedido(s)", output.getvalue())
+        self.assertIn(
+            "origem do fato=" + first["audit"]["pendencias"][0]["origem"],
+            output.getvalue(),
+        )
 
     def test_shared_boundary_and_existing_updated(self):
         class Boundary:

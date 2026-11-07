@@ -172,6 +172,10 @@ def print_summary(summary):
         f"\nJanelas: {summary.get('windows', '—')}; incompletas: {summary.get('incomplete_windows', '—')}"
     )
     audit = summary.get("audit", {})
+    if audit.get("origens"):
+        print("ORIGENS DOS FATOS ARMAZENADOS (não comprovam a execução de entrada)")
+        for source, count in sorted(audit["origens"].items()):
+            print(f"  {source}: {count} pedido(s)")
     if audit.get("janelas_persistidas"):
         print("Janelas persistidas (podem incluir execuções anteriores):")
         for window in audit["janelas_persistidas"]:
@@ -184,7 +188,7 @@ def print_summary(summary):
     print(f"  Quantidade: {sum(i['quantidade'] for i in issues)}")
     for issue in issues:
         print(
-            f"  {issue['motivo']}: {issue['quantidade']} | {issue['efeito']} | {issue['acao']}"
+            f"  {issue['motivo']}: {issue['quantidade']} | origem do fato={issue['origem']} | {issue['efeito']} | {issue['acao']}"
         )
     print(
         "Cobertura temporal: LIMITES_DA_API_NAO_HOMOLOGADOS; páginas completas não comprovam todo o período civil."
