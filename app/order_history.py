@@ -40,6 +40,21 @@ def digest(value):
     ).hexdigest()
 
 
+def preserve_item_positions(previous, incoming):
+    """Reordenação de itens oficiais idênticos preserva chaves analíticas locais."""
+    if not previous or previous["state"] != "valido" or incoming["state"] != "valido":
+        return incoming
+
+    def content(items):
+        return sorted(
+            digest({k: v for k, v in item.items() if k != "position"}) for item in items
+        )
+
+    if content(previous["items"]) == content(incoming["items"]):
+        return dict(incoming, items=previous["items"])
+    return incoming
+
+
 @dataclass(frozen=True)
 class HistoryQuery:
     segment: str

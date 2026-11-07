@@ -14,6 +14,7 @@ from order_history import (
     ltv,
     normalize_order,
     page_envelope,
+    preserve_item_positions,
 )
 
 SCHEMA = """
@@ -156,6 +157,7 @@ class HistoryStore:
             (self.segment, oid),
         ).fetchone()
         old_record = json.loads(old[0]) if old else None
+        record = preserve_item_positions(old_record, record)
         reason = (
             record["reason"]
             if record["state"] == "pendente"
@@ -197,8 +199,16 @@ class HistoryStore:
                 (self.segment, oid),
             )
         if old_record:
+            record = dict(record)
             record["contact_uuid"] = old_record.get("contact_uuid", "")
             record["link_state"] = old_record.get("link_state", "NAO_CONFERIDO")
+            if digest(old_record) == digest(record):
+                # Confirmação recente mantém precedência frente a snapshots antigos.
+                self.db.execute(
+                    "UPDATE history_orders SET updated=? WHERE segment=? AND id=?",
+                    (now, self.segment, oid),
+                )
+                return "existente"
             self.db.execute(
                 "INSERT OR IGNORE INTO history_revisions VALUES(?,?,?,?,?,?)",
                 (self.segment, oid, digest(old_record), digest(record), mode, now),

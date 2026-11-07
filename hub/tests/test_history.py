@@ -235,3 +235,40 @@ def test_incremental_window_and_recheck_completed_window(store):
             ).fetchone()["n"]
             >= 1
         )
+
+
+def test_reordered_items_do_not_reopen_old_closing(store):
+    create(store, changes={"quantidade_sintetica": 1})
+    task = store.claim()
+    history = PgHistory(store, task)
+    query = validate_parameters("PET", task["parametros"])
+    payload = SyntheticHistorySource(1).get_pedidos_history(query, 1)["pedidos"][0]
+    payload["capa"]["emissao"] = "2026-01-01T10:00:00"
+    second = deepcopy(payload["itens"][0])
+    second["id"] = "second-item"
+    payload["itens"].append(second)
+    now = "2026-11-06T20:00:00-03:00"
+    first = normalize_order(payload, "PET", now)
+    with store.connect() as db:
+        history.upsert(db, first, now=now, mode="historica")
+        payload["itens"].reverse()
+        history.upsert(
+            db, normalize_order(payload, "PET", now), now=now, mode="historica"
+        )
+        saved = db.execute(
+            "SELECT registro FROM hub.historico_pedidos WHERE segmento='PET' AND pedido_id=%s",
+            (first["id"],),
+        ).fetchone()
+        assert saved["registro"] == first
+        assert (
+            db.execute("SELECT count(*) AS n FROM hub.historico_pendencias").fetchone()[
+                "n"
+            ]
+            == 0
+        )
+        assert (
+            db.execute("SELECT count(*) AS n FROM hub.historico_revisoes").fetchone()[
+                "n"
+            ]
+            == 0
+        )

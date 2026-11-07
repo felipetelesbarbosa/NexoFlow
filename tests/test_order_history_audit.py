@@ -163,6 +163,33 @@ class AuditTests(unittest.TestCase):
         self.assertNotIn("próxima página", output.getvalue())
         self.assertIn("10/10", output.getvalue())
 
+    def test_reordered_items_preserve_positions_and_do_not_reopen_old_closing(self):
+        from copy import deepcopy
+
+        payload = order(88, day="2026-01-01")
+        second = deepcopy(payload["itens"][0])
+        second.update(id="second", codProduto=9)
+        payload["itens"].append(second)
+        first = normalize_order(payload, "PET", NOW)
+        self.store.upsert(first, now=NOW, mode="historica")
+        payload["itens"].reverse()
+        incoming = normalize_order(payload, "PET", NOW)
+        self.assertEqual(
+            self.store.upsert(incoming, now=NOW, mode="historica"), "existente"
+        )
+        self.assertEqual(list(self.store.records())[0], first)
+        self.assertEqual(self.store.totals()["pendencias"], 0)
+        self.assertEqual(
+            self.db.execute("SELECT count(*) FROM history_revisions").fetchone()[0], 0
+        )
+        payload["itens"][0]["total"] = 90
+        payload["itens"][0]["valor"] = 90
+        changed = normalize_order(payload, "PET", NOW)
+        self.assertEqual(
+            self.store.upsert(changed, now=NOW, mode="historica"), "preservado"
+        )
+        self.assertEqual(self.store.totals()["pendencias"], 1)
+
     def test_empty_and_multiple_orders_same_owner(self):
         self.assertEqual(history_audit(self.store)["acumulado"]["pedidos_validos"], 0)
         for oid in (1, 2):

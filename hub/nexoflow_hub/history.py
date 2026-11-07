@@ -12,6 +12,7 @@ from order_history import (
     digest,
     normalize_order,
     page_envelope,
+    preserve_item_positions,
 )
 from pedido_utils import business_order_datetime
 
@@ -250,6 +251,7 @@ class PgHistory:
             (self.segment, record["id"]),
         ).fetchone()
         old = found["registro"] if found else None
+        record = preserve_item_positions(old, record)
         reason = (
             record["reason"]
             if record["state"] == "pendente" or (old and record["state"] == "ignorado")
@@ -285,6 +287,12 @@ class PgHistory:
                 "DELETE FROM hub.historico_pendencias WHERE segmento=%s AND pedido_id=%s",
                 (self.segment, record["id"]),
             )
+        if old and digest(old) == digest(record):
+            db.execute(
+                "UPDATE hub.historico_pedidos SET atualizado_em=clock_timestamp() WHERE segmento=%s AND pedido_id=%s",
+                (self.segment, record["id"]),
+            )
+            return
         if old:
             db.execute(
                 "INSERT INTO hub.historico_revisoes(segmento,pedido_id,anterior,atual,modo,tarefa_id) VALUES(%s,%s,%s,%s,%s,%s)",
