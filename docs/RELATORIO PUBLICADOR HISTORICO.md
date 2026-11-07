@@ -59,7 +59,7 @@ Ensaio puramente de capacidade com **1.100.000 pedidos + 207.582 linhas de itens
 
 ## Cobertura de testes
 
-Implementação inicial em `01260749c17c736f4d3e98f4c45d47f5f0e54a36`, complementada pela guarda de tipos em `eb73b575791f07529bb022f00e759b2e34c2c3ba`. Validação local final: **1.851 testes Python, sem falhas, 73 ignorados por condições de plataforma/ambiente**; **30 testes Node aprovados**; Ruff e Pyright sem erros; auditoria de consistência e documentação HTML aprovadas; pip-audit sem vulnerabilidades conhecidas nas dependências principais/webhook. Gitleaks aprovou o histórico Git e a exportação dos arquivos destinados ao commit. Credenciais locais ignoradas não foram incluídas nessa exportação. Testes ignorados não contam como validação real Windows/Google.
+Implementação inicial em `01260749c17c736f4d3e98f4c45d47f5f0e54a36`, complementada pela guarda de tipos em `eb73b575791f07529bb022f00e759b2e34c2c3ba`. Validação local final: **1.852 testes Python, sem falhas, 73 ignorados por condições de plataforma/ambiente**; **30 testes Node aprovados**; Ruff e Pyright sem erros; auditoria de consistência e documentação HTML aprovadas; pip-audit sem vulnerabilidades conhecidas nas dependências principais/webhook. Gitleaks aprovou o histórico Git e a exportação dos arquivos destinados ao commit. Credenciais locais ignoradas não foram incluídas nessa exportação. Testes ignorados não contam como validação real Windows/Google.
 
 Os workflows Windows/qualidade/segredos e CodeQL do commit final devem ser conferidos no GitHub; o resultado efetivo e o SHA final acompanham a entrega. Os commits de desenvolvimento/preparação usam `[skip release]`; a publicação autorizada é executada pelo workflow manual no mesmo SHA, após CodeQL e checks aprovados.
 
@@ -89,3 +89,5 @@ O [roteiro operacional para o Work](PUBLICADOR%20HISTORICO%20SQLITE%20SHEETS.md)
 O CI de `9f5f03c` comprovou WinError 32 somente no encerramento do teste que altera coordenadas do journal: o contexto SQLite do teste não fechava a conexão. Corrigido com `contextlib.closing` e commit explícito, sem ignorar a falha ou forçar remoção. As conexões do publicador já usavam fechamento explícito. A suíte Windows precisa ser repetida no commit final da 1.5.21 antes da publicação.
 
 O orçamento de 240 segundos é compartilhado entre as leituras de pedidos e itens no mesmo getData, evitando reiniciar o prazo ao passar à segunda tabela. Regressão sintética recusa uma segunda leitura que já consumiu o prazo global.
+
+A regressão de aba legada no arquivo Operação (quando o papel autorizado é Histórico) falhou antes da guarda adicional e passou depois. O preparo agora verifica essas abas órfãs em todos os arquivos inventariados, bloqueando antes de criar cópia ou gravar fatos; o legado não é movido nem apagado.

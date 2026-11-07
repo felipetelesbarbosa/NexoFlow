@@ -183,6 +183,16 @@ class SheetsTransport:
             self.store._headers_cache[title] = headers
             registered = self.manager.index.table_parts(title)
             root = roots_for(self.store)[storage_role(title)]
+            coordinates = {(p.book_id, p.sheet_id) for p in registered}
+            for book_id, layout in layouts.items():
+                if book_id == root:
+                    continue
+                if any(
+                    s["properties"]["title"] == title
+                    and (book_id, s["properties"]["sheetId"]) not in coordinates
+                    for s in layout["sheets"]
+                ):
+                    raise HistoryError("ABA_ORFA_FORA_DO_PAPEL_AUTORIZADO")
             root_sheets = [
                 s["properties"]
                 for s in layouts[root]["sheets"]

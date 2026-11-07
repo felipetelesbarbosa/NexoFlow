@@ -86,6 +86,22 @@ class TransportTests(unittest.TestCase):
         self.remote._drive = info
         self.pub = Publication(self.remote, "FARMA", Path(self.tmp.name))
 
+    def test_legacy_table_in_wrong_root_blocks_before_new_copy(self):
+        from order_history import HistoryError
+
+        db, data = fixture(1)
+        self.addCleanup(db.close)
+        title = "Historico_Pedidos"
+        self.store._storage_books["operations"].add(
+            title, [SCHEMAS[title], [data[title][0][h] for h in SCHEMAS[title]]]
+        )
+        with self.assertRaisesRegex(HistoryError, "ABA_ORFA"):
+            self.pub.prepare(stream(data))
+        self.assertEqual(self.provider.creations, 0)
+        self.assertEqual(
+            sum(b.data_writes for b in self.store.client.books.values()), 0
+        )
+
     def test_real_transport_rolls_and_reads_back_exact_cells(self):
         db, data = fixture(12)
         self.addCleanup(db.close)
