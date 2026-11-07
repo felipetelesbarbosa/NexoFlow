@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.18",
+    [string]$Version = "1.5.19",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -414,13 +414,13 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-O histórico inclui todo o dia final informado sem horário, enviando 23:59:59.999999, e preserva data-hora explícita. GETs pontuais FARMA confirmaram os 85 IDs ausentes do dia 06/11; a API também confirmou o limite de 1 a 500 por página. O menu e a CLI rejeitam valores acima desse limite antes da chamada.
+O histórico segue para o próximo período quando a API confirma que não há pedidos na janela consultada. Quando encontra pedidos, pagina normalmente e continua até a data final escolhida. A retomada mantém as janelas e páginas já concluídas, sem duplicar faturamento.
 
-Itens idênticos retornados em outra ordem conservam posições e chaves analíticas: os 105 casos reais deixaram de representar falsas atualizações na reprodução privada. A mesma proteção evita falso conflito de fechamento antigo. Divergência isolada de frete vira aviso: a compra usa o frete oficial do cabeçalho, sem duplicação, mantendo as demais validações. A pendência antiga continua preservada até recuperar a resposta oficial, pois seus itens/valores não podem ser reconstruídos.
+Apenas o HTTP 404 com a mensagem específica de ausência, na primeira página da rota paginada, é convertido em janela vazia. Erros genéricos de rota, autenticação, rede e páginas ausentes continuam protegidos. O progresso mostra “sem pedidos nesta janela”. Uma consulta vazia consome uma unidade do orçamento definido pelo operador.
 
-A chave de cursor distingue a política nova de datas; fatos e checkpoints antigos permanecem disponíveis. Tentativas antigas com limite inválido e sem qualquer recebimento não são retomadas. Não houve nova carga anual, gravação comercial ou alteração dos SQLite recebidos. A evidência real é da amostra FARMA; não certifica cobertura anual ou homologação comercial PET. [Relatório técnico](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/VALIDACAO%20HISTORICO%201.5.18.md).
+Esta correção permite iniciar antes do primeiro pedido conhecido, sem presumir sua data. A coleta depende dos dados disponíveis na API. Não foi executada nova carga anual, nem alterado o SQLite comercial. Permanecem as correções de data final, limite de 500 por página, posições de itens e frete como aviso da 1.5.18.
 
-Feche as rotinas, faça backup privado consistente e atualize pelo Setup em Preserve. Não apague o SQLite nem reinicie todo o histórico. O Analytics usa a faixa recente configurada e incorpora os fatos locais. Abas específicas Histórico/LTV têm revisão separada. O Hub recebe código e testes PostgreSQL, sem implantação na VPS ou release comercial.
+Feche as rotinas, faça backup privado consistente e atualize pelo Setup em Preserve. Depois repita o período desejado; as janelas confirmadas são reaproveitadas. A release 1.5.18 permanece intacta. Hub somente código/homologação, sem implantação VPS ou ativação comercial. [Guia do histórico](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/HISTORICO%20PEDIDOS.md).
 
 Analytics e Noturno usam a integração Meta nativa, sem exigir MCP ou Codex CLI. As rotinas FARMA/PET e as funcionalidades da versão anterior permanecem preservadas. A atualização Preserve mantém configurações e dados. Esta versão não comprova autenticação no proxy corporativo ou aprovação pelo antivírus no PC do usuário; consulte os relatórios e o guia de homologação.
 
@@ -436,4 +436,4 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.18
+# NexoFlow 1.5.19

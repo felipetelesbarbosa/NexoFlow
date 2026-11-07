@@ -1,6 +1,6 @@
-# NexoFlow 1.5.18
+# NexoFlow 1.5.19
 
-A versão em preparação é **NexoFlow 1.5.18**, autorizada para nova publicação após a validação do mesmo commit. A versão 1.5.17 já foi publicada: preserve sua tag, seu release e todos os anteriores. Confirme os arquivos disponibilizados antes de anunciar a entrega. Novas tentativas desta entrega não incrementam novamente a versão. A data pública deve refletir a publicação real em `America/Fortaleza`; não antecipar a data enquanto a entrega estiver em validação.
+A versão em preparação é **NexoFlow 1.5.19**, autorizada para nova publicação após a validação do mesmo commit. A versão 1.5.18 já foi publicada: preserve sua tag, seu release e todos os anteriores. Confirme os arquivos disponibilizados antes de anunciar a entrega. Novas tentativas desta entrega não incrementam novamente a versão. A data pública deve refletir a publicação real em `America/Fortaleza`; não antecipar a data enquanto a entrega estiver em validação.
 
 ## Conferência antes da entrega
 
@@ -13,9 +13,9 @@ A versão em preparação é **NexoFlow 1.5.18**, autorizada para nova publicaç
 
 ## Regras do projeto
 
-- Use mensagens de commit curtas em português que descrevam a área ou a alteração, como `Automação`, `Documentação`, `Instalador` ou `Corrigir revisão da Recompra`. `NexoFlow 1.5.18` identifica a versão, não é uma mensagem obrigatória de commit. Separe alterações por área quando isso tornar a navegação do GitHub mais clara; não reescreva o histórico apenas para mudar os textos exibidos.
+- Use mensagens de commit curtas em português que descrevam a área ou a alteração, como `Automação`, `Documentação`, `Instalador` ou `Corrigir revisão da Recompra`. `NexoFlow 1.5.19` identifica a versão, não é uma mensagem obrigatória de commit. Separe alterações por área quando isso tornar a navegação do GitHub mais clara; não reescreva o histórico apenas para mudar os textos exibidos.
 - A `main` é a única branch de trabalho do repositório. Atualize diretamente a `main`; não crie nem mantenha branches adicionais.
-- A entrega autorizada usa `NexoFlow 1.5.18`, tag `v1.5.18` e pacotes com sufixo `1.5.18`, somente após autorização e validação. Para cada próxima publicação de atualização/hotfix/patch, incremente uma única vez: 1.5.19, 1.5.20, ... 1.5.99; depois 1.6, 1.6.1, ... 1.6.99. Não incremente por commit ou tentativa de CI da mesma entrega. Preserve tags e releases anteriores; nunca sobrescreva uma versão anterior com um novo patch. Confira `VERSION` e `docs/VERSIONAMENTO.md`.
+- A entrega autorizada usa `NexoFlow 1.5.19`, tag `v1.5.19` e pacotes com sufixo `1.5.19`, somente após autorização e validação. Para cada próxima publicação de atualização/hotfix/patch, incremente uma única vez: 1.5.20, 1.5.21, ... 1.5.99; depois 1.6, 1.6.1, ... 1.6.99. Não incremente por commit ou tentativa de CI da mesma entrega. Preserve tags e releases anteriores; nunca sobrescreva uma versão anterior com um novo patch. Confira `VERSION` e `docs/VERSIONAMENTO.md`.
 - Cada release deve mostrar a data da sua publicação. Não reutilize uma versão já publicada para código novo.
 - O NexoFlow Windows é operacional e autônomo; Analytics e Noturno usam a integração Meta nativa, sem exigir Codex ou MCP. MCP é opcional. O **NexoFlow Hub** tem desenvolvimento e homologação Linux expressamente autorizados na Etapa 2, isolados em `hub/`, com dados sintéticos, PostgreSQL temporário e escrita real bloqueada. Consulte [o núcleo](hub/README.md) e o [planejamento](docs/planejamento/README.md). Não transformar o Windows em cliente dependente do Hub, não alterar serviços/volumes da VPS nem abrir portas públicas nesta fase. Commits Hub usam `[skip release]`, sem incrementar a versão ou publicar releases Windows. Alterações compartilhadas exigem regressão Windows.
 - Preserve as credenciais e os diagnósticos privados fora do Git e dos pacotes públicos.

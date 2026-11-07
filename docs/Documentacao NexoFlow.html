@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>NexoFlow 1.5.18 - Documentação</title>
+  <title>NexoFlow 1.5.19 - Documentação</title>
   <style>
     html {
       color: #1a1a1a;
@@ -170,9 +170,9 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">NexoFlow 1.5.18 - Documentação</h1>
+<h1 class="title">NexoFlow 1.5.19 - Documentação</h1>
 </header>
-<h1 id="nexoflow-1518--guia-de-operação">NexoFlow 1.5.18 — Guia de
+<h1 id="nexoflow-1519--guia-de-operação">NexoFlow 1.5.19 — Guia de
 operação</h1>
 <p>O NexoFlow integra Weni e a API FarmaLíder para <strong>FarmaLíder e
 Pets Líder</strong>, mantendo dados separados por perfil. O objetivo é
@@ -227,29 +227,19 @@ confirmações durante a carga.</td>
 </tr>
 </tbody>
 </table>
-<h2 id="atualização-1518">Atualização 1.5.18</h2>
-<p>O histórico passa a enviar o dia final sem horário como
-<code>23:59:59.999999</code> e preserva horários explícitos. A API
-confirmou o limite de 1 a 500 por página. O menu repete entradas
-inválidas e a CLI recusa-as antes do GET. Novas chaves de cursor evitam
-reutilizar a cobertura antiga à meia-noite; os fatos e checkpoints
-anteriores são preservados.</p>
-<p>Itens idênticos retornados em ordem diferente mantêm posições e
-chaves analíticas locais. Consultas pontuais confirmaram os 85 IDs de
-06/11 antes ausentes. Divergência isolada de frete vira aviso sem
-excluir a compra, com valor oficial do cabeçalho e diferença registrada.
-A pendência antiga permanece preservada até recuperar seus itens/valores
-oficiais. Consulte o <a
-href="VALIDACAO%20HISTORICO%201.5.18.md">relatório da 1.5.18</a> para
-distinguir testes sintéticos e evidência real.</p>
-<p>A opção 10 armazena histórico no SQLite. O Analytics incorpora os
-fatos locais às tabelas normais de pedidos/itens. As abas específicas
-Histórico/LTV/Cobertura exigem a revisão separada descrita no <a
-href="HISTORICO%20PEDIDOS.md">guia</a>. O Windows permanece autônomo e o
-Hub em homologação, sem implantação nesta entrega.</p>
+<h2 id="atualização-1519">Atualização 1.5.19</h2>
+<p>O histórico avança automaticamente para o próximo período quando a
+API confirma que não há pedidos na janela consultada. Ao encontrar
+pedidos, pagina normalmente e continua até a data final. A retomada
+preserva janelas concluídas, páginas confirmadas e fatos anteriores.</p>
+<p>Somente a resposta específica de ausência na página 1 é aceita como
+janela vazia. Outros erros 404, autenticação, rede e páginas ausentes
+continuam protegidos. O progresso mostra “sem pedidos nesta janela”. Não
+é necessário conhecer previamente a data do primeiro pedido; a coleta
+recupera o que a API disponibilizar desde a data escolhida.</p>
 <h2 id="antes-de-começar">Antes de começar</h2>
 <p>Instale pelo <a
-href="https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.18">Setup
+href="https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.19">Setup
 oficial</a>, configure suas próprias credenciais e compartilhe as
 planilhas com a conta de serviço Google. O diretório padrão é
 <code>C:\NexoFlow</code>. Confira os requisitos e os campos necessários
@@ -428,4 +418,4 @@ href="RASTREAMENTO_META.md">regras e instruções de Oscarzinho e
 Lili</a>.</p>
 </body>
 </html>
-<!-- NexoFlow documentation: source-sha256=9d2cf208c1619cb314d14d5d06eb8a040da70c7bb5cefd210c21ad4232965177 content-sha256=7c8f5c8cc3910b395264771789e2bfcd03114c38324ef22c3c6296eae5ee47a8 -->
+<!-- NexoFlow documentation: source-sha256=b49f0c20ebe4e54aee7fea4325b4f6c2d6daa38e2b85960fff74fc9643fed543 content-sha256=9fae124c47a916348bf6bdb065b61d438dd81c68c9a810b1d198f45326ed4270 -->

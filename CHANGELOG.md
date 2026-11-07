@@ -1,6 +1,14 @@
 # NexoFlow — Changelog
 
-## NexoFlow 1.5.18 — Contrato real de datas, itens e frete (em validação)
+## NexoFlow 1.5.19 — Continuidade do histórico em períodos vazios (em validação)
+
+- A resposta oficial de ausência na primeira página da rota paginada encerra a janela vazia e permite consultar o próximo período, até a data final. Não precisa conhecer a data do primeiro pedido.
+- Outros 404, falhas de rede/autenticação e ausência de página posterior continuam interrompendo com checkpoint preservado. Nenhum fato anterior é excluído e não há criação de venda/cancelamento por janela vazia.
+- Progresso mostra “sem pedidos nesta janela”, sem página 1/0. Retomada e orçamento de consultas continuam funcionando.
+- Regressões SQLite e PostgreSQL cobrem janelas vazias seguidas por pedidos, paginação, retomada, 404 genérico e preservação de páginas já confirmadas. Não houve nova carga histórica real ou alteração comercial.
+- Pacotes próprios preservam a release 1.5.18 e anteriores. O Hub recebe apenas código/homologação, sem implantação ou release comercial. Data real nas notas da publicação após checks do mesmo commit.
+
+## NexoFlow 1.5.18 — Contrato real de datas, itens e frete — 07/11/2026
 
 - Dia final sem horário é enviado como 23:59:59.999999; horário explícito é preservado. GETs pontuais FARMA confirmaram os 85 IDs ausentes de 06/11 e 26 IDs adicionais fora da cópia anterior. Não houve nova carga anual ou atualização de dados comerciais.
 - Limite oficial confirmado pela resposta da API: de 1 a 500 pedidos por página. Menu/CLI/Hub validam antes da consulta. Tentativas legadas inválidas sem recebimentos são preservadas no diagnóstico e não são retomadas; estado incompatível com recebimentos exige revisão.

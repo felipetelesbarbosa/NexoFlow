@@ -1,4 +1,4 @@
-# NexoFlow 1.5.18 — Guia de operação
+# NexoFlow 1.5.19 — Guia de operação
 
 O NexoFlow integra Weni e a API FarmaLíder para **FarmaLíder e Pets Líder**, mantendo dados separados por perfil. O objetivo é manter contatos e pedidos atualizados e alimentar o Google Sheets e os painéis do Data Studio.
 
@@ -15,17 +15,15 @@ O NexoFlow identifica pedidos registrados na API **independentemente de terem si
 | **Noturno** | Executar Weni, Analytics e Recompra na marca escolhida sem confirmações durante a carga. |
 | **Terminal** | Executar comandos, consultar dados e diagnosticar a instalação. |
 
-## Atualização 1.5.18
+## Atualização 1.5.19
 
-O histórico passa a enviar o dia final sem horário como `23:59:59.999999` e preserva horários explícitos. A API confirmou o limite de 1 a 500 por página. O menu repete entradas inválidas e a CLI recusa-as antes do GET. Novas chaves de cursor evitam reutilizar a cobertura antiga à meia-noite; os fatos e checkpoints anteriores são preservados.
+O histórico avança automaticamente para o próximo período quando a API confirma que não há pedidos na janela consultada. Ao encontrar pedidos, pagina normalmente e continua até a data final. A retomada preserva janelas concluídas, páginas confirmadas e fatos anteriores.
 
-Itens idênticos retornados em ordem diferente mantêm posições e chaves analíticas locais. Consultas pontuais confirmaram os 85 IDs de 06/11 antes ausentes. Divergência isolada de frete vira aviso sem excluir a compra, com valor oficial do cabeçalho e diferença registrada. A pendência antiga permanece preservada até recuperar seus itens/valores oficiais. Consulte o [relatório da 1.5.18](VALIDACAO%20HISTORICO%201.5.18.md) para distinguir testes sintéticos e evidência real.
-
-A opção 10 armazena histórico no SQLite. O Analytics incorpora os fatos locais às tabelas normais de pedidos/itens. As abas específicas Histórico/LTV/Cobertura exigem a revisão separada descrita no [guia](HISTORICO%20PEDIDOS.md). O Windows permanece autônomo e o Hub em homologação, sem implantação nesta entrega.
+Somente a resposta específica de ausência na página 1 é aceita como janela vazia. Outros erros 404, autenticação, rede e páginas ausentes continuam protegidos. O progresso mostra “sem pedidos nesta janela”. Não é necessário conhecer previamente a data do primeiro pedido; a coleta recupera o que a API disponibilizar desde a data escolhida.
 
 ## Antes de começar
 
-Instale pelo [Setup oficial](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.18), configure suas próprias credenciais e compartilhe as planilhas com a conta de serviço Google. O diretório padrão é `C:\NexoFlow`. Confira os requisitos e os campos necessários no [guia de instalação](README%20INSTALACAO.md).
+Instale pelo [Setup oficial](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.19), configure suas próprias credenciais e compartilhe as planilhas com a conta de serviço Google. O diretório padrão é `C:\NexoFlow`. Confira os requisitos e os campos necessários no [guia de instalação](README%20INSTALACAO.md).
 
 Abra o mesmo aplicativo e escolha **FarmaLíder** ou **Pets Líder** antes da carga. Configure tokens Weni e três destinos Sheets em cada perfil. A credencial Google pode ser compartilhada. Veja [configuração dos segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 
