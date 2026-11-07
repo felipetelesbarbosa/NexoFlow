@@ -284,7 +284,9 @@ class HistoryTransportTests(unittest.TestCase):
                 parse_qs(urlsplit(prepared.url).query)["token"], ["fixture+/&=?% token"]
             )
             self.assertFalse(call.kwargs["allow_redirects"])
-            self.assertEqual(call.kwargs["params"]["dataFim"], "2026-11-06T23:59:59.999999")
+            self.assertEqual(
+                call.kwargs["params"]["dataFim"], "2026-11-06T23:59:59.999999"
+            )
             response.status_code = 302
             with self.assertRaisesRegex(FarmaliderError, "Redirecionamento"):
                 client.get_pedidos_history(q, 1)
@@ -371,16 +373,10 @@ class HistorySheetsTests(unittest.TestCase):
         from pathlib import Path
         from tempfile import TemporaryDirectory
 
-        from order_history_sheets import HistorySheets, google_store_type, tables
-        from tests.test_meta_ads_sheets import MemoryStore
+        from order_history_sheets import HistorySheets, tables
+        from tests.test_history_publication import Sheets
 
-        class Store(MemoryStore):
-            _native_meta_headers = staticmethod(
-                google_store_type()._native_meta_headers
-            )
-
-        store = Store()
-        store.profile = "PET"
+        store = Sheets("PET")
         db = sqlite3.connect(":memory:")
         self.addCleanup(db.close)
         history = HistoryStore(db, "PET")
@@ -396,10 +392,20 @@ class HistorySheetsTests(unittest.TestCase):
             plan = adapter.plan(data)
             self.assertEqual(store.writes, 0)
             self.assertGreater(adapter.apply(data, plan), 0)
-            self.assertTrue(list(Path(tmp).glob("*.json")))
+            self.assertTrue(list(Path(tmp).rglob("lote_*.json")))
             self.assertEqual(adapter.apply(data, adapter.plan(data)), 0)
-            self.assertIn("Historico_Pedidos", store._storage_books["hist"].tabs)
-            self.assertIn("BI_LTV_Clientes", store._storage_books["dash"].tabs)
+            self.assertIn(
+                "Historico_Pedidos",
+                {
+                    p["title"]
+                    for p in store.parts
+                    if p["title"].startswith("Historico_")
+                },
+            )
+            self.assertIn(
+                "BI_LTV_Clientes",
+                {p["title"] for p in store.parts if p["title"].startswith("BI_")},
+            )
             altered = deepcopy(data)
             altered["Historico_Pedidos"][0]["segmento"] = "FARMA"
             with self.assertRaises(HistoryError):
@@ -507,16 +513,10 @@ class HistoryIntegrationTests(unittest.TestCase):
         from pathlib import Path
         from tempfile import TemporaryDirectory
 
-        from order_history_sheets import HistorySheets, google_store_type, tables
-        from tests.test_meta_ads_sheets import MemoryStore
+        from order_history_sheets import HistorySheets, tables
+        from tests.test_history_publication import Sheets
 
-        class Store(MemoryStore):
-            _native_meta_headers = staticmethod(
-                google_store_type()._native_meta_headers
-            )
-
-        remote = Store()
-        remote.profile = "PET"
+        remote = Sheets("PET")
         db = sqlite3.connect(":memory:")
         self.addCleanup(db.close)
         local = HistoryStore(db, "PET")

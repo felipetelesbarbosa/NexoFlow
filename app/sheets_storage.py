@@ -11,6 +11,15 @@ STORAGE_SHEET = "NexoFlow_Arquivos"
 STORAGE_HEADERS = ["papel", "planilha_id"]
 
 
+def storage_role(title: str) -> str:
+    """Papel único das tabelas lógicas, inclusive o histórico paginado."""
+    if title.startswith("BI_"):
+        return "dashboard"
+    if title in {SHEET_HISTORICO, "Historico_Pedidos", "Historico_Itens"}:
+        return "historico"
+    return "operacao"
+
+
 @dataclass(frozen=True)
 class SheetsStorage:
     dashboard: str
@@ -62,11 +71,11 @@ class SheetsStorage:
         return layout
 
     def destination(self, title: str) -> str:
-        if title == SHEET_HISTORICO or title in {"Historico_Pedidos", "Historico_Itens"}:
-            return self.history
-        if title.startswith("BI_"):
-            return self.dashboard
-        return self.operations
+        return {
+            "dashboard": self.dashboard,
+            "operacao": self.operations,
+            "historico": self.history,
+        }[storage_role(title)]
 
 
 def configured_storage(hub_id: str) -> SheetsStorage | None:

@@ -551,6 +551,7 @@ class GoogleSheetsStore:
     @classmethod
     def bi_schemas(cls):
         from delivery_tickets import DELIVERY_ORDER_COLUMNS
+        from order_history_sheets import SCHEMAS as HISTORY_SCHEMAS
 
         return {
             **{
@@ -559,6 +560,7 @@ class GoogleSheetsStore:
                 if title.startswith("BI_")
             },
             "BI_Delivery_Pedidos": DELIVERY_ORDER_COLUMNS,
+            **HISTORY_SCHEMAS,
         }
 
     @classmethod

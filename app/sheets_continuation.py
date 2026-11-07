@@ -17,6 +17,8 @@ from google.auth.exceptions import TransportError
 from gspread.exceptions import APIError
 from requests import RequestException
 
+from sheets_storage import storage_role
+
 INDEX_TITLE = "NexoFlow_Continuidade"
 INDEX_HEADERS = ["tipo", "chave", "valor"]
 CELL_LIMIT = 20_000_000
@@ -197,7 +199,11 @@ class ContinuationIndex:
             if type(config["max_part_rows"]) is not int or config["max_part_rows"] < 2:
                 raise ValueError("Tamanho de parte inválido.")
             if not isinstance(config["connector_tables"], list) or any(
-                not isinstance(title, str) or not title.startswith("BI_")
+                not isinstance(title, str)
+                or not (
+                    title.startswith("BI_")
+                    or title in {"Historico_Pedidos", "Historico_Itens"}
+                )
                 for title in config["connector_tables"]
             ):
                 raise ValueError("Fontes Data Studio inválidas.")
@@ -235,13 +241,7 @@ class ContinuationIndex:
                 ):
                     raise ValueError("Arquivo de continuação inválido.")
             for part in index.parts.values():
-                role = (
-                    "dashboard"
-                    if part.title.startswith("BI_")
-                    else "historico"
-                    if part.title == "Historico_Alteracoes"
-                    else "operacao"
-                )
+                role = storage_role(part.title)
                 if (part.book_id in roots.values() and part.book_id != roots[role]) or (
                     part.book_id in index.files
                     and index.files[part.book_id]["role"] != role
@@ -276,14 +276,7 @@ class ContinuationIndex:
                 if (
                     not isinstance(title, str)
                     or not title
-                    or role
-                    != (
-                        "dashboard"
-                        if title.startswith("BI_")
-                        else "historico"
-                        if title == "Historico_Alteracoes"
-                        else "operacao"
-                    )
+                    or role != storage_role(title)
                 ):
                     raise ValueError("Criação pertence a outro papel de armazenamento.")
                 if (

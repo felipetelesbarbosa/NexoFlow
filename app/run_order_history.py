@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 from contextlib import closing
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -55,8 +54,26 @@ def parser():
     )
     result.add_argument(
         "--planilhas",
-        choices=("preparar", "aplicar"),
+        choices=("preparar", "capacidade", "aplicar", "conferir", "rollback"),
         help="Revisão separada, sem nova coleta",
+    )
+    result.add_argument(
+        "--banco",
+        type=Path,
+        help="SQLite local do perfil; preparo cria cópia consistente sem nova coleta",
+    )
+    result.add_argument(
+        "--max-lotes",
+        type=int,
+        help="Pausar após N lotes (até 200 linhas por lote), preservando a revisão",
+    )
+    result.add_argument(
+        "--lote", type=int, help="Lote específico para rollback protegido"
+    )
+    result.add_argument(
+        "--resumo-mensal",
+        type=Path,
+        help="Saída privada de conferência agregada por mês e período",
     )
     result.add_argument(
         "--revisao", type=Path, help="Arquivo privado de revisão de planilhas"
@@ -211,6 +228,14 @@ def run(argv=None):
     args = parser().parse_args(argv)
     if args.max_paginas is not None and args.max_paginas < 1:
         raise HistoryError("MAXIMO_PAGINAS_INVALIDO")
+    if args.max_lotes is not None and (
+        args.planilhas != "aplicar" or args.max_lotes < 1
+    ):
+        raise HistoryError("MAX_LOTES_REQUER_APLICACAO_E_VALOR_POSITIVO")
+    if args.planilhas:
+        from history_publish_cli import publish
+
+        return publish(args)
     if args.auditar_banco:
         import sqlite3
 
@@ -230,6 +255,13 @@ def run(argv=None):
             db.execute("PRAGMA query_only=ON")
             history = object.__new__(HistoryStore)
             history.db, history.segment = db, segment()
+            if args.resumo_mensal:
+                from dedup_io import save_private
+                from history_conference import receipts, summarize
+
+                report = summarize(history.records(), segment())
+                report["recebimentos"] = receipts(history)
+                save_private(args.resumo_mensal, report)
             audit = history_audit(history, query)
             print_summary(dict(audit=audit))
             return 3 if audit["pendencias"] else 0
@@ -254,44 +286,6 @@ def run(argv=None):
         history = HistoryStore(db, segment())
         if args.somente_resumo:
             summary = dict(history.totals(), audit=history_audit(history))
-        elif args.planilhas:
-            if args.revisao is None:
-                raise HistoryError("REVISAO_OBRIGATORIA")
-            from order_history_sheets import HistorySheets, google_store_type, tables
-            from project_paths import load_private_settings
-            from proxy_config import configure_proxy
-
-            configure_proxy()
-            settings = load_private_settings()
-            google = google_store_type().open_native_readonly(
-                settings.GOOGLE_SPREADSHEET_ID
-            )
-            try:
-                adapter = HistorySheets(
-                    google, segment(), LOG_DIR / "privado" / "historico_backups"
-                )
-                data = tables(history)
-                if args.planilhas == "preparar":
-                    plan = adapter.plan(data)
-                    args.revisao.parent.mkdir(parents=True, exist_ok=True)
-                    args.revisao.write_text(
-                        json.dumps(plan, ensure_ascii=False), encoding="utf-8"
-                    )
-                    args.revisao.chmod(0o600)
-                    summary = {
-                        "linhas_preparadas": sum(
-                            len(v) for v in plan["changes"].values()
-                        ),
-                        "aplicadas": 0,
-                    }
-                else:
-                    summary = {
-                        "linhas_aplicadas": adapter.apply(
-                            data, json.loads(args.revisao.read_text(encoding="utf-8"))
-                        )
-                    }
-            finally:
-                google.close()
         else:
             from farmalider_customers import CustomerDirectory
             from nexo_cli import _make_farmalider_client, _make_weni_client

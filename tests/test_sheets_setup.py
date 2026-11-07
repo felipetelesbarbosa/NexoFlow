@@ -112,6 +112,7 @@ class ConnectorContractTests(unittest.TestCase):
                 "--test",
                 "tests/test_continuation_connector.cjs",
                 "tests/test_looker_abc_connector.cjs",
+                "tests/test_history_connector.cjs",
             ],
             cwd=ROOT,
             capture_output=True,

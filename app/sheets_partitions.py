@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 from uuid import uuid4
@@ -20,6 +21,7 @@ from sheets_continuation import (
     stamp_book,
 )
 from sheets_provisioning import DRIVE, CreationRejected, MyDriveProvisioner
+from sheets_storage import storage_role
 
 
 def roots_for(store):
@@ -33,13 +35,7 @@ def roots_for(store):
 
 
 def role_for(title):
-    return (
-        "dashboard"
-        if title.startswith("BI_")
-        else "historico"
-        if title == "Historico_Alteracoes"
-        else "operacao"
-    )
+    return storage_role(title)
 
 
 @dataclass
@@ -59,6 +55,8 @@ class RolloverManager:
         self.handles = {}
         self.provider = None
         self.provider_factory = provisioner_factory or self._new_provider
+        self.before_manifest_write: Callable[[list[list[str]]], Any] | None = None
+        self.after_manifest_write: Callable[[list[list[str]]], Any] | None = None
         self.persisted_hash = fingerprint(index.values())
         self.metadata = {}
         from project_paths import ROOT
@@ -113,6 +111,9 @@ class RolloverManager:
                 "O índice de continuações mudou durante a carga; reexecute a rotina."
             )
         values = self.index.values()
+        before_manifest = getattr(self, "before_manifest_write", None)
+        if before_manifest is not None:
+            before_manifest(values)
         size = max(len(values), len(current), 1)
         if self.sheet.row_count < size:
             self.store._write_with_retry(
@@ -156,6 +157,9 @@ class RolloverManager:
                 "A gravação do índice não foi confirmada; preservar os comprovantes."
             )
         self.persisted_hash = fingerprint(values)
+        after_manifest = getattr(self, "after_manifest_write", None)
+        if after_manifest is not None:
+            after_manifest(values)
 
     def _book(self, book_id):
         if book_id not in self.books:

@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import json
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from uuid import uuid4
 
-from order_history import HistoryError, digest, ltv
+from order_history import HistoryError
 
 SCHEMAS = {
     "Historico_Pedidos": [
@@ -71,7 +69,37 @@ SCHEMAS = {
 }
 
 
+SCHEMAS["BI_Historico_Resumo"] = [
+    "chave",
+    "segmento",
+    "tipo_recorte",
+    "competencia",
+    "periodo_inicio",
+    "periodo_fim",
+    "pedidos",
+    "validos",
+    "cancelados",
+    "pendentes",
+    "outros",
+    "clientes",
+    "itens",
+    "unidades",
+    "produtos",
+    "frete",
+    "faturamento",
+    "cobertura",
+    "vigente",
+]
+
+
 NUMERIC = {
+    "validos",
+    "cancelados",
+    "pendentes",
+    "outros",
+    "clientes",
+    "itens",
+    "unidades",
     "produtos",
     "frete",
     "faturamento",
@@ -93,7 +121,10 @@ def normalized_cells(row):
     for key, value in row.items():
         text = str(value)
         if key in NUMERIC and text not in ("", "Sim", "Não"):
-            number = Decimal(text)
+            try:
+                number = Decimal(text)
+            except InvalidOperation:
+                raise HistoryError("NUMERO_INVALIDO") from None
             if not number.is_finite():
                 raise HistoryError("NUMERO_INVALIDO")
             text = format(number.normalize(), "f")
@@ -108,83 +139,206 @@ def typed_cells(row):
     }
 
 
-def tables(store):
-    result = {name: [] for name in SCHEMAS}
-
-    def add(title, values):
-        result[title].append(dict(zip(SCHEMAS[title], values, strict=True)))
+def iter_tables(store):
+    """Linhas em fluxo; agregação LTV em SQLite, sem lista de pedidos em RAM."""
 
     def amount(cents):
         return str(Decimal(cents) / 100)
 
+    from pedido_utils import business_order_datetime
+
+    item_summary = {}
     for row in store.records():
+        day = business_order_datetime(row["date"])
+        periods = [
+            ("MES", day.strftime("%Y-%m") if day else None),
+            ("ANO", day.strftime("%Y") if day else None),
+            ("TOTAL", "TOTAL"),
+        ]
         key = row["segment"] + ":" + row["id"]
-        add(
+        yield (
             "Historico_Pedidos",
-            [
-                key,
-                row["segment"],
-                row["id"],
-                row["owner"],
-                row["contact_uuid"],
-                row["link_state"],
-                row["date"],
-                row["state"],
-                row["reason"],
-                amount(row["products_cents"]),
-                amount(row["freight_cents"]),
-                amount(row["revenue_cents"]),
-                row["source"],
-                row["policy"],
-                "Sim",
-            ],
+            dict(
+                zip(
+                    SCHEMAS["Historico_Pedidos"],
+                    [
+                        key,
+                        row["segment"],
+                        row["id"],
+                        row["owner"],
+                        row["contact_uuid"],
+                        row["link_state"],
+                        row["date"],
+                        row["state"],
+                        row["reason"],
+                        amount(row["products_cents"]),
+                        amount(row["freight_cents"]),
+                        amount(row["revenue_cents"]),
+                        row["source"],
+                        row["policy"],
+                        "Sim",
+                    ],
+                    strict=True,
+                )
+            ),
         )
         for item in row["items"]:
-            add(
+            if row["state"] == "valido" and not item["freight"]:
+                for scope in periods:
+                    count, units = item_summary.get(scope, (0, Decimal(0)))
+                    item_summary[scope] = (
+                        count + 1,
+                        units + Decimal(str(item["quantity"])),
+                    )
+            yield (
                 "Historico_Itens",
-                [
-                    key + ":" + item["id"],
-                    row["segment"],
-                    row["id"],
-                    item["id"],
-                    item["sku"],
-                    item["name"],
-                    item["quantity"],
-                    amount(item["total_cents"]),
-                    "Sim" if item["freight"] else "Não",
-                    row["state"],
-                    "Sim",
-                ],
+                dict(
+                    zip(
+                        SCHEMAS["Historico_Itens"],
+                        [
+                            key + ":" + item["id"],
+                            row["segment"],
+                            row["id"],
+                            item["id"],
+                            item["sku"],
+                            item["name"],
+                            item["quantity"],
+                            amount(item["total_cents"]),
+                            "Sim" if item["freight"] else "Não",
+                            row["state"],
+                            "Sim",
+                        ],
+                        strict=True,
+                    )
+                ),
             )
-    for row in ltv(store.records()):
-        add(
-            "BI_LTV_Clientes",
-            [
-                row["segment"] + ":" + row["owner"],
-                row["segment"],
-                row["owner"],
-                str(row["orders"]),
-                amount(row["revenue_cents"]),
-                row["average"],
-                row["first"],
-                row["last"],
-                row["coverage"],
-                "Sim",
-            ],
-        )
-    for row in store.db.execute(
-        "SELECT key,segment,start,end,page_limit,next_page,total,pages,status,reason,updated FROM history_windows WHERE segment=?",
+    for owner, count, revenue, first, last in store.db.execute(
+        "SELECT owner,count(*),sum(json_extract(record,'$.revenue_cents')),min(json_extract(record,'$.date')),max(json_extract(record,'$.date')) FROM history_orders WHERE segment=? AND json_extract(record,'$.state')='valido' GROUP BY owner ORDER BY owner",
         (store.segment,),
     ):
-        add(
-            "BI_Cobertura_Historica",
-            [
-                *[str(v) if v is not None else "" for v in row],
-                "LIMITES_API_NAO_HOMOLOGADOS",
-                str(store.totals()["pendencias"]),
-                "Sim",
-            ],
+        average = str((Decimal(revenue) / 100 / count).quantize(Decimal("0.01")))
+        yield (
+            "BI_LTV_Clientes",
+            dict(
+                zip(
+                    SCHEMAS["BI_LTV_Clientes"],
+                    [
+                        store.segment + ":" + owner,
+                        store.segment,
+                        owner,
+                        str(count),
+                        amount(revenue),
+                        average,
+                        first,
+                        last,
+                        "LTV_OBSERVADO",
+                        "Sim",
+                    ],
+                    strict=True,
+                )
+            ),
         )
+    pending = store.db.execute(
+        "SELECT count(*) FROM history_issues WHERE segment=?", (store.segment,)
+    ).fetchone()[0]
+    for row in store.db.execute(
+        "SELECT key,segment,start,end,page_limit,next_page,total,pages,status,reason,updated FROM history_windows WHERE segment=? ORDER BY key",
+        (store.segment,),
+    ):
+        yield (
+            "BI_Cobertura_Historica",
+            dict(
+                zip(
+                    SCHEMAS["BI_Cobertura_Historica"],
+                    [
+                        *[str(v) if v is not None else "" for v in row],
+                        "LIMITES_API_NAO_HOMOLOGADOS",
+                        str(pending),
+                        "Sim",
+                    ],
+                    strict=True,
+                )
+            ),
+        )
+
+    # Resumo pequeno para o leitor anual, com clientes distintos calculados
+    # diretamente em cada grão. Nunca somar clientes mensais para obter o ano.
+    raw_date = "json_extract(record,'$.date')"
+    date_expr = f"CASE WHEN length({raw_date})=10 THEN {raw_date}||'T00:00:00-03:00' WHEN instr(substr({raw_date},11),'+')=0 AND instr(substr({raw_date},11),'-')=0 AND upper(substr({raw_date},-1))!='Z' THEN {raw_date}||'-03:00' ELSE {raw_date} END"
+    expressions = [
+        ("MES", f"strftime('%Y-%m',{date_expr},'-3 hours')"),
+        ("ANO", f"strftime('%Y',{date_expr},'-3 hours')"),
+        ("TOTAL", "'TOTAL'"),
+    ]
+    for kind, period in expressions:
+        sql = f"""SELECT {period} AS competence,
+             min(date({date_expr},'-3 hours')),max(date({date_expr},'-3 hours')),
+             count(*),sum(json_extract(record,'$.state')='valido'),
+             sum(json_extract(record,'$.state')='cancelado'),sum(json_extract(record,'$.state')='pendente'),
+             sum(json_extract(record,'$.state') NOT IN ('valido','cancelado','pendente')),
+             count(DISTINCT CASE WHEN json_extract(record,'$.state')='valido' THEN owner END),
+             coalesce(sum(CASE WHEN json_extract(record,'$.state')='valido' THEN json_extract(record,'$.products_cents') ELSE 0 END),0),
+             coalesce(sum(CASE WHEN json_extract(record,'$.state')='valido' THEN json_extract(record,'$.freight_cents') ELSE 0 END),0),
+             coalesce(sum(CASE WHEN json_extract(record,'$.state')='valido' THEN json_extract(record,'$.revenue_cents') ELSE 0 END),0)
+             FROM history_orders WHERE segment=? GROUP BY competence ORDER BY competence"""
+        for (
+            period_id,
+            first,
+            last,
+            count,
+            valid,
+            cancel,
+            pending,
+            other,
+            buyers,
+            products,
+            freight,
+            revenue,
+        ) in store.db.execute(sql, (store.segment,)):
+            if period_id is None and kind == "ANO":
+                continue
+            type_id = kind if period_id is not None else "SEM_EMISSAO"
+            period_id = period_id or "SEM_EMISSAO"
+            lines, units = item_summary.get(
+                (kind, None if type_id == "SEM_EMISSAO" else period_id), (0, Decimal(0))
+            )
+            yield (
+                "BI_Historico_Resumo",
+                dict(
+                    zip(
+                        SCHEMAS["BI_Historico_Resumo"],
+                        [
+                            store.segment + ":" + type_id + ":" + period_id,
+                            store.segment,
+                            type_id,
+                            period_id,
+                            first or "",
+                            last or "",
+                            str(count),
+                            str(valid or 0),
+                            str(cancel or 0),
+                            str(pending or 0),
+                            str(other or 0),
+                            str(buyers),
+                            str(lines),
+                            str(units),
+                            amount(products),
+                            amount(freight),
+                            amount(revenue),
+                            "OBSERVADO; LIMITES_API_NAO_HOMOLOGADOS",
+                            "Sim",
+                        ],
+                        strict=True,
+                    )
+                ),
+            )
+
+
+def tables(store):
+    """Compatibilidade para consumidores pequenos; publicação usa iter_tables."""
+    result = {name: [] for name in SCHEMAS}
+    for title, row in iter_tables(store):
+        result[title].append(row)
     return result
 
 
@@ -201,116 +355,39 @@ def google_store_type():
 
 
 class HistorySheets:
+    """Fachada compatível do publicador; todos os caminhos usam o protocolo v2."""
+
     def __init__(self, store, segment, backup_dir: Path):
-        self.store, self.segment, self.backup_dir = store, segment, backup_dir
+        from history_publication import Publication
+        from history_sheets_transport import SheetsTransport
 
-    def plan(self, data):
-        if set(data) != set(SCHEMAS):
+        remote = store if hasattr(store, "describe") else SheetsTransport(store)
+        self.engine = Publication(remote, segment, backup_dir)
+        self.last_result = {}
+
+    def plan(self, data, *, evidence=None):
+        if isinstance(data, dict) and set(data) != set(SCHEMAS):
             raise HistoryError("TABELAS_INCOMPLETAS")
-        context = self.store.native_meta_context()
-        if (
-            context["segment"] != self.segment
-            or len({context[k] for k in ("history", "operations", "dashboard")}) != 3
-        ):
-            raise HistoryError("DESTINOS_INVALIDOS")
-        snapshots, changes = {}, {}
-        for title, headers in SCHEMAS.items():
-            snapshot = self.store.native_meta_read(title, headers)
-            expected_book = context[
-                "history" if title.startswith("Historico_") else "dashboard"
-            ]
-            if snapshot["book_id"] != expected_book:
-                raise HistoryError("DESTINO_DIVERGENTE")
-            values = snapshot["values"]
-            if values and values[0] != headers:
-                raise HistoryError("CABECALHO_DIVERGENTE")
-            old = {}
-            for cells in values[1:]:
-                if not cells or not any(cells):
-                    continue
-                if len(cells) > len(headers) or cells[0] in old:
-                    raise HistoryError("LINHA_DUPLICADA_OU_INVALIDA")
-                row = dict(
-                    zip(
-                        headers, cells + [""] * (len(headers) - len(cells)), strict=True
-                    )
-                )
-                if row["segmento"] != self.segment:
-                    raise HistoryError("SEGMENTO_DIVERGENTE")
-                old[row["chave"]] = normalized_cells(row)
-            incoming = {}
-            for row in data[title]:
-                if (
-                    set(row) != set(headers)
-                    or row["segmento"] != self.segment
-                    or not row["chave"]
-                    or row["chave"] in incoming
-                ):
-                    raise HistoryError("REGISTRO_INVALIDO")
-                incoming[row["chave"]] = normalized_cells(row)
-            # Ausência local não autoriza apagar/inativar uma compra remota.
-            missing = old.keys() - incoming.keys()
-            if title == "Historico_Pedidos" and any(
-                old[k].get("vigente") != "Não" for k in missing
-            ):
-                raise HistoryError("BASE_LOCAL_INCOMPLETA_RECONCILIAR")
-            for key in missing:
-                # Itens/LTV derivados só ficam inativos após conhecer todos os
-                # pedidos remotos no preflight da primeira tabela.
-                incoming[key] = dict(old[key], vigente="Não")
-            changes[title] = [r for k, r in incoming.items() if r != old.get(k)]
-            snapshots[title] = snapshot
-        return {
-            "segment": self.segment,
-            "context": context,
-            "data_digest": digest(data),
-            "snapshots": snapshots,
-            "changes": changes,
-        }
+        rows = (
+            ((title, row) for title, records in data.items() for row in records)
+            if isinstance(data, dict)
+            else data
+        )
+        return self.engine.prepare(rows, evidence=evidence)
 
-    def apply(self, data, review):
-        plan = self.plan(data)
-        if plan != review:
-            raise HistoryError("REVISAO_OU_DESTINO_ALTERADO")
-        self.backup_dir.mkdir(parents=True, exist_ok=True)
-        count = 0
-        for title, changes in plan["changes"].items():
-            for offset in range(0, len(changes), 200):
-                batch = changes[offset : offset + 200]
-                snapshot = self.store.native_meta_read(title, SCHEMAS[title])
-                # Conferir novamente antes da primeira gravação de cada tabela.
-                if offset == 0 and snapshot != plan["snapshots"][title]:
-                    raise HistoryError("PLANILHA_ALTERADA_APOS_REVISAO")
-                path = self.backup_dir / (uuid4().hex + ".json")
-                path.write_text(
-                    json.dumps(
-                        {"title": title, "snapshot": snapshot, "batch": batch},
-                        ensure_ascii=False,
-                    ),
-                    encoding="utf-8",
-                )
-                path.chmod(0o600)
-                self.store.native_meta_upsert_chunk(
-                    title,
-                    SCHEMAS[title],
-                    [typed_cells(r) for r in batch],
-                    expected_snapshot=snapshot,
-                )
-                checked = self.store.native_meta_read(title, SCHEMAS[title])["values"]
-                observed = {
-                    str(r[0]): dict(
-                        zip(
-                            SCHEMAS[title],
-                            [str(v) for v in r] + [""] * (len(SCHEMAS[title]) - len(r)),
-                            strict=True,
-                        )
-                    )
-                    for r in checked[1:]
-                    if r
-                }
-                if any(
-                    normalized_cells(observed.get(r["chave"], {})) != r for r in batch
-                ):
-                    raise HistoryError("GRAVACAO_NAO_CONFIRMADA")
-                count += len(batch)
-        return count
+    def apply(self, data, review, *, max_batches=None):
+        if data is not None:
+            rows = (
+                ((title, row) for title, records in data.items() for row in records)
+                if isinstance(data, dict)
+                else data
+            )
+            self.engine.verify_input(rows, review)
+        self.last_result = self.engine.apply(review, max_batches=max_batches)
+        return self.last_result["applied_rows"]
+
+    def check(self, review):
+        return self.engine.check(review)
+
+    def rollback(self, review, batch):
+        return self.engine.rollback(review, batch)
