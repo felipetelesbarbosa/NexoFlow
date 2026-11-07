@@ -1,6 +1,12 @@
 # Histórico SQLite → Sheets → Data Studio: homologação FARMA
 
-Esta implementação integra a preparação da release Windows 1.5.21, cuja publicação foi autorizada após os testes e a validação dos pacotes. A release 1.5.20 permanece preservada. Não houve alteração de relatório publicado, VPS ou planilha comercial. O Work deverá homologar o mesmo SHA em uma instalação isolada com três planilhas **de teste**. Não substituir manualmente módulos em `C:\NexoFlow` operacional. PET somente foi validado com fixtures; a réplica comercial depende da aprovação de FARMA.
+O publicador foi distribuído na [release Windows 1.5.21](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.21), no commit `29bba747a6cc5dcc57e1c547f94dc3a6af3fb6f1`. A homologação operacional da FARMA deve usar os pacotes dessa release. Não houve alteração de relatório publicado, VPS ou planilha comercial. O Work deverá homologar o mesmo SHA em uma instalação isolada com três planilhas **de teste**. Não substituir manualmente módulos em `C:\NexoFlow` operacional. PET somente foi validado com fixtures; a réplica comercial depende da aprovação de FARMA.
+
+## Acompanhamento do Work em 07/11/2026
+
+O Work criou três planilhas privadas e vazias para o piloto FARMA, separadas por papel (Dashboard, Operação e Histórico), e conferiu a pasta e as permissões. O kit sintético passou pela auditoria local. O Data Studio reconheceu o conector privado do Apps Script com os quatro arquivos da versão 1.5.21 e o serviço avançado Google Sheets API v4. A interface solicitou o consentimento do titular para concluir a conexão.
+
+Ainda faltam a confirmação da instalação Windows em modo Preserve após backup privado, a inicialização dos destinos e a conferência do manifesto, a aplicação de um lote piloto no Google e a reconciliação do SQLite com a releitura das planilhas. A publicação comercial FARMA continua pendente. A réplica comercial PET vem após a homologação FARMA.
 
 ## Diagnóstico e arquitetura
 
