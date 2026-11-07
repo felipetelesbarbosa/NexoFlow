@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.17",
+    [string]$Version = "1.5.18",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -414,13 +414,13 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-Histórico com resumo separado por execução, período solicitado e acumulado; contagens distinguem pedidos e clientes. Terminal mostra origens dos fatos e pendências, valores em reais e janelas concluídas sem sugerir páginas inexistentes.
+O histórico inclui todo o dia final informado sem horário, enviando 23:59:59.999999, e preserva data-hora explícita. GETs pontuais FARMA confirmaram os 85 IDs ausentes do dia 06/11; a API também confirmou o limite de 1 a 500 por página. O menu e a CLI rejeitam valores acima desse limite antes da chamada.
 
-Corrige cancelamento e entradas inválidas no menu e fecha efetivamente a conexão da auditoria SQLite somente leitura. Recebimentos das novas execuções são persistidos com a página, sem inventar a origem de dados antigos. Reduz recálculos de LTV entre janelas e regravações de vínculos idênticos. Incorpora f1da4f7, 7d06041 e 0ba9ed7. Regras financeiras e de identidade permanecem preservadas.
+Itens idênticos retornados em outra ordem conservam posições e chaves analíticas: os 105 casos reais deixaram de representar falsas atualizações na reprodução privada. A mesma proteção evita falso conflito de fechamento antigo. A pendência FRETE_DIVERGENTE continua preservada.
 
-**Limitação da auditoria real FARMA:** a cópia SQLite enviada excedeu o limite de transferência de 32 MiB do ambiente de auditoria. A composição dos 43.806 pedidos válidos, do faturamento acumulado e a causa da única pendência real ainda não foram verificadas no banco. Esta release valida correções de software com fixtures e testes Windows; não declara homologação financeira completa. Não foi repetida a carga anual. [Relatório da auditoria](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/AUDITORIA%20FINAL%20HISTORICO%20FARMA.md).
+A chave de cursor distingue a política nova de datas; fatos e checkpoints antigos permanecem disponíveis. Tentativas antigas com limite inválido e sem qualquer recebimento não são retomadas. Não houve nova carga anual, gravação comercial ou alteração dos SQLite recebidos. A evidência real é da amostra FARMA; não certifica cobertura anual ou homologação comercial PET. [Relatório técnico](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/VALIDACAO%20HISTORICO%201.5.18.md).
 
-Atualize pelo Setup no modo Preserve, após backup privado consistente e encerramento das rotinas. Mantenha SQLite, logs e checkpoints; não reinicie janelas para atualizar. A tabela de recebimentos é aditiva. O Hub continua somente em homologação, sem implantação ou release comercial nesta entrega.
+Feche as rotinas, faça backup privado consistente e atualize pelo Setup em Preserve. Não apague o SQLite nem reinicie todo o histórico. O Analytics usa a faixa recente configurada e incorpora os fatos locais. Abas específicas Histórico/LTV têm revisão separada. O Hub recebe código e testes PostgreSQL, sem implantação na VPS ou release comercial.
 
 Analytics e Noturno usam a integração Meta nativa, sem exigir MCP ou Codex CLI. As rotinas FARMA/PET e as funcionalidades da versão anterior permanecem preservadas. A atualização Preserve mantém configurações e dados. Esta versão não comprova autenticação no proxy corporativo ou aprovação pelo antivírus no PC do usuário; consulte os relatórios e o guia de homologação.
 
@@ -436,4 +436,4 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.17
+# NexoFlow 1.5.18

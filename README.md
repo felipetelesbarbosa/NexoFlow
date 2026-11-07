@@ -1,10 +1,10 @@
-# NexoFlow 1.5.17
+# NexoFlow 1.5.18
 
 Aplicativos operacionais e autônomos para Windows que integram **Weni e a API FarmaLíder nos segmentos FarmaLíder e Pets Líder**, atualizam contatos e pedidos e organizam os dados no **Google Sheets** para análise no **Data Studio**.
 
 O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
 
-[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.17/NexoFlow-Setup-1.5.17.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
+[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.18/NexoFlow-Setup-1.5.18.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
 
 ## Componentes
 
@@ -17,11 +17,11 @@ O NexoFlow identifica pedidos registrados na API **independentemente de terem si
 | **NexoFlow Recompra** | Mantém a elegibilidade da Recompra FarmaLíder D+25 e Pets Líder D+30; os envios ficam na campanha Weni. |
 | **NexoFlow Terminal** | Oferece comandos, consultas e diagnóstico pelo comando `nexo`. |
 
-## Atualização 1.5.17
+## Atualização 1.5.18
 
-O histórico apresenta separadamente a execução atual, o período solicitado e o acumulado. Os rótulos distinguem pedidos de clientes; o terminal mostra valores em reais, origens e pendências agrupadas. Uma janela concluída não sugere página pendente.
+O histórico inclui todo o dia final quando informado sem horário e valida o limite oficial de 1 a 500 pedidos por página. Consultas pontuais FARMA confirmaram os 85 IDs antes ausentes em 06/11. Horários explícitos são preservados. O cursor distingue a nova política de datas, mantendo os estados anteriores.
 
-O menu valida entradas e aceita cancelamento sem iniciar consultas. A auditoria offline abre a cópia SQLite somente para leitura e fecha a conexão. O cálculo financeiro e a identidade permanecem preservados. A auditoria dos dados reais FARMA ainda depende do acesso à cópia: esta versão não certifica a composição do faturamento nem a causa da pendência real. Consulte o [relatório](docs/AUDITORIA%20FINAL%20HISTORICO%20FARMA.md).
+Reordenação de itens idênticos preserva posições e chaves analíticas, sem falsa atualização ou conflito de fechamento. A pendência de frete permanece para conferência oficial. Consulte a [validação e os limites da evidência](docs/VALIDACAO%20HISTORICO%201.5.18.md).
 
 ## NexoFlow Hub em homologação
 
@@ -82,7 +82,7 @@ As continuações automáticas no Meu Drive exigem autorização Google local. O
 
 ## Versões e atualizações
 
-A versão desta entrega é **1.5.17**. Os pacotes públicos são disponibilizados após a validação do mesmo commit. As próximas correções seguem **1.5.18, 1.5.19, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
+A versão desta entrega é **1.5.18**. Os pacotes públicos são disponibilizados após a validação do mesmo commit. As próximas correções seguem **1.5.19, 1.5.20, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
 
 ## NexoFlow Hub: projeto paralelo futuro
 

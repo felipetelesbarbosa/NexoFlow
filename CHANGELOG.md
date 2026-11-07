@@ -1,6 +1,14 @@
 # NexoFlow — Changelog
 
-## NexoFlow 1.5.17 — Auditoria e interação do histórico (em validação)
+## NexoFlow 1.5.18 — Contrato real de datas e itens estáveis (em validação)
+
+- Dia final sem horário é enviado como 23:59:59.999999; horário explícito é preservado. GETs pontuais FARMA confirmaram os 85 IDs ausentes de 06/11 e 26 IDs adicionais fora da cópia anterior. Não houve nova carga anual ou atualização de dados comerciais.
+- Limite oficial confirmado pela resposta da API: de 1 a 500 pedidos por página. Menu/CLI/Hub validam antes da consulta. Tentativas legadas inválidas sem recebimentos são preservadas no diagnóstico e não são retomadas; estado incompatível com recebimentos exige revisão.
+- Nova chave de cursor impede reaproveitar cobertura antiga à meia-noite. Checkpoints e fatos anteriores são preservados; tarefas interrompidas do Hub com outro contrato exigem nova chave.
+- Reordenação de itens idênticos preserva posições e chaves analíticas, sem falsa atualização ou pendência de fechamento. Os 105 casos reais foram reproduzidos em memória. Mudanças efetivas continuam protegidas pelas guardas financeiras.
+- Pendência de frete preservada. Windows/Hub compartilham o contrato; Hub sem deploy ou release comercial. Release 1.5.17 e anteriores permanecem intactas. Data real nas notas da publicação após validação do mesmo commit.
+
+## NexoFlow 1.5.17 — Auditoria e interação do histórico — 06/11/2026
 
 - Incorpora as correções f1da4f7, 7d06041 e 0ba9ed7: escopos separados, recebimentos atômicos, paginação legível, cancelamento/validação de entradas e fechamento efetivo da conexão SQLite offline.
 - Exibe origens dos fatos e das pendências que eram calculadas mas omitidas do terminal. Preserva fatos anteriores, regras financeiras, identidade, checkpoints e compatibilidade com bancos da 1.5.16.
