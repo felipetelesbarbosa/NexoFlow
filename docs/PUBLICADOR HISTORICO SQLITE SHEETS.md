@@ -32,7 +32,7 @@ IDs são texto, inclusive zeros à esquerda. Datas usam America/Belem, com conve
 
 Filtrar `vigente=Sim`. Receita, produtos e frete consideram estado `valido`. Cancelamento não apaga o pedido: atualiza sua linha e revisa LTV/itens vigentes. Frete técnico não vira produto ou unidade e não duplica o frete oficial. Não somar receita do pedido às linhas de itens, meses ao TOTAL, ou modelos de primeiro/último toque.
 
-`clientes` é distinto por grão: comprador em dois meses conta uma vez no ANO/TOTAL. No Looker, usar um único ANO/TOTAL para um card de clientes, ou detalhar por competência. A agregação MAX não resolve uma soma arbitrária de competências; o conector bloqueia o card sem competência quando existem múltiplos recortes. LTV não é recalculado pelo filtro mensal de receita.
+`clientes` é distinto por grão: comprador em dois meses conta uma vez no ANO/TOTAL. No Looker, usar um único ANO/TOTAL para um card de clientes, ou detalhar por competência. A agregação MAX não resolve uma soma arbitrária de competências; o conector bloqueia o card sem competência quando existem múltiplos recortes. LTV não é recalculado pelo filtro mensal de receita. No detalhe de produtos, filtrar também `estado=valido` e `frete=Não`; para auditar cancelamentos, manter os estados visíveis na tabela de pedidos. Clientes distintos em um período arbitrário podem exigir `COUNT_DISTINCT(cliente_id)` sobre pedidos válidos do período, dentro dos limites do detalhe, em vez de somar resumos mensais.
 
 ## Comandos reais para o Work
 

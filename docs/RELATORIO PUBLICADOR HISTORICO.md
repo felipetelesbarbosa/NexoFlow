@@ -59,7 +59,7 @@ Ensaio puramente de capacidade com **1.100.000 pedidos + 207.582 linhas de itens
 
 ## Cobertura de testes
 
-Implementação registrada em `01260749c17c736f4d3e98f4c45d47f5f0e54a36`. Validação local final: **1.850 testes Python, sem falhas, 73 ignorados por condições de plataforma/ambiente**; **29 testes Node aprovados**; Ruff e Pyright sem erros; auditoria de consistência e documentação HTML aprovadas; pip-audit sem vulnerabilidades conhecidas nas dependências principais/webhook. Gitleaks aprovou o histórico Git e a exportação dos arquivos destinados ao commit. Credenciais locais ignoradas não foram incluídas nessa exportação. Testes ignorados não contam como validação real Windows/Google.
+Implementação inicial em `01260749c17c736f4d3e98f4c45d47f5f0e54a36`, complementada pela guarda de tipos em `eb73b575791f07529bb022f00e759b2e34c2c3ba`. Validação local final: **1.851 testes Python, sem falhas, 73 ignorados por condições de plataforma/ambiente**; **29 testes Node aprovados**; Ruff e Pyright sem erros; auditoria de consistência e documentação HTML aprovadas; pip-audit sem vulnerabilidades conhecidas nas dependências principais/webhook. Gitleaks aprovou o histórico Git e a exportação dos arquivos destinados ao commit. Credenciais locais ignoradas não foram incluídas nessa exportação. Testes ignorados não contam como validação real Windows/Google.
 
 Os workflows Windows/qualidade/segredos e CodeQL do commit final devem ser conferidos no GitHub; o resultado efetivo e o SHA final acompanham a entrega. O marcador `[skip release]` impede empacotamento/publicação automática nesta tarefa.
 
