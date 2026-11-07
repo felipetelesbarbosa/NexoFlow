@@ -64,6 +64,16 @@ Homologue primeiro com três planilhas **de teste** configuradas em uma instala�
 
 IDs de pedido/cliente/contato são texto. A tabela de pedidos informa estado, motivo, origem, política financeira, vínculo Weni, produtos, frete e faturamento. LTV informa compras, primeira/última compra e cobertura observada. As abas preexistentes não mudam de cabeçalho. A fonte do Data Studio deve usar data do pedido para receita mensal e a tabela LTV independente do filtro mensal. Nenhum dashboard foi editado neste desenvolvimento.
 
+### Conferir capacidade e publicação
+
+O preparo gera uma revisão local. Para confirmar publicação, confira a aplicação e a releitura das linhas no destino. O publicador desta versão lê e atualiza uma aba física por tabela. Habilitar as [continuações](CONTINUACOES.md) no perfil não faz esse caminho percorrer as partes. A aplicação processa toda a revisão em lotes de 200, sem opção de encerrar após um lote piloto.
+
+Antes de aplicar, confira a grade alocada de cada arquivo e projete o crescimento por tabela, incluindo cabeçalhos e itens. Se o histórico não couber, interrompa antes da primeira escrita. Para publicar em partes, é necessário homologar o publicador e o leitor do Data Studio com o mesmo manifesto, incluindo a localização das chaves nas partes anteriores. Um resultado parcial deve conservar seu estado de cobertura.
+
+Na conferência entre SQLite e Sheets, compare por segmento e mês de emissão os pedidos únicos, seus estados, os itens, os produtos, o frete e o faturamento em centavos. Separe pendências sem data válida. Para o total do período, conte clientes distintos sobre todos os pedidos válidos do segmento; somar compradores distintos mensais contaria novamente quem comprou em mais de um mês.
+
+Na análise de anúncios, conte conversas em uma fonte com unidade e período conhecidos. Os campos de primeiro e último anúncio de um contato registram evidências de origem e não contam as conversas do dia.
+
 ## Persistência, falhas e rollback
 
 São tabelas aditivas no `clientes_observados.sqlite` privado de cada segmento: `history_orders`, `history_windows`, `history_seen`, `history_issues`, `history_revisions`. Fatos, itens normalizados (JSON mínimo) e cursor da página fazem commit juntos. O banco não recebe endereço, observações ou rastreio. O histórico recebido comercial nunca entra no Git, CI ou pacote.
