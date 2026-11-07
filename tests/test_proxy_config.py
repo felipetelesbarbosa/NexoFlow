@@ -9,6 +9,9 @@ from unittest.mock import Mock, patch
 
 class ProxyConfigTests(unittest.TestCase):
     def setUp(self):
+        memory = patch("network_session.windows_network_choice", return_value=None)
+        memory.start()
+        self.addCleanup(memory.stop)
         self._module_snapshot = {
             name: sys.modules.get(name) for name in ("secrets_config", "proxy_config")
         }

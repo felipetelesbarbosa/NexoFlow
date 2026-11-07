@@ -65,15 +65,15 @@ function Exit-NexoMaintenance {
 
 function Invoke-OptionalMetaAdsSetup {
     param([switch]$Selected, [switch]$Unattended, [string]$Mode = 'Preserve')
+    $script:MetaOptionalStatus = 'não solicitado (opcional)'
     $requested = [bool]$Selected
     if (-not $requested -and -not $Unattended) {
-        if ($Mode -eq 'Clean') {
-            $answer = Read-Host 'Reinstalar o ambiente Meta Ads MCP local opcional (somente leitura)? [S/n]'
-            $requested = ($answer.Trim().ToLowerInvariant() -notin @('n','não','nao'))
-        } else {
-            $answer = Read-Host 'Instalar/validar Meta Ads MCP local (somente leitura)? [s/N]'
-            $requested = ($answer.Trim().ToLowerInvariant() -in @('s','sim'))
-        }
+        Write-Host '[INFO] MCP é opcional para clientes de IA. Analytics e Noturno coletam Meta Ads sem MCP.'
+        do {
+            $answer = (Read-Host 'Instalar/validar Meta Ads MCP local opcional (somente leitura)? [S/N]').Trim().ToUpperInvariant()
+            if ($answer -notin @('S','N')) { Write-Host 'Digite S para instalar ou N para continuar sem MCP.' }
+        } until ($answer -in @('S','N'))
+        $requested = ($answer -eq 'S')
     }
     if (-not $requested) { return }
     $statusFile = Join-Path $InstallDir 'logs/meta_ads_mcp_instalacao.json'
@@ -101,9 +101,11 @@ function Invoke-OptionalMetaAdsSetup {
         }
         $status = @{ componente = 'Meta Ads MCP'; status = 'instalado'; registro_cliente = 'manual_opcional'; acesso_meta = 'nao_validado'; diagnostico_dependencias = 'logs/meta_ads_mcp_dependencias.json'; atualizado_em = (Get-Date).ToUniversalTime().ToString('o') }
         $status | ConvertTo-Json | Set-Content -LiteralPath $statusFile -Encoding UTF8
+        $script:MetaOptionalStatus = 'instalado; acesso Meta ainda não validado'
         Write-Host '[OK] Meta Ads MCP instalado/validado. Registro em cliente de IA é manual e opcional.' -ForegroundColor Green
         Write-Host '[INFO] Status: logs/meta_ads_mcp_instalacao.json. Diagnóstico da última etapa pip, quando executada: logs/meta_ads_mcp_dependencias.json.'
     } catch {
+        $script:MetaOptionalStatus = 'pendente; instalação principal preservada'
         # O programa principal já foi instalado. Não restaurar/apagar NexoFlow
         # nem credenciais porque uma integração opcional ficou pendente.
         $status = @{ componente = 'Meta Ads MCP'; status = 'pendente'; proxima_acao = 'Executar scripts/instalar_meta_ads_mcp.ps1 -Perfil FARMA ou PET, após conferir a configuração de rede'; diagnostico_dependencias = 'logs/meta_ads_mcp_dependencias.json'; atualizado_em = (Get-Date).ToUniversalTime().ToString('o') }
@@ -115,16 +117,29 @@ function Invoke-OptionalMetaAdsSetup {
 function Select-SetupNetwork {
     if ($NetworkMode -ne 'Auto') { $env:NEXOFLOW_NETWORK_MODE = $NetworkMode.ToLowerInvariant(); return }
     if ($env:NEXOFLOW_NETWORK_MODE -in @('personal','corporate')) { return }
+    $recognizer = Join-Path $PayloadDir 'scripts/reconhecer_rede.ps1'
+    if (Test-Path -LiteralPath $recognizer) {
+        $known = & $recognizer
+        if ($known -in @('personal','corporate')) {
+            $env:NEXOFLOW_NETWORK_MODE = $known
+            Write-Host "[INFO] Rede reconhecida pelo Windows: rota=$known."
+            return
+        }
+    }
     if ($NonInteractive) { return }
-    Write-Host 'Escolha a rede desta sessão. A escolha não altera secrets_config.py.'
+    Write-Host 'Confirme a rede desconhecida. A escolha será lembrada para esta rede neste usuário Windows.'
     Write-Host '[1] PC pessoal / conexão direta autorizada'
     Write-Host '[2] Rede corporativa / proxy obrigatório'
-    $answer = Read-Host 'Rede [1/2; outro valor cancela]'
+    do {
+        $answer = Read-Host 'Rede [1/2; 0 cancela]'
+        if ($answer -notin @('1','2','0')) { Write-Host 'Opção inválida. Digite 1, 2 ou 0.' }
+    } until ($answer -in @('1','2','0'))
     switch ($answer) {
         '1' { $env:NEXOFLOW_NETWORK_MODE = 'personal' }
         '2' { $env:NEXOFLOW_NETWORK_MODE = 'corporate' }
-        default { throw 'Seleção de rede cancelada antes da instalação.' }
+        '0' { throw 'Seleção de rede cancelada antes da instalação.' }
     }
+    if (Test-Path -LiteralPath $recognizer) { & $recognizer -Action Salvar -Mode $env:NEXOFLOW_NETWORK_MODE }
     Write-Host '[INFO] Rede selecionada para Setup, pip e MCP; credenciais preservadas.'
 }
 
@@ -1557,14 +1572,14 @@ $backupDir = $null
 $previousNetworkMode = $env:NEXOFLOW_NETWORK_MODE
 try {
     Write-Host '==========================================================' -ForegroundColor DarkCyan
-    Write-Host ' NexoFlow - Instalador' -ForegroundColor Cyan
+    Write-Host " NexoFlow $AppVersion - Instalação e atualização" -ForegroundColor Cyan
     Write-Host '==========================================================' -ForegroundColor DarkCyan
     Ensure-Administrator
     Enter-NexoMaintenance
-    Select-SetupNetwork
 
     Write-Step 'Validando integridade do pacote'
     Validate-Payload
+    Select-SetupNetwork
 
     $selectedMode = $InstallMode
     $hasPreviousData = @($InstallDir, $DataDir, $LegacyInstallDir, $LegacyDataDir) | Where-Object { Test-Path -LiteralPath $_ -PathType Container }
@@ -1593,7 +1608,7 @@ try {
     $backupDir = Join-Path $env:TEMP ('NexoFlow Setup ' + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
 
-    Write-Step 'Preparando recuperação dos dados existentes em caso de falha'
+    Write-Step 'Preparando recuperação da instalação em caso de falha'
     Backup-PrivateData -Source $LegacyDataDir -Backup (Join-Path $backupDir 'legacy preserved')
     Backup-PrivateData -Source $LegacyInstallDir -Backup (Join-Path $backupDir 'legacy installed')
     Backup-PrivateData -Source $DataDir -Backup (Join-Path $backupDir 'preserved')
@@ -1610,7 +1625,7 @@ try {
     Restore-SetupData -BackupRoot $backupDir -Target $InstallDir -Mode $selectedMode -KeepExistingData:($selectedMode -eq 'Preserve')
     New-Item -ItemType Directory -Force -Path (Join-Path $InstallDir 'importacoes') | Out-Null
 
-    Write-Step 'Preparando ambiente Python e dependências'
+    Write-Step 'Preparando Python e dependências na rota de rede selecionada'
     $oldInstaller = $env:NEXOFLOW_INSTALLER
     $oldPythonExe = $env:NEXOFLOW_PYTHON_EXE
     $oldSetupPythonPath = $env:PYTHONPATH
@@ -1718,7 +1733,7 @@ try {
     if (Test-Path -LiteralPath $documentation -PathType Leaf) {
         Create-Shortcut -ShortcutPath (Join-Path $startMenu 'Documentacao NexoFlow.lnk') -TargetPath $documentation -WorkingDirectory $InstallDir -Description 'Abre a documentação operacional do NexoFlow' -IconPath $appIcon
     }
-    Write-Host '[OK] Atalhos "NexoFlow Analytics", "NexoFlow Weni", "NexoFlow Terminal" e "NexoFlow Planilha" criados na Área de Trabalho.' -ForegroundColor Green
+    Write-Host '[OK] Atalhos "NexoFlow Analytics", "NexoFlow Weni", "NexoFlow Recompra", "NexoFlow Terminal", "NexoFlow Planilha" e "NexoFlow Noturno" criados na Área de Trabalho.' -ForegroundColor Green
 
     Write-Step 'Atualizando cache de ícones do Windows'
     $uninstallExe = Join-Path $InstallDir 'NexoFlow Uninstall.exe'
@@ -1744,10 +1759,18 @@ try {
     $hasGoogle = Test-Path -LiteralPath (Join-Path $InstallDir 'credentials\google_credentials.json') -PathType Leaf
     Write-Host "`n[OK] $AppName instalado com sucesso." -ForegroundColor Green
     Invoke-OptionalMetaAdsSetup -Selected:$InstallMetaAdsMcp -Unattended:$NonInteractive -Mode $selectedMode
+    Write-Host "`n=== Resumo da instalação ===" -ForegroundColor Cyan
+    Write-Host "[OK] Programa instalado em: $InstallDir"
+    Write-Host "[INFO] Modo aplicado: $selectedMode. FARMA e PET usam a mesma instalação, com configurações separadas."
+    Write-Host "[INFO] Meta Ads MCP: $script:MetaOptionalStatus."
+    Write-Host '[INFO] Coleta Meta nativa: disponível no Analytics/Noturno; depende do token e das contas autorizadas, sem exigir MCP.'
+    Write-Host '[INFO] Integridade local aprovada não confirma acesso às APIs nem às planilhas.'
+    Write-Host '[PRÓXIMO] Execute check-up.bat e testar_conexoes.bat no segmento desejado antes da carga.'
+    Write-Host "[INFO] Log desta instalação: $SetupLogPath"
     if ($hasSecrets -and $hasGoogle) {
-        Show-Info "NexoFlow foi instalado/atualizado com sucesso.`n`nOs atalhos NexoFlow Analytics, NexoFlow Weni, NexoFlow Terminal, NexoFlow Planilha e NexoFlow Noturno foram criados na Área de Trabalho.`n`nNexoFlow Weni executa check-up, teste de conexões, dry-run/auditoria obrigatória e somente depois permite aplicar as alterações."
+        Show-Info "NexoFlow foi instalado/atualizado com sucesso.`nMCP opcional: $script:MetaOptionalStatus.`n`nOs atalhos NexoFlow Analytics, NexoFlow Weni, NexoFlow Recompra, NexoFlow Terminal, NexoFlow Planilha e NexoFlow Noturno foram criados na Área de Trabalho.`n`nNexoFlow Weni executa check-up, teste de conexões, dry-run/auditoria obrigatória e somente depois permite aplicar as alterações."
     } else {
-        Show-Info "NexoFlow foi instalado.`n`nOs atalhos NexoFlow Analytics, NexoFlow Weni, NexoFlow Terminal, NexoFlow Planilha e NexoFlow Noturno foram criados na Área de Trabalho.`n`nAntes da primeira execução, configure:`n- secrets_config.py`n- credentials\google_credentials.json"
+        Show-Info "NexoFlow foi instalado.`nMCP opcional: $script:MetaOptionalStatus.`n`nOs atalhos NexoFlow Analytics, NexoFlow Weni, NexoFlow Recompra, NexoFlow Terminal, NexoFlow Planilha e NexoFlow Noturno foram criados na Área de Trabalho.`n`nAntes da primeira execução, configure:`n- secrets_config.py`n- credentials\google_credentials.json"
     }
     try { Stop-Transcript | Out-Null } catch { }
     exit 0

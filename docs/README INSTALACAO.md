@@ -98,3 +98,15 @@ A instalação limpa reinicia configuração/estado e precisa conseguir mover os
 ## Meta Ads MCP opcional
 
 A oferta do Setup prepara somente o MCP, sem instalar, validar ou registrar Codex CLI. A coleta Meta nativa é independente. O MCP carrega a configuração de rede NexoFlow para instalar suas dependências; HTTP 407 indica falha de autenticação no proxy, sem comprovar ausência de uma versão do pacote. Confira [instalação MCP e homologação pessoal/corporativa](META%20ADS%20MCP%20LOCAL.md).
+
+### Mensagens e componentes opcionais
+
+O resumo do Setup informa instalação principal, modo Preserve/Clean, caminho,
+seis atalhos (Analytics, Weni, Recompra, Terminal, Planilha e Noturno), estado do
+MCP e log da execução. A validação de integridade local não confirma acesso às
+APIs. Execute `check-up.bat` e `testar_conexoes.bat` antes da carga.
+
+A pergunta do MCP usa `[S/N]`, sem resposta implícita: entradas diferentes repetem
+a pergunta. O componente serve a clientes de IA e continua opcional; a integração
+Meta nativa do Analytics/Noturno funciona sem MCP ou Codex. Uma falha do componente
+opcional permanece identificada como pendência, preservando a instalação principal.

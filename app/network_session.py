@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import subprocess
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
@@ -61,3 +62,25 @@ def save_choice(choice: str) -> None:
         os.replace(temporary, path)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def windows_network_choice(choice: str | None = None) -> str | None:
+    """Reconhece rede já autorizada; falhas deixam a seleção ambígua."""
+    if os.name != "nt":
+        return None
+    system_root = os.environ.get("SystemRoot")
+    if not system_root:
+        return None
+    shell = Path(system_root) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+    script = Path(__file__).resolve().parents[1] / "scripts/reconhecer_rede.ps1"
+    command = [str(shell), "-NoLogo", "-NoProfile", "-NonInteractive", "-File", str(script)]
+    if choice is not None:
+        if choice not in ("personal", "corporate"):
+            raise ValueError("Escolha de rede inválida.")
+        command += ["-Action", "Salvar", "-Mode", choice]
+    try:
+        result = subprocess.run(command, capture_output=True, timeout=8, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    value = result.stdout.decode("utf-8", errors="replace").strip()
+    return value if result.returncode == 0 and value in ("personal", "corporate") else None

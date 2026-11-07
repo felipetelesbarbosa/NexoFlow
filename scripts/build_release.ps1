@@ -88,7 +88,7 @@ function Copy-TrackedFiles {
             if ($relative -like "hub/*") { continue }
             if ($relative -like "native_launcher/prebuilt/*") { continue }
             if ($relative -like ".github/*") { continue }
-            if ($relative -like "scripts/*" -and $relative -notin @("scripts/confirmar_revisao_weni.ps1", "scripts/resultado_carga_weni.ps1", "scripts/check_release_secrets.py", "scripts/build_documentation.py", "scripts/instalar_meta_ads_mcp.ps1", "scripts/instalar_codex_cli.ps1")) { continue }
+            if ($relative -like "scripts/*" -and $relative -notin @("scripts/reconhecer_rede.ps1", "scripts/confirmar_revisao_weni.ps1", "scripts/resultado_carga_weni.ps1", "scripts/check_release_secrets.py", "scripts/build_documentation.py", "scripts/instalar_meta_ads_mcp.ps1", "scripts/instalar_codex_cli.ps1")) { continue }
 
             $source = Join-Path $RepoRoot $relative
             if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { continue }
@@ -439,3 +439,6 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
 # NexoFlow 1.5.21
+
+Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
+Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"

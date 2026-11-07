@@ -68,6 +68,8 @@ class ProxyStatus:
         auth = "sim" if self.has_credentials else "não"
         active = "sim" if self.active else "não"
         reachable = "sim" if self.reachable else "não"
+        if self.mode == "off":
+            reachable = "não sondado (rota direta)"
         return (
             f"modo={self.mode} | proxy={endpoint} | "
             f"acessível={reachable} | ativo={active} | "
@@ -252,11 +254,18 @@ def _activate_proxy(
 def configure_proxy(
     *, detection_attempts: int | None = None, preserve_active_proxy: bool = False
 ) -> ProxyStatus:
-    from network_session import read_choice, save_choice
+    from network_session import read_choice, save_choice, windows_network_choice
 
     choice = read_choice()
     if choice:
         os.environ["NEXOFLOW_NETWORK_MODE"] = choice
+    elif os.environ.get("NEXOFLOW_NETWORK_MODE", "auto") == "auto":
+        # Somente no modo automático: configuração explícita on/off é soberana.
+        if _read_settings()[0] == "auto":
+            remembered = windows_network_choice()
+            if remembered:
+                os.environ["NEXOFLOW_NETWORK_MODE"] = remembered
+                logging.info("Rede reconhecida pelo Windows: rota=%s", remembered)
     if sys.stdin.isatty():
         detection_attempts = max(3, detection_attempts or PROXY_DETECTION_ATTEMPTS)
     while True:
@@ -274,6 +283,7 @@ def configure_proxy(
             choice = _ask_route(initial_ambiguity=ambiguous)
             os.environ["NEXOFLOW_NETWORK_MODE"] = choice
             save_choice(choice)
+            windows_network_choice(choice)
     save_choice("corporate" if status.active else "personal")
     return status
 
@@ -558,7 +568,7 @@ def refresh_network_route(
     """
     with _ROUTE_REFRESH_LOCK:
         previous_active = _proxy_active_from_env()
-        from network_session import read_choice, save_choice
+        from network_session import read_choice, save_choice, windows_network_choice
 
         choice = read_choice() or os.environ.get("NEXOFLOW_NETWORK_MODE", "auto")
         if attempt < 3 and choice in ("personal", "corporate"):
@@ -578,6 +588,7 @@ def refresh_network_route(
         if attempt >= 3 and sys.stdin.isatty() and choice in ("personal", "corporate"):
             choice = _ask_route()
             save_choice(choice)
+            windows_network_choice(choice)
             os.environ["NEXOFLOW_NETWORK_MODE"] = choice
         status = configure_proxy(preserve_active_proxy=previous_active is True)
         current_active = bool(status.active)

@@ -206,3 +206,22 @@ No Windows, registrar `Get-FileHash -Algorithm SHA256 -LiteralPath '{arquivo}'` 
 ## Sessão entre etapas
 
 A escolha de rede é compartilhada entre os processos da mesma execução, inclusive dry-run e aplicação. Uma queda recuperável mantém a rota por pelo menos três tentativas antes de oferecer troca explícita no console. Consulte [Sessão de rede](SESSAO%20DE%20REDE.md) para os limites das gravações, tarefas sem console e homologação. Não há fallback direto automático para contornar o proxy corporativo.
+
+### Reconhecimento local de redes no Windows
+
+No modo automático, Setup e `configure_proxy()` consultam o mesmo auxiliar
+`scripts/reconhecer_rede.ps1`. Uma rede autenticada em domínio seleciona proxy;
+redes já confirmadas pelo operador reutilizam a escolha. A memória é por usuário
+Windows e conjunto de GUIDs das redes conectadas, em
+`%LOCALAPPDATA%\NexoFlow\rede`, sem nome da rede, IP, senha ou token.
+Uma rede nova, VPN adicional ou identificação indisponível mantém a confirmação;
+falha TCP não comprova rede pessoal. A autorização explícita `personal/corporate`
+e `PROXY_MODE=on/off` nos processos Python continua prevalecendo. Para esquecer
+uma escolha, remova o arquivo local correspondente ou a pasta `rede` com as
+rotinas encerradas; a confirmação volta na próxima sessão.
+
+A rota é herdada durante toda a sessão por executáveis, BAT, pip e MCP. O proxy
+corporativo indisponível mantém três tentativas e não provoca troca direta
+silenciosa. O reconhecimento não comprova autenticação CONNECT, TLS ou acesso às
+APIs. UAC usando outra conta possui memória separada; confirme nessa conta também.
+Este mecanismo precisa de homologação no PC pessoal e na rede corporativa real.

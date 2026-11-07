@@ -36,11 +36,12 @@ def _configure_proxy() -> None:
         raise
 
     status = configure_proxy()
-    print(f"[INFO] Proxy para pip: {status.safe_summary}")
+    print(f"[INFO] Rota das dependências: {status.safe_summary}")
     from pip_network import pip_environment, preflight
 
     env = pip_environment(status.active)
     preflight(env)
+    print("[OK] Acesso HTTPS ao índice de dependências confirmado nesta etapa.")
     os.environ.update(env)
 
 
@@ -92,7 +93,7 @@ def main() -> int:
                 "[ERRO] pip não concluiu a etapa. Saída bruta omitida para proteger URLs e credenciais; nenhuma etapa seguinte será iniciada."
             )
         else:
-            print("[OK] Etapa pip concluída.")
+            print("[OK] Dependências solicitadas nesta etapa instaladas ou já compatíveis.")
         return completed.returncode
     except (OSError, subprocess.TimeoutExpired):
         print(
