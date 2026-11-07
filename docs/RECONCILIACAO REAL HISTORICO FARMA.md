@@ -37,3 +37,11 @@ Procedimento mínimo pendente: localizar privadamente esse único ID em `history
 Nenhuma divergência nas invariantes dos 43.806 fatos válidos: receita = produtos + frete; produtos = soma dos itens classificados como produtos. Cancelados e pendentes ficam fora da receita. Essas verificações confirmam a consistência interna; não substituem a conferência dos payloads oficiais originais, que não estão integralmente preservados para todos os pedidos, nem revalidam individualmente identidade Weni.
 
 Integridade estrutural, contagens e reconciliação do acumulado: comprovadas. Completude do período civil, os 85 fatos não recebidos nas janelas e os valores da divergência de frete: pendentes de evidência externa. Não foi encontrado motivo para alterar regras financeiras, eliminar fatos ou modificar o Hub. A release 1.5.17 permanece intacta; esta entrega adiciona somente o relatório agregado, sem dados pessoais ou IDs comerciais.
+
+## Cópia após rejeição HTTP 400 com limite 1.000
+
+A nova cópia tem 175.149.056 bytes, perfil FARMA e integridade `ok`. SHA-256 antes/depois: `78d06667272825f54ebc5093655fcf97dbd810a13bc845143fb079c14f1c3b46`.
+
+Comparação integral das linhas de `history_orders`, `history_seen`, `history_issues` e `history_revisions`: idênticas à cópia anterior, sem fatos removidos ou adicionados. As dez janelas com limite 500 continuam extraídas. A nova janela de 01/11/2026 a 06/11/2026, limite 1.000, está incompleta, cursor 1, sem totais recebidos, motivo `FALHA_LEITURA_API`. A tabela nova de recebimentos contém zero linhas. Portanto a requisição recusada não avançou página nem alterou pedidos, receita ou a pendência de frete anterior.
+
+O log comprova HTTP 400, mas não identifica o parâmetro recusado. A orientação anterior afirmava indevidamente que 1.000 era aceito pela API com base em fixtures. O commit f5e9292 corrige a ajuda/documentação e adiciona diagnóstico seguro dos parâmetros, sem expor resposta bruta ou token e sem troca automática do limite. Regressão reproduzida antes da correção; 28 testes de histórico passaram, assim como Ruff, Pyright e varredura de segredos. Sem nova consulta comercial ou release. Próximo teste operacional: mesmo período com limite 500, que já funcionou na carga anterior, para isolar a rejeição; se persistir, obter validação oficial dos parâmetros.
