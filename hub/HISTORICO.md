@@ -33,3 +33,7 @@ Use os comandos Docker e os segredos temporários do [guia do Hub](README.md). O
 A instalação de versão 1 do schema é testada, recebe uma tarefa normal e migra para 2 sem perdê-la. A reversão recusa dados históricos/tarefas existentes. Rollback de aplicação: parar somente API/worker de homologação e preservar volume/banco; não tentar rodar um binário de schema 1 sobre schema 2. Restaurar backup em banco temporário separado para voltar ao schema anterior. `002_down.sql` só é aplicável em ambiente de homologação sem histórico; não executar sobre banco de produção.
 
 O workflow `n8n/historico-homologacao.json` fica inativo, manual e com credencial Header Auth a configurar. Não importar/ativar automaticamente no n8n da VPS. Os locks PostgreSQL continuam sem coordenação com Windows; escrita comercial do Hub segue bloqueada.
+
+## Compatibilidade da auditoria Windows
+
+A auditoria da primeira carga FARMA corrige escopos/apresentação e adiciona ledger local de recebimentos no Windows. Não altera `order_history.py`, a paginação, a normalização financeira ou o LTV compartilhados. O Hub conserva o contrato e seus testes PostgreSQL; métricas legadas `clientes_oficiais` representam compradores distintos, não total cadastral da API. Não houve deploy nem escrita comercial.
