@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from order_history import (
+    MAX_HISTORY_PAGE_SIZE,
     HistoryError,
     HistoryQuery,
     canonical,
@@ -503,11 +504,23 @@ def collect_windows(
     started = perf_counter()
     store.active_run = uuid4().hex
     queries = []
+    rejected_legacy_windows = 0
     if mode == "incremental":
-        for start, end, limit in store.db.execute(
-            "SELECT start,end,page_limit FROM history_windows WHERE segment=? AND status='incompleta' ORDER BY start",
+        for key, start, end, limit, cursor, total in store.db.execute(
+            "SELECT key,start,end,page_limit,next_page,total FROM history_windows WHERE segment=? AND status='incompleta' ORDER BY start",
             (store.segment,),
         ):
+            if limit > MAX_HISTORY_PAGE_SIZE:
+                if (
+                    cursor != 1
+                    or total is not None
+                    or store.db.execute(
+                        "SELECT 1 FROM history_seen WHERE window_key=? LIMIT 1", (key,)
+                    ).fetchone()
+                ):
+                    raise HistoryError("JANELA_LEGADA_LIMITE_INVALIDO_REQUER_REVISAO")
+                rejected_legacy_windows += 1
+                continue
             queries.append(HistoryQuery(store.segment, start, end, limit))
     if len(query.start) == len(query.end) == 10:
         cursor = query.start_at.date()
@@ -569,6 +582,7 @@ def collect_windows(
         status="incompleta" if incomplete else "extraida",
         windows=len(queries),
         incomplete_windows=incomplete,
+        rejected_legacy_windows=rejected_legacy_windows,
         pages_this_run=sum(r["pages_this_run"] for r in results),
     )
     store.active_run = None
@@ -588,6 +602,7 @@ def execution_totals(store, windows, query, elapsed):
         segmento=store.segment,
         inicio=query.start,
         fim=query.end,
+        fim_enviado_api=query.api_end,
         limite=query.limit,
         janelas_consultadas=sum(w["pages_this_run"] > 0 for w in windows),
         paginas_consultadas=sum(w["pages_this_run"] for w in windows),
@@ -702,8 +717,18 @@ def history_audit(store, query=None):
         )
     windows = []
     keys = []
-    for key, start, end, total, pages, cursor, status, received in store.db.execute(
-        """SELECT w.key,w.start,w.end,w.total,w.pages,w.next_page,w.status,count(s.id)
+    for (
+        key,
+        start,
+        end,
+        limit,
+        total,
+        pages,
+        cursor,
+        status,
+        received,
+    ) in store.db.execute(
+        """SELECT w.key,w.start,w.end,w.page_limit,w.total,w.pages,w.next_page,w.status,count(s.id)
         FROM history_windows w LEFT JOIN history_seen s ON s.window_key=w.key
         WHERE w.segment=? GROUP BY w.key ORDER BY w.start""",
         (store.segment,),
@@ -716,6 +741,7 @@ def history_audit(store, query=None):
             dict(
                 inicio=start,
                 fim=end,
+                limite=limit,
                 declarados=total,
                 paginas=pages,
                 recebidos=received,

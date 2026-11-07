@@ -1,3 +1,5 @@
+> Registro da entrega inicial. A validação real posterior e os limites aceitos estão em [1.5.18](VALIDACAO%20HISTORICO%201.5.18.md). O ensaio antigo com 1.000 era sintético e não representa suporte da API.
+
 # Entrega: histórico paginado Windows e Hub
 
 ## Escopo e marcos

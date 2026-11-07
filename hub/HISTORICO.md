@@ -10,7 +10,7 @@ O marco Windows foi validado antes desta implementação. A rota/envelope agora 
 {"segmento":"PET","origem":"n8n","chave":"historico-hml-001","inicio":"2026-11-01","fim":"2026-11-06","limite":100,"max_paginas":2,"modo":"historica","reiniciar":false,"quantidade_sintetica":205}
 ```
 
-A resposta é 202 e informa a tarefa persistida. Consulte as rotas existentes `/tarefas/{id}`, `/resultado` e `/erros`. Nenhum segredo, URL de destino ou pedido comercial é aceito no corpo. `quantidade_sintetica` é exclusivo da fixture de homologação, limitado a 1.200 registros; **não é limite da API comercial**. `limite` aceita int32 positivo, incluindo 500 e 1.000.
+A resposta é 202 e informa a tarefa persistida. Consulte as rotas existentes `/tarefas/{id}`, `/resultado` e `/erros`. Nenhum segredo, URL de destino ou pedido comercial é aceito no corpo. `quantidade_sintetica` é exclusivo da fixture de homologação, limitado a 1.200 registros; **não é limite da API comercial**. `limite` aceita de 1 a 500, conforme validação oficial FARMA; o mesmo contrato é imposto pela API interna e pelo módulo compartilhado.
 
 Com 205 registros/limite 100/orçamento duas páginas, a primeira tarefa termina parcial com 200. Uma nova chave, mesmos parâmetros de janela e `reiniciar=false`, retoma na página 3 e fecha em 205. Repetir a mesma chave é idempotente. Alterar parâmetros da mesma chave retorna 409. `reiniciar=true` reabre explicitamente a faixa, mantendo os fatos deduplicados. Trocar limite usa outra chave de cursor e começa na página 1.
 
@@ -37,3 +37,9 @@ O workflow `n8n/historico-homologacao.json` fica inativo, manual e com credencia
 ## Compatibilidade da auditoria Windows
 
 A auditoria da primeira carga FARMA corrige escopos/apresentação e adiciona ledger local de recebimentos no Windows. Não altera `order_history.py`, a paginação, a normalização financeira ou o LTV compartilhados. O Hub conserva o contrato e seus testes PostgreSQL; métricas legadas `clientes_oficiais` representam compradores distintos, não total cadastral da API. Não houve deploy nem escrita comercial.
+
+## Contrato de calendário 1.5.18
+
+Data final civil é serializada com `23:59:59.999999`, enquanto data-hora explícita é preservada. O transporte sintético valida essa serialização. A chave muda para impedir reaproveitamento de cobertura antiga à meia-noite. Tarefa antiga interrompida com checkpoint de outra política é recusada antes de novas páginas: criar tarefa de homologação com nova chave, preservando a anterior. Não reescrever checkpoints para forçar retomada. Posições de itens idênticos são preservadas, como no Windows; reordenação não é mudança financeira.
+
+Os GETs comerciais de evidência foram executados somente no diagnóstico privado Windows/FARMA, fora do worker. O Hub continua exclusivamente sintético, sem implantação na VPS. O Work deve homologar o SHA do release Windows 1.5.18 no ambiente isolado e só então preparar atualização dos serviços. Não ativar fontes comerciais.

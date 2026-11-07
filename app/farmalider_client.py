@@ -1082,7 +1082,7 @@ class FarmaliderClient:
                 self._delivery_path(f"pedidos/{query.segment.lower()}"),
                 query={
                     "dataInicio": query.start,
-                    "dataFim": query.end,
+                    "dataFim": query.api_end,
                     "pagina": page,
                     "limite": query.limit,
                 },
@@ -1090,11 +1090,10 @@ class FarmaliderClient:
         except FarmaliderBadRequestError:
             raise FarmaliderBadRequestError(
                 "Histórico: a API recusou a consulta (HTTP 400). "
-                f"Segmento={query.segment}; início={query.start}; fim={query.end}; "
+                f"Segmento={query.segment}; início={query.start}; fim enviado={query.api_end}; "
                 f"página={page}; limite={query.limit}. "
                 "O HTTP 400 não confirma qual parâmetro foi recusado. "
-                "O limite 500 já funcionou na carga FARMA anterior; "
-                "se usou outro limite, tente 500 mantendo o período. "
+                "O limite permitido pela API é de 1 a 500. "
                 "Não houve troca automática de limite nem confirmação desta página. "
                 "Se persistir, conferir com a API os parâmetros aceitos."
             ) from None

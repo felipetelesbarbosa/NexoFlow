@@ -21,6 +21,7 @@ from pedido_utils import (
 
 SOURCE = "FARMALIDER_PEDIDOS_PAGINADOS"
 POLICY = "itens_liquidos_mais_frete_v1"
+MAX_HISTORY_PAGE_SIZE = 500
 
 
 class HistoryError(ValueError):
@@ -65,8 +66,10 @@ class HistoryQuery:
     def __post_init__(self):
         if self.segment not in {"FARMA", "PET"}:
             raise HistoryError("SEGMENTO_INVALIDO")
-        if type(self.limit) is not int or not 1 <= self.limit <= 2147483647:
-            raise HistoryError("LIMITE_INVALIDO")
+        if type(self.limit) is not int or not 1 <= self.limit <= MAX_HISTORY_PAGE_SIZE:
+            raise HistoryError(
+                "LIMITE_INVALIDO: informe entre 1 e 500 pedidos por página."
+            )
         for value in (self.start, self.end):
             if (
                 not isinstance(value, str)
@@ -88,14 +91,22 @@ class HistoryQuery:
 
     @property
     def end_at(self):
-        result = business_order_datetime(self.end)
+        result = business_order_datetime(self.api_end)
         assert result is not None
         return result
 
     @property
     def key(self):
         # Limite faz parte do cursor: tamanho diferente inicia pela página 1.
-        return digest([SOURCE, self.segment, self.start, self.end, self.limit])
+        parts = [SOURCE, self.segment, self.start, self.end, self.limit]
+        if len(self.end) == 10:
+            parts.append("fim_civil_com_horario_v1")
+        return digest(parts)
+
+    @property
+    def api_end(self):
+        # GETs FARMA: data sem hora termina à meia-noite; hora explícita inclui o dia.
+        return self.end + "T23:59:59.999999" if len(self.end) == 10 else self.end
 
     def contains(self, value):
         dt = business_order_datetime(value)

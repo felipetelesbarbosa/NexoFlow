@@ -69,7 +69,7 @@ class HistoryTests(unittest.TestCase):
         return collect(source, self.store, self.query, now=NOW, **kw)
 
     def test_limits_1200_and_single_page(self):
-        for limit, expected in ((500, [1, 2, 3]), (1000, [1, 2])):
+        for limit, expected in ((400, [1, 2, 3]), (500, [1, 2, 3])):
             q = HistoryQuery("PET", "2026-11-03", "2026-11-03", limit)
             source = Source([order(i) for i in range(1, 1201)])
             first = collect(source, self.store, q, now=NOW, max_pages=1)
@@ -261,7 +261,7 @@ class HistoryTransportTests(unittest.TestCase):
 
         client = FarmaliderClient("fixture+/&=?% token")
         self.addCleanup(client.close)
-        q = HistoryQuery("FARMA", "2026-11-01", "2026-11-06", 1000)
+        q = HistoryQuery("FARMA", "2026-11-01", "2026-11-06", 500)
         response = requests.Response()
         response.status_code = 200
         response._content = b'{"pedidos":[]}'
@@ -284,6 +284,7 @@ class HistoryTransportTests(unittest.TestCase):
                 parse_qs(urlsplit(prepared.url).query)["token"], ["fixture+/&=?% token"]
             )
             self.assertFalse(call.kwargs["allow_redirects"])
+            self.assertEqual(call.kwargs["params"]["dataFim"], "2026-11-06T23:59:59.999999")
             response.status_code = 302
             with self.assertRaisesRegex(FarmaliderError, "Redirecionamento"):
                 client.get_pedidos_history(q, 1)
@@ -302,7 +303,7 @@ class HistoryTransportTests(unittest.TestCase):
 
         client = FarmaliderClient("TOKEN_PRIVADO_SINTETICO")
         self.addCleanup(client.close)
-        q = HistoryQuery("FARMA", "2026-11-01", "2026-11-06", 1000)
+        q = HistoryQuery("FARMA", "2026-11-01", "2026-11-06", 500)
         response = requests.Response()
         response.status_code = 400
         response._content = b'{"error":"DADO_PRIVADO_NAO_EXIBIR"}'
@@ -321,7 +322,7 @@ class HistoryTransportTests(unittest.TestCase):
             ):
                 collect(client, store, q, now=NOW)
             message = str(error.exception)
-            self.assertIn("limite=1000", message)
+            self.assertIn("limite=500", message)
             self.assertIn("500", message)
             self.assertIn("não confirma", message)
             self.assertNotIn("TOKEN_PRIVADO", message)
@@ -466,13 +467,13 @@ class HistoryIntegrationTests(unittest.TestCase):
                 "--fim",
                 "2026-11-06",
                 "--limite",
-                "1000",
+                "500",
                 "--max-paginas",
                 "1",
             ]
         )
         self.assertEqual(
-            (args.command, args.limite, args.max_paginas), ("historico", 1000, 1)
+            (args.command, args.limite, args.max_paginas), ("historico", 500, 1)
         )
 
     def test_multiwindow_boundaries_and_incremental_resume(self):

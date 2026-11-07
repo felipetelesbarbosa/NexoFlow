@@ -11,6 +11,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from order_history import MAX_HISTORY_PAGE_SIZE
+
 from .config import Settings
 from .contracts import Scenario
 from .store import Conflict, Store
@@ -31,7 +33,7 @@ class HistoryRequest(BaseModel):
     chave: str = Field(min_length=1, max_length=96, pattern=r"^[a-zA-Z0-9_-]+$")
     inicio: str
     fim: str
-    limite: int = Field(default=500, ge=1, le=2147483647)
+    limite: int = Field(default=500, ge=1, le=MAX_HISTORY_PAGE_SIZE)
     max_paginas: int = Field(default=100, ge=1, le=10000)
     modo: Literal["historica", "incremental", "reconciliacao"] = "historica"
     reiniciar: bool = False

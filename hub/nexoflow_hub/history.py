@@ -73,6 +73,8 @@ class SyntheticHistorySource:
                 request.method != "GET"
                 or request.url.path != f"/api/Delivery/pedidos/{query.segment.lower()}"
                 or params["token"] != "fixture+/&=?%"
+                or params["dataInicio"] != query.start
+                or params["dataFim"] != query.api_end
             ):
                 return httpx.Response(400)
             first = (int(params["pagina"]) - 1) * int(params["limite"])
@@ -122,7 +124,7 @@ class SyntheticHistorySource:
                 f"https://fixture.invalid/api/Delivery/pedidos/{query.segment.lower()}",
                 params={
                     "dataInicio": query.start,
-                    "dataFim": query.end,
+                    "dataFim": query.api_end,
                     "pagina": page,
                     "limite": query.limit,
                     "token": "fixture+/&=?%",
@@ -337,6 +339,8 @@ def run_history(store, task, *, source=None, interrupt_after=None):
     )
     history = PgHistory(store, task)
     saved = store.checkpoints(task)
+    if saved and saved.get(0, {}).get("janela") != query.key:
+        raise HistoryError("CONTRATO_CALENDARIO_ALTERADO_CRIAR_NOVA_TAREFA")
     # Reinício explícito uma vez por tarefa; crash não apaga cursor confirmado.
     if not saved:
         state = history.begin(query)

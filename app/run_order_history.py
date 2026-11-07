@@ -33,7 +33,7 @@ def parser():
         "--limite",
         type=int,
         default=500,
-        help="Pedidos por página (padrão 500; outros limites dependem de confirmação da API)",
+        help="Pedidos por página (de 1 a 500; padrão 500)",
     )
     result.add_argument(
         "--max-paginas",
@@ -67,7 +67,7 @@ def parser():
 def interactive():
     print("\nHistórico — digite 0, sair ou exit em qualquer campo para voltar ao menu.")
 
-    def read(prompt, default=None, numeric=False):
+    def read(prompt, default=None, numeric=False, maximum=2147483647):
         while True:
             value = input(prompt).strip()
             if value.lower() in {"0", "sair", "exit"}:
@@ -75,9 +75,9 @@ def interactive():
             if not value and default is not None:
                 return default
             if numeric:
-                if value.isdecimal() and 1 <= int(value) <= 2147483647:
+                if value.isdecimal() and 1 <= int(value) <= maximum:
                     return value
-                print("Informe um inteiro positivo ou 0 para cancelar.")
+                print(f"Informe um inteiro entre 1 e {maximum}, ou 0 para cancelar.")
             else:
                 return value
 
@@ -93,7 +93,7 @@ def interactive():
                 )
                 continue
             break
-        limit = read("Pedidos por página (ENTER = 500): ", "500", True)
+        limit = read("Pedidos por página (1 a 500; ENTER = 500): ", "500", True, 500)
         maximum = read("Máximo de páginas (ENTER = todas): ", "", True)
         args = ["--inicio", start, "--fim", end, "--limite", limit]
         if maximum:
@@ -172,6 +172,11 @@ def print_summary(summary):
         f"\nJanelas: {summary.get('windows', '—')}; incompletas: {summary.get('incomplete_windows', '—')}"
     )
     audit = summary.get("audit", {})
+    if summary.get("rejected_legacy_windows"):
+        print(
+            f"Tentativas antigas com limite inválido: {summary['rejected_legacy_windows']}; "
+            "preservadas no diagnóstico, sem retomada automática."
+        )
     if audit.get("origens"):
         print("ORIGENS DOS FATOS ARMAZENADOS (não comprovam a execução de entrada)")
         for source, count in sorted(audit["origens"].items()):

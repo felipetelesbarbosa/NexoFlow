@@ -18,7 +18,7 @@ from test_hub import expire
 from test_hub import settings as fixture_settings
 from test_hub import store as fixture_store
 
-from order_history import HistoryError, normalize_order
+from order_history import SOURCE, HistoryError, digest, normalize_order
 
 settings = fixture_settings
 store = fixture_store
@@ -73,7 +73,7 @@ def test_budget_resume_and_official_identity_without_weni(store, segment):
         assert coverage["estado"] == "incompleta"  # calendário ainda não demonstrado
 
 
-@pytest.mark.parametrize("limit,pages", [(500, 3), (1000, 2)])
+@pytest.mark.parametrize("limit,pages", [(400, 3), (500, 3)])
 def test_1200_sizes_and_fencing(store, limit, pages):
     task = create(
         store,
@@ -268,6 +268,45 @@ def test_reordered_items_do_not_reopen_old_closing(store):
         )
         assert (
             db.execute("SELECT count(*) AS n FROM hub.historico_revisoes").fetchone()[
+                "n"
+            ]
+            == 0
+        )
+
+
+def test_civil_calendar_and_limit_validation(store, settings):
+    query = validate_parameters("PET", parameters())
+    assert query.api_end == "2026-11-06T23:59:59.999999"
+    with pytest.raises(HistoryError, match="LIMITE"):
+        validate_parameters("PET", {**parameters(), "limite": 1000})
+    api = TestClient(create_app(settings))
+    response = api.post(
+        "/tarefas/historico",
+        json={
+            "segmento": "PET",
+            "origem": "teste",
+            "chave": "invalid-limit",
+            "inicio": query.start,
+            "fim": query.end,
+            "limite": 1000,
+        },
+        headers={"Authorization": "Bearer " + settings.tokens["PET"]},
+    )
+    assert response.status_code == 422
+
+
+def test_old_calendar_checkpoint_requires_new_task(store):
+    create(store, changes={"quantidade_sintetica": 1})
+    task = store.claim()
+    q = validate_parameters("PET", task["parametros"])
+    legacy = digest([SOURCE, q.segment, q.start, q.end, q.limit])
+    store.checkpoint(task, 0, {"janela": legacy})
+    with pytest.raises(HistoryError, match="CRIAR_NOVA_TAREFA"):
+        run_history(store, task)
+    assert store.checkpoints(task) == {0: {"janela": legacy}}
+    with store.connect() as db:
+        assert (
+            db.execute("SELECT count(*) AS n FROM hub.historico_pedidos").fetchone()[
                 "n"
             ]
             == 0
