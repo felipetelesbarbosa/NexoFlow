@@ -236,9 +236,12 @@ reutilizar a cobertura antiga à meia-noite; os fatos e checkpoints
 anteriores são preservados.</p>
 <p>Itens idênticos retornados em ordem diferente mantêm posições e
 chaves analíticas locais. Consultas pontuais confirmaram os 85 IDs de
-06/11 antes ausentes. A pendência de frete permanece preservada.
-Consulte o <a href="VALIDACAO%20HISTORICO%201.5.18.md">relatório da
-1.5.18</a> para distinguir testes sintéticos e evidência real.</p>
+06/11 antes ausentes. Divergência isolada de frete vira aviso sem
+excluir a compra, com valor oficial do cabeçalho e diferença registrada.
+A pendência antiga permanece preservada até recuperar seus itens/valores
+oficiais. Consulte o <a
+href="VALIDACAO%20HISTORICO%201.5.18.md">relatório da 1.5.18</a> para
+distinguir testes sintéticos e evidência real.</p>
 <p>A opção 10 armazena histórico no SQLite. O Analytics incorpora os
 fatos locais às tabelas normais de pedidos/itens. As abas específicas
 Histórico/LTV/Cobertura exigem a revisão separada descrita no <a
@@ -425,4 +428,4 @@ href="RASTREAMENTO_META.md">regras e instruções de Oscarzinho e
 Lili</a>.</p>
 </body>
 </html>
-<!-- NexoFlow documentation: source-sha256=038777fbb7563b4755f7c1b804d1a296c19f07c053b73ed067585fc4966a2418 content-sha256=6f8d61260658aa29ccb675f5514a5d1b0e758126be37e2e8b124a2094941b15e -->
+<!-- NexoFlow documentation: source-sha256=9d2cf208c1619cb314d14d5d06eb8a040da70c7bb5cefd210c21ad4232965177 content-sha256=7c8f5c8cc3910b395264771789e2bfcd03114c38324ef22c3c6296eae5ee47a8 -->

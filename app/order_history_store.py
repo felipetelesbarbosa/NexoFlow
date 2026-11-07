@@ -12,6 +12,7 @@ from order_history import (
     HistoryQuery,
     canonical,
     digest,
+    financial_record_digest,
     ltv,
     normalize_order,
     page_envelope,
@@ -327,13 +328,7 @@ class HistoryStore:
 
 
 def financial_digest(record):
-    return digest(
-        {
-            k: v
-            for k, v in record.items()
-            if k not in {"contact_uuid", "link_state", "source"}
-        }
-    )
+    return financial_record_digest(record)
 
 
 def collect(
@@ -634,6 +629,7 @@ def history_audit(store, query=None):
             faturamento_centavos=0,
             pedidos_com_vinculo=0,
             pedidos_sem_vinculo=0,
+            avisos_frete=0,
         )
 
     accumulated, period = empty(), empty()
@@ -658,6 +654,11 @@ def history_audit(store, query=None):
         )
         for target in [accumulated, period] if in_period else [accumulated]:
             target["pedidos_armazenados"] += 1
+            if any(
+                w.get("reason") == "FRETE_DIVERGENTE"
+                for w in record.get("warnings", [])
+            ):
+                target["avisos_frete"] += 1
             key = {
                 "valido": "pedidos_validos",
                 "cancelado": "cancelados",

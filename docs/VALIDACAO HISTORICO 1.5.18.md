@@ -46,3 +46,11 @@ Checks de publicação: suíte completa Windows com Python 3.11/3.14 e dois modo
 Para atualizar, fechar rotinas, fazer backup consistente e usar Setup **Preserve**. Não apagar SQLite, revisões ou checkpoints. Para conferir novamente 06/11, solicitar somente a faixa necessária; não repetir todo o ano. A opção 10 armazena fatos localmente. O Analytics os incorpora às tabelas normais de pedidos/itens; abas específicas Histórico/LTV/Cobertura requerem revisão separada conforme o guia.
 
 Rollback: desativar coleta recente e restaurar somente o programa anterior via processo oficial preservando dados. Cursores das políticas coexistem; o programa antigo não deve ser usado para certificar cobertura do dia final. O Work deve homologar o SHA da tag v1.5.18 no Hub isolado antes de atualizar a VPS. Nenhum deploy foi realizado aqui.
+
+## Ajuste de política de frete aprovado durante a validação
+
+O usuário autorizou manter o pedido quando a única divergência é entre frete do cabeçalho e lançamentos técnicos código zero/descrição vazia. A fonte monetária é o cabeçalho oficial: produtos + frete do cabeçalho, sem somar outra vez o lançamento. Não foi inventado um limite de tolerância. O registro privado guarda aviso, ambos os valores e diferença em centavos; o resumo apresenta avisos separados de pendências. A mesma política vale no histórico FARMA/PET e no Hub sintético. Cancelamentos, descontos, itens inválidos e totais explícitos incompatíveis continuam protegidos.
+
+Metadados dos lançamentos de frete e avisos não reabrem, sozinhos, o fechamento antigo; alteração real no frete do cabeçalho ou demais valores continua sujeita à reconciliação prevista. A cópia antiga ainda contém uma pendência, pois o erro descartou itens/valores e não é possível reconstruir sua compra válida sem resposta oficial. Nenhuma exclusão/limpeza automática dessa pendência foi executada.
+
+A tentativa inicial do workflow 1.5.18 foi cancelada antes da publicação para incorporar essa regra. A versão não foi incrementada novamente. A validação completa será conferida no novo commit final, incluindo regressões com fretes 9,99/0,00, não duplicação, aviso não bloqueante e preservação das outras guardas, tanto SQLite quanto PostgreSQL temporário.

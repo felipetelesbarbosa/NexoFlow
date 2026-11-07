@@ -10,6 +10,7 @@ from order_history import (
     HistoryError,
     HistoryQuery,
     digest,
+    financial_record_digest,
     normalize_order,
     page_envelope,
     preserve_item_positions,
@@ -272,10 +273,7 @@ class PgHistory:
             and (current.date() - prior.date()).days > 20
             and mode != "reconciliacao"
         ):
-            keys = set(record) - {"contact_uuid", "link_state", "source"}
-            if digest({k: old.get(k) for k in keys}) != digest(
-                {k: record[k] for k in keys}
-            ):
+            if financial_record_digest(old) != financial_record_digest(record):
                 reason = "FECHAMENTO_ANTIGO_REQUER_RECONCILIACAO"
         if reason:
             db.execute(
@@ -323,12 +321,18 @@ class PgHistory:
                 "SELECT count(*) AS n FROM hub.historico_pendencias WHERE segmento=%s",
                 (self.segment,),
             ).fetchone()
-            assert row is not None and pending is not None
+            warnings = db.execute(
+                """SELECT count(*) AS n FROM hub.historico_pedidos WHERE segmento=%s
+                   AND registro->'warnings' @> '[{"reason":"FRETE_DIVERGENTE"}]'::jsonb""",
+                (self.segment,),
+            ).fetchone()
+            assert row is not None and pending is not None and warnings is not None
             return {
                 "faturamento_centavos": int(row["cents"]),
                 "pedidos_validos": int(row["orders"]),
                 "clientes_oficiais": row["clients"],
                 "pendencias": pending["n"],
+                "avisos_frete": warnings["n"],
             }
 
 

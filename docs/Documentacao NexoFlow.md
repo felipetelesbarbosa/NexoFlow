@@ -19,7 +19,7 @@ O NexoFlow identifica pedidos registrados na API **independentemente de terem si
 
 O histórico passa a enviar o dia final sem horário como `23:59:59.999999` e preserva horários explícitos. A API confirmou o limite de 1 a 500 por página. O menu repete entradas inválidas e a CLI recusa-as antes do GET. Novas chaves de cursor evitam reutilizar a cobertura antiga à meia-noite; os fatos e checkpoints anteriores são preservados.
 
-Itens idênticos retornados em ordem diferente mantêm posições e chaves analíticas locais. Consultas pontuais confirmaram os 85 IDs de 06/11 antes ausentes. A pendência de frete permanece preservada. Consulte o [relatório da 1.5.18](VALIDACAO%20HISTORICO%201.5.18.md) para distinguir testes sintéticos e evidência real.
+Itens idênticos retornados em ordem diferente mantêm posições e chaves analíticas locais. Consultas pontuais confirmaram os 85 IDs de 06/11 antes ausentes. Divergência isolada de frete vira aviso sem excluir a compra, com valor oficial do cabeçalho e diferença registrada. A pendência antiga permanece preservada até recuperar seus itens/valores oficiais. Consulte o [relatório da 1.5.18](VALIDACAO%20HISTORICO%201.5.18.md) para distinguir testes sintéticos e evidência real.
 
 A opção 10 armazena histórico no SQLite. O Analytics incorpora os fatos locais às tabelas normais de pedidos/itens. As abas específicas Histórico/LTV/Cobertura exigem a revisão separada descrita no [guia](HISTORICO%20PEDIDOS.md). O Windows permanece autônomo e o Hub em homologação, sem implantação nesta entrega.
 

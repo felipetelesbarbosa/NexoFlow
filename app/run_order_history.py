@@ -146,6 +146,7 @@ def print_summary(summary):
 
     labels = {
         "pedidos_validos": "Compras válidas",
+        "avisos_frete": "Avisos de frete (não excluem a compra)",
         "clientes_oficiais": "Clientes com compras válidas",
         "vinculados": "Pedidos com vínculo Weni (acumulado)",
         "sem_vinculo": "Pedidos sem vínculo Weni (acumulado)",

@@ -41,6 +41,21 @@ def digest(value):
     ).hexdigest()
 
 
+def financial_record_digest(record):
+    """Frete financeiro vem do cabeçalho; avisos/ordem não mudam uma venda."""
+    values = {
+        k: v
+        for k, v in record.items()
+        if k not in {"contact_uuid", "link_state", "source", "warnings"}
+    }
+    values["items"] = sorted(
+        digest({k: v for k, v in item.items() if k != "position"})
+        for item in record["items"]
+        if not item["freight"]
+    )
+    return digest(values)
+
+
 def preserve_item_positions(previous, incoming):
     """Reordenação de itens oficiais idênticos preserva chaves analíticas locais."""
     if not previous or previous["state"] != "valido" or incoming["state"] != "valido":
@@ -274,7 +289,15 @@ def normalize_order(payload, segment, now):
                 }
             )
         if freight_count and freight_items != freight:
-            raise HistoryError("FRETE_DIVERGENTE")
+            result["warnings"] = [
+                {
+                    "reason": "FRETE_DIVERGENTE",
+                    "header_cents": cents(freight),
+                    "items_cents": cents(freight_items),
+                    "header_minus_items_cents": cents(freight - freight_items),
+                    "financial_source": "CAPA_OFICIAL",
+                }
+            ]
         if all(i["freight"] for i in result["items"]):
             result.update(state="cancelado", reason="SEM_PRODUTOS_CONFIRMADO")
             return result

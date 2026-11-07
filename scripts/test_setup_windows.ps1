@@ -378,7 +378,7 @@ public static class NexoFlowSetupRootLock {
     Push-Location $InstallDir
     try {
         $env:PYTHONPATH = Join-Path $InstallDir 'app'
-        & (Join-Path $InstallDir '.venv\Scripts\python.exe') -m unittest tests.test_order_history tests.test_order_history_audit tests.test_history_request_contract -q
+        & (Join-Path $InstallDir '.venv\Scripts\python.exe') -m unittest tests.test_order_history tests.test_order_history_audit tests.test_history_request_contract tests.test_history_freight_warning -q
         if ($LASTEXITCODE -ne 0) { throw 'A regressão do histórico no pacote instalado falhou.' }
     } finally {
         Pop-Location

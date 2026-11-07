@@ -416,7 +416,7 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 O histórico inclui todo o dia final informado sem horário, enviando 23:59:59.999999, e preserva data-hora explícita. GETs pontuais FARMA confirmaram os 85 IDs ausentes do dia 06/11; a API também confirmou o limite de 1 a 500 por página. O menu e a CLI rejeitam valores acima desse limite antes da chamada.
 
-Itens idênticos retornados em outra ordem conservam posições e chaves analíticas: os 105 casos reais deixaram de representar falsas atualizações na reprodução privada. A mesma proteção evita falso conflito de fechamento antigo. A pendência FRETE_DIVERGENTE continua preservada.
+Itens idênticos retornados em outra ordem conservam posições e chaves analíticas: os 105 casos reais deixaram de representar falsas atualizações na reprodução privada. A mesma proteção evita falso conflito de fechamento antigo. Divergência isolada de frete vira aviso: a compra usa o frete oficial do cabeçalho, sem duplicação, mantendo as demais validações. A pendência antiga continua preservada até recuperar a resposta oficial, pois seus itens/valores não podem ser reconstruídos.
 
 A chave de cursor distingue a política nova de datas; fatos e checkpoints antigos permanecem disponíveis. Tentativas antigas com limite inválido e sem qualquer recebimento não são retomadas. Não houve nova carga anual, gravação comercial ou alteração dos SQLite recebidos. A evidência real é da amostra FARMA; não certifica cobertura anual ou homologação comercial PET. [Relatório técnico](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/VALIDACAO%20HISTORICO%201.5.18.md).
 

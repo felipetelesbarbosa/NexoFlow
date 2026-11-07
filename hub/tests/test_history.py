@@ -311,3 +311,53 @@ def test_old_calendar_checkpoint_requires_new_task(store):
             ]
             == 0
         )
+
+
+@pytest.mark.parametrize("segment", ["FARMA", "PET"])
+def test_freight_disagreement_is_nonblocking_and_uses_header(store, segment):
+    create(store, segment, {"quantidade_sintetica": 1})
+    task = store.claim()
+    history = PgHistory(store, task)
+    query = validate_parameters(segment, task["parametros"])
+    history.begin(query)
+    page = SyntheticHistorySource(1).get_pedidos_history(query, 1)
+    payload = page["pedidos"][0]
+    payload["capa"]["frete"] = 9.99
+    payload["itens"].append(
+        dict(
+            payload["itens"][0],
+            id="freight",
+            codProduto=0,
+            descricao="",
+            valor=0,
+            total=0,
+        )
+    )
+    history.commit_page(
+        query, 1, page, now="2026-11-07T12:00:00-03:00", mode="historica", step=1
+    )
+    result = history.totals()
+    assert result["pedidos_validos"] == 1
+    assert result["faturamento_centavos"] == 8999
+    assert result["pendencias"] == 0
+    assert result["avisos_frete"] == 1
+    with store.connect() as db:
+        saved = db.execute(
+            "SELECT registro FROM hub.historico_pedidos WHERE segmento=%s", (segment,)
+        ).fetchone()["registro"]
+        assert saved["warnings"][0]["header_cents"] == 999
+        assert saved["warnings"][0]["items_cents"] == 0
+        payload["itens"][-1].update(valor=9.99, total=9.99)
+        later = "2026-12-01T12:00:00-03:00"
+        history.upsert(
+            db, normalize_order(payload, segment, later), now=later, mode="historica"
+        )
+        assert (
+            db.execute(
+                "SELECT count(*) AS n FROM hub.historico_pendencias WHERE segmento=%s",
+                (segment,),
+            ).fetchone()["n"]
+            == 0
+        )
+    assert history.totals()["faturamento_centavos"] == 8999
+    assert history.totals()["avisos_frete"] == 0

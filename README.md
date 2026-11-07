@@ -21,7 +21,7 @@ O NexoFlow identifica pedidos registrados na API **independentemente de terem si
 
 O histórico inclui todo o dia final quando informado sem horário e valida o limite oficial de 1 a 500 pedidos por página. Consultas pontuais FARMA confirmaram os 85 IDs antes ausentes em 06/11. Horários explícitos são preservados. O cursor distingue a nova política de datas, mantendo os estados anteriores.
 
-Reordenação de itens idênticos preserva posições e chaves analíticas, sem falsa atualização ou conflito de fechamento. A pendência de frete permanece para conferência oficial. Consulte a [validação e os limites da evidência](docs/VALIDACAO%20HISTORICO%201.5.18.md).
+Reordenação de itens idênticos preserva posições e chaves analíticas, sem falsa atualização ou conflito de fechamento. Divergência isolada de frete passa a aviso: usa o valor oficial do cabeçalho sem excluir a compra ou duplicar frete. A pendência antiga depende de recuperar a resposta oficial. Consulte a [validação e os limites da evidência](docs/VALIDACAO%20HISTORICO%201.5.18.md).
 
 ## NexoFlow Hub em homologação
 
