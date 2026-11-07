@@ -3,11 +3,22 @@
 import json
 import shutil
 import subprocess
+import time
 import unittest
+from copy import deepcopy
 from pathlib import Path
+from unittest.mock import patch
+
+from requests import Timeout
 
 from run_sheets_continuation import StorageSetup
-from sheets_continuation import FILE_MARKER_KEY, INDEX_TITLE, ContinuationError
+from sheets_continuation import (
+    FILE_MARKER_KEY,
+    INDEX_TITLE,
+    ContinuationError,
+    stamp_book,
+)
+from sheets_provisioning import MyDriveProvisioner
 from sheets_storage import STORAGE_SHEET, SheetsStorage
 from tests.sheets_memory import Book, Client, Provisioner
 
@@ -57,6 +68,23 @@ class StorageSetupTests(unittest.TestCase):
         )
         again.close()
 
+    def test_fresh_configuration_proves_all_three_origins(self):
+        setup, provider, books = self.make()
+        self.addCleanup(setup.close)
+        self.assertTrue(all(not b.metadata for b in books.values()))
+        setup.configure(provider)
+        for role, key in setup.roots.items():
+            tags = [
+                m
+                for m in books[key].metadata.values()
+                if m["metadataKey"] == FILE_MARKER_KEY
+            ]
+            self.assertEqual(len(tags), 1, role)
+            self.assertEqual(
+                json.loads(tags[0]["metadataValue"]),
+                dict(hub="dashboard", segment="FARMA", role=role),
+            )
+
     def test_lost_configuration_response_is_verified_without_recreating_index(self):
         setup, provider, books = self.make()
         books["dashboard"].lose_data_response = True
@@ -85,6 +113,156 @@ class StorageSetupTests(unittest.TestCase):
         setup.close()
         with self.assertRaises(ContinuationError):
             StorageSetup(setup.client, "dashboard", "PET")
+
+    def test_all_markers_preflighted_before_any_origin_write(self):
+        for target in ("operations", "history"):
+            for conflict in (
+                dict(segment="PET"),
+                dict(role="dashboard"),
+                dict(hub="other"),
+            ):
+                with self.subTest(target=target, conflict=conflict):
+                    setup, provider, books = self.make()
+                    self.addCleanup(setup.close)
+                    args = dict(
+                        hub="dashboard",
+                        segment="FARMA",
+                        role="operacao" if target == "operations" else "historico",
+                    )
+                    stamp_book(books[target], **(args | conflict))
+                    previous = deepcopy({k: b.metadata for k, b in books.items()})
+                    with self.assertRaises(ContinuationError):
+                        setup.configure(provider)
+                    setup.close()
+                    self.assertEqual(
+                        {k: b.metadata for k, b in books.items()}, previous
+                    )
+                    self.assertNotIn(
+                        INDEX_TITLE, [w.title for w in setup.hub.worksheets()]
+                    )
+
+    def test_partial_initialization_and_lost_marker_response_resume_without_duplicates(
+        self,
+    ):
+        setup, provider, books = self.make()
+        self.addCleanup(setup.close)
+        # Índice/Dashboard gravados; resposta de Operação perdida depois do commit.
+        books["operations"].lose_response = True
+        with self.assertRaises(Timeout):
+            setup.configure(provider)
+        setup.close()
+        again = StorageSetup(setup.client, "dashboard", "FARMA")
+        self.addCleanup(again.close)
+        again.lease.now = lambda: time.time() + 301
+        self.assertFalse(again.configure(provider))
+        before = deepcopy({k: b.metadata for k, b in books.items()})
+        self.assertFalse(again.configure(provider))
+        self.assertEqual({k: b.metadata for k, b in books.items()}, before)
+        for book in books.values():
+            self.assertEqual(
+                sum(
+                    m["metadataKey"] == FILE_MARKER_KEY for m in book.metadata.values()
+                ),
+                1,
+            )
+
+    def test_same_id_two_roles_rejected_before_marker_write(self):
+        setup, provider, books = self.make()
+        self.addCleanup(setup.close)
+        setup.roots["historico"] = setup.roots["operacao"]
+        with self.assertRaisesRegex(ContinuationError, "diferentes"):
+            setup.configure(provider)
+        self.assertFalse(any(b.metadata for b in books.values()))
+
+    def test_real_provider_decisions_check_all_permissions_before_stamping(self):
+        for failure in ("service", "oauth", "public_folder", "drive_timeout", None):
+            with self.subTest(failure=failure):
+                setup, _, books = self.make()
+                self.addCleanup(setup.close)
+                provider = MyDriveProvisioner.__new__(MyDriveProvisioner)
+                provider.source, provider.owner = object(), object()
+                reads = []
+
+                def get(
+                    session,
+                    path,
+                    failure=failure,
+                    reads=reads,
+                    provider=provider,
+                    **kwargs,
+                ):
+                    reads.append((session, path))
+                    if failure == "drive_timeout" and path == "/files/history":
+                        raise Timeout("synthetic")
+                    if path.endswith("/permissions"):
+                        return dict(
+                            permissions=[
+                                dict(
+                                    type="anyone"
+                                    if failure == "public_folder" and "folder" in path
+                                    else "user",
+                                    role="owner",
+                                    emailAddress="fake@example.invalid",
+                                )
+                            ]
+                        )
+                    key = path.rsplit("/", 1)[-1]
+                    allowed = not (
+                        key == "history"
+                        and (
+                            failure == "service"
+                            and session is provider.source
+                            or failure == "oauth"
+                            and session is provider.owner
+                        )
+                    )
+                    return dict(
+                        id=key,
+                        name="Synthetic",
+                        mimeType="application/vnd.google-apps.spreadsheet",
+                        parents=["folder"],
+                        capabilities=dict(canEdit=allowed),
+                    )
+
+                with patch.object(provider, "_get", side_effect=get):
+                    if failure:
+                        with self.assertRaises((ContinuationError, Timeout)):
+                            setup.configure(provider)
+                        self.assertFalse(
+                            any(
+                                m["metadataKey"] == FILE_MARKER_KEY
+                                for b in books.values()
+                                for m in b.metadata.values()
+                            )
+                        )
+                    else:
+                        self.assertTrue(setup.configure(provider))
+                        self.assertTrue(
+                            all(
+                                any(
+                                    m["metadataKey"] == FILE_MARKER_KEY
+                                    for m in b.metadata.values()
+                                )
+                                for b in books.values()
+                            )
+                        )
+                self.assertTrue(reads)
+
+    def test_duplicate_or_malformed_marker_blocks_before_index(self):
+        for duplicate in (False, True):
+            setup, provider, books = self.make()
+            self.addCleanup(setup.close)
+            stamp_book(
+                books["history"], hub="dashboard", segment="FARMA", role="historico"
+            )
+            tag = next(iter(books["history"].metadata.values()))
+            if duplicate:
+                books["history"].metadata[999] = deepcopy(tag)
+            else:
+                tag["location"] = {"sheetId": 1}
+            with self.assertRaises(ContinuationError):
+                setup.configure(provider)
+            self.assertFalse(books["operations"].metadata)
 
 
 class ConnectorContractTests(unittest.TestCase):

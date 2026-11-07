@@ -1,6 +1,106 @@
 # Histórico SQLite → Sheets → Data Studio: homologação FARMA
 
-O publicador foi distribuído na [release Windows 1.5.21](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.21), no commit `29bba747a6cc5dcc57e1c547f94dc3a6af3fb6f1`. A homologação operacional da FARMA deve usar os pacotes dessa release. Não houve alteração de relatório publicado, VPS ou planilha comercial. O Work deverá homologar o mesmo SHA em uma instalação isolada com três planilhas **de teste**. Não substituir manualmente módulos em `C:\NexoFlow` operacional. PET somente foi validado com fixtures; a réplica comercial depende da aprovação de FARMA.
+O publicador lógico foi inicialmente distribuído na [release Windows 1.5.21](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.21), no commit `29bba747a6cc5dcc57e1c547f94dc3a6af3fb6f1`. A homologação operacional da FARMA deve usar os pacotes dessa release. Não houve alteração de relatório publicado, VPS ou planilha comercial. O Work deverá homologar o mesmo SHA em uma instalação isolada com três planilhas **de teste**. Não substituir manualmente módulos em `C:\NexoFlow` operacional. PET somente foi validado com fixtures; a réplica comercial depende da aprovação de FARMA.
+
+## Correção 1.5.22 e início comercial FARMA pelo Work
+
+A 1.5.21 está publicada e preservada. A 1.5.22 corrige `_stamp()` para registrar
+Dashboard, Operação e Histórico, com `stamp_book` sob a mesma trava remota.
+Antes de marcar qualquer origem, valida TODOS os marcadores e os três IDs
+exclusivos. O provisionador confere pasta privada, acessos e edição pela conta de
+serviço e pelo usuário OAuth. Conflitos de segmento, papel, hub, localização ou
+marcadores duplicados bloqueiam; não remover a proteção para publicar.
+Se o índice já existe, a configuração relê o manifesto e completa somente os
+marcadores ausentes. Resposta incerta mantém o lease por até cinco minutos;
+aguardar expiração antes de reabrir, sem apagar locks ou metadados.
+
+**Situação atual:** código corrigido e testes sintéticos; dados comerciais ainda
+não publicados por esta missão. Após CI, CodeQL e pacote instalado aprovados,
+o Work pode seguir diretamente aos três destinos comerciais FARMA conferidos,
+começando por UM lote. Não é exigida nova carga prolongada de homologação.
+O registro abaixo sobre o ensaio 1.5.21 é histórico, não uma exigência para repetir
+essa etapa. PET continua somente fixtures, com réplica comercial posterior.
+
+### Roteiro curto para o Work (1.5.22)
+
+1. Fechar rotinas; backup privado de configuração, credenciais, SQLite e todos os
+   journals; instalar o novo Setup em **Preserve**. Não misturar uma revisão em
+   andamento de outra versão: preservar e reconciliar os comprovantes primeiro.
+2. Selecionar FARMA. Confirmar os três IDs no perfil, mapa `NexoFlow_Arquivos`,
+   pasta NexoFlow/FarmaLíder e acessos privados; nenhuma mudança automática de marca.
+3. Configurar/recuperar origens e índice. Isso escreve SOMENTE metadados/índice,
+   não pedidos. A preparação de capacidade posterior não escreve remotamente.
+
+```text
+nexo armazenamento configurar
+nexo armazenamento status
+nexo armazenamento ativar-data-studio --abas Historico_Pedidos Historico_Itens BI_LTV_Clientes BI_Cobertura_Historica BI_Historico_Resumo --confirmar-fontes
+nexo historico --auditar-banco C:\NexoFlow\logs\privado\farma-copia.sqlite --resumo-mensal C:\NexoFlow\logs\privado\farma-atual.json
+nexo historico --planilhas capacidade --banco C:\NexoFlow\logs\privado\farma-copia.sqlite --revisao C:\NexoFlow\logs\privado\farma-plano.json --resumo-mensal C:\NexoFlow\logs\privado\farma-esperado.json
+nexo historico --planilhas aplicar --revisao C:\NexoFlow\logs\privado\farma-plano.json --max-lotes 1
+nexo historico --planilhas conferir --revisao C:\NexoFlow\logs\privado\farma-plano.json --resumo-mensal C:\NexoFlow\logs\privado\farma-observado.json
+nexo historico --planilhas aplicar --revisao C:\NexoFlow\logs\privado\farma-plano.json
+nexo historico --planilhas conferir --revisao C:\NexoFlow\logs\privado\farma-plano.json --resumo-mensal C:\NexoFlow\logs\privado\farma-observado-final.json
+```
+
+`--max-lotes 1` pausa no primeiro lote determinístico (até 200 linhas/1 MB;
+partes menores podem reduzir esse número). A conferência parcial identifica
+somente os lotes confirmados; não libera total completo ao painel. Na pausa,
+WRITING bloqueia leitura completa no conector. O mesmo plano retoma o restante;
+não preparar outro para contornar resposta incerta. No fechamento exigir READY,
+zero lotes restantes, zero divergência mensal/total e pedidos válidos = LTV ao
+centavo. Repreparar depois de concluído deve indicar zero deltas idênticos.
+
+Rollback específico (número do lote no journal/comprovante):
+
+```text
+nexo historico --planilhas rollback --revisao C:\NexoFlow\logs\privado\farma-plano.json --lote 1
+```
+
+Restaura só células do lote, conferindo os valores posteriores antes; edição de
+terceiro bloqueia. Não apaga partes nem históricos; restauração confirmada deixa o
+lote pendente e permite reaplicá-lo. Guardar o snapshot-base, plano.sqlite,
+comprovantes e backups de intervalos juntos, fora de Git/Drive público.
+
+### Backup consistente incluindo WAL
+
+Em PowerShell na raiz instalada, sem iniciar coleta/API, criar uma cópia privada
+usando a função do próprio publicador (não copiar o `.sqlite` isoladamente):
+
+```powershell
+$env:NEXOFLOW_PERFIL='FARMA'
+$env:PYTHONPATH='app;.'
+@'
+from pathlib import Path
+from history_snapshot import snapshot
+result = snapshot(Path('logs/privado/clientes_observados.sqlite'), Path('logs/privado/backup-publicacao'), 'FARMA')
+print(result)  # somente caminho, tamanho e hash; nenhum registro individual
+'@ | .\.venv\Scripts\python.exe -
+```
+
+Usar o caminho resultante como `--banco`, preservando também configurações e todos
+os journals. A rotina abre o original em leitura/query_only e usa SQLite backup;
+valida integridade e segmento da cópia. A cópia não é migração nem nova coleta.
+
+### Referência agregada recebida em 07/11/2026
+
+O resumo `historico_conferencia_v1` anexado confirma aritmeticamente:
+267.672 pedidos = 207.582 válidos + 60.077 cancelados + 13 pendentes;
+39.365 compradores distintos; 552.168 linhas de produto e 780.749 unidades.
+Produtos 3.380.346.934 + frete 3.620.056 = faturamento 3.383.966.990 centavos
+(R$ 33.839.669,90). Período 20/04/2020–07/11/2026; 11 pendências sem emissão,
+sem receita. Isso comprova os agregados do arquivo recebido, não o conteúdo
+individual do SQLite nem o estado atual dos destinos. Recalcular no corte real.
+`LIMITES_DA_API_NAO_HOMOLOGADOS` permanece. Não somar totais de janelas a fatos
+únicos, nem compradores mensais ao TOTAL.
+
+Abril/2026: 539.736.781 centavos, 2.636 compras e 41.568 unidades.
+Junho/2025: 56.186.752 centavos, 2.012 compras e 32.293 unidades.
+Não foi disponibilizado nesta missão SQLite correspondente a esse resumo;
+a causa das concentrações permanece pendente. Não alterar os fatos válidos para
+ajustar médias; conservar o aviso de qualidade na conferência privada do Work.
+Veja a [inspeção pontual por pedido](AUDITORIA%20PONTUAL%20HISTORICO.md).
+
 
 ## Acompanhamento do Work em 07/11/2026
 

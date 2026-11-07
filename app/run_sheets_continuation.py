@@ -20,6 +20,7 @@ from sheets_continuation import (
     allocated_cells,
     fingerprint,
     stamp_book,
+    verify_book_stamp,
 )
 from sheets_storage import STORAGE_SHEET, SheetsStorage, configured_storage
 
@@ -73,15 +74,26 @@ class StorageSetup:
 
     def _stamp(self):
         try:
-            stamp_book(
-                self.hub, hub=self.hub_id, segment=self.segment, role="dashboard"
-            )
+            for role, key in self.roots.items():
+                self.lease.require()
+                stamp_book(
+                    self.books[key], hub=self.hub_id, segment=self.segment, role=role
+                )
         except (APIError, RequestException, GoogleAuthError):
             self.lease.note_uncertain()
             raise
 
     def configure(self, provider):
-        # Conferir destino/pasta e acessos antes de ativar qualquer gravação.
+        # A trava protege também o pré-voo de marcadores. Nenhum fato é escrito.
+        if len(set(self.roots.values())) != 3:
+            raise ContinuationError("Os três papéis exigem arquivos diferentes.")
+        self.lease.require()
+        # Conferir TODOS os marcadores antes de criar o índice ou marcar origens.
+        for role, key in self.roots.items():
+            verify_book_stamp(
+                self.books[key], hub=self.hub_id, segment=self.segment, role=role
+            )
+        # O provisionador comprova pasta privada e edição nas duas identidades.
         for role, key in self.roots.items():
             provider.prepare_intent(
                 key,
@@ -93,6 +105,20 @@ class StorageSetup:
             )
         self.lease.require()
         if self.index is not None:
+            if self.sheet is None:
+                raise ContinuationError(
+                    "Índice sem aba comprovada; reabra a configuração."
+                )
+            current = ContinuationIndex.parse(
+                self.sheet.get_all_values(),
+                hub=self.hub_id,
+                segment=self.segment,
+                roots=self.roots,
+            )
+            if fingerprint(current.values()) != fingerprint(self.index.values()):
+                raise ContinuationError(
+                    "O índice mudou; reabra a configuração antes de continuar."
+                )
             self._stamp()
             return False
         metadata = self.hub.fetch_sheet_metadata()
@@ -297,7 +323,7 @@ def run(argv=None):
                 )
                 setup.configure(provider)
                 print(
-                    "[OK] Continuações de Operação e Histórico ativadas. Os dados existentes foram preservados."
+                    "[OK] Origens Dashboard, Operação e Histórico comprovadas; índice de continuações configurado. Nenhum fato comercial foi publicado."
                 )
                 print(
                     "Para as tabelas BI, configure o conector e confirme as fontes. Guia: docs/CONTINUACOES.md"

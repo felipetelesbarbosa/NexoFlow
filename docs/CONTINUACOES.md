@@ -69,3 +69,12 @@ Falhas isoladas de consulta de contatos/pedidos mantêm o comportamento das roti
 ## Histórico SQLite: caminho novo em homologação
 
 A implementação da 1.5.21 integra o publicador das cinco tabelas históricas ao manifesto oficial e adiciona piloto limitado, retomada da mesma revisão, backup por intervalo e conferência mensal/total. Os ZIPs originais da 1.5.20 não contêm esse caminho. Consulte [comandos e homologação FARMA para o Work](PUBLICADOR%20HISTORICO%20SQLITE%20SHEETS.md). Nenhuma configuração do Data Studio ou publicação comercial é efetuada automaticamente nesta entrega.
+
+
+### Publicador histórico — correção 1.5.22
+
+A release 1.5.21 existe e permanece preservada. A atualização 1.5.22 corrige a
+configuração das três origens, inclui reconhecimento de rede e logs do Setup e
+mantém continuações, piloto, retomada e rollback. Após o pacote aprovado, o Work
+inicia FARMA comercial com um lote e conferência, sem nova carga anual. PET
+comercial permanece posterior. Consulte o [roteiro atualizado](PUBLICADOR%20HISTORICO%20SQLITE%20SHEETS.md).

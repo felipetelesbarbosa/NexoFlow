@@ -1,5 +1,12 @@
 # NexoFlow — Changelog
 
+## 1.5.22
+
+- Corrige o registro das origens Dashboard, Operação e Histórico sob a trava oficial, com pré-validação dos três destinos, papéis, segmento e permissões, recuperação parcial e preservação de marcadores corretos.
+- Mantém a proteção ORIGEM_DO_ARQUIVO_NAO_COMPROVADA, capacidade global, continuações, piloto limitado, conferência financeira, retomada idempotente e rollback por lote.
+- Reúne reconhecimento local de redes Windows autorizadas e mensagens atualizadas do Setup: seis atalhos, MCP opcional com S/N explícito e resumo de instalação/pendências.
+- Carga comercial FARMA reservada ao Work, começando por um lote. PET comercial e implantação Hub continuam fora desta publicação.
+
 ## NexoFlow 1.5.21 — Publicação lógica do histórico (em validação)
 
 - Publicador SQLite → Sheets passa pelo manifesto oficial de continuações, capacidade global e guardas de perfil, schema, chaves, pasta e permissões. Preserva tabelas, arquivos e dados existentes.

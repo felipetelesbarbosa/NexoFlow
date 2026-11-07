@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.21",
+    [string]$Version = "1.5.22",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -414,15 +414,17 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
+A configuração agora comprova e registra as três origens (Dashboard, Operação e Histórico) sob a trava oficial. Corrige o bloqueio da 1.5.21 sem remover validações de segmento, papel ou permissões. Repetições e configuração parcial preservam marcadores corretos. Inclui reconhecimento de redes Windows previamente autorizadas e logs do Setup com seis atalhos e MCP opcional [S/N].
+
 O histórico já coletado pelo Terminal pode ser publicado no Sheets sem nova consulta FarmaLíder e sem executar Weni, Noturno ou Recompra. O publicador usa tabelas lógicas, manifesto de continuidade, capacidade global, revisão e validação dos destinos por segmento. Não apaga ou move o legado.
 
 Adiciona piloto limitado por --max-lotes, retomada da mesma revisão, reconciliação de respostas perdidas e rollback específico por lote com proteção contra edições posteriores. Os backups guardam somente intervalos afetados, compartilhando o baseline privado do preparo.
 
 A nova BI_Historico_Resumo fornece meses, anos, TOTAL e SEM_EMISSAO para o Data Studio. O relatório privado historico_conferencia_v1 compara SQLite e partes publicadas, distingue compradores únicos e exige fechamento ao centavo entre pedidos e LTV. IDs numéricos indevidos, schema/segmento divergente e partes ausentes ou em publicação bloqueiam aprovação, sem total parcial silencioso.
 
-FARMA é o primeiro piloto: homologar em três planilhas de teste antes de qualquer carga comercial. PET foi validado somente com fixtures de isolamento; sua réplica comercial é uma etapa posterior. A atualização não ativa publicação de dados nem troca fontes do relatório. O Work deve atualizar o conector privado e conferir fontes, cortes, permissões e métricas conforme o [roteiro SQLite/Sheets](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/PUBLICADOR%20HISTORICO%20SQLITE%20SHEETS.md).
+O Work inicia FARMA comercial nos três destinos conferidos, com um lote de segurança e conferência antes da retomada. PET foi validado somente com fixtures de isolamento; sua réplica comercial é uma etapa posterior. A atualização não ativa publicação de dados nem troca fontes do relatório. O Work deve atualizar o conector privado e conferir fontes, cortes, permissões e métricas conforme o [roteiro SQLite/Sheets](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/PUBLICADOR%20HISTORICO%20SQLITE%20SHEETS.md).
 
-Feche as rotinas, faça backup privado consistente e atualize pelo Setup em Preserve. Configurações, credenciais, SQLite, logs e checkpoints são preservados. A release 1.5.20 e as anteriores permanecem intactas. Hub permanece independente, sem implantação VPS ou ativação comercial. Não houve nova carga histórica real nem escrita em planilhas comerciais durante o desenvolvimento.
+Feche as rotinas, faça backup privado consistente e atualize pelo Setup em Preserve. Configurações, credenciais, SQLite, logs e checkpoints são preservados. A release 1.5.21 e as anteriores permanecem intactas. Hub permanece independente, sem implantação VPS ou ativação comercial. Não houve nova carga histórica real nem escrita em planilhas comerciais durante o desenvolvimento.
 
 Analytics e Noturno usam a integração Meta nativa, sem exigir MCP ou Codex CLI. As rotinas FARMA/PET e as funcionalidades da versão anterior permanecem preservadas. A atualização Preserve mantém configurações e dados. Esta versão não comprova autenticação no proxy corporativo ou aprovação pelo antivírus no PC do usuário; consulte os relatórios e o guia de homologação.
 
@@ -438,7 +440,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.21
+# NexoFlow 1.5.22
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"

@@ -91,3 +91,31 @@ O CI de `9f5f03c` comprovou WinError 32 somente no encerramento do teste que alt
 O orçamento de 240 segundos é compartilhado entre as leituras de pedidos e itens no mesmo getData, evitando reiniciar o prazo ao passar à segunda tabela. Regressão sintética recusa uma segunda leitura que já consumiu o prazo global.
 
 A regressão de aba legada no arquivo Operação (quando o papel autorizado é Histórico) falhou antes da guarda adicional e passou depois. O preparo agora verifica essas abas órfãs em todos os arquivos inventariados, bloqueando antes de criar cópia ou gravar fatos; o legado não é movido nem apagado.
+
+
+## Correção das três origens — entrega 1.5.22
+
+Causa comprovada: `StorageSetup._stamp()` da 1.5.21 só marcava Dashboard. O
+transporte exigia os três marcadores corretamente. A fixture de transporte
+pré-marcava origens e ocultava a falha de inicialização. Regressão sem marcadores
+falhou em Operação antes da correção. O fluxo agora valida todos os marcadores,
+pré-verifica permissões/pastas nos três destinos, confere o índice existente e
+executa `stamp_book` para cada papel sob lease. Edição pela conta de serviço
+passou a ser condição explícita da comprovação Drive. Sem fatos comerciais novos.
+
+Arquivos operacionais: `run_sheets_continuation.py`, `sheets_continuation.py`,
+`sheets_provisioning.py`. Regressões em `test_sheets_setup.py` e
+`test_history_sheets_transport.py`: configuração realmente nova, três origens,
+idempotência, inicialização parcial, resposta perdida/lease expirado, conflito de
+papel/segmento/hub/localização/duplicação, IDs repetidos, falhas Drive e permissão,
+mais caminho configurar → ativar → capacidade → piloto → conferir → rollback →
+retomar → conferir → repetição sem deltas. O smoke do pacote instalado inclui os
+novos testes de origem e rede, além das suítes do publicador. O código do conector
+não mudou: cinco schemas e verificações de WRITING/partes/segmento permanecem.
+
+A release reúne `aed1ac1` (rede e Setup) e preserva todas as releases anteriores.
+A coleta anual, Weni, Recompra, planilhas comerciais, relatórios e VPS não foram
+executados/alterados. A análise do anexo agregado fecha em centavos; anomalias
+individuais dependem da inspeção pontual privada do SQLite pelo Work.
+Os resultados do CI/CodeQL e os hashes efetivos acompanham a entrega publicada;
+não presumir homologação comercial a partir de testes simulados.

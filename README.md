@@ -1,10 +1,10 @@
-# NexoFlow 1.5.21
+# NexoFlow 1.5.22
 
 Aplicativos operacionais e autônomos para Windows que integram **Weni e a API FarmaLíder nos segmentos FarmaLíder e Pets Líder**, atualizam contatos e pedidos e organizam os dados no **Google Sheets** para análise no **Data Studio**.
 
 O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
 
-[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.21/NexoFlow-Setup-1.5.21.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
+[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.22/NexoFlow-Setup-1.5.22.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
 
 ## Componentes
 
@@ -17,7 +17,10 @@ O NexoFlow identifica pedidos registrados na API **independentemente de terem si
 | **NexoFlow Recompra** | Mantém a elegibilidade da Recompra FarmaLíder D+25 e Pets Líder D+30; os envios ficam na campanha Weni. |
 | **NexoFlow Terminal** | Oferece comandos, consultas e diagnóstico pelo comando `nexo`. |
 
-## Atualização 1.5.21
+## Atualização 1.5.22
+
+Corrige a inicialização das três origens Sheets do publicador histórico, preservando continuações, conferência e retomada. Inclui reconhecimento de redes previamente autorizadas e logs claros do Setup. A operação FARMA começa com um lote de segurança pelo Work; veja o [roteiro atualizado](docs/PUBLICADOR%20HISTORICO%20SQLITE%20SHEETS.md).
+
 
 Publica o histórico já coletado no SQLite em tabelas lógicas de Histórico e Dashboard, com capacidade global, continuações oficiais, revisão, piloto limitado, retomada e rollback por lote. Não exige recolher novamente a API ou executar Weni, Noturno ou Recompra para publicar.
 
@@ -82,7 +85,7 @@ As continuações automáticas no Meu Drive exigem autorização Google local. O
 
 ## Versões e atualizações
 
-A versão desta entrega é **1.5.21**. Os pacotes públicos são disponibilizados após a validação do mesmo commit. As próximas correções seguem **1.5.22, 1.5.23, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
+A versão desta entrega é **1.5.22**. Os pacotes públicos são disponibilizados após a validação do mesmo commit. As próximas correções seguem **1.5.22, 1.5.23, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
 
 ## NexoFlow Hub: projeto paralelo futuro
 

@@ -105,3 +105,12 @@ O reconhecimento compartilhado Windows/Hub passa a decodificar uma string JSON a
 A regressão reproduziu o HTTP 404 antes da correção. O teste de integração usa o cliente e coletor reais com respostas HTTP simuladas: duas janelas JSON vazias, página com pedidos, interrupção por orçamento e retomada na página seguinte, sem duplicar receita. O Hub usa a mesma regra e fixture JSON em PostgreSQL temporário, nos dois segmentos. A consulta real foi mínima e somente leitura; não houve nova carga anual ou alteração do SQLite do operador.
 
 Esse comportamento foi testado também no transporte sintético do Hub e no PostgreSQL temporário. Não houve carga anual de investigação nem alteração do banco comercial. A release 1.5.18 original permanece intacta e não contém esse ajuste. Os pacotes 1.5.19 passam pelo processo oficial de validação Windows antes da publicação.
+
+
+### Publicador histórico — correção 1.5.22
+
+A release 1.5.21 existe e permanece preservada. A atualização 1.5.22 corrige a
+configuração das três origens, inclui reconhecimento de rede e logs do Setup e
+mantém continuações, piloto, retomada e rollback. Após o pacote aprovado, o Work
+inicia FARMA comercial com um lote e conferência, sem nova carga anual. PET
+comercial permanece posterior. Consulte o [roteiro atualizado](PUBLICADOR%20HISTORICO%20SQLITE%20SHEETS.md).

@@ -86,6 +86,70 @@ class TransportTests(unittest.TestCase):
         self.remote._drive = info
         self.pub = Publication(self.remote, "FARMA", Path(self.tmp.name))
 
+    def test_fresh_setup_through_pilot_resume_check_and_idempotence(self):
+        from run_sheets_continuation import StorageSetup
+        from sheets_storage import STORAGE_SHEET
+
+        books = self.store.client.books
+        for book in books.values():
+            book.metadata.clear()
+        hub = books["dashboard"]
+        hub.sheets = [w for w in hub.sheets if w.title != "NexoFlow_Continuidade"]
+        hub.add(STORAGE_SHEET, self.store._storage_layout.values())
+        with patch(
+            "run_sheets_continuation.configured_storage",
+            return_value=self.store._storage_layout,
+        ):
+            setup = StorageSetup(self.store.client, "dashboard", "FARMA")
+        self.addCleanup(setup.close)
+        self.assertTrue(setup.configure(self.provider))
+        setup.activate_connector(list(SCHEMAS))
+        # Fronteiras pequenas no mesmo mecanismo oficial, sem fatos pré-gravados.
+        setup.index.config.update(max_part_rows=5)
+        setup.sheet.update(
+            range_name=f"A1:C{len(setup.index.values())}", values=setup.index.values()
+        )
+        setup.close()
+        self.store._continuity = RolloverManager(
+            self.store,
+            setup.sheet,
+            setup.index,
+            provisioner_factory=lambda: self.provider,
+        )
+        self.store._continuity.journal_path = (
+            Path(self.tmp.name) / "fresh-creation.json"
+        )
+        self.remote = SheetsTransport(self.store)
+        self.remote._drive = lambda book: dict(
+            version=digest(
+                [
+                    books[book].fetch_sheet_metadata(),
+                    [w.values for w in books[book].sheets],
+                ]
+            ),
+            capabilities=dict(canEdit=True),
+            parents=[],
+        )
+        self.pub = Publication(self.remote, "FARMA", Path(self.tmp.name) / "fresh")
+        db, data = fixture(12)
+        self.addCleanup(db.close)
+        before = sum(b.data_writes for b in books.values())
+        plan = self.pub.prepare(stream(data))
+        self.assertEqual(sum(b.data_writes for b in books.values()), before)
+        self.assertEqual(self.provider.creations, 0)
+        pilot = self.pub.apply(plan, max_batches=1)
+        self.assertGreater(pilot["remaining_batches"], 0)
+        self.pub.check(plan)
+        self.assertEqual(self.pub.rollback(plan, 1)["status"], "restaurado")
+        complete = self.pub.apply(plan)
+        self.assertEqual(complete["remaining_batches"], 0)
+        self.pub.check(plan)
+        self.assertEqual(
+            self.store._continuity.index.config["history_publication"]["state"], "READY"
+        )
+        repeated = self.pub.prepare(stream(data))
+        self.assertEqual(self.pub.apply(repeated)["applied_rows"], 0)
+
     def test_legacy_table_in_wrong_root_blocks_before_new_copy(self):
         from order_history import HistoryError
 

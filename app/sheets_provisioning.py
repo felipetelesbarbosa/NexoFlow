@@ -130,8 +130,9 @@ class MyDriveProvisioner:
             result.get("id") != source_id
             or result.get("trashed")
             or result.get("mimeType") != "application/vnd.google-apps.spreadsheet"
+            or (result.get("capabilities") or {}).get("canEdit") is not True
         ):
-            raise ContinuationError("A origem da continuação não é uma planilha ativa.")
+            raise ContinuationError("A origem precisa ser uma planilha ativa com edição pela conta de serviço.")
         return result
 
     def locate(self, operation: str) -> str | None:

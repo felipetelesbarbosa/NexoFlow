@@ -37,3 +37,12 @@ Novos registros são escritos em intervalos explícitos, sempre a partir da colu
 Retentativas repetem o mesmo intervalo sem duplicar registros. Se o cabeçalho ou a chave do destino mudar durante uma retentativa, a gravação é interrompida. Colunas vazias acrescentadas pela leitura retangular da API não são consideradas novos campos; valores preenchidos fora do cabeçalho bloqueiam a carga até a correção da tabela.
 
 O limite de células considera todas as linhas e colunas alocadas em todas as abas de cada arquivo, incluindo células vazias. A separação entre Operação, Histórico e Dashboard permanece ativa.
+
+
+### Publicador histórico — correção 1.5.22
+
+A release 1.5.21 existe e permanece preservada. A atualização 1.5.22 corrige a
+configuração das três origens, inclui reconhecimento de rede e logs do Setup e
+mantém continuações, piloto, retomada e rollback. Após o pacote aprovado, o Work
+inicia FARMA comercial com um lote e conferência, sem nova carga anual. PET
+comercial permanece posterior. Consulte o [roteiro atualizado](PUBLICADOR%20HISTORICO%20SQLITE%20SHEETS.md).

@@ -42,29 +42,31 @@ def fingerprint(value: Any) -> str:
     ).hexdigest()
 
 
+def verify_book_stamp(book, *, hub: str, segment: str, role: str) -> bool:
+    """Valida origem existente sem gravar; ausência é distinta de conflito."""
+    value = json.dumps({"hub": hub, "segment": segment, "role": role}, sort_keys=True)
+    metadata = book.fetch_sheet_metadata(params={"fields": "developerMetadata"})
+    found = [
+        m
+        for m in metadata.get("developerMetadata", [])
+        if m.get("metadataKey") == FILE_MARKER_KEY
+    ]
+    if found and (
+        len(found) != 1
+        or found[0].get("metadataValue") != value
+        or found[0].get("location") != {"spreadsheet": True}
+        or found[0].get("visibility") != "DOCUMENT"
+    ):
+        raise ContinuationError(
+            "A origem do arquivo diverge do segmento ou papel configurado."
+        )
+    return bool(found)
+
+
 def stamp_book(book, *, hub: str, segment: str, role: str):
     """Origem legível pelo conector somente leitura, sem credenciais no índice."""
     value = json.dumps({"hub": hub, "segment": segment, "role": role}, sort_keys=True)
-
-    def matches():
-        metadata = book.fetch_sheet_metadata(params={"fields": "developerMetadata"})
-        found = [
-            m
-            for m in metadata.get("developerMetadata", [])
-            if m.get("metadataKey") == FILE_MARKER_KEY
-        ]
-        if found and (
-            len(found) != 1
-            or found[0].get("metadataValue") != value
-            or found[0].get("location") != {"spreadsheet": True}
-            or found[0].get("visibility") != "DOCUMENT"
-        ):
-            raise ContinuationError(
-                "A origem do arquivo diverge do segmento configurado."
-            )
-        return bool(found)
-
-    if not matches():
+    if not verify_book_stamp(book, hub=hub, segment=segment, role=role):
         book.batch_update(
             {
                 "requests": [
@@ -81,7 +83,7 @@ def stamp_book(book, *, hub: str, segment: str, role: str):
                 ]
             }
         )
-        if not matches():
+        if not verify_book_stamp(book, hub=hub, segment=segment, role=role):
             raise ContinuationError("A origem do arquivo não foi confirmada.")
 
 
