@@ -507,6 +507,7 @@ def _api_farmalider(args: argparse.Namespace) -> int:
 
 
 def _menu() -> int:
+    last_code = 0
     while True:
         _title(f"NexoFlow Terminal {VERSION}")
         print("1. Ver status")
@@ -520,10 +521,13 @@ def _menu() -> int:
         print("9. Listar todos os comandos")
         print("10. Importar histórico de pedidos / LTV observado")
         print("0. Sair")
-        choice = input("\nEscolha uma opção: ").strip()
+        try:
+            choice = input("\nEscolha uma opção: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            return 130
         try:
             if choice == "0":
-                return 0
+                return last_code
             if choice == "1":
                 _status(False)
             elif choice == "2":
@@ -546,10 +550,11 @@ def _menu() -> int:
             elif choice == "10":
                 from run_order_history import interactive
 
-                interactive()
+                last_code = interactive()
             else:
                 print("Opção inválida.")
         except Exception as exc:
+            last_code = 1
             print(f"[ERRO] {_safe_text(exc, max_len=220)}")
         input("\nPressione ENTER para voltar ao menu...")
         print()

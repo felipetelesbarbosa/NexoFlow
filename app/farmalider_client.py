@@ -171,6 +171,7 @@ class FarmaliderClient:
         self._total_response_seconds = 0.0
         self._max_response_seconds = 0.0
         self._slow_requests = 0
+        self._endpoint_timings = {}
         self._response_times_seconds: list[float] = []
         self._status_counts: dict[int, int] = {}
 
@@ -645,6 +646,17 @@ class FarmaliderClient:
         is_slow = slow_threshold > 0 and elapsed_seconds >= slow_threshold
 
         with self._metrics_lock:
+            label = (
+                endpoint_label
+                if endpoint_label in {"pedidos/segmento", "clientes/segmento"}
+                else "outros"
+            )
+            entry = self._endpoint_timings.setdefault(
+                label, {"tentativas": 0, "segundos": 0.0, "maximo_segundos": 0.0}
+            )
+            entry["tentativas"] += 1
+            entry["segundos"] += elapsed_seconds
+            entry["maximo_segundos"] = max(entry["maximo_segundos"], elapsed_seconds)
             self._total_requests += 1
             if status_code is not None:
                 self._status_counts[status_code] = (
@@ -677,6 +689,11 @@ class FarmaliderClient:
     def _record_retry(self) -> None:
         with self._metrics_lock:
             self._total_retries += 1
+
+    def endpoint_metrics(self):
+        """Somente rótulos estáticos e tempos; nenhuma URL/query."""
+        with self._metrics_lock:
+            return {k: dict(v) for k, v in self._endpoint_timings.items()}
 
     def metrics_snapshot(self) -> dict[str, int | float]:
         with self._rate_lock:

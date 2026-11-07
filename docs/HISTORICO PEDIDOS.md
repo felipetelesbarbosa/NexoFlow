@@ -71,3 +71,7 @@ Rollback Windows: fechar as rotinas, fazer backup privado do SQLite e dos arquiv
 ## Evidência e limites
 
 A análise local da amostra PET classificou 40 pedidos válidos e 12 cancelados, sem pendências financeiras. Confirmou 52 IDs, 73 itens, status 2/1/3 em 33/7/12 pedidos; todos os cancelados tinham pagamento diferente de zero. Dados não foram copiados para fixtures. Múltiplas páginas, identidade, valores, falhas e retomada são testados com dados sintéticos. Rotas reais em ambas as redes, dados FARMA, inclusividade da data final e semântica de descontos permanecem para homologação autorizada.
+
+## Auditoria da primeira carga FARMA
+
+O resumo da 1.5.16 misturava contagens da última janela com o acumulado. Consulte a [auditoria e correções preparatórias](AUDITORIA%20HISTORICO%20FARMA%201.5.16.md). O código corrigido separa execução, período e acumulado, e oferece `--auditar-banco` somente leitura. Essas correções ainda exigem validação e distribuição de novo patch; não estão nos ZIPs originais da 1.5.16.

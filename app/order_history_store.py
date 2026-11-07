@@ -17,6 +17,10 @@ from order_history import (
 )
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS history_run_receipts (
+ run TEXT NOT NULL, segment TEXT NOT NULL, id TEXT NOT NULL,
+ occurrences INTEGER NOT NULL, fresh INTEGER NOT NULL, changed INTEGER NOT NULL,
+ state TEXT NOT NULL, PRIMARY KEY(run,segment,id));
 CREATE TABLE IF NOT EXISTS history_windows (
  key TEXT PRIMARY KEY, segment TEXT NOT NULL, start TEXT NOT NULL, end TEXT NOT NULL,
  page_limit INTEGER NOT NULL, next_page INTEGER NOT NULL DEFAULT 1,
@@ -43,6 +47,7 @@ class HistoryStore:
     def __init__(self, db, segment):
         self.db, self.segment = db, segment
         db.executescript(SCHEMA)
+        self.active_run = None
 
     def begin(self, query, *, restart=False):
         if query.segment != self.segment:
@@ -111,7 +116,22 @@ class HistoryStore:
                     raise HistoryError("PAGINA_REPETIDA_RECONCILIAR")
                 if record["date"] and not query.contains(record["date"]):
                     raise HistoryError("EMISSAO_FORA_DA_FAIXA")
-                self.upsert(record, now=now, mode=mode)
+                outcome = self.upsert(record, now=now, mode=mode)
+                if self.active_run:
+                    self.db.execute(
+                        """INSERT INTO history_run_receipts VALUES(?,?,?,?,?,?,?)
+                    ON CONFLICT(run,segment,id) DO UPDATE SET occurrences=occurrences+1,
+                    changed=max(changed,excluded.changed),state=excluded.state""",
+                        (
+                            self.active_run,
+                            self.segment,
+                            oid,
+                            1,
+                            int(outcome == "novo"),
+                            int(outcome == "atualizado"),
+                            record["state"],
+                        ),
+                    )
                 self.db.execute(
                     "INSERT INTO history_seen VALUES(?,?,?)", (query.key, oid, page)
                 )
@@ -170,7 +190,7 @@ class HistoryStore:
                 (self.segment, oid, reason),
             )
             if old_record:
-                return
+                return "preservado"
         else:
             self.db.execute(
                 "DELETE FROM history_issues WHERE segment=? AND id=?",
@@ -194,6 +214,13 @@ class HistoryStore:
                 now,
                 now,
             ),
+        )
+        return (
+            "novo"
+            if not old_record
+            else "atualizado"
+            if financial_digest(old_record) != financial_digest(record)
+            else "existente"
         )
 
     def records(self):
@@ -225,8 +252,14 @@ class HistoryStore:
                 )
                 if uid and len(owners_by_contact[uid]) != 1:
                     uid, state = "", "CLIENTE_OFICIAL_AMBIGUO"
+                unchanged = (
+                    record.get("contact_uuid") == uid
+                    and record.get("link_state") == state
+                )
                 record.update(contact_uuid=uid, link_state=state)
                 counts["vinculados" if uid else "sem_vinculo"] += 1
+                if unchanged:
+                    continue
                 self.db.execute(
                     "UPDATE history_orders SET record=? WHERE segment=? AND id=?",
                     (
@@ -302,6 +335,7 @@ def collect(
     restart=False,
     mode="historica",
     progress=None,
+    include_totals=True,
 ):
     if max_pages is not None and (type(max_pages) is not int or max_pages < 1):
         raise HistoryError("MAXIMO_PAGINAS_INVALIDO")
@@ -324,7 +358,9 @@ def collect(
         processed += 1
         if progress:
             progress(state)
-    return dict(state, pages_this_run=processed, **store.totals())
+    return dict(
+        state, pages_this_run=processed, **(store.totals() if include_totals else {})
+    )
 
 
 def merge_canonical(store, orders, items):
@@ -451,6 +487,11 @@ def collect_windows(
         raise HistoryError("JANELA_DIAS_INVALIDA")
     if max_pages is not None and (type(max_pages) is not int or max_pages < 1):
         raise HistoryError("MAXIMO_PAGINAS_INVALIDO")
+    from time import perf_counter
+    from uuid import uuid4
+
+    started = perf_counter()
+    store.active_run = uuid4().hex
     queries = []
     if mode == "incremental":
         for start, end, limit in store.db.execute(
@@ -477,7 +518,7 @@ def collect_windows(
     queries = list({q.key: q for q in queries}.values())
     budget = max_pages if max_pages is not None else 10000
     results = []
-    for q in queries:
+    for index, q in enumerate(queries, 1):
         state = store.begin(q)
         reset = restart or (mode == "incremental" and state["status"] == "extraida")
         if budget <= 0:
@@ -490,15 +531,205 @@ def collect_windows(
             max_pages=budget,
             restart=reset,
             mode=mode,
-            progress=progress,
+            progress=(
+                lambda state, index=index: progress(
+                    dict(
+                        state,
+                        window=index,
+                        windows=len(queries),
+                        current_page=state["next_page"] - 1,
+                        pending_page=None
+                        if state["status"] == "extraida"
+                        else state["next_page"],
+                    )
+                )
+            )
+            if progress
+            else None,
+            include_totals=False,
         )
         results.append(result)
         budget -= result["pages_this_run"]
     incomplete = sum(store.begin(q)["status"] != "extraida" for q in queries)
-    return dict(
-        results[-1] if results else store.totals(),
+    summary = dict(
+        results[-1] if results else {},
+        **store.totals(),
+        execution=execution_totals(store, results, query, perf_counter() - started),
+        audit=history_audit(store, query),
         status="incompleta" if incomplete else "extraida",
         windows=len(queries),
         incomplete_windows=incomplete,
         pages_this_run=sum(r["pages_this_run"] for r in results),
+    )
+    store.active_run = None
+    return summary
+
+
+def execution_totals(store, windows, query, elapsed):
+    row = store.db.execute(
+        """SELECT coalesce(sum(occurrences),0),count(*),
+        coalesce(sum(fresh),0),coalesce(sum(changed),0),
+        coalesce(sum(state='cancelado'),0),coalesce(sum(state='pendente'),0)
+        FROM history_run_receipts WHERE run=? AND segment=?""",
+        (store.active_run, store.segment),
+    ).fetchone()
+    return dict(
+        execucao_id=store.active_run,
+        segmento=store.segment,
+        inicio=query.start,
+        fim=query.end,
+        limite=query.limit,
+        janelas_consultadas=sum(w["pages_this_run"] > 0 for w in windows),
+        paginas_consultadas=sum(w["pages_this_run"] for w in windows),
+        total_declarado_janelas_consultadas=sum(
+            w["total"] or 0 for w in windows if w["pages_this_run"]
+        ),
+        registros_recebidos=row[0],
+        ids_unicos=row[1],
+        repetidos_entre_janelas=row[0] - row[1],
+        novos=row[2],
+        ja_existentes=row[1] - row[2],
+        atualizados=row[3],
+        cancelados_recebidos=row[4],
+        pendentes_recebidos=row[5],
+        duracao_segundos=round(elapsed, 3),
+    )
+
+
+def history_audit(store, query=None):
+    """Uma passagem local; nenhum identificador pessoal é exibido."""
+
+    def empty():
+        return dict(
+            pedidos_armazenados=0,
+            pedidos_validos=0,
+            cancelados=0,
+            pendentes=0,
+            ignorados=0,
+            faturamento_centavos=0,
+            pedidos_com_vinculo=0,
+            pedidos_sem_vinculo=0,
+        )
+
+    accumulated, period = empty(), empty()
+    groups = {
+        name: set()
+        for name in (
+            "compradores",
+            "cancelados",
+            "pendentes",
+            "vinculados",
+            "sem_vinculo",
+            "contatos",
+        )
+    }
+    period_buyers = set()
+    sources = {}
+    for record in store.records():
+        in_period = (
+            query is not None
+            and bool(record["date"])
+            and query.contains(record["date"])
+        )
+        for target in [accumulated, period] if in_period else [accumulated]:
+            target["pedidos_armazenados"] += 1
+            key = {
+                "valido": "pedidos_validos",
+                "cancelado": "cancelados",
+                "pendente": "pendentes",
+                "ignorado": "ignorados",
+            }[record["state"]]
+            target[key] += 1
+            if record["state"] == "valido":
+                target["faturamento_centavos"] += record["revenue_cents"]
+            target[
+                "pedidos_com_vinculo"
+                if record.get("contact_uuid")
+                else "pedidos_sem_vinculo"
+            ] += 1
+        owner = record["owner"]
+        if record["state"] == "valido":
+            groups["compradores"].add(owner)
+            if in_period:
+                period_buyers.add(owner)
+        elif record["state"] in ("cancelado", "pendente"):
+            groups[
+                {"cancelado": "cancelados", "pendente": "pendentes"}[record["state"]]
+            ].add(owner)
+        groups["vinculados" if record.get("contact_uuid") else "sem_vinculo"].add(owner)
+        if record.get("contact_uuid"):
+            groups["contatos"].add(record["contact_uuid"])
+        source = record.get("source", "NAO_INFORMADA")
+        sources[source] = sources.get(source, 0) + 1
+    for group in groups.values():
+        group.discard("")
+    accumulated.update(
+        clientes_com_compras_validas=len(groups["compradores"]),
+        clientes_com_cancelados=len(groups["cancelados"]),
+        clientes_com_pendentes=len(groups["pendentes"]),
+        clientes_com_vinculo=len(groups["vinculados"]),
+        clientes_sem_vinculo=len(groups["sem_vinculo"]),
+        contatos_weni_distintos=len(groups["contatos"]),
+    )
+    period["clientes_com_compras_validas"] = len(period_buyers)
+    issues = []
+    for reason, state, source, count in store.db.execute(
+        """SELECT i.reason,json_extract(o.record,'$.state'),json_extract(o.record,'$.source'),count(*)
+         FROM history_issues i LEFT JOIN history_orders o ON i.segment=o.segment AND i.id=o.id
+         WHERE i.segment=? GROUP BY i.reason,json_extract(o.record,'$.state'),json_extract(o.record,'$.source')""",
+        (store.segment,),
+    ):
+        issues.append(
+            dict(
+                motivo=reason,
+                origem=source or "NAO_INFORMADA",
+                quantidade=count,
+                efeito="atualizacao_bloqueada_fato_anterior_preservado"
+                if state == "valido"
+                else "sem_compra_valida_para_LTV",
+                acao="Conferir fonte oficial e revisões privadas; usar reconciliação explícita somente após validar a divergência.",
+            )
+        )
+    windows = []
+    keys = []
+    for key, start, end, total, pages, cursor, status, received in store.db.execute(
+        """SELECT w.key,w.start,w.end,w.total,w.pages,w.next_page,w.status,count(s.id)
+        FROM history_windows w LEFT JOIN history_seen s ON s.window_key=w.key
+        WHERE w.segment=? GROUP BY w.key ORDER BY w.start""",
+        (store.segment,),
+    ):
+        window = HistoryQuery(store.segment, start, end)
+        if query and (window.end_at < query.start_at or window.start_at > query.end_at):
+            continue
+        keys.append(key)
+        windows.append(
+            dict(
+                inicio=start,
+                fim=end,
+                declarados=total,
+                paginas=pages,
+                recebidos=received,
+                extracao=status,
+                proxima_pagina_pendente=None if status == "extraida" else cursor,
+            )
+        )
+    unique = (
+        store.db.execute(
+            "SELECT count(DISTINCT id) FROM history_seen WHERE window_key IN ("
+            + ",".join("?" for _ in keys)
+            + ")",
+            keys,
+        ).fetchone()[0]
+        if keys
+        else 0
+    )
+    return dict(
+        janelas_persistidas=windows,
+        ids_unicos_janelas_persistidas=unique,
+        repeticoes_janelas_persistidas=sum(w["recebidos"] for w in windows) - unique,
+        acumulado=accumulated,
+        periodo=period if query else None,
+        pendencias=issues,
+        origens=sources,
+        cobertura_temporal="LIMITES_DA_API_NAO_HOMOLOGADOS",
     )
