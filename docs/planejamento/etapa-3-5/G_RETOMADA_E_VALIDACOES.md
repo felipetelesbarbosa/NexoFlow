@@ -44,4 +44,6 @@ Apenas especificados: Grafana/Prometheus/Loki, frontend da Central, frontend do 
 - Exposição pública, novos acessos, escrita, exclusões de snapshots e reboot dependem de autorização específica.
 
 ## Mudanças e rollback desta retomada
-Mudaram somente documentação, matriz e arquivos privados de evidência. Não houve alteração de credenciais, grants, serviços, redes, volumes, bancos, versões ou dashboards. O rollback operacional da Etapa 3.5 permanece no relatório original. Para desfazer esta documentação, reverter somente os commits documentais, sem reescrever o histórico nem alterar a versão Windows.
+Nesta retomada mudaram apenas documentos e evidências. O rollback operacional permanece no relatório original; alterações documentais podem ser revertidas por commit, sem mudar a versão Windows.
+
+A conexão com o navegador caiu após as validações. A cópia final dos documentos do commit 90c5bad para a VPS não foi executada. A cópia BI a24799d já havia sido sincronizada. Os entregáveis e o GitHub preservam o fechamento; última saúde confirmada às 03h30min25s.
