@@ -269,7 +269,7 @@ class GoogleSheetsStore:
             raise ValueError("Os destinos Meta mudaram na configuração local.")
         try:
             mapping = self._read_with_retry(
-                "revalidar mapa dos arquivos Meta",
+                "revalidar mapa de arquivos",
                 lambda: self.book.worksheet(STORAGE_SHEET),
             )
         except WorksheetNotFound:
@@ -280,7 +280,7 @@ class GoogleSheetsStore:
         else:
             current = SheetsStorage.from_values(
                 self._read_with_retry(
-                    "conferir mapa dos arquivos Meta", lambda: mapping.get("A1:B5")
+                    "conferir mapa de arquivos", lambda: mapping.get("A1:B5")
                 ),
                 self._hub_id,
             )
@@ -836,6 +836,7 @@ class GoogleSheetsStore:
                         )
                     return result
                 except APIError as exc:
+                    vars(exc)["nexoflow_operation"] = description
                     elapsed = time.monotonic() - attempt_started
                     status = self._api_status_code(exc)
                     if not self._retryable_status(status) or attempt >= attempts:
@@ -843,7 +844,11 @@ class GoogleSheetsStore:
 
                     retry_after = self._retry_after_seconds(exc)
                     if status == 429:
-                        wait = retry_after if retry_after is not None else 5.0
+                        wait = (
+                            retry_after
+                            if retry_after is not None
+                            else min(5.0 * 2 ** (attempt - 1), 65.0)
+                        )
                     else:
                         wait = (
                             retry_after
@@ -968,6 +973,7 @@ class GoogleSheetsStore:
                     self._write_requests = getattr(self, "_write_requests", 0) + 1
                     return func()
                 except APIError as exc:
+                    vars(exc)["nexoflow_operation"] = description
                     status = self._api_status_code(exc)
                     if self._continuity is not None and (
                         (status is not None and status >= 500) or status in (408, 499)

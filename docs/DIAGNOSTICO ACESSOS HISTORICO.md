@@ -32,7 +32,7 @@ evidência de compartilhamento amplo ou exposição comercial no ambiente do ope
 Na primeira fase isso comprovava somente o defeito de código. O diagnóstico real
 recebido em 08/11/2026 confirmou essa mesma causa nas três continuações do
 operador; o fechamento e os limites da evidência estão ao final deste documento.
-A correção está em validação para a distribuição 1.5.28, fora dos ZIPs 1.5.27;
+A correção foi publicada na distribuição 1.5.28, fora dos ZIPs 1.5.27;
 não copiar módulos da main sobre a instalação.
 
 ## Auditor independente para a instalação original 1.5.27
@@ -158,3 +158,8 @@ continua protegida por revalidação atual de fonte, baseline, manifesto, pastas
 permissões e códigos. Mudanças depois da coleta podem voltar a bloquear com
 motivo acionável. Não é necessário outro auditor ou novo plano para tentar
 resolver esta ocorrência já comprovada.
+
+
+## Continuidade após a 1.5.28
+
+A comparação de autoridade passou na execução comercial relatada. O próximo bloqueio foi HTTP 400 no piloto, sem lotes confirmados. Consulte a [correção de grade e retomada 1.5.29](CORRECAO%20GRADE%20HISTORICO%201.5.29.md). O auditor deste documento permanece restrito aos módulos originais 1.5.27 e não deve ser executado em outras versões.

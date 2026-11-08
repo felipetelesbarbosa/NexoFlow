@@ -28,6 +28,20 @@ def bounds(target):
     return col(match[1]), int(match[2]) - 1, col(match[3]) + 1, int(match[4])
 
 
+def require_grid(sheet, target):
+    left, first, right, last = bounds(target)
+    if first >= sheet.row_count or left >= sheet.col_count:
+        raise APIError(
+            SimpleNamespace(
+                status_code=400,
+                json=lambda: {
+                    "error": {"code": 400, "message": "Range exceeds grid limits"}
+                },
+            )
+        )
+    return left, first, min(right, sheet.col_count), min(last, sheet.row_count)
+
+
 class Sheet:
     def __init__(self, book, title, values, sheet_id, *, rows=None, cols=None):
         self.book, self.title, self.id = book, title, sheet_id
@@ -46,7 +60,7 @@ class Sheet:
         return values
 
     def get(self, target, **kwargs):
-        first_col, first_row, last_col, last_row = bounds(target)
+        first_col, first_row, last_col, last_row = require_grid(self, target)
         result = [
             copy.deepcopy(row[first_col:last_col])
             for row in self.values[first_row:last_row]
@@ -137,7 +151,7 @@ class GspreadSheet(Sheet):
                 values = getattr(self, "formatted_values", values)
             area = target.rsplit("!", 1)[-1]
             if re.fullmatch(r"[A-Z]+\d+:[A-Z]+\d+", area):
-                left, first, right, last = bounds(area)
+                left, first, right, last = require_grid(self, area)
                 values = [row[left:right] for row in values[first:last]]
                 while values and not any(v not in (None, "") for v in values[-1]):
                     values.pop()
@@ -257,6 +271,33 @@ class Book(MetadataBook):
         return result
 
     def batch_update(self, body):
+        # O Google valida o lote inteiro antes de aplicar. Não aceitar no fake
+        # updateCells que só funciona porque listas Python crescem sem reserva.
+        grids = {ws.id: (ws.row_count, ws.col_count) for ws in self.sheets}
+        for request in body["requests"]:
+            if "addSheet" in request:
+                props = request["addSheet"]["properties"]
+                grid = props["gridProperties"]
+                grids[props["sheetId"]] = grid["rowCount"], grid["columnCount"]
+            if "updateCells" in request:
+                data = request["updateCells"]
+                area = data["range"]
+                rows, cols = grids[area["sheetId"]]
+                if (
+                    area["endRowIndex"] > rows
+                    or area.get("endColumnIndex", cols) > cols
+                ):
+                    raise APIError(
+                        SimpleNamespace(
+                            status_code=400,
+                            json=lambda: {
+                                "error": {
+                                    "code": 400,
+                                    "message": "Range exceeds grid limits",
+                                }
+                            },
+                        )
+                    )
         metadata_requests = [
             r for r in body["requests"] if "DeveloperMetadata" in next(iter(r))
         ]

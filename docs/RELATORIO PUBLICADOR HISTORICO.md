@@ -1,5 +1,7 @@
 # Relatório técnico: publicador histórico SQLite / Sheets
 
+> Estado atual: 1.5.28 publicada e preservada; 1.5.29 em validação. Consulte a [correção de grade e retomada 1.5.29](CORRECAO%20GRADE%20HISTORICO%201.5.29.md). A reconciliação comercial foi aprovada, mas o piloto relatou HTTP 400 e zero lotes confirmados. Os registros abaixo documentam entregas anteriores; não representam conclusão comercial.
+
 > Correção posterior: a versão 1.5.24 corrige a varredura repetida de itens na conferência. Para bases grandes, atualizar em Preserve e preparar nova revisão sobre o mesmo backup consistente; preservar o plano interrompido. Ver [correção 1.5.24](CORRECAO%20CONFERENCIA%201.5.24.md).
 
 > Próxima operação: [inicialização comercial corrigida e roteiro completo FARMA → PET](INICIALIZACAO%20HISTORICO%20PRODUCAO.md). A vinculação validada por schema precede a carga; leitura financeira exige partes confirmadas/READY.

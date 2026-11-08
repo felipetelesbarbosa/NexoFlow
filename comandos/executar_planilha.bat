@@ -15,7 +15,7 @@ title NexoFlow Planilha
 :menu
 cls
 echo ==========================================================
-echo NexoFlow Planilha - NexoFlow 1.5.28
+echo NexoFlow Planilha - NexoFlow 1.5.29
 echo ==========================================================
 echo Coloque os arquivos na pasta %IMPORT_DIR%:
 echo   Conversas_Delivery.xlsx

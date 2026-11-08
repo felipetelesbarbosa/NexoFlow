@@ -523,6 +523,78 @@ class PreparedRootRecoveryTests(unittest.TestCase):
     legacy = ReconciliationTests.legacy
     command = ReconciliationTests.command
 
+    def test_28_grid_read_failure_preserves_same_review_then_full_recovery(self):
+        from gspread.exceptions import APIError
+
+        from tests.test_history_sheets_transport import batch_get
+
+        # Assinatura recalculada nos módulos do ZIP público 1.5.28 (CRLF).
+        previous_signature = (
+            "dde1c46545a52d8abf5a6496e65cac5d9c82a0a9701eaeab085612747d71095f"
+        )
+        review = self.legacy()
+        original_source = sha256(review["evidence"]["path"])
+
+        def old_read(part, headers, positions):
+            book = self.store.client.books[part["book"]]
+            # Caminho antigo: consulta linhas futuras antes da reserva.
+            return batch_get(
+                book, [f"'{part['title']}'!A{positions[0]}:A{positions[0]}"]
+            )
+
+        with patch(
+            "history_publication.publisher_signature", return_value=previous_signature
+        ):
+            previous_receipt = reconcile(self.pub, review)
+            with patch.object(self.remote, "read_rows", side_effect=old_read):
+                with self.assertRaises(APIError) as error:
+                    self.pub.apply(review, max_batches=1)
+            self.assertEqual(error.exception.response.status_code, 400)
+        self.store._continuity.close()
+        with closing(self.pub._open_local(review)) as journal:
+            self.assertEqual(
+                journal.execute("SELECT DISTINCT state FROM batches").fetchall(),
+                [("pending",)],
+            )
+            self.assertEqual(
+                len(get(journal, "parts")), len(review["capacity"]["creations"])
+            )
+        self.assertFalse(list(Path(review["journal"]).parent.glob("lote_*.json")))
+        creations = self.provider.creations
+        receipt = reconcile(self.pub, review)
+        self.assertEqual(receipt["previous_receipt"], previous_receipt)
+        self.assertEqual(reconcile(self.pub, review), receipt)
+        self.assertEqual(self.command("aplicar", "--max-lotes", "1")[0], 3)
+        self.assertEqual(self.pub.check(review)["confirmed_batches"], 1)
+        self.assertEqual(self.command("aplicar")[0], 0)
+        self.assertEqual(self.command("conferir")[0], 0)
+        self.assertEqual(self.pub.rollback(review, 1)["status"], "restaurado")
+        self.assertEqual(self.command("aplicar")[0], 0)
+        self.assertEqual(self.command("aplicar")[0], 0)
+        self.assertEqual(self.provider.creations, creations)
+        self.assertEqual(self.review_path.read_bytes(), self.original_review)
+        self.assertEqual(sha256(review["evidence"]["path"]), original_source)
+        self.assertEqual(
+            self.pub.check(review)["conference"]["diferenca_pedidos_ltv_centavos"], 0
+        )
+
+    def test_28_upgrade_refuses_uncertain_batch_without_rewriting_receipt(self):
+        review = self.legacy()
+        signature = "dde1c46545a52d8abf5a6496e65cac5d9c82a0a9701eaeab085612747d71095f"
+        with patch("history_publication.publisher_signature", return_value=signature):
+            receipt = reconcile(self.pub, review)
+            with closing(self.pub._open_local(review)) as db:
+                db.execute("UPDATE batches SET state='sending' WHERE n=1")
+                db.commit()
+        with self.assertRaisesRegex(HistoryError, "ZERO_LOTES"):
+            reconcile(self.pub, review)
+        with closing(self.pub._open_local(review)) as db:
+            self.assertEqual(get(db, RECEIPT_KEY), receipt)
+            self.assertEqual(
+                db.execute("SELECT state FROM batches WHERE n=1").fetchone(),
+                ("sending",),
+            )
+
     # Reutilizar os helpers sem repetir os testes da primeira reconciliação.
     def interrupted_26(self, **legacy_options):
         review = self.legacy(**legacy_options)

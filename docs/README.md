@@ -1,4 +1,4 @@
-# Documentação do NexoFlow 1.5.28
+# Documentação do NexoFlow 1.5.29
 
 O **NexoFlow Windows** atende **FarmaLíder e Pets Líder**, com aplicativos operacionais autônomos e dados separados. Confira [segmentos, campos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 
@@ -15,6 +15,8 @@ Comece pela [instalação](README%20INSTALACAO.md) e pelo [guia de operação](D
 | Comandos e diagnóstico | [NexoFlow Terminal](README%20TERMINAL.md) |
 
 ## Dados e integrações
+
+- [correção de grade e retomada 1.5.29](CORRECAO%20GRADE%20HISTORICO%201.5.29.md).
 
 - [Configuração do Google Sheets](GOOGLE%20SETUP.md) e [divisão em três arquivos](planilhas_separadas.md).
 - [Continuações automáticas e capacidade do Sheets](CONTINUACOES.md).

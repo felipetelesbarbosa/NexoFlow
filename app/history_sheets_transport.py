@@ -47,7 +47,7 @@ class SheetsTransport:
         index = ContinuationIndex.parse(
             values,
             hub=self.store._hub_id,
-            segment=self.context()["segment"],
+            segment=self.manager.index.config["segment"],
             roots=roots_for(self.store),
         )
         self.manager.index = index
@@ -95,7 +95,9 @@ class SheetsTransport:
         if not isinstance(stamp, dict) or any(
             stamp.get(k) != v
             for k, v in dict(
-                hub=self.store._hub_id, segment=self.context()["segment"], role=role
+                hub=self.store._hub_id,
+                segment=self.manager.index.config["segment"],
+                role=role,
             ).items()
         ):
             raise HistoryError("ORIGEM_DO_ARQUIVO_NAO_COMPROVADA")
@@ -634,7 +636,7 @@ class SheetsTransport:
                     metadata["roots"][role],
                     "0" * 32,
                     hub=self.store._hub_id,
-                    segment=self.context()["segment"],
+                    segment=metadata["context"]["segment"],
                     role=role,
                     number=info["number"],
                 )
@@ -653,7 +655,7 @@ class SheetsTransport:
                 or intent.get("source")
                 != metadata["roots"][storage_role(planned["title"])]
                 or intent.get("hub") != self.manager.index.config["hub"]
-                or intent.get("segment") != self.context()["segment"]
+                or intent.get("segment") != metadata["context"]["segment"]
                 or intent.get("role") != storage_role(planned["title"])
                 or not intent.get("file_id")
                 or intent.get("create_state") != "sending"
@@ -835,11 +837,11 @@ class SheetsTransport:
             used_rows=1,
         )
 
-    def _header(self, ws, headers):
+    def _header(self, ws, headers, *, columns=None):
         raw = self.store._read_with_retry(
             "conferir cabeçalho físico completo",
             lambda: ws.get(
-                f"A1:{self.manager.store_column(ws.col_count)}1",
+                f"A1:{self.manager.store_column(columns or ws.col_count)}1",
                 value_render_option="FORMULA",
             ),
         )
@@ -874,10 +876,22 @@ class SheetsTransport:
     def read_rows(self, part, headers, positions):
         self.manager.require()
         ws = self._physical(part)
-        self._header(ws, headers)
+        geometry = self.geometry(part)
+        if geometry["columns"] != part["cols"]:
+            raise HistoryError("COLUNAS_ALTERADAS_APOS_REVISAO")
+        self._header(ws, headers, columns=geometry["columns"])
+        if any(type(r) is not int or r < 2 for r in positions):
+            raise HistoryError("POSICAO_DE_LOTE_INVALIDA")
+        # Coordenadas futuras não existem ainda. Ler A2 numa aba de uma linha
+        # gera HTTP 400 antes de reservar o lote. Não ampliar a grade para ler:
+        # isso seria uma escrita anterior ao backup/intenção durável.
+        # A grade é relida, não a do plano: expansão externa pode conter dados.
+        existing = [r for r in positions if r <= geometry["rows"]]
+        if not existing:
+            return [None] * len(positions)
         ranges = [
             f"'{part['title']}'!A{r}:{self.manager.store_column(len(headers))}{r}"
-            for r in positions
+            for r in existing
         ]
         result = self.store._read_with_retry(
             "conferir intervalos do lote",
@@ -886,7 +900,7 @@ class SheetsTransport:
             ),
         )
         groups = result.get("valueRanges", [])
-        if len(groups) != len(positions):
+        if len(groups) != len(existing):
             raise HistoryError("RESPOSTA_DE_INTERVALOS_INCOMPLETA")
         rows = []
         for group in groups:
@@ -907,7 +921,8 @@ class SheetsTransport:
                 if any(v not in ("", None) for v in cells)
                 else None
             )
-        return rows
+        by_position = dict(zip(existing, rows, strict=True))
+        return [by_position.get(r) for r in positions]
 
     def geometry(self, part):
         book = self.manager._book(part["book"])
@@ -989,6 +1004,8 @@ class SheetsTransport:
         except Exception as exc:
             from gspread.exceptions import APIError
 
+            if isinstance(exc, APIError):
+                vars(exc)["nexoflow_operation"] = "escrever intervalos do lote"
             if not isinstance(exc, APIError) or exc.response.status_code not in (
                 400,
                 401,

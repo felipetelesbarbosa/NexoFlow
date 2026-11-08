@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from dedup_io import save_private
@@ -155,6 +156,25 @@ def publish(args):
         raise
     except APIError as error:
         code = error.response.status_code
+        # Não imprimir mensagem/resposta/URL do provedor: podem conter valores.
+        operation = getattr(error, "nexoflow_operation", "não identificada")
+        if not isinstance(operation, str) or not re.fullmatch(
+            r"[a-záàâãéêíóôõúç /-]{1,90}", operation
+        ):
+            operation = "não identificada"
+        category = "causa não identificada"
+        try:
+            message = str(
+                error.response.json().get("error", {}).get("message", "")
+            ).lower()
+            if "exceeds grid limits" in message:
+                category = "intervalo fora da grade"
+            elif "unable to parse range" in message:
+                category = "intervalo inválido"
+            elif "cannot freeze all" in message:
+                category = "congelamento de toda a grade"
+        except (ValueError, TypeError, AttributeError):
+            pass
         if code == 429:
             raise HistoryError(
                 "SHEETS_QUOTA: aguarde o prazo do serviço e retome a mesma revisão; lotes confirmados preservados."
@@ -164,7 +184,8 @@ def publish(args):
                 "SHEETS_AUTENTICACAO_OU_PERMISSAO: confira o acesso privado aos destinos; preserve a revisão."
             ) from None
         raise HistoryError(
-            f"SHEETS_HTTP_{code}: gravação não confirmada; conferir e retomar a mesma revisão."
+            f"SHEETS_HTTP_{code}: etapa={operation}; diagnóstico={category}. "
+            "Nenhum lote adicional é considerado confirmado; preserve e confira a mesma revisão."
         ) from None
     except RequestException:
         raise HistoryError(

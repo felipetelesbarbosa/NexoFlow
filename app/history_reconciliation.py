@@ -22,10 +22,12 @@ LEGACY_SIGNATURES = {
     # Os mesmos seis blobs oficiais com checkout Windows CRLF.
     "5145fe31d04c2a6bc1dcfb1eef2f7154c36d5dbcb053a6f5c0c8d5d42956aca5",
 }
-# v1.5.26 oficial (a62a707), mesmos dez módulos em LF e CRLF.
+# v1.5.26 (a62a707) e v1.5.28 (8b25edc) oficiais, dez módulos em LF/CRLF.
 PREVIOUS_SIGNATURES = {
     "8d664728064f89b1a0a1bf806a7d3154decee3b23e6a37bf0119a8161014bfa6",
     "25fcd2cba0b985fa7983e1dfe94e527d38185990a512b66d09b0661142c4cb16",
+    "ff08ffe9e1b045342062f1c1e3e87335736dfa16f1181b5ccb72d89cfb2435d8",
+    "dde1c46545a52d8abf5a6496e65cac5d9c82a0a9701eaeab085612747d71095f",
 }
 RECEIPT_KEY = "code_reconciliation"
 

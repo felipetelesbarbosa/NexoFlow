@@ -1,10 +1,10 @@
-# NexoFlow 1.5.28
+# NexoFlow 1.5.29
 
 Aplicativos operacionais e autônomos para Windows que integram **Weni e a API FarmaLíder nos segmentos FarmaLíder e Pets Líder**, atualizam contatos e pedidos e organizam os dados no **Google Sheets** para análise no **Data Studio**.
 
 O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
 
-[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.28/NexoFlow-Setup-1.5.28.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
+[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.29/NexoFlow-Setup-1.5.29.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
 
 ## Componentes
 
@@ -17,11 +17,11 @@ O NexoFlow identifica pedidos registrados na API **independentemente de terem si
 | **NexoFlow Recompra** | Mantém a elegibilidade da Recompra FarmaLíder D+25 e Pets Líder D+30; os envios ficam na campanha Weni. |
 | **NexoFlow Terminal** | Oferece comandos, consultas e diagnóstico pelo comando `nexo`. |
 
-## Atualização 1.5.28
+## Atualização 1.5.29
 
-Corrige o bloqueio `PASTA_OU_PERMISSOES_ALTERADAS` no histórico: a pasta das continuações é conferida pelo usuário OAuth que aprovou sua criação. A conta de serviço continua precisando editar o arquivo; sua visão de pasta não é comparada à de outra conta. A retomada também reconfere o compartilhamento privado. Mudança real de pasta, acesso removido, falha de leitura, conteúdo inesperado ou revisão alterada continuam bloqueando.
+Corrige a leitura do primeiro lote em abas com somente o cabeçalho. As linhas futuras são tratadas como ainda inexistentes após conferir a grade atual; a reserva continua depois do backup/intenção durável. Alterações de terceiros permanecem bloqueadas. O publicador também reduz leituras repetidas do mapa, usa espera crescente para HTTP 429 e distingue zero lotes confirmados de um piloto validado.
 
-O diagnóstico do operador confirmou as três continuações na pasta aprovada, controles íntegros e todos os lotes pendentes. A recuperação foi reproduzida com dados sintéticos, usando os validadores reais e as duas autoridades do Drive. Atualize por **Preserve**, execute `--planilhas reconciliar` na **mesma revisão**, aplique um lote com `--max-lotes 1` e confira antes de continuar. Não copiar módulos, alterar assinaturas/journals ou gerar outro plano sobre a publicação WRITING. Consulte o [diagnóstico e a retomada](docs/DIAGNOSTICO%20ACESSOS%20HISTORICO.md).
+Atualize por **Preserve** e siga o [roteiro de retomada da mesma revisão](docs/CORRECAO%20GRADE%20HISTORICO%201.5.29.md). A reconciliação da revisão 1.5.25 já validada na 1.5.28 só é aceita com todos os lotes pendentes, nenhum backup/envio incerto e comprovação integral das fontes/partes. Não editar a revisão nem copiar módulos avulsos. Dados e publicações comerciais continuam sob conferência do operador/Work.
 
 ## NexoFlow Hub em homologação
 
@@ -82,7 +82,7 @@ As continuações automáticas no Meu Drive exigem autorização Google local. O
 
 ## Versões e atualizações
 
-A versão desta entrega é **1.5.28**. Os pacotes públicos são disponibilizados após a validação do mesmo commit. As próximas correções seguem **1.5.29, 1.5.30, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
+A versão desta entrega é **1.5.29**. Os pacotes públicos são disponibilizados após a validação do mesmo commit. As próximas correções seguem **1.5.30, 1.5.31, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
 
 ## NexoFlow Hub: projeto paralelo futuro
 

@@ -1,4 +1,4 @@
-# NexoFlow 1.5.28 — Guia de operação
+# NexoFlow 1.5.29 — Guia de operação
 
 O NexoFlow integra Weni e a API FarmaLíder para **FarmaLíder e Pets Líder**, mantendo dados separados por perfil. O objetivo é manter contatos e pedidos atualizados e alimentar o Google Sheets e os painéis do Data Studio.
 
@@ -23,7 +23,7 @@ os limites em [Exclusões de publicação](EXCLUSOES%20PUBLICACAO%20HISTORICO.md
 | **Noturno** | Executar Weni, Analytics e Recompra na marca escolhida sem confirmações durante a carga. |
 | **Terminal** | Executar comandos, consultar dados e diagnosticar a instalação. |
 
-## Atualização 1.5.28
+## Atualização 1.5.29
 
 Corrige o bloqueio `PASTA_OU_PERMISSOES_ALTERADAS` no histórico: a pasta das continuações é conferida pelo usuário OAuth que aprovou sua criação. A conta de serviço continua precisando editar o arquivo; sua visão de pasta não é comparada à de outra conta. A retomada também reconfere o compartilhamento privado. Mudança real de pasta, acesso removido, falha de leitura, conteúdo inesperado ou revisão alterada continuam bloqueando.
 
@@ -31,7 +31,7 @@ O diagnóstico do operador confirmou as três continuações na pasta aprovada, 
 
 ## Antes de começar
 
-Instale pelo [Setup oficial](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.28), configure suas próprias credenciais e compartilhe as planilhas com a conta de serviço Google. O diretório padrão é `C:\NexoFlow`. Confira os requisitos e os campos necessários no [guia de instalação](README%20INSTALACAO.md).
+Instale pelo [Setup oficial](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.29), configure suas próprias credenciais e compartilhe as planilhas com a conta de serviço Google. O diretório padrão é `C:\NexoFlow`. Confira os requisitos e os campos necessários no [guia de instalação](README%20INSTALACAO.md).
 
 Abra o mesmo aplicativo e escolha **FarmaLíder** ou **Pets Líder** antes da carga. Configure tokens Weni e três destinos Sheets em cada perfil. A credencial Google pode ser compartilhada. Veja [configuração dos segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 
@@ -138,3 +138,8 @@ diagnóstico das origens e pré-voo antes de qualquer escrita e
 mantém continuações, piloto, retomada e rollback. Após o pacote aprovado, o Work
 inicia FARMA comercial com um lote e conferência, sem nova carga anual. PET
 comercial permanece posterior. Consulte o [roteiro atualizado](PUBLICADOR%20HISTORICO%20SQLITE%20SHEETS.md).
+
+
+## Retomada do histórico na 1.5.29
+
+Consulte a [correção de grade e retomada 1.5.29](CORRECAO%20GRADE%20HISTORICO%201.5.29.md). Atualizar pelo Setup Preserve; manter a mesma revisão e snapshot. Zero lotes confirmados não valida o piloto; envios incertos continuam bloqueando reconciliação entre publicadores. Não apagar backups, editar assinaturas ou preparar nova coleta para contornar falhas.

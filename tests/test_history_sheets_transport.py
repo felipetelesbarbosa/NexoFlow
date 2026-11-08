@@ -22,7 +22,15 @@ def batch_get(book, ranges, params=None):
     for target in ranges:
         title, area = target.split("!", 1)
         result.append(
-            dict(range=target, values=book.worksheet(title.strip("'")).get(area))
+            dict(
+                range=target,
+                values=book.worksheet(title.strip("'")).get(
+                    area,
+                    value_render_option=(params or {}).get(
+                        "valueRenderOption", "FORMATTED_VALUE"
+                    ),
+                ),
+            )
         )
     return dict(valueRanges=result)
 
@@ -85,6 +93,126 @@ class TransportTests(unittest.TestCase):
 
         self.remote._drive = info
         self.pub = Publication(self.remote, "FARMA", Path(self.tmp.name))
+
+    def test_unallocated_rows_are_empty_without_reading_outside_live_grid(self):
+        db, data = fixture(1)
+        self.addCleanup(db.close)
+        plan = self.pub.prepare(stream(data))
+        self.remote.acquire()
+        self.remote.preflight(plan["capacity"], self.pub_metadata(plan))
+        self.remote.begin(plan["revision"], SCHEMAS)
+        planned = plan["capacity"]["creations"][0]
+        headers = SCHEMAS[planned["title"]]
+        part = self.remote.ensure_part(planned, headers)
+        ws = self.remote._physical(part)
+        book = self.store.client.books[part["book"]]
+        with patch.object(
+            book, "values_batch_get", wraps=book.values_batch_get
+        ) as read:
+            writes = self.store._write_requests
+            self.assertEqual(
+                self.remote.read_rows(part, headers, [2, 201]), [None, None]
+            )
+            read.assert_not_called()
+            self.assertEqual(ws.row_count, 1)
+            self.assertEqual(self.store._write_requests, writes)
+            # O plano/handle ainda apontam uma linha. Uma expansão de terceiro
+            # deve ser percebida, inclusive com posições intercaladas e fora de ordem.
+            ws.resize(rows=3)
+            row = next(r for t, r in stream(data) if t == part["title"])
+            ws.update(
+                range_name=f"A3:{self.remote.manager.store_column(len(headers))}3",
+                values=[[row[h] for h in headers]],
+            )
+            from order_history_sheets import normalized_cells
+
+            self.assertEqual(
+                self.remote.read_rows(part, headers, [4, 3, 2]),
+                [None, normalized_cells(row), None],
+            )
+            ranges = read.call_args.args[0]
+            self.assertEqual(len(ranges), 2)
+            self.assertTrue(all("4:" not in r for r in ranges))
+            ws.col_count += 1
+            with self.assertRaisesRegex(ValueError, "COLUNAS_ALTERADAS"):
+                self.remote.read_rows(part, headers, [2])
+
+    def test_live_route_is_checked_per_phase_and_before_batch_without_per_file_reads(
+        self,
+    ):
+        from contextlib import closing
+
+        from history_publication import get
+        from sheets_storage import STORAGE_SHEET
+
+        mapping = self.store.book.add(
+            STORAGE_SHEET, self.store._storage_layout.values()
+        )
+        live_context = GoogleSheetsStore.native_meta_context.__get__(self.store)
+        with (
+            patch("runtime_profile.segment", return_value="FARMA"),
+            patch("runtime_profile.validate_sheet_destinations"),
+            patch(
+                "sheets_storage.configured_storage",
+                return_value=self.store._storage_layout,
+            ),
+            patch.object(
+                self.store, "native_meta_context", wraps=live_context
+            ) as context,
+        ):
+            db, data = fixture(12)
+            self.addCleanup(db.close)
+            plan = self.pub.prepare(stream(data))
+            context.reset_mock()
+            pilot = self.pub.apply(plan, max_batches=1)
+            self.assertEqual(pilot["applied_batches"], 1)
+            self.assertEqual(context.call_count, 4)
+            self.pub.apply(plan)
+            self.assertEqual(self.pub.check(plan)["status"], "conferida")
+            # Revalidar ao retomar; nenhuma cache permanente do mapa.
+            mapping.values[-1][1] = "outro-historico"
+            with self.assertRaisesRegex(ValueError, "mapa de arquivos mudou"):
+                self.pub.apply(plan)
+            with closing(self.pub._open(plan)) as journal:
+                self.assertTrue(get(journal, "finished"))
+
+    def test_route_changed_after_preflight_blocks_first_batch(self):
+        from contextlib import closing
+
+        from sheets_storage import STORAGE_SHEET
+
+        mapping = self.store.book.add(
+            STORAGE_SHEET, self.store._storage_layout.values()
+        )
+        live_context = GoogleSheetsStore.native_meta_context.__get__(self.store)
+        ensure = self.remote.ensure_part
+
+        def changed(planned, headers):
+            part = ensure(planned, headers)
+            mapping.values[-1][1] = "outro-historico"
+            return part
+
+        with (
+            patch("runtime_profile.segment", return_value="FARMA"),
+            patch("runtime_profile.validate_sheet_destinations"),
+            patch(
+                "sheets_storage.configured_storage",
+                return_value=self.store._storage_layout,
+            ),
+            patch.object(self.store, "native_meta_context", wraps=live_context),
+        ):
+            db, data = fixture(1)
+            self.addCleanup(db.close)
+            plan = self.pub.prepare(stream(data))
+            with patch.object(self.remote, "ensure_part", side_effect=changed):
+                with self.assertRaisesRegex(ValueError, "mapa de arquivos mudou"):
+                    self.pub.apply(plan, max_batches=1)
+            with closing(self.pub._open(plan)) as journal:
+                self.assertEqual(
+                    journal.execute("SELECT DISTINCT state FROM batches").fetchall(),
+                    [("pending",)],
+                )
+            self.assertFalse(list(Path(plan["journal"]).parent.glob("lote_*.json")))
 
     @patch("tests.sheets_memory.Sheet", GspreadSheet)
     def test_fresh_setup_through_pilot_resume_check_and_idempotence(self):

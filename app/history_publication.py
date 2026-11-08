@@ -796,13 +796,25 @@ class Publication:
             report: dict[str, Any]
             if remaining:
                 report = dict(
-                    status="piloto parcial conferido",
+                    status=(
+                        "piloto parcial conferido"
+                        if scope
+                        else "nenhum lote confirmado; piloto ainda não validado"
+                    ),
                     confirmed_batches=len(scope),
                     remaining_batches=remaining,
                     scope=scope,
                     financial_closure="pendente até concluir todas as tabelas",
                     revision=review["revision"],
                 )
+                uncertain = db.execute(
+                    "SELECT count(*) FROM batches WHERE state IN ('sending','restoring')"
+                ).fetchone()[0]
+                report["uncertain_batches"] = uncertain
+                if uncertain:
+                    report["status"] = (
+                        "resposta incerta; conferência não autoriza conclusão"
+                    )
             else:
                 report = dict(
                     status="conferida",

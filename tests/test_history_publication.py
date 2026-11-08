@@ -260,6 +260,23 @@ class PublicationTests(unittest.TestCase):
         )
         self.assertIn("indisponível", result["conference"]["ltv_conference"])
 
+    def test_zero_confirmed_and_uncertain_batches_are_not_successful_pilots(self):
+        review = self.prepare()
+        result = self.pub.check(review)
+        self.assertEqual(result["confirmed_batches"], 0)
+        self.assertIn("nenhum lote confirmado", result["status"])
+        self.assertEqual(result["uncertain_batches"], 0)
+        self.remote.lost = True
+        with self.assertRaises(TimeoutError):
+            self.pub.apply(review, max_batches=1)
+        result = self.pub.check(review)
+        self.assertEqual(result["confirmed_batches"], 0)
+        self.assertEqual(result["uncertain_batches"], 1)
+        self.assertIn("resposta incerta", result["status"])
+        # Conferir não confirma silenciosamente um lote sending.
+        self.assertEqual(self.pub.apply(review, max_batches=1)["written_rows"], 0)
+        self.assertEqual(self.pub.check(review)["confirmed_batches"], 1)
+
     def test_rollback_lost_response_recovers_without_second_write(self):
         review = self.prepare()
         self.pub.apply(review)

@@ -1,6 +1,15 @@
 # NexoFlow — Changelog
 
-## NexoFlow 1.5.28 — Autoridade da pasta no Drive — em validação
+## NexoFlow 1.5.29 — Grade do primeiro lote e quota — em validação
+
+- Corrige leitura de linhas futuras em abas que possuem apenas o cabeçalho: reconfere grade atual, lê somente posições existentes e mantém reserva após backup/intenção durável.
+- Reduz revalidações redundantes do mapa sem remover guardas nas fases e antes de cada lote; espera crescente para 429 e respeito a Retry-After.
+- Diagnóstico HTTP com etapa/categoria sanitizadas; conferência distingue zero lotes, piloto confirmado e resposta incerta.
+- Recupera a mesma revisão reconciliada pela 1.5.28, somente com ZERO lotes, sem backup/resposta incerta e após conferir fontes/partes; preserva comprovantes anteriores.
+- Fixtures recusam intervalos fora da grade e validam updateCells; regressões de CLI, piloto, retomada, idempotência, alteração externa, centavos e rollback.
+- [Relatório, limites e comandos para o Work](docs/CORRECAO%20GRADE%20HISTORICO%201.5.29.md). Nenhum fato comercial publicado nesta correção; a causa específica do HTTP 400 comercial não é comprovada apenas pela mensagem genérica.
+
+## NexoFlow 1.5.28 — Autoridade da pasta no Drive — publicada em 08/11/2026, 17:38:43 (America/Fortaleza)
 
 - Reproduzir `PASTA_OU_PERMISSOES_ALTERADAS` na retomada/reconciliação quando a conta de serviço não enxerga a pasta que o usuário OAuth aprovou.
 - Verificar a pasta da continuação com a mesma autoridade OAuth do preparo; manter a comprovação de arquivo ativo e edição pela conta de serviço. Falha OAuth, pasta realmente diferente e acesso removido continuam bloqueantes. Nenhum compartilhamento de pasta é concedido.
@@ -8,7 +17,7 @@
 - Identificar etapa, papel, arquivo e campos nas quatro comparações de acesso; preservar a distinção entre divergência e falha de leitura.
 - Exercitar os validadores reais de origem, compartilhamento e acesso nas fixtures de publicação, com pasta OAuth válida e pasta omitida na visão de serviço.
 - Disponibilizar auditor independente para a instalação original 1.5.27: somente GET de metadados/controles, SQLite em modo somente leitura, hashes antes/depois e relatório sanitizado exclusivo. Não substitui módulos, não aplica/reconcilia planos e não libera carga comercial.
-- Diagnóstico real recebido confirmou o bloqueio pela comparação entre autoridades nas três continuações; acessos e controles coletados conferem. Distribuição 1.5.28 em validação; pacotes/tag 1.5.27 preservados.
+- Diagnóstico real recebido confirmou o bloqueio pela comparação entre autoridades nas três continuações; acessos e controles coletados conferem. Distribuição 1.5.28 publicada no commit 8b25edc; pacotes/tag 1.5.27 preservados.
 
 - Reproduzir a forma observada com três continuações, zero intenções, LTV vazio e recibo oficial 1.5.26 CRLF: reconciliar a revisão 1.5.25, aplicar piloto, conferir, retomar, conferir e reverter/reaplicar sem duplicidade. Não usar dados comerciais nas fixtures.
 

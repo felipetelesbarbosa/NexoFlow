@@ -139,9 +139,9 @@ class CliTests(unittest.TestCase):
 
     def test_quota_auth_and_transport_errors_do_not_print_provider_payload(self):
         from gspread.exceptions import APIError
-        from requests import Response, Timeout
+        from requests import Response
 
-        for status in (401, 403, 429, 503):
+        for status in (400, 401, 403, 429, 503):
             response = Response()
             response.status_code = status
             response._content = json.dumps(
@@ -170,6 +170,77 @@ class CliTests(unittest.TestCase):
             self.assertEqual(code, 1)
             self.assertNotIn("detalhe privado", errors.getvalue())
             self.assertIn("SHEETS_", errors.getvalue())
+
+    def test_grid_error_has_safe_stage_without_provider_values(self):
+        from gspread.exceptions import APIError
+        from requests import Response
+
+        response = Response()
+        response.status_code = 400
+        response._content = json.dumps(
+            {
+                "error": {
+                    "code": 400,
+                    "message": "Range (private client token=synthetic-private) exceeds grid limits",
+                }
+            }
+        ).encode()
+        error = APIError(response)
+        error.nexoflow_operation = "conferir intervalos do lote"
+        with (
+            patch("history_publish_cli.google_store_type", side_effect=error),
+            redirect_stderr(io.StringIO()) as errors,
+        ):
+            code, _ = self.command(
+                "--planilhas",
+                "preparar",
+                "--banco",
+                str(self.source),
+                "--revisao",
+                str(self.review),
+            )
+        self.assertEqual(code, 1)
+        text = errors.getvalue()
+        self.assertIn("etapa=conferir intervalos do lote", text)
+        self.assertIn("intervalo fora da grade", text)
+        self.assertNotIn("private", text)
+
+    def test_read_quota_uses_increasing_backoff_and_preserves_retry_after(self):
+        from unittest.mock import Mock
+
+        from gspread.exceptions import APIError
+        from requests import Response
+
+        from google_sheets import GoogleSheetsStore
+
+        response = Response()
+        response.status_code = 429
+        response._content = b'{"error":{"code":429,"message":"synthetic"}}'
+        error = APIError(response)
+        store = GoogleSheetsStore.__new__(GoogleSheetsStore)
+        for retry_after, expected in ((None, [5.0, 10.0, 20.0]), ("71", [71.0] * 3)):
+            response.headers.clear()
+            if retry_after:
+                response.headers["Retry-After"] = retry_after
+            operation = Mock(side_effect=[error, error, error, "ok"])
+            with patch("google_sheets.time.sleep") as sleep:
+                self.assertEqual(
+                    store._read_with_retry("ler bloco do histórico", operation), "ok"
+                )
+                self.assertEqual([c.args[0] for c in sleep.call_args_list], expected)
+        operation = Mock(side_effect=error)
+        with (
+            patch("google_sheets.time.sleep"),
+            patch("google_sheets.GOOGLE_SHEETS_READ_MAX_RETRIES", 2),
+        ):
+            with self.assertRaises(APIError):
+                store._read_with_retry("ler bloco do histórico", operation)
+        self.assertEqual(operation.call_count, 2)
+        self.assertEqual(error.nexoflow_operation, "ler bloco do histórico")
+
+    def test_transport_error_does_not_print_provider_payload(self):
+        from requests import Timeout
+
         with (
             patch(
                 "history_publish_cli.google_store_type",
