@@ -25,7 +25,9 @@ inesperadas bloqueiam antes de qualquer escrita de cabeçalho. O cabeçalho comp
 aba, sem criar outra ou substituir fatos.
 
 A guarda de estrutura pode conferir uma aba específica da raiz, preservando as
-outras abas e reconferindo o inventário completo. Continuações continuam exigindo
+outras abas e reconferindo o inventário completo. Aceita metadados das demais
+abas-raiz na resposta nativa, sem interpretar isso como abas extras de uma
+continuação. Continuações continuam exigindo
 uma única aba. Não há redimensionamento implícito de dados existentes.
 
 ## Recuperação de revisão reconciliada na 1.5.26

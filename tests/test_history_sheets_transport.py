@@ -210,6 +210,36 @@ class TransportTests(unittest.TestCase):
             self.remote.ensure_part(planned, SCHEMAS[planned["title"]])
         self.assertEqual(ws.writes, 0)
 
+    @patch("tests.sheets_memory.Sheet", GspreadSheet)
+    def test_root_native_metadata_can_include_other_sheets_without_their_grid(self):
+        db, data = fixture(1)
+        self.addCleanup(db.close)
+        plan = self.pub.prepare(stream(data))
+        self.remote.acquire()
+        self.remote.preflight(plan["capacity"], self.pub_metadata(plan))
+        self.remote.begin(plan["revision"], SCHEMAS)
+        planned = next(
+            p for p in plan["capacity"]["creations"] if not p["book"].startswith("new:")
+        )
+        book = self.store.client.books[planned["book"]]
+        fetch = book.fetch_sheet_metadata
+
+        def metadata(**kwargs):
+            result = fetch(**kwargs)
+            if kwargs.get("params", {}).get("includeGridData"):
+                ids = {s["properties"]["sheetId"] for s in result["sheets"]}
+                result["sheets"].extend(
+                    s
+                    for s in fetch()["sheets"]
+                    if s["properties"]["sheetId"] not in ids
+                )
+            return result
+
+        with patch.object(book, "fetch_sheet_metadata", side_effect=metadata):
+            part = self.remote.ensure_part(planned, SCHEMAS[planned["title"]])
+        self.assertEqual(part["book"], planned["book"])
+        self.assertTrue(book.worksheet("NexoFlow_Continuidade"))
+
     def pub_metadata(self, plan):
         from contextlib import closing
 

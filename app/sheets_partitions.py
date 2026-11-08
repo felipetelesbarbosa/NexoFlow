@@ -345,7 +345,7 @@ class RolloverManager:
             if s.get("properties", {}).get("sheetId") == ws.id
         ]
         if (
-            len(metadata.get("sheets", [])) != 1
+            (single_sheet and len(metadata.get("sheets", [])) != 1)
             or len(matching) != 1
             or any(matching[0].get(key) for key in structures)
             or any(
