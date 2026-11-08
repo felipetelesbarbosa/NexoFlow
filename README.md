@@ -1,10 +1,10 @@
-# NexoFlow 1.5.27
+# NexoFlow 1.5.28
 
 Aplicativos operacionais e autônomos para Windows que integram **Weni e a API FarmaLíder nos segmentos FarmaLíder e Pets Líder**, atualizam contatos e pedidos e organizam os dados no **Google Sheets** para análise no **Data Studio**.
 
 O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
 
-[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.27/NexoFlow-Setup-1.5.27.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
+[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.28/NexoFlow-Setup-1.5.28.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
 
 ## Componentes
 
@@ -17,13 +17,11 @@ O NexoFlow identifica pedidos registrados na API **independentemente de terem si
 | **NexoFlow Recompra** | Mantém a elegibilidade da Recompra FarmaLíder D+25 e Pets Líder D+30; os envios ficam na campanha Weni. |
 | **NexoFlow Terminal** | Oferece comandos, consultas e diagnóstico pelo comando `nexo`. |
 
-## Atualização 1.5.27
+## Atualização 1.5.28
 
-Corrige `ABA_CRIADA_COM_CONTEUDO_DIVERGENTE` ao criar o cabeçalho das tabelas nos arquivos principais. O caminho agora reconhece a resposta vazia real de `Worksheet.get()` do gspread, preserva fórmulas e estruturas inesperadas e relê o cabeçalho antes do registro.
+Corrige o bloqueio `PASTA_OU_PERMISSOES_ALTERADAS` no histórico: a pasta das continuações é conferida pelo usuário OAuth que aprovou sua criação. A conta de serviço continua precisando editar o arquivo; sua visão de pasta não é comparada à de outra conta. A retomada também reconfere o compartilhamento privado. Mudança real de pasta, acesso removido, falha de leitura, conteúdo inesperado ou revisão alterada continuam bloqueando.
 
-Para uma revisão 1.5.25 já reconciliada na 1.5.26 que parou antes do primeiro lote, `--planilhas reconciliar` verifica novamente a fonte, os destinos e as partes preparadas sem fatos. Preserva a revisão e o recibo anterior; bloqueia conteúdo, lotes enviados/incertos e recibos desconhecidos. Atualize por **Preserve**, reconcilie a mesma revisão e aplique o piloto separadamente. Não copie módulos avulsos, edite journals ou gere outro plano sobre uma publicação WRITING. Consulte a [correção da aba-raiz](docs/CORRECAO%20ABA%20RAIZ%20HISTORICO.md).
-
-**Bloqueio posterior à publicação:** se `reconciliar` retornar `PASTA_OU_PERMISSOES_ALTERADAS`, preserve a instalação/revisão e execute o [diagnóstico somente leitura](docs/DIAGNOSTICO%20ACESSOS%20HISTORICO.md). Há uma correção de comparação entre autoridades do Drive na main, ainda sem novo pacote. Não alterar compartilhamentos ou repetir a aplicação para tentar ultrapassar o bloqueio.
+O diagnóstico do operador confirmou as três continuações na pasta aprovada, controles íntegros e todos os lotes pendentes. A recuperação foi reproduzida com dados sintéticos, usando os validadores reais e as duas autoridades do Drive. Atualize por **Preserve**, execute `--planilhas reconciliar` na **mesma revisão**, aplique um lote com `--max-lotes 1` e confira antes de continuar. Não copiar módulos, alterar assinaturas/journals ou gerar outro plano sobre a publicação WRITING. Consulte o [diagnóstico e a retomada](docs/DIAGNOSTICO%20ACESSOS%20HISTORICO.md).
 
 ## NexoFlow Hub em homologação
 
@@ -84,7 +82,7 @@ As continuações automáticas no Meu Drive exigem autorização Google local. O
 
 ## Versões e atualizações
 
-A versão desta entrega é **1.5.27**. Os pacotes públicos são disponibilizados após a validação do mesmo commit. As próximas correções seguem **1.5.28, 1.5.29, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
+A versão desta entrega é **1.5.28**. Os pacotes públicos são disponibilizados após a validação do mesmo commit. As próximas correções seguem **1.5.29, 1.5.30, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
 
 ## NexoFlow Hub: projeto paralelo futuro
 

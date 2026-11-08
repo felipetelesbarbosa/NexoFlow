@@ -34,10 +34,10 @@ from tests.test_history_publication import fixture
 class ReconciliationTests(unittest.TestCase):
     setUp = transport_fixture.TransportTests.setUp
 
-    def legacy(self, signature=LEGACY_SIGNATURE, *, baseline=False):
+    def legacy(self, signature=LEGACY_SIGNATURE, *, baseline=False, factory=None):
         self.root = Path(self.tmp.name)
         source = self.root / "fonte.sqlite"
-        original, data = fixture(9)
+        original, data = factory() if factory is not None else fixture(9)
         with closing(original), closing(sqlite3.connect(source)) as db:
             original.backup(db)
             db.execute("CREATE TABLE profile(segment TEXT NOT NULL)")
@@ -524,8 +524,8 @@ class PreparedRootRecoveryTests(unittest.TestCase):
     command = ReconciliationTests.command
 
     # Reutilizar os helpers sem repetir os testes da primeira reconciliação.
-    def interrupted_26(self):
-        review = self.legacy()
+    def interrupted_26(self, **legacy_options):
+        review = self.legacy(**legacy_options)
         signature = sorted(PREVIOUS_SIGNATURES)[0]
         ensure = self.remote.ensure_part
 
@@ -569,6 +569,72 @@ class PreparedRootRecoveryTests(unittest.TestCase):
         self.assertEqual(self.command("conferir")[0], 0)
         self.assertEqual(sha256(review["evidence"]["path"]), before)
         self.assertEqual(self.review_path.read_bytes(), self.original_review)
+
+    def test_observed_shape_three_continuations_empty_ltv_and_receipt26_crlf(self):
+        from order_history import HistoryQuery
+        from order_history_sheets import tables
+        from order_history_store import HistoryStore, collect
+        from tests.test_order_history import NOW, Source, order
+
+        def source():
+            db = sqlite3.connect(":memory:")
+            history = HistoryStore(db, "FARMA")
+            rows = []
+            for n in range(1, 4):
+                item = order(n, amount=40, segment="FARMA")
+                item["itens"].append(dict(item["itens"][0], id=f"second-{n}"))
+                rows.append(item)
+            collect(
+                Source(rows),
+                history,
+                HistoryQuery("FARMA", "2026-11-01", "2026-11-06", 500),
+                now=NOW,
+            )
+            return db, tables(history)
+
+        legacy_crlf = next(s for s in LEGACY_SIGNATURES if s != LEGACY_SIGNATURE)
+        review, old_receipt = self.interrupted_26(signature=legacy_crlf, factory=source)
+        self.assertEqual(
+            old_receipt["to_signature"],
+            "25fcd2cba0b985fa7983e1dfe94e527d38185990a512b66d09b0661142c4cb16",
+        )
+        manager = self.store._continuity
+        self.assertEqual(len(manager.index.files), 3)
+        self.assertFalse(manager.index.intents)
+        self.assertEqual(self.blank_root.title, "BI_LTV_Clientes")
+        self.assertEqual(self.blank_root.values, [])
+        counts = {}
+        for part in manager.index.parts.values():
+            counts[part.title] = counts.get(part.title, 0) + 1
+            ws = manager.worksheet(part)
+            self.assertEqual(ws.row_count, 1)
+            self.assertEqual(ws.values, [SCHEMAS[part.title]])
+        self.assertEqual(counts, {"Historico_Pedidos": 1, "Historico_Itens": 2})
+        original_json = self.review_path.read_bytes()
+        source_sha = sha256(review["evidence"]["path"])
+        writes = sum(b.data_writes for b in self.store.client.books.values())
+        self.assertEqual(self.command("reconciliar")[0], 0)
+        self.assertEqual(
+            sum(b.data_writes for b in self.store.client.books.values()), writes
+        )
+        self.assertEqual(self.command("aplicar", "--max-lotes", "1")[0], 3)
+        self.assertEqual(self.command("conferir")[0], 3)
+        self.assertEqual(self.command("aplicar")[0], 0)
+        self.assertEqual(self.command("conferir")[0], 0)
+        self.assertEqual(self.pub.rollback(review, 1)["status"], "restaurado")
+        self.assertEqual(self.command("aplicar")[0], 0)
+        self.assertEqual(self.command("conferir")[0], 0)
+        self.assertEqual(self.review_path.read_bytes(), original_json)
+        self.assertEqual(sha256(review["evidence"]["path"]), source_sha)
+        self.assertEqual(self.provider.creations, 3)
+        with closing(self.pub._open(review)) as journal:
+            self.assertEqual(get(journal, RECEIPT_KEY)["previous_receipt"], old_receipt)
+            self.assertEqual(get(journal, "review"), review)
+            self.assertTrue(get(journal, "finished"))
+            self.assertEqual(
+                journal.execute("SELECT DISTINCT state FROM batches").fetchall(),
+                [("done",)],
+            )
 
     def test_upgrade_blocks_facts_formulas_structures_and_unplanned_root(self):
         review, old_receipt = self.interrupted_26()

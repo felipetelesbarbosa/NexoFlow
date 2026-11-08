@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.27",
+    [string]$Version = "1.5.28",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -414,13 +414,13 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-Corrige ABA_CRIADA_COM_CONTEUDO_DIVERGENTE ao inicializar tabelas nos arquivos principais. Reconhece a resposta vazia real de Worksheet.get() do gspread, confere a grade e a estrutura nativa e relê o cabeçalho antes de registrar a parte. Fórmulas, dados e estruturas inesperadas são preservados para revisão.
+Corrige PASTA_OU_PERMISSOES_ALTERADAS no histórico quando a conta de serviço não enxerga a pasta aprovada pelo usuário OAuth. A localização é conferida pela mesma autoridade OAuth do preparo, exigindo arquivo ativo, edição e pasta exata. A conta de serviço continua precisando editar o arquivo. A retomada reconfere também o compartilhamento privado; mudança real de pasta, falha OAuth ou ampliação de acesso continuam bloqueando. Nenhuma permissão de pasta é concedida.
 
-Para revisão oficial 1.5.25 já reconciliada na 1.5.26 e interrompida antes do primeiro lote, --planilhas reconciliar confere novamente fonte, transformação, baseline, destinos, permissões e partes preparadas sem fatos. A revisão permanece intacta, o recibo anterior é preservado e somente após o OK o operador deve aplicar --max-lotes 1 e conferir o piloto. Lotes enviados/incertos, fatos inesperados ou código desconhecido continuam bloqueados.
+O diagnóstico real recebido confirmou três continuações privadas na pasta aprovada, cabeçalhos íntegros, LTV vazio previsto, manifesto estável e 4.301 lotes pendentes. Os testes sintéticos reproduzem essa forma, com validadores reais e duas autoridades: mesma revisão, reconciliação, piloto, conferência, retomada, fechamento, rollback e reaplicação sem duplicidade. Isso não é conciliação financeira nem publicação comercial.
 
-Atualize por Preserve mantendo SQLite, exclusões, revisões e journals. Não copie módulos avulsos, altere assinaturas ou prepare outro plano sobre a publicação WRITING. O instalador não executa a carga comercial. Capacidade, rollback e fechamento integral ao centavo continuam obrigatórios. A versão 1.5.26 e anteriores permanecem preservadas.
+Atualize por Preserve, mantendo fonte SQLite, exclusões, plano e journals. No mesmo perfil FARMA, execute --planilhas reconciliar com a mesma revisão existente. Somente após OK, aplicar --max-lotes 1 e conferir separadamente. O recibo anterior é preservado. Não copiar módulos avulsos, editar assinaturas/journals ou criar outro plano sobre a publicação WRITING. Capacidade e fechamento integral ao centavo continuam obrigatórios. A tag e os arquivos 1.5.27 e anteriores permanecem preservados.
 
-Consulte a [correção da aba-raiz](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/CORRECAO%20ABA%20RAIZ%20HISTORICO.md). Testes e pacotes validados não comprovam publicação comercial ou conciliação da base real.
+Consulte o [diagnóstico e a retomada](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/DIAGNOSTICO%20ACESSOS%20HISTORICO.md). O auditor independente continua exclusivo à instalação original 1.5.27; não é necessário executá-lo novamente após atualizar.
 
 Analytics e Noturno usam a integração Meta nativa, sem exigir MCP ou Codex CLI. As rotinas FARMA/PET e as funcionalidades da versão anterior permanecem preservadas. A atualização Preserve mantém configurações e dados. Esta versão não comprova autenticação no proxy corporativo ou aprovação pelo antivírus no PC do usuário; consulte os relatórios e o guia de homologação.
 
@@ -436,7 +436,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.27
+# NexoFlow 1.5.28
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"

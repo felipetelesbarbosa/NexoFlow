@@ -29,11 +29,11 @@ A main reutiliza agora `verify_private_access` antes de continuar, com regressã
 que exige bloqueio sem novas linhas. Esse cenário foi somente simulado; não há
 evidência de compartilhamento amplo ou exposição comercial no ambiente do operador.
 
-Isso comprova um defeito no código, mas **não comprova sozinho a causa da
-ocorrência do operador**: o mesmo erro tinha quatro origens possíveis. Uma
-mudança real de acesso continua possível. O diagnóstico abaixo precisa fechar
-essa distinção antes de nova distribuição ou aplicação. A correção operacional
-não está nos ZIPs 1.5.27; não copiar módulos da main sobre a instalação.
+Na primeira fase isso comprovava somente o defeito de código. O diagnóstico real
+recebido em 08/11/2026 confirmou essa mesma causa nas três continuações do
+operador; o fechamento e os limites da evidência estão ao final deste documento.
+A correção está em validação para a distribuição 1.5.28, fora dos ZIPs 1.5.27;
+não copiar módulos da main sobre a instalação.
 
 ## Auditor independente para a instalação original 1.5.27
 
@@ -100,3 +100,61 @@ CI e pacotes. O script não emite recibo de compatibilidade nem autoriza aplicar
 Nenhuma planilha comercial foi consultada por esta implementação no ambiente do
 Codex. O diagnóstico real será executado pelo operador. Aprovação de testes
 sintéticos não equivale a homologação das planilhas.
+
+## Fechamento do diagnóstico recebido e distribuição 1.5.28
+
+Em 08/11/2026 o operador devolveu a coleta sanitizada da instalação 1.5.27. Não
+foram incluídos neste repositório o arquivo privado nem seus IDs ou hashes.
+Os agregados e controles observados foram:
+
+| Controle | Resultado observado |
+| --- | --- |
+| Arquivos originais com origem e edição confirmadas | 3 |
+| Continuações com origem, edição e compartilhamento privado confirmados | 3 |
+| Pasta OAuth das continuações versus pasta aprovada | Coincide nas 3 |
+| Pasta na visão da conta de serviço das continuações | Omitida nas 3 |
+| Origem Histórico: pasta e permissões versus prova armazenada | Coincidem |
+| Origens Dashboard/Operação: prova OAuth armazenada antiga | Ausente; não inferir comparação histórica |
+| Arquivos originais: visão de pasta do serviço versus seu próprio baseline | Coincide nos 3 |
+| Cabeçalhos das continuações | 3 corretos e com estrutura nativa íntegra |
+| Cabeçalho BI_LTV_Clientes | Vazio, reserva mínima e estrutura íntegra; criação ainda pendente |
+| Manifesto versus journal / estabilidade da coleta | Confere / estável |
+| Lotes | 4.301 previstos e observados, todos pending |
+| Intenções pendentes / backups de lote / manifesto incerto | 0 / 0 / ausente |
+| Journal antes/depois da coleta | Mesmo SHA-256 |
+| Recibo anterior | Publicador oficial 1.5.26 CRLF reconhecido pelo protocolo |
+
+Isso confirma a causa da ocorrência: a regra publicada comparava duas visões de
+pasta diferentes. Não houve evidência de pasta movida ou de mudança dos acessos
+nas comparações disponíveis. O estado coletado corresponde ao protocolo de
+recuperação antes do primeiro lote. A fonte SQLite e a transformação financeira
+serão novamente verificadas pelo comando reconciliar; o diagnóstico de metadados
+não é uma auditoria financeira completa nem autorização de aplicação.
+
+O teste de regressão recria a mesma forma com dados sintéticos: uma continuação
+de pedidos, duas de itens, zero intenções e LTV vazio não registrado. O teste
+falha usando o preflight dos bytes efetivamente publicados na 1.5.27 e passa na
+correção. Exercita a CLI para reconciliação sem fatos, piloto limitado,
+conferência, retomada, fechamento e rollback/reaplicação. Mantém os bytes da
+revisão e da fonte, preserva o recibo anterior e reutiliza os mesmos três
+arquivos. As pastas e os validadores de acesso simulados representam as duas
+identidades reais; nenhuma planilha comercial foi alterada pelo Codex.
+
+Após disponibilização do pacote 1.5.28 aprovado, fechar as rotinas e atualizar
+pelo Setup em Preserve. Abrir FARMA no Terminal e conferir `nexo versao`.
+Usar o mesmo plano, inclusive se seu nome contiver 1.5.25:
+
+```powershell
+nexo historico --planilhas reconciliar --revisao $planoFarma
+nexo historico --planilhas aplicar --revisao $planoFarma --max-lotes 1
+nexo historico --planilhas conferir --revisao $planoFarma --resumo-mensal "C:\NexoFlow\logs\privado\conferencia-piloto-1.5.28.json"
+```
+
+Executar cada comando somente após avaliar o resultado anterior. O piloto
+pausado retorna 3 com lotes restantes; divergência também precisa ser avaliada,
+não tratada como pausa normal. Depois da conferência do piloto, continuar a
+mesma revisão sem max-lotes e concluir a conferência integral. A última decisão
+continua protegida por revalidação atual de fonte, baseline, manifesto, pastas,
+permissões e códigos. Mudanças depois da coleta podem voltar a bloquear com
+motivo acionável. Não é necessário outro auditor ou novo plano para tentar
+resolver esta ocorrência já comprovada.

@@ -1,6 +1,6 @@
 # NexoFlow — Changelog
 
-## Não publicado — Autoridade da pasta no Drive e diagnóstico de acessos
+## NexoFlow 1.5.28 — Autoridade da pasta no Drive — em validação
 
 - Reproduzir `PASTA_OU_PERMISSOES_ALTERADAS` na retomada/reconciliação quando a conta de serviço não enxerga a pasta que o usuário OAuth aprovou.
 - Verificar a pasta da continuação com a mesma autoridade OAuth do preparo; manter a comprovação de arquivo ativo e edição pela conta de serviço. Falha OAuth, pasta realmente diferente e acesso removido continuam bloqueantes. Nenhum compartilhamento de pasta é concedido.
@@ -8,7 +8,9 @@
 - Identificar etapa, papel, arquivo e campos nas quatro comparações de acesso; preservar a distinção entre divergência e falha de leitura.
 - Exercitar os validadores reais de origem, compartilhamento e acesso nas fixtures de publicação, com pasta OAuth válida e pasta omitida na visão de serviço.
 - Disponibilizar auditor independente para a instalação original 1.5.27: somente GET de metadados/controles, SQLite em modo somente leitura, hashes antes/depois e relatório sanitizado exclusivo. Não substitui módulos, não aplica/reconcilia planos e não libera carga comercial.
-- Correção de código em validação. Causa do bloqueio na instalação do operador depende do diagnóstico real. Pacotes/tag 1.5.27 preservados; nenhuma nova release nesta investigação.
+- Diagnóstico real recebido confirmou o bloqueio pela comparação entre autoridades nas três continuações; acessos e controles coletados conferem. Distribuição 1.5.28 em validação; pacotes/tag 1.5.27 preservados.
+
+- Reproduzir a forma observada com três continuações, zero intenções, LTV vazio e recibo oficial 1.5.26 CRLF: reconciliar a revisão 1.5.25, aplicar piloto, conferir, retomar, conferir e reverter/reaplicar sem duplicidade. Não usar dados comerciais nas fixtures.
 
 ## NexoFlow 1.5.27 — Cabeçalho vazio e retomada da revisão — 08/11/2026
 
