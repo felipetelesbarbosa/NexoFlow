@@ -1,16 +1,18 @@
-# NexoFlow 1.5.29 — Scripts
+# NexoFlow 1.5.30 — Scripts
 
-Scripts usados para empacotamento e validação do NexoFlow 1.5.29.
+Scripts usados para empacotamento e validação do NexoFlow 1.5.30.
 
-- `build_release.ps1`: monta o projeto completo, o Setup, checksums e notas da distribuição NexoFlow 1.5.29.
+- `build_release.ps1`: monta o projeto completo, o Setup, checksums e notas da distribuição NexoFlow 1.5.30.
 - `embed_windows_icon.ps1`: incorpora o ícone correspondente em cada executável Windows.
 - `test_executable_icons.ps1`: valida os ícones incorporados nos executáveis dos pacotes.
 - `test_setup_windows.ps1`: executa smoke tests do Setup em Windows.
 - `test_recompra_launcher_windows.ps1`: valida o executável dedicado de recompra e a propagação do código de saída no Windows.
 - `test_noturno_launcher_windows.ps1`: verifica o executável Noturno sem console e os códigos de saída.
 
-A publicação da [release v1.5.29](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.29) segue o [workflow de publicação](../.github/workflows/release-v1.yml) e só prossegue após testes, auditoria do projeto, validação dos ícones e smoke tests do Setup.
+A publicação da [release v1.5.30](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.30) segue o [workflow de publicação](../.github/workflows/release-v1.yml) e só prossegue após testes, auditoria do projeto, validação dos ícones e smoke tests do Setup.
 
 Os nomes e links estáveis dos pacotes estão em [Downloads](../releases/README.md).
 
 Este diretório pertence ao **NexoFlow Windows**, que executa suas rotinas de forma autônoma. O projeto futuro NexoFlow Hub (VPS, Docker e n8n) fica no [planejamento](../docs/planejamento/README.md).
+
+- `check_history_quota_contract.py`: exige os bytes oficiais do contrato 1.5.29 e a ativação do controlador HTTP nos dois ZIPs da correção de quota.

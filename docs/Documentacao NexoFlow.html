@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>NexoFlow 1.5.29 - Documentação</title>
+  <title>NexoFlow 1.5.30 - Documentação</title>
   <style>
     html {
       color: #1a1a1a;
@@ -170,9 +170,9 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">NexoFlow 1.5.29 - Documentação</h1>
+<h1 class="title">NexoFlow 1.5.30 - Documentação</h1>
 </header>
-<h1 id="nexoflow-1529--guia-de-operação">NexoFlow 1.5.29 — Guia de
+<h1 id="nexoflow-1530--guia-de-operação">NexoFlow 1.5.30 — Guia de
 operação</h1>
 <p>O NexoFlow integra Weni e a API FarmaLíder para <strong>FarmaLíder e
 Pets Líder</strong>, mantendo dados separados por perfil. O objetivo é
@@ -236,7 +236,7 @@ confirmações durante a carga.</td>
 </tr>
 </tbody>
 </table>
-<h2 id="atualização-1529">Atualização 1.5.29</h2>
+<h2 id="atualização-1530">Atualização 1.5.30</h2>
 <p>Corrige o bloqueio <code>PASTA_OU_PERMISSOES_ALTERADAS</code> no
 histórico: a pasta das continuações é conferida pelo usuário OAuth que
 aprovou sua criação. A conta de serviço continua precisando editar o
@@ -256,7 +256,7 @@ Consulte o <a href="DIAGNOSTICO%20ACESSOS%20HISTORICO.md">diagnóstico e
 a retomada</a>.</p>
 <h2 id="antes-de-começar">Antes de começar</h2>
 <p>Instale pelo <a
-href="https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.29">Setup
+href="https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.30">Setup
 oficial</a>, configure suas próprias credenciais e compartilhe as
 planilhas com a conta de serviço Google. O diretório padrão é
 <code>C:\NexoFlow</code>. Confira os requisitos e os campos necessários
@@ -453,6 +453,15 @@ revisão e snapshot. Zero lotes confirmados não valida o piloto; envios
 incertos continuam bloqueando reconciliação entre publicadores. Não
 apagar backups, editar assinaturas ou preparar nova coleta para
 contornar falhas.</p>
+<h2 id="ritmo-preventivo-do-sheets-na-1530">Ritmo preventivo do Sheets
+na 1.5.30</h2>
+<p>A publicação histórica controla a frequência HTTP, compartilha pausas
+por 429 entre os comandos de histórico da instalação e mantém o contrato
+de revisão da 1.5.29. Atualizar em Preserve; conferir o estado e retomar
+a mesma revisão, sem repetir a coleta. O contador HTTP não equivale a
+lotes confirmados. Consulte o <a
+href="COTAS%20SHEETS%20HISTORICO%201.5.30.md">diagnóstico e os comandos
+de retomada</a>.</p>
 </body>
 </html>
-<!-- NexoFlow documentation: source-sha256=474ccf5cb46431723d04c6ada0cc6eea7dcba09ea650f4656f2358cc0839def6 content-sha256=0a3c548d1037597374f74da455c2706e0d986e60c63ee245bd8cdd756922c8e8 -->
+<!-- NexoFlow documentation: source-sha256=a3926526ba9de28bfbca1bde6d5d66ffa593f7dbbd1a89d665d24db835d9a4bb content-sha256=20449fd188218cb597139129ae9f9555d7e96b1399d74c80a12d7b2d137fbc5e -->

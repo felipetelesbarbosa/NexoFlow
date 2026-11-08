@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.29",
+    [string]$Version = "1.5.30",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -414,15 +414,17 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-Corrige a leitura de linhas futuras em abas que possuem somente o cabeçalho. Antes do lote, consulta a grade atual e lê somente posições existentes, sem ampliar a aba antes do backup e da intenção durável. Preserva conteúdo, fórmulas, coordenadas, validação de origens, pastas OAuth e compartilhamento privado.
+A publicação histórica passa a controlar preventivamente o ritmo HTTP da API Sheets, incluindo abertura, chamadas diretas do lease e retentativas. O padrão é 45 leituras e 45 escritas por minuto por identidade/projeto, com reservas locais compartilhadas entre comandos de histórico desta instalação e orçamento adicional conservador por projeto. Leitura e escrita usam orçamentos separados.
 
-Reduz as consultas redundantes ao mapa de destinos sem cache permanente, mantendo revalidação por fase e antes de cada lote. HTTP 429 usa espera crescente, limitada, respeitando Retry-After. Erros HTTP informam etapa e categoria sanitizadas, sem revelar a resposta do Google. A conferência diferencia zero lotes confirmados, piloto parcial e resposta incerta.
+HTTP 429 impõe pausa compartilhada de pelo menos 65 segundos, respeitando Retry-After maior. O adaptador não repete POST e preserva o cliente, autenticação, proxy, TLS, timeouts, payloads e todas as conferências. O ledger privado contém apenas hashes de escopo, tipos de operação e horários; nenhum token ou dado comercial.
 
-O defeito de intervalo fora da grade foi reproduzido com gspread real e transporte sintético que recusa a leitura inválida. O erro comercial original não revelou sua causa específica; testes simulados não são prova de conciliação comercial. A regressão cobre revisão antiga com recibo oficial 1.5.28, piloto, retomada, idempotência e rollback, preservando fonte e plano.
+Os dez módulos que vinculam a revisão ao publicador mantêm exatamente os bytes oficiais Windows da 1.5.29. O workflow verifica esse contrato dentro dos dois ZIPs antes de publicar. A revisão já parcialmente aplicada na 1.5.29 pode continuar sem preparar outra revisão ou reconciliar o código novamente apenas por esse ajuste. Preservar JSON, recibos, snapshot, backups, exclusões e estados de lotes.
 
-Atualize por Preserve, mantendo fonte SQLite, exclusões, plano e journals. No perfil FARMA, execute --planilhas reconciliar com a mesma revisão. A recuperação entre publicadores exige todos os lotes pendentes, sem backup ou resposta incerta, além de conferir fontes e partes. Somente após OK, aplicar --max-lotes 1 e conferir separadamente: o piloto exige UM lote confirmado. Não copiar módulos, editar assinaturas/journals ou criar outro plano sobre WRITING. Se houver bloqueio ou zero lotes, preservar evidências e interromper. As versões 1.5.28 e anteriores permanecem intactas.
+Atualize pelo Setup em Preserve depois de encerrar a carga. No mesmo perfil FARMA, conferir a mesma revisão para identificar o saldo atual, aplicar --max-lotes 1 e conferir novamente. Somente após validar, continuar sem --max-lotes e fechar a conferência. Não apagar journals, editar assinaturas ou forçar lote incerto como confirmado. As versões 1.5.29 e anteriores permanecem intactas.
 
-Consulte o [relatório e comandos de retomada](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/CORRECAO%20GRADE%20HISTORICO%201.5.29.md). Nenhuma coleta ou escrita comercial foi realizada nesta correção; capacidade e fechamento integral ao centavo continuam obrigatórios.
+A cada aproximadamente um minuto, o contador de rede informa tentativas HTTP e pausas; ele não equivale a lotes confirmados. Outras aplicações e computadores podem consumir a mesma cota: o controle local não garante ausência de 429. A carga pode ser demorada. Os testes com relógio virtual, SQLite, requests/gspread e serviços simulados não comprovam a cota efetiva da conta comercial. Nenhum fato comercial foi aplicado nesta validação.
+
+Consulte o [relatório e roteiro para o Work](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/COTAS%20SHEETS%20HISTORICO%201.5.30.md).
 
 Analytics e Noturno usam a integração Meta nativa, sem exigir MCP ou Codex CLI. As rotinas FARMA/PET e as funcionalidades da versão anterior permanecem preservadas. A atualização Preserve mantém configurações e dados. Esta versão não comprova autenticação no proxy corporativo ou aprovação pelo antivírus no PC do usuário; consulte os relatórios e o guia de homologação.
 
@@ -438,7 +440,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.29
+# NexoFlow 1.5.30
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"

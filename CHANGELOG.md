@@ -1,6 +1,15 @@
 # NexoFlow — Changelog
 
-## NexoFlow 1.5.29 — Grade do primeiro lote e quota — em validação
+## NexoFlow 1.5.30 — Ritmo preventivo da publicação histórica — em validação
+
+- Controla chamadas HTTP antes do envio, com orçamentos separados de leitura/escrita e reservas compartilhadas entre comandos de histórico da instalação.
+- Padrão de 45/minuto por identidade/projeto; 429 gera pausa compartilhada de pelo menos 65s, respeitando Retry-After. O adaptador não repete POST.
+- Inclui abertura inicial, leituras diretas do lease e retries, mantendo autenticação, proxy, TLS, timeouts, payloads e verificações.
+- Preserva os dez módulos/bytes do contrato 1.5.29, revisão já aplicada, recibos, snapshots e journals. Workflow confere compatibilidade nos dois ZIPs antes de publicar.
+- Testes de quota, concorrência, CLI, resposta perdida, retomada sem duplicidade, rollback e integridade dos pacotes; progresso HTTP sem dados privados.
+- [Diagnóstico, limitações e comandos para o Work](docs/COTAS%20SHEETS%20HISTORICO%201.5.30.md). Sem nova coleta ou publicação comercial nesta validação.
+
+## NexoFlow 1.5.29 — Grade do primeiro lote e quota — publicada em 08/11/2026, 18:40:46 (America/Fortaleza)
 
 - Corrige leitura de linhas futuras em abas que possuem apenas o cabeçalho: reconfere grade atual, lê somente posições existentes e mantém reserva após backup/intenção durável.
 - Reduz revalidações redundantes do mapa sem remover guardas nas fases e antes de cada lote; espera crescente para 429 e respeito a Retry-After.

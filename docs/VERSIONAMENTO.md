@@ -1,14 +1,14 @@
 # Versionamento do NexoFlow
 
-A entrega corretiva **1.5.29** está em validação. A **1.5.28 já foi publicada** e permanece intacta. A nova entrega corrige leitura de linhas futuras fora da grade, reduz consultas repetidas do mapa e torna a conferência de zero lotes explícita. Publicar somente após checks e pacotes validados no mesmo commit; não reempacotar versões anteriores.
+A entrega corretiva **1.5.30** está em validação. A **1.5.29 já foi publicada** e permanece intacta. O ajuste acrescenta ritmo HTTP preventivo à publicação histórica, preservando os bytes do contrato de revisão 1.5.29 para retomar lotes já confirmados. Publicar somente após checks e pacotes instalados validados no mesmo commit.
 
-As próximas publicações de atualização, hotfix ou patch seguem **1.5.30 → 1.5.31 → ... → 1.5.99 → 1.6 → 1.6.1**. Cada publicação incrementa uma única vez; commits e novas tentativas de CI da mesma entrega não mudam a numeração. Não há salto automático de versão principal.
+As próximas publicações de atualização, hotfix ou patch seguem **1.5.31 → 1.5.32 → ... → 1.5.99 → 1.6 → 1.6.1**. Cada publicação incrementa uma única vez; commits e novas tentativas de CI da mesma entrega não mudam a numeração. Não há salto automático de versão principal.
 
 A versão da distribuição fica em `VERSION`. A tag é `v{versao}`, o título é `NexoFlow {versao}` e os pacotes são `NexoFlow-{versao}.zip` e `NexoFlow-Setup-{versao}.zip`. Nunca sobrescreva os arquivos de uma versão pública para entregar código novo. O workflow permite retomar somente um rascunho da mesma entrega.
 
 Cada release informa a data real de publicação em **America/Fortaleza**. Enquanto a entrega estiver em validação, use esse estado no changelog. O workflow obtém `publishedAt` do GitHub após publicar e registra a data correspondente nas notas; não reutiliza a data de uma autorização ou de um teste. O calendário operacional das cargas continua em `America/Belem`.
 
-Os recursos Windows usam quatro componentes: **1.5.0.0** para 1.5, **1.5.29.0** para 1.5.29 e **1.6.0.0** para 1.6. O nome dos aplicativos e a pasta de instalação continuam NexoFlow. Os EXEs preservados em `native_launcher/prebuilt/` têm sua própria versão de referência documentada; os executáveis instalados na raiz devem coincidir com a distribuição atual.
+Os recursos Windows usam quatro componentes: **1.5.0.0** para 1.5, **1.5.30.0** para 1.5.30 e **1.6.0.0** para 1.6. O nome dos aplicativos e a pasta de instalação continuam NexoFlow. Os EXEs preservados em `native_launcher/prebuilt/` têm sua própria versão de referência documentada; os executáveis instalados na raiz devem coincidir com a distribuição atual.
 
 Antes da publicação, alinhe programa, instalador, metadados, pacote Python, documentação, tag e workflow; execute os testes e confira os arquivos publicados do mesmo commit. A numeração menor não dispensa a validação.
 

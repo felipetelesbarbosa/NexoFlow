@@ -1,5 +1,7 @@
 # Relatório técnico: publicador histórico SQLite / Sheets
 
+> Atualização de ritmo 1.5.30 em validação; a 1.5.29 está publicada e seu piloto comercial confirmou um lote. A continuação atingiu quota de leituras. O [controle HTTP e roteiro de retomada](COTAS%20SHEETS%20HISTORICO%201.5.30.md) preserva a mesma revisão já aplicada; não refaz coleta nem altera o contrato dos lotes.
+
 > Estado atual: 1.5.28 publicada e preservada; 1.5.29 em validação. Consulte a [correção de grade e retomada 1.5.29](CORRECAO%20GRADE%20HISTORICO%201.5.29.md). A reconciliação comercial foi aprovada, mas o piloto relatou HTTP 400 e zero lotes confirmados. Os registros abaixo documentam entregas anteriores; não representam conclusão comercial.
 
 > Correção posterior: a versão 1.5.24 corrige a varredura repetida de itens na conferência. Para bases grandes, atualizar em Preserve e preparar nova revisão sobre o mesmo backup consistente; preservar o plano interrompido. Ver [correção 1.5.24](CORRECAO%20CONFERENCIA%201.5.24.md).

@@ -8,9 +8,10 @@ from pathlib import Path
 
 from dedup_io import save_private
 from history_conference import receipts, summarize
+from history_sheets_quota import google_store_type
 from history_snapshot import readonly, snapshot
 from order_history import HistoryError
-from order_history_sheets import HistorySheets, google_store_type, iter_tables
+from order_history_sheets import HistorySheets, iter_tables
 
 
 def _publish(args):
