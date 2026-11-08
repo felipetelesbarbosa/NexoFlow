@@ -91,7 +91,7 @@ class ReconciliationTests(unittest.TestCase):
         with patch("history_publication.publisher_signature", return_value=signature):
             code, _ = self.command("preparar", "--banco", str(source))
             self.assertEqual(code, 0)
-        review = json.loads(self.review_path.read_text())
+        review = json.loads(self.review_path.read_text(encoding="utf-8"))
         self.original_review = self.review_path.read_bytes()
         # Estrutura exata do incidente: intenção persistida, cabeçalho 1×15,
         # nenhum lote iniciado e nenhuma parte ativada. Falha antes do stamp.
@@ -131,6 +131,23 @@ class ReconciliationTests(unittest.TestCase):
                 ]
             )
         return code, output.getvalue()
+
+    def test_legacy_review_integrity_with_windows_cp1252_default(self):
+        read_text = Path.read_text
+
+        def windows_default(path, encoding=None, errors=None):
+            return read_text(
+                path,
+                encoding="cp1252" if encoding is None else encoding,
+                errors=errors,
+            )
+
+        with patch.object(Path, "read_text", windows_default):
+            review = self.legacy()
+            receipt = reconcile(self.pub, review)
+        self.store._continuity.close()
+        self.assertEqual(json.loads(self.original_review.decode("utf-8")), review)
+        self.assertEqual(receipt["review_digest"], review["digest"])
 
     def test_cli_reconcile_same_revision_pilot_resume_and_financial_closure(self):
         review = self.legacy()
