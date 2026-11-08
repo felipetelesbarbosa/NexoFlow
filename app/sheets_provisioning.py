@@ -384,6 +384,60 @@ class MyDriveProvisioner:
             )
             present[key] = permission["role"]
 
+    def verify_private_access(self, file_id, intent):
+        """Comprova o compartilhamento atual sem conceder permissões."""
+        from sheets_continuation import fingerprint
+
+        response = self._get(
+            self.owner,
+            f"/files/{file_id}/permissions",
+            params={
+                "fields": "permissions(type,emailAddress,role,deleted,expirationTime),nextPageToken",
+                "pageSize": 100,
+            },
+        )
+        if response.get("nextPageToken"):
+            raise ContinuationError(
+                "Não foi possível conferir todos os acessos da continuação."
+            )
+        present = {}
+        for p in response.get("permissions", []):
+            if p.get("deleted"):
+                continue
+            if p.get("type") not in ("user", "group") or not p.get("emailAddress"):
+                raise ContinuationError(
+                    "A continuação possui acesso amplo ou não comprovado."
+                )
+            key = (p["type"], p["emailAddress"].casefold())
+            if key in present:
+                raise ContinuationError("Permissões ambíguas na continuação.")
+            present[key] = p
+        wanted = {
+            (p["type"], p["emailAddress"].casefold()): dict(p)
+            for p in intent["permissions"]
+        }
+        # O acesso de serviço é a única consolidação prevista pelo provisionador.
+        wanted["user", self.service_email.casefold()] = dict(
+            type="user", role="writer", emailAddress=self.service_email
+        )
+        if set(present) != set(wanted):
+            raise ContinuationError("Os acessos da continuação divergiram da intenção.")
+        for key, p in wanted.items():
+            actual = present[key]
+            roles = {"owner", "writer"} if p["role"] == "owner" else {p["role"]}
+            if actual.get("role") not in roles or actual.get("expirationTime") != p.get(
+                "expirationTime"
+            ):
+                raise ContinuationError(
+                    "Permissão da continuação não corresponde à intenção."
+                )
+        return fingerprint(
+            sorted(
+                present.values(),
+                key=lambda p: (p["type"], p["emailAddress"].casefold()),
+            )
+        )
+
     def verify(self, file_id, *, hub, segment, role=None):
         info = self._get(
             self.source,

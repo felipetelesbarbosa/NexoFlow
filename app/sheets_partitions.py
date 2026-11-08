@@ -38,6 +38,16 @@ def role_for(title):
     return storage_role(title)
 
 
+def _empty_creation_values(values):
+    # gspread 6 pode representar uma resposta sem valores como [[]].
+    # Não converter falsy, espaços ou tipos desconhecidos em ausência de dados.
+    return isinstance(values, list) and all(
+        isinstance(row, list)
+        and all(isinstance(value, str) and value == "" for value in row)
+        for row in values
+    )
+
+
 @dataclass
 class TableSnapshot:
     part: Part
@@ -282,6 +292,103 @@ class RolloverManager:
         self.metadata[part.book_id] = metadata
         return allocated_cells(metadata)
 
+    def _check_creation_structure(self, book, ws):
+        from gspread.utils import absolute_range_name
+
+        structures = (
+            "merges",
+            "protectedRanges",
+            "basicFilter",
+            "filterViews",
+            "charts",
+            "conditionalFormats",
+            "bandedRanges",
+            "rowGroups",
+            "columnGroups",
+            "slicers",
+            "tables",
+        )
+        cell_fields = (
+            "note",
+            "dataValidation",
+            "userEnteredFormat",
+            "textFormatRuns",
+            "chipRuns",
+            "pivotTable",
+            "dataSourceTable",
+            "dataSourceFormula",
+        )
+        # Values API não revela notas, validações ou outras estruturas que o
+        # resize apagaria. Conferir toda a grade antes de renomear/dimensionar.
+        metadata = self.store._read_with_retry(
+            "conferir estrutura da nova continuação",
+            lambda: book.fetch_sheet_metadata(
+                params={
+                    "includeGridData": "true",
+                    "ranges": [
+                        absolute_range_name(
+                            ws.title,
+                            f"A1:{self.store_column(ws.col_count)}{ws.row_count}",
+                        )
+                    ],
+                    "fields": "sheets(properties(sheetId),"
+                    + ",".join(structures)
+                    + ",data(rowData(values("
+                    + ",".join(cell_fields)
+                    + "))))",
+                }
+            ),
+        )
+        matching = [
+            s
+            for s in metadata.get("sheets", [])
+            if s.get("properties", {}).get("sheetId") == ws.id
+        ]
+        if (
+            len(metadata.get("sheets", [])) != 1
+            or len(matching) != 1
+            or any(matching[0].get(key) for key in structures)
+            or any(
+                cell.get(key)
+                for data in matching[0].get("data", [])
+                for row in data.get("rowData", [])
+                for cell in row.get("values", [])
+                for key in cell_fields
+            )
+        ):
+            raise ContinuationError(
+                "A nova continuação contém estrutura inesperada; preservar para revisão."
+            )
+
+        # Sem ranges: conferir todas as abas, sem ler grades inesperadas.
+        inventory = self.store._read_with_retry(
+            "reconferir abas da nova continuação",
+            lambda: book.fetch_sheet_metadata(
+                params={
+                    "fields": "sheets(properties(sheetId,title,gridProperties),"
+                    + ",".join(structures)
+                    + ")",
+                }
+            ),
+        ).get("sheets", [])
+        if (
+            len(inventory) != 1
+            or inventory[0].get("properties", {}).get("sheetId") != ws.id
+            or inventory[0].get("properties", {}).get("title") != ws.title
+            or any(inventory[0].get(key) for key in structures)
+        ):
+            raise ContinuationError(
+                "A nova continuação contém estrutura inesperada; preservar para revisão."
+            )
+        grid = inventory[0].get("properties", {}).get("gridProperties", {})
+        if (grid.get("rowCount"), grid.get("columnCount")) != (
+            ws.row_count,
+            ws.col_count,
+        ):
+            raise ContinuationError(
+                "A grade da nova continuação mudou; preservar para revisão."
+            )
+
     def _create_part(self, title, headers):
         self.require()
         role = role_for(title)
@@ -381,31 +488,31 @@ class RolloverManager:
         sheets = self.store._read_with_retry(
             "conferir nova continuação", book.worksheets
         )
-        matching = [sheet for sheet in sheets if sheet.title == title]
-        if matching:
-            ws = matching[0]
-            values = self.store._read_with_retry(
-                "conferir criação retomada", ws.get_all_values
+        if len(sheets) > 1:
+            raise ContinuationError(
+                "A criação pendente contém abas inesperadas; preservar para revisão."
             )
-            if values not in ([], [headers]):
+        if sheets:
+            ws = sheets[0]
+            values = self.store._read_with_retry(
+                "conferir criação retomada",
+                lambda: ws.get_all_values(value_render_option="FORMULA"),
+            )
+            if not _empty_creation_values(values) and not (
+                ws.title == title and values == [headers]
+            ):
                 raise ContinuationError(
                     "A nova continuação recebeu dados antes da ativação; revisar."
                 )
-        elif len(sheets) == 1 and not self.store._read_with_retry(
-            "conferir aba inicial vazia", sheets[0].get_all_values
-        ):
-            ws = sheets[0]
-            self.store._write_with_retry(
-                "nomear aba da continuação", lambda: ws.update_title(title)
-            )
-        elif not sheets:
+            self._check_creation_structure(book, ws)
+            if ws.title != title:
+                self.store._write_with_retry(
+                    "nomear aba da continuação", lambda: ws.update_title(title)
+                )
+        else:
             ws = self.store._write_with_retry(
                 "criar aba da continuação",
                 lambda: book.add_worksheet(title=title, rows=1, cols=len(headers)),
-            )
-        else:
-            raise ContinuationError(
-                "A criação pendente contém abas inesperadas; preservar para revisão."
             )
         self.store._write_with_retry(
             "dimensionar nova continuação", lambda: ws.resize(rows=1, cols=len(headers))
@@ -418,9 +525,8 @@ class RolloverManager:
                 value_input_option="RAW",
             ),
         )
-        self.store._write_with_retry(
-            "fixar cabeçalho da continuação", lambda: ws.freeze(rows=1)
-        )
+        # A grade aprovada tem só o cabeçalho. O Google rejeita congelar todas
+        # as linhas; não ampliar a reserva nem bloquear a criação por formatação.
         if self.store._read_with_retry(
             "confirmar cabeçalho da continuação", ws.get_all_values
         ) != [headers]:

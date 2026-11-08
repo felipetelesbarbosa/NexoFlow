@@ -1144,7 +1144,7 @@ class GoogleSheetsStore:
 
         # Evita uma escrita de freeze em toda execução. Só formata quando
         # a aba é criada ou realmente teve a estrutura alterada.
-        if created or structure_changed:
+        if (created or structure_changed) and ws.row_count > 1:
             self._write_with_retry(
                 f"freeze do cabeçalho em {title}",
                 lambda: ws.freeze(rows=1),

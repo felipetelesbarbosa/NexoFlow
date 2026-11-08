@@ -54,7 +54,14 @@ def parser():
     )
     result.add_argument(
         "--planilhas",
-        choices=("preparar", "capacidade", "aplicar", "conferir", "rollback"),
+        choices=(
+            "preparar",
+            "capacidade",
+            "aplicar",
+            "conferir",
+            "rollback",
+            "reconciliar",
+        ),
         help="Revisão separada, sem nova coleta",
     )
     result.add_argument(

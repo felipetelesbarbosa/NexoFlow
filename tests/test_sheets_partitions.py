@@ -3,13 +3,15 @@
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
+
+from requests import Timeout
 
 from google_sheets import GoogleSheetsStore
 from sheets_continuation import ContinuationError, ContinuationIndex, allocated_cells
 from sheets_partitions import RolloverManager, roots_for
 from sheets_storage import SheetsStorage
-from tests.sheets_memory import Book, Client, Provisioner
+from tests.sheets_memory import Book, Client, GspreadSheet, Provisioner
 
 
 class SheetsPartitionTests(unittest.TestCase):
@@ -245,6 +247,309 @@ class SheetsPartitionTests(unittest.TestCase):
         self.assertEqual(provider.creations, 1)
         self.assertEqual(provider.shared, [])
         self.assertEqual(len(store._continuity.index.intents), 1)
+
+    def creation_candidate(self, *, title="Página1", values=()):
+        store, _, provider = self.make("Historico_Pedidos", ["chave", "valor"])
+        manager = store._continuity
+        original = provider.create
+
+        def create(intent, **kwargs):
+            file_id = original(intent, **kwargs)
+            book = store.client.books[file_id]
+            initial = book.sheets[0]
+            book.sheets[0] = GspreadSheet(
+                book,
+                title,
+                list(values),
+                initial.id,
+                rows=initial.row_count,
+                cols=initial.col_count,
+            )
+            return file_id
+
+        provider.create = Mock(side_effect=create)
+        return manager, provider
+
+    def test_initial_empty_sheet_uses_real_gspread_contract(self):
+        for values in ([], [[]], [[""]], [["", ""], ["", ""]]):
+            for include_empty in (False, True):
+                for title in ("Página1", "Historico_Pedidos"):
+                    with self.subTest(
+                        values=values, include_empty=include_empty, title=title
+                    ):
+                        manager, provider = self.creation_candidate(
+                            title=title, values=values
+                        )
+                        original = provider.share
+
+                        def share(
+                            file_id,
+                            intent,
+                            original=original,
+                            manager=manager,
+                            include_empty=include_empty,
+                        ):
+                            original(file_id, intent)
+                            candidate = manager.store.client.books[file_id].sheets[0]
+                            candidate.include_empty_values = include_empty
+
+                        with patch.object(provider, "share", side_effect=share):
+                            snapshot = manager._create_part(
+                                "Historico_Pedidos", ["chave", "valor"]
+                            )
+                        self.assertEqual(
+                            snapshot.worksheet.values, [["chave", "valor"]]
+                        )
+                        self.assertEqual(snapshot.worksheet.row_count, 1)
+                        self.assertEqual(snapshot.worksheet.frozen_row_count, 0)
+                        self.assertEqual(provider.creations, 1)
+                        self.assertEqual(manager.index.intents, {})
+                        self.assertEqual(
+                            snapshot.worksheet.reads[0]["valueRenderOption"], "FORMULA"
+                        )
+                        manager.close()
+
+    def test_one_row_anchor_keeps_capacity_without_freezing_all_rows(self):
+        store, ws, provider = self.make("Pedidos_FarmaLider", ["chave", "valor"])
+        ws.book.sheets.remove(ws)
+        ws.book.add("Outra aba", [], rows=998, cols=1)
+        created = store._get_or_create_sheet("Pedidos_FarmaLider", ["chave", "valor"])
+        self.assertEqual(created.row_count, 1)
+        self.assertEqual(created.frozen_row_count, 0)
+        self.assertEqual(allocated_cells(created.book.fetch_sheet_metadata()), 1000)
+        self.assertEqual(provider.creations, 0)
+
+    def test_normal_root_creation_still_freezes_header_with_free_rows(self):
+        store, ws, _ = self.make("Pedidos_FarmaLider", ["chave", "valor"])
+        ws.book.sheets.remove(ws)
+        manager = store._continuity
+        store._continuity = None
+        created = store._get_or_create_sheet("Pedidos_FarmaLider", ["chave", "valor"])
+        self.assertGreater(created.row_count, 1)
+        self.assertEqual(created.frozen_row_count, 1)
+        manager.close()
+
+    def test_unexpected_content_is_preserved_before_resize_or_header_write(self):
+        for values in (
+            [["manual"]],
+            [[0]],
+            [[False]],
+            [[" "]],
+            [[None]],
+            [['=""']],
+            [["chave", "valor"], ['=""']],
+        ):
+            for title in ("Página1", "Historico_Pedidos"):
+                with self.subTest(values=values, title=title):
+                    manager, provider = self.creation_candidate(
+                        title=title, values=values
+                    )
+                    original = provider.share
+
+                    def share(file_id, intent, original=original, manager=manager):
+                        original(file_id, intent)
+                        candidate = manager.store.client.books[file_id].sheets[0]
+                        candidate.formatted_values = []
+
+                    with patch.object(provider, "share", side_effect=share):
+                        with self.assertRaises(ContinuationError):
+                            manager._create_part(
+                                "Historico_Pedidos", ["chave", "valor"]
+                            )
+                    candidate = manager.store.client.books["continuation1"].sheets[0]
+                    self.assertEqual(candidate.values, values)
+                    self.assertEqual(
+                        (candidate.row_count, candidate.col_count), (1000, 26)
+                    )
+                    self.assertEqual(candidate.writes, 0)
+                    self.assertEqual(candidate.title, title)
+                    self.assertIn("Historico_Pedidos#0", manager.index.intents)
+                    self.assertEqual(manager.index.parts, {})
+                    manager.close()
+
+    def test_multiple_sheets_are_rejected_even_with_matching_title(self):
+        for title in ("Página1", "Historico_Pedidos"):
+            with self.subTest(title=title):
+                manager, provider = self.creation_candidate(
+                    title=title,
+                    values=[["chave", "valor"]] if title == "Historico_Pedidos" else [],
+                )
+                original = provider.share
+
+                def share(file_id, intent, original=original, manager=manager):
+                    original(file_id, intent)
+                    manager.store.client.books[file_id].add("Outra aba", [["manual"]])
+
+                with patch.object(provider, "share", side_effect=share):
+                    with self.assertRaisesRegex(ContinuationError, "abas inesperadas"):
+                        manager._create_part("Historico_Pedidos", ["chave", "valor"])
+                book = manager.store.client.books["continuation1"]
+                self.assertEqual(len(book.sheets), 2)
+                self.assertEqual(book.sheets[0].writes, 0)
+                self.assertEqual(book.sheets[0].row_count, 1000)
+                self.assertEqual(book.sheets[1].values, [["manual"]])
+                manager.close()
+
+    def test_invisible_cell_structure_is_preserved_before_resize(self):
+        for field, content in (
+            ("note", "anotação"),
+            ("dataValidation", {"strict": True}),
+            ("userEnteredFormat", {"backgroundColor": {"red": 1}}),
+        ):
+            with self.subTest(field=field):
+                manager, provider = self.creation_candidate()
+                original = provider.share
+
+                def share(
+                    file_id,
+                    intent,
+                    original=original,
+                    manager=manager,
+                    field=field,
+                    content=content,
+                ):
+                    original(file_id, intent)
+                    candidate = manager.store.client.books[file_id].sheets[0]
+                    candidate.native_cells[999, 25] = {field: content}
+
+                with patch.object(provider, "share", side_effect=share):
+                    with self.assertRaisesRegex(
+                        ContinuationError, "estrutura inesperada"
+                    ):
+                        manager._create_part("Historico_Pedidos", ["chave", "valor"])
+                candidate = manager.store.client.books["continuation1"].sheets[0]
+                self.assertEqual(candidate.native_cells[999, 25], {field: content})
+                self.assertEqual((candidate.row_count, candidate.col_count), (1000, 26))
+                self.assertEqual(candidate.title, "Página1")
+                self.assertEqual(candidate.writes, 0)
+                manager.close()
+
+    def test_unexpected_sheet_structure_or_extra_metadata_blocks_resize(self):
+        for field in (
+            "protectedRanges",
+            "merges",
+            "bandedRanges",
+            "rowGroups",
+            "columnGroups",
+            "slicers",
+            "tables",
+            "extra_sheet",
+            "changed_id",
+            "changed_title",
+            "changed_grid",
+        ):
+            with self.subTest(field=field):
+                manager, provider = self.creation_candidate()
+                original = provider.share
+
+                def share(
+                    file_id, intent, original=original, manager=manager, field=field
+                ):
+                    original(file_id, intent)
+                    book = manager.store.client.books[file_id]
+                    fetch = book.fetch_sheet_metadata
+
+                    def metadata(**kwargs):
+                        result = fetch(**kwargs)
+                        params = kwargs.get("params", {})
+                        if not params.get("ranges"):
+                            properties = result["sheets"][0]["properties"]
+                            if field == "extra_sheet":
+                                result["sheets"].append(
+                                    {"properties": {"sheetId": 999}}
+                                )
+                            elif field == "changed_id":
+                                properties["sheetId"] = 999
+                            elif field == "changed_title":
+                                properties["title"] = "Outra aba"
+                            elif field == "changed_grid":
+                                properties["gridProperties"]["rowCount"] += 1
+                        elif (
+                            not field.startswith("changed_") and field != "extra_sheet"
+                        ):
+                            result["sheets"][0][field] = [
+                                {"range": {"startRowIndex": 999}}
+                            ]
+                        return result
+
+                    book.fetch_sheet_metadata = Mock(side_effect=metadata)
+
+                with patch.object(provider, "share", side_effect=share):
+                    with self.assertRaisesRegex(
+                        ContinuationError,
+                        "estrutura inesperada|grade da nova continuação mudou",
+                    ):
+                        manager._create_part("Historico_Pedidos", ["chave", "valor"])
+                candidate = manager.store.client.books["continuation1"].sheets[0]
+                self.assertEqual((candidate.row_count, candidate.col_count), (1000, 26))
+                self.assertEqual(candidate.title, "Página1")
+                self.assertEqual(candidate.writes, 0)
+                if field == "extra_sheet" or field.startswith("changed_"):
+                    params = candidate.book.fetch_sheet_metadata.call_args.kwargs[
+                        "params"
+                    ]
+                    self.assertNotIn("ranges", params)
+                    self.assertNotIn("data(", params["fields"])
+                manager.close()
+
+    def test_lost_rename_or_header_response_resumes_same_intent_without_duplicate(self):
+        import json
+
+        from sheets_continuation import LEASE_ID
+
+        for step in ("update_title", "update"):
+            with self.subTest(step=step):
+                manager, provider = self.creation_candidate()
+                original = provider.share
+
+                def share(
+                    file_id, intent, original=original, manager=manager, step=step
+                ):
+                    original(file_id, intent)
+                    candidate = manager.store.client.books[file_id].sheets[0]
+                    operation = getattr(candidate, step)
+
+                    def lost(*args, **kwargs):
+                        operation(*args, **kwargs)
+                        raise Timeout("resposta perdida sintética")
+
+                    setattr(candidate, step, Mock(side_effect=lost))
+
+                with patch.object(provider, "share", side_effect=share):
+                    with self.assertRaisesRegex(ContinuationError, "não confirmou"):
+                        manager._create_part("Historico_Pedidos", ["chave", "valor"])
+                candidate = manager.store.client.books["continuation1"].sheets[0]
+                setattr(candidate, step, getattr(GspreadSheet, step).__get__(candidate))
+                # Reabrir o índice persistido, como uma nova execução após a falha.
+                manager.close()
+                lease = json.loads(
+                    manager.store.book.metadata[LEASE_ID]["metadataValue"]
+                )
+                lease["expires"] = 1
+                manager.store.book.metadata[LEASE_ID]["metadataValue"] = json.dumps(
+                    lease
+                )
+                index = ContinuationIndex.parse(
+                    manager.sheet.get_all_values(),
+                    hub="dashboard",
+                    segment="FARMA",
+                    roots=roots_for(manager.store),
+                )
+                resumed = RolloverManager(
+                    manager.store,
+                    manager.sheet,
+                    index,
+                    provisioner_factory=lambda provider=provider: provider,
+                )
+                manager.store._continuity = resumed
+                snapshot = resumed._create_part("Historico_Pedidos", ["chave", "valor"])
+                self.assertEqual(snapshot.worksheet.values, [["chave", "valor"]])
+                self.assertEqual(provider.creations, 1)
+                self.assertEqual(provider.create.call_count, 1)
+                self.assertEqual(len(resumed.index.parts), 1)
+                self.assertEqual(resumed.index.intents, {})
+                self.assertEqual(len(candidate.book.sheets), 1)
+                resumed.close()
 
     def test_unchanged_bi_is_confirmed_after_activation_or_interrupted_publication(
         self,

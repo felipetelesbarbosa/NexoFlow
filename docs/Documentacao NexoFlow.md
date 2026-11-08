@@ -1,4 +1,4 @@
-# NexoFlow 1.5.25 — Guia de operação
+# NexoFlow 1.5.26 — Guia de operação
 
 O NexoFlow integra Weni e a API FarmaLíder para **FarmaLíder e Pets Líder**, mantendo dados separados por perfil. O objetivo é manter contatos e pedidos atualizados e alimentar o Google Sheets e os painéis do Data Studio.
 
@@ -23,15 +23,17 @@ os limites em [Exclusões de publicação](EXCLUSOES%20PUBLICACAO%20HISTORICO.md
 | **Noturno** | Executar Weni, Analytics e Recompra na marca escolhida sem confirmações durante a carga. |
 | **Terminal** | Executar comandos, consultar dados e diagnosticar a instalação. |
 
-## Atualização 1.5.25
+## Atualização 1.5.26
 
-Corrige a escolha do índice na conferência de itens do histórico, evitando reler todos os itens para cada pedido. Mantém os mesmos totais, segmentação, piloto, revisão, continuações e fechamento ao centavo.
+Corrige a criação e a retomada de continuações vazias quando o gspread retorna `[[]]` ou células com strings vazias. Mantém a mesma intenção e o arquivo já criado, sem duplicar partes. Corrige também o HTTP 400 ao tentar congelar toda a grade de uma linha, sem aumentar a capacidade aprovada. A leitura de fórmulas e a conferência da estrutura nativa bloqueiam conteúdo, anotações, validações, proteções ou abas inesperadas antes de redimensionar.
 
-Atualize em **Preserve** e prepare uma revisão inédita usando o backup consistente já conferido. Preserve o plano interrompido e seus comprovantes; não altere assinaturas ou journals para reaproveitar uma revisão de código diferente. Consulte a [correção operacional](CORRECAO%20CONFERENCIA%201.5.25.md) e o [roteiro de produção](INICIALIZACAO%20HISTORICO%20PRODUCAO.md).
+Inclui a correção de privacidade do resumo de exclusões: somente quantidade e valor original excluído ficam no resumo agregado; o detalhe necessário permanece nos comprovantes privados.
+
+**Revisões WRITING da 1.5.25 exigem diagnóstico antes da atualização.** Para o caso estrito interrompido antes do primeiro lote, a 1.5.26 oferece `--planilhas reconciliar`: valida fonte, transformação, baseline, destinos e intenção antes de auditar a compatibilidade da mesma revisão. Após o pacote aprovado, atualize por **Preserve**, reconcilie e aplique o piloto separadamente. Não instale módulos avulsos, não edite assinaturas/journals nem prepare outro plano sobre a revisão pendente. Outros estados permanecem bloqueados. Veja a [correção de continuações](CORRECAO%20CRIACAO%20CONTINUACOES.md).
 
 ## Antes de começar
 
-Instale pelo [Setup oficial](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.25), configure suas próprias credenciais e compartilhe as planilhas com a conta de serviço Google. O diretório padrão é `C:\NexoFlow`. Confira os requisitos e os campos necessários no [guia de instalação](README%20INSTALACAO.md).
+Instale pelo [Setup oficial](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.26), configure suas próprias credenciais e compartilhe as planilhas com a conta de serviço Google. O diretório padrão é `C:\NexoFlow`. Confira os requisitos e os campos necessários no [guia de instalação](README%20INSTALACAO.md).
 
 Abra o mesmo aplicativo e escolha **FarmaLíder** ou **Pets Líder** antes da carga. Configure tokens Weni e três destinos Sheets em cada perfil. A credencial Google pode ser compartilhada. Veja [configuração dos segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 

@@ -37,6 +37,46 @@ class ProvisioningTests(unittest.TestCase):
             "permissions": [],
         }
 
+    def test_reconciliation_access_is_exact_readonly_and_service_is_writer(self):
+        p = self.provider()
+        intent = self.intent()
+        intent["permissions"] = [
+            dict(type="user", role="owner", emailAddress="owner@example.invalid"),
+            dict(type="user", role="reader", emailAddress="reader@example.invalid"),
+            dict(type="user", role="reader", emailAddress=p.service_email),
+        ]
+        valid = [
+            dict(type="user", role="owner", emailAddress="owner@example.invalid"),
+            dict(type="user", role="reader", emailAddress="reader@example.invalid"),
+            dict(type="user", role="writer", emailAddress=p.service_email),
+        ]
+        with patch.object(p, "_get", return_value=dict(permissions=valid)):
+            self.assertTrue(p.verify_private_access("created", intent))
+        valid[0]["role"] = "writer"  # Owner da origem vira writer ao compartilhar.
+        with patch.object(p, "_get", return_value=dict(permissions=valid)):
+            self.assertTrue(p.verify_private_access("created", intent))
+        cases = [
+            [*valid, dict(type="anyone", role="reader")],
+            [*valid, valid[1]],
+            valid[:2],
+            [valid[0], dict(valid[1], role="writer"), valid[2]],
+            [valid[0], valid[1], dict(valid[2], role="owner")],
+            [valid[0], dict(valid[1], expirationTime="2030-01-01T00:00:00Z"), valid[2]],
+        ]
+        for permissions in cases:
+            with (
+                self.subTest(permissions=permissions),
+                patch.object(p, "_get", return_value=dict(permissions=permissions)),
+            ):
+                with self.assertRaises(ContinuationError):
+                    p.verify_private_access("created", intent)
+        with patch.object(
+            p, "_get", return_value=dict(permissions=valid, nextPageToken="next")
+        ):
+            with self.assertRaises(ContinuationError):
+                p.verify_private_access("created", intent)
+        p.before_write.assert_not_called()
+
     def test_lost_creation_response_adopts_same_file_without_second_post(self):
         p = self.provider()
         with (

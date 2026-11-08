@@ -13,7 +13,7 @@ from order_history_sheets import SCHEMAS
 from sheets_continuation import ContinuationIndex, allocated_cells, stamp_book
 from sheets_partitions import RolloverManager, roots_for
 from sheets_storage import SheetsStorage
-from tests.sheets_memory import Book, Client, Provisioner
+from tests.sheets_memory import Book, Client, GspreadSheet, Provisioner
 from tests.test_history_publication import fixture, stream
 
 
@@ -86,6 +86,7 @@ class TransportTests(unittest.TestCase):
         self.remote._drive = info
         self.pub = Publication(self.remote, "FARMA", Path(self.tmp.name))
 
+    @patch("tests.sheets_memory.Sheet", GspreadSheet)
     def test_fresh_setup_through_pilot_resume_check_and_idempotence(self):
         from run_sheets_continuation import StorageSetup
         from sheets_storage import STORAGE_SHEET

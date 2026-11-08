@@ -55,6 +55,12 @@ nexo historico --planilhas preparar --revisao logs\privado\historico_revisao.jso
 nexo historico --planilhas aplicar --revisao logs\privado\historico_revisao.json
 ```
 
+Uma revisão 1.5.25 interrompida antes do primeiro lote pode exigir o protocolo
+restrito `--planilhas reconciliar` após atualização Preserve para o pacote
+1.5.26 aprovado. Ele preserva a revisão e comprova compatibilidade antes do
+piloto; não envia fatos. Veja os requisitos, bloqueios e a sequência na
+[correção de continuações](CORRECAO%20CRIACAO%20CONTINUACOES.md).
+
 Homologue primeiro com três planilhas **de teste** configuradas em uma instalação de teste, não nas planilhas comerciais. Nenhuma escrita real foi executada durante o desenvolvimento. A aplicação exige revisão com os mesmos dados, IDs, schemas e snapshots. Pedido ativo remoto ausente da base local bloqueia a aplicação para reconciliação. Backup privado antecede cada lote; respostas são relidas. Na nova implementação descrita abaixo, falha parcial exige retomar a mesma revisão, sem duplicação. Não prepare outro plano durante uma publicação em andamento. Linhas substituídas permanecem com `vigente=Não`; filtros usam `vigente=Sim`.
 
 | Arquivo | Abas novas | Grão |

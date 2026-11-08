@@ -1,4 +1,4 @@
-# Documentação do NexoFlow 1.5.15
+# Documentação do NexoFlow 1.5.26
 
 O **NexoFlow Windows** atende **FarmaLíder e Pets Líder**, com aplicativos operacionais autônomos e dados separados. Confira [segmentos, campos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 
@@ -18,6 +18,7 @@ Comece pela [instalação](README%20INSTALACAO.md) e pelo [guia de operação](D
 
 - [Configuração do Google Sheets](GOOGLE%20SETUP.md) e [divisão em três arquivos](planilhas_separadas.md).
 - [Continuações automáticas e capacidade do Sheets](CONTINUACOES.md).
+- [Criação e retomada de continuações vazias](CORRECAO%20CRIACAO%20CONTINUACOES.md), incluindo a revisão pendente sob 1.5.25.
 - [Fontes e indicadores do Data Studio](DATA%20STUDIO.md).
 - [Regras de pedidos](PEDIDOS.md), [campos de pedido na Weni](PEDIDOS%20WENI.md) e [API FarmaLíder](FARMALIDER%20API.md).
 - [Cadastro por segmento](CADASTRO%20FARMA.md), [localização](geografia.md) e [contatos duplicados](deduplicacao_weni.md).

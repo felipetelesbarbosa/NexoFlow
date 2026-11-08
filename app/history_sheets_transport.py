@@ -460,6 +460,124 @@ class SheetsTransport:
                 ):
                     raise HistoryError("GRADE_ALTERADA_APOS_REVISAO")
 
+    def verify_reconciliation(self, capacity, metadata, revision):
+        """Somente leitura de origens/grades/intenção; não adota ou cria partes."""
+        from sheets_partitions import _empty_creation_values
+
+        self.manager.require()
+        self.preflight(capacity, metadata)
+        for book_id, layout in metadata["layouts"].items():
+            current_layout = self.store._read_with_retry(
+                "conferir inventário original da reconciliação",
+                self.manager._book(book_id).fetch_sheet_metadata,
+            )
+            if {s["properties"]["sheetId"] for s in current_layout["sheets"]} != {
+                s["properties"]["sheetId"] for s in layout["sheets"]
+            }:
+                raise HistoryError("RECONCILIACAO_NAO_ACEITA_ABAS_NOVAS_NA_RAIZ")
+        expected = {
+            (p["title"], p["number"], p["book"], p["sheet"]) for p in metadata["parts"]
+        }
+        actual = {
+            (p.title, p.number, p.book_id, p.sheet_id)
+            for p in self.manager.index.parts.values()
+            if p.title in self.schemas
+        }
+        if not actual <= expected or set(self.manager.index.files) - set(
+            metadata["books"]
+        ):
+            raise HistoryError("RECONCILIACAO_NAO_ACEITA_PARTES_JA_ATIVADAS")
+        publication = self.manager.index.config.get("history_publication", {})
+        if publication and publication != dict(state="WRITING", revision=revision):
+            raise HistoryError("OUTRA_PUBLICACAO_EM_ANDAMENTO")
+        approved = {f"{p['title']}#{p['number']}": p for p in capacity["creations"]}
+        proofs = []
+        for key, intent in self.manager.index.intents.items():
+            planned = approved.get(key)
+            if (
+                not planned
+                or not planned["book"].startswith("new:")
+                or intent.get("table") != planned["title"]
+                or intent.get("part") != planned["number"]
+                or intent.get("schema") != fingerprint(self.schemas[planned["title"]])
+                or intent.get("source")
+                != metadata["roots"][storage_role(planned["title"])]
+                or intent.get("hub") != self.manager.index.config["hub"]
+                or intent.get("segment") != self.context()["segment"]
+                or intent.get("role") != storage_role(planned["title"])
+                or not intent.get("file_id")
+                or intent.get("create_state") != "sending"
+            ):
+                raise HistoryError("INTENCAO_NAO_COMPROVADA_PARA_RECONCILIACAO")
+            if self.manager.provider is None:
+                self.manager.provider = self.manager.provider_factory()
+            provider = self.manager.provider
+            file_id = intent["file_id"]
+            if provider.locate(intent["operation"]) != file_id:
+                raise HistoryError("ARQUIVO_DA_OPERACAO_NAO_COMPROVADO")
+            provider.verify_owned(file_id, intent)
+            current = provider.prepare_intent(
+                intent["source"],
+                intent["operation"],
+                hub=intent["hub"],
+                segment=intent["segment"],
+                role=intent["role"],
+                number=intent["number"],
+            )
+
+            def permissions(data):
+                return sorted(
+                    data["permissions"],
+                    key=lambda p: (p["type"], p["emailAddress"].casefold()),
+                )
+
+            if current["parents"] != intent["parents"] or permissions(
+                current
+            ) != permissions(intent):
+                raise HistoryError("PASTA_OU_PERMISSOES_ALTERADAS")
+            provider.verify(
+                file_id,
+                hub=intent["hub"],
+                segment=intent["segment"],
+                role=intent["role"],
+            )
+            access = provider.verify_private_access(file_id, intent)
+            book = self.store._read_with_retry(
+                "abrir candidata da reconciliação",
+                lambda file_id=file_id: self.store.client.open_by_key(file_id),
+            )
+            sheets = self.store._read_with_retry(
+                "conferir candidata da reconciliação", book.worksheets
+            )
+            if len(sheets) != 1:
+                raise HistoryError("CANDIDATA_COM_ABAS_INESPERADAS")
+            ws = sheets[0]
+            values = self.store._read_with_retry(
+                "ler candidata sem calcular fórmulas",
+                lambda ws=ws: ws.get_all_values(value_render_option="FORMULA"),
+            )
+            if not _empty_creation_values(values) and not (
+                ws.title == planned["title"]
+                and values == [self.schemas[planned["title"]]]
+            ):
+                raise HistoryError("CANDIDATA_CONTEM_FATOS_OU_FORMULAS")
+            self.manager._check_creation_structure(book, ws)
+            proofs.append(
+                dict(
+                    intent=fingerprint(intent),
+                    access=access,
+                    grid=self.store_column_proof(ws),
+                )
+            )
+        self.manager.require()
+        return proofs
+
+    @staticmethod
+    def store_column_proof(ws):
+        return dict(
+            sheet=ws.id, title=ws.title, rows=ws.row_count, columns=ws.col_count
+        )
+
     def begin(self, revision, schemas):
         self.schemas = schemas
         state = self.manager.index.config.get("history_publication", {})

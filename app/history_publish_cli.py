@@ -91,6 +91,18 @@ def _publish(args):
                 )
                 return 0
             review = json.loads(Path(args.revisao).read_text(encoding="utf-8"))
+            if args.planilhas == "reconciliar":
+                from history_reconciliation import reconcile
+
+                if args.banco is not None or args.resumo_mensal is not None:
+                    raise HistoryError(
+                        "RECONCILIACAO_USA_A_FONTE_E_O_COMPROVANTE_DA_REVISAO"
+                    )
+                reconcile(adapter.engine, review)
+                print(
+                    "[OK] Compatibilidade conferida e auditada na mesma revisão. Nenhum lote de fatos foi enviado; aplique separadamente o piloto com --max-lotes 1."
+                )
+                return 0
             if args.planilhas == "aplicar":
                 adapter.apply(None, review, max_batches=args.max_lotes)
                 result = adapter.last_result

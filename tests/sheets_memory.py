@@ -3,8 +3,11 @@
 import copy
 import re
 from types import SimpleNamespace
+from unittest.mock import Mock
 
-from gspread.exceptions import WorksheetNotFound
+from gspread import Worksheet
+from gspread.exceptions import APIError, WorksheetNotFound
+from gspread.http_client import HTTPClient
 from requests import Timeout
 
 from tests.test_sheets_continuation import MetadataBook
@@ -33,6 +36,7 @@ class Sheet:
         self.lose_response = False
         self.native_cells = {}
         self.writes = 0
+        self.frozen_row_count = 0
 
     def get_all_values(self, **kwargs):
         values = copy.deepcopy(self.values)
@@ -92,6 +96,20 @@ class Sheet:
         self.title = title
 
     def freeze(self, **kwargs):
+        rows = kwargs.get("rows", self.frozen_row_count)
+        if rows >= self.row_count:
+            raise APIError(
+                SimpleNamespace(
+                    status_code=400,
+                    json=lambda: {
+                        "error": {
+                            "code": 400,
+                            "message": "Synthetic: cannot freeze all rows in the grid",
+                        }
+                    },
+                )
+            )
+        self.frozen_row_count = rows
         return {}
 
     def batch_format(self, *args, **kwargs):
@@ -102,6 +120,41 @@ class Sheet:
             row[number - 1] if len(row) >= number else ""
             for row in self.get_all_values()
         ]
+
+
+class GspreadSheet(Sheet):
+    """Executa get_all_values real; somente a resposta HTTP é simulada."""
+
+    def get_all_values(self, **kwargs):
+        if not hasattr(self, "reads"):
+            self.reads = []
+
+        def values_get(spreadsheet_id, target, params):
+            self.reads.append(copy.deepcopy(params))
+            values = self.values
+            if params.get("valueRenderOption") != "FORMULA":
+                values = getattr(self, "formatted_values", values)
+            response = {"range": target, "majorDimension": "ROWS"}
+            if values or getattr(self, "include_empty_values", False):
+                response["values"] = copy.deepcopy(values)
+            return response
+
+        client = Mock(spec=HTTPClient)
+        client.values_get.side_effect = values_get
+        worksheet = Worksheet(
+            None,
+            {
+                "sheetId": self.id,
+                "title": self.title,
+                "gridProperties": {
+                    "rowCount": self.row_count,
+                    "columnCount": self.col_count,
+                },
+            },
+            spreadsheet_id=self.book.id,
+            client=client,
+        )
+        return worksheet.get_all_values(**kwargs)
 
 
 class Book(MetadataBook):
@@ -288,6 +341,7 @@ class Provisioner:
     def __init__(self, client):
         self.client, self.creations = client, 0
         self.shared = []
+        self.operations = {}
 
     def prepare_intent(
         self, source_id, operation, *, hub, segment, role, number, primary=False
@@ -312,6 +366,7 @@ class Provisioner:
         book = Book(key)
         book.add("Sheet1", [], rows=1000, cols=26)
         self.client.books[key] = book
+        self.operations[intent["operation"]] = key
         self.client.properties[key] = {
             "nexoflow_hub": intent["hub"],
             "nexoflow_segment": intent["segment"],
@@ -322,11 +377,17 @@ class Provisioner:
     def verify_owned(self, file_id, intent):
         return None
 
+    def locate(self, operation):
+        return self.operations.get(operation)
+
     def share(self, file_id, intent):
         self.shared.append(file_id)
 
     def verify(self, *args, **kwargs):
         return None
+
+    def verify_private_access(self, file_id, intent):
+        return "synthetic-private-access"
 
     def close(self):
         pass

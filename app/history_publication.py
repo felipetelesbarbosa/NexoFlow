@@ -73,11 +73,15 @@ def publisher_signature():
     root = Path(__file__).parent
     files = [
         "history_publication.py",
+        "history_reconciliation.py",
         "history_sheets_transport.py",
         "history_capacity.py",
         "history_conference.py",
         "history_exclusions.py",
         "order_history_sheets.py",
+        "sheets_partitions.py",
+        "sheets_provisioning.py",
+        "google_sheets.py",
     ]
     return digest(
         {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in files}
@@ -94,6 +98,39 @@ def journal_signature(db):
         for row in db.execute(query):
             result.update(json.dumps(list(row), ensure_ascii=False).encode())
     return result.hexdigest()
+
+
+def add_retirements(db, segment, evidence):
+    for title, key, raw in db.execute(
+        "SELECT b.t,b.k,b.v FROM baseline b LEFT JOIN incoming i ON i.t=b.t AND i.k=b.k WHERE i.k IS NULL"
+    ):
+        row = json.loads(raw)
+        if title == "Historico_Pedidos" and row["vigente"] != "Não":
+            exceptions = (evidence or {}).get("publication_exclusions", [])
+            fields = (
+                "segmento",
+                "pedido_id",
+                "cliente_id",
+                "data",
+                "estado",
+                "produtos",
+                "frete",
+                "faturamento",
+            )
+            actual = normalized_cells({field: row[field] for field in fields})
+            authorized = any(
+                entry.get("segmento") == segment
+                and entry.get("pedido_id") == row["pedido_id"]
+                and normalized_cells(entry.get("pedido_original", {})) == actual
+                for entry in exceptions
+            )
+            if not authorized:
+                raise HistoryError("BASE_LOCAL_INCOMPLETA_RECONCILIAR")
+        row["vigente"] = "Não"
+        db.execute(
+            "INSERT INTO incoming VALUES(?,?,?)",
+            (title, key, pack(title, row, segment)),
+        )
 
 
 class Publication:
@@ -162,36 +199,7 @@ class Publication:
             if verify_snapshot is not None:
                 verify_snapshot(metadata)
             input_digest = rows_hash(db, "incoming")
-            for title, key, raw in db.execute(
-                "SELECT b.t,b.k,b.v FROM baseline b LEFT JOIN incoming i ON i.t=b.t AND i.k=b.k WHERE i.k IS NULL"
-            ):
-                row = json.loads(raw)
-                if title == "Historico_Pedidos" and row["vigente"] != "Não":
-                    exceptions = (evidence or {}).get("publication_exclusions", [])
-                    fields = (
-                        "segmento",
-                        "pedido_id",
-                        "cliente_id",
-                        "data",
-                        "estado",
-                        "produtos",
-                        "frete",
-                        "faturamento",
-                    )
-                    actual = normalized_cells({field: row[field] for field in fields})
-                    authorized = any(
-                        entry.get("segmento") == self.segment
-                        and entry.get("pedido_id") == row["pedido_id"]
-                        and normalized_cells(entry.get("pedido_original", {})) == actual
-                        for entry in exceptions
-                    )
-                    if not authorized:
-                        raise HistoryError("BASE_LOCAL_INCOMPLETA_RECONCILIAR")
-                row["vigente"] = "Não"
-                db.execute(
-                    "INSERT INTO incoming VALUES(?,?,?)",
-                    (title, key, pack(title, row, self.segment)),
-                )
+            add_retirements(db, self.segment, evidence)
             db.commit()
             additions = {
                 title: db.execute(
@@ -363,17 +371,13 @@ class Publication:
             if rows_hash(db, "incoming") != review["input_digest"]:
                 raise HistoryError("DADOS_ALTERADOS_APOS_REVISAO")
 
-    def _open(self, review):
+    def _open_local(self, review):
         if review.get("format") != FORMAT or review.get("segment") != self.segment:
             raise HistoryError("REVISAO_INCOMPATIVEL_PREPARAR_NOVAMENTE")
         original = dict(review)
         checksum = original.pop("digest", None)
         if checksum != digest(original):
             raise HistoryError("REVISAO_ALTERADA")
-        if review.get("publisher_signature") != publisher_signature():
-            raise HistoryError(
-                "PUBLICADOR_ALTERADO: retome com o código da revisão ou reconcilie o plano antes de preparar outra revisão"
-            )
         path = Path(review["journal"]).resolve()
         # Uma revisão não pode apontar a um banco de outro diretório privado.
         if not path.is_relative_to(self.directory.resolve()):
@@ -393,6 +397,19 @@ class Publication:
         ):
             db.close()
             raise HistoryError("PLANO_LOCAL_ALTERADO")
+        return db
+
+    def _open(self, review):
+        db = self._open_local(review)
+        current = publisher_signature()
+        if review.get("publisher_signature") != current:
+            from history_reconciliation import compatible
+
+            if not compatible(db, review, current):
+                db.close()
+                raise HistoryError(
+                    "PUBLICADOR_ALTERADO: retome com o código da revisão ou reconcilie o plano antes de preparar outra revisão"
+                )
         return db
 
     def _binding(self, db):

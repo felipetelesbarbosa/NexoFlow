@@ -1,13 +1,18 @@
 # NexoFlow — Changelog
 
-## Não publicado — privacidade do resumo de exclusões
+## NexoFlow 1.5.26 — Criação de continuações e privacidade — em validação
 
+- Aceitar respostas vazias reais do gspread na primeira aba e na retomada já renomeada, mantendo a intenção e o arquivo aprovados.
+- Ler fórmulas e conferir estrutura nativa, abas e dimensões antes do redimensionamento; preservar conteúdo, notas, validações, proteções e estruturas inesperadas.
+- Omitir congelamento quando a grade tem somente uma linha, evitando o HTTP 400 comprovado no Google sem ampliar a capacidade aprovada.
+- Cobrir perda de resposta, piloto, retomada, conferência e idempotência com o método real do gspread e transporte sintético.
+- Oferecer `--planilhas reconciliar` para revisão oficial 1.5.25 com zero lotes iniciados: após atualização Preserve para o pacote aprovado, provar integridade, mesma transformação, baseline, destinos, permissões e intenção antes de emitir recibo transacional privado. Preservar a revisão original e aplicar piloto/conferência separadamente; bloquear estados incertos ou já avançados sem contornar assinaturas.
 - Retirar IDs de pedidos/clientes e texto livre de responsável/motivo do resumo mensal agregado, tanto ao derivar a cópia como na auditoria offline.
 - Manter quantidade e valor original excluído no resumo; conservar integralmente os detalhes no comprovante privado e na revisão de publicação.
 - Corrigir com regressões que falham na 1.5.25; preservar a release publicada, dados, autorização e guardas de inativação. Nova distribuição depende de patch próprio; não sobrescrever os pacotes 1.5.25.
 
 
-## NexoFlow 1.5.25 — Exclusões autorizadas do histórico — em validação
+## NexoFlow 1.5.25 — Exclusões autorizadas do histórico — 08/11/2026
 
 - Criar cópia privada a partir de backup consistente e hash declarado, retirando somente compras válidas expressamente autorizadas por ID, motivo e responsável.
 - Preservar fonte bruta, registros originais, recebimentos, janelas, pendências e revisões; recalcular resumo e LTV no universo filtrado.

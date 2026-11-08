@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>NexoFlow 1.5.25 - Documentação</title>
+  <title>NexoFlow 1.5.26 - Documentação</title>
   <style>
     html {
       color: #1a1a1a;
@@ -170,9 +170,9 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">NexoFlow 1.5.25 - Documentação</h1>
+<h1 class="title">NexoFlow 1.5.26 - Documentação</h1>
 </header>
-<h1 id="nexoflow-1525--guia-de-operação">NexoFlow 1.5.25 — Guia de
+<h1 id="nexoflow-1526--guia-de-operação">NexoFlow 1.5.26 — Guia de
 operação</h1>
 <p>O NexoFlow integra Weni e a API FarmaLíder para <strong>FarmaLíder e
 Pets Líder</strong>, mantendo dados separados por perfil. O objetivo é
@@ -236,20 +236,31 @@ confirmações durante a carga.</td>
 </tr>
 </tbody>
 </table>
-<h2 id="atualização-1525">Atualização 1.5.25</h2>
-<p>Corrige a escolha do índice na conferência de itens do histórico,
-evitando reler todos os itens para cada pedido. Mantém os mesmos totais,
-segmentação, piloto, revisão, continuações e fechamento ao centavo.</p>
-<p>Atualize em <strong>Preserve</strong> e prepare uma revisão inédita
-usando o backup consistente já conferido. Preserve o plano interrompido
-e seus comprovantes; não altere assinaturas ou journals para
-reaproveitar uma revisão de código diferente. Consulte a <a
-href="CORRECAO%20CONFERENCIA%201.5.25.md">correção operacional</a> e o
-<a href="INICIALIZACAO%20HISTORICO%20PRODUCAO.md">roteiro de
-produção</a>.</p>
+<h2 id="atualização-1526">Atualização 1.5.26</h2>
+<p>Corrige a criação e a retomada de continuações vazias quando o
+gspread retorna <code>[[]]</code> ou células com strings vazias. Mantém
+a mesma intenção e o arquivo já criado, sem duplicar partes. Corrige
+também o HTTP 400 ao tentar congelar toda a grade de uma linha, sem
+aumentar a capacidade aprovada. A leitura de fórmulas e a conferência da
+estrutura nativa bloqueiam conteúdo, anotações, validações, proteções ou
+abas inesperadas antes de redimensionar.</p>
+<p>Inclui a correção de privacidade do resumo de exclusões: somente
+quantidade e valor original excluído ficam no resumo agregado; o detalhe
+necessário permanece nos comprovantes privados.</p>
+<p><strong>Revisões WRITING da 1.5.25 exigem diagnóstico antes da
+atualização.</strong> Para o caso estrito interrompido antes do primeiro
+lote, a 1.5.26 oferece <code>--planilhas reconciliar</code>: valida
+fonte, transformação, baseline, destinos e intenção antes de auditar a
+compatibilidade da mesma revisão. Após o pacote aprovado, atualize por
+<strong>Preserve</strong>, reconcilie e aplique o piloto separadamente.
+Não instale módulos avulsos, não edite assinaturas/journals nem prepare
+outro plano sobre a revisão pendente. Outros estados permanecem
+bloqueados. Veja a <a
+href="CORRECAO%20CRIACAO%20CONTINUACOES.md">correção de
+continuações</a>.</p>
 <h2 id="antes-de-começar">Antes de começar</h2>
 <p>Instale pelo <a
-href="https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.25">Setup
+href="https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.26">Setup
 oficial</a>, configure suas próprias credenciais e compartilhe as
 planilhas com a conta de serviço Google. O diretório padrão é
 <code>C:\NexoFlow</code>. Confira os requisitos e os campos necessários
@@ -439,4 +450,4 @@ href="PUBLICADOR%20HISTORICO%20SQLITE%20SHEETS.md">roteiro
 atualizado</a>.</p>
 </body>
 </html>
-<!-- NexoFlow documentation: source-sha256=597ace4b7cc14fb0f7cd9e23042a1b736c5c92352245dedb6b706d50fd544a3d content-sha256=624dc4ba885fc87808d917befc098db3fe2244fc34bce7ee487877549a495437 -->
+<!-- NexoFlow documentation: source-sha256=20605e4e25626422935a0faa94bcaf946423be7a12120ee53802337773fd1769 content-sha256=1ace76bde4b81c7d29d4b4a63d77ef31fd6afd7c9de34b0fe459e86bba8734de -->
