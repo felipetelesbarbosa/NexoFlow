@@ -292,7 +292,7 @@ class RolloverManager:
         self.metadata[part.book_id] = metadata
         return allocated_cells(metadata)
 
-    def _check_creation_structure(self, book, ws):
+    def _check_creation_structure(self, book, ws, *, single_sheet=True):
         from gspread.utils import absolute_range_name
 
         structures = (
@@ -371,16 +371,19 @@ class RolloverManager:
                 }
             ),
         ).get("sheets", [])
+        targets = [
+            s for s in inventory if s.get("properties", {}).get("sheetId") == ws.id
+        ]
         if (
-            len(inventory) != 1
-            or inventory[0].get("properties", {}).get("sheetId") != ws.id
-            or inventory[0].get("properties", {}).get("title") != ws.title
-            or any(inventory[0].get(key) for key in structures)
+            (single_sheet and len(inventory) != 1)
+            or len(targets) != 1
+            or targets[0].get("properties", {}).get("title") != ws.title
+            or any(targets[0].get(key) for key in structures)
         ):
             raise ContinuationError(
                 "A nova continuação contém estrutura inesperada; preservar para revisão."
             )
-        grid = inventory[0].get("properties", {}).get("gridProperties", {})
+        grid = targets[0].get("properties", {}).get("gridProperties", {})
         if (grid.get("rowCount"), grid.get("columnCount")) != (
             ws.row_count,
             ws.col_count,

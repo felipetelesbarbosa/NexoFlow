@@ -1,6 +1,14 @@
 # NexoFlow — Changelog
 
-## NexoFlow 1.5.26 — Criação de continuações e privacidade — em validação
+## NexoFlow 1.5.27 — Cabeçalho vazio e retomada da revisão — em validação
+
+- Corrigir `ABA_CRIADA_COM_CONTEUDO_DIVERGENTE` na inicialização de tabelas nos arquivos principais: também `Worksheet.get()` real retorna `[[]]` para uma aba sem valores.
+- Conferir grade mínima, fórmulas, estruturas nativas e cabeçalho completo antes de registrar a nova tabela; preservar conteúdo divergente sem sobrescrever.
+- Exercitar tanto `get()` como `get_all_values()` reais do gspread com HTTP sintético, incluindo perda de resposta e releitura.
+- Reconciliar novamente uma revisão 1.5.25 com recibo oficial 1.5.26 e partes já preparadas, estritamente antes do primeiro lote. Provar fonte, projeção, baseline, capacidade, destinos, acessos e cabeçalhos vazios; preservar o recibo anterior, a revisão e todos os fatos.
+- Recusar lotes enviados/incertos, fórmulas, fatos, estruturas, abas não previstas ou recibos desconhecidos. Preservar 1.5.26 e versões anteriores; atualização somente por pacote próprio em Preserve.
+
+## NexoFlow 1.5.26 — Criação de continuações e privacidade — 08/11/2026
 
 - Aceitar respostas vazias reais do gspread na primeira aba e na retomada já renomeada, mantendo a intenção e o arquivo aprovados.
 - Ler fórmulas e conferir estrutura nativa, abas e dimensões antes do redimensionamento; preservar conteúdo, notas, validações, proteções e estruturas inesperadas.

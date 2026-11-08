@@ -1,6 +1,6 @@
 # Criação e retomada de continuações vazias
 
-Correção local em validação para a próxima entrega, NexoFlow 1.5.26. A versão
+Correção distribuída na release NexoFlow 1.5.26, publicada em 08/11/2026. A versão
 1.5.25 já foi publicada e seus pacotes, tag e release devem ser preservados.
 
 ## Causa e comportamento
@@ -125,3 +125,9 @@ modificado por esta implementação.
 - [GridProperties](https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/sheets#GridProperties): define os campos de grade e congelamento. A restrição de congelar todas as linhas foi comprovada pela resposta real do Google, não por uma desigualdade publicada nessa referência.
 - [Erros da Sheets API](https://developers.google.com/workspace/sheets/api/troubleshoot-api-errors): argumento inválido em HTTP 400 exige corrigir a solicitação; repetir ou reautorizar não corrige o argumento.
 - [Limites de arquivos do Google Drive](https://support.google.com/drive/answer/37603): limites publicados para arquivos, incluindo planilhas.
+
+## Ajuste posterior das tabelas-raiz
+
+A validação de cabeçalhos em arquivos principais exigiu outro ajuste após a
+1.5.26. Para o erro `ABA_CRIADA_COM_CONTEUDO_DIVERGENTE` e a revisão já reconciliada
+antes do primeiro lote, consulte [a correção específica](CORRECAO%20ABA%20RAIZ%20HISTORICO.md).

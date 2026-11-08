@@ -125,7 +125,7 @@ class Sheet:
 class GspreadSheet(Sheet):
     """Executa get_all_values real; somente a resposta HTTP é simulada."""
 
-    def get_all_values(self, **kwargs):
+    def _gspread(self):
         if not hasattr(self, "reads"):
             self.reads = []
 
@@ -134,6 +134,12 @@ class GspreadSheet(Sheet):
             values = self.values
             if params.get("valueRenderOption") != "FORMULA":
                 values = getattr(self, "formatted_values", values)
+            area = target.rsplit("!", 1)[-1]
+            if re.fullmatch(r"[A-Z]+\d+:[A-Z]+\d+", area):
+                left, first, right, last = bounds(area)
+                values = [row[left:right] for row in values[first:last]]
+                while values and not any(v not in (None, "") for v in values[-1]):
+                    values.pop()
             response = {"range": target, "majorDimension": "ROWS"}
             if values or getattr(self, "include_empty_values", False):
                 response["values"] = copy.deepcopy(values)
@@ -154,7 +160,13 @@ class GspreadSheet(Sheet):
             spreadsheet_id=self.book.id,
             client=client,
         )
-        return worksheet.get_all_values(**kwargs)
+        return worksheet
+
+    def get_all_values(self, **kwargs):
+        return self._gspread().get_all_values(**kwargs)
+
+    def get(self, target, **kwargs):
+        return self._gspread().get(target, **kwargs)
 
 
 class Book(MetadataBook):

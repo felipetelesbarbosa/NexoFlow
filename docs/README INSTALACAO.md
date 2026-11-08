@@ -1,4 +1,4 @@
-# NexoFlow 1.5.26 — Instalação
+# NexoFlow 1.5.27 — Instalação
 
 ## Requisitos
 
@@ -8,11 +8,11 @@
 
 ## Instalar
 
-1. Baixe [NexoFlow-Setup-1.5.26.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.26/NexoFlow-Setup-1.5.26.zip).
+1. Baixe [NexoFlow-Setup-1.5.27.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.27/NexoFlow-Setup-1.5.27.zip).
 2. Extraia todo o pacote e execute **NexoFlow Setup.exe**. Autorize a instalação quando o Windows solicitar.
 3. Conclua o assistente. O destino padrão é `C:\NexoFlow`, com atalhos dos aplicativos na Área de Trabalho e no Menu Iniciar.
 
-O [release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.26) também oferece o projeto completo e o arquivo de hashes dos pacotes.
+O [release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.27) também oferece o projeto completo e o arquivo de hashes dos pacotes.
 
 ## Configurar os acessos
 

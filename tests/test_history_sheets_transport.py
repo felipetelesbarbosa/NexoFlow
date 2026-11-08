@@ -151,6 +151,73 @@ class TransportTests(unittest.TestCase):
         repeated = self.pub.prepare(stream(data))
         self.assertEqual(self.pub.apply(repeated)["applied_rows"], 0)
 
+    @patch("tests.sheets_memory.Sheet", GspreadSheet)
+    def test_root_blank_get_contract_and_header_response_loss_resume(self):
+        from requests import Timeout
+
+        db, data = fixture(1)
+        self.addCleanup(db.close)
+        plan = self.pub.prepare(stream(data))
+        self.remote.acquire()
+        self.remote.preflight(plan["capacity"], self.pub_metadata(plan))
+        self.remote.begin(plan["revision"], SCHEMAS)
+        planned = next(
+            p for p in plan["capacity"]["creations"] if not p["book"].startswith("new:")
+        )
+        book = self.store.client.books[planned["book"]]
+        ws = book.add_worksheet(title=planned["title"], rows=1, cols=planned["width"])
+        self.assertEqual(ws.get("A1:A1", value_render_option="FORMULA"), [[]])
+        ws.lose_response = True
+        # A escrita é aceita, mas a resposta é perdida; retry confere o mesmo
+        # cabeçalho antes de registrar a parte, sem duplicar a aba.
+        with patch.object(
+            self.store, "_write_with_retry", side_effect=lambda _, fn: fn()
+        ):
+            with self.assertRaises(Timeout):
+                self.remote.ensure_part(planned, SCHEMAS[planned["title"]])
+        count = len(book.sheets)
+        actual = self.remote.ensure_part(planned, SCHEMAS[planned["title"]])
+        self.assertEqual(len(book.sheets), count)
+        self.assertEqual(actual["sheet"], ws.id)
+        self.assertEqual(ws.values, [SCHEMAS[planned["title"]]])
+
+    @patch("tests.sheets_memory.Sheet", GspreadSheet)
+    def test_root_nonempty_header_or_hidden_structure_is_never_overwritten(self):
+        from order_history import HistoryError
+        from sheets_continuation import ContinuationError
+
+        db, data = fixture(1)
+        self.addCleanup(db.close)
+        plan = self.pub.prepare(stream(data))
+        self.remote.acquire()
+        self.remote.preflight(plan["capacity"], self.pub_metadata(plan))
+        self.remote.begin(plan["revision"], SCHEMAS)
+        planned = next(
+            p for p in plan["capacity"]["creations"] if not p["book"].startswith("new:")
+        )
+        book = self.store.client.books[planned["book"]]
+        ws = book.add_worksheet(title=planned["title"], rows=1, cols=planned["width"])
+        for values in ([[0]], [[False]], [[" "]], [['=""']], [["externo"]]):
+            with self.subTest(values=values):
+                ws.values = values
+                with self.assertRaisesRegex(HistoryError, "CONTEUDO_DIVERGENTE"):
+                    self.remote.ensure_part(planned, SCHEMAS[planned["title"]])
+                self.assertEqual(ws.values, values)
+                self.assertEqual(ws.writes, 0)
+        ws.values = []
+        ws.native_cells[0, 0] = {"note": "nota sintética"}
+        with self.assertRaisesRegex(ContinuationError, "estrutura inesperada"):
+            self.remote.ensure_part(planned, SCHEMAS[planned["title"]])
+        self.assertEqual(ws.writes, 0)
+
+    def pub_metadata(self, plan):
+        from contextlib import closing
+
+        from history_publication import get
+
+        with closing(self.pub._open_local(plan)) as db:
+            return get(db, "metadata")
+
     def test_legacy_table_in_wrong_root_blocks_before_new_copy(self):
         from order_history import HistoryError
 

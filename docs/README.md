@@ -1,4 +1,4 @@
-# Documentação do NexoFlow 1.5.26
+# Documentação do NexoFlow 1.5.27
 
 O **NexoFlow Windows** atende **FarmaLíder e Pets Líder**, com aplicativos operacionais autônomos e dados separados. Confira [segmentos, campos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 

@@ -16,6 +16,7 @@ from history_publication import get, publisher_signature, put
 from history_reconciliation import (
     LEGACY_SIGNATURE,
     LEGACY_SIGNATURES,
+    PREVIOUS_SIGNATURES,
     RECEIPT_KEY,
     compatible,
     reconcile,
@@ -515,3 +516,91 @@ class ReconciliationTests(unittest.TestCase):
                     self.assertNotEqual(publisher_signature(), before)
                     with self.assertRaisesRegex(HistoryError, "PUBLICADOR_ALTERADO"):
                         self.pub._open(review)
+
+
+class PreparedRootRecoveryTests(unittest.TestCase):
+    setUp = ReconciliationTests.setUp
+    legacy = ReconciliationTests.legacy
+    command = ReconciliationTests.command
+
+    # Reutilizar os helpers sem repetir os testes da primeira reconciliação.
+    def interrupted_26(self):
+        review = self.legacy()
+        signature = sorted(PREVIOUS_SIGNATURES)[0]
+        ensure = self.remote.ensure_part
+
+        def old_empty_root(planned, headers):
+            if not planned["book"].startswith("new:"):
+                book = self.store.client.books[planned["book"]]
+                self.blank_root = book.add_worksheet(
+                    title=planned["title"], rows=1, cols=len(headers)
+                )
+                raise HistoryError("ABA_CRIADA_COM_CONTEUDO_DIVERGENTE")
+            return ensure(planned, headers)
+
+        with patch("history_publication.publisher_signature", return_value=signature):
+            old_receipt = reconcile(self.pub, review)
+            with patch.object(self.remote, "ensure_part", side_effect=old_empty_root):
+                with self.assertRaisesRegex(HistoryError, "ABA_CRIADA"):
+                    self.pub.apply(review, max_batches=1)
+        self.store._continuity.close()
+        self.remote.manifest()
+        with closing(self.pub._open_local(review)) as db:
+            self.assertEqual(
+                db.execute("SELECT DISTINCT state FROM batches").fetchall(),
+                [("pending",)],
+            )
+            self.assertGreater(len(get(db, "parts")), len(get(db, "metadata")["parts"]))
+        return review, old_receipt
+
+    def test_upgrade_reconciled_26_with_created_parts_empty_root_and_no_facts(self):
+        review, old_receipt = self.interrupted_26()
+        before = sha256(review["evidence"]["path"])
+        writes = sum(b.data_writes for b in self.store.client.books.values())
+        receipt = reconcile(self.pub, review)
+        self.assertEqual(receipt["previous_receipt"], old_receipt)
+        self.assertEqual(
+            sum(b.data_writes for b in self.store.client.books.values()), writes
+        )
+        self.assertEqual(reconcile(self.pub, review), receipt)
+        self.assertEqual(self.command("aplicar", "--max-lotes", "1")[0], 3)
+        self.assertEqual(self.command("conferir")[0], 3)
+        self.assertEqual(self.command("aplicar")[0], 0)
+        self.assertEqual(self.command("conferir")[0], 0)
+        self.assertEqual(sha256(review["evidence"]["path"]), before)
+        self.assertEqual(self.review_path.read_bytes(), self.original_review)
+
+    def test_upgrade_blocks_facts_formulas_structures_and_unplanned_root(self):
+        review, old_receipt = self.interrupted_26()
+        ws = self.blank_root
+        for values in ([["fato externo"]], [['=""']], [[0]], [[False]], [[" "]]):
+            with self.subTest(values=values):
+                ws.values = values
+                with self.assertRaisesRegex(HistoryError, "CONTEM_FATOS_OU_FORMULAS"):
+                    reconcile(self.pub, review)
+        ws.values = []
+        ws.native_cells[0, 0] = {"note": "nota sintética"}
+        with self.assertRaisesRegex(ContinuationError, "estrutura inesperada"):
+            reconcile(self.pub, review)
+        ws.native_cells.clear()
+        ws.book.add("Não prevista", [], rows=1, cols=1)
+        with self.assertRaisesRegex(HistoryError, "ABA_NAO_PREVISTA"):
+            reconcile(self.pub, review)
+        with closing(self.pub._open_local(review)) as db:
+            self.assertEqual(get(db, RECEIPT_KEY), old_receipt)
+
+    def test_upgrade_blocks_nonpending_uncertain_or_untrusted_receipt(self):
+        review, old_receipt = self.interrupted_26()
+        with closing(self.pub._open_local(review)) as db:
+            db.execute("UPDATE batches SET state='sending' WHERE n=1")
+            db.commit()
+            with self.assertRaisesRegex(HistoryError, "ZERO_LOTES"):
+                reconcile(self.pub, review)
+            db.execute("UPDATE batches SET state='pending' WHERE n=1")
+            db.commit()
+            changed = dict(old_receipt, to_signature="código desconhecido")
+            changed.pop("digest")
+            changed["digest"] = digest(changed)
+            put(db, RECEIPT_KEY, changed)
+            with self.assertRaisesRegex(HistoryError, "COMPATIBILIDADE_INVALIDO"):
+                reconcile(self.pub, review)

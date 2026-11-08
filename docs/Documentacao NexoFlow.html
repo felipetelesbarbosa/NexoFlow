@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>NexoFlow 1.5.26 - Documentação</title>
+  <title>NexoFlow 1.5.27 - Documentação</title>
   <style>
     html {
       color: #1a1a1a;
@@ -170,9 +170,9 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">NexoFlow 1.5.26 - Documentação</h1>
+<h1 class="title">NexoFlow 1.5.27 - Documentação</h1>
 </header>
-<h1 id="nexoflow-1526--guia-de-operação">NexoFlow 1.5.26 — Guia de
+<h1 id="nexoflow-1527--guia-de-operação">NexoFlow 1.5.27 — Guia de
 operação</h1>
 <p>O NexoFlow integra Weni e a API FarmaLíder para <strong>FarmaLíder e
 Pets Líder</strong>, mantendo dados separados por perfil. O objetivo é
@@ -236,31 +236,25 @@ confirmações durante a carga.</td>
 </tr>
 </tbody>
 </table>
-<h2 id="atualização-1526">Atualização 1.5.26</h2>
-<p>Corrige a criação e a retomada de continuações vazias quando o
-gspread retorna <code>[[]]</code> ou células com strings vazias. Mantém
-a mesma intenção e o arquivo já criado, sem duplicar partes. Corrige
-também o HTTP 400 ao tentar congelar toda a grade de uma linha, sem
-aumentar a capacidade aprovada. A leitura de fórmulas e a conferência da
-estrutura nativa bloqueiam conteúdo, anotações, validações, proteções ou
-abas inesperadas antes de redimensionar.</p>
-<p>Inclui a correção de privacidade do resumo de exclusões: somente
-quantidade e valor original excluído ficam no resumo agregado; o detalhe
-necessário permanece nos comprovantes privados.</p>
-<p><strong>Revisões WRITING da 1.5.25 exigem diagnóstico antes da
-atualização.</strong> Para o caso estrito interrompido antes do primeiro
-lote, a 1.5.26 oferece <code>--planilhas reconciliar</code>: valida
-fonte, transformação, baseline, destinos e intenção antes de auditar a
-compatibilidade da mesma revisão. Após o pacote aprovado, atualize por
-<strong>Preserve</strong>, reconcilie e aplique o piloto separadamente.
-Não instale módulos avulsos, não edite assinaturas/journals nem prepare
-outro plano sobre a revisão pendente. Outros estados permanecem
-bloqueados. Veja a <a
-href="CORRECAO%20CRIACAO%20CONTINUACOES.md">correção de
-continuações</a>.</p>
+<h2 id="atualização-1527">Atualização 1.5.27</h2>
+<p>Corrige <code>ABA_CRIADA_COM_CONTEUDO_DIVERGENTE</code> ao criar o
+cabeçalho das tabelas nos arquivos principais. O caminho agora reconhece
+a resposta vazia real de <code>Worksheet.get()</code> do gspread,
+preserva fórmulas e estruturas inesperadas e relê o cabeçalho antes do
+registro.</p>
+<p>Para uma revisão 1.5.25 já reconciliada na 1.5.26 que parou antes do
+primeiro lote, <code>--planilhas reconciliar</code> verifica novamente a
+fonte, os destinos e as partes preparadas sem fatos. Preserva a revisão
+e o recibo anterior; bloqueia conteúdo, lotes enviados/incertos e
+recibos desconhecidos. Atualize por <strong>Preserve</strong>,
+reconcilie a mesma revisão e aplique o piloto separadamente. Não copie
+módulos avulsos, edite journals ou gere outro plano sobre uma publicação
+WRITING. Consulte a <a
+href="CORRECAO%20ABA%20RAIZ%20HISTORICO.md">correção da
+aba-raiz</a>.</p>
 <h2 id="antes-de-começar">Antes de começar</h2>
 <p>Instale pelo <a
-href="https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.26">Setup
+href="https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.27">Setup
 oficial</a>, configure suas próprias credenciais e compartilhe as
 planilhas com a conta de serviço Google. O diretório padrão é
 <code>C:\NexoFlow</code>. Confira os requisitos e os campos necessários
@@ -450,4 +444,4 @@ href="PUBLICADOR%20HISTORICO%20SQLITE%20SHEETS.md">roteiro
 atualizado</a>.</p>
 </body>
 </html>
-<!-- NexoFlow documentation: source-sha256=20605e4e25626422935a0faa94bcaf946423be7a12120ee53802337773fd1769 content-sha256=1ace76bde4b81c7d29d4b4a63d77ef31fd6afd7c9de34b0fe459e86bba8734de -->
+<!-- NexoFlow documentation: source-sha256=42c4d1647671ed7a02da4fc58f8ddabf4bb554809b7ed5bdb2548838cc1c6223 content-sha256=14211cc38e605fb3580a4f01500c42e4534e858256f177407d19aee130f0c277 -->

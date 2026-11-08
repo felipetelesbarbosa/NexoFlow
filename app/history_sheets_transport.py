@@ -10,7 +10,7 @@ from gspread.exceptions import WorksheetNotFound
 from order_history import HistoryError
 from order_history_sheets import normalized_cells, typed_cells
 from sheets_continuation import ContinuationIndex, allocated_cells, fingerprint
-from sheets_partitions import roots_for
+from sheets_partitions import _empty_creation_values, roots_for
 from sheets_provisioning import DRIVE
 from sheets_storage import storage_role
 
@@ -460,31 +460,84 @@ class SheetsTransport:
                 ):
                     raise HistoryError("GRADE_ALTERADA_APOS_REVISAO")
 
-    def verify_reconciliation(self, capacity, metadata, revision):
+    def verify_reconciliation(
+        self, capacity, metadata, revision, *, prepared_parts=None
+    ):
         """Somente leitura de origens/grades/intenção; não adota ou cria partes."""
         from sheets_partitions import _empty_creation_values
 
         self.manager.require()
         self.preflight(capacity, metadata)
+        prepared = []
+        if prepared_parts is not None:
+            original = {(p["title"], p["number"]): p for p in metadata["parts"]}
+            approved = {(p["title"], p["number"]): p for p in capacity["creations"]}
+            seen = set()
+            for part in prepared_parts:
+                key = (part["title"], part["number"])
+                if key in seen:
+                    raise HistoryError("PARTES_PREPARADAS_DIVERGENTES")
+                seen.add(key)
+                if key in original:
+                    if part != original[key]:
+                        raise HistoryError("PARTES_PREPARADAS_DIVERGENTES")
+                    continue
+                plan = approved.get(key)
+                if (
+                    not plan
+                    or (
+                        not plan["book"].startswith("new:")
+                        and part["book"] != plan["book"]
+                    )
+                    or (
+                        plan["book"].startswith("new:")
+                        and part["book"] in metadata["books"]
+                    )
+                    or part["width"] != plan["width"]
+                    or part["cols"] != plan["width"]
+                    or part["allocated_rows"] != 1
+                    or part["used_rows"] != 1
+                ):
+                    raise HistoryError("PARTES_PREPARADAS_DIVERGENTES")
+                prepared.append(part)
+            if not original.keys() <= seen:
+                raise HistoryError("PARTES_ORIGINAIS_AUSENTES")
         for book_id, layout in metadata["layouts"].items():
             current_layout = self.store._read_with_retry(
                 "conferir inventário original da reconciliação",
                 self.manager._book(book_id).fetch_sheet_metadata,
             )
-            if {s["properties"]["sheetId"] for s in current_layout["sheets"]} != {
-                s["properties"]["sheetId"] for s in layout["sheets"]
-            }:
+            old_ids = {s["properties"]["sheetId"] for s in layout["sheets"]}
+            current_ids = {s["properties"]["sheetId"] for s in current_layout["sheets"]}
+            if not old_ids <= current_ids:
                 raise HistoryError("RECONCILIACAO_NAO_ACEITA_ABAS_NOVAS_NA_RAIZ")
+            for sheet in current_layout["sheets"]:
+                props = sheet["properties"]
+                if props["sheetId"] in old_ids:
+                    continue
+                if prepared_parts is None or not any(
+                    p["book"] == book_id and p["title"] == props["title"]
+                    for p in capacity["creations"]
+                ):
+                    raise HistoryError("RECONCILIACAO_NAO_ACEITA_ABAS_NOVAS_NA_RAIZ")
+                ws = self.manager._book(book_id).get_worksheet_by_id(props["sheetId"])
+                self._verify_prepared_header(
+                    self.manager._book(book_id), ws, single_sheet=False
+                )
         expected = {
-            (p["title"], p["number"], p["book"], p["sheet"]) for p in metadata["parts"]
+            (p["title"], p["number"], p["book"], p["sheet"])
+            for p in [*metadata["parts"], *prepared]
         }
         actual = {
             (p.title, p.number, p.book_id, p.sheet_id)
             for p in self.manager.index.parts.values()
             if p.title in self.schemas
         }
-        if not actual <= expected or set(self.manager.index.files) - set(
-            metadata["books"]
+        extra_files = set(self.manager.index.files) - set(metadata["books"])
+        if (
+            not actual <= expected
+            or (prepared_parts is not None and actual != expected)
+            or extra_files - {p["book"] for p in prepared}
         ):
             raise HistoryError("RECONCILIACAO_NAO_ACEITA_PARTES_JA_ATIVADAS")
         publication = self.manager.index.config.get("history_publication", {})
@@ -492,6 +545,41 @@ class SheetsTransport:
             raise HistoryError("OUTRA_PUBLICACAO_EM_ANDAMENTO")
         approved = {f"{p['title']}#{p['number']}": p for p in capacity["creations"]}
         proofs = []
+        for part in prepared:
+            book = self.manager._book(part["book"])
+            ws = self.manager.worksheet(
+                next(
+                    p
+                    for p in self.manager.index.parts.values()
+                    if (p.title, p.number) == (part["title"], part["number"])
+                )
+            )
+            if (book.id, ws.id) != (part["book"], part["sheet"]):
+                raise HistoryError("PARTES_PREPARADAS_DIVERGENTES")
+            self._verify_prepared_header(
+                book, ws, single_sheet=part["book"] in extra_files
+            )
+            if part["book"] in extra_files:
+                role = storage_role(part["title"])
+                info = self.manager.index.files[part["book"]]
+                if (
+                    info.get("source") != metadata["roots"][role]
+                    or info.get("role") != role
+                ):
+                    raise HistoryError("ORIGEM_DA_PARTE_PREPARADA_DIVERGENTE")
+                provider = self.manager.provider
+                intent = provider.prepare_intent(
+                    metadata["roots"][role],
+                    "0" * 32,
+                    hub=self.store._hub_id,
+                    segment=self.context()["segment"],
+                    role=role,
+                    number=info["number"],
+                )
+                access = provider.verify_private_access(part["book"], intent)
+            else:
+                access = "raiz_validada"
+            proofs.append(dict(prepared_part=part, access=access))
         for key, intent in self.manager.index.intents.items():
             planned = approved.get(key)
             if (
@@ -572,6 +660,18 @@ class SheetsTransport:
         self.manager.require()
         return proofs
 
+    def _verify_prepared_header(self, book, ws, *, single_sheet):
+        headers = self.schemas.get(ws.title)
+        if not headers or ws.row_count != 1 or ws.col_count != len(headers):
+            raise HistoryError("GRADE_DA_ABA_PREPARADA_DIVERGENTE")
+        values = self.store._read_with_retry(
+            "conferir aba preparada sem fatos",
+            lambda: ws.get_all_values(value_render_option="FORMULA"),
+        )
+        if values != [headers] and not _empty_creation_values(values):
+            raise HistoryError("ABA_PREPARADA_CONTEM_FATOS_OU_FORMULAS")
+        self.manager._check_creation_structure(book, ws, single_sheet=single_sheet)
+
     @staticmethod
     def store_column_proof(ws):
         return dict(
@@ -617,6 +717,9 @@ class SheetsTransport:
                     "criar cabeçalho histórico reservado",
                     lambda: book.add_worksheet(title=title, rows=1, cols=len(headers)),
                 )
+            if ws.row_count != 1 or ws.col_count != len(headers):
+                raise HistoryError("GRADE_DA_ABA_CRIADA_DIVERGENTE")
+            self.manager._check_creation_structure(book, ws, single_sheet=False)
             values = self.store._read_with_retry(
                 "conferir adoção de cabeçalho",
                 lambda: ws.get(
@@ -624,9 +727,9 @@ class SheetsTransport:
                     value_render_option="FORMULA",
                 ),
             )
-            if values not in ([], [headers]):
+            if values != [headers] and not _empty_creation_values(values):
                 raise HistoryError("ABA_CRIADA_COM_CONTEUDO_DIVERGENTE")
-            if values == []:
+            if _empty_creation_values(values):
                 self.store._write_with_retry(
                     "cabeçalho histórico",
                     lambda: ws.update(
@@ -635,6 +738,7 @@ class SheetsTransport:
                         value_input_option="RAW",
                     ),
                 )
+            self._header(ws, headers)
             part = self.manager.register_root(ws, headers)[0]
             self.manager.index.status[title] = dict(
                 state="WRITING",

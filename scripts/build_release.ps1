@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.26",
+    [string]$Version = "1.5.27",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -414,15 +414,13 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-Corrige a criação e a retomada de continuações vazias quando o gspread retorna ``[[]]`` ou strings vazias. Reaproveita a mesma intenção e o arquivo já criado, com leitura FORMULA e conferência nativa de células e estruturas antes de renomear ou redimensionar. Conteúdo, notas, validações, formatação explícita, proteções e abas inesperadas bloqueiam a criação para revisão.
+Corrige ABA_CRIADA_COM_CONTEUDO_DIVERGENTE ao inicializar tabelas nos arquivos principais. Reconhece a resposta vazia real de Worksheet.get() do gspread, confere a grade e a estrutura nativa e relê o cabeçalho antes de registrar a parte. Fórmulas, dados e estruturas inesperadas são preservados para revisão.
 
-Inclui a correção de privacidade do resumo de exclusões publicada anteriormente apenas na main: mantém quantidade e valor original excluído no resumo agregado; os IDs e a auditoria completa permanecem nos comprovantes privados e na revisão. Preserva as regras financeiras e a autorização das exclusões.
+Para revisão oficial 1.5.25 já reconciliada na 1.5.26 e interrompida antes do primeiro lote, --planilhas reconciliar confere novamente fonte, transformação, baseline, destinos, permissões e partes preparadas sem fatos. A revisão permanece intacta, o recibo anterior é preservado e somente após o OK o operador deve aplicar --max-lotes 1 e conferir o piloto. Lotes enviados/incertos, fatos inesperados ou código desconhecido continuam bloqueados.
 
-Corrige também o HTTP 400 ao congelar toda a grade de uma linha, mantendo a capacidade aprovada. Para uma revisão 1.5.25 interrompida antes do primeiro lote, oferece --planilhas reconciliar: após atualização Preserve com pacote aprovado, confere fonte, transformação, baseline, destinos, permissões e a única candidata da intenção antes de gravar um recibo privado de compatibilidade. A revisão original permanece intacta. Piloto e conferência são comandos separados. Outros estados são bloqueados; não copiar módulos avulsos, editar assinaturas/journals ou replanejar sobre a revisão pendente.
+Atualize por Preserve mantendo SQLite, exclusões, revisões e journals. Não copie módulos avulsos, altere assinaturas ou prepare outro plano sobre a publicação WRITING. O instalador não executa a carga comercial. Capacidade, rollback e fechamento integral ao centavo continuam obrigatórios. A versão 1.5.26 e anteriores permanecem preservadas.
 
-Continuam obrigatórios a capacidade global, o piloto limitado, a retomada sem duplicidade, o rollback protegido e o fechamento integral ao centavo. FARMA e PET exigem sessões, fontes, backups e revisões próprios. A versão 1.5.25 e anteriores permanecem preservadas. Nenhum fato comercial é aplicado por esta distribuição.
-
-Consulte a [correção de continuações](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/CORRECAO%20CRIACAO%20CONTINUACOES.md) e o [guia de exclusões](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/EXCLUSOES%20PUBLICACAO%20HISTORICO.md).
+Consulte a [correção da aba-raiz](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/CORRECAO%20ABA%20RAIZ%20HISTORICO.md). Testes e pacotes validados não comprovam publicação comercial ou conciliação da base real.
 
 Analytics e Noturno usam a integração Meta nativa, sem exigir MCP ou Codex CLI. As rotinas FARMA/PET e as funcionalidades da versão anterior permanecem preservadas. A atualização Preserve mantém configurações e dados. Esta versão não comprova autenticação no proxy corporativo ou aprovação pelo antivírus no PC do usuário; consulte os relatórios e o guia de homologação.
 
@@ -438,7 +436,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.26
+# NexoFlow 1.5.27
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"

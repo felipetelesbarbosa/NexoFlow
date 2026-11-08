@@ -7,6 +7,7 @@ import sqlite3
 from contextlib import closing
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from dedup_io import save_private
 from history_snapshot import readonly, sha256
@@ -20,6 +21,11 @@ LEGACY_SIGNATURES = {
     LEGACY_SIGNATURE,
     # Os mesmos seis blobs oficiais com checkout Windows CRLF.
     "5145fe31d04c2a6bc1dcfb1eef2f7154c36d5dbcb053a6f5c0c8d5d42956aca5",
+}
+# v1.5.26 oficial (a62a707), mesmos dez módulos em LF e CRLF.
+PREVIOUS_SIGNATURES = {
+    "8d664728064f89b1a0a1bf806a7d3154decee3b23e6a37bf0119a8161014bfa6",
+    "25fcd2cba0b985fa7983e1dfe94e527d38185990a512b66d09b0661142c4cb16",
 }
 RECEIPT_KEY = "code_reconciliation"
 
@@ -203,11 +209,19 @@ def reconcile(engine, review):
     from history_publication import get, publisher_signature, rows_hash
 
     current = publisher_signature()
+    receipt: dict[str, Any]
     with closing(engine._open_local(review)) as db:
         if compatible(db, review, current):
             receipt = get(db, RECEIPT_KEY)
         else:
-            if db.execute("SELECT 1 FROM meta WHERE k=?", (RECEIPT_KEY,)).fetchone():
+            previous = get(db, RECEIPT_KEY)
+            upgrading = previous is not None and any(
+                compatible(db, review, signature) for signature in PREVIOUS_SIGNATURES
+            )
+            if (
+                db.execute("SELECT 1 FROM meta WHERE k=?", (RECEIPT_KEY,)).fetchone()
+                and not upgrading
+            ):
                 raise HistoryError("COMPROVANTE_DE_COMPATIBILIDADE_INVALIDO")
             if review.get("publisher_signature") not in LEGACY_SIGNATURES:
                 raise HistoryError("PUBLICADOR_LEGADO_NAO_SUPORTADO_PARA_RECONCILIACAO")
@@ -215,13 +229,15 @@ def reconcile(engine, review):
             if db.execute("PRAGMA integrity_check").fetchone() != ("ok",):
                 raise HistoryError("JOURNAL_INTEGRIDADE_INVALIDA")
             _zero_batches(db, review)
+            if get(db, RECEIPT_KEY) != previous:
+                raise HistoryError("COMPROVANTE_MUDOU_DURANTE_RECONCILIACAO")
             if (
                 rows_hash(db, "incoming") != review["source_digest"]
                 or digest(get(db, "metadata")) != review["metadata_signature"]
             ):
                 raise HistoryError("PLANO_LOCAL_ALTERADO")
             metadata = get(db, "metadata")
-            if get(db, "parts") != metadata["parts"]:
+            if not upgrading and get(db, "parts") != metadata["parts"]:
                 raise HistoryError("RECONCILIACAO_NAO_ACEITA_PARTES_JA_ATIVADAS")
             _transform(db, review, engine.segment)
             engine.remote.acquire()
@@ -234,8 +250,9 @@ def reconcile(engine, review):
             verifier = getattr(engine.remote, "verify_reconciliation", None)
             if verifier is None:
                 raise HistoryError("TRANSPORTE_NAO_COMPROVA_RECONCILIACAO")
+            kwargs = {"prepared_parts": get(db, "parts")} if upgrading else {}
             proofs = verifier(
-                review["capacity"], deepcopy(metadata), review["revision"]
+                review["capacity"], deepcopy(metadata), review["revision"], **kwargs
             )
             _baseline(engine, db, metadata["parts"])
             engine.remote.acquire()
@@ -255,6 +272,10 @@ def reconcile(engine, review):
                 manifest_at_reconciliation=manifest,
                 remote_proofs=proofs,
             )
+            if upgrading:
+                # Preservar a primeira prova; não converter silenciosamente uma
+                # assinatura desconhecida nem um plano com fatos já enviados.
+                receipt["previous_receipt"] = previous
             receipt["digest"] = digest(receipt)
             db.execute(
                 "INSERT OR REPLACE INTO meta VALUES(?,?)",
