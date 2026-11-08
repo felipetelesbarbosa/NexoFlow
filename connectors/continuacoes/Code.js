@@ -23,11 +23,18 @@ function fields_(title) {
     var field = spec[1] === 'number' ? fields.newMetric() : fields.newDimension();
     field.setId(spec[0]).setName(spec[0]);
     field.setType(spec[1] === 'date' ? cc.FieldType.YEAR_MONTH_DAY : spec[1].startsWith('number') ? cc.FieldType.NUMBER : cc.FieldType.TEXT);
-    if (spec[1] === 'number') field.setAggregation(title==='BI_Historico_Resumo' ? (spec[0]==='clientes' ? cc.AggregationType.MAX : cc.AggregationType.SUM) : /(idade|ranking|taxa|pct|disponivel|informada|identificada|pendente|ticket_medio|historico_completo|^clientes$)/.test(spec[0]) ? cc.AggregationType.MAX : cc.AggregationType.SUM);
+    if (spec[1] === 'number') field.setAggregation(title==='BI_Historico_Resumo' ? (spec[0]==='clientes' ? cc.AggregationType.MAX : cc.AggregationType.SUM) : /((?:^|_)idade(?:$|_)|ranking|taxa|pct|disponivel|informada|identificada|pendente|ticket_medio|historico_completo|^clientes$)/.test(spec[0]) ? cc.AggregationType.MAX : cc.AggregationType.SUM);
   });
   return fields;
 }
-function getSchema(request) { return {schema: fields_(request.configParams.tabela).build()}; }
+function getSchema(request) {
+  var params=request.configParams||{}, title=params.tabela;
+  // Vinculação verificável antes do primeiro lote: valida origem, nunca retorna fatos.
+  NexoTables.read(String(params.spreadsheetId||'').trim(),[title],{
+    api:api_(),hash:hash_,schemas:NexoSchemas,segment:params.segmento,schemaOnly:true
+  });
+  return {schema:fields_(title).build()};
+}
 function api_() {
   return {
     meta: function (id) { return Sheets.Spreadsheets.get(id, {fields: 'sheets(properties(sheetId,title,gridProperties)),developerMetadata'}); },

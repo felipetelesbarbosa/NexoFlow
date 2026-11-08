@@ -53,6 +53,18 @@ var NexoTables = (function () {
       if (tag.hub !== hub || tag.segment !== c.segment || tag.role !== role) fail('segmento do arquivo divergente.');
     }
     origin(hub, 'dashboard');
+    if (options.schemaOnly === true) {
+      if (!initial || !options.schemas || !['FARMA','PET'].includes(options.segment)) fail('vinculação exige manifesto, registro e segmento.');
+      var roots=maps.config.principal.roots, roles=['dashboard','operacao','historico'];
+      if (roles.some(function(role){return !idPattern.test(roots[role]||'');}) || new Set(roles.map(function(role){return roots[role];})).size!==3) fail('três origens distintas são obrigatórias.');
+      roles.forEach(function(role){origin(roots[role],role);});
+      // Somente cabeçalhos do registro autorizado. Não consultar linhas de fatos,
+      // exigir READY ou alegar que uma fonte vazia já foi conciliada.
+      var definitions=titles.map(function(title){return [options.schemas[title].map(function(spec){return spec[0];})];});
+      delete metadata[hub];
+      if (stable(indexValues()) !== stable(initial)) fail('a carga mudou durante a vinculação; tente novamente.');
+      return definitions;
+    }
     var physical = new Set();
     var result = titles.map(function (title) {
       var historical = history.includes(title), role = title.startsWith('Historico_') ? 'historico' : 'dashboard', keys = new Set();

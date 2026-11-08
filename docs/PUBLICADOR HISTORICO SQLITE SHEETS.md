@@ -1,5 +1,7 @@
 # Histórico SQLite → Sheets → Data Studio: homologação FARMA
 
+> Próxima operação: [inicialização comercial corrigida e roteiro completo FARMA → PET](INICIALIZACAO%20HISTORICO%20PRODUCAO.md). A vinculação validada por schema precede a carga; leitura financeira exige partes confirmadas/READY.
+
 > Distribuição corretiva 1.5.23 autorizada, em validação. Após instalar o Setup em **Preserve**, usar diretamente `nexo armazenamento diagnosticar-origens`, `nexo armazenamento configurar` e `nexo armazenamento status`. O auxiliar externo era exclusivo para a instalação original 1.5.22 e não é necessário na 1.5.23. Fontes Data Studio e publicação comercial continuam dependendo de conferência operacional; esta release não aplica fatos comerciais.
 
 > Correção posterior à 1.5.22: [origem Google com locationType e diagnóstico seguro](CORRECAO%20ORIGENS%201.5.22.md). A rejeição comercial foi reproduzida e corrigida no código; release e carga comercial permanecem pausadas nesta missão.

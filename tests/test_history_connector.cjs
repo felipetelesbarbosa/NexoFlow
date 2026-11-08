@@ -68,8 +68,8 @@ test('publicação parcial e cabeçalho alterado nunca retornam total incompleto
 });
 function connector(f) {
   const all=[];
-  const field=()=>({setId(x){this.id=x;return this;},setName(){return this;},setType(){return this;},setAggregation(){return this;},getId(){return this.id;}});
-  const fields={newMetric:()=>{const x=field();all.push(x);return x;},newDimension:()=>{const x=field();all.push(x);return x;},
+  const field=()=>({setId(x){this.id=x;return this;},setName(){return this;},setType(value){this.type=value;return this;},setAggregation(value){this.aggregation=value;return this;},getId(){return this.id;}});
+  const fields={build:()=>all,newMetric:()=>{const x=field();all.push(x);return x;},newDimension:()=>{const x=field();all.push(x);return x;},
     forIds:n=>{const selected=all.filter(f=>n.includes(f.id));return {asArray:()=>selected,build:()=>selected.map(f=>({name:f.id}))};}};
   const ctx={NexoSchemas:schemas,NexoTables:reader,Date,Intl,Sheets:{},Utilities:{},DataStudioApp:{createCommunityConnector:()=>({getFields:()=>fields,FieldType:{YEAR_MONTH_DAY:'date',NUMBER:'number',TEXT:'text'},AggregationType:{MAX:'max',SUM:'sum'},newUserError:()=>({setText:t=>({throwException:()=>{throw Error(t);}})})})}};
   vm.createContext(ctx);vm.runInContext(fs.readFileSync('connectors/continuacoes/Code.js','utf8'),ctx);
@@ -133,4 +133,47 @@ test('itens usam pedido oficial e período, com cerca entre as duas fontes',()=>
 test('orçamento de tempo compartilhado bloqueia a segunda leitura tardia',()=>{
   const f=fixture();
   assert.throws(()=>f.run({startedAt:Date.now()-240001}),/tempo de consulta excedido/);
+});
+test('quantidade soma itens e não herda MAX de idade',()=>{
+  const ctx=connector(fixture('Historico_Itens'));
+  const fields=ctx.fields_('Historico_Itens').build();
+  const quantity=fields.find(f=>f.id==='quantidade');
+  assert.equal(quantity.aggregation,'sum');
+  const values=[2,3];
+  assert.equal(quantity.aggregation==='sum'?values.reduce((a,b)=>a+b,0):Math.max(...values),5);
+});
+test('vincula cinco schemas comerciais antes das partes sem liberar leitura parcial FARMA/PET',()=>{
+  const titles=['Historico_Pedidos','Historico_Itens','BI_LTV_Clientes','BI_Cobertura_Historica','BI_Historico_Resumo'];
+  for(const segment of ['FARMA','PET']) {
+    const f=fixture();f.index.splice(2);let config=JSON.parse(f.index[1][2]);
+    config.segment=segment;config.connector_tables=[];delete config.history_publication;
+    f.index[1][2]=JSON.stringify(config);
+    const op=config.roots.operacao;
+    f.files[op]={sheets:[],developerMetadata:[{metadataKey:'nexoflow_continuation_origin_v1',metadataValue:JSON.stringify({hub,segment,role:'operacao'}),visibility:'DOCUMENT',location:{spreadsheet:true,locationType:'SPREADSHEET'}}]};
+    for(const file of Object.values(f.files)) for(const tag of file.developerMetadata||[]) {const value=JSON.parse(tag.metadataValue);value.segment=segment;tag.metadataValue=JSON.stringify(value);}
+    const ctx=connector(f);
+    const original=f.api.values;
+    f.api.values=(id,range)=>{assert.match(range,/NexoFlow_Continuidade/);return original(id,range);};
+    for(const title of titles) {
+      assert.equal(connector(f).getSchema({configParams:{spreadsheetId:hub,segmento:segment,tabela:title}}).schema.length,schemas[title].length);
+      assert.throws(()=>f.run({segment}),/sem partes confirmadas/);
+    }
+    assert.equal(JSON.parse(f.index[1][2]).connector_tables.length,0);
+    config.history_publication={state:'WRITING'};f.index[1][2]=JSON.stringify(config);
+    assert.equal(ctx.getSchema({configParams:{spreadsheetId:hub,segmento:segment,tabela:titles[0]}}).schema.length,15);
+    assert.throws(()=>f.run({segment}),/publicação/);
+    assert.throws(()=>ctx.getSchema({configParams:{spreadsheetId:hub,segmento:segment==='FARMA'?'PET':'FARMA',tabela:titles[0]}}),/divergente/);
+    f.files[op].developerMetadata=[];
+    assert.throws(()=>ctx.getSchema({configParams:{spreadsheetId:hub,segmento:segment,tabela:titles[0]}}),/origem não comprovada/);
+  }
+});
+test('métricas aditivas históricas e idade mantêm semânticas distintas',()=>{
+  for(const title of ['Historico_Pedidos','Historico_Itens','BI_LTV_Clientes','BI_Cobertura_Historica','BI_Historico_Resumo']) {
+    const fields=connector(fixture()).fields_(title).build();
+    for(const field of fields.filter(f=>f.type==='number' && f.aggregation!==undefined && ['quantidade','unidades','produtos','frete','faturamento'].includes(f.id))) assert.equal(field.aggregation,'sum',title+'.'+field.id);
+  }
+  const age=connector(fixture()).fields_('BI_Publico').build().find(f=>f.id==='idade');
+  assert.equal(age.type,'number');assert.equal(age.aggregation,undefined);
+  const ctx=connector(fixture());ctx.NexoSchemas={Teste:[['idade','number'],['quantidade','number']]};
+  const metrics=ctx.fields_('Teste').build();assert.equal(metrics[0].aggregation,'max');assert.equal(metrics[1].aggregation,'sum');
 });

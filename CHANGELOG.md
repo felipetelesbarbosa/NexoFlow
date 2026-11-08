@@ -1,5 +1,12 @@
 # NexoFlow — Changelog
 
+## Não publicado — agregação e inicialização das fontes históricas
+
+- Corrigir Historico_Itens.quantidade como SUM: a regra de idade não pode casar dentro de quantidade.
+- Validar origem, manifesto, segmento e schema ao vincular fonte antes da primeira carga, sem ler fatos nem liberar totais parciais/WRITING.
+- Documentar implantação privada do conector e operação integral FARMA/PET com piloto, continuações, conferência e rollback; Windows 1.5.23 preservado, sem nova release nesta alteração.
+
+
 ## NexoFlow 1.5.23 — Origens Google Sheets — em validação
 
 - Corrigir falso conflito de origem quando o Google retorna `locationType=SPREADSHEET`; comparar JSON por campos e preservar marcadores válidos.
