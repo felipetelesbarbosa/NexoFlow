@@ -1,5 +1,12 @@
 # NexoFlow — Changelog
 
+## NexoFlow 1.5.24 — Conferência de itens — em validação
+
+- Exigir o índice por pedido/segmento na conferência para evitar a varredura de todos os itens por pedido induzida pelo ORDER BY.
+- Adicionar regressão com limite de instruções SQLite e totais completos, sem limiar de duração dependente da máquina.
+- Preservar semântica financeira, capacidade, piloto, rollback e assinaturas de revisão; atualização Preserve e novo preparo sobre o mesmo backup consistente.
+
+
 ## Não publicado — agregação e inicialização das fontes históricas
 
 - Corrigir Historico_Itens.quantidade como SUM: a regra de idade não pode casar dentro de quantidade.

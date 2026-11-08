@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>NexoFlow 1.5.23 - Documentação</title>
+  <title>NexoFlow 1.5.24 - Documentação</title>
   <style>
     html {
       color: #1a1a1a;
@@ -170,9 +170,9 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">NexoFlow 1.5.23 - Documentação</h1>
+<h1 class="title">NexoFlow 1.5.24 - Documentação</h1>
 </header>
-<h1 id="nexoflow-1523--guia-de-operação">NexoFlow 1.5.23 — Guia de
+<h1 id="nexoflow-1524--guia-de-operação">NexoFlow 1.5.24 — Guia de
 operação</h1>
 <p>O NexoFlow integra Weni e a API FarmaLíder para <strong>FarmaLíder e
 Pets Líder</strong>, mantendo dados separados por perfil. O objetivo é
@@ -227,21 +227,20 @@ confirmações durante a carga.</td>
 </tr>
 </tbody>
 </table>
-<h2 id="atualização-1523">Atualização 1.5.23</h2>
-<p>Publica o histórico já coletado no SQLite em tabelas lógicas de
-Histórico e Dashboard, com capacidade global, continuações oficiais,
-revisão, piloto limitado, retomada e rollback por lote. Não exige
-recolher novamente a API ou executar Weni, Noturno ou Recompra para
-publicar.</p>
-<p>Adiciona resumo mensal/anual/TOTAL para o Data Studio, conferência ao
-centavo e validação das partes futuras. FARMA é o primeiro piloto de
-homologação; PET continua restrito a fixtures e futura réplica
-autorizada. A distribuição não escreve nas planilhas automaticamente.
-Consulte o <a href="PUBLICADOR%20HISTORICO%20SQLITE%20SHEETS.md">roteiro
-para o Work</a> antes de aplicar.</p>
+<h2 id="atualização-1524">Atualização 1.5.24</h2>
+<p>Corrige a escolha do índice na conferência de itens do histórico,
+evitando reler todos os itens para cada pedido. Mantém os mesmos totais,
+segmentação, piloto, revisão, continuações e fechamento ao centavo.</p>
+<p>Atualize em <strong>Preserve</strong> e prepare uma revisão inédita
+usando o backup consistente já conferido. Preserve o plano interrompido
+e seus comprovantes; não altere assinaturas ou journals para
+reaproveitar uma revisão de código diferente. Consulte a <a
+href="CORRECAO%20CONFERENCIA%201.5.24.md">correção operacional</a> e o
+<a href="INICIALIZACAO%20HISTORICO%20PRODUCAO.md">roteiro de
+produção</a>.</p>
 <h2 id="antes-de-começar">Antes de começar</h2>
 <p>Instale pelo <a
-href="https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.23">Setup
+href="https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.24">Setup
 oficial</a>, configure suas próprias credenciais e compartilhe as
 planilhas com a conta de serviço Google. O diretório padrão é
 <code>C:\NexoFlow</code>. Confira os requisitos e os campos necessários
@@ -431,4 +430,4 @@ href="PUBLICADOR%20HISTORICO%20SQLITE%20SHEETS.md">roteiro
 atualizado</a>.</p>
 </body>
 </html>
-<!-- NexoFlow documentation: source-sha256=ac66aaacb77bcd26aff3d77bb161ab3149b209b9fa7ed005a8e0279c8316eec1 content-sha256=6a87aa702ceb104ef15080764d4e35335550cd1d599595340d518bd76eedf8ab -->
+<!-- NexoFlow documentation: source-sha256=ac9db8cf6544522f27fb039c656a7c2573b789f601e4a45a4eea46ee2cb7a042 content-sha256=c1e15ecb01ac8ad37961b194b2cf67b7bccf5338dfd7d35bdd3dbcb988af04f8 -->

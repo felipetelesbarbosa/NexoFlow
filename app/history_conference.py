@@ -195,8 +195,11 @@ def from_published(db, table="observed"):
         if row["vigente"] != "Sim":
             continue
         items = []
+        # Sem INDEXED BY, SQLite pode preferir (t,k) para evitar a ordenação
+        # e reler todos os itens para cada pedido. O índice por pedido já foi
+        # criado acima; ordenar somente os seus itens mantém o custo limitado.
         for (encoded,) in db.execute(
-            f"SELECT v FROM {table} WHERE t='Historico_Itens' AND json_extract(v,'$.pedido_id')=? AND json_extract(v,'$.segmento')=? ORDER BY k",
+            f"SELECT v FROM {table} INDEXED BY {table}_pedido WHERE t='Historico_Itens' AND json_extract(v,'$.pedido_id')=? AND json_extract(v,'$.segmento')=? ORDER BY k",
             (row["pedido_id"], row["segmento"]),
         ):
             item = json.loads(encoded)

@@ -1,12 +1,74 @@
+import json
+import sqlite3
 import unittest
 from copy import deepcopy
 
-from history_conference import compare, summarize
+from history_conference import compare, from_published, summarize
 from order_history import normalize_order
 from tests.test_order_history import NOW, order
 
 
 class ConferenceTests(unittest.TestCase):
+    def test_item_conference_work_is_bounded_by_matching_orders_and_items(self):
+        """O ORDER BY não pode induzir uma varredura de todos os itens por pedido."""
+        db = sqlite3.connect(":memory:")
+        self.addCleanup(db.close)
+        db.execute("CREATE TABLE incoming(t TEXT,k TEXT,v TEXT,PRIMARY KEY(t,k))")
+        count = 1200
+        for number in range(count):
+            key = f"FARMA:{number:06d}"
+            row = dict(
+                pedido_id=str(number),
+                segmento="FARMA",
+                cliente_id="cliente",
+                data="2026-11-01",
+                estado="valido",
+                produtos="5",
+                frete="0.5",
+                faturamento="5.5",
+                vigente="Sim",
+            )
+            db.execute(
+                "INSERT INTO incoming VALUES(?,?,?)",
+                ("Historico_Pedidos", key, json.dumps(row)),
+            )
+            for item in range(5):
+                db.execute(
+                    "INSERT INTO incoming VALUES(?,?,?)",
+                    (
+                        "Historico_Itens",
+                        f"{key}:{item}",
+                        json.dumps(
+                            dict(
+                                pedido_id=str(number),
+                                segmento="FARMA",
+                                quantidade=1,
+                                frete="Não",
+                                vigente="Sim",
+                            )
+                        ),
+                    ),
+                )
+        db.commit()
+        ticks = 0
+
+        def budget():
+            nonlocal ticks
+            ticks += 1
+            return int(ticks > 1000)
+
+        # Limite de instruções, sem depender da velocidade da máquina ou do relógio.
+        db.set_progress_handler(budget, 1000)
+        try:
+            report = summarize(from_published(db, "incoming"), "FARMA")
+        finally:
+            db.set_progress_handler(None, 0)
+        total = report["recortes"][-1]
+        self.assertEqual(total["pedidos"], count)
+        self.assertEqual(total["itens_linhas_validas"], count * 5)
+        self.assertEqual(total["faturamento_centavos"], count * 550)
+        self.assertEqual(total["unidades_validas"], str(count * 5))
+
     def test_shared_boundary_receipts_do_not_duplicate_monthly_financials(self):
         import sqlite3
 

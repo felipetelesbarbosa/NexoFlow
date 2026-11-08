@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.23",
+    [string]$Version = "1.5.24",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -414,17 +414,17 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-A configuração agora comprova e registra as três origens (Dashboard, Operação e Histórico) sob a trava oficial. Corrige o bloqueio da 1.5.21 sem remover validações de segmento, papel ou permissões. Repetições e configuração parcial preservam marcadores corretos. Inclui reconhecimento de redes Windows previamente autorizadas e logs do Setup com seis atalhos e MCP opcional [S/N].
+Corrige a lentidão da conferência de itens do histórico: o SQLite podia escolher o índice genérico para ordenar as chaves e percorrer todos os itens novamente para cada pedido. A consulta agora exige o índice por pedido e segmento. A regressão limita as instruções SQLite e confere pedidos, itens, unidades e faturamento, sem depender da velocidade da máquina.
 
-O histórico já coletado pelo Terminal pode ser publicado no Sheets sem nova consulta FarmaLíder e sem executar Weni, Noturno ou Recompra. O publicador usa tabelas lógicas, manifesto de continuidade, capacidade global, revisão e validação dos destinos por segmento. Não apaga ou move o legado.
+Feche as rotinas e atualize pelo Setup em **Preserve**. Mantenha o backup consistente e o plano interrompido. Após conferir o hash do backup, prepare uma revisão de nome inédito sobre a mesma cópia: não alterar assinaturas nem misturar journals de outro código. O comando de capacidade não publica fatos comerciais.
 
-Adiciona piloto limitado por --max-lotes, retomada da mesma revisão, reconciliação de respostas perdidas e rollback específico por lote com proteção contra edições posteriores. Os backups guardam somente intervalos afetados, compartilhando o baseline privado do preparo.
+O histórico já coletado pode ser publicado sem nova consulta FarmaLíder e sem executar Weni, Noturno ou Recompra. Permanecem a capacidade global, as continuações oficiais, o piloto de um lote, a retomada da mesma revisão nova, o rollback protegido e o fechamento ao centavo entre pedidos e LTV. A correção não altera valores comerciais nem remove validações de segmento, vigência ou schema.
 
-A nova BI_Historico_Resumo fornece meses, anos, TOTAL e SEM_EMISSAO para o Data Studio. O relatório privado historico_conferencia_v1 compara SQLite e partes publicadas, distingue compradores únicos e exige fechamento ao centavo entre pedidos e LTV. IDs numéricos indevidos, schema/segmento divergente e partes ausentes ou em publicação bloqueiam aprovação, sem total parcial silencioso.
+O pacote também inclui as correções já versionadas do conector: Historico_Itens.quantidade como Número/Soma e validação do vínculo de origem/schema antes da primeira carga. Uma fonte vinculada não comprova valores publicados; o leitor continua recusando partes ausentes ou em publicação.
 
-O Work inicia FARMA comercial nos três destinos conferidos, com um lote de segurança e conferência antes da retomada. PET foi validado somente com fixtures de isolamento; sua réplica comercial é uma etapa posterior. A atualização não ativa publicação de dados nem troca fontes do relatório. O Work deve atualizar o conector privado e conferir fontes, cortes, permissões e métricas conforme o [roteiro SQLite/Sheets](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/PUBLICADOR%20HISTORICO%20SQLITE%20SHEETS.md).
+FARMA e PET exigem sessões, destinos, fontes, backups e revisões próprios. A distribuição não publica fatos nem troca fontes do painel automaticamente. Consulte a [correção operacional](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/CORRECAO%20CONFERENCIA%201.5.24.md) e o [roteiro de produção](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/INICIALIZACAO%20HISTORICO%20PRODUCAO.md).
 
-Feche as rotinas, faça backup privado consistente e atualize pelo Setup em Preserve. Configurações, credenciais, SQLite, logs e checkpoints são preservados. A release 1.5.21 e as anteriores permanecem intactas. Hub permanece independente, sem implantação VPS ou ativação comercial. Não houve nova carga histórica real nem escrita em planilhas comerciais durante o desenvolvimento.
+Configurações, credenciais, SQLite, logs e checkpoints são preservados. A release 1.5.23 e as anteriores permanecem intactas. Não houve nova coleta nem escrita de fatos comerciais durante o desenvolvimento desta correção.
 
 Analytics e Noturno usam a integração Meta nativa, sem exigir MCP ou Codex CLI. As rotinas FARMA/PET e as funcionalidades da versão anterior permanecem preservadas. A atualização Preserve mantém configurações e dados. Esta versão não comprova autenticação no proxy corporativo ou aprovação pelo antivírus no PC do usuário; consulte os relatórios e o guia de homologação.
 
@@ -440,7 +440,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.23
+# NexoFlow 1.5.24
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"

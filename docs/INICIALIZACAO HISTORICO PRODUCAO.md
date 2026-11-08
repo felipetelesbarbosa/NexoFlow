@@ -1,5 +1,7 @@
 # Histórico em produção: inicialização das fontes e publicação FARMA/PET
 
+> Correção posterior: a versão 1.5.24 corrige a varredura repetida de itens na conferência. Para bases grandes, atualizar em Preserve e preparar nova revisão sobre o mesmo backup consistente; preservar o plano interrompido. Ver [correção 1.5.24](CORRECAO%20CONFERENCIA%201.5.24.md).
+
 ## Correção após a revisão operacional 1.5.23
 
 O relatório privado do Work identificou duas causas reproduzíveis. `quantidade`

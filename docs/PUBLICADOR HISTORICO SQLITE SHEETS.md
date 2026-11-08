@@ -1,5 +1,7 @@
 # Histórico SQLite → Sheets → Data Studio: homologação FARMA
 
+> Correção posterior: a versão 1.5.24 corrige a varredura repetida de itens na conferência. Para bases grandes, atualizar em Preserve e preparar nova revisão sobre o mesmo backup consistente; preservar o plano interrompido. Ver [correção 1.5.24](CORRECAO%20CONFERENCIA%201.5.24.md).
+
 > Próxima operação: [inicialização comercial corrigida e roteiro completo FARMA → PET](INICIALIZACAO%20HISTORICO%20PRODUCAO.md). A vinculação validada por schema precede a carga; leitura financeira exige partes confirmadas/READY.
 
 > Distribuição corretiva 1.5.23 autorizada, em validação. Após instalar o Setup em **Preserve**, usar diretamente `nexo armazenamento diagnosticar-origens`, `nexo armazenamento configurar` e `nexo armazenamento status`. O auxiliar externo era exclusivo para a instalação original 1.5.22 e não é necessário na 1.5.23. Fontes Data Studio e publicação comercial continuam dependendo de conferência operacional; esta release não aplica fatos comerciais.
