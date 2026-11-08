@@ -93,6 +93,16 @@ def exclusion_audit(db, segment):
     return entries
 
 
+def aggregate_exclusions(entries):
+    """Resumo sem IDs ou texto livre; detalhes ficam no comprovante privado."""
+    return {
+        "quantidade": len(entries),
+        "faturamento_original_centavos": sum(
+            entry["valor_original_centavos"] for entry in entries
+        ),
+    }
+
+
 def derive(
     source,
     expected_hash,
@@ -226,7 +236,7 @@ def derive(
     after["contexto"] = dict(
         snapshot_sha256=evidence["sha256"], fonte_sha256=expected_hash.lower()
     )
-    after["exclusoes_publicacao"] = audit
+    after["exclusoes_publicacao"] = aggregate_exclusions(audit)
     proof = dict(
         formato="historico_exclusoes_v1",
         segmento=segment,

@@ -1,5 +1,7 @@
 # Exclusões autorizadas numa cópia de publicação
 
+> Revisão posterior à publicação 1.5.25: o resumo gerado nessa versão inclui a lista detalhada das exclusões, com IDs de pedido/cliente e responsável. Tratar esses JSONs como detalhados e privados. A correção na main mantém no resumo somente quantidade e faturamento original excluído; o detalhe completo permanece no comprovante privado e na tabela de auditoria, inclusive para autorizar inativações. A correção não modifica os pacotes/tag 1.5.25 já publicados. Não substituir módulos avulsos; uma distribuição corrigida exige novo patch validado.
+
 Disponível na 1.5.25. Uma venda informada como erro operacional pode ser retirada
 de uma cópia para publicação sem apagar o backup bruto ou alterar a resposta
 oficial. Esta rotina não corrige a API nem configura uma exclusão global em Weni,

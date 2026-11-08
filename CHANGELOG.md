@@ -1,5 +1,12 @@
 # NexoFlow — Changelog
 
+## Não publicado — privacidade do resumo de exclusões
+
+- Retirar IDs de pedidos/clientes e texto livre de responsável/motivo do resumo mensal agregado, tanto ao derivar a cópia como na auditoria offline.
+- Manter quantidade e valor original excluído no resumo; conservar integralmente os detalhes no comprovante privado e na revisão de publicação.
+- Corrigir com regressões que falham na 1.5.25; preservar a release publicada, dados, autorização e guardas de inativação. Nova distribuição depende de patch próprio; não sobrescrever os pacotes 1.5.25.
+
+
 ## NexoFlow 1.5.25 — Exclusões autorizadas do histórico — em validação
 
 - Criar cópia privada a partir de backup consistente e hash declarado, retirando somente compras válidas expressamente autorizadas por ID, motivo e responsável.

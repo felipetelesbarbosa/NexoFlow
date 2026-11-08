@@ -185,6 +185,47 @@ class HistoryExclusionsTests(unittest.TestCase):
         with self.assertRaisesRegex(HistoryError, "FONTE_JA_TEM_EXCLUSOES"):
             self.derive(source=first["banco_publicacao"], expected_hash=first["sha256"])
 
+    def test_monthly_summary_contains_only_aggregate_exclusions(self):
+        result = self.derive()
+        report = json.loads(Path(result["resumo"]).read_text())
+        self.assertEqual(
+            report["exclusoes_publicacao"],
+            {
+                "quantidade": 2,
+                "faturamento_original_centavos": 33000,
+            },
+        )
+        self.assertNotIn("pedido_id", json.dumps(report))
+        self.assertNotIn("cliente_id", json.dumps(report))
+        self.assertNotIn("Operador de teste", json.dumps(report))
+        proof = json.loads(Path(result["comprovante"]).read_text())
+        self.assertEqual(len(proof["exclusoes"]), 2)
+        self.assertEqual(proof["exclusoes"][0]["pedido_id"], "1")
+
+    def test_offline_audit_summary_does_not_expose_individual_exclusions(self):
+        result = self.derive()
+        target = self.root / "mensal-auditado.json"
+        with patch("builtins.print"):
+            code = run(
+                [
+                    "--auditar-banco",
+                    result["banco_publicacao"],
+                    "--resumo-mensal",
+                    str(target),
+                ]
+            )
+        self.assertIn(code, (0, 3))
+        report = json.loads(target.read_text())
+        self.assertEqual(
+            report["exclusoes_publicacao"],
+            {
+                "quantidade": 2,
+                "faturamento_original_centavos": 33000,
+            },
+        )
+        self.assertNotIn("pedido_id", json.dumps(report))
+        self.assertNotIn("cliente_id", json.dumps(report))
+
     def test_hash_and_missing_order_fail_before_creating_output(self):
         for changes in ({"expected_hash": "0" * 64}, {"ids": ["999"]}):
             with self.subTest(changes=changes), self.assertRaises(HistoryError):

@@ -296,9 +296,11 @@ def run(argv=None):
                 from history_conference import receipts, summarize
 
                 report = summarize(history.records(), segment())
-                from history_exclusions import exclusion_audit
+                from history_exclusions import aggregate_exclusions, exclusion_audit
 
-                report["exclusoes_publicacao"] = exclusion_audit(db, segment())
+                report["exclusoes_publicacao"] = aggregate_exclusions(
+                    exclusion_audit(db, segment())
+                )
                 report["recebimentos"] = receipts(history)
                 save_private(args.resumo_mensal, report)
             audit = history_audit(history, query)
