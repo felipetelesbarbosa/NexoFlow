@@ -76,6 +76,7 @@ def publisher_signature():
         "history_sheets_transport.py",
         "history_capacity.py",
         "history_conference.py",
+        "history_exclusions.py",
         "order_history_sheets.py",
     ]
     return digest(
@@ -166,7 +167,26 @@ class Publication:
             ):
                 row = json.loads(raw)
                 if title == "Historico_Pedidos" and row["vigente"] != "Não":
-                    raise HistoryError("BASE_LOCAL_INCOMPLETA_RECONCILIAR")
+                    exceptions = (evidence or {}).get("publication_exclusions", [])
+                    fields = (
+                        "segmento",
+                        "pedido_id",
+                        "cliente_id",
+                        "data",
+                        "estado",
+                        "produtos",
+                        "frete",
+                        "faturamento",
+                    )
+                    actual = normalized_cells({field: row[field] for field in fields})
+                    authorized = any(
+                        entry.get("segmento") == self.segment
+                        and entry.get("pedido_id") == row["pedido_id"]
+                        and normalized_cells(entry.get("pedido_original", {})) == actual
+                        for entry in exceptions
+                    )
+                    if not authorized:
+                        raise HistoryError("BASE_LOCAL_INCOMPLETA_RECONCILIAR")
                 row["vigente"] = "Não"
                 db.execute(
                     "INSERT INTO incoming VALUES(?,?,?)",

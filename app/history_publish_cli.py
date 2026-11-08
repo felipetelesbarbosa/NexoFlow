@@ -42,6 +42,11 @@ def _publish(args):
                 source = args.banco or root / "clientes_observados.sqlite"
                 evidence = snapshot(source, directory / "fontes", segment())
                 with readonly(evidence["path"], segment()) as history:
+                    from history_exclusions import exclusion_audit
+
+                    evidence["publication_exclusions"] = exclusion_audit(
+                        history.db, segment()
+                    )
                     conference = summarize(
                         history.records(),
                         segment(),

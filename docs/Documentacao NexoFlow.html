@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>NexoFlow 1.5.24 - Documentação</title>
+  <title>NexoFlow 1.5.25 - Documentação</title>
   <style>
     html {
       color: #1a1a1a;
@@ -170,9 +170,9 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">NexoFlow 1.5.24 - Documentação</h1>
+<h1 class="title">NexoFlow 1.5.25 - Documentação</h1>
 </header>
-<h1 id="nexoflow-1524--guia-de-operação">NexoFlow 1.5.24 — Guia de
+<h1 id="nexoflow-1525--guia-de-operação">NexoFlow 1.5.25 — Guia de
 operação</h1>
 <p>O NexoFlow integra Weni e a API FarmaLíder para <strong>FarmaLíder e
 Pets Líder</strong>, mantendo dados separados por perfil. O objetivo é
@@ -187,6 +187,15 @@ pedido validados. Nos aplicativos individuais, a aplicação segue a
 revisão solicitada; no Noturno, ela é automática. O canal específico da
 compra só é informado quando há evidência: estar na API não prova que o
 pedido veio da Weni ou de uma ligação.</p>
+<h2 id="exclusões-autorizadas-do-histórico-para-publicação">Exclusões
+autorizadas do histórico para publicação</h2>
+<p>O comando <code>nexo historico --excluir-pedidos</code> cria uma
+cópia privada a partir de backup consistente e SHA-256 declarado. Exige
+IDs, motivo e responsável; conserva os registros originais e recalcula
+vendas e LTV. A exceção vale para essa cópia, sem alterar a fonte bruta,
+a API, Weni ou Analytics legado. Veja o procedimento e os limites em <a
+href="EXCLUSOES%20PUBLICACAO%20HISTORICO.md">Exclusões de
+publicação</a>.</p>
 <h2 id="escolha-o-aplicativo">Escolha o aplicativo</h2>
 <table>
 <thead>
@@ -227,7 +236,7 @@ confirmações durante a carga.</td>
 </tr>
 </tbody>
 </table>
-<h2 id="atualização-1524">Atualização 1.5.24</h2>
+<h2 id="atualização-1525">Atualização 1.5.25</h2>
 <p>Corrige a escolha do índice na conferência de itens do histórico,
 evitando reler todos os itens para cada pedido. Mantém os mesmos totais,
 segmentação, piloto, revisão, continuações e fechamento ao centavo.</p>
@@ -235,12 +244,12 @@ segmentação, piloto, revisão, continuações e fechamento ao centavo.</p>
 usando o backup consistente já conferido. Preserve o plano interrompido
 e seus comprovantes; não altere assinaturas ou journals para
 reaproveitar uma revisão de código diferente. Consulte a <a
-href="CORRECAO%20CONFERENCIA%201.5.24.md">correção operacional</a> e o
+href="CORRECAO%20CONFERENCIA%201.5.25.md">correção operacional</a> e o
 <a href="INICIALIZACAO%20HISTORICO%20PRODUCAO.md">roteiro de
 produção</a>.</p>
 <h2 id="antes-de-começar">Antes de começar</h2>
 <p>Instale pelo <a
-href="https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.24">Setup
+href="https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.25">Setup
 oficial</a>, configure suas próprias credenciais e compartilhe as
 planilhas com a conta de serviço Google. O diretório padrão é
 <code>C:\NexoFlow</code>. Confira os requisitos e os campos necessários
@@ -430,4 +439,4 @@ href="PUBLICADOR%20HISTORICO%20SQLITE%20SHEETS.md">roteiro
 atualizado</a>.</p>
 </body>
 </html>
-<!-- NexoFlow documentation: source-sha256=ac9db8cf6544522f27fb039c656a7c2573b789f601e4a45a4eea46ee2cb7a042 content-sha256=c1e15ecb01ac8ad37961b194b2cf67b7bccf5338dfd7d35bdd3dbcb988af04f8 -->
+<!-- NexoFlow documentation: source-sha256=597ace4b7cc14fb0f7cd9e23042a1b736c5c92352245dedb6b706d50fd544a3d content-sha256=624dc4ba885fc87808d917befc098db3fe2244fc34bce7ee487877549a495437 -->

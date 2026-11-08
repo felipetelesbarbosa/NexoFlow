@@ -1,6 +1,13 @@
 # NexoFlow — Changelog
 
-## NexoFlow 1.5.24 — Conferência de itens — em validação
+## NexoFlow 1.5.25 — Exclusões autorizadas do histórico — em validação
+
+- Criar cópia privada a partir de backup consistente e hash declarado, retirando somente compras válidas expressamente autorizadas por ID, motivo e responsável.
+- Preservar fonte bruta, registros originais, recebimentos, janelas, pendências e revisões; recalcular resumo e LTV no universo filtrado.
+- Registrar evidências privadas na revisão; permitir inativação de fatos anteriores apenas quando identidade, data, estado e valores correspondem exatamente à autorização. Ausências não autorizadas continuam bloqueadas.
+- Testar separação FARMA/PET, integridade, CLI, piloto, retomada, fechamento e idempotência. Nenhum ID comercial é distribuído; a exceção não é global na API, Weni ou Analytics legado.
+
+## NexoFlow 1.5.24 — Conferência de itens — 08/11/2026
 
 - Exigir o índice por pedido/segmento na conferência para evitar a varredura de todos os itens por pedido induzida pelo ORDER BY.
 - Adicionar regressão com limite de instruções SQLite e totais completos, sem limiar de duração dependente da máquina.

@@ -1,10 +1,10 @@
-# NexoFlow 1.5.24
+# NexoFlow 1.5.25
 
 Aplicativos operacionais e autônomos para Windows que integram **Weni e a API FarmaLíder nos segmentos FarmaLíder e Pets Líder**, atualizam contatos e pedidos e organizam os dados no **Google Sheets** para análise no **Data Studio**.
 
 O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
 
-[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.24/NexoFlow-Setup-1.5.24.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
+[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.25/NexoFlow-Setup-1.5.25.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
 
 ## Componentes
 
@@ -17,11 +17,13 @@ O NexoFlow identifica pedidos registrados na API **independentemente de terem si
 | **NexoFlow Recompra** | Mantém a elegibilidade da Recompra FarmaLíder D+25 e Pets Líder D+30; os envios ficam na campanha Weni. |
 | **NexoFlow Terminal** | Oferece comandos, consultas e diagnóstico pelo comando `nexo`. |
 
-## Atualização 1.5.24
+## Atualização 1.5.25
 
-Corrige a conferência de itens do histórico para usar o índice por pedido. O SQLite podia priorizar a ordenação por chave e reler todos os itens para cada pedido, mantendo CPU ativa por muito tempo sem concluir o preparo. A regressão limita as instruções SQLite e confere os totais completos, sem depender de tempo de execução.
+Adiciona exclusões expressamente autorizadas em uma cópia privada do histórico para publicação. O comando exige IDs, motivo, responsável e hash do backup; conserva a fonte bruta e registra os pedidos originais numa auditoria da cópia. Vendas, itens, compradores e LTV são recalculados pelo publicador oficial.
 
-O publicador mantém capacidade global, continuações oficiais, piloto, retomada, rollback e fechamento ao centavo. A atualização não recolhe pedidos nem publica fatos automaticamente. Instale em **Preserve**, mantenha o backup e os comprovantes anteriores, e prepare uma revisão inédita com a mesma cópia consistente. Veja a [correção operacional](docs/CORRECAO%20CONFERENCIA%201.5.24.md).
+A exceção vale somente para a cópia criada, sem configurar bloqueio global na API, Weni ou Analytics legado. Futuras cargas exigem usar uma nova cópia com as exceções ou corrigir a origem. Os IDs comerciais não fazem parte do programa. O publicador continua bloqueando qualquer pedido ausente sem autorização correspondente, inclusive quando o valor remoto diverge da evidência.
+
+Atualize em **Preserve** e prepare nova revisão com o backup apropriado. Permanecem capacidade global, piloto, retomada, rollback e fechamento ao centavo. Veja [exclusões de publicação](docs/EXCLUSOES%20PUBLICACAO%20HISTORICO.md).
 
 ## NexoFlow Hub em homologação
 
@@ -82,7 +84,7 @@ As continuações automáticas no Meu Drive exigem autorização Google local. O
 
 ## Versões e atualizações
 
-A versão desta entrega é **1.5.24**. Os pacotes públicos são disponibilizados após a validação do mesmo commit. As próximas correções seguem **1.5.25, 1.5.26, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
+A versão desta entrega é **1.5.25**. Os pacotes públicos são disponibilizados após a validação do mesmo commit. As próximas correções seguem **1.5.26, 1.5.27, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
 
 ## NexoFlow Hub: projeto paralelo futuro
 

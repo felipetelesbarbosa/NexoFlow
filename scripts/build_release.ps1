@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.24",
+    [string]$Version = "1.5.25",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -359,7 +359,7 @@ foreach ($relative in @('app/run_noturno_console.py','comandos/executar_noturno.
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/NexoFlow Recompra.exe"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/NexoFlow Recompra.exe"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/weni_update.py"
-foreach ($module in @("history_capacity", "history_conference", "history_publication", "history_publish_cli", "history_sheets_transport", "history_snapshot", "order_history_sheets", "run_order_history", "meta_ads_native", "meta_ads_model", "meta_ads_sheets", "meta_ads_evidence", "run_meta_ads", "meta_events", "ad_attribution", "weni_dedup", "contact_dedup_guard", "dedup_io", "dedup_sheets", "dedup_bi", "recompra_lock", "recompra_review_audit", "farmalider_customers", "recompra_profiles", "recompra_cleanup", "runtime_profile", "recompra_group_audit")) {
+foreach ($module in @("history_capacity", "history_conference", "history_exclusions", "history_publication", "history_publish_cli", "history_sheets_transport", "history_snapshot", "order_history_sheets", "run_order_history", "meta_ads_native", "meta_ads_model", "meta_ads_sheets", "meta_ads_evidence", "run_meta_ads", "meta_events", "ad_attribution", "weni_dedup", "contact_dedup_guard", "dedup_io", "dedup_sheets", "dedup_bi", "recompra_lock", "recompra_review_audit", "farmalider_customers", "recompra_profiles", "recompra_cleanup", "runtime_profile", "recompra_group_audit")) {
     Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/$module.py"
     Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/app/$module.py"
 }
@@ -414,17 +414,15 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-Corrige a lentidão da conferência de itens do histórico: o SQLite podia escolher o índice genérico para ordenar as chaves e percorrer todos os itens novamente para cada pedido. A consulta agora exige o índice por pedido e segmento. A regressão limita as instruções SQLite e confere pedidos, itens, unidades e faturamento, sem depender da velocidade da máquina.
+Adiciona o comando oficial de exclusões expressamente autorizadas em uma cópia privada do histórico para publicação. Exige IDs, motivo, responsável e hash do backup consistente; preserva a fonte bruta e conserva os registros originais na auditoria privada da cópia.
 
-Feche as rotinas e atualize pelo Setup em **Preserve**. Mantenha o backup consistente e o plano interrompido. Após conferir o hash do backup, prepare uma revisão de nome inédito sobre a mesma cópia: não alterar assinaturas nem misturar journals de outro código. O comando de capacidade não publica fatos comerciais.
+O publicador recalcula vendas, itens, compradores e LTV no mesmo universo. A revisão incorpora as evidências; pedidos anteriormente publicados só podem ser inativados se identidade, data, estado e valores correspondem exatamente à exclusão autorizada. Qualquer outra ausência continua bloqueada.
 
-O histórico já coletado pode ser publicado sem nova consulta FarmaLíder e sem executar Weni, Noturno ou Recompra. Permanecem a capacidade global, as continuações oficiais, o piloto de um lote, a retomada da mesma revisão nova, o rollback protegido e o fechamento ao centavo entre pedidos e LTV. A correção não altera valores comerciais nem remove validações de segmento, vigência ou schema.
+A exceção vale somente para a cópia criada. Não cancela pedidos na API nem configura exclusões globais em Weni ou Analytics legado. Futuras publicações precisam usar uma nova cópia com as exceções ou corrigir a origem. Nenhum ID comercial ou credencial é distribuído.
 
-O pacote também inclui as correções já versionadas do conector: Historico_Itens.quantidade como Número/Soma e validação do vínculo de origem/schema antes da primeira carga. Uma fonte vinculada não comprova valores publicados; o leitor continua recusando partes ausentes ou em publicação.
+Atualize pelo Setup em **Preserve**, mantenha backups e journals e prepare revisão inédita no código atualizado. O comando de exclusões não consulta APIs nem publica fatos. Continuam obrigatórios a capacidade global, o piloto de um lote, a retomada da mesma revisão, o rollback protegido e o fechamento integral ao centavo.
 
-FARMA e PET exigem sessões, destinos, fontes, backups e revisões próprios. A distribuição não publica fatos nem troca fontes do painel automaticamente. Consulte a [correção operacional](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/CORRECAO%20CONFERENCIA%201.5.24.md) e o [roteiro de produção](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/INICIALIZACAO%20HISTORICO%20PRODUCAO.md).
-
-Configurações, credenciais, SQLite, logs e checkpoints são preservados. A release 1.5.23 e as anteriores permanecem intactas. Não houve nova coleta nem escrita de fatos comerciais durante o desenvolvimento desta correção.
+FARMA e PET exigem sessões, fontes, backups e revisões próprios. As versões 1.5.24 e anteriores permanecem preservadas. Consulte o [guia de exclusões](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/EXCLUSOES%20PUBLICACAO%20HISTORICO.md) e o [roteiro de produção](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/INICIALIZACAO%20HISTORICO%20PRODUCAO.md).
 
 Analytics e Noturno usam a integração Meta nativa, sem exigir MCP ou Codex CLI. As rotinas FARMA/PET e as funcionalidades da versão anterior permanecem preservadas. A atualização Preserve mantém configurações e dados. Esta versão não comprova autenticação no proxy corporativo ou aprovação pelo antivírus no PC do usuário; consulte os relatórios e o guia de homologação.
 
@@ -440,7 +438,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.24
+# NexoFlow 1.5.25
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"

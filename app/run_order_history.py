@@ -78,6 +78,20 @@ def parser():
     result.add_argument(
         "--revisao", type=Path, help="Arquivo privado de revisão de planilhas"
     )
+    result.add_argument(
+        "--excluir-pedidos",
+        nargs="+",
+        help="IDs autorizados: cria cópia privada para publicação, sem alterar a fonte",
+    )
+    result.add_argument(
+        "--motivo-exclusao", help="Motivo registrado na auditoria privada"
+    )
+    result.add_argument(
+        "--responsavel-exclusao", help="Responsável que autorizou a exclusão"
+    )
+    result.add_argument(
+        "--sha256-banco", help="SHA-256 do backup consistente usado nas exclusões"
+    )
     return result
 
 
@@ -226,6 +240,28 @@ def print_summary(summary):
 def run(argv=None):
     summary: dict[str, Any] = {}
     args = parser().parse_args(argv)
+    if args.excluir_pedidos is not None:
+        if any(
+            (
+                args.planilhas,
+                args.auditar_banco,
+                args.somente_resumo,
+                args.inicio,
+                args.fim,
+                args.max_paginas is not None,
+                args.reiniciar_janela,
+                args.revisao,
+                args.lote is not None,
+                args.max_lotes is not None,
+                args.modo != "historica",
+            )
+        ):
+            raise HistoryError("EXCLUSAO_NAO_COMBINA_COLETA_OU_PUBLICACAO")
+        from history_exclusions import exclude
+
+        return exclude(args)
+    if any((args.motivo_exclusao, args.responsavel_exclusao, args.sha256_banco)):
+        raise HistoryError("OPCOES_EXCLUSAO_EXIGEM_EXCLUIR_PEDIDOS")
     if args.max_paginas is not None and args.max_paginas < 1:
         raise HistoryError("MAXIMO_PAGINAS_INVALIDO")
     if args.max_lotes is not None and (
@@ -260,6 +296,9 @@ def run(argv=None):
                 from history_conference import receipts, summarize
 
                 report = summarize(history.records(), segment())
+                from history_exclusions import exclusion_audit
+
+                report["exclusoes_publicacao"] = exclusion_audit(db, segment())
                 report["recebimentos"] = receipts(history)
                 save_private(args.resumo_mensal, report)
             audit = history_audit(history, query)
