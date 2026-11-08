@@ -10,6 +10,7 @@ from gspread.exceptions import APIError, WorksheetNotFound
 from gspread.http_client import HTTPClient
 from requests import Timeout
 
+from sheets_provisioning import MyDriveProvisioner
 from tests.test_sheets_continuation import MetadataBook
 
 
@@ -349,26 +350,63 @@ class Client:
         )
 
 
-class Provisioner:
+class Provisioner(MyDriveProvisioner):
+    """Drive em memória com validadores reais e duas autoridades distintas."""
+
     def __init__(self, client):
         self.client, self.creations = client, 0
         self.shared = []
         self.operations = {}
-
-    def prepare_intent(
-        self, source_id, operation, *, hub, segment, role, number, primary=False
-    ):
-        return {
-            "operation": operation,
-            "source": source_id,
-            "hub": hub,
-            "segment": segment,
-            "role": role,
-            "number": number,
-            "parents": [],
-            "permissions": [],
-            "name": "Continuação",
+        self.owner_parents = {}
+        self.service_parents = {}
+        self.service_email = "service@example.invalid"
+        self.owner_email = "owner@example.invalid"
+        self.before_write = lambda: None
+        self.source = SimpleNamespace(request=Mock())
+        self.owner = SimpleNamespace(request=Mock())
+        self.permissions = {
+            book: [
+                dict(type="user", role="owner", emailAddress=self.owner_email),
+                dict(type="user", role="writer", emailAddress=self.service_email),
+            ]
+            for book in client.books
         }
+
+    def _get(self, session, path, **kwargs):
+        parts = path.split("/")
+        book = parts[2]
+        if path.endswith("/permissions"):
+            return dict(
+                permissions=copy.deepcopy(
+                    self.permissions.get(
+                        book,
+                        [
+                            dict(
+                                type="user", role="owner", emailAddress=self.owner_email
+                            )
+                        ],
+                    )
+                )
+            )
+        result = dict(
+            id=book,
+            name=self.client.books[book].title,
+            mimeType="application/vnd.google-apps.spreadsheet",
+            capabilities=dict(canEdit=True),
+            properties=copy.deepcopy(self.client.properties.get(book, {})),
+        )
+        if session is self.owner:
+            result["parents"] = list(self.owner_parents.get(book, ["folder"]))
+        elif book in self.service_parents:
+            result["parents"] = list(self.service_parents[book])
+        return result
+
+    def _json(self, session, method, path, **kwargs):
+        if method != "POST" or not path.endswith("/permissions"):
+            raise AssertionError("Unexpected synthetic Drive mutation")
+        book = path.split("/")[2]
+        self.permissions[book].append(copy.deepcopy(kwargs["json"]))
+        return {}
 
     def create(self, intent, *, first_attempt):
         if not first_attempt:
@@ -379,27 +417,24 @@ class Provisioner:
         book.add("Sheet1", [], rows=1000, cols=26)
         self.client.books[key] = book
         self.operations[intent["operation"]] = key
+        self.owner_parents[key] = list(intent["parents"])
+        self.permissions[key] = [
+            dict(type="user", role="owner", emailAddress=self.owner_email)
+        ]
         self.client.properties[key] = {
             "nexoflow_hub": intent["hub"],
             "nexoflow_segment": intent["segment"],
             "nexoflow_role": intent["role"],
+            "nexoflow_operation": intent["operation"],
         }
         return key
-
-    def verify_owned(self, file_id, intent):
-        return None
 
     def locate(self, operation):
         return self.operations.get(operation)
 
     def share(self, file_id, intent):
+        super().share(file_id, intent)
         self.shared.append(file_id)
-
-    def verify(self, *args, **kwargs):
-        return None
-
-    def verify_private_access(self, file_id, intent):
-        return "synthetic-private-access"
 
     def close(self):
         pass

@@ -297,6 +297,52 @@ class TransportTests(unittest.TestCase):
             sum(b.data_writes for b in self.store.client.books.values()), before
         )
 
+    def test_same_oauth_folder_hidden_to_service_resumes_but_real_move_blocks(self):
+        from sheets_continuation import ContinuationError
+
+        db, data = fixture(12)
+        self.addCleanup(db.close)
+        plan = self.pub.prepare(stream(data))
+        self.assertEqual(
+            self.pub_metadata(plan)["permissions"]["historico"]["parents"], ["folder"]
+        )
+        self.pub.apply(plan, max_batches=1)
+        target = next(
+            book
+            for book in self.store._continuity.index.files
+            if book not in self.pub_metadata(plan)["books"]
+        )
+        before = sum(b.data_writes for b in self.store.client.books.values())
+        self.provider.owner_parents[target] = ["moved"]
+        with self.assertRaisesRegex(ContinuationError, "PASTA_OAUTH_ALTERADA"):
+            self.pub.apply(plan)
+        self.assertEqual(
+            sum(b.data_writes for b in self.store.client.books.values()), before
+        )
+        self.provider.owner_parents[target] = ["folder"]
+        self.assertEqual(self.pub.apply(plan)["remaining_batches"], 0)
+        self.assertEqual(self.pub.check(plan)["status"], "conferida")
+
+    def test_broadened_access_to_created_file_blocks_resume_without_new_rows(self):
+        from sheets_continuation import ContinuationError
+
+        db, data = fixture(9)
+        self.addCleanup(db.close)
+        plan = self.pub.prepare(stream(data))
+        self.pub.apply(plan, max_batches=1)
+        created = next(
+            book
+            for book in self.store._continuity.index.files
+            if book not in self.pub_metadata(plan)["books"]
+        )
+        self.provider.permissions[created].append(dict(type="anyone", role="reader"))
+        before = sum(b.data_writes for b in self.store.client.books.values())
+        with self.assertRaisesRegex(ContinuationError, "acesso amplo"):
+            self.pub.apply(plan)
+        self.assertEqual(
+            sum(b.data_writes for b in self.store.client.books.values()), before
+        )
+
     def test_folder_or_edit_permission_change_blocks_before_write(self):
         from order_history import HistoryError
 

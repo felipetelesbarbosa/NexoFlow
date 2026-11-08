@@ -384,6 +384,45 @@ class MyDriveProvisioner:
             )
             present[key] = permission["role"]
 
+    def verify_location(self, file_id, *, parents):
+        """Compara pasta na mesma autoridade OAuth que aprovou a criação.
+
+        A conta de serviço comprova acesso ao arquivo, mas não necessariamente
+        enxerga a pasta que não foi compartilhada com ela. Nunca conceder acesso
+        à pasta nem aceitar ausência de parents como prova de localização.
+        """
+        if not isinstance(parents, list) or len(parents) != 1:
+            raise ContinuationError("PASTA_OAUTH_APROVADA_NAO_COMPROVADA")
+        try:
+            info = self._get(
+                self.owner,
+                f"/files/{file_id}",
+                params={
+                    "fields": "id,mimeType,trashed,driveId,parents,capabilities(canEdit)"
+                },
+            )
+        except RequestException as exc:
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            raise ContinuationError(
+                "VERIFICACAO_PASTA_OAUTH_FALHOU: "
+                f"arquivo={file_id}; HTTP={status}; tipo={type(exc).__name__}"
+            ) from None
+        if (
+            info.get("id") != file_id
+            or info.get("trashed")
+            or info.get("driveId")
+            or info.get("mimeType") != "application/vnd.google-apps.spreadsheet"
+            or (info.get("capabilities") or {}).get("canEdit") is not True
+        ):
+            raise ContinuationError("ACESSO_OAUTH_A_CONTINUACAO_NAO_COMPROVADO")
+        actual = info.get("parents")
+        if not isinstance(actual, list) or len(actual) != 1:
+            raise ContinuationError("PASTA_OAUTH_ATUAL_NAO_COMPROVADA")
+        if actual != parents:
+            raise ContinuationError(
+                f"PASTA_OAUTH_ALTERADA: arquivo={file_id}; autoridade=usuario_oauth"
+            )
+
     def verify_private_access(self, file_id, intent):
         """Comprova o compartilhamento atual sem conceder permissões."""
         from sheets_continuation import fingerprint

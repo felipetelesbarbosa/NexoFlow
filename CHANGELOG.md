@@ -1,6 +1,16 @@
 # NexoFlow — Changelog
 
-## NexoFlow 1.5.27 — Cabeçalho vazio e retomada da revisão — em validação
+## Não publicado — Autoridade da pasta no Drive e diagnóstico de acessos
+
+- Reproduzir `PASTA_OU_PERMISSOES_ALTERADAS` na retomada/reconciliação quando a conta de serviço não enxerga a pasta que o usuário OAuth aprovou.
+- Verificar a pasta da continuação com a mesma autoridade OAuth do preparo; manter a comprovação de arquivo ativo e edição pela conta de serviço. Falha OAuth, pasta realmente diferente e acesso removido continuam bloqueantes. Nenhum compartilhamento de pasta é concedido.
+- Revalidar também o compartilhamento privado das continuações antes da retomada; bloquear ampliação de acesso sem novas linhas, comprovado apenas com dados sintéticos.
+- Identificar etapa, papel, arquivo e campos nas quatro comparações de acesso; preservar a distinção entre divergência e falha de leitura.
+- Exercitar os validadores reais de origem, compartilhamento e acesso nas fixtures de publicação, com pasta OAuth válida e pasta omitida na visão de serviço.
+- Disponibilizar auditor independente para a instalação original 1.5.27: somente GET de metadados/controles, SQLite em modo somente leitura, hashes antes/depois e relatório sanitizado exclusivo. Não substitui módulos, não aplica/reconcilia planos e não libera carga comercial.
+- Correção de código em validação. Causa do bloqueio na instalação do operador depende do diagnóstico real. Pacotes/tag 1.5.27 preservados; nenhuma nova release nesta investigação.
+
+## NexoFlow 1.5.27 — Cabeçalho vazio e retomada da revisão — 08/11/2026
 
 - Corrigir `ABA_CRIADA_COM_CONTEUDO_DIVERGENTE` na inicialização de tabelas nos arquivos principais: também `Worksheet.get()` real retorna `[[]]` para uma aba sem valores.
 - Conferir grade mínima, fórmulas, estruturas nativas e cabeçalho completo antes de registrar a nova tabela; preservar conteúdo divergente sem sobrescrever.

@@ -1,6 +1,6 @@
 # Versionamento do NexoFlow
 
-A versão desta entrega é **1.5.27**, autorizada para publicação após os checks e a validação do pacote Windows do mesmo commit. A versão **1.5.26 já foi publicada**; sua tag, seu release e os anteriores permanecem preservados.
+A distribuição atual é **1.5.27**, publicada em 08/11/2026. Seus pacotes, tag e os anteriores permanecem preservados. Correções posteriores na main usam `[skip release]` e não estão nos ZIPs públicos. A comparação de autoridades do Drive aguarda o diagnóstico real e a validação antes de outra distribuição. Não reempacotar a 1.5.27; a próxima distribuição corretiva usa 1.5.28 após autorização e checks.
 
 As próximas publicações de atualização, hotfix ou patch seguem **1.5.28 → 1.5.29 → ... → 1.5.99 → 1.6 → 1.6.1**. Cada publicação incrementa uma única vez; commits e novas tentativas de CI da mesma entrega não mudam a numeração. Não há salto automático de versão principal.
 

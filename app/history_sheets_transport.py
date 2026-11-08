@@ -15,6 +15,14 @@ from sheets_provisioning import DRIVE
 from sheets_storage import storage_role
 
 
+def _access_changed(stage, book, role, fields):
+    # Identificar a comparação, nunca imprimir e-mails, tokens ou respostas.
+    raise HistoryError(
+        "PASTA_OU_PERMISSOES_ALTERADAS: "
+        f"etapa={stage}; papel={role}; arquivo={book}; campos={','.join(fields)}"
+    )
+
+
 class SheetsTransport:
     def __init__(self, store):
         self.store = store
@@ -338,7 +346,16 @@ class SheetsTransport:
                     ),
                 )
                 if expected is not None and current != expected:
-                    raise HistoryError("PASTA_OU_PERMISSOES_ALTERADAS")
+                    _access_changed(
+                        "origem_oauth",
+                        metadata["roots"][role],
+                        role,
+                        [
+                            key
+                            for key in ("parents", "permissions")
+                            if current[key] != expected.get(key)
+                        ],
+                    )
                 metadata["permissions"][role] = current
         # A capacidade física pode ter sido consumida por uma edição externa.
         # O writer reconfere crescimento exato antes de cada reserva.
@@ -350,7 +367,31 @@ class SheetsTransport:
                 or sorted(access.get("parents", []))
                 != metadata["access_proofs"][book_id]
             ):
-                raise HistoryError("PASTA_OU_PERMISSOES_ALTERADAS")
+                _access_changed(
+                    "arquivo_original_servico",
+                    book_id,
+                    next(
+                        (r for r, b in metadata["roots"].items() if b == book_id),
+                        "continuacao",
+                    ),
+                    [
+                        field
+                        for field, changed in (
+                            ("trashed", bool(access.get("trashed"))),
+                            (
+                                "canEdit",
+                                access.get("capabilities", {}).get("canEdit")
+                                is not True,
+                            ),
+                            (
+                                "parents_servico",
+                                sorted(access.get("parents", []))
+                                != metadata["access_proofs"][book_id],
+                            ),
+                        )
+                        if changed
+                    ],
+                )
             book = self.manager._book(book_id)
             meta = self.store._read_with_retry(
                 "revalidar grade do arquivo", book.fetch_sheet_metadata
@@ -430,9 +471,30 @@ class SheetsTransport:
                 not proof
                 or access.get("trashed")
                 or access.get("capabilities", {}).get("canEdit") is not True
-                or sorted(access.get("parents", [])) != proof["parents"]
             ):
-                raise HistoryError("PASTA_OU_PERMISSOES_ALTERADAS")
+                _access_changed(
+                    "continuacao_servico",
+                    book_id,
+                    role,
+                    [
+                        field
+                        for field, changed in (
+                            ("prova_oauth_ausente", not proof),
+                            ("trashed", bool(access.get("trashed"))),
+                            (
+                                "canEdit",
+                                access.get("capabilities", {}).get("canEdit")
+                                is not True,
+                            ),
+                        )
+                        if changed
+                    ],
+                )
+            # O preparo aprovou a pasta pelo usuário OAuth. Conferir com a
+            # mesma autoridade; parents omitido na visão de serviço não prova
+            # mudança de pasta nem autoriza dispensar a verificação OAuth.
+            self.manager.provider.verify_location(book_id, parents=proof["parents"])
+            self.manager.provider.verify_private_access(book_id, proof)
             parts = [
                 p for p in self.manager.index.parts.values() if p.book_id == book_id
             ]
@@ -622,7 +684,22 @@ class SheetsTransport:
             if current["parents"] != intent["parents"] or permissions(
                 current
             ) != permissions(intent):
-                raise HistoryError("PASTA_OU_PERMISSOES_ALTERADAS")
+                _access_changed(
+                    "intencao_origem_oauth",
+                    intent["source"],
+                    intent["role"],
+                    [
+                        field
+                        for field, changed in (
+                            ("parents_oauth", current["parents"] != intent["parents"]),
+                            (
+                                "permissions",
+                                permissions(current) != permissions(intent),
+                            ),
+                        )
+                        if changed
+                    ],
+                )
             provider.verify(
                 file_id,
                 hub=intent["hub"],

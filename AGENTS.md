@@ -1,6 +1,6 @@
 # NexoFlow 1.5.27
 
-A versão desta entrega é **NexoFlow 1.5.27**, em validação para corrigir o cabeçalho vazio das tabelas-raiz e recuperar revisões reconciliadas antes do primeiro lote. A versão 1.5.26 já foi publicada: preserve sua tag, seu release e todos os anteriores. Confirme os arquivos disponibilizados antes de anunciar a entrega. Novas tentativas desta entrega não incrementam novamente a versão. A data pública deve refletir a publicação real em `America/Fortaleza`; não antecipar a data enquanto a entrega estiver em validação.
+A distribuição Windows atual é **NexoFlow 1.5.27**, publicada em 08/11/2026. Preserve sua tag, seus pacotes e os anteriores. A correção posterior das visões de pasta OAuth/conta de serviço está em validação na main, com commits `[skip release]`. Antes de outra distribuição, conferir o diagnóstico real do operador e os checks: não recomendar novo piloto ou nova release como tentativa de descobrir a próxima guarda. Não substituir módulos avulsos nem enfraquecer as validações de pasta, origem, permissões, revisão ou journal. Uma eventual próxima distribuição usa 1.5.28, sem reempacotar a 1.5.27.
 
 ## Conferência antes da entrega
 

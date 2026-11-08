@@ -37,6 +37,38 @@ class ProvisioningTests(unittest.TestCase):
             "permissions": [],
         }
 
+    def test_location_uses_authorized_oauth_and_never_grants_folder_access(self):
+        p = self.provider()
+        info = dict(
+            id="created",
+            mimeType="application/vnd.google-apps.spreadsheet",
+            parents=["folder"],
+            capabilities=dict(canEdit=True),
+        )
+        with patch.object(p, "_get", return_value=info) as read:
+            p.verify_location("created", parents=["folder"])
+            self.assertIs(read.call_args.args[0], p.owner)
+            self.assertEqual(read.call_count, 1)
+        for changed, code in (
+            (dict(info, parents=["moved"]), "PASTA_OAUTH_ALTERADA"),
+            (dict(info, parents=[]), "PASTA_OAUTH_ATUAL_NAO_COMPROVADA"),
+            (dict(info, capabilities=dict(canEdit=False)), "ACESSO_OAUTH"),
+            (dict(info, trashed=True), "ACESSO_OAUTH"),
+            (dict(info, driveId="shared"), "ACESSO_OAUTH"),
+            (dict(info, id="other"), "ACESSO_OAUTH"),
+        ):
+            with self.subTest(code=code), patch.object(p, "_get", return_value=changed):
+                with self.assertRaisesRegex(ContinuationError, code):
+                    p.verify_location("created", parents=["folder"])
+        with self.assertRaisesRegex(ContinuationError, "APROVADA_NAO_COMPROVADA"):
+            p.verify_location("created", parents=[])
+        with patch.object(p, "_get", side_effect=http_error(403)):
+            with self.assertRaisesRegex(
+                ContinuationError, "VERIFICACAO_PASTA_OAUTH_FALHOU.*HTTP=403"
+            ):
+                p.verify_location("created", parents=["folder"])
+        p.before_write.assert_not_called()
+
     def test_reconciliation_access_is_exact_readonly_and_service_is_writer(self):
         p = self.provider()
         intent = self.intent()

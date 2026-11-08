@@ -23,6 +23,8 @@ Corrige `ABA_CRIADA_COM_CONTEUDO_DIVERGENTE` ao criar o cabeçalho das tabelas n
 
 Para uma revisão 1.5.25 já reconciliada na 1.5.26 que parou antes do primeiro lote, `--planilhas reconciliar` verifica novamente a fonte, os destinos e as partes preparadas sem fatos. Preserva a revisão e o recibo anterior; bloqueia conteúdo, lotes enviados/incertos e recibos desconhecidos. Atualize por **Preserve**, reconcilie a mesma revisão e aplique o piloto separadamente. Não copie módulos avulsos, edite journals ou gere outro plano sobre uma publicação WRITING. Consulte a [correção da aba-raiz](docs/CORRECAO%20ABA%20RAIZ%20HISTORICO.md).
 
+**Bloqueio posterior à publicação:** se `reconciliar` retornar `PASTA_OU_PERMISSOES_ALTERADAS`, preserve a instalação/revisão e execute o [diagnóstico somente leitura](docs/DIAGNOSTICO%20ACESSOS%20HISTORICO.md). Há uma correção de comparação entre autoridades do Drive na main, ainda sem novo pacote. Não alterar compartilhamentos ou repetir a aplicação para tentar ultrapassar o bloqueio.
+
 ## NexoFlow Hub em homologação
 
 O [núcleo Linux do Hub](hub/README.md) possui API interna, worker e PostgreSQL para tarefas sintéticas em Docker. Escrita real e implantação comercial continuam desabilitadas. O Windows permanece autônomo. Consulte o [relatório técnico](hub/RELATORIO.md).
