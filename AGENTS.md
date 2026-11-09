@@ -17,6 +17,9 @@ A 1.5.30 foi publicada em 08/11/2026 às 20:04:31 America/Fortaleza, SHA 42c7bfe
 
 ## Regras do projeto
 
+**Referência para trabalhos futuros com IA Manager, agentes personalizados, Weni CLI, ferramentas Python e disparos por Flows:** consulte [a base de conhecimento Weni CLI e agentes](docs/WENI%20CLI%20AGENTES%20E%20FLUXOS.md). É documentação de pesquisa, não autorização para alterar agentes, fluxos ou campanhas em produção.
+
+
 - Use mensagens de commit curtas em português que descrevam a área ou a alteração, como `Automação`, `Documentação`, `Instalador` ou `Corrigir revisão da Recompra`. `NexoFlow 1.5.28` identifica a versão, não é uma mensagem obrigatória de commit. Separe alterações por área quando isso tornar a navegação do GitHub mais clara; não reescreva o histórico apenas para mudar os textos exibidos.
 - A `main` é a única branch de trabalho do repositório. Atualize diretamente a `main`; não crie nem mantenha branches adicionais.
 - A entrega autorizada usa `NexoFlow 1.5.30`, tag `v1.5.30` e pacotes com sufixo `1.5.30`, somente após autorização e validação. Para cada próxima publicação de atualização/hotfix/patch, incremente uma única vez: 1.5.31, 1.5.32, ... 1.5.99; depois 1.6, 1.6.1, ... 1.6.99. Não incremente por commit ou tentativa de CI da mesma entrega. Preserve tags e releases anteriores; nunca sobrescreva uma versão anterior com um novo patch. Confira `VERSION` e `docs/VERSIONAMENTO.md`.
