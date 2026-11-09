@@ -164,6 +164,9 @@ class FractionCLITests(unittest.TestCase):
             / "ultima_interrupcao.json"
         )
         report = json.loads(path.read_text())
+        self.assertTrue(
+            (path.parent / ("interrupcao_" + report["event"] + ".json")).is_file()
+        )
         cursor = report["cursor"]
         self.assertEqual(cursor["state"], "sending")
         with closing(sqlite3.connect(review["journal"])) as db:

@@ -62,6 +62,7 @@ def record_failure(args, error):
         review = json.loads(Path(args.revisao).read_text(encoding="utf-8"))
         cursor = pending_cursor(review)
         status = getattr(getattr(error, "response", None), "status_code", None)
+        event = uuid4().hex
         report = dict(
             recorded_at=datetime.now(UTC).isoformat(),
             error_class=type(error).__name__,
@@ -69,13 +70,13 @@ def record_failure(args, error):
             if type(status) is int and 100 <= status <= 599
             else None,
             format="historico_interrupcao_v1",
-            event=uuid4().hex,
+            event=event,
             cursor=cursor,
             interpretation="Cursor pendente no momento da interrupção; não prova falha exclusiva nesse lote. Revalidar contexto e valores antes de escrever.",
             action="Retomar a mesma revisão; não alterar estados, recibos ou assinaturas.",
         )
         path = Path(review["journal"]).parent / "ultima_interrupcao.json"
-        save_private(path.parent / ("interrupcao_" + report["event"] + ".json"), report)
+        save_private(path.parent / ("interrupcao_" + event + ".json"), report)
         save_private(path, report)
         if cursor:
             print(
