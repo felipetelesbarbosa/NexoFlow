@@ -10,6 +10,7 @@ Comece pela [instalação](README%20INSTALACAO.md) e pelo [guia de operação](D
 | --- | --- |
 | Rotina automática durante a madrugada | [NexoFlow Noturno](NOTURNO.md) |
 | Contatos, pedidos e grupos na Weni | [NexoFlow Weni](README%20WENI.md) |
+| Agentes de IA, Weni CLI, IA Manager e Flows (referência futura) | [Base de conhecimento Weni CLI e agentes](WENI%20CLI%20AGENTES%20E%20FLUXOS.md) |
 | Importação de conversas e contatos | [NexoFlow Planilha](README%20DELIVERY.md) |
 | Campanhas Farma D+25 e Pets D+30 | [NexoFlow Recompra](README%20RECOMPRA.md) |
 | Comandos e diagnóstico | [NexoFlow Terminal](README%20TERMINAL.md) |
