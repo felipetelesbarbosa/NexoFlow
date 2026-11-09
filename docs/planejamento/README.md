@@ -38,5 +38,6 @@ Ambos são **baseline obrigatório** do NexoFlow Métricas. Inventariar páginas
 - [Histórico de pedidos, atribuição e LTV](HISTORICO_PEDIDOS_ATRIBUICAO_LTV.md): contratos e propostas comerciais, confrontar com documentação operacional atual.
 - [Guia operacional Windows](../HISTORICO%20PEDIDOS.md).
 - [Núcleo e guia Hub](../../hub/README.md).
+- [Weni CLI, IA Manager, agentes ativos/passivos e integração futura com Flows](../WENI%20CLI%20AGENTES%20E%20FLUXOS.md) — referências e critérios de validação, **sem ativação de agentes ou disparos comerciais**.
 
 O Windows deve continuar autônomo, sem dependência de n8n/VPS, e os dois segmentos devem manter separação de estado, credenciais, dados e permissões. Todos os segredos permanecem fora do Git.
