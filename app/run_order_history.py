@@ -70,6 +70,17 @@ def parser():
         help="SQLite local do perfil; preparo cria cópia consistente sem nova coleta",
     )
     result.add_argument(
+        "--percentual",
+        type=int,
+        choices=(25, 50, 75, 100),
+        help="Fração do total original de lotes por execução; somente aplicar",
+    )
+    result.add_argument(
+        "--retomar-lote",
+        type=int,
+        help="Revalidar e aplicar somente o primeiro lote pendente indicado",
+    )
+    result.add_argument(
         "--max-lotes",
         type=int,
         help="Pausar após N lotes (até 200 linhas por lote), preservando a revisão",
@@ -260,6 +271,8 @@ def run(argv=None):
                 args.revisao,
                 args.lote is not None,
                 args.max_lotes is not None,
+                args.percentual is not None,
+                args.retomar_lote is not None,
                 args.modo != "historica",
             )
         ):
@@ -275,6 +288,17 @@ def run(argv=None):
         args.planilhas != "aplicar" or args.max_lotes < 1
     ):
         raise HistoryError("MAX_LOTES_REQUER_APLICACAO_E_VALOR_POSITIVO")
+    if args.percentual is not None and (
+        args.planilhas != "aplicar" or args.max_lotes is not None
+    ):
+        raise HistoryError("PERCENTUAL_REQUER_APLICAR_SEM_MAX_LOTES")
+    if args.retomar_lote is not None and (
+        args.planilhas != "aplicar"
+        or args.retomar_lote < 1
+        or args.percentual is not None
+        or args.max_lotes is not None
+    ):
+        raise HistoryError("RETOMAR_LOTE_REQUER_APLICAR_SEM_FRACAO_OU_MAX_LOTES")
     if args.planilhas:
         from history_publish_cli import publish
 

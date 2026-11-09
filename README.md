@@ -23,6 +23,10 @@ Controla preventivamente o ritmo HTTP na publicação do histórico, antes de co
 
 A atualização em **Preserve** mantém a mesma revisão e os lotes já confirmados. Os dez módulos vinculados ao recibo continuam com os mesmos bytes oficiais 1.5.29, conferidos nos dois pacotes antes da publicação. Não é preciso reconciliar novamente uma revisão já aceita na 1.5.29 apenas para ativar o ritmo HTTP. [Relatório, limites e roteiro de retomada](docs/COTAS%20SHEETS%20HISTORICO%201.5.30.md).
 
+## Próximas melhorias do histórico — ainda não distribuídas
+
+Aplicação por frações de 25/50/75/100%, retomada do primeiro lote pendente e redução de leituras HTTP agrupando cabeçalho/células, sem cache nem remoção de conferências. [Semântica e roteiro de desenvolvimento](docs/FRACOES%20E%20LEITURAS%20HISTORICO.md). Não atualizar a instalação durante a carga ativa. Os comandos novos ainda não existem no Setup 1.5.30.
+
 ## NexoFlow Hub em homologação
 
 O [núcleo Linux do Hub](hub/README.md) possui API interna, worker e PostgreSQL para tarefas sintéticas em Docker. Escrita real e implantação comercial continuam desabilitadas. O Windows permanece autônomo. Consulte o [relatório técnico](hub/RELATORIO.md).

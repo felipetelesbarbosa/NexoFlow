@@ -7,11 +7,14 @@ import re
 from pathlib import Path
 
 from dedup_io import save_private
+from history_batch_progress import record_failure, retry_budget
 from history_conference import receipts, summarize
+from history_sheets_bulk import BulkHistorySheets as HistorySheets
+from history_sheets_bulk import batch_budget
 from history_sheets_quota import google_store_type
 from history_snapshot import readonly, snapshot
 from order_history import HistoryError
-from order_history_sheets import HistorySheets, iter_tables
+from order_history_sheets import iter_tables
 
 
 def _publish(args):
@@ -106,7 +109,20 @@ def _publish(args):
                 )
                 return 0
             if args.planilhas == "aplicar":
-                adapter.apply(None, review, max_batches=args.max_lotes)
+                budget = batch_budget(
+                    review, getattr(args, "percentual", None), args.max_lotes
+                )
+                if getattr(args, "percentual", None) is not None:
+                    print(
+                        f"[FRAÇÃO] {args.percentual}% do total original; limite de lotes nesta execução={budget if budget is not None else 'todo o saldo'}. Até 200 linhas por lote."
+                    )
+                retry = retry_budget(
+                    review,
+                    getattr(args, "retomar_lote", None),
+                    args.max_lotes,
+                    getattr(args, "percentual", None),
+                )
+                adapter.apply(None, review, max_batches=retry or budget)
                 result = adapter.last_result
                 print(
                     f"[RESULTADO] {result['status']}: linhas confirmadas nesta execução={result['applied_rows']}; lotes restantes={result['remaining_batches']}."
@@ -117,7 +133,7 @@ def _publish(args):
                     )
                 if result["remaining_batches"]:
                     print(
-                        "[INFO] Piloto pausado; retome com a mesma revisão. O leitor não apresenta esta carga parcial como completa."
+                        "[INFO] Carga parcial pausada; retome com a mesma revisão. O leitor não apresenta esta carga parcial como completa."
                     )
                 return (
                     3
@@ -153,9 +169,11 @@ def publish(args):
 
     try:
         return _publish(args)
-    except (HistoryError, ContinuationError):
+    except (HistoryError, ContinuationError) as error:
+        record_failure(args, error)
         raise
     except APIError as error:
+        record_failure(args, error)
         code = error.response.status_code
         # Não imprimir mensagem/resposta/URL do provedor: podem conter valores.
         operation = getattr(error, "nexoflow_operation", "não identificada")
@@ -188,7 +206,8 @@ def publish(args):
             f"SHEETS_HTTP_{code}: etapa={operation}; diagnóstico={category}. "
             "Nenhum lote adicional é considerado confirmado; preserve e confira a mesma revisão."
         ) from None
-    except RequestException:
+    except RequestException as error:
+        record_failure(args, error)
         raise HistoryError(
             "SHEETS_TRANSPORTE: resposta não confirmada; preserve o plano e reconcilie antes de retomar."
         ) from None

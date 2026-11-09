@@ -1,6 +1,13 @@
 # NexoFlow — Changelog
 
-## NexoFlow 1.5.30 — Ritmo preventivo da publicação histórica — em validação
+## Próxima entrega — desenvolvimento, ainda não distribuída
+
+- Aplicação por 25%, 50%, 75% ou 100% do total original de lotes por execução, com limite de 200 linhas por lote e retomada da mesma revisão.
+- Agrupa releitura de cabeçalho completo e células do lote, sem cache; preserva geometria, trava, manifesto, backup, conferência posterior e ritmo de 45/minuto.
+- Diagnóstico privado do primeiro lote pendente após interrupção e retomada de um lote específico respeitando a ordem. Falha não invalida lotes confirmados; não pula falhas estruturais.
+- [Semântica, testes e roteiro](docs/FRACOES%20E%20LEITURAS%20HISTORICO.md). Não instalar mudanças durante a carga comercial ativa.
+
+## NexoFlow 1.5.30 — Ritmo preventivo da publicação histórica — publicada em 08/11/2026, 20:04:31 (America/Fortaleza)
 
 - Controla chamadas HTTP antes do envio, com orçamentos separados de leitura/escrita e reservas compartilhadas entre comandos de histórico da instalação.
 - Padrão de 45/minuto por identidade/projeto; 429 gera pausa compartilhada de pelo menos 65s, respeitando Retry-After. O adaptador não repete POST.

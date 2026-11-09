@@ -32,6 +32,8 @@ def verify(path, prefix):
         expected += [
             prefix + "app/history_sheets_quota.py",
             prefix + "app/history_publish_cli.py",
+            prefix + "app/history_sheets_bulk.py",
+            prefix + "app/history_batch_progress.py",
         ]
         if any(names.count(name) != 1 for name in expected):
             raise ValueError("Pacote sem módulos únicos do contrato de histórico.")
@@ -50,6 +52,11 @@ def verify(path, prefix):
             prefix + "app/history_publish_cli.py"
         ):
             raise ValueError("Entrada do histórico não ativa o controle de quota.")
+        if (
+            b"from history_sheets_bulk import BulkHistorySheets as HistorySheets"
+            not in archive.read(prefix + "app/history_publish_cli.py")
+        ):
+            raise ValueError("Entrada do histórico não ativa o transporte agrupado.")
         return signature
 
 

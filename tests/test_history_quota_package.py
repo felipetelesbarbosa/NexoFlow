@@ -27,7 +27,13 @@ class PackageContractTests(unittest.TestCase):
         wired=True,
     ):
         with zipfile.ZipFile(self.path, "w") as archive:
-            for name in (*MODULES, "history_sheets_quota.py", "history_publish_cli.py"):
+            for name in (
+                *MODULES,
+                "history_sheets_quota.py",
+                "history_publish_cli.py",
+                "history_sheets_bulk.py",
+                "history_batch_progress.py",
+            ):
                 if name == omit:
                     continue
                 body = (
@@ -59,6 +65,8 @@ class PackageContractTests(unittest.TestCase):
         for options in (
             dict(changed="history_sheets_transport.py"),
             dict(omit="history_sheets_quota.py"),
+            dict(omit="history_sheets_bulk.py"),
+            dict(omit="history_batch_progress.py"),
             dict(duplicate="google_sheets.py"),
             dict(wired=False),
         ):
