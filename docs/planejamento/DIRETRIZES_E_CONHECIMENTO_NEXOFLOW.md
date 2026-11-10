@@ -202,3 +202,5 @@ Nesta tarefa: somente consolidação documental, sem código, testes alterados, 
 - **10/11/2026:** primeira consolidação; release Windows 1.5.31 comprovada no GitHub; contratos existentes reaproveitados; regras e hipóteses separados; referências Weni incorporadas; estado instalado/comercial/VPS não revalidado. Próximas alterações devem acrescentar data, decisão, evidência e pendências sem apagar a história anterior.
 
 - **10/11/2026, tarefa posterior:** usuário autorizou otimizações Windows/Local. Desenvolvimento de agrupamento de intervalos documentado no [relatório específico](../OTIMIZACAO%20INTERVALOS%20HISTORICO.md); isso não muda a distribuição 1.5.31 ou comprova desempenho comercial. A restrição documental acima descreve a missão original de consolidação.
+
+- **10/11/2026, preparação 1.5.32:** publicação da otimização autorizada após checks/pacotes aprovados. Avisar sempre quando uma mudança precisar de release para alcançar o Windows instalado; dispensar o aviso quando não houver essa necessidade. A 1.5.31 publicada continua sendo a referência até a conclusão dessa publicação.

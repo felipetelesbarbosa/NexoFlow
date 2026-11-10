@@ -1,4 +1,4 @@
-﻿param([string]$Version = "1.5.31")
+﻿param([string]$Version = "1.5.32")
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -52,7 +52,7 @@ function Assert-ExecutableIcon {
     }
 
     $metadata = [Diagnostics.FileVersionInfo]::GetVersionInfo($Executable)
-    if ($metadata.ProductName -ne "NexoFlow 1.5.31" -or $metadata.ProductVersion -ne "1.5.31.0") {
+    if ($metadata.ProductName -ne "NexoFlow 1.5.32" -or $metadata.ProductVersion -ne "1.5.32.0") {
         throw "Metadados de versão incorretos: $Executable"
     }
     # The 0416/04B0 string table is Brazilian Portuguese with Unicode encoding.

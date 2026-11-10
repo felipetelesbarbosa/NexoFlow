@@ -1,6 +1,6 @@
 # Intervalos contíguos no publicador histórico
 
-Desenvolvimento autorizado em 10/11/2026, posterior à release 1.5.31. Não incluído nos ZIPs já publicados; não substituir módulos avulsos na instalação. Nenhum dado comercial foi consultado ou escrito nesta tarefa.
+Desenvolvimento autorizado em 10/11/2026, posterior à release 1.5.31. A distribuição 1.5.32 foi autorizada e está em validação; não substituir módulos avulsos na instalação. Nenhum dado comercial foi consultado ou escrito nesta tarefa.
 
 ## Problema e alteração
 
@@ -40,7 +40,7 @@ Ver a [Base Mestre](planejamento/DIRETRIZES_E_CONHECIMENTO_NEXOFLOW.md) e o [gui
 
 ## Distribuição e homologação posterior
 
-Esta tarefa registra desenvolvimento com [skip release]; não altera VERSION, tags ou artefatos públicos. Para distribuição futura, usar próximo patch autorizado e workflow oficial com Windows, executáveis, Setup Preserve/Clean/rollback e conferência dos ZIPs. A 1.5.31 permanece intacta.
+A entrega 1.5.32 usa o workflow oficial com Windows, executáveis, Setup Preserve/Clean/rollback e conferência dos ZIPs. Os commits preparatórios usam [skip release]. A 1.5.31 e suas tags/pacotes permanecem intactos. A otimização só chega ao PC após atualizar pelo novo Setup em Preserve; não exige repetir a coleta histórica.
 
 No ambiente autorizado, registrar tempo total, chamadas, espera preventiva, bytes quando disponíveis e lotes confirmados do mesmo recorte. Comparar valores e fechamento mensal/TOTAL ao centavo. Não apagar journals, iniciar carga anual adicional ou aumentar quotas para demonstrar ganho. Não há medição real no PC do usuário, Kaspersky, proxy ou Google Sheets nesta entrega.
 

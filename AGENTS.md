@@ -1,6 +1,6 @@
-# NexoFlow 1.5.31
+# NexoFlow 1.5.32
 
-A distribuição 1.5.31 foi publicada em 10/11/2026, no SHA a31237c088e4b699f166086d01abfbb7da0b9a18; versões anteriores permanecem intactas. Após a consolidação documental, o usuário autorizou otimizações funcionais no Windows/Local. Escopo atual: reduzir o custo dos intervalos de leitura do histórico com testes de regressão, preservando guardas e os dez módulos de assinatura. Sem cargas comerciais, implantação na VPS ou nova publicação nesta tarefa; commits de desenvolvimento usam [skip release].
+A distribuição 1.5.31 foi publicada em 10/11/2026, no SHA a31237c088e4b699f166086d01abfbb7da0b9a18; versões anteriores permanecem intactas. Após a consolidação documental, o usuário autorizou otimizações funcionais no Windows/Local. Escopo atual: reduzir o custo dos intervalos de leitura do histórico com testes de regressão, preservando guardas e os dez módulos de assinatura. A publicação corretiva 1.5.32 foi autorizada após validação; não executar cargas comerciais ou implantação na VPS. Commits preparatórios usam [skip release].
 
 Antes de qualquer nova tarefa, consultar a [Base Mestre permanente](docs/planejamento/DIRETRIZES_E_CONHECIMENTO_NEXOFLOW.md), os contratos especializados e o estado atual da main/release. Distinguir código, testes, distribuição, instalação, implantação e homologação comercial.
 
@@ -16,6 +16,9 @@ Reutilizar os planos, journals, capacidade e guardas existentes. Preservar byte 
 - Informe o que foi validado e seus limites: teste local, compilação para Windows, execução no Windows e teste do pacote são evidências diferentes. Não prometa ausência de erros nem apresente hipótese como causa confirmada.
 
 ## Regras do projeto
+
+- Sempre informar quando uma alteração exigir nova release/Setup para chegar à instalação Windows/Local. Para mudanças exclusivamente documentais ou outras que não precisem de distribuição, não emitir esse aviso. Código na main não atualiza automaticamente C:\NexoFlow.
+
 
 **Referência para trabalhos futuros com IA Manager, agentes personalizados, Weni CLI, ferramentas Python e disparos por Flows:** consulte [a base de conhecimento Weni CLI e agentes](docs/WENI%20CLI%20AGENTES%20E%20FLUXOS.md). É documentação de pesquisa, não autorização para alterar agentes, fluxos ou campanhas em produção.
 

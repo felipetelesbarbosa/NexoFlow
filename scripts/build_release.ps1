@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.31",
+    [string]$Version = "1.5.32",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -414,6 +414,8 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
+O publicador histórico agrupa linhas vizinhas no batchGet: 200 linhas contíguas passam de 201 intervalos para dois, mantendo as mesmas células, cabeçalho e geometria novos. Isso reduz endereços e metadados, sem aumentar quota ou prometer redução proporcional do tempo. Linhas esparsas, vazios, fórmulas, edição concorrente e retomada permanecem protegidos. [Medição e limites](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/OTIMIZACAO%20INTERVALOS%20HISTORICO.md).
+
 Analytics integra a coleta recente (hoje até D-20) e o publicador das cinco fontes históricas, quando habilitado no perfil. Carga histórica exige período explícito. Revisões interrompidas retomam o mesmo snapshot; novas mudanças ficam para a carga seguinte. Cópias, exclusões autorizadas, conferência financeira, rollback por lote e isolamento FARMA/PET permanecem protegidos.
 
 Frações de 25/50/75/100% permitem limitar cada execução. Cabeçalho e células são relidos em conjunto, mantendo geometria, assinaturas e verificações. Durações do terminal usam minutos e horas; os dados numéricos continuam em segundos. Quota preventiva permanece ativa; consumo externo ainda pode causar 429.
@@ -436,7 +438,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.31
+# NexoFlow 1.5.32
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"
