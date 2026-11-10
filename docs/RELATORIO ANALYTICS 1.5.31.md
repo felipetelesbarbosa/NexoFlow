@@ -23,6 +23,8 @@ A publicação cria uma cópia consistente, herda exclusões comprovadas do jour
 
 Fixtures SQLite e Sheets executam o motor real: fração, pausa, fechamento, execução idêntica sem reenvio, resposta perdida, revisão manual, alterações posteriores à coleta, fontes FARMA/PET e exclusões. Testes da CLI verificam validação de datas, propagação e restauração do ambiente. Testes do pipeline Analytics verificam publicação parcial sem avançar checkpoint e confirmação com avanço; rotinas BI existentes permanecem executadas.
 
+Entrada nativa do publicador testada com transporte real sobre três arquivos simulados (grade inicial de 18.413.260 células), criação de continuações e repetição sem novas gravações.
+
 Teste real da coleta sobre API simulada verifica janela D-20, novo pedido e cancelamento reconsultado nos dois perfis. Testes anteriores cobrem quota/429, rollback protegido, partes, idempotência e assinaturas. Não substituem validação do Google comercial.
 
 Lint, tipos, Node (33 testes), consistência, dependências e segredos aprovados localmente. Resultado completo Python e Windows/CI deve ser conferido no SHA final antes de publicar; não considerar este documento aprovação antecipada dos jobs.

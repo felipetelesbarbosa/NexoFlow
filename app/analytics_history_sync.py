@@ -25,6 +25,9 @@ def requested_period(settings, now, segment):
 
     from pedido_utils import business_order_datetime
 
+    fraction = os.getenv("NEXOFLOW_HISTORY_PERCENTUAL", "100").strip()
+    if fraction not in {"25", "50", "75", "100"}:
+        raise HistoryError("PERCENTUAL_INVALIDO")
     start = os.getenv("NEXOFLOW_HISTORY_INICIO", "").strip()
     end = os.getenv("NEXOFLOW_HISTORY_FIM", "").strip()
     if bool(start) != bool(end):

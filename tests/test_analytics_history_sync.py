@@ -188,6 +188,11 @@ class EntryTests(unittest.TestCase):
             os.environ["NEXOFLOW_HISTORY_FIM"] = "2026-11-07"
             self.assertTrue(requested_period(settings, datetime.now(UTC), "FARMA")[1])
 
+    def test_invalid_inherited_fraction_blocks_before_network(self):
+        with patch.dict(os.environ, {"NEXOFLOW_HISTORY_PERCENTUAL": "10"}):
+            with self.assertRaisesRegex(HistoryError, "PERCENTUAL_INVALIDO"):
+                requested_period(SimpleNamespace(), datetime.now(UTC), "FARMA")
+
     def test_cli_propagates_period_and_fraction_and_restores_environment(self):
         from nexo_cli import run
 
@@ -291,3 +296,59 @@ class NativeCollectionTests(unittest.TestCase):
                     self.assertEqual(
                         {r["state"] for r in rows}, {"valido", "cancelado"}
                     )
+
+
+class NativePublisherTests(unittest.TestCase):
+    from tests import test_history_sheets_transport as fixtures
+
+    setUp = fixtures.TransportTests.setUp
+
+    def test_entry_uses_real_transport_on_three_destinations_and_confirms(self):
+        from analytics_history_sync import run
+        from tests.sheets_memory import GspreadSheet
+
+        root = Path(self.tmp.name)
+        source, _ = fixture(3)
+        (root / "privado").mkdir()
+        with (
+            closing(source),
+            closing(
+                sqlite3.connect(root / "privado" / "clientes_observados.sqlite")
+            ) as db,
+        ):
+            source.backup(db)
+            db.execute("CREATE TABLE profile(segment TEXT NOT NULL)")
+            db.execute("INSERT INTO profile VALUES('FARMA')")
+            db.commit()
+
+        def adapter(store, segment, directory):
+            result = BulkHistorySheets(store, segment, directory)
+            result.engine.remote._drive = self.remote._drive
+            return result
+
+        self.store.close = lambda: None
+        settings = SimpleNamespace(
+            FARMALIDER_HISTORY_ENABLED=True, GOOGLE_SPREADSHEET_ID="dashboard"
+        )
+        with (
+            patch("config.LOG_DIR", root),
+            patch("customer_observations.DB_ROOT", None),
+            patch.dict(
+                os.environ,
+                {"NEXOFLOW_PERFIL": "FARMA", "NEXOFLOW_HISTORY_PERCENTUAL": "100"},
+            ),
+            patch("analytics_history_sync.BulkHistorySheets", side_effect=adapter),
+            patch(
+                "history_sheets_quota.google_store_type",
+                return_value=SimpleNamespace(open_native_readonly=lambda _: self.store),
+            ),
+            patch("tests.sheets_memory.Sheet", GspreadSheet),
+        ):
+            first = run(settings)
+            self.assertEqual(first["status"], "conferida", first)
+            self.assertFalse(first["partial"])
+            written = self.store._write_requests
+            second = run(settings)
+            self.assertEqual(second["status"], "conferida", second)
+            self.assertEqual(second["applied_rows"], 0)
+            self.assertEqual(self.store._write_requests, written)
