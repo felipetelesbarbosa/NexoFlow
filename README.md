@@ -1,10 +1,10 @@
-# NexoFlow 1.5.30
+# NexoFlow 1.5.31
 
 Aplicativos operacionais e autônomos para Windows que integram **Weni e a API FarmaLíder nos segmentos FarmaLíder e Pets Líder**, atualizam contatos e pedidos e organizam os dados no **Google Sheets** para análise no **Data Studio**.
 
 O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
 
-[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.30/NexoFlow-Setup-1.5.30.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
+[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.31/NexoFlow-Setup-1.5.31.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
 
 ## Componentes
 
@@ -17,15 +17,10 @@ O NexoFlow identifica pedidos registrados na API **independentemente de terem si
 | **NexoFlow Recompra** | Mantém a elegibilidade da Recompra FarmaLíder D+25 e Pets Líder D+30; os envios ficam na campanha Weni. |
 | **NexoFlow Terminal** | Oferece comandos, consultas e diagnóstico pelo comando `nexo`. |
 
-## Atualização 1.5.30
+## Atualização 1.5.31
 
-Controla preventivamente o ritmo HTTP na publicação do histórico, antes de consumir a cota do Sheets. O padrão é 45 leituras e 45 escritas por minuto por identidade/projeto, com reservas locais compartilhadas entre comandos de histórico. Um HTTP 429 impõe pausa compartilhada, respeitando Retry-After; o limitador nunca repete uma gravação por conta própria.
+Analytics publica automaticamente as cinco fontes históricas quando habilitado, consulta pedidos recentes e aceita período explícito para carga histórica. Retomada, exclusões autorizadas e conferência financeira permanecem protegidas. Frações 25/50/75/100%, leituras agrupadas e durações legíveis completam a entrega. [Ativação, comandos e limites](docs/ANALYTICS%20HISTORICO%20AUTOMATICO.md).
 
-A atualização em **Preserve** mantém a mesma revisão e os lotes já confirmados. Os dez módulos vinculados ao recibo continuam com os mesmos bytes oficiais 1.5.29, conferidos nos dois pacotes antes da publicação. Não é preciso reconciliar novamente uma revisão já aceita na 1.5.29 apenas para ativar o ritmo HTTP. [Relatório, limites e roteiro de retomada](docs/COTAS%20SHEETS%20HISTORICO%201.5.30.md).
-
-## Próximas melhorias do histórico — ainda não distribuídas
-
-Aplicação por frações de 25/50/75/100%, retomada do primeiro lote pendente e redução de leituras HTTP agrupando cabeçalho/células, sem cache nem remoção de conferências. [Semântica e roteiro de desenvolvimento](docs/FRACOES%20E%20LEITURAS%20HISTORICO.md). Não atualizar a instalação durante a carga ativa. Os comandos novos ainda não existem no Setup 1.5.30.
 
 ## NexoFlow Hub em homologação
 
@@ -86,7 +81,7 @@ As continuações automáticas no Meu Drive exigem autorização Google local. O
 
 ## Versões e atualizações
 
-A versão desta entrega é **1.5.30**. Os pacotes públicos são disponibilizados após a validação do mesmo commit. As próximas correções seguem **1.5.31, 1.5.32, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
+A versão desta entrega é **1.5.31**. Os pacotes públicos são disponibilizados após a validação do mesmo commit. As próximas correções seguem **1.5.31, 1.5.32, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
 
 ## NexoFlow Hub: projeto paralelo futuro
 

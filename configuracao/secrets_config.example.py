@@ -28,6 +28,12 @@ FARMALIDER_USE_HML = False
 FARMALIDER_CUSTOMER_DIRECTORY_MODE = "auto"
 FARMALIDER_CUSTOMER_DIRECTORY_MIN_CONTACTS = 500
 
+# Histórico incremental e suas cinco fontes: habilitar após validar destinos/fontes.
+FARMALIDER_HISTORY_ENABLED = False
+FARMALIDER_HISTORY_SHEETS_ENABLED = False
+FARMALIDER_HISTORY_PAGE_LIMIT = 500
+FARMALIDER_HISTORY_MAX_PAGES = 100
+
 # Webhook (futuro)
 WEBHOOK_SHARED_SECRET = "TROQUE_POR_UM_SEGREDO_FORTE"
 
@@ -84,6 +90,8 @@ PERFIS = {
         "FARMALIDER_API_ENABLED": True,
         "FARMALIDER_API_TOKEN": "",
         "FARMALIDER_USE_HML": False,
+        "FARMALIDER_HISTORY_ENABLED": False,
+        "FARMALIDER_HISTORY_SHEETS_ENABLED": False,
         # Ative após configurar o fluxo e o evento D+30 usando pedido_data.
         "RECOMPRA_ENABLED": False,
     },

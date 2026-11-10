@@ -191,6 +191,15 @@ def print_progress(state):
 
 
 def print_summary(summary):
+    from duration_display import duration
+
+    def display(key, value):
+        if key.endswith("segundos") and isinstance(value, (int, float)):
+            return duration(value)
+        if isinstance(value, dict):
+            return {k: display(k, v) for k, v in value.items()}
+        return value
+
     def money(cents):
         from decimal import Decimal
 
@@ -216,12 +225,12 @@ def print_summary(summary):
         print("\n" + name)
         for key, value in data.items():
             print(
-                f"  {labels.get(key, key.replace('_', ' ').capitalize())}: {money(value) if key == 'faturamento_centavos' else value}"
+                f"  {labels.get(key, key.replace('_', ' ').capitalize())}: {money(value) if key == 'faturamento_centavos' else display(key, value)}"
             )
     if not summary.get("audit"):
         for key, value in summary.items():
             print(
-                f"  {labels.get(key, key)}: {money(value) if key == 'faturamento_centavos' else value}"
+                f"  {labels.get(key, key)}: {money(value) if key == 'faturamento_centavos' else display(key, value)}"
             )
     print(
         f"\nJanelas: {summary.get('windows', '—')}; incompletas: {summary.get('incomplete_windows', '—')}"

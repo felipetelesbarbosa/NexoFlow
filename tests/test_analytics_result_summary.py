@@ -11,7 +11,9 @@ import main
 
 
 class AnalyticsResultSummaryTests(unittest.TestCase):
-    def run_pipeline(self, *, client_errors=0, order_errors=0, meta=None):
+    def run_pipeline(
+        self, *, client_errors=0, order_errors=0, meta=None, historical=None
+    ):
         sheets, farm, weni = Mock(), Mock(), Mock()
         farm.metrics_snapshot.return_value = {}
         weni.list_contacts.return_value = []
@@ -53,6 +55,13 @@ class AnalyticsResultSummaryTests(unittest.TestCase):
             ):
                 stack.enter_context(patch("main." + target, return_value=value))
             stack.enter_context(patch("customer_observations.acknowledge"))
+            stack.enter_context(
+                patch(
+                    "analytics_history_sync.run",
+                    return_value=historical
+                    or {"status": "desativado", "partial": False},
+                )
+            )
             with self.assertLogs(level=logging.INFO) as captured:
                 code = main.main()
         return code, "\n".join(captured.output), controls, sheets
@@ -121,6 +130,29 @@ class AnalyticsResultSummaryTests(unittest.TestCase):
         )
         self.assertIn("linhas confirmadas em abas ainda pendentes=5", output)
         self.assertNotIn("1000", output)
+
+    def test_history_pending_preserves_checkpoint_and_other_tables(self):
+        code, output, controls, sheets = self.run_pipeline(
+            historical={"status": "pendente", "partial": True}
+        )
+        self.assertEqual(code, 3)
+        self.assertEqual(controls["ultima_execucao_status"], "parcial")
+        self.assertEqual(
+            controls["ultima_sincronizacao_sucesso_utc"], "2026-10-01T12:00:00+00:00"
+        )
+        self.assertTrue(sheets.replace_looker_tables.called)
+        self.assertIn("Cinco fontes históricas: publicação pendente", output)
+
+    def test_history_confirmed_allows_primary_checkpoint(self):
+        code, output, controls, sheets = self.run_pipeline(
+            historical={"status": "conferida", "partial": False}
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(controls["ultima_execucao_status"], "sucesso")
+        self.assertTrue(sheets.replace_bi_orders.called)
+        self.assertIn(
+            "Cinco fontes históricas: publicação e conferência concluídas", output
+        )
 
     def test_storage_failure_stays_critical_without_success_summary(self):
         with patch("main.build_looker_tables", side_effect=RuntimeError("synthetic")):

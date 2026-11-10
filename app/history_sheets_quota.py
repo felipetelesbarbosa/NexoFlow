@@ -21,6 +21,7 @@ from urllib.parse import urlsplit
 
 from requests.adapters import BaseAdapter
 
+from duration_display import duration
 from order_history import HistoryError
 
 PERIOD = 60.0
@@ -185,8 +186,8 @@ class QuotaGate:
                 )
         self.limited += 1
         logging.warning(
-            "Google Sheets: HTTP 429; pausa compartilhada de pelo menos %.1fs para %s. Nenhum POST será repetido pelo limitador.",
-            seconds,
+            "Google Sheets: HTTP 429; pausa compartilhada de pelo menos %s para %s. Nenhum POST será repetido pelo limitador.",
+            duration(seconds),
             "leituras" if kind == "read" else "escritas",
         )
 
@@ -194,7 +195,7 @@ class QuotaGate:
         if self.now() - self.last_progress >= 60:
             self.last_progress = self.now()
             print(
-                f"[REDE SHEETS] Tentativas HTTP: leituras={self.calls['read']}; escritas={self.calls['write']}; 429={self.limited}; espera preventiva={self.wait_seconds:.1f}s. Lotes são confirmados pelo journal.",
+                f"[REDE SHEETS] Tentativas HTTP: leituras={self.calls['read']}; escritas={self.calls['write']}; 429={self.limited}; espera preventiva={duration(self.wait_seconds)}. Lotes são confirmados pelo journal.",
                 flush=True,
             )
 

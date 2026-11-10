@@ -6,10 +6,14 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from config import LOG_DIR, LOG_FILE
+from duration_display import humanize
 
 
 class BelemFormatter(logging.Formatter):
     """Use America/Belem (UTC-3) even when the machine runs in another zone."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        return humanize(super().format(record))
 
     def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
         local = datetime.fromtimestamp(

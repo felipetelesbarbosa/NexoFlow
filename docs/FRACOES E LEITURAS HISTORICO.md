@@ -1,6 +1,6 @@
 # Frações e leituras agrupadas do histórico
 
-Estado: desenvolvimento posterior à 1.5.30, ainda sem distribuição Windows.
+Estado: incluído na entrega 1.5.31 em validação.
 Não alterar a instalação nem a execução comercial em andamento. Os comandos
 abaixo são do código em desenvolvimento: não estão disponíveis no Setup 1.5.30.
 Nenhuma carga comercial, API de pedidos, Weni, Noturno ou Recompra é executada

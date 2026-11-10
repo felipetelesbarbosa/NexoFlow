@@ -33,6 +33,8 @@ class PackageContractTests(unittest.TestCase):
                 "history_publish_cli.py",
                 "history_sheets_bulk.py",
                 "history_batch_progress.py",
+                "analytics_history_sync.py",
+                "duration_display.py",
             ):
                 if name == omit:
                     continue

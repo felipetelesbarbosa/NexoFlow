@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.30",
+    [string]$Version = "1.5.31",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -414,17 +414,13 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-A publicação histórica passa a controlar preventivamente o ritmo HTTP da API Sheets, incluindo abertura, chamadas diretas do lease e retentativas. O padrão é 45 leituras e 45 escritas por minuto por identidade/projeto, com reservas locais compartilhadas entre comandos de histórico desta instalação e orçamento adicional conservador por projeto. Leitura e escrita usam orçamentos separados.
+Analytics integra a coleta recente (hoje até D-20) e o publicador das cinco fontes históricas, quando habilitado no perfil. Carga histórica exige período explícito. Revisões interrompidas retomam o mesmo snapshot; novas mudanças ficam para a carga seguinte. Cópias, exclusões autorizadas, conferência financeira, rollback por lote e isolamento FARMA/PET permanecem protegidos.
 
-HTTP 429 impõe pausa compartilhada de pelo menos 65 segundos, respeitando Retry-After maior. O adaptador não repete POST e preserva o cliente, autenticação, proxy, TLS, timeouts, payloads e todas as conferências. O ledger privado contém apenas hashes de escopo, tipos de operação e horários; nenhum token ou dado comercial.
+Frações de 25/50/75/100% permitem limitar cada execução. Cabeçalho e células são relidos em conjunto, mantendo geometria, assinaturas e verificações. Durações do terminal usam minutos e horas; os dados numéricos continuam em segundos. Quota preventiva permanece ativa; consumo externo ainda pode causar 429.
 
-Os dez módulos que vinculam a revisão ao publicador mantêm exatamente os bytes oficiais Windows da 1.5.29. O workflow verifica esse contrato dentro dos dois ZIPs antes de publicar. A revisão já parcialmente aplicada na 1.5.29 pode continuar sem preparar outra revisão ou reconciliar o código novamente apenas por esse ajuste. Preservar JSON, recibos, snapshot, backups, exclusões e estados de lotes.
+Os dez módulos do contrato mantêm os bytes oficiais Windows 1.5.29/30, conferidos nos dois pacotes. Atualize em Preserve com cargas encerradas. Não apagar snapshots, journals, recibos ou revisões. Nenhum fato comercial foi publicado nestes testes.
 
-Atualize pelo Setup em Preserve depois de encerrar a carga. No mesmo perfil FARMA, conferir a mesma revisão para identificar o saldo atual, aplicar --max-lotes 1 e conferir novamente. Somente após validar, continuar sem --max-lotes e fechar a conferência. Não apagar journals, editar assinaturas ou forçar lote incerto como confirmado. As versões 1.5.29 e anteriores permanecem intactas.
-
-A cada aproximadamente um minuto, o contador de rede informa tentativas HTTP e pausas; ele não equivale a lotes confirmados. Outras aplicações e computadores podem consumir a mesma cota: o controle local não garante ausência de 429. A carga pode ser demorada. Os testes com relógio virtual, SQLite, requests/gspread e serviços simulados não comprovam a cota efetiva da conta comercial. Nenhum fato comercial foi aplicado nesta validação.
-
-Consulte o [relatório e roteiro para o Work](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/COTAS%20SHEETS%20HISTORICO%201.5.30.md).
+Consulte [ativação e roteiro do Work](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/ANALYTICS%20HISTORICO%20AUTOMATICO.md). Primeiro FARMA; PET exige ativação e destinos próprios. A revisão manual ainda em publicação deve ser concluída no Terminal antes da automação.
 
 Analytics e Noturno usam a integração Meta nativa, sem exigir MCP ou Codex CLI. As rotinas FARMA/PET e as funcionalidades da versão anterior permanecem preservadas. A atualização Preserve mantém configurações e dados. Esta versão não comprova autenticação no proxy corporativo ou aprovação pelo antivírus no PC do usuário; consulte os relatórios e o guia de homologação.
 
@@ -440,7 +436,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.30
+# NexoFlow 1.5.31
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"

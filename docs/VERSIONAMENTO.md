@@ -1,8 +1,8 @@
 # Versionamento do NexoFlow
 
-A entrega corretiva **1.5.30** está em validação. A **1.5.29 já foi publicada** e permanece intacta. O ajuste acrescenta ritmo HTTP preventivo à publicação histórica, preservando os bytes do contrato de revisão 1.5.29 para retomar lotes já confirmados. Publicar somente após checks e pacotes instalados validados no mesmo commit.
+A entrega **1.5.31** está em validação. A **1.5.30 já foi publicada** e permanece intacta. Publicar somente após checks e pacotes instalados validados no mesmo commit.
 
-As próximas publicações de atualização, hotfix ou patch seguem **1.5.31 → 1.5.32 → ... → 1.5.99 → 1.6 → 1.6.1**. Cada publicação incrementa uma única vez; commits e novas tentativas de CI da mesma entrega não mudam a numeração. Não há salto automático de versão principal.
+As próximas publicações de atualização, hotfix ou patch seguem **1.5.32 → ... → 1.5.99 → 1.6 → 1.6.1**. Cada publicação incrementa uma única vez; commits e novas tentativas de CI da mesma entrega não mudam a numeração. Não há salto automático de versão principal.
 
 A versão da distribuição fica em `VERSION`. A tag é `v{versao}`, o título é `NexoFlow {versao}` e os pacotes são `NexoFlow-{versao}.zip` e `NexoFlow-Setup-{versao}.zip`. Nunca sobrescreva os arquivos de uma versão pública para entregar código novo. O workflow permite retomar somente um rascunho da mesma entrega.
 

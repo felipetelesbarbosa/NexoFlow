@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 
 from dedup_io import save_private
+from duration_display import duration
 from history_batch_progress import record_failure, retry_budget
 from history_conference import receipts, summarize
 from history_sheets_bulk import BulkHistorySheets as HistorySheets
@@ -129,7 +130,7 @@ def _publish(args):
                 )
                 if "seconds" in result:
                     print(
-                        f"[MÉTRICAS] Escritas de linhas={result['written_rows']}; reconciliadas sem novo POST={result['reconciled_rows']}; tentativas de leitura/escrita={result['read_attempts']}/{result['write_attempts']}; tempo={result['seconds']:.3f}s; backup acumulado={result['backup_bytes']} bytes."
+                        f"[MÉTRICAS] Escritas de linhas={result['written_rows']}; reconciliadas sem novo POST={result['reconciled_rows']}; tentativas de leitura/escrita={result['read_attempts']}/{result['write_attempts']}; tempo={duration(float(result['seconds']))}; backup acumulado={result['backup_bytes']} bytes."
                     )
                 if result["remaining_batches"]:
                     print(

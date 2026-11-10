@@ -60,9 +60,9 @@ exit /b 0
 :parcial
 echo.
 echo ==========================================================
-echo [AVISO] Sincronização parcial: algumas consultas à FarmaLíder falharam.
-echo Os dados processados foram salvos; o marco incremental anterior foi
-echo mantido para nova tentativa. Consulte logs\nexoflow.log.
+echo [AVISO] Analytics executado com pendências. Confira a etapa no resumo.
+echo Os dados e lotes confirmados foram preservados. Confira os checkpoints
+echo e a etapa pendente no resumo em %PROFILE_LOG%\nexoflow.log.
 echo Código de saída: %RC%
 echo ==========================================================
 echo.

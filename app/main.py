@@ -304,12 +304,16 @@ def _log_final_summary(
     completion_controls,
     full_quarter,
     native_meta_result,
+    historical_publication=None,
 ):
     """Apresenta resultados confirmados e a retomada de cada fonte separadamente."""
     native_partial = bool(native_meta_result.get("partial")) or (
         native_meta_result.get("status") == "falha"
     )
-    primary_partial = bool(cliente_stats.api_errors or order_stats.api_errors)
+    history_partial = bool((historical_publication or {}).get("partial"))
+    primary_partial = bool(
+        cliente_stats.api_errors or order_stats.api_errors or history_partial
+    )
     log_result = logging.warning if primary_partial or native_partial else logging.info
     log_result("=== Resumo final Analytics | duração=%.2fs ===", total_elapsed)
     logging.info("--- CONFIRMADO NESTA CARGA ---")
@@ -340,6 +344,16 @@ def _log_final_summary(
     elif full_quarter is not None:
         logging.info(
             "Checkpoint principal: mantido até concluir as quatro partes da carga completa."
+        )
+    if history_partial:
+        logging.warning(
+            "Cinco fontes históricas: publicação pendente; lotes preservados. Consulte a revisão automática e retome pelo Analytics."
+        )
+    elif (historical_publication or {}).get("status") == "conferida":
+        logging.info("Cinco fontes históricas: publicação e conferência concluídas.")
+    elif (historical_publication or {}).get("status") == "desativado":
+        logging.info(
+            "Cinco fontes históricas: automação desativada no perfil; não publicadas nesta execução."
         )
     if native_meta_result.get("status") == "desativado":
         logging.info("Meta Ads: desativado nesta carga.")
@@ -1046,6 +1060,10 @@ def main() -> int:
 
     try:
         validate_configuration()
+        from analytics_history_sync import requested_period
+        from runtime_profile import segment
+
+        requested_period(secrets, datetime.now(UTC), segment())
         force_full = os.getenv("FORCE_FULL_SYNC", "").strip() == "1"
         full_quarter: int | None = None
         raw_quarter = os.getenv("FULL_SYNC_QUARTER", "").strip()
@@ -1517,10 +1535,16 @@ def main() -> int:
             all_weni_contacts,
         )
 
+        from analytics_history_sync import run as publish_history
+
+        historical_publication = publish_history(secrets)
+
         # O status é gravado por último para refletir a própria execução do BI.
         completion_status, completion_controls = _completion_controls(
             sync_started,
-            api_errors=cliente_stats.api_errors + order_stats.api_errors,
+            api_errors=cliente_stats.api_errors
+            + order_stats.api_errors
+            + int(bool(historical_publication.get("partial"))),
         )
         if full_quarter is not None:
             # Partes 1-3 não podem avançar o cursor incremental. Na Parte 4,
@@ -1765,6 +1789,7 @@ def main() -> int:
             completion_controls=completion_controls,
             full_quarter=full_quarter,
             native_meta_result=native_meta_result,
+            historical_publication=historical_publication,
         )
         return PARTIAL_SYNC_EXIT_CODE if partial else 0
 

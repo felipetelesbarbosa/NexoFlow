@@ -1,5 +1,14 @@
 # NexoFlow — Changelog
 
+## 1.5.31 — em validação
+
+- Analytics conecta o publicador histórico nativo: coleta recente D-20 e período histórico explícito, cinco fontes com conferência financeira e retomada durável.
+- Preserva exclusões autorizadas na cópia privada; bloqueia fatos alterados, journal ausente, segmentos divergentes e revisão manual ainda ativa.
+- Frações 25/50/75/100%, diagnóstico por lote e leitura agrupada com as mesmas guardas.
+- Tempos apresentados em minutos/horas, mantendo métricas numéricas em segundos.
+- Setup Preserve e contrato de revisão permanecem protegidos. Testes comerciais não executados nesta entrega.
+
+
 ## Próxima entrega — desenvolvimento, ainda não distribuída
 
 - Aplicação por 25%, 50%, 75% ou 100% do total original de lotes por execução, com limite de 200 linhas por lote e retomada da mesma revisão.

@@ -34,6 +34,8 @@ def verify(path, prefix):
             prefix + "app/history_publish_cli.py",
             prefix + "app/history_sheets_bulk.py",
             prefix + "app/history_batch_progress.py",
+            prefix + "app/analytics_history_sync.py",
+            prefix + "app/duration_display.py",
         ]
         if any(names.count(name) != 1 for name in expected):
             raise ValueError("Pacote sem módulos únicos do contrato de histórico.")

@@ -301,7 +301,9 @@ def _print_commands() -> None:
     print("  nexo weni planilhas          Atualiza a Weni a partir dos exports XLSX")
     print()
     print("ANALYTICS")
-    print("  nexo analytics               Executa o NexoFlow Analytics")
+    print("  nexo analytics               Atualiza Analytics e histórico habilitado")
+    print("  nexo analytics --historico-inicio AAAA-MM-DD --historico-fim AAAA-MM-DD")
+    print("  nexo analytics --percentual 25  Limita lotes do histórico nesta carga")
     print(
         "  nexo looker --inicio AAAA-MM-DD --fim AAAA-MM-DD  Recalcula KPIs para o Data Studio"
     )
@@ -613,6 +615,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="carga pelos exports de conversas e contatos",
     )
 
+    analytics.add_argument(
+        "--historico-inicio", help="Coleta histórica explícita: AAAA-MM-DD"
+    )
+    analytics.add_argument(
+        "--historico-fim", help="Fim obrigatório da coleta histórica"
+    )
+    analytics.add_argument(
+        "--percentual",
+        type=int,
+        choices=[25, 50, 75, 100],
+        help="Fração dos lotes históricos por execução",
+    )
+
     looker = sub.add_parser(
         "looker",
         help="recalcula os KPIs do Data Studio usando o histórico do Google Sheets",
@@ -737,11 +752,50 @@ def run(argv: list[str] | None = None) -> int:
         if args.command in {"diagnostico", "doctor", "check"}:
             return _doctor()
         if args.command == "analytics":
-            return _run_windows_target(
-                "comandos/executar_analytics_planilhas.bat"
-                if args.analytics_op == "planilhas"
-                else "NexoFlow Analytics.exe"
-            )
+            from contextlib import contextmanager
+
+            from order_history import HistoryQuery
+            from runtime_profile import segment
+
+            if bool(args.historico_inicio) != bool(args.historico_fim):
+                raise RuntimeError(
+                    "Informe --historico-inicio e --historico-fim juntos."
+                )
+            if args.analytics_op == "planilhas" and (
+                args.historico_inicio or args.percentual
+            ):
+                raise RuntimeError(
+                    "Opções de histórico exigem Analytics nativo, sem 'planilhas'."
+                )
+            values = {}
+            if args.historico_inicio:
+                HistoryQuery(segment(), args.historico_inicio, args.historico_fim, 500)
+                values.update(
+                    NEXOFLOW_HISTORY_INICIO=args.historico_inicio,
+                    NEXOFLOW_HISTORY_FIM=args.historico_fim,
+                )
+            if args.percentual:
+                values["NEXOFLOW_HISTORY_PERCENTUAL"] = str(args.percentual)
+
+            @contextmanager
+            def environment():
+                before = {key: os.environ.get(key) for key in values}
+                os.environ.update(values)
+                try:
+                    yield
+                finally:
+                    for key, value in before.items():
+                        if value is None:
+                            os.environ.pop(key, None)
+                        else:
+                            os.environ[key] = value
+
+            with environment():
+                return _run_windows_target(
+                    "comandos/executar_analytics_planilhas.bat"
+                    if args.analytics_op == "planilhas"
+                    else "NexoFlow Analytics.exe"
+                )
         if args.command == "looker":
             from run_looker import run as looker_run
 

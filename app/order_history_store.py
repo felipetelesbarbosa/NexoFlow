@@ -434,28 +434,28 @@ def merge_canonical(store, orders, items):
 
 
 def analytics_history(client, contacts, orders, items, *, now, settings):
-    """Opt-in explícito; só hoje..D-20, nenhum backfill automático no Noturno."""
-    from datetime import timedelta
+    from config import LOG_DIR
+    from recompra_lock import state_lock
 
+    with state_lock(LOG_DIR / "historico_pedidos_state.json"):
+        return _analytics_history(
+            client, contacts, orders, items, now=now, settings=settings
+        )
+
+
+def _analytics_history(client, contacts, orders, items, *, now, settings):
+    """Opt-in explícito; só hoje..D-20, nenhum backfill automático no Noturno."""
+    from analytics_history_sync import requested_period
     from customer_observations import connect
     from farmalider_customers import directory_for
-    from pedido_utils import business_order_datetime
     from runtime_profile import segment
 
-    if not getattr(settings, "FARMALIDER_HISTORY_ENABLED", False):
+    query, historical = requested_period(settings, now, segment())
+    if not historical and not getattr(settings, "FARMALIDER_HISTORY_ENABLED", False):
         with connect() as db:
             store = HistoryStore(db, segment())
             merged, details = merge_canonical(store, orders, items)
             return merged, details, None
-    dt = business_order_datetime(now)
-    if dt is None:
-        raise HistoryError("DATA_EXECUCAO_INVALIDA")
-    query = HistoryQuery(
-        segment(),
-        (dt.date() - timedelta(days=20)).isoformat(),
-        dt.date().isoformat(),
-        int(getattr(settings, "FARMALIDER_HISTORY_PAGE_LIMIT", 500)),
-    )
     with connect() as db:
         store = HistoryStore(db, segment())
         store.seed_observations(now)
@@ -464,8 +464,10 @@ def analytics_history(client, contacts, orders, items, *, now, settings):
             store,
             query,
             now=now,
-            mode="incremental",
-            max_pages=int(getattr(settings, "FARMALIDER_HISTORY_MAX_PAGES", 100)),
+            mode="historica" if historical else "incremental",
+            max_pages=None
+            if historical
+            else int(getattr(settings, "FARMALIDER_HISTORY_MAX_PAGES", 100)),
         )
         directory = directory_for(client)
         if directory is not None:
