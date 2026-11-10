@@ -1,5 +1,11 @@
 # NexoFlow — Changelog
 
+## Otimização em desenvolvimento — posterior à 1.5.31
+
+- Agrupa linhas contíguas no batchGet do publicador histórico, reduzindo intervalos/endereços sem ler linhas intermediárias não solicitadas.
+- Mantém cabeçalho e geometria novos, fórmulas, posições originais, linhas futuras e conferências por lote. Testes com respostas sintéticas e retomada/rollback.
+- Não altera os pacotes 1.5.31 já publicados. Ver [medição e limites](docs/OTIMIZACAO%20INTERVALOS%20HISTORICO.md).
+
 ## Documentação posterior à 1.5.31 — 10/11/2026
 
 - Consolida a [Base Mestre permanente](docs/planejamento/DIRETRIZES_E_CONHECIMENTO_NEXOFLOW.md), liga os contratos existentes e distingue código, release, implantação e homologação comercial.

@@ -48,3 +48,5 @@ A fonte do guia de operação é `docs/Documentacao NexoFlow.md`; seu [HTML](Doc
 - [Diagnóstico somente leitura de pastas e permissões do histórico](DIAGNOSTICO%20ACESSOS%20HISTORICO.md): diferencia as autoridades OAuth/serviço sem substituir a instalação 1.5.27.
 
 - [Analytics e histórico automático 1.5.31](ANALYTICS%20HISTORICO%20AUTOMATICO.md)
+
+- [Otimização de intervalos do histórico — desenvolvimento posterior à 1.5.31](OTIMIZACAO%20INTERVALOS%20HISTORICO.md).

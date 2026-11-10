@@ -1,6 +1,6 @@
 # NexoFlow 1.5.31
 
-A distribuição 1.5.31 foi publicada em 10/11/2026, no SHA a31237c088e4b699f166086d01abfbb7da0b9a18; versões anteriores permanecem intactas. A missão atual é exclusivamente documental: consolidar a Base Mestre, sem melhorias funcionais, cargas comerciais, implantação, alteração de versões/tags ou release.
+A distribuição 1.5.31 foi publicada em 10/11/2026, no SHA a31237c088e4b699f166086d01abfbb7da0b9a18; versões anteriores permanecem intactas. Após a consolidação documental, o usuário autorizou otimizações funcionais no Windows/Local. Escopo atual: reduzir o custo dos intervalos de leitura do histórico com testes de regressão, preservando guardas e os dez módulos de assinatura. Sem cargas comerciais, implantação na VPS ou nova publicação nesta tarefa; commits de desenvolvimento usam [skip release].
 
 Antes de qualquer nova tarefa, consultar a [Base Mestre permanente](docs/planejamento/DIRETRIZES_E_CONHECIMENTO_NEXOFLOW.md), os contratos especializados e o estado atual da main/release. Distinguir código, testes, distribuição, instalação, implantação e homologação comercial.
 

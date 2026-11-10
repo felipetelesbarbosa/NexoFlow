@@ -72,6 +72,81 @@ class BulkTests(unittest.TestCase):
         with self.assertRaisesRegex(HistoryError, "COLUNAS"):
             new.read_rows(part, headers, [2])
 
+    def test_dense_lot_uses_two_ranges_and_preserves_all_cells(self):
+        headers, book, ws, part = self.setup_part()
+        ws.row_count = 201
+        ws.values = [headers] + [
+            [str(i), "FARMA", str(i), "owner", "", "", "", "valido", "", "1.23"]
+            for i in range(200)
+        ]
+        positions = list(range(2, 202))
+        expected = self.remote.read_rows(part, headers, positions)
+        with patch.object(
+            book, "values_batch_get", wraps=book.values_batch_get
+        ) as read:
+            actual = BulkTransport(self.store).read_rows(part, headers, positions)
+        self.assertEqual(actual, expected)
+        self.assertEqual(len(actual), 200)
+        ranges = read.call_args.args[0]
+        self.assertEqual(
+            ranges, ["'Historico_Pedidos'!A1:O1", "'Historico_Pedidos'!A2:O201"]
+        )
+        old_ranges = [ranges[0]] + [f"'Historico_Pedidos'!A{r}:O{r}" for r in positions]
+        self.assertLess(sum(map(len, ranges)), sum(map(len, old_ranges)) // 20)
+
+    def test_sparse_unsorted_duplicates_and_future_positions_keep_their_order(self):
+        headers, book, ws, part = self.setup_part()
+        ws.row_count = 8
+        ws.values = [headers] + [[str(i), "FARMA"] for i in range(2, 9)]
+        positions = [5, 2, 3, 8, 5, 999]
+        expected = self.remote.read_rows(part, headers, positions)
+        with patch.object(
+            book, "values_batch_get", wraps=book.values_batch_get
+        ) as read:
+            actual = BulkTransport(self.store).read_rows(part, headers, positions)
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            read.call_args.args[0][1:],
+            [
+                "'Historico_Pedidos'!A2:O3",
+                "'Historico_Pedidos'!A5:O5",
+                "'Historico_Pedidos'!A8:O8",
+            ],
+        )
+        self.assertIsNone(actual[-1])
+
+    def test_omitted_trailing_blank_rows_are_empty_but_extra_rows_block(self):
+        headers, book, ws, part = self.setup_part()
+        reader = BulkTransport(self.store)
+        response = {
+            "valueRanges": [{"values": [headers]}, {"values": [["k", "FARMA"]]}]
+        }
+        with patch.object(book, "values_batch_get", return_value=response):
+            rows = reader.read_rows(part, headers, [2, 3])
+        self.assertEqual(rows[0]["chave"], "k")
+        self.assertIsNone(rows[1])
+        for values in ([["a"], ["b"], ["outside"]], [["x"] * (len(headers) + 1)]):
+            response = {"valueRanges": [{"values": [headers]}, {"values": values}]}
+            with patch.object(book, "values_batch_get", return_value=response):
+                with self.assertRaisesRegex(HistoryError, "INTERVALO_DIVERGENTE"):
+                    reader.read_rows(part, headers, [2, 3])
+
+    def test_middle_blanks_formulas_zero_and_external_edit_are_reread(self):
+        headers, book, ws, part = self.setup_part()
+        ws.row_count = 5
+        ws.values = [headers, ["a", "FARMA"], [], ["b", "FARMA", "=1+1"], [0]]
+        positions = [2, 3, 4, 5]
+        reader = BulkTransport(self.store)
+        first = reader.read_rows(part, headers, positions)
+        self.assertEqual(first, self.remote.read_rows(part, headers, positions))
+        self.assertIsNone(first[1])
+        self.assertEqual(first[2]["pedido_id"], "=1+1")
+        self.assertEqual(first[3]["chave"], "0")
+        ws.values[3][0] = "edição externa"
+        second = reader.read_rows(part, headers, positions)
+        self.assertEqual(second[2]["chave"], "edição externa")
+        self.assertNotEqual(first[2], second[2])
+
     def test_fraction_is_original_total_not_remaining(self):
         review = dict(batches=4301)
         self.assertEqual(batch_budget(review, 25, None), 1076)

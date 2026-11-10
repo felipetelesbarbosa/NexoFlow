@@ -18,13 +18,19 @@ class BulkTransport(SheetsTransport):
         # gera HTTP 400 antes de reservar o lote. Não ampliar a grade para ler:
         # isso seria uma escrita anterior ao backup/intenção durável.
         # A grade é relida, não a do plano: expansão externa pode conter dados.
-        existing = [r for r in positions if r <= geometry["rows"]]
+        existing = sorted({r for r in positions if r <= geometry["rows"]})
+        spans = []
+        for row in existing:
+            if spans and row == spans[-1][1] + 1:
+                spans[-1] = (spans[-1][0], row)
+            else:
+                spans.append((row, row))
         # Cabeçalho completo e células do lote são relidos juntos, sem cache.
         # O nome é escapado como literal A1, inclusive apóstrofos.
         title = part["title"].replace("'", "''")
         ranges = [f"'{title}'!A1:{self.manager.store_column(geometry['columns'])}1"] + [
-            f"'{title}'!A{r}:{self.manager.store_column(len(headers))}{r}"
-            for r in existing
+            f"'{title}'!A{first}:{self.manager.store_column(len(headers))}{last}"
+            for first, last in spans
         ]
         result = self.store._read_with_retry(
             "conferir intervalos do lote",
@@ -33,7 +39,7 @@ class BulkTransport(SheetsTransport):
             ),
         )
         groups = result.get("valueRanges", [])
-        if len(groups) != len(existing) + 1:
+        if len(groups) != len(spans) + 1:
             raise HistoryError("RESPOSTA_DE_INTERVALOS_INCOMPLETA")
         raw_header = groups.pop(0).get("values", [])
         if len(raw_header) > 1:
@@ -43,26 +49,30 @@ class BulkTransport(SheetsTransport):
             actual.pop()
         if actual != headers:
             raise HistoryError("CABECALHO_ALTERADO_APOS_REVISAO")
-        rows = []
-        for group in groups:
+        by_position = {}
+        for (first, last), group in zip(spans, groups, strict=True):
             values = group.get("values", [])
-            cells = values[0] if values else []
-            if len(values) > 1 or len(cells) > len(headers):
+            if len(values) > last - first + 1:
                 raise HistoryError("INTERVALO_DIVERGENTE")
-            rows.append(
-                normalized_cells(
-                    dict(
-                        zip(
-                            headers,
-                            cells + [""] * (len(headers) - len(cells)),
-                            strict=True,
+            # Sheets omite linhas vazias finais; manter suas posições sem
+            # confundir omissão permitida com resposta de intervalo ausente.
+            for offset, position in enumerate(range(first, last + 1)):
+                cells = values[offset] if offset < len(values) else []
+                if len(cells) > len(headers):
+                    raise HistoryError("INTERVALO_DIVERGENTE")
+                by_position[position] = (
+                    normalized_cells(
+                        dict(
+                            zip(
+                                headers,
+                                cells + [""] * (len(headers) - len(cells)),
+                                strict=True,
+                            )
                         )
                     )
+                    if any(v not in ("", None) for v in cells)
+                    else None
                 )
-                if any(v not in ("", None) for v in cells)
-                else None
-            )
-        by_position = dict(zip(existing, rows, strict=True))
         return [by_position.get(r) for r in positions]
 
 
