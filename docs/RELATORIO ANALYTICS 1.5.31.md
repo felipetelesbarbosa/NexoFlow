@@ -43,3 +43,5 @@ Operação: consultar [o guia](ANALYTICS%20HISTORICO%20AUTOMATICO.md). Primeiro 
 ## Conferência de codificação no Windows
 
 A matriz com UTF-8 desativado identificou duas verificações de teste que reabriam o estado privado UTF-8 com a codificação padrão do sistema, alterando os acentos e produzindo REVISAO_ALTERADA. As quatro leituras do estado na fixture agora especificam UTF-8, como já faz a implementação operacional. A assinatura e as guardas do publicador não foram alteradas. A distribuição exige repetir a matriz no commit corrigido.
+
+O build de publicação também revelou uma corrida na fixture Windows de revisão XLSX: Test-Path podia encontrar dialog_open durante o Set-Content, e a leitura Python recebia PermissionError. O sinal simulado agora é escrito em arquivo temporário e renomeado somente após fechar a escrita, como já ocorria com a resposta decision. Nenhum script operacional, regra de aprovação ou timeout foi relaxado; a matriz e o pacote devem ser revalidados no novo SHA.
