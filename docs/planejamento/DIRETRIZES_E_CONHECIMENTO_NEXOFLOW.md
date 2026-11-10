@@ -16,8 +16,8 @@ Uma nota de planejamento não substitui contrato executável; uma divergência e
 
 | Componente | Estado documentado neste corte | Limite da conclusão |
 | --- | --- | --- |
-| Windows/Local, Terminal, Weni, Analytics, Noturno e Recompra | [1.5.31 publicada](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.31), SHA `a31237c088e4b699f166086d01abfbb7da0b9a18`, 10/11/2026 às 17:07:39 UTC−3 | Release não comprova instalação ou ativação em cada PC. |
-| Validação da distribuição | [Workflow oficial aprovado](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/42887462788): Windows, Setup e pacotes; conferência independente registrada nas notas da release | Testes sintéticos/CI não equivalem à conciliação comercial, aprovação de antivírus ou autenticação no proxy real. |
+| Windows/Local, Terminal, Weni, Analytics, Noturno e Recompra | [1.5.32 publicada](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.32), SHA `9d4be5d911a817a09773fc843f7674a6480e0b71`, 10/11/2026 às 19:16:49 UTC−3 | Release não comprova instalação ou ativação em cada PC. |
+| Validação da distribuição | [Workflow oficial aprovado](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/42908265073): Windows, Setup e pacotes; conferência independente registrada nas notas da release | Testes sintéticos/CI não equivalem à conciliação comercial, aprovação de antivírus ou autenticação no proxy real. |
 | Hub/Cloud | Núcleo Python, FastAPI, worker, PostgreSQL e Docker desenvolvidos em homologação; implantação isolada na VPS relatada pelo Work, originalmente SHA `23f2806` | Não houve inspeção da VPS nesta consolidação; SHA instalado atual e fontes reais precisam de conferência pelo Work. Sem release comercial do Hub. |
 | Central de Operações e NexoFlow Métricas | Planejados no cronograma e na Etapa 3.5 | URLs propostas e requisitos não comprovam serviços implantados. |
 | Data Studio FARMA/PET | Relatórios existentes; inventário datado e matriz de paridade disponíveis | Não foram abertos/alterados nesta tarefa; toda ligação, fórmula e total comercial exige evidência do corte correspondente. |
@@ -204,3 +204,5 @@ Nesta tarefa: somente consolidação documental, sem código, testes alterados, 
 - **10/11/2026, tarefa posterior:** usuário autorizou otimizações Windows/Local. Desenvolvimento de agrupamento de intervalos documentado no [relatório específico](../OTIMIZACAO%20INTERVALOS%20HISTORICO.md); isso não muda a distribuição 1.5.31 ou comprova desempenho comercial. A restrição documental acima descreve a missão original de consolidação.
 
 - **10/11/2026, preparação 1.5.32:** publicação da otimização autorizada após checks/pacotes aprovados. Avisar sempre quando uma mudança precisar de release para alcançar o Windows instalado; dispensar o aviso quando não houver essa necessidade. A 1.5.31 publicada continua sendo a referência até a conclusão dessa publicação.
+
+- **10/11/2026, publicação 1.5.32:** tag/pacotes e downloads conferidos no SHA `9d4be5d911a817a09773fc843f7674a6480e0b71`; a 1.5.31 permanece intacta. A orientação de avisar quando uma mudança exige release está registrada no AGENTS. Sem carga comercial ou implantação nesta entrega.

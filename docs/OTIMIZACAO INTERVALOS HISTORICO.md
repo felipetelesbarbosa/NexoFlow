@@ -1,6 +1,6 @@
 # Intervalos contíguos no publicador histórico
 
-Desenvolvimento autorizado em 10/11/2026, posterior à release 1.5.31. A distribuição 1.5.32 foi autorizada e está em validação; não substituir módulos avulsos na instalação. Nenhum dado comercial foi consultado ou escrito nesta tarefa.
+Desenvolvimento autorizado em 10/11/2026, posterior à release 1.5.31. A distribuição [1.5.32 foi publicada em 10/11/2026](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.32) após validação; não substituir módulos avulsos na instalação. Nenhum dado comercial foi consultado ou escrito nesta tarefa.
 
 ## Problema e alteração
 
@@ -51,3 +51,7 @@ No ambiente autorizado, registrar tempo total, chamadas, espera preventiva, byte
 - 33 testes Node dos conectores: aprovados.
 - Ruff, Pyright (zero erros/avisos), consistência, HTML gerado, pip-audit e Gitleaks staged: aprovados.
 - Nenhum dos dez módulos protegidos mudou. Windows, executáveis instalados e transporte Google real não foram executados localmente; conferir o CI do commit antes de distribuir.
+
+## Publicação comprovada
+
+Tag v1.5.32 no SHA `9d4be5d911a817a09773fc843f7674a6480e0b71`; publicada em 10/11/2026, 19:16:49 (America/Fortaleza). [Workflow](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/42908265073) e CodeQL aprovados. Downloads públicos conferidos: SHA-256, CRC, manifesto, 104 módulos comparados ao commit, executáveis x64/pt-BR/1.5.32.0 e contrato anterior preservado nos dois ZIPs. Setup Preserve/Clean/rollback e pacote instalado passaram no Windows CI, sem validar o PC/rede/Google comercial do usuário. Registro posterior é exclusivamente documental; não muda tag, código ou bytes dos pacotes publicados.

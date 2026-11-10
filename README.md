@@ -83,7 +83,7 @@ As continuações automáticas no Meu Drive exigem autorização Google local. O
 
 ## Versões e atualizações
 
-A versão desta entrega é **1.5.32**, em preparação autorizada. Os pacotes públicos são disponibilizados após a validação do mesmo commit. As próximas correções seguem **1.5.33, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
+A versão desta entrega é **1.5.32**, publicada em 10/11/2026. Os pacotes públicos são disponibilizados após a validação do mesmo commit. As próximas correções seguem **1.5.33, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
 
 ## NexoFlow Hub: homologação e evolução paralela
 

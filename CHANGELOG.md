@@ -1,6 +1,6 @@
 # NexoFlow — Changelog
 
-## 1.5.32 — em validação
+## 1.5.32 — publicada em 10/11/2026, 19:16:49 (America/Fortaleza)
 
 - Agrupa linhas contíguas no batchGet do publicador histórico, reduzindo intervalos/endereços sem ler linhas intermediárias não solicitadas.
 - Mantém cabeçalho e geometria novos, fórmulas, posições originais, linhas futuras e conferências por lote. Testes com respostas sintéticas e retomada/rollback.
