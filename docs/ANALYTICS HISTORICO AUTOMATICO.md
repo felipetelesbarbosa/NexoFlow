@@ -4,7 +4,7 @@ Entrega em validação. A 1.5.30 permanece publicada e intacta. A carga anual FA
 
 ## Rotina
 
-Com `FARMALIDER_HISTORY_ENABLED = True` no perfil, o Analytics consulta os pedidos de hoje até 20 dias atrás, inclusive, em America/Belem, com limite padrão 500. Reconsulta os pedidos recentes para capturar alterações e cancelamentos. Não usa a data de modificação do contato como cursor de pedidos. Limites da API continuam não homologados; páginas completas não provam cobertura civil completa.
+Com `FARMALIDER_HISTORY_ENABLED = True` no perfil, o Analytics consulta os pedidos de hoje até 20 dias atrás, inclusive, em America/Belem, com limite padrão 500. Janelas antigas incompletas fora desse recorte permanecem no SQLite para retomada explícita pelo Terminal; o Analytics não as inclui automaticamente. Reconsulta os pedidos recentes para capturar alterações e cancelamentos. Não usa a data de modificação do contato como cursor de pedidos. Limites da API continuam não homologados; páginas completas não provam cobertura civil completa.
 
 O Analytics conserva suas etapas de contatos, pedidos/itens, BI, Looker e Meta nativo. Depois executa o mesmo publicador histórico validado pelo Terminal, alimentando Historico_Pedidos, Historico_Itens, BI_LTV_Clientes, BI_Cobertura_Historica e BI_Historico_Resumo, com continuações. Não recria as planilhas. Tabelas opcionais continuam dependentes das respectivas credenciais, fontes e evidências; atualizar Analytics não inventa custos, CAC, atribuições ou conversas. O relatório Data Studio precisa atualizar sua leitura das fontes já conectadas; o Analytics não edita a diagramação.
 

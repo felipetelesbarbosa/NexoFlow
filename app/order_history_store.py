@@ -465,6 +465,7 @@ def _analytics_history(client, contacts, orders, items, *, now, settings):
             query,
             now=now,
             mode="historica" if historical else "incremental",
+            resume_pending=False,
             max_pages=None
             if historical
             else int(getattr(settings, "FARMALIDER_HISTORY_MAX_PAGES", 100)),
@@ -487,6 +488,7 @@ def collect_windows(
     restart=False,
     mode="historica",
     progress=None,
+    resume_pending=True,
 ):
     """Faixas com fronteira compartilhada; cobertura civil continua não comprovada."""
     from datetime import timedelta
@@ -502,7 +504,7 @@ def collect_windows(
     store.active_run = uuid4().hex
     queries = []
     rejected_legacy_windows = 0
-    if mode == "incremental":
+    if mode == "incremental" and resume_pending:
         for key, start, end, limit, cursor, total in store.db.execute(
             "SELECT key,start,end,page_limit,next_page,total FROM history_windows WHERE segment=? AND status='incompleta' ORDER BY start",
             (store.segment,),

@@ -20,7 +20,7 @@ def duration(seconds: float) -> str:
 def humanize(message: str) -> str:
     # Somente tokens com unidade explícita, nunca IDs, centavos ou JSON.
     return re.sub(
-        r"(?<![\w./:-])(\d+(?:\.\d+)?)\s?s\b",
+        r"(?<![\w.:-])(\d+(?:\.\d+)?)\s?s\b",
         lambda m: duration(float(m[1])) if float(m[1]) >= 60 else m[0],
         message,
     )

@@ -15,7 +15,7 @@ from analytics_history_sync import requested_period, synchronize
 from duration_display import duration, humanize
 from history_sheets_bulk import BulkHistorySheets
 from history_snapshot import sha256
-from order_history import HistoryError
+from order_history import HistoryError, HistoryQuery
 from tests.test_history_publication import Sheets, fixture
 
 
@@ -236,6 +236,10 @@ class EntryTests(unittest.TestCase):
         ]:
             self.assertEqual(duration(value), expected)
         self.assertEqual(
+            humanize("latência=61.0s/120.0s/3601.0s"),
+            "latência=1min 1s/2min 0s/1h 0min 1s",
+        )
+        self.assertEqual(
             humanize("espera preventiva=45445.0s; CPF 12345678901"),
             "espera preventiva=12h 37min 25s; CPF 12345678901",
         )
@@ -245,7 +249,7 @@ class NativeCollectionTests(unittest.TestCase):
     def test_incremental_collects_new_and_recent_then_rechecks_cancellation(self):
         from contextlib import contextmanager
 
-        from order_history_store import analytics_history
+        from order_history_store import HistoryStore, analytics_history
         from tests.test_order_history import NOW, Source, order
 
         with tempfile.TemporaryDirectory() as directory:
@@ -272,6 +276,10 @@ class NativeCollectionTests(unittest.TestCase):
                     patch("customer_observations.connect", connection),
                     patch("farmalider_customers.directory_for", return_value=None),
                 ):
+                    with connection() as db:
+                        HistoryStore(db, profile).begin(
+                            HistoryQuery(profile, "2020-01-01", "2020-02-01", 500)
+                        )
                     client = Source([order(1, segment=profile)])
                     _, _, result = analytics_history(
                         client, [], [], [], now=NOW, settings=settings

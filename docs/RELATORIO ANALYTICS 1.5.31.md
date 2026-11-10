@@ -6,7 +6,7 @@ Em validação em 10/11/2026 (America/Sao_Paulo). Código, fixtures e pacotes; n
 
 O Analytics já chamava `analytics_history` para pedidos recentes, mas não chamava o publicador das cinco tabelas históricas. Elas dependiam da operação manual Terminal. A fachada nova `analytics_history_sync` liga essas etapas sem substituir o motor e sem modificar os dez módulos que assinam os recibos 1.5.29/30.
 
-A coleta agora usa trava histórica também no Analytics. Datas completas são explícitas via CLI e herdadas por subprocessos; a execução incremental mantém hoje..D-20, limite padrão 500. Uma carga completa de contatos não dispara automaticamente coleta anual.
+A coleta agora usa trava histórica também no Analytics. Datas completas são explícitas via CLI e herdadas por subprocessos; a execução incremental mantém hoje..D-20, limite padrão 500. Uma carga completa de contatos não dispara automaticamente coleta anual. A revisão encontrou que collect_windows também retomava janelas antigas incompletas: o Analytics agora usa resume_pending=False e consulta somente o período autorizado; o Terminal mantém a retomada antiga. Regressão semeia uma janela pendente de 2020 e comprova que a carga diária consulta só D-20, nos dois perfis.
 
 A publicação cria uma cópia consistente, herda exclusões comprovadas do journal publicado, prepara capacidade e revisão, salva o estado antes de escrever e retoma o mesmo plano após falha. Uma revisão manual WRITING bloqueia tomada automática. Fatos excluídos alterados exigem revisão. Na retomada, pedidos posteriores ao snapshot são explicitamente pendentes para a próxima execução. Só após conferência integral o estado muda para conferida. Falhas geram código 3 e mantêm o checkpoint de sucesso.
 
