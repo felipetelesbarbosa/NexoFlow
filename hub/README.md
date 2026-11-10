@@ -1,6 +1,6 @@
 # NexoFlow Hub — núcleo de homologação Linux
 
-Estado: desenvolvimento `0.1.0.dev0`, independente da versão Windows **1.5.15**. Não é um release operacional do Hub. API, worker e persistência são reais; as fontes comerciais são fixtures e todos os conectores de produção recusam leitura e escrita.
+Estado: desenvolvimento `0.1.0.dev0`, independente da versão Windows (consultar `../VERSION` e a release vigente). Não é um release operacional do Hub. API, worker e persistência são reais; as fontes comerciais são fixtures e todos os conectores de produção recusam leitura e escrita.
 
 ## Arquitetura implementada
 

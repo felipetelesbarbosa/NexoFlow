@@ -2,6 +2,8 @@
 
 > **Referência documental. Atualizado em 09/11/2026.** Não é especificação de funcionalidade já implantada. Não autoriza deploy, criação de agente, alteração de fluxos, disparo de mensagens ou escrita comercial.
 
+Consulte primeiro a [Base Mestre compartilhada](planejamento/DIRETRIZES_E_CONHECIMENTO_NEXOFLOW.md). Este guia continua sendo a referência especializada de agentes e Flows.
+
 ## 1. Propósito e aplicações no NexoFlow
 
 Esta base reúne referências oficiais da **Weni / VTEX CX Platform (Weni)** para futuras integrações com **NexoFlow Windows/Local, Analytics, Hub/Cloud, Painel Web e Métricas**. O foco é compreender como agentes personalizados e o IA Manager podem consultar dados oficiais, executar ferramentas autorizadas e eventualmente cooperar com **Flows/Studio** para automações de atendimento (FARMA e PET).

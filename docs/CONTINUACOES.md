@@ -1,5 +1,7 @@
 # Continuações de planilhas — NexoFlow
 
+> **Consulta atual — 10/11/2026:** Windows 1.5.31 publicada. Ver [Base Mestre](planejamento/DIRETRIZES_E_CONHECIMENTO_NEXOFLOW.md) e [Analytics/histórico automático](ANALYTICS%20HISTORICO%20AUTOMATICO.md). Trechos abaixo que citam validações e bloqueios de versões anteriores são registros datados, não diagnóstico atual dos destinos. Conferir o corte e os comprovantes antes de retomar; esta consolidação não executa publicação comercial.
+
 A partir da 1.5.5, Operação, Histórico e tabelas BI podem continuar em novos arquivos do Meu Drive. Os três arquivos configurados em cada perfil continuam sendo as origens; o NexoFlow registra suas continuações na aba `NexoFlow_Continuidade` do Dashboard.
 
 ## Capacidade e histórico

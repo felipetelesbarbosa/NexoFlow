@@ -1,6 +1,11 @@
 # NexoFlow — Changelog
 
-## 1.5.31 — em validação
+## Documentação posterior à 1.5.31 — 10/11/2026
+
+- Consolida a [Base Mestre permanente](docs/planejamento/DIRETRIZES_E_CONHECIMENTO_NEXOFLOW.md), liga os contratos existentes e distingue código, release, implantação e homologação comercial.
+- Atualiza referências de versão/publicação e registra conflitos/pendências sem alterar funcionalidades, dados, tags ou pacotes.
+
+## 1.5.31 — publicada em 10/11/2026, 17:07:39 (America/Fortaleza)
 
 - Analytics conecta o publicador histórico nativo: coleta recente D-20 e período histórico explícito, cinco fontes com conferência financeira e retomada durável.
 - Preserva exclusões autorizadas na cópia privada; bloqueia fatos alterados, journal ausente, segmentos divergentes e revisão manual ainda ativa.
@@ -9,7 +14,7 @@
 - Setup Preserve e contrato de revisão permanecem protegidos. Testes comerciais não executados nesta entrega.
 
 
-## Próxima entrega — desenvolvimento, ainda não distribuída
+### Frações e leituras agrupadas — incluídas na 1.5.31
 
 - Aplicação por 25%, 50%, 75% ou 100% do total original de lotes por execução, com limite de 200 linhas por lote e retomada da mesma revisão.
 - Agrupa releitura de cabeçalho completo e células do lote, sem cache; preserva geometria, trava, manifesto, backup, conferência posterior e ritmo de 45/minuto.

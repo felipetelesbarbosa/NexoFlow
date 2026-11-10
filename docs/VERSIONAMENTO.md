@@ -1,6 +1,6 @@
 # Versionamento do NexoFlow
 
-A entrega **1.5.31** está em validação. A **1.5.30 já foi publicada** e permanece intacta. Publicar somente após checks e pacotes instalados validados no mesmo commit.
+A **1.5.31 foi publicada em 10/11/2026 às 17:07:39 (America/Fortaleza)**, no SHA `a31237c088e4b699f166086d01abfbb7da0b9a18`. A 1.5.30 e as anteriores permanecem intactas. Ver [release e evidências](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.31). A consolidação documental posterior não altera essa tag, seus pacotes ou VERSION. Novas publicações exigem checks e pacotes instalados validados no mesmo commit.
 
 As próximas publicações de atualização, hotfix ou patch seguem **1.5.32 → ... → 1.5.99 → 1.6 → 1.6.1**. Cada publicação incrementa uma única vez; commits e novas tentativas de CI da mesma entrega não mudam a numeração. Não há salto automático de versão principal.
 

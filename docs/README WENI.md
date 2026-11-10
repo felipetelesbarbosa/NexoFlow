@@ -1,8 +1,10 @@
-# NexoFlow 1.5.15 — Weni
+# NexoFlow — Weni
 
 A rotina atende **FarmaLíder e Pets Líder**. Escolha o perfil ao abrir o mesmo executável; cada marca usa sua organização, token, planilhas e estado. Veja [campos, campanhas e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 
 O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
+
+Os marcos de versões citados abaixo preservam a evolução da política. Para estado atual, escopo e evidências, consultar a [Base Mestre](planejamento/DIRETRIZES_E_CONHECIMENTO_NEXOFLOW.md) e o changelog.
 
 ## Objetivo
 

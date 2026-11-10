@@ -1,6 +1,6 @@
 # NexoFlow | Cronograma mestre: Hub, Central de Operações e Métricas
 
-**Planejamento atualizado em 07/11/2026.** Este documento registra prioridades, responsáveis, dependências e critérios de aceite. **Não autoriza implantação comercial, exposição pública ou exclusão de dados.** Datas de entrega dependem de homologação e recursos reais.
+**Planejamento de 07/11/2026; estado da distribuição atualizado em 10/11/2026.** Consulte a [Base Mestre](DIRETRIZES_E_CONHECIMENTO_NEXOFLOW.md). Este documento registra prioridades, responsáveis, dependências e critérios de aceite. **Não autoriza implantação comercial, exposição pública ou exclusão de dados.** Datas de entrega dependem de homologação e recursos reais.
 
 ## 1. Produtos, acesso e identidade
 
@@ -32,7 +32,7 @@ Os subdomínios são **propostas**. Implantação via Cloudflare Tunnel/HTTPS/Ac
 
 ### Estado do código
 
-O Windows **1.5.18** está publicado conforme o repositório, mas o Hub da VPS foi homologado originalmente no SHA `23f2806`. Antes de atualizar o Hub, conferir o SHA exato da tag, diff, migrations, backup, rollback e regressões; atualizar HML de modo controlado e **sem deploy comercial automático**. O Windows continua autônomo, sem dependência do Hub.
+O Windows **1.5.31** está publicado, no SHA `a31237c088e4b699f166086d01abfbb7da0b9a18`, mas o Hub da VPS foi homologado originalmente no SHA `23f2806`. Antes de atualizar o Hub, conferir o SHA exato da tag, diff, migrations, backup, rollback e regressões; atualizar HML de modo controlado e **sem deploy comercial automático**. O Windows continua autônomo, sem dependência do Hub.
 
 ## 3. Etapa 3.5 | O que iniciar AGORA
 
@@ -181,7 +181,7 @@ A autonomia para mudanças **reversíveis e isoladas em homologação** é ampla
 ### Próximos entregáveis práticos
 
 1. **Work 3.5:** inventário e retenção; verificar execuções n8n; acesso PostgreSQL read-only via túnel e manual DBeaver; contrato mínimo de métricas; projeto de autorização; monitoramento de custo/capacidade. Sem mexer em serviços comerciais.
-2. **Codex 3.5/4:** instrumentação mínima e contrato de métricas/erros, API de consulta e validação de regressões Windows 1.5.18 ↔ Hub, sem portal completo ainda.
+2. **Codex 3.5/4:** instrumentação mínima e contrato de métricas/erros, API de consulta e validação de regressões Windows no SHA vigente ↔ Hub instalado, sem portal completo ainda.
 3. **Work + Codex 4:** homologação real em leitura, por fonte e segmento, com desempenho, recorte de datas, idempotência e comparação das contas atuais.
 4. **Work + Codex 5/6:** dashboards/portal e Métricas com paridade e autorização; só então considerar substituição do Data Studio.
 

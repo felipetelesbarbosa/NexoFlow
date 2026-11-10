@@ -1,6 +1,6 @@
 # Analytics, histórico e publicação automática — 1.5.31
 
-Entrega em validação. A 1.5.30 permanece publicada e intacta. A carga anual FARMA concluída pelo operador não foi repetida durante o desenvolvimento.
+A [1.5.31 foi publicada](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.31) em 10/11/2026, no SHA a31237c088e4b699f166086d01abfbb7da0b9a18. A 1.5.30 permanece intacta. A carga anual FARMA concluída pelo operador não foi repetida durante o desenvolvimento.
 
 ## Rotina
 

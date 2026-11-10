@@ -1,5 +1,7 @@
 # Histórico paginado de pedidos e LTV observado
 
+> **Consulta atual — 10/11/2026:** Windows 1.5.31 publicada. Ver [Base Mestre](planejamento/DIRETRIZES_E_CONHECIMENTO_NEXOFLOW.md) e [Analytics/histórico automático](ANALYTICS%20HISTORICO%20AUTOMATICO.md). Trechos abaixo que citam validações e bloqueios de versões anteriores são registros datados, não diagnóstico atual dos destinos. Conferir o corte e os comprovantes antes de retomar; esta consolidação não executa publicação comercial.
+
 Contrato recebido: `GET /api/Delivery/pedidos/{segmento}`, parâmetros `dataInicio`, `dataFim`, `pagina`, `limite` e token privado em query. O cliente utiliza a rota direta/proxy já selecionada e recusa redirecionamentos. FARMA e PET possuem estado, cadastros, contatos e destinos separados.
 
 ## Executar no Windows

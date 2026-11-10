@@ -1,6 +1,6 @@
 # Frações e leituras agrupadas do histórico
 
-Estado: incluído na entrega 1.5.31 em validação.
+Estado: incluído na [1.5.31 publicada em 10/11/2026](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.31).
 Não alterar a instalação nem a execução comercial em andamento. Os comandos
 abaixo são do código em desenvolvimento: não estão disponíveis no Setup 1.5.30.
 Nenhuma carga comercial, API de pedidos, Weni, Noturno ou Recompra é executada

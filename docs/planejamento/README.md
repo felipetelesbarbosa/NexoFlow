@@ -2,6 +2,10 @@
 
 Esta pasta reúne o planejamento do **NexoFlow Hub**, da **Central de Operações** e do **NexoFlow Métricas**. O roadmap diferencia entregas já homologadas de funcionalidades planejadas e **não autoriza produção, publicação de serviços ou exclusões destrutivas**.
 
+## Ponto de entrada compartilhado
+
+Leia a [Base Mestre permanente de conhecimento](DIRETRIZES_E_CONHECIMENTO_NEXOFLOW.md) antes de tarefas de desenvolvimento, operação ou BI. Ela liga os contratos especializados e separa implementação de ativação comercial.
+
 ## Cronograma oficial
 
 **[Cronograma mestre: Hub, Central de Operações e NexoFlow Métricas](CRONOGRAMA_MESTRE_HUB_METRICAS.md)**
@@ -19,7 +23,7 @@ O documento consolida:
 
 | Produto | Situação |
 | --- | --- |
-| **Windows** | Operacional e autônomo; release 1.5.18 disponível, sujeito a homologações comerciais próprias. |
+| **Windows** | Operacional e autônomo; release 1.5.31 publicada em 10/11/2026, sujeito a homologações comerciais próprias. |
 | **Hub Linux** | Núcleo desenvolvido; implantado em **homologação isolada na VPS** na Etapa 3, originalmente SHA 23f2806. Testes n8n/PostgreSQL, backups e restauração aprovados com ressalvas. Nenhuma integração comercial ativada. |
 | **Central de Operações** | Planejada, com preparação de telemetria e segurança na 3.5. |
 | **NexoFlow Métricas** | Planejado, com inventário/paridade Data Studio e arquitetura de permissões iniciados na 3.5. |
