@@ -39,3 +39,7 @@ Lint, tipos, Node (33 testes), consistência, dependências e segredos aprovados
 - A diagramação do Data Studio e a homologação comercial pós-atualização permanecem com o Work.
 
 Operação: consultar [o guia](ANALYTICS%20HISTORICO%20AUTOMATICO.md). Primeiro FARMA; ativação PET separada.
+
+## Conferência de codificação no Windows
+
+A matriz com UTF-8 desativado identificou duas verificações de teste que reabriam o estado privado UTF-8 com a codificação padrão do sistema, alterando os acentos e produzindo REVISAO_ALTERADA. As quatro leituras do estado na fixture agora especificam UTF-8, como já faz a implementação operacional. A assinatura e as guardas do publicador não foram alteradas. A distribuição exige repetir a matriz no commit corrigido.

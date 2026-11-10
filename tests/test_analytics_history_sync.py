@@ -60,12 +60,16 @@ class AutomationTests(unittest.TestCase):
     def test_four_fractions_resume_same_snapshot_then_idempotent(self):
         first = self.sync(25)
         self.assertTrue(first["partial"])
-        state = json.loads((self.directory / "analytics_estado.json").read_text())
+        state = json.loads(
+            (self.directory / "analytics_estado.json").read_text(encoding="utf-8")
+        )
         revision = state["review"]["revision"]
         result = first
         while result["remaining_batches"]:
             result = self.sync(25)
-            current = json.loads((self.directory / "analytics_estado.json").read_text())
+            current = json.loads(
+                (self.directory / "analytics_estado.json").read_text(encoding="utf-8")
+            )
             self.assertEqual(current["review"]["revision"], revision)
         self.assertEqual(result["remaining_batches"], 0)
         self.assertTrue(result["resumed"])
@@ -80,7 +84,9 @@ class AutomationTests(unittest.TestCase):
         self.remote.lost = True
         with self.assertRaises(TimeoutError):
             self.sync()
-        state = json.loads((self.directory / "analytics_estado.json").read_text())
+        state = json.loads(
+            (self.directory / "analytics_estado.json").read_text(encoding="utf-8")
+        )
         self.assertEqual(state["status"], "preparada")
         revision = state["review"]["revision"]
         self.remote.lost = False
@@ -126,7 +132,9 @@ class AutomationTests(unittest.TestCase):
         while result["remaining_batches"]:
             result = self.sync(25)
         self.assertEqual(result["remaining_batches"], 0)
-        state = json.loads((self.directory / "analytics_estado.json").read_text())
+        state = json.loads(
+            (self.directory / "analytics_estado.json").read_text(encoding="utf-8")
+        )
         report = self.adapter.check(state["review"])
         self.assertEqual(
             report["conference"]["observado"]["recortes"][-1]["pedidos"], 9
