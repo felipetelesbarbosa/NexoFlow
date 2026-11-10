@@ -60,9 +60,11 @@ else:
                 "param([string]$Expected,[string]$Title)\n"
                 '. "$PSScriptRoot/real_review.ps1" -Expected $Expected -Title $Title\n'
                 "function Show-WeniReviewDialog { param([string]$Message,[string]$Title)\n"
-                # O leitor só deve ver o sinal após o PowerShell fechar o arquivo.
+                # Publicar uma vez, após fechar; a confirmação pode perguntar duas vezes.
+                ' if (-not (Test-Path -LiteralPath "$PSScriptRoot/../dialog_open")) {\n'
                 ' Set-Content -LiteralPath "$PSScriptRoot/../dialog_open.pending" -Value $Message -Encoding UTF8\n'
                 ' Move-Item -LiteralPath "$PSScriptRoot/../dialog_open.pending" -Destination "$PSScriptRoot/../dialog_open"\n'
+                " }\n"
                 ' while (-not (Test-Path -LiteralPath "$PSScriptRoot/../decision")) { Start-Sleep -Milliseconds 50 }\n'
                 ' return (Get-Content -LiteralPath "$PSScriptRoot/../decision" -Raw)\n}\n'
                 "exit (Confirm-WeniReview -Expected $Expected -Title $Title)\n",
