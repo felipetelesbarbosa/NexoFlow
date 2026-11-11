@@ -29,6 +29,8 @@ O NexoFlow cria a continuação na mesma pasta da origem e reproduz os acessos i
 
 ## Preparar o Data Studio uma vez
 
+Para `BI_Itens#0` registrada sem estado antes da primeira publicação, consultar a [conferência inicial controlada](INICIALIZACAO%20BI%20ITENS.md). Não editar o manifesto para fabricar `READY`; atualizar a implantação Apps Script e validar a fonte antes da confirmação local.
+
 Uma fonte nativa Google Sheets lê uma aba de um arquivo. Ela **não passa automaticamente** a unir as continuações. Por isso, a criação de partes BI fica bloqueada até a confirmação das fontes que já usam o conector NexoFlow.
 
 O Setup e o GitHub não implantam um Apps Script nem substituem fontes do relatório. Faça esta configuração no Google com a conta responsável pelo dashboard:

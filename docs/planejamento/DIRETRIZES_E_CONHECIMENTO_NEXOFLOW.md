@@ -210,3 +210,5 @@ Nesta tarefa: somente consolidação documental, sem código, testes alterados, 
 - **10/11/2026, preparação 1.5.33:** usuário autorizou publicação da correção da leitura da trava após HTTP 429/5xx. Preservar os dez módulos de assinatura e a release 1.5.32; anúncio depende dos checks e pacotes do novo SHA. Não inicia cargas comerciais.
 
 - **10/11/2026, 23:28:34, publicação 1.5.33:** checks, Setup e downloads públicos conferidos no SHA `7884d7007fd0c65cbf90bfc30c5c35dc6c9056fb`. 1.5.32 preservada. A otimização de CI posterior usa uma geração e reutilização dos mesmos pacotes; não altera a versão Windows nem seus artefatos. Ver [guia](../RELEASE%20EFICIENTE.md).
+
+- **11/11/2026, conferência inicial de BI_Itens:** o Work encontrou raiz registrada sem estado e não confirmou a fonte. O leitor Apps Script foi ajustado para conferir exclusivamente o legado principal estável, sem fabricar READY, mantendo bloqueios de escrita, partes pendentes e cruzamentos. Ver [diagnóstico e passagem](../INICIALIZACAO%20BI%20ITENS.md). Os testes são sintéticos; atualização da implantação e comparação comercial permanecem com o Work. Pacotes Windows preservados.

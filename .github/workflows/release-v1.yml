@@ -49,7 +49,7 @@ jobs:
           ruff check .
           pyright
       - name: Testar leitores Data Studio e histórico completo
-        run: node --test tests/test_continuation_connector.cjs tests/test_looker_abc_connector.cjs tests/test_history_connector.cjs
+        run: node --test tests/test_continuation_connector.cjs tests/test_looker_abc_connector.cjs tests/test_history_connector.cjs tests/test_legacy_items_connector.cjs
       - name: Auditar dependências
         run: pip-audit -r requirements.txt -r dependencias/requirements-webhook.txt
 

@@ -65,6 +65,18 @@ var NexoTables = (function () {
       if (stable(indexValues()) !== stable(initial)) fail('a carga mudou durante a vinculação; tente novamente.');
       return definitions;
     }
+    // Uma raiz legada registrada durante o planejamento ainda não foi publicada
+    // pelo gerenciador. Sua conferência não fabrica estado READY no manifesto.
+    var bootstrapRead = false;
+    function legacyWriterFree() {
+      var locks = (meta(hub).developerMetadata || []).filter(function(m) { return m.metadataKey==='nexoflow_continuation_writer_v1' || m.metadataId===191126102; });
+      if (!locks.length) return;
+      if (locks.length!==1) fail('trava do gravador remoto inconsistente.');
+      var lock=locks[0], value;
+      try { value=JSON.parse(lock.metadataValue); } catch (_) { fail('trava do gravador remoto inválida.'); }
+      if (lock.metadataId!==191126102 || lock.metadataKey!=='nexoflow_continuation_writer_v1' || lock.visibility!=='DOCUMENT' || !lock.location || lock.location.spreadsheet!==true || !value || !/^[a-f0-9]{32}$/.test(value.owner || '') || typeof value.expires!=='number' || !Number.isFinite(value.expires)) fail('trava do gravador remoto inválida.');
+      if (Date.now()/1000<=value.expires+60) fail('gravador ativo ou em recuperação; aguarde antes de conferir o legado.');
+    }
     var physical = new Set();
     var result = titles.map(function (title) {
       var historical = history.includes(title), role = title.startsWith('Historico_') ? 'historico' : 'dashboard', keys = new Set();
@@ -74,8 +86,10 @@ var NexoTables = (function () {
         if (k !== p.title + '#' + p.number) fail('chave de parte divergente.');
         return p;
       }).filter(function (p) { return p.title === title; }).sort(function (a, b) { return a.number - b.number; });
+      var bootstrap = !!(initial && options.schemas && titles.length===1 && title==='BI_Itens' && !state && registered.length===1 && registered[0].number===0 && registered[0].book_id===hub && registered[0].width===options.schemas[title].length && /^[a-f0-9]{64}$/.test(registered[0].schema || '') && !Object.keys(maps.criacao).some(function(key) { return key.startsWith(title+'#') || maps.criacao[key].title===title; }));
+      if (bootstrap) { legacyWriterFree(); bootstrapRead=true; }
       if (state && state.state !== 'READY') fail('tabela em atualização. Aguarde a carga terminar.');
-      if (registered.length && (!state || state.state !== 'READY' || !Array.isArray(state.parts) || state.parts.length !== registered.length)) fail('tabela em atualização ou sem confirmação. Aguarde a carga terminar.');
+      if (registered.length && !bootstrap && (!state || state.state !== 'READY' || !Array.isArray(state.parts) || state.parts.length !== registered.length)) fail('tabela em atualização ou sem confirmação. Aguarde a carga terminar.');
       if (historical && !registered.length) fail('tabela histórica sem partes confirmadas.');
       if (!registered.length) {
         var sheet = (meta(hub).sheets || []).find(function (s) { return s.properties.title === title; });
@@ -110,6 +124,17 @@ var NexoTables = (function () {
             actual++;
             if (++scanned > 1000000) fail('consulta acima de um milhão de linhas lidas; use as tabelas de resumo ou uma fonte de maior capacidade. Nenhum resultado parcial foi retornado.');
             row = row.concat(Array(width - row.length).fill(''));
+            if (bootstrap) {
+              var itemKey=row[header.indexOf('item_chave')];
+              if (typeof itemKey!=='string' || !itemKey || keys.has(itemKey)) fail('chave de item legada ausente ou duplicada.');
+              keys.add(itemKey);
+              options.schemas[title].forEach(function(spec,i) {
+                var value=row[i]; if (value==='' || value===null) return;
+                if (spec[1]==='number' && (typeof value!=='number' || !Number.isFinite(value))) fail('medida legada sem tipo numérico.');
+                if (spec[1]==='text' && typeof value!=='string') fail('identificador legado sem tipo texto.');
+                if (spec[1]==='date' && options.date) options.date(value);
+              });
+            }
             if (historical) {
               var keyIndex=header.indexOf('chave'), segIndex=header.indexOf('segmento');
               if (keyIndex<0 || typeof row[keyIndex]!=='string' || !row[keyIndex] || keys.has(row[keyIndex])) fail('chave histórica ausente ou duplicada entre partes.');
@@ -136,6 +161,7 @@ var NexoTables = (function () {
     if (Date.now() - started > 240000) fail('tempo de consulta excedido; reduza o volume da fonte.');
     delete metadata[hub];
     if (stable(indexValues()) !== stable(initial)) fail('a carga mudou durante a leitura; tente novamente.');
+    if (bootstrapRead) legacyWriterFree();
     if (options.onManifest) options.onManifest(hash(stable(initial)));
     return result;
   }

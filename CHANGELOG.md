@@ -1,5 +1,10 @@
 # NexoFlow — Changelog
 
+## Conector posterior à 1.5.33 — conferência inicial de BI_Itens
+
+- Permite conferir uma única raiz legada registrada sem estado, com schema/origem/chaves verificados e sem gravador ou criação pendente. O leitor não grava `READY`, não libera publicações parciais e mantém bloqueados cruzamentos ABC até confirmação. [Diagnóstico e roteiro](docs/INICIALIZACAO%20BI%20ITENS.md).
+- Leitores geral/ABC sincronizados e 45 testes Node aprovados. A implantação Apps Script e a comparação comercial pelo Work continuam pendentes; os pacotes Windows permanecem intactos.
+
 ## CI posterior à 1.5.33 — eficiência de publicação
 
 - Declara UTF-8 nas leituras de YAML dos testes do fluxo, incluindo a rodada Windows com `PYTHONUTF8=0`. Regressão reproduzida sem locale UTF-8 e corrigida sem alterar os pacotes públicos.
