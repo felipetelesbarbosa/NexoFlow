@@ -414,7 +414,7 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-Corrige a recuperação da trava Sheets após resposta perdida: repete somente leituras seguras, confirma valor e prazo e impede novas gravações quando a confirmação é incerta. Preserva dados, journals, manifesto e proprietário. Após instalar em Preserve, retome apenas Analytics com `nexo analytics` no perfil correto; isso não é retomada exata por linha. [Diagnóstico e limites](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/RECUPERACAO%20TRAVA%20SHEETS.md). A validação comercial do cartão BI_Itens no Data Studio continua pendente e separada.
+Corrige a recuperação da trava Sheets após resposta perdida: repete somente leituras seguras, confirma valor e prazo e impede novas gravações quando a confirmação é incerta. Preserva dados, journals, manifesto e proprietário. Após instalar em Preserve, retome apenas Analytics com nexo analytics no perfil correto; isso não é retomada exata por linha. [Diagnóstico e limites](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/RECUPERACAO%20TRAVA%20SHEETS.md). A validação comercial do cartão BI_Itens no Data Studio continua pendente e separada.
 
 Não comprova eliminação do HTTP 500 da leitura integral de partes grandes, ausência de novos 429 ou conclusão das cargas comerciais do operador. Atualize em Preserve, com as rotinas encerradas; confira nexo versao e retome nexo analytics no segmento correto. Não recriar planilhas, alterar estados WRITING manualmente ou apagar journals.
 
