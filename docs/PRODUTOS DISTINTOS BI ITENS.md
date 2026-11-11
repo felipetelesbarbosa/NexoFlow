@@ -44,3 +44,36 @@ As operações de filtro/conjunto no teste são um oráculo da regra comercial, 
 8. Antes da migração, conferir os nove usos, mesclagens com BI_Clientes_Vendas e dependências de atualizado_em. Manter confirmação no Terminal pendente até a validação no Google e ligação efetiva da fonte correta. A primeira continuação comercial terá conferência posterior à retomada pelo operador. Curva ABC continua separada.
 
 Não há autorização nesta tarefa para executar Analytics ou outra carga, editar manifesto, fabricar READY ou alterar PET. Os três arquivos são implantados no Apps Script; este roteiro não substitui módulos na instalação local.
+
+## Seguimento após a versão privada v4
+
+O Work confirmou que corrigir o papel de sku_informado não eliminou a divergência no cartão de vários dias. O recorte de um dia passou, a tabela de vários dias também; o cartão de vários dias continuou divergente com aviso de reagregação. O teste sem filtro ficou inconclusivo. Portanto, a alteração de schema foi necessária à semântica do indicador, mas **não comprovou a resolução do cartão**. Os números e referências comerciais permanecem na evidência privada do operador.
+
+Não houve acesso autenticado pelo Codex às consultas do relatório. Uma soma de distintos diários/por partes poderia divergir do conjunto global, mas não foi demonstrado que o Google realizou essa soma. Não atribuir uma causa ao número mostrado sem comparar as consultas efetivas.
+
+### Aplicação conservadora do filtro no conector
+
+O conector passa a aplicar **somente em BI_Itens FARMA** filtros de sku_informado com EQUALS ou IN_LIST, INCLUDE/EXCLUDE e valores numéricos 0/1 (ou seus textos canônicos no pedido Google). Respeita AND entre grupos e OR dentro de cada grupo. Só aplica se **todos** os filtros forem suportados. Caso contrário, devolve todas as linhas do período e todos os campos solicitados, inclusive forFilterOnly, com filtersApplied=false. O fallback não aplica um subconjunto de condições.
+
+Quando todos os filtros são suportados, eles são avaliados por item no leitor antes da projeção. A resposta usa filtersApplied=true e retira somente os campos que foram solicitados exclusivamente para filtrar. O indicador permanece na resposta quando também é um campo de exibição. Nenhum resultado é agregado ou deduplicado por produto, dia ou parte: isso preserva quantidades e receita. Ausência de filtro não exclui automaticamente itens sem SKU.
+
+A varredura de todas as partes e as verificações de origem, tipos, chaves, contagens, trava e manifesto acontecem normalmente. Um item inválido fora da seleção também bloqueia a consulta. O código de leitura compartilhado, schema, publicação Windows, manifesto e PET não foram alterados nesta continuação. O histórico e as demais tabelas mantêm a delegação de filtros existente.
+
+Esse caminho segue o [contrato oficial de filtros](https://developers.google.com/data-studio/connector/filters), evitando a necessidade de o Google reaplicar esse filtro específico antes de COUNT_DISTINCT. A eficácia sobre o aviso comercial ainda depende de homologação da nova implantação.
+
+### Comparação estruturada e segura das consultas
+
+As chamadas FARMA BI_Itens passam a registrar no console Apps Script um JSON `diagnostico: consulta_bi_itens_v1`, somente depois de concluídas as guardas da leitura. Campos: nomes autorizados solicitados, marca somente_filtro, início/fim, quantidade de grupos, formato dos filtros (campo autorizado/operador/tipo, nunca valores; até 25 grupos e condições), filtros_aplicados, tratamento e quantidade de linhas da resposta. Não inclui valores dos filtros, códigos de produto, dados pessoais, destino, token ou linhas da origem. Esse registro não aparece como linha de dados nem exige novas permissões.
+
+O Work deverá comparar o registro do cartão de um dia com o de três dias e com o da tabela, se esses registros estiverem acessíveis nas superfícies já autorizadas. Verificar especialmente: campo data solicitado ou não, indicador como forFilterOnly, quantidade de chamadas e recortes efetivamente recebidos. `SKU_ANTES_AGREGACAO` significa que todos os filtros reconhecidos foram aplicados; `DELEGADO` significa que nenhum filtro de dimensão foi aplicado pelo conector. A captura é estrutural; não demonstra uma execução interna específica do otimizador Google. Se os logs não estiverem disponíveis, registrar essa pendência; não ampliar permissões nem contornar o bloqueio do Console Cloud.
+
+### Nova validação privada pelo Work
+
+1. Preservar a implantação v4 e criar uma nova versão privada com os três arquivos completos do mesmo commit corrigido. Nesta continuação, somente Code.js mudou em código operacional. Manter o schema corrigido da v4, a fonte direta em produção e o PET.
+2. Em uma fonte privada ligada à nova implantação, conferir os tipos e repetir a tabela e o cartão equivalentes. Filtrar inicialmente apenas sku_informado = 1, sem filtros ocultos ou mesclagens, no recorte de um dia e de três dias, e depois no vazio. Forçar atualização e aguardar que os componentes terminem; não concluir com indicadores de atualização pendente.
+3. Exigir tabela e cartão coerentes e sem aviso, além das quantidades e receitas corretas. Não usar uma soma dos cartões de cada dia como referência do período completo. A comparação sintética comprova que o mesmo SKU entre dias e partes conta uma única vez no conjunto global.
+4. Fazer controle sem filtro na mesma fonte privada, um componente por vez. Esse controle retorna inclusive itens sem SKU informado e pode ter outra contagem. Não alterar produção para comparar.
+5. Se persistir o erro, devolver privadamente o resultado e, quando acessíveis, os registros consulta_bi_itens_v1 correspondentes a cartão/dia, cartão/período e tabela/período, com horário e implantação. Não presumir que o campo corrigido ou o filtro aplicado já resolveram o aviso.
+6. Manter migração e confirmação no Terminal pendentes até a leitura, os nove usos e a ligação efetiva serem validados. A primeira continuação real e a Curva ABC continuam com conferências separadas.
+
+Novas regressões executam getData e o leitor reais com APIs sintéticas, incluindo aplicação prévia, retirada de forFilterOnly, preservação de campos exibidos, ausência/combinações de filtros, fallback integral, um dia/vários dias/vazio, SKU entre partes, valores financeiros, WRITING e chave duplicada em linha excluída. A base e5bbbef reprova a nova regressão de aplicação; o novo código passa. Esses testes não executam o Data Studio nem reproduzem sua mensagem interna de reagregação.

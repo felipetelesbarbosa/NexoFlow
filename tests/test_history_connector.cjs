@@ -200,10 +200,10 @@ function skuFixture(){
   }
   f.state[2]=JSON.stringify({state:'READY',revision:'a',parts:f.counts});return f;
 }
-test('getData preserva grão de item e campos forFilterOnly para filtro anterior ao COUNT_DISTINCT',()=>{
+test('filtro não suportado preserva todas as linhas e forFilterOnly para delegação integral',()=>{
   for(const [start,end,distinct,units,cents,unfiltered] of [['01','03',2,7,3700,4],['02','02',2,2,1200,3],['30','30',0,0,0,0]]){
     const ctx=connector(skuFixture());
-    const request={configParams:{spreadsheetId:hub,segmento:'FARMA',tabela:'BI_Itens'},fields:[{name:'produto_codigo'},{name:'quantidade'},{name:'receita_item'},{name:'sku_informado',forFilterOnly:true}],dateRange:{startDate:'2026-11-'+start,endDate:'2026-11-'+end},dimensionsFilters:[[{fieldName:'sku_informado',type:'INCLUDE',operator:'EQUALS',values:['1']}]]};
+    const request={configParams:{spreadsheetId:hub,segmento:'FARMA',tabela:'BI_Itens'},fields:[{name:'produto_codigo'},{name:'quantidade'},{name:'receita_item'},{name:'sku_informado',forFilterOnly:true}],dateRange:{startDate:'2026-11-'+start,endDate:'2026-11-'+end},dimensionsFilters:[[{fieldName:'sku_informado',type:'INCLUDE',operator:'EQUALS',values:['1']}],[{fieldName:'produto_codigo',type:'INCLUDE',operator:'CONTAINS',values:['0']}]]};
     const result=ctx.getData(request), names=result.schema.map(s=>s.name), pos=name=>names.indexOf(name);
     assert.equal(result.filtersApplied,false);assert.ok(pos('sku_informado')>=0);
     const all=result.rows.map(r=>r.values), eligible=all.filter(r=>r[pos('sku_informado')]===1);
@@ -220,4 +220,52 @@ test('getData preserva grão de item e campos forFilterOnly para filtro anterior
 test('dimensão numérica de SKU continua validada mesmo ausente dos campos solicitados',()=>{
   const f=skuFixture();f.physical[hub][1][f.header.indexOf('sku_informado')]='1';
   assert.throws(()=>connector(f).getData({configParams:{spreadsheetId:hub,segmento:'FARMA',tabela:'BI_Itens'},fields:[{name:'produto_codigo'}]}),/numérico/);
+});
+
+function filterRequest(groups,start='01',end='03'){
+  return {configParams:{spreadsheetId:hub,segmento:'FARMA',tabela:'BI_Itens'},fields:[{name:'produto_codigo'},{name:'quantidade'},{name:'receita_item'},{name:'sku_informado',forFilterOnly:true}],dateRange:{startDate:'2026-11-'+start,endDate:'2026-11-'+end},dimensionsFilters:groups};
+}
+const skuEquals=(v='1',type='INCLUDE')=>({fieldName:'sku_informado',operator:'EQUALS',type,values:[v]});
+test('cartão de três dias aplica SKU antes de responder: distintos globais, não soma diária ou por parte',()=>{
+  for(const [start,end,count,units,cents] of [['01','03',2,7,3700],['02','02',2,2,1200],['30','30',0,0,0]]){
+    const ctx=connector(skuFixture()), request=filterRequest([[skuEquals()]],start,end), response=ctx.getData(request);
+    assert.equal(response.filtersApplied,true);assert.equal(response.schema.some(s=>s.name==='sku_informado'),false);
+    assert.equal(new Set(response.rows.map(r=>r.values[0])).size,count);
+    assert.equal(response.rows.reduce((sum,r)=>sum+r.values[1],0),units);
+    assert.equal(response.rows.reduce((sum,r)=>sum+Math.round(r.values[2]*100),0),cents);
+    const card=connector(skuFixture()).getData({...request,fields:[{name:'produto_codigo'},{name:'sku_informado',forFilterOnly:true}]});
+    assert.equal(card.filtersApplied,true);assert.equal(card.schema.length,1);
+    assert.equal(new Set(card.rows.map(r=>r.values[0])).size,count);
+    if(start==='01'){assert.equal(card.rows.length,4);assert.equal(response.rows.length,4);}
+  }
+});
+test('filtros SKU suportam AND/OR, INCLUDE/EXCLUDE, igualdade numérica e lista sem aplicação parcial',()=>{
+  const cases=[[[[skuEquals(1)]],4],[[[skuEquals(0,'EXCLUDE')]],4],[[[skuEquals(1),skuEquals(0)]],6],[[[skuEquals(1)],[skuEquals(0)]],0],[[[{...skuEquals(),operator:'IN_LIST',values:['0',1]}]],6]];
+  for(const [groups,length] of cases){const result=connector(skuFixture()).getData(filterRequest(groups));assert.equal(result.filtersApplied,true);assert.equal(result.rows.length,length);}
+  for(const groups of [undefined,[],[[{...skuEquals(),values:['not-a-number']}]],[[skuEquals()],[{...skuEquals(),operator:'CONTAINS'}]],[[skuEquals()],[]]]){
+    const result=connector(skuFixture()).getData(filterRequest(groups));assert.equal(result.filtersApplied,false);assert.equal(result.rows.length,6);assert.ok(result.schema.some(s=>s.name==='sku_informado'));
+  }
+});
+test('campo de filtro também exibido permanece; ausência de filtro não exclui itens sem SKU',()=>{
+  const request=filterRequest([[skuEquals()]]);delete request.fields[3].forFilterOnly;
+  const result=connector(skuFixture()).getData(request);assert.equal(result.filtersApplied,true);assert.ok(result.schema.some(s=>s.name==='sku_informado'));
+  const noFilter=connector(skuFixture()).getData(filterRequest(undefined));assert.equal(noFilter.rows.length,6);
+});
+test('trilha estrutural distingue dia e período sem registrar valores do filtro nem destino',()=>{
+  const ctx=connector(skuFixture()), a=filterRequest([[skuEquals()]],'02','02'), b=filterRequest([[skuEquals()]],'01','03');
+  const trace=request=>ctx.queryTrace_(request,request.configParams,ctx.itemFilters_(request,request.configParams),4);
+  assert.equal(trace(a).inicio,'2026-11-02');assert.equal(trace(b).inicio,'2026-11-01');
+  assert.equal(trace(b).filtros_aplicados,true);assert.ok(!JSON.stringify(trace(b)).includes(hub));
+  b.dimensionsFilters[0][0].values=['segredo-ficticio'];assert.ok(!JSON.stringify(trace(b)).includes('segredo-ficticio'));
+  assert.equal(trace(b).filtros_aplicados,false);
+  b.dimensionsFilters[0][0].fieldName='segredo-ficticio';b.dimensionsFilters[0][0].operator='segredo-ficticio';assert.ok(!JSON.stringify(trace(b)).includes('segredo-ficticio'));
+  assert.equal(trace(b).filtros[0][0].campo,'OUTRO');
+  const other=filterRequest([[skuEquals()]]);other.configParams.segmento='PET';assert.equal(ctx.itemFilters_(other,other.configParams).applied,false);
+});
+
+test('filtro aplicado não encobre WRITING nem chave inválida em linha excluída',()=>{
+  const writing=skuFixture();writing.state[2]=JSON.stringify({state:'WRITING'});
+  assert.throws(()=>connector(writing).getData(filterRequest([[skuEquals()]])),/atualiza/);
+  const duplicate=skuFixture();duplicate.physical[hub][3][0]=duplicate.physical[hub][1][0];
+  assert.throws(()=>connector(duplicate).getData(filterRequest([[skuEquals()]])),/chave/);
 });

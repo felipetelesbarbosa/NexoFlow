@@ -67,6 +67,27 @@ function date_(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(text) || isNaN(Date.parse(text)) || new Date(text).toISOString().slice(0, 10) !== text) throw new Error('Data inválida na tabela BI.');
   return text.replace(/-/g, '');
 }
+// Aplicação conservadora: somente o indicador numérico conhecido do piloto FARMA.
+// Outros filtros continuam integralmente no Data Studio (all-or-none).
+function itemFilters_(request,params) {
+  var groups=request.dimensionsFilters;
+  var delegated={applied:false,reason:'DELEGADO',accept:function(){return true;}};
+  if (params.segmento!=='FARMA' || params.tabela!=='BI_Itens' || !Array.isArray(groups) || !groups.length) return delegated;
+  var valid=groups.every(function(group){return Array.isArray(group) && group.length && group.every(function(f){
+    return f && f.fieldName==='sku_informado' && ['INCLUDE','EXCLUDE'].includes(f.type) && ['EQUALS','IN_LIST'].includes(f.operator) && Array.isArray(f.values) && f.values.length && (f.operator!=='EQUALS' || f.values.length===1) && f.values.every(function(v){return v===0 || v===1 || v==='0' || v==='1';});
+  });});
+  if (!valid) return delegated;
+  return {applied:true,reason:'SKU_ANTES_AGREGACAO',accept:function(header,row){
+    var value=row[header.indexOf('sku_informado')];
+    return groups.every(function(group){return group.some(function(f){var matches=f.values.some(function(v){return value===Number(v);});return f.type==='INCLUDE'?matches:!matches;});});
+  }};
+}
+function queryTrace_(request,params,plan,count) {
+  // Só estrutura autorizada: sem valores de filtros, registros ou ID de destino.
+  function day(value){var text=String(value || '');return /^\d{4}-\d{2}-\d{2}$/.test(text)?text:null;}
+  var shape=Array.isArray(request.dimensionsFilters)?request.dimensionsFilters.slice(0,25).map(function(group){return Array.isArray(group)?group.slice(0,25).map(function(f){f=f || {};return {campo:NexoSchemas.BI_Itens.some(function(s){return s[0]===f.fieldName;})?f.fieldName:'OUTRO',operador:['EQUALS','IN_LIST','CONTAINS','REGEXP_PARTIAL_MATCH','BETWEEN','IS_NULL'].includes(f.operator)?f.operator:'OUTRO',tipo:['INCLUDE','EXCLUDE'].includes(f.type)?f.type:'OUTRO'};}):[];}):[];
+  return {diagnostico:'consulta_bi_itens_v1',filtros:shape,segmento:params.segmento,campos:request.fields.map(function(f){return {nome:f.name,somente_filtro:f.forFilterOnly===true};}),inicio:day(request.dateRange && request.dateRange.startDate),fim:day(request.dateRange && request.dateRange.endDate),grupos_filtro:Array.isArray(request.dimensionsFilters)?request.dimensionsFilters.length:0,filtros_aplicados:plan.applied,tratamento:plan.reason,linhas_resposta:count};
+}
 function getData(request) {
   var cc = DataStudioApp.createCommunityConnector();
   try {
@@ -74,6 +95,8 @@ function getData(request) {
     if (!spec || !['FARMA', 'PET'].includes(params.segmento)) throw new Error('Selecione tabela e segmento válidos.');
     var fields = fields_(params.tabela), names = request.fields.map(function (f) { return f.name; });
     if (names.some(function (name) { return !spec.some(function (s) { return s[0] === name; }); })) throw new Error('Campo solicitado não pertence à tabela.');
+    var itemFilters=itemFilters_(request,params);
+    if (itemFilters.applied) names=names.filter(function(name){return request.fields.some(function(f){return f.name===name && f.forFilterOnly!==true;});});
     var selected = fields.forIds(names);
     names = selected.asArray().map(function (f) { return f.getId(); });
     var widths = {}; widths[params.tabela] = spec.length;
@@ -93,6 +116,7 @@ function getData(request) {
       });
     }
     var table = NexoTables.read(String(params.spreadsheetId || '').trim(), [params.tabela], {api: api, hash: hash_, widths: widths, schemas:NexoSchemas,date:date_,onManifest:fence,startedAt:queryStarted, segment: params.segmento, accept: function (title, header, row) {
+      if (itemFilters.applied && !itemFilters.accept(header,row)) return false;
       if (linked) return linked.has(String(row[header.indexOf('pedido_id')]));
       if (title==='BI_Historico_Resumo') {
         var cut=params.recorte_historico||'MES';
@@ -126,7 +150,8 @@ function getData(request) {
         if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error('Medida BI sem tipo numérico; execute uma nova carga Analytics.');
         return value;
       })};
-    }), filtersApplied: false};
+    }), filtersApplied: itemFilters.applied};
+    if (params.tabela==='BI_Itens' && params.segmento==='FARMA' && typeof console.info==='function') console.info(JSON.stringify(queryTrace_(request,params,itemFilters,response.rows.length)));
     if (api.checkDeadline) api.checkDeadline('RESULTADO');
     return response;
   } catch (error) {

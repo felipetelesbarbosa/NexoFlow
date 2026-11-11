@@ -1,5 +1,10 @@
 # NexoFlow — Changelog
 
+## Conector posterior à 1.5.33 — filtro antes da contagem distinta
+
+- Aplica filtros suportados de `sku_informado` em BI_Itens FARMA antes da resposta, com contrato all-or-none e tratamento correto de `forFilterOnly`. Mantém itens separados, guardas, demais tabelas e PET.
+- Acrescenta trilha estrutural sanitizada para comparar consulta de um dia, vários dias e tabela. A v4 corrigiu o schema, mas o cartão comercial continuou divergente; a nova implantação exige validação privada. [Seguimento e roteiro](docs/PRODUTOS%20DISTINTOS%20BI%20ITENS.md#seguimento-após-a-versão-privada-v4).
+
 ## Conector posterior à 1.5.33 — produtos distintos
 
 - Corrige `BI_Itens.sku_informado` para dimensão numérica, preservando valores, cabeçalhos e validação de tipos. Mantém campos de filtro e a resposta no grão de item; não soma distintos por dia/parte.
