@@ -1,5 +1,10 @@
 # NexoFlow — Changelog
 
+## Correção Windows posterior à 1.5.33 — trava com resposta incerta
+
+- Recupera leituras da trava após falhas de transporte sem repetir o POST. Bloqueia nova renovação e escrita em Controle quando a confirmação é inconclusiva ou expirada.
+- Preserva metadados, proprietários, manifestos e journals. A instalação necessita de nova distribuição validada; sem carga comercial nesta entrega. [Diagnóstico e retomada somente do Analytics](docs/RECUPERACAO%20TRAVA%20SHEETS.md).
+
 ## Conector posterior à 1.5.33 — período da consulta BI_Itens FARMA
 
 - Corrige a declaração de período em getConfig por configuração em etapas, restrita ao piloto FARMA; recusa getData sem datas válidas antes de acessar o Sheets. Preserva o modo das outras tabelas e PET.

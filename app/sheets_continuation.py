@@ -468,6 +468,20 @@ class SheetsLease:
                     duration(wait),
                 )
                 self.sleep(wait)
+            except (RequestException, TransportError):
+                if attempt == 6:
+                    raise ContinuationError(
+                        "Não foi possível conferir a trava remota após falhas de rede. "
+                        "Nenhuma nova gravação foi autorizada."
+                    ) from None
+                wait = float(min(2**attempt, 30))
+                logging.warning(
+                    "Google Sheets: falha de rede ao conferir trava remota. "
+                    "Tentativa %s/6; aguardando %s. Somente a leitura será repetida.",
+                    attempt,
+                    duration(wait),
+                )
+                self.sleep(wait)
 
     def _lookup_once(self):
         if self.server_clock:
@@ -596,15 +610,27 @@ class SheetsLease:
                 }
             }
         )
+        # Desde o envio até a releitura exata, qualquer resultado é incerto.
+        # Inclusive um POST 200 pode ser seguido de falha na confirmação.
+        # O handler de Controle não pode iniciar outra renovação nesse estado.
+        self.note_uncertain()
         try:
-            self.book.batch_update({"requests": requests})
-        except (APIError, RequestException, TransportError):
-            # Confirmar por leitura: nunca repetir cegamente a tomada do bloqueio.
-            if self._lookup() != proposed:
-                raise
-        if self._lookup() != proposed:
-            raise ContinuationError("Não foi possível confirmar o bloqueio remoto.")
+            try:
+                self.book.batch_update({"requests": requests})
+            except (APIError, RequestException, TransportError):
+                # Não repetir POST: uma resposta perdida pode ter sido aplicada.
+                pass
+            confirmed = self._lookup()
+            if confirmed != proposed or self.now() >= now + LEASE_SECONDS:
+                raise ContinuationError("Não foi possível confirmar o bloqueio remoto.")
+        except (APIError, RequestException, TransportError, ContinuationError):
+            raise ContinuationError(
+                "Renovação ou tomada da trava remota sem confirmação. "
+                "Gravações interrompidas; aguarde até 5 minutos e retome a carga "
+                "para conferir os dados. Não remova a trava manualmente."
+            ) from None
         self.value, self.renewed_at = proposed, now
+        self.uncertain = False
 
     def release(self):
         if self.value is None:

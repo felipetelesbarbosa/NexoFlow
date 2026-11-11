@@ -236,6 +236,130 @@ def metadata_api_error(status, retry_after=None):
 
 
 class LeaseMetadataRecoveryTests(unittest.TestCase):
+    def test_reset_after_renewal_recovers_get_without_reposting(self):
+        book, clock = MetadataBook(), [1000]
+        lease = SheetsLease(book, now=lambda clock=clock: clock[0], sleep=Mock())
+        lease.require()
+        clock[0] += 31
+        original = book.fetch_sheet_metadata
+        failed = [0]
+
+        def metadata(**kwargs):
+            if book.writes == 2 and failed[0] < 2:
+                failed[0] += 1
+                raise Timeout("synthetic-private-secret")
+            return original(**kwargs)
+
+        book.fetch_sheet_metadata = Mock(side_effect=metadata)
+        book.lose_response = True
+        with self.assertLogs(level="WARNING") as logs:
+            lease.require()
+        self.assertNotIn("synthetic-private-secret", str(logs.output))
+        self.assertEqual(book.writes, 2)
+        self.assertEqual(failed[0], 2)
+        self.assertEqual(lease.value, book.metadata[LEASE_ID]["metadataValue"])
+        self.assertFalse(lease.uncertain)
+
+    def test_unconfirmed_renewal_blocks_control_write_and_release(self):
+        for lost_post in (False, True):
+            with self.subTest(lost_post=lost_post):
+                book, clock = MetadataBook(), [1000]
+                lease = SheetsLease(
+                    book, now=lambda clock=clock: clock[0], sleep=Mock()
+                )
+                lease.require()
+                clock[0] += 31
+                original = book.fetch_sheet_metadata
+
+                def metadata(book=book, original=original, **kwargs):
+                    if book.writes == 2:
+                        raise Timeout("synthetic-private-secret")
+                    return original(**kwargs)
+
+                book.fetch_sheet_metadata = Mock(side_effect=metadata)
+                book.lose_response = lost_post
+                with self.assertRaises(ContinuationError):
+                    lease.require()
+                self.assertTrue(lease.uncertain)
+                with self.assertRaisesRegex(ContinuationError, "sem confirmação"):
+                    lease.require()  # Same path used by the error handler / Controle.
+                lease.release()
+                self.assertEqual(book.writes, 2)
+                self.assertIn(LEASE_ID, book.metadata)
+                book.fetch_sheet_metadata = original
+                clock[0] += LEASE_SECONDS + 1
+                successor = SheetsLease(book, now=lambda clock=clock: clock[0])
+                successor.require()
+                self.assertEqual(book.writes, 3)
+                self.assertNotEqual(successor.owner, lease.owner)
+
+    def test_error_handler_cannot_write_control_after_uncertain_renewal(self):
+        from google_sheets import GoogleSheetsStore
+
+        book, clock = MetadataBook(), [1000]
+        lease = SheetsLease(book, now=lambda: clock[0], sleep=Mock())
+        lease.require()
+        clock[0] += 31
+        original = book.fetch_sheet_metadata
+
+        def metadata(**kwargs):
+            if book.writes == 1:
+                return original(**kwargs)
+            raise Timeout("private-token")
+
+        book.fetch_sheet_metadata = Mock(side_effect=metadata)
+        store = GoogleSheetsStore.__new__(GoogleSheetsStore)
+        store._wait_before_write = Mock()
+        store._continuity = SimpleNamespace(require=lease.require)
+        write_fact, write_control = Mock(), Mock()
+        with self.assertRaises(ContinuationError):
+            store._write_with_retry("update sintético", write_fact)
+        with self.assertRaises(ContinuationError):
+            store._write_with_retry("Controle sintético", write_control)
+        write_fact.assert_not_called()
+        write_control.assert_not_called()
+        self.assertEqual(book.writes, 2)
+        self.assertTrue(lease.uncertain)
+
+    def test_conflict_or_stale_confirmation_preserves_marker_without_retry(self):
+        for foreign in (False, True):
+            with self.subTest(foreign=foreign):
+                book, clock = MetadataBook(), [1000]
+                lease = SheetsLease(book, now=lambda clock=clock: clock[0])
+                lease.require()
+                previous = book.fetch_sheet_metadata()
+                clock[0] += 31
+                marker = copy.deepcopy(previous)
+                if foreign:
+                    data = json.loads(marker["developerMetadata"][0]["metadataValue"])
+                    data["owner"] = "a" * 32
+                    marker["developerMetadata"][0]["metadataValue"] = json.dumps(data)
+                book.fetch_sheet_metadata = Mock(side_effect=[previous, marker])
+                book.batch_update = Mock(side_effect=metadata_api_error(400))
+                with self.assertRaises(ContinuationError):
+                    lease.require()
+                with self.assertRaises(ContinuationError):
+                    lease.require()
+                lease.release()
+                self.assertEqual(book.batch_update.call_count, 1)
+                self.assertTrue(lease.uncertain)
+
+    def test_expired_confirmation_never_authorizes_data_write(self):
+        book, clock = MetadataBook(), [1000]
+        original = book.fetch_sheet_metadata
+
+        def metadata(**kwargs):
+            if book.writes:
+                clock[0] = 1400
+            return original(**kwargs)
+
+        book.fetch_sheet_metadata = Mock(side_effect=metadata)
+        lease = SheetsLease(book, now=lambda clock=clock: clock[0], sleep=Mock())
+        with self.assertRaises(ContinuationError):
+            lease.require()
+        self.assertTrue(lease.uncertain)
+        self.assertEqual(book.writes, 1)
+
     def test_quota_after_lease_post_retries_confirmation_without_second_post(self):
         book = MetadataBook()
         original = book.fetch_sheet_metadata
