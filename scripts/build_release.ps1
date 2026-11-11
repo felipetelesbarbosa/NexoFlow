@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.32",
+    [string]$Version = "1.5.33",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -414,11 +414,15 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
+Recupera HTTP 429/5xx na leitura da trava remota das continuações, inclusive na confirmação após renovar a trava. Repete somente o GET, até seis tentativas, com espera mínima de 65s para quota e respeito a Retry-After. Não repete cegamente POSTs e preserva proprietário, horário do Google e respostas incertas. Regressões sintéticas FARMA/PET confirmam fechamento do manifesto e repetição sem nova escrita de fatos. [Diagnóstico e limites](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/CORRECAO%20LEITURA%20TRAVA%20SHEETS.md).
+
+Não comprova eliminação do HTTP 500 da leitura integral de partes grandes, ausência de novos 429 ou conclusão das cargas comerciais do operador. Atualize em Preserve, com as rotinas encerradas; confira nexo versao e retome nexo analytics no segmento correto. Não recriar planilhas, alterar estados WRITING manualmente ou apagar journals.
+
 O publicador histórico agrupa linhas vizinhas no batchGet: 200 linhas contíguas passam de 201 intervalos para dois, mantendo as mesmas células, cabeçalho e geometria novos. Isso reduz endereços e metadados, sem aumentar quota ou prometer redução proporcional do tempo. Linhas esparsas, vazios, fórmulas, edição concorrente e retomada permanecem protegidos. [Medição e limites](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/OTIMIZACAO%20INTERVALOS%20HISTORICO.md).
 
 Analytics integra a coleta recente (hoje até D-20) e o publicador das cinco fontes históricas, quando habilitado no perfil. Carga histórica exige período explícito. Revisões interrompidas retomam o mesmo snapshot; novas mudanças ficam para a carga seguinte. Cópias, exclusões autorizadas, conferência financeira, rollback por lote e isolamento FARMA/PET permanecem protegidos.
 
-Frações de 25/50/75/100% permitem limitar cada execução. Cabeçalho e células são relidos em conjunto, mantendo geometria, assinaturas e verificações. Durações do terminal usam minutos e horas; os dados numéricos continuam em segundos. Quota preventiva permanece ativa; consumo externo ainda pode causar 429.
+Frações de 25/50/75/100% permitem limitar cada execução. Cabeçalho e células são relidos em conjunto, mantendo geometria, assinaturas e verificações. Durações do terminal usam minutos e horas; os dados numéricos continuam em segundos. Quota preventiva do publicador histórico permanece ativa; outras rotinas e aplicações ainda podem consumir a mesma cota e causar 429.
 
 Os dez módulos do contrato mantêm os bytes oficiais Windows 1.5.29/30, conferidos nos dois pacotes. Atualize em Preserve com cargas encerradas. Não apagar snapshots, journals, recibos ou revisões. Nenhum fato comercial foi publicado nestes testes.
 
@@ -438,7 +442,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.32
+# NexoFlow 1.5.33
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"

@@ -236,6 +236,45 @@ def metadata_api_error(status, retry_after=None):
 
 
 class LeaseMetadataRecoveryTests(unittest.TestCase):
+    def test_quota_after_lease_post_retries_confirmation_without_second_post(self):
+        book = MetadataBook()
+        original = book.fetch_sheet_metadata
+        injected = [False]
+
+        def metadata(**kwargs):
+            if book.writes == 1 and not injected[0]:
+                injected[0] = True
+                raise metadata_api_error(429)
+            return original(**kwargs)
+
+        book.fetch_sheet_metadata = Mock(side_effect=metadata)
+        sleep = Mock()
+        lease = SheetsLease(book, now=lambda: 1000, sleep=sleep)
+        with self.assertLogs(level="WARNING"):
+            lease.require()
+        self.assertTrue(injected[0])
+        self.assertEqual(book.fetch_sheet_metadata.call_count, 3)
+        self.assertEqual(book.writes, 1)
+        sleep.assert_called_once_with(65)
+        self.assertEqual(book.metadata[LEASE_ID]["metadataValue"], lease.value)
+        self.assertEqual(json.loads(lease.value)["owner"], lease.owner)
+
+    def test_http_date_retry_after_is_respected(self):
+        book = MetadataBook()
+        book.fetch_sheet_metadata = Mock(
+            side_effect=[
+                metadata_api_error(429, "Thu, 01 Jan 1970 00:20:00 GMT"),
+                {"developerMetadata": []},
+            ]
+        )
+        sleep = Mock()
+        with self.assertLogs(level="WARNING"):
+            self.assertIsNone(
+                SheetsLease(book, now=lambda: 1000, sleep=sleep)._lookup()
+            )
+        sleep.assert_called_once_with(200)
+        self.assertEqual(book.writes, 0)
+
     def test_lookup_recovers_quota_without_a_metadata_write(self):
         book = MetadataBook()
         original = book.fetch_sheet_metadata

@@ -206,3 +206,5 @@ Nesta tarefa: somente consolidação documental, sem código, testes alterados, 
 - **10/11/2026, preparação 1.5.32:** publicação da otimização autorizada após checks/pacotes aprovados. Avisar sempre quando uma mudança precisar de release para alcançar o Windows instalado; dispensar o aviso quando não houver essa necessidade. A 1.5.31 publicada continua sendo a referência até a conclusão dessa publicação.
 
 - **10/11/2026, publicação 1.5.32:** tag/pacotes e downloads conferidos no SHA `9d4be5d911a817a09773fc843f7674a6480e0b71`; a 1.5.31 permanece intacta. A orientação de avisar quando uma mudança exige release está registrada no AGENTS. Sem carga comercial ou implantação nesta entrega.
+
+- **10/11/2026, preparação 1.5.33:** usuário autorizou publicação da correção da leitura da trava após HTTP 429/5xx. Preservar os dez módulos de assinatura e a release 1.5.32; anúncio depende dos checks e pacotes do novo SHA. Não inicia cargas comerciais.

@@ -1,10 +1,10 @@
-# NexoFlow 1.5.32
+# NexoFlow 1.5.33
 
 Aplicativos operacionais e autônomos para Windows que integram **Weni e a API FarmaLíder nos segmentos FarmaLíder e Pets Líder**, atualizam contatos e pedidos e organizam os dados no **Google Sheets** para análise no **Data Studio**.
 
 O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
 
-[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.32/NexoFlow-Setup-1.5.32.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
+[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.33/NexoFlow-Setup-1.5.33.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
 
 [Base Mestre permanente de conhecimento e diretrizes](docs/planejamento/DIRETRIZES_E_CONHECIMENTO_NEXOFLOW.md) — ponto de consulta compartilhado entre Codex e Work antes de novas tarefas.
 
@@ -19,10 +19,11 @@ O NexoFlow identifica pedidos registrados na API **independentemente de terem si
 | **NexoFlow Recompra** | Mantém a elegibilidade da Recompra FarmaLíder D+25 e Pets Líder D+30; os envios ficam na campanha Weni. |
 | **NexoFlow Terminal** | Oferece comandos, consultas e diagnóstico pelo comando `nexo`. |
 
-## Atualização 1.5.32
+## Atualização 1.5.33
 
-A leitura do histórico agrupa linhas contíguas: um lote denso de 200 linhas usa dois intervalos em vez de 201, preservando conferências e quota. [Medição e limites](docs/OTIMIZACAO%20INTERVALOS%20HISTORICO.md). Analytics publica automaticamente as cinco fontes históricas quando habilitado, consulta pedidos recentes e aceita período explícito para carga histórica. Retomada, exclusões autorizadas e conferência financeira permanecem protegidas. Frações 25/50/75/100%, leituras agrupadas e durações legíveis completam a entrega. [Ativação, comandos e limites](docs/ANALYTICS%20HISTORICO%20AUTOMATICO.md).
+Recupera HTTP 429/5xx na consulta da trava remota das continuações, inclusive na confirmação após renovação. As tentativas repetem somente a leitura; proprietário, horário do Google, respostas incertas e gravações continuam protegidos. [Diagnóstico, testes e limites](docs/CORRECAO%20LEITURA%20TRAVA%20SHEETS.md).
 
+Mantém as otimizações do histórico, publicação automática das cinco fontes quando habilitada, período explícito para carga histórica e frações de 25/50/75/100%. Esta correção não comprova eliminação do HTTP 500 da leitura integral de partes grandes nem ausência de novos 429. Atualize pelo Setup em **Preserve**, com as cargas encerradas, e confira `nexo versao` antes de retomar `nexo analytics` no perfil correto.
 
 ## NexoFlow Hub em homologação
 
@@ -83,7 +84,7 @@ As continuações automáticas no Meu Drive exigem autorização Google local. O
 
 ## Versões e atualizações
 
-A versão desta entrega é **1.5.32**, publicada em 10/11/2026. Os pacotes públicos são disponibilizados após a validação do mesmo commit. As próximas correções seguem **1.5.33, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
+A versão desta entrega é **1.5.33**, em validação para publicação. A release 1.5.32 e as anteriores permanecem intactas. Os pacotes públicos são disponibilizados após a validação do mesmo commit. As próximas correções seguem **1.5.34, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
 
 ## NexoFlow Hub: homologação e evolução paralela
 

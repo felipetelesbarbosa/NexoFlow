@@ -37,7 +37,7 @@ O teste sintético não comprova recuperação no Google real nem elimina a poss
 
 ## Distribuição e retomada
 
-A versão pública 1.5.32 permanece intacta. Esta correção de código precisa de nova release/Setup aprovada para alcançar `C:\NexoFlow`; não substituir módulos avulsos. Não atualizar durante uma carga em andamento. Não declarar correção instalada apenas por estar na main.
+A versão pública 1.5.32 permanece intacta. A entrega 1.5.33 está em validação; esta correção de código precisa de nova release/Setup aprovada para alcançar `C:\NexoFlow`; não substituir módulos avulsos. Não atualizar durante uma carga em andamento. Não declarar correção instalada apenas por estar na main.
 
 Após distribuição e instalação em Preserve, com nenhuma outra carga do mesmo segmento ativa, abrir o Terminal no perfil PET, conferir `nexo versao` e executar `nexo analytics`. Preservar continuações, índices, dados e checkpoints. O upsert relê as chaves existentes; não iniciar uma nova coleta histórica integral para reparar o BI. Se ocorrer novo erro, guardar a saída completa e o log do perfil `logs\PET\nexoflow.log`, sobretudo a primeira tentativa, as recuperações e o traceback final. Nunca mudar `WRITING` para `READY` manualmente.
 
@@ -47,3 +47,11 @@ Após distribuição e instalação em Preserve, com nenhuma outra carga do mesm
 - 33 testes Node aprovados.
 - Ruff, Pyright, consistência e documentação HTML aprovados.
 - Os resultados locais são Linux com serviços simulados. Windows/Setup, CodeQL e instalação da correção dependem dos respectivos checks/distribuição; não confundir a aprovação da 1.5.32 com aprovação deste novo commit.
+
+### Evidência FARMA complementar e distribuição 1.5.33
+
+A execução FARMA de 10/11/2026 às 22:11 (America/Fortaleza) releu as duas partes de itens sem HTTP 500 nem novas inserções; falhou antes de BI_Vendas ao confirmar a renovação da trava por GET, com HTTP 429. O registro do erro em Controle também falhou nessa consulta. Isso não comprova ausência definitiva do HTTP 500. Teste adicional reproduz 429 após um POST bem-sucedido e confirma exatamente um POST, repetindo apenas o GET; outro teste confere Retry-After em formato de data HTTP. A correção funcional permanece a mesma.
+
+A 1.5.33 só poderá ser instalada após publicação e verificação dos pacotes. Não houve consulta ou escrita comercial nesta preparação.
+
+Validação local do conteúdo preparado para a 1.5.33: 1.988 testes Python sem falhas (73 ignorados), 33 testes Node aprovados, Ruff, Pyright, consistência, documentação e varredura de segredos aprovados. A documentação registra separadamente o teste de código e a publicação/instalação; Windows e pacotes serão conferidos pelo workflow oficial do SHA desta entrega.

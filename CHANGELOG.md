@@ -1,6 +1,6 @@
 # NexoFlow — Changelog
 
-## Correção posterior à 1.5.32 — ainda não distribuída
+## 1.5.33 — em validação para publicação
 
 - Recupera HTTP 429/5xx na leitura direta da trava das continuações, com tentativas limitadas e prazo do serviço. Preserva confirmação por releitura, proprietário, horário do Google e POSTs sem repetição cega.
 - Regressão do fechamento do BI e repetição idempotente em FARMA/PET com serviços simulados. [Diagnóstico e limites](docs/CORRECAO%20LEITURA%20TRAVA%20SHEETS.md). Não comprova atualização comercial ou correção do HTTP 500 da leitura integral FARMA.
