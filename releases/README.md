@@ -1,6 +1,6 @@
 # NexoFlow 1.5.33 — Downloads
 
-Instalador, projeto completo e hashes da entrega 1.5.33. Em validação para publicação após aprovação do mesmo commit e conferência dos downloads. A versão 1.5.32 e as anteriores permanecem intactas no histórico do GitHub.
+Instalador, projeto completo e hashes da entrega 1.5.33. Publicados em 10/11/2026, 23:28:34 (America/Fortaleza), após aprovação do mesmo commit e conferência dos downloads. A versão 1.5.32 e as anteriores permanecem intactas no histórico do GitHub.
 
 A [release v1.5.33](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.33) reúne os pacotes oficiais:
 

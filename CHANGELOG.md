@@ -1,6 +1,12 @@
 # NexoFlow — Changelog
 
-## 1.5.33 — em validação para publicação
+## CI posterior à 1.5.33 — eficiência de publicação
+
+- Uma geração de pacotes por SHA, publicação por `validated_run_id`, reaproveitando os mesmos ZIPs aprovados. Confere origem, seis jobs, CodeQL/Meta, digest, hashes, CRC, versão e contrato histórico; mantém as proteções da main, tag e release pública.
+- Conserva quatro execuções completas na matriz Windows; retira a quinta repetição do build, mantendo check-up, executáveis, Setup e rollback. Monitoramento determinístico para evitar trabalho redundante do modelo. [Guia e limites](docs/RELEASE%20EFICIENTE.md).
+- Não altera os pacotes já publicados ou o código operacional do Windows.
+
+## 1.5.33 — publicada em 10/11/2026, 23:28:34 (America/Fortaleza)
 
 - Recupera HTTP 429/5xx na leitura direta da trava das continuações, com tentativas limitadas e prazo do serviço. Preserva confirmação por releitura, proprietário, horário do Google e POSTs sem repetição cega.
 - Regressão do fechamento do BI e repetição idempotente em FARMA/PET com serviços simulados. [Diagnóstico e limites](docs/CORRECAO%20LEITURA%20TRAVA%20SHEETS.md). Não comprova atualização comercial ou correção do HTTP 500 da leitura integral FARMA.

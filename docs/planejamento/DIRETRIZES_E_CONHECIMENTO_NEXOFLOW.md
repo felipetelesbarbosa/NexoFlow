@@ -16,8 +16,8 @@ Uma nota de planejamento não substitui contrato executável; uma divergência e
 
 | Componente | Estado documentado neste corte | Limite da conclusão |
 | --- | --- | --- |
-| Windows/Local, Terminal, Weni, Analytics, Noturno e Recompra | [1.5.32 publicada](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.32), SHA `9d4be5d911a817a09773fc843f7674a6480e0b71`, 10/11/2026 às 19:16:49 UTC−3 | Release não comprova instalação ou ativação em cada PC. |
-| Validação da distribuição | [Workflow oficial aprovado](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/42908265073): Windows, Setup e pacotes; conferência independente registrada nas notas da release | Testes sintéticos/CI não equivalem à conciliação comercial, aprovação de antivírus ou autenticação no proxy real. |
+| Windows/Local, Terminal, Weni, Analytics, Noturno e Recompra | [1.5.33 publicada](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.33), SHA `7884d7007fd0c65cbf90bfc30c5c35dc6c9056fb`, 10/11/2026, 23:28:34 UTC−3 | Release não comprova instalação ou ativação em cada PC. |
+| Validação da distribuição | [Workflow oficial aprovado](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/42943029299): Windows, Setup e pacotes; conferência independente registrada nas notas da release | Testes sintéticos/CI não equivalem à conciliação comercial, aprovação de antivírus ou autenticação no proxy real. |
 | Hub/Cloud | Núcleo Python, FastAPI, worker, PostgreSQL e Docker desenvolvidos em homologação; implantação isolada na VPS relatada pelo Work, originalmente SHA `23f2806` | Não houve inspeção da VPS nesta consolidação; SHA instalado atual e fontes reais precisam de conferência pelo Work. Sem release comercial do Hub. |
 | Central de Operações e NexoFlow Métricas | Planejados no cronograma e na Etapa 3.5 | URLs propostas e requisitos não comprovam serviços implantados. |
 | Data Studio FARMA/PET | Relatórios existentes; inventário datado e matriz de paridade disponíveis | Não foram abertos/alterados nesta tarefa; toda ligação, fórmula e total comercial exige evidência do corte correspondente. |
@@ -208,3 +208,5 @@ Nesta tarefa: somente consolidação documental, sem código, testes alterados, 
 - **10/11/2026, publicação 1.5.32:** tag/pacotes e downloads conferidos no SHA `9d4be5d911a817a09773fc843f7674a6480e0b71`; a 1.5.31 permanece intacta. A orientação de avisar quando uma mudança exige release está registrada no AGENTS. Sem carga comercial ou implantação nesta entrega.
 
 - **10/11/2026, preparação 1.5.33:** usuário autorizou publicação da correção da leitura da trava após HTTP 429/5xx. Preservar os dez módulos de assinatura e a release 1.5.32; anúncio depende dos checks e pacotes do novo SHA. Não inicia cargas comerciais.
+
+- **10/11/2026, 23:28:34, publicação 1.5.33:** checks, Setup e downloads públicos conferidos no SHA `7884d7007fd0c65cbf90bfc30c5c35dc6c9056fb`. 1.5.32 preservada. A otimização de CI posterior usa uma geração e reutilização dos mesmos pacotes; não altera a versão Windows nem seus artefatos. Ver [guia](../RELEASE%20EFICIENTE.md).
