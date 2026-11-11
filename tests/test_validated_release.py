@@ -165,7 +165,7 @@ class ValidatedReleaseTests(unittest.TestCase):
 
         source = (
             Path(__file__).resolve().parents[1] / ".github/workflows/release-v1.yml"
-        ).read_text()
+        ).read_text(encoding="utf-8")
         jobs = dict(
             re.findall(
                 r"^  ([a-z][a-z-]*):\n(.*?)(?=^  [a-z][a-z-]*:|\Z)", source, re.M | re.S
@@ -202,7 +202,7 @@ class ValidatedReleaseTests(unittest.TestCase):
     def test_build_depends_on_full_matrix_without_fifth_duplicate_suite(self):
         source = (
             Path(__file__).resolve().parents[1] / ".github/workflows/release-v1.yml"
-        ).read_text()
+        ).read_text(encoding="utf-8")
         matrix = source.split("  validar-python:", 1)[1].split(
             "  validar-e-publicar:", 1
         )[0]

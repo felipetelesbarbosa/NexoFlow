@@ -31,3 +31,7 @@ Se o artefato expirou ou o código mudou, é necessário gerar e validar novos p
 - Testes do validador usam dados sintéticos e não publicam releases. A primeira publicação real pelo novo caminho deve registrar o tempo medido; não prometer redução percentual sem essa evidência.
 
 A suíte completa permanece nas quatro combinações da matriz Windows (3.11/3.14 e duas codificações), que bloqueia o build por `needs`. A quinta execução completa no job de compilação foi removida por duplicação. Esse job conserva Python 3.13 para check-up e as validações próprias de executáveis, assinaturas, instalador e pacote instalado. Nenhum caso da suíte foi excluído.
+
+## Regressão de codificação do validador
+
+Em 11/11/2026, o CI posterior à publicação falhou na rodada Windows com `PYTHONUTF8=0`. Dois testes novos liam o YAML sem declarar codificação. A reprodução local com `LC_ALL=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0` falhou nesses dois testes por `UnicodeDecodeError`; com `encoding="utf-8"`, os oito testes passaram. A bateria direcionada de 48 testes e Ruff também passou. A correção altera somente a leitura nos testes; não modifica os ZIPs 1.5.33 publicados. A nova execução do CI deve confirmar o resultado no Windows.

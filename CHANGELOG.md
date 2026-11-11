@@ -2,6 +2,8 @@
 
 ## CI posterior à 1.5.33 — eficiência de publicação
 
+- Declara UTF-8 nas leituras de YAML dos testes do fluxo, incluindo a rodada Windows com `PYTHONUTF8=0`. Regressão reproduzida sem locale UTF-8 e corrigida sem alterar os pacotes públicos.
+
 - Uma geração de pacotes por SHA, publicação por `validated_run_id`, reaproveitando os mesmos ZIPs aprovados. Confere origem, seis jobs, CodeQL/Meta, digest, hashes, CRC, versão e contrato histórico; mantém as proteções da main, tag e release pública.
 - Conserva quatro execuções completas na matriz Windows; retira a quinta repetição do build, mantendo check-up, executáveis, Setup e rollback. Monitoramento determinístico para evitar trabalho redundante do modelo. [Guia e limites](docs/RELEASE%20EFICIENTE.md).
 - Não altera os pacotes já publicados ou o código operacional do Windows.
