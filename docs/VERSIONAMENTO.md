@@ -31,3 +31,7 @@ O commit final pode usar `[skip release] [preparar pacotes]` para gerar os pacot
 ## Preparação 1.5.34
 
 Publicação autorizada em 11/11/2026 para corrigir confirmação incerta da trava Sheets. Manter uma única geração de pacotes no SHA final e publicar somente após checks aprovados. 1.5.33 e anteriores preservadas.
+
+## Publicação 1.5.34
+
+Publicada em 11/11/2026, 19:12:49 (America/Fortaleza), no SHA `a25ae828b6dc732ecfcafa60db145e8cf27c84f5`, com reutilização dos pacotes da execução 43106347604 pela publicação 43109707841. Tag, downloads públicos, hashes, CRC, manifesto e módulos conferidos; releases anteriores preservadas.

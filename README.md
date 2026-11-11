@@ -23,7 +23,7 @@ O NexoFlow identifica pedidos registrados na API **independentemente de terem si
 
 Recupera falhas de transporte na leitura da trava Sheets e impede nova renovação quando a resposta anterior ficou incerta. Confere o valor remoto e sua validade antes de autorizar novas escritas; preserva manifesto, journals e dados. [Diagnóstico e retomada](docs/RECUPERACAO%20TRAVA%20SHEETS.md).
 
-Atualização em preparação: após publicação, instalar pelo Setup em **Preserve**, com cargas encerradas. Para retomar somente Analytics, selecione FARMA no Terminal, confira `nexo versao` e execute `nexo analytics`. Isso evita repetir Weni/Recompra, mas pode regravar BI_Pedidos e realizar as consultas próprias do Analytics. A validação do cartão BI_Itens no Data Studio continua separada.
+Publicada em 11/11/2026, 19:12:49 (America/Fortaleza). Instalar pelo Setup em **Preserve**, com cargas encerradas. Para retomar somente Analytics, selecione FARMA no Terminal, confira `nexo versao` e execute `nexo analytics`. Isso evita repetir Weni/Recompra, mas pode regravar BI_Pedidos e realizar as consultas próprias do Analytics. A validação do cartão BI_Itens no Data Studio continua separada.
 
 ## NexoFlow Hub em homologação
 

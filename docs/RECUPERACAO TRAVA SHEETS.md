@@ -81,3 +81,28 @@ A preparação será repetida em um novo commit documental, conservando a corre�
 a numeração 1.5.34 e os releases anteriores. Execuções obsoletas podem ser
 canceladas; não apagar commits, tags ou evidências para esconder falhas.
 Publicar somente os pacotes aprovados e conferidos do mesmo SHA final.
+
+## Distribuição concluída
+
+Publicada em 11/11/2026, 19:12:49 (America/Fortaleza), SHA `a25ae828b6dc732ecfcafa60db145e8cf27c84f5`.
+Preparação [43106347604](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43106347604)
+e publicação com reutilização [43109707841](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43109707841)
+aprovadas. CodeQL 43106347601 e Meta/MCP 43106366597 aprovados no mesmo SHA.
+Não houve nova compilação na publicação. Os downloads públicos correspondem aos
+artefatos originais. Conferidos 104 módulos Python e 485 arquivos do commit em
+cada pacote, 492 entradas do manifesto Setup, executáveis x64 1.5.34.0, CRC e
+contrato dos dez módulos históricos.
+
+SHA-256 recalculados após baixar os dois ZIPs públicos:
+
+```text
+eb5164967fe6d55745212529390636df0a8d7ae9d4a14f8cae347699c1a4d036  NexoFlow-Setup-1.5.34.zip
+4a8d6c2890fabdba4b7bfccbe50bd6b7f5723fa824bec4108276d87f3ffbdfbb  NexoFlow-1.5.34.zip
+```
+
+[Release e downloads oficiais](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.34).
+Instalar em Preserve com cargas encerradas, conferir `nexo versao` e retomar
+somente `nexo analytics` no perfil FARMA quando confirmado que não há outra carga
+ativa. Não significa continuação da revisão BI_Pedidos anterior por linha.
+A aplicação comercial, a conferência do manifesto após a carga e a validação dos
+cartões v6 continuam pendentes. Nenhum destino comercial foi alterado nesta publicação.

@@ -1,6 +1,6 @@
 # NexoFlow 1.5.34 — Downloads
 
-Pacotes 1.5.34 em preparação autorizada. Os links abaixo ficam disponíveis somente após aprovação e publicação oficial. A release 1.5.33 e anteriores permanecem intactas.
+Pacotes 1.5.34 publicados em 11/11/2026, 19:12:49 (America/Fortaleza), no SHA `a25ae828b6dc732ecfcafa60db145e8cf27c84f5`. Checks, pacotes e downloads conferidos. A release 1.5.33 e anteriores permanecem intactas.
 
 A [release v1.5.34](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.34) reúne os pacotes oficiais:
 

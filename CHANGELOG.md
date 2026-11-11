@@ -1,6 +1,8 @@
 # NexoFlow — Changelog
 
-## 1.5.34 — em preparação: trava com resposta incerta
+## 1.5.34 — publicada em 11/11/2026, 19:12:49 (America/Fortaleza)
+
+Commit validado: `a25ae828b6dc732ecfcafa60db145e8cf27c84f5`. CI, CodeQL, Meta/MCP, Windows 3.11/3.14 nas duas codificações, executáveis, Setup e segurança dos pacotes aprovados. Downloads públicos conferidos; recuperação comercial permanece pendente.
 
 - Recupera leituras da trava após falhas de transporte sem repetir o POST. Bloqueia nova renovação e escrita em Controle quando a confirmação é inconclusiva ou expirada.
 - Preserva metadados, proprietários, manifestos e journals. A instalação necessita de nova distribuição validada; sem carga comercial nesta entrega. [Diagnóstico e retomada somente do Analytics](docs/RECUPERACAO%20TRAVA%20SHEETS.md).
