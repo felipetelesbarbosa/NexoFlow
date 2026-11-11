@@ -1,14 +1,14 @@
-# NexoFlow 1.5.33 — Downloads
+# NexoFlow 1.5.34 — Downloads
 
-Instalador, projeto completo e hashes da entrega 1.5.33. Publicados em 10/11/2026, 23:28:34 (America/Fortaleza), após aprovação do mesmo commit e conferência dos downloads. A versão 1.5.32 e as anteriores permanecem intactas no histórico do GitHub.
+Pacotes 1.5.34 em preparação autorizada. Os links abaixo ficam disponíveis somente após aprovação e publicação oficial. A release 1.5.33 e anteriores permanecem intactas.
 
-A [release v1.5.33](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.33) reúne os pacotes oficiais:
+A [release v1.5.34](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.34) reúne os pacotes oficiais:
 
 | Arquivo | Uso |
 | --- | --- |
-| [NexoFlow-Setup-1.5.33.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.33/NexoFlow-Setup-1.5.33.zip) | Instalador para Windows; recomendado para usar o NexoFlow. |
-| [NexoFlow-1.5.33.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.33/NexoFlow-1.5.33.zip) | Projeto completo. |
-| [SHA256SUMS-1.5.33.txt](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.33/SHA256SUMS-1.5.33.txt) | Hashes para conferir os dois pacotes baixados. |
+| [NexoFlow-Setup-1.5.34.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.34/NexoFlow-Setup-1.5.34.zip) | Instalador para Windows; recomendado para usar o NexoFlow. |
+| [NexoFlow-1.5.34.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.34/NexoFlow-1.5.34.zip) | Projeto completo. |
+| [SHA256SUMS-1.5.34.txt](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.34/SHA256SUMS-1.5.34.txt) | Hashes para conferir os dois pacotes baixados. |
 
 Extraia todo o ZIP do Setup antes de executar **NexoFlow Setup.exe**. Os pacotes não incluem credenciais; configure seus próprios acessos.
 

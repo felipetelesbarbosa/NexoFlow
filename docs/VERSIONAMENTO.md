@@ -27,3 +27,7 @@ No GitHub, `cancelled` indica execução interrompida e não comprova falha de t
 ## Reutilização segura de pacotes aprovados
 
 O commit final pode usar `[skip release] [preparar pacotes]` para gerar os pacotes na mesma execução do CI, sem publicar. Depois, `workflow_dispatch` com `publish_release=true` e `validated_run_id` publica os mesmos ZIPs, sem repetir build ou suíte completa. SHA, origem e checks completos, CodeQL/Meta e integridade dos artefatos permanecem exigidos. A matriz Windows mantém suas quatro combinações; o build conserva suas verificações específicas. Não atualizar a main entre gerar e publicar. Ver [comandos e critérios](RELEASE%20EFICIENTE.md). Este mecanismo é posterior à publicação 1.5.33; os pacotes daquela versão permanecem intactos.
+
+## Preparação 1.5.34
+
+Publicação autorizada em 11/11/2026 para corrigir confirmação incerta da trava Sheets. Manter uma única geração de pacotes no SHA final e publicar somente após checks aprovados. 1.5.33 e anteriores preservadas.

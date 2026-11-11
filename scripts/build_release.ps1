@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.33",
+    [string]$Version = "1.5.34",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -414,7 +414,7 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-Recupera HTTP 429/5xx na leitura da trava remota das continuações, inclusive na confirmação após renovar a trava. Repete somente o GET, até seis tentativas, com espera mínima de 65s para quota e respeito a Retry-After. Não repete cegamente POSTs e preserva proprietário, horário do Google e respostas incertas. Regressões sintéticas FARMA/PET confirmam fechamento do manifesto e repetição sem nova escrita de fatos. [Diagnóstico e limites](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/CORRECAO%20LEITURA%20TRAVA%20SHEETS.md).
+Corrige a recuperação da trava Sheets após resposta perdida: repete somente leituras seguras, confirma valor e prazo e impede novas gravações quando a confirmação é incerta. Preserva dados, journals, manifesto e proprietário. Após instalar em Preserve, retome apenas Analytics com `nexo analytics` no perfil correto; isso não é retomada exata por linha. [Diagnóstico e limites](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/RECUPERACAO%20TRAVA%20SHEETS.md). A validação comercial do cartão BI_Itens no Data Studio continua pendente e separada.
 
 Não comprova eliminação do HTTP 500 da leitura integral de partes grandes, ausência de novos 429 ou conclusão das cargas comerciais do operador. Atualize em Preserve, com as rotinas encerradas; confira nexo versao e retome nexo analytics no segmento correto. Não recriar planilhas, alterar estados WRITING manualmente ou apagar journals.
 
@@ -442,7 +442,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.33
+# NexoFlow 1.5.34
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"

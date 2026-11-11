@@ -1,6 +1,6 @@
 # NexoFlow — Changelog
 
-## Correção Windows posterior à 1.5.33 — trava com resposta incerta
+## 1.5.34 — em preparação: trava com resposta incerta
 
 - Recupera leituras da trava após falhas de transporte sem repetir o POST. Bloqueia nova renovação e escrita em Controle quando a confirmação é inconclusiva ou expirada.
 - Preserva metadados, proprietários, manifestos e journals. A instalação necessita de nova distribuição validada; sem carga comercial nesta entrega. [Diagnóstico e retomada somente do Analytics](docs/RECUPERACAO%20TRAVA%20SHEETS.md).
