@@ -68,3 +68,16 @@ Gitleaks aprovados. Os dez módulos de assinatura permanecem idênticos à tag
 v1.5.33. Sem alteração de versão, pacotes ou serviços comerciais nesta correção.
 A aprovação Windows/CI/CodeQL do novo SHA e a distribuição corrigida são etapas
 separadas; consultar as execuções no GitHub antes de anunciar disponibilidade.
+
+## Retomada da preparação após indisponibilidade do GitHub
+
+Em 11/11/2026, as tentativas de preparação, CodeQL e Meta/MCP da 1.5.34
+registraram falha de inicialização, sem execução dos testes. O incidente oficial
+[dvy0t3mvh1lg](https://stspg.io/jdjlq5zjyl48) afetou Actions, Pages e outros
+produtos; foi resolvido às 18h21 (America/Fortaleza). A recuperação do serviço
+não equivale à aprovação do código ou à publicação da versão.
+
+A preparação será repetida em um novo commit documental, conservando a correção,
+a numeração 1.5.34 e os releases anteriores. Execuções obsoletas podem ser
+canceladas; não apagar commits, tags ou evidências para esconder falhas.
+Publicar somente os pacotes aprovados e conferidos do mesmo SHA final.
