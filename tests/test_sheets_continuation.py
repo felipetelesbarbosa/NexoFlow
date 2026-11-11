@@ -3,8 +3,11 @@
 import copy
 import json
 import unittest
+from types import SimpleNamespace
+from unittest.mock import Mock
 
-from requests import Timeout
+from gspread.exceptions import APIError
+from requests import Response, Timeout
 
 from sheets_continuation import (
     LEASE_ID,
@@ -219,3 +222,92 @@ class ServerClockLeaseTests(unittest.TestCase):
         with self.assertRaisesRegex(ContinuationError, "horário"):
             SheetsLease(book).require()
         self.assertEqual(book.writes, 0)
+
+
+def metadata_api_error(status, retry_after=None):
+    response = Response()
+    response.status_code = status
+    response._content = json.dumps(
+        {"error": {"code": status, "message": "synthetic-private-marker"}}
+    ).encode()
+    if retry_after is not None:
+        response.headers["Retry-After"] = retry_after
+    return APIError(response)
+
+
+class LeaseMetadataRecoveryTests(unittest.TestCase):
+    def test_lookup_recovers_quota_without_a_metadata_write(self):
+        book = MetadataBook()
+        original = book.fetch_sheet_metadata
+        book.fetch_sheet_metadata = Mock(
+            side_effect=[
+                metadata_api_error(429),
+                metadata_api_error(429, "90"),
+                original(),
+            ]
+        )
+        sleep = Mock()
+        with self.assertLogs(level="WARNING") as logs:
+            self.assertIsNone(
+                SheetsLease(book, now=lambda: 1000, sleep=sleep)._lookup()
+            )
+        self.assertEqual(book.fetch_sheet_metadata.call_count, 3)
+        self.assertEqual([call.args[0] for call in sleep.call_args_list], [65, 90])
+        self.assertEqual(book.writes, 0)
+        self.assertNotIn("synthetic-private-marker", "\n".join(logs.output))
+
+    def test_persistent_quota_stops_before_any_write(self):
+        book = MetadataBook()
+        book.fetch_sheet_metadata = Mock(side_effect=metadata_api_error(429))
+        sleep = Mock()
+        with self.assertRaises(APIError), self.assertLogs(level="WARNING"):
+            SheetsLease(book, now=lambda: 1000, sleep=sleep).require()
+        self.assertEqual(book.fetch_sheet_metadata.call_count, 6)
+        self.assertEqual(sleep.call_count, 5)
+        self.assertEqual(book.writes, 0)
+
+    def test_permanent_failures_are_not_retried_or_written(self):
+        for status in (400, 401, 403, 404):
+            with self.subTest(status=status):
+                book = MetadataBook()
+                book.fetch_sheet_metadata = Mock(side_effect=metadata_api_error(status))
+                sleep = Mock()
+                with self.assertRaises(APIError):
+                    SheetsLease(book, now=lambda: 1000, sleep=sleep).require()
+                self.assertEqual(book.fetch_sheet_metadata.call_count, 1)
+                sleep.assert_not_called()
+                self.assertEqual(book.writes, 0)
+
+    def test_server_clock_is_still_required_after_quota_recovery(self):
+        book = MetadataBook()
+        book.id = "synthetic"
+        book.client = SimpleNamespace(
+            request=Mock(
+                side_effect=[metadata_api_error(429), SimpleNamespace(headers={})]
+            )
+        )
+        sleep = Mock()
+        with (
+            self.assertRaisesRegex(ContinuationError, "horário"),
+            self.assertLogs(level="WARNING"),
+        ):
+            SheetsLease(book, sleep=sleep).require()
+        sleep.assert_called_once_with(65)
+        self.assertEqual(book.writes, 0)
+
+    def test_foreign_owner_still_blocks_after_transient_server_error(self):
+        book = MetadataBook()
+        first = SheetsLease(book, now=lambda: 1000)
+        first.require()
+        original = book.fetch_sheet_metadata()
+        book.fetch_sheet_metadata = Mock(
+            side_effect=[metadata_api_error(500), original]
+        )
+        sleep = Mock()
+        with (
+            self.assertRaisesRegex(ContinuationError, "Outra carga"),
+            self.assertLogs(level="WARNING"),
+        ):
+            SheetsLease(book, now=lambda: 1000, sleep=sleep).require()
+        sleep.assert_called_once_with(2)
+        self.assertEqual(book.writes, 1)

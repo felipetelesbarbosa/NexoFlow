@@ -17,6 +17,7 @@ from google.auth.exceptions import TransportError
 from gspread.exceptions import APIError
 from requests import RequestException
 
+from duration_display import duration
 from sheets_storage import storage_role
 
 INDEX_TITLE = "NexoFlow_Continuidade"
@@ -433,6 +434,42 @@ class SheetsLease:
         self.renewed_at = 0.0
 
     def _lookup(self):
+        # A conferência da trava também consome cota de leitura. Repetir apenas
+        # este GET; tomada/renovação por POST continuam exigindo releitura.
+        for attempt in range(1, 7):
+            try:
+                return self._lookup_once()
+            except APIError as exc:
+                response = getattr(exc, "response", None)
+                status = getattr(response, "status_code", None)
+                if (
+                    status != 429 and (status is None or not 500 <= status < 600)
+                ) or attempt == 6:
+                    raise
+                wait = 65.0 if status == 429 else float(min(2**attempt, 30))
+                header = getattr(response, "headers", {}).get("Retry-After")
+                if header:
+                    try:
+                        retry_after = float(header)
+                    except ValueError:
+                        try:
+                            retry_after = (
+                                parsedate_to_datetime(header).timestamp() - self.now()
+                            )
+                        except (TypeError, ValueError, OverflowError):
+                            retry_after = 0.0
+                    if math.isfinite(retry_after):
+                        wait = max(wait, retry_after)
+                logging.warning(
+                    "Google Sheets: HTTP %s ao conferir trava remota. "
+                    "Tentativa %s/6; aguardando %s. Nenhuma tomada da trava foi repetida.",
+                    status,
+                    attempt,
+                    duration(wait),
+                )
+                self.sleep(wait)
+
+    def _lookup_once(self):
         if self.server_clock:
             raw = self.book.client.request(
                 "get",

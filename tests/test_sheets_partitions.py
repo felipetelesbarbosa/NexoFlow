@@ -12,6 +12,7 @@ from sheets_continuation import ContinuationError, ContinuationIndex, allocated_
 from sheets_partitions import RolloverManager, roots_for
 from sheets_storage import SheetsStorage
 from tests.sheets_memory import Book, Client, GspreadSheet, Provisioner
+from tests.test_sheets_continuation import metadata_api_error
 
 
 class SheetsPartitionTests(unittest.TestCase):
@@ -75,6 +76,79 @@ class SheetsPartitionTests(unittest.TestCase):
         manager.journal_path = Path(temporary.name) / "history.json"
         store._continuity = manager
         return store, ws, provisioner
+
+    def test_final_lease_quota_recovers_manifest_without_repeating_fact_writes(self):
+        for segment in ("FARMA", "PET"):
+            with self.subTest(segment=segment):
+                store, ws, _ = self.make(
+                    "BI_Conversao", ["chave", "valor"], segment=segment
+                )
+                manager = store._continuity
+                original_values = ws.get_all_values
+                original_metadata = store.book.fetch_sheet_metadata
+                failure = [False]
+                triggered = [False]
+
+                def values(
+                    original_values=original_values,
+                    triggered=triggered,
+                    failure=failure,
+                    manager=manager,
+                    **kwargs,
+                ):
+                    result = original_values(**kwargs)
+                    if (
+                        kwargs.get("value_render_option") == "UNFORMATTED_VALUE"
+                        and not triggered[0]
+                    ):
+                        triggered[0] = failure[0] = True
+                        manager.lease.renewed_at = 0
+                    return result
+
+                def metadata(
+                    failure=failure,
+                    original_metadata=original_metadata,
+                    **kwargs,
+                ):
+                    if (
+                        failure[0]
+                        and kwargs.get("params", {}).get("fields")
+                        == "developerMetadata"
+                    ):
+                        failure[0] = False
+                        raise metadata_api_error(429)
+                    return original_metadata(**kwargs)
+
+                manager.lease.sleep = Mock()
+                records = [{"chave": "sintetica", "valor": "12.34"}]
+                with (
+                    patch.object(ws, "get_all_values", side_effect=values),
+                    patch.object(
+                        store.book, "fetch_sheet_metadata", side_effect=metadata
+                    ),
+                    self.assertLogs(level="WARNING"),
+                ):
+                    result = store._upsert_records_detailed(ws, records, "chave")
+                self.assertTrue(triggered[0])
+                self.assertEqual(result.inserted, 1)
+                manager.lease.sleep.assert_called_once_with(65)
+                self.assertEqual(manager.index.status[ws.title]["state"], "READY")
+                persisted = ContinuationIndex.parse(
+                    manager.sheet.get_all_values(),
+                    hub=store._hub_id,
+                    segment=segment,
+                    roots=roots_for(store),
+                )
+                self.assertEqual(persisted.status[ws.title]["state"], "READY")
+                before_writes = ws.writes
+                repeated = store._upsert_records_detailed(ws, records, "chave")
+                self.assertEqual(
+                    (repeated.inserted, repeated.updated, repeated.unchanged), (0, 0, 1)
+                )
+                self.assertEqual(ws.writes, before_writes)
+                self.assertEqual(
+                    ws.get_all_values(), [["chave", "valor"], ["sintetica", "12.34"]]
+                )
 
     def test_upsert_rolls_before_capacity_and_revalidates_orders_in_old_parts(self):
         for segment in ("FARMA", "PET"):
