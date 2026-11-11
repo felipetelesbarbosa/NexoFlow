@@ -15,6 +15,11 @@ def run(argv: list[str] | None = None) -> int:
     parser.add_argument("--inicio", help="Início do período ABC, AAAA-MM-DD")
     parser.add_argument("--fim", help="Fim do período ABC, AAAA-MM-DD")
     args = parser.parse_args(argv)
+    from bi_preflight import (
+        BIContinuationPending,
+        check_replacements,
+        looker_replacements,
+    )
     from looker_bi import build_looker_tables, reporting_period
 
     now = datetime.now(ZoneInfo("America/Belem"))
@@ -49,6 +54,7 @@ def run(argv: list[str] | None = None) -> int:
             period_end=end,
             history_observed_since=store.get_control("historico_observado_desde"),
         )
+        check_replacements(store, looker_replacements(store, tables))
         store.migrate_bi_summary_numbers()
         store.replace_looker_tables(tables)
         logging.info(
@@ -56,6 +62,9 @@ def run(argv: list[str] | None = None) -> int:
             start,
             end,
         )
+    except BIContinuationPending as exc:
+        logging.warning("[PENDÊNCIA] %s", exc)
+        return 3
     finally:
         store.close()
     return 0

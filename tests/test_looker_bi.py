@@ -380,6 +380,7 @@ class TypedSheetTests(unittest.TestCase):
         from run_looker import run
 
         store = Mock()
+        store._continuity = None
         store.load_base_snapshot.return_value = ([], [], {})
         store.load_order_records.return_value = [order(1)]
         store.load_order_item_records.return_value = []

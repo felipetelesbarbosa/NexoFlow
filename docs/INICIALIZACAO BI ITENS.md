@@ -51,3 +51,23 @@ Esses testes não substituem a atualização real da implantação e a comparaç
 ## Seguimento de getData após a implantação versão 2
 
 O Work informou que a implantação privada do SHA `6738dff` carregou o schema, mas falhou ao consultar os dados. Isso não invalida a guarda inicial nem comprova a causa de transporte. A investigação seguinte reproduziu excesso de chamadas em uma grade de 500 mil linhas e adicionou leitura agrupada, recuperação limitada e diagnóstico no próprio Data Studio. Consultar [diagnóstico, testes e roteiro atualizado](DIAGNOSTICO%20GETDATA%20BI%20ITENS.md). A comparação comercial e a confirmação local continuam pendentes.
+
+## Bloqueio observado após instalar 1.5.34
+
+Em 11/11/2026, o log fornecido pelo operador mostrou atualização de BI_Pedidos e BI_Clientes_Vendas, seguida da recusa de criar uma continuação de BI_Itens porque sua fonte ainda não estava confirmada. Não houve repetição do erro de renovação da trava nesse trecho. Isso não comprova o estado atual do manifesto nem a homologação do painel.
+
+A recusa é necessária enquanto a produção usa uma aba direta. O defeito corrigido foi a detecção tardia: o Analytics já havia substituído tabelas grandes antes de descobrir a pendência. O novo `app/bi_preflight.py` verifica o grupo BI_Vendas, BI_Ads, BI_Pedidos e as oito tabelas comerciais antes de iniciar essas substituições. O comando `nexo looker` verifica as oito tabelas antes de sua migração numérica/substituição. A publicação nativa continua conferindo tudo novamente; a prévia não autoriza escrita nem cria READY, partes, confirmação, trava ou revisão.
+
+A prévia conta a grade de cada arquivo uma vez, projeta a expansão na ordem do gravador e não libera capacidade por redução de dados. Acima da margem operacional, a reserva vazia da raiz não é tratada como espaço para novos fatos. Quando necessário para uma fonte não confirmada, lê somente sua coluna de chave, em blocos de até 10 mil células; não refaz um download de todos os valores da tabela. Fontes confirmadas continuam sujeitas às guardas reais, sem essa contagem adicional. Mudanças de manifesto/cabeçalho e falhas de acesso permanecem bloqueantes.
+
+**Limites:** a prévia ocorre depois da coleta e das gravações operacionais e das primeiras três tabelas BI. Não transforma toda a rotina em uma transação, não elimina todas as consultas do Analytics, não garante capacidade diante de edições posteriores e não valida permissões de uma continuação ainda não criada. A pendência conhecida retorna 3, mantém o cursor de sucesso e impede as etapas posteriores; falhas estruturais continuam retornando 1. A distribuição 1.5.34 não contém esta melhoria; será necessária uma nova release validada.
+
+### Próximo passo operacional
+
+Não repetir Analytics/Noturno para tentar resolver a ausência de confirmação. Com as cargas FARMA encerradas, o Work deve retomar a comparação no relatório privado v6, incluindo o cartão original versus `COUNT_DISTINCT(produto_codigo)`, os nove usos/mesclagens e o período vazio. A tabela conciliada isoladamente não resolve o aviso no cartão. Conferir também manifesto e ausência de gravador ativo; nenhum READY ou desbloqueio manual.
+
+Somente depois da validação e ligação real da fonte, o operador usa os comandos do roteiro acima. Para recalcular apenas as oito tabelas comerciais a partir dos fatos já armazenados no Sheets, existe `nexo looker --inicio AAAA-MM-DD --fim AAAA-MM-DD`; o intervalo define o período ABC/KPIs. Esse comando grava BI, não coleta FarmaLíder/Weni, não atualiza todas as etapas do Analytics e não retoma uma revisão física anterior por número de linha. Não executá-lo enquanto a fonte continuar pendente. Após a migração, conferir a continuação e os totais; só então retomar a rotina completa.
+
+Testes sintéticos novos cobrem FARMA/PET, crescimento conjunto, grade de 500 mil linhas, fonte já confirmada com duas continuações, cabeçalho/manifesto alterados, nenhuma escrita no bloqueio e preservação do checkpoint. As regressões dos comandos Analytics e looker falham contra os respectivos pontos de entrada anteriores. Os dez módulos de assinatura foram preservados. Evidências comerciais permanecem exclusivamente nos anexos privados do operador.
+
+Validação local desta correção: 2.009 testes Python, 95 ignorados por dependências/plataforma; 78 testes Node; Ruff, Pyright (zero erros/avisos), auditoria de consistência, documentação gerada e pip-audit aprovados. São testes sintéticos em Linux; os checks Windows/CodeQL devem ser consultados no commit enviado. Não houve nova publicação, instalação Windows ou homologação comercial.

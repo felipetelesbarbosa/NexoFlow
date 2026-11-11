@@ -14,6 +14,9 @@ from zoneinfo import ZoneInfo
 
 from analytics import (
     AD_FIELDS,
+    BI_ADS_COLUMNS,
+    BI_ORDERS_COLUMNS,
+    BI_SALES_COLUMNS,
     ad_is_after_order,
     build_bi_ads_rows,
     build_bi_channel_records,
@@ -32,6 +35,12 @@ from analytics import (
     normalize_cpf,
     prepare_full_load_quarter,
     validate_full_load_quarter,
+)
+from bi_preflight import (
+    BIContinuationPending,
+    Replacement,
+    check_replacements,
+    looker_replacements,
 )
 from config import (
     FARMALIDER_BATCH_ERROR_WARN_MIN_ERRORS,
@@ -1482,26 +1491,18 @@ def main() -> int:
             snapshot_date=bi_snapshot_date,
             updated_at=sync_time,
         )
-        sheets.replace_bi_sales(bi_sales)
-        logging.info("Google Sheets: BI 4/7 - BI_Vendas atualizado.")
-
         bi_ads = build_bi_ads_rows(
             contact_result.final_records,
             all_order_records,
             snapshot_date=bi_snapshot_date,
             updated_at=sync_time,
         )
-        sheets.replace_bi_ads(bi_ads)
-        logging.info("Google Sheets: BI 5/7 - BI_Ads atualizado.")
-
         bi_orders = build_bi_order_rows(
             contact_result.final_records,
             all_order_records,
             all_item_records,
             updated_at=sync_time,
         )
-        sheets.replace_bi_orders(bi_orders)
-        logging.info("Google Sheets: BI 6/7 - BI_Pedidos atualizado.")
         history_started = (
             sheets.get_control("historico_observado_desde") or bi_snapshot_date
         )
@@ -1515,6 +1516,21 @@ def main() -> int:
             period_end=looker_end,
             history_observed_since=history_started,
         )
+        check_replacements(
+            sheets,
+            [
+                Replacement(sheets.bi_sales, BI_SALES_COLUMNS, len(bi_sales)),
+                Replacement(sheets.bi_ads, BI_ADS_COLUMNS, len(bi_ads)),
+                Replacement(sheets.bi_orders, BI_ORDERS_COLUMNS, len(bi_orders)),
+                *looker_replacements(sheets, looker_tables),
+            ],
+        )
+        sheets.replace_bi_sales(bi_sales)
+        logging.info("Google Sheets: BI 4/7 - BI_Vendas atualizado.")
+        sheets.replace_bi_ads(bi_ads)
+        logging.info("Google Sheets: BI 5/7 - BI_Ads atualizado.")
+        sheets.replace_bi_orders(bi_orders)
+        logging.info("Google Sheets: BI 6/7 - BI_Pedidos atualizado.")
         sheets.replace_looker_tables(looker_tables)
         sheets.set_controls(
             {
@@ -1794,13 +1810,21 @@ def main() -> int:
         return PARTIAL_SYNC_EXIT_CODE if partial else 0
 
     except Exception as exc:
-        logging.exception("Falha na sincronização: %s", exc)
+        source_pending = isinstance(exc, BIContinuationPending)
+        if source_pending:
+            logging.warning("[PENDÊNCIA] %s", exc)
+            logging.warning(
+                "Gravações anteriores preservadas; BI e etapas seguintes pendentes. "
+                "Checkpoint de sucesso mantido. Não repita a carga antes de validar a fonte."
+            )
+        else:
+            logging.exception("Falha na sincronização: %s", exc)
 
         if sheets is not None:
             try:
                 sheets.set_controls(
                     {
-                        "ultima_execucao_status": "erro",
+                        "ultima_execucao_status": "parcial" if source_pending else "erro",
                         "ultima_execucao_erro_tipo": exc.__class__.__name__,
                         "ultima_execucao_erro_em_utc": utc_iso(datetime.now(UTC)),
                     }
@@ -1810,7 +1834,7 @@ def main() -> int:
                     "Não foi possível registrar o status de erro na aba Controle.",
                     exc_info=True,
                 )
-        return 1
+        return PARTIAL_SYNC_EXIT_CODE if source_pending else 1
     finally:
         if farm_client is not None:
             farm_client.close()

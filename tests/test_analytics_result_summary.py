@@ -12,9 +12,16 @@ import main
 
 class AnalyticsResultSummaryTests(unittest.TestCase):
     def run_pipeline(
-        self, *, client_errors=0, order_errors=0, meta=None, historical=None
+        self,
+        *,
+        client_errors=0,
+        order_errors=0,
+        meta=None,
+        historical=None,
+        bi_pending=False,
     ):
         sheets, farm, weni = Mock(), Mock(), Mock()
+        sheets._continuity = None
         farm.metrics_snapshot.return_value = {}
         weni.list_contacts.return_value = []
         sheets.load_base_snapshot.return_value = ([], [], set())
@@ -62,6 +69,16 @@ class AnalyticsResultSummaryTests(unittest.TestCase):
                     or {"status": "desativado", "partial": False},
                 )
             )
+            if bi_pending:
+                from bi_preflight import BIContinuationPending
+
+                stack.enter_context(
+                    patch(
+                        "main.check_replacements",
+                        side_effect=BIContinuationPending("BI_Itens: fonte pendente"),
+                        create=True,
+                    )
+                )
             with self.assertLogs(level=logging.INFO) as captured:
                 code = main.main()
         return code, "\n".join(captured.output), controls, sheets
@@ -160,6 +177,24 @@ class AnalyticsResultSummaryTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertEqual(controls["ultima_execucao_status"], "erro")
         self.assertNotIn("Resumo final Analytics", output)
+
+    def test_bi_source_pending_stops_before_large_replacements_and_success_cursor(self):
+        code, output, controls, sheets = self.run_pipeline(bi_pending=True)
+        self.assertEqual(code, 3)
+        self.assertEqual(controls["ultima_execucao_status"], "parcial")
+        self.assertEqual(
+            controls["ultima_sincronizacao_sucesso_utc"], "2026-10-01T12:00:00+00:00"
+        )
+        sheets.replace_bi_sales.assert_not_called()
+        sheets.replace_bi_ads.assert_not_called()
+        sheets.replace_bi_orders.assert_not_called()
+        sheets.replace_looker_tables.assert_not_called()
+        sheets.refresh_delivery_bi.assert_not_called()
+        sheets.replace_bi_status.assert_not_called()
+        self.assertIn("[PENDÊNCIA] BI_Itens", output)
+        self.assertNotIn("Traceback", output)
+        self.assertIn("Checkpoint de sucesso mantido", output)
+        sheets.close.assert_called_once()
 
 
 if __name__ == "__main__":

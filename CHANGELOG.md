@@ -1,5 +1,11 @@
 # NexoFlow — Changelog
 
+## Correções posteriores à 1.5.34 — ainda não distribuídas
+
+- Analytics e `nexo looker`: prévia da expansão por arquivo/parte antes das substituições grandes do BI. Detecta fontes não confirmadas, considera grades reservadas e crescimento conjunto; preserva o publicador e suas guardas.
+- Dependência de migração do Data Studio retorna pendência (código 3), sem traceback ou avanço do checkpoint de sucesso. Etapas anteriores podem já estar gravadas; não declarar todas as fontes atualizadas.
+- Correção da detecção tardia não confirma fontes nem resolve o aviso de reagregação no Google. Requer nova release/Setup para chegar ao Windows; a 1.5.34 permanece intacta.
+
 ## 1.5.34 — publicada em 11/11/2026, 19:12:49 (America/Fortaleza)
 
 Commit validado: `a25ae828b6dc732ecfcafa60db145e8cf27c84f5`. CI, CodeQL, Meta/MCP, Windows 3.11/3.14 nas duas codificações, executáveis, Setup e segurança dos pacotes aprovados. Downloads públicos conferidos; recuperação comercial permanece pendente.

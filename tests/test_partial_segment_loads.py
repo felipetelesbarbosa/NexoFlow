@@ -35,6 +35,7 @@ class PartialSegmentLoadsTests(unittest.TestCase):
                     },
                 ]
                 farm, sheets, weni = Mock(), Mock(), Mock()
+                sheets._continuity = None
                 snapshot = customer_snapshot()
                 snapshot["ultimoPedido"]["segmento"] = segment
                 incomplete = [True]
