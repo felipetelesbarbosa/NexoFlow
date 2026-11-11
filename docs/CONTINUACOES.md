@@ -58,7 +58,7 @@ Atualize o projeto Apps Script da Curva ABC com os **três** arquivos `AbcCore.j
 
 O conector confere cabeçalhos, segmento, origem e contagens de todas as partes. Se uma tabela estiver em gravação ou o índice mudar durante a leitura, ele retorna erro para nova tentativa; não mostra uma soma parcial como total.
 
-Cada consulta pode examinar até 1 milhão de linhas e retornar até 200 mil, com orçamento de 240 segundos. Não há amostragem ou corte silencioso. Para detalhes volumosos, restrinja o período ou use tabelas de resumo; se ultrapassar esses limites, planeje um armazenamento analítico adequado. O Apps Script/Google também pode impor quotas menores.
+Cada consulta pode examinar até 1 milhão de linhas e retornar até 200 mil, com orçamento de 240 segundos. Não há amostragem ou corte silencioso. Para detalhes volumosos, restrinja o período ou use tabelas de resumo; se ultrapassar esses limites, planeje um armazenamento analítico adequado. O Apps Script/Google também pode impor quotas menores. A leitura usa `batchGet` com até oito intervalos, recuperação limitada no mesmo prazo e diagnósticos sanitizados de cota, acesso, serviço e tempo. Consulte [a investigação de getData em 500 mil linhas](DIAGNOSTICO%20GETDATA%20BI%20ITENS.md); a redução de chamadas não autoriza omitir blocos vazios ou devolver totais parciais.
 
 O conector geral não impõe uma janela automática de 30 dias. Tabelas de clientes sem coluna `data` permanecem completas; tabelas com data respeitam o período solicitado pelo relatório. As agregações dos gráficos e o período escolhido continuam exigindo conferência.
 

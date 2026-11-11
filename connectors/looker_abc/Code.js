@@ -45,11 +45,7 @@ function fields_(mode) {
   return f;
 }
 function getSchema(request) { return {schema: fields_(request.configParams.tabela).build()}; }
-function readTables_(id, dateRange) {
-  var api = {
-    meta: function (key) { return Sheets.Spreadsheets.get(key, {fields: 'sheets(properties(sheetId,title,gridProperties)),developerMetadata'}); },
-    values: function (key, range) { return Sheets.Spreadsheets.Values.get(key, range, {valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'FORMATTED_STRING', majorDimension: 'ROWS'}).values || []; }
-  };
+function readTables_(id, dateRange, api) {
   var hash = function (text) { return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text, Utilities.Charset.UTF_8).map(function (b) { return ('0' + ((b + 256) % 256).toString(16)).slice(-2); }).join(''); };
   return NexoTables.read(id, ['BI_Itens', 'BI_Clientes_Vendas'], {api: api, hash: hash, widths: {BI_Itens: 12, BI_Clientes_Vendas: 9}, legacy: true, accept: function (title, headers, row) {
     var value = row[headers.indexOf('data')];
@@ -60,6 +56,7 @@ function readTables_(id, dateRange) {
 }
 function getData(request) {
   var cc = DataStudioApp.createCommunityConnector();
+  var api=NexoTables.googleApi(Sheets,{startedAt:Date.now(),dateTimeRenderOption:'FORMATTED_STRING',sleep:function(ms){Utilities.sleep(ms);},warn:function(info){console.warn(JSON.stringify(info));}});
   try {
     var params = request.configParams || {}, id = String(params.spreadsheetId || '').trim();
     if (!/^[a-zA-Z0-9_-]{20,100}$/.test(id)) throw new Error('Informe um ID de planilha válido.');
@@ -69,9 +66,9 @@ function getData(request) {
     if (names.some(function (name) { return !valid.has(name); })) throw new Error('O relatório solicitou um campo desconhecido.');
     var requestedFields = fields.forIds(names);
     names = requestedFields.asArray().map(function (f) { return f.getId(); });
-    var tables = readTables_(id, request.dateRange);
+    var tables = readTables_(id, request.dateRange,api);
     var result = NexoAbc.calculate(tables[0], tables[1], request.dateRange.startDate, request.dateRange.endDate);
-    return {
+    var response = {
       schema: requestedFields.build(),
       rows: result[mode].map(function (r) { return {values: names.map(function (name) {
         var value = r[name];
@@ -79,9 +76,11 @@ function getData(request) {
       })}; }),
       filtersApplied: false
     };
+    api.checkDeadline('RESULTADO_ABC');
+    return response;
   } catch (error) {
-    // Mensagens produzidas pelo motor não contêm registros. Erros Google ficam privados.
-    var safe = /^(Continuações:|Data inválida|Valor monetário|Cabeçalho|Chave obrigatória|Registros conflitantes|O início|Item sem|Versão da carga|Quantidade inválida|Valor acima|As bases|Pedido com|Selecione|Aba BI|A origem excede|Informe um ID|A consulta precisa|O relatório solicitou)/.test(String(error.message));
-    cc.newUserError().setText(safe ? error.message : 'Não foi possível ler a planilha BI. Confira o acesso e tente novamente.').throwException();
+    var safe = error.nexoValidation || !error.nexoDiagnostic && /^(Continuações:|Data inválida|Valor monetário|Cabeçalho|Chave obrigatória|Registros conflitantes|O início|Item sem|Versão da carga|Quantidade inválida|Valor acima|As bases|Pedido com|Selecione|Aba BI|A origem excede|Informe um ID|A consulta precisa|O relatório solicitou)/.test(String(error.message));
+    console.error(JSON.stringify(NexoTables.diagnostic(error,api)));
+    cc.newUserError().setText((safe?error.message+' ':'')+NexoTables.diagnosticText(error,api)).throwException();
   }
 }

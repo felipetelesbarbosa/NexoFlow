@@ -28,18 +28,28 @@ function fields_(title) {
   return fields;
 }
 function getSchema(request) {
-  var params=request.configParams||{}, title=params.tabela;
+  var params=request.configParams||{}, title=params.tabela, api=api_();
   // Vinculação verificável antes do primeiro lote: valida origem, nunca retorna fatos.
+  try {
   NexoTables.read(String(params.spreadsheetId||'').trim(),[title],{
-    api:api_(),hash:hash_,schemas:NexoSchemas,segment:params.segmento,schemaOnly:true
+    api:api,hash:hash_,schemas:NexoSchemas,segment:params.segmento,schemaOnly:true
   });
   return {schema:fields_(title).build()};
+  } catch(error) { reportError_(DataStudioApp.createCommunityConnector(),error,api); }
 }
-function api_() {
-  return {
-    meta: function (id) { return Sheets.Spreadsheets.get(id, {fields: 'sheets(properties(sheetId,title,gridProperties)),developerMetadata'}); },
-    values: function (id, range) { return Sheets.Spreadsheets.Values.get(id, range, {valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'SERIAL_NUMBER', majorDimension: 'ROWS'}).values || []; }
-  };
+function api_(startedAt) {
+  return NexoTables.googleApi(Sheets,{
+    startedAt:startedAt,
+    sleep:typeof Utilities.sleep==='function'?function(ms){Utilities.sleep(ms);}:undefined,
+    warn:function(info){console.warn(JSON.stringify(info));}
+  });
+}
+function reportError_(cc,error,api) {
+  var text=String(error.message || '');
+  var safe=error.nexoValidation || !error.nexoDiagnostic && /^(Selecione tabela|Campo solicitado|Cabeçalho da tabela|Medida BI|Data inválida|Continuações:)/.test(text);
+  // Nunca registrar message/stack da exceção Google: podem conter URL ou valores.
+  console.error(JSON.stringify(NexoTables.diagnostic(error,api)));
+  cc.newUserError().setText((safe?text+' ':'')+NexoTables.diagnosticText(error,api)).throwException();
 }
 function hash_(text) {
   return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text, Utilities.Charset.UTF_8).map(function (b) { return ('0' + ((b + 256) % 256).toString(16)).slice(-2); }).join('');
@@ -67,7 +77,7 @@ function getData(request) {
     var selected = fields.forIds(names);
     names = selected.asArray().map(function (f) { return f.getId(); });
     var widths = {}; widths[params.tabela] = spec.length;
-    var signature=null, api=api_(), linked=null, queryStarted=Date.now();
+    var queryStarted=Date.now(), signature=null, api=api_(queryStarted), linked=null;
     function fence(value) { if (signature!==null && signature!==value) throw new Error('Continuações: publicação mudou entre as fontes.'); signature=value; }
     if (params.tabela==='Historico_Itens') {
       if (!request.dateRange) throw new Error('Continuações: selecione um período para o detalhe de itens.');
@@ -107,7 +117,7 @@ function getData(request) {
     if (NexoTables.stable(table[0]) !== NexoTables.stable(spec.map(function (s) { return s[0]; }))) throw new Error('Cabeçalho da tabela difere da versão do conector.');
     if (params.tabela==='BI_Historico_Resumo' && names.includes('clientes') && table.length>2 && !names.includes('competencia')) throw new Error('Continuações: clientes distintos não são aditivos. Use ANO ou TOTAL em um único recorte, ou detalhe por competência.');
     var positions = names.map(function (name) { return table[0].indexOf(name); });
-    return {schema: selected.build(), rows: table.slice(1).map(function (row) {
+    var response={schema: selected.build(), rows: table.slice(1).map(function (row) {
       return {values: positions.map(function (i) {
         var value = row[i];
         if (value === '' || value === undefined || value === null) return null;
@@ -117,9 +127,9 @@ function getData(request) {
         return value;
       })};
     }), filtersApplied: false};
+    if (api.checkDeadline) api.checkDeadline('RESULTADO');
+    return response;
   } catch (error) {
-    var text = String(error.message || '');
-    var safe = /^(Continuações:|Selecione tabela|Campo solicitado|Cabeçalho da tabela|Medida BI|Data inválida)/.test(text);
-    cc.newUserError().setText(safe ? text : 'Não foi possível ler a fonte. Confira o acesso aos arquivos do segmento e tente novamente.').throwException();
+    reportError_(cc,error,api);
   }
 }

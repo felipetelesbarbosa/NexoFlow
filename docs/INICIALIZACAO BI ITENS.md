@@ -47,3 +47,7 @@ A Curva ABC precisa de implantação e diagnóstico próprios. Atualizar seus tr
 A regressão sintética reproduziu a recusa da raiz registrada sem estado no código anterior. Com a correção, 45 testes Node passaram, incluindo os leitores geral e ABC, FARMA/PET, manifesto imutável, escritor ativo/iniciado durante a consulta, schema/origem, intenção pendente, chaves duplicadas, medidas com tipo inválido e a permanência do bloqueio de cruzamentos sem `READY`. Ruff, validação do workflow e diff também foram conferidos. O CI executa a nova regressão junto às existentes.
 
 Esses testes não substituem a atualização real da implantação e a comparação dos dados pelo Work. Nenhum registro comercial, credencial, manifesto ou relatório publicado foi alterado nesta implementação.
+
+## Seguimento de getData após a implantação versão 2
+
+O Work informou que a implantação privada do SHA `6738dff` carregou o schema, mas falhou ao consultar os dados. Isso não invalida a guarda inicial nem comprova a causa de transporte. A investigação seguinte reproduziu excesso de chamadas em uma grade de 500 mil linhas e adicionou leitura agrupada, recuperação limitada e diagnóstico no próprio Data Studio. Consultar [diagnóstico, testes e roteiro atualizado](DIAGNOSTICO%20GETDATA%20BI%20ITENS.md). A comparação comercial e a confirmação local continuam pendentes.

@@ -1,5 +1,10 @@
 # NexoFlow — Changelog
 
+## Conector posterior à 1.5.33 — diagnóstico e cota de getData
+
+- Agrupa 125 intervalos de uma grade de 500 mil linhas em 16 chamadas de dados, com recuperação limitada de quota/timeout/5xx dentro de 4 minutos e diagnóstico sanitizado no Data Studio. Reconfere cabeçalhos, origens, manifesto, trava e chaves; nunca devolve total parcial.
+- Regressões sintéticas de volume, acesso, falhas transitórias e integridade. A causa comercial ainda depende da leitura com a nova implantação privada; nenhuma fonte foi confirmada ou alterada. [Evidências e roteiro para o Work](docs/DIAGNOSTICO%20GETDATA%20BI%20ITENS.md).
+
 ## Conector posterior à 1.5.33 — conferência inicial de BI_Itens
 
 - Permite conferir uma única raiz legada registrada sem estado, com schema/origem/chaves verificados e sem gravador ou criação pendente. O leitor não grava `READY`, não libera publicações parciais e mantém bloqueados cruzamentos ABC até confirmação. [Diagnóstico e roteiro](docs/INICIALIZACAO%20BI%20ITENS.md).
