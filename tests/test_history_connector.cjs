@@ -219,7 +219,7 @@ test('filtro não suportado preserva todas as linhas e forFilterOnly para delega
 });
 test('dimensão numérica de SKU continua validada mesmo ausente dos campos solicitados',()=>{
   const f=skuFixture();f.physical[hub][1][f.header.indexOf('sku_informado')]='1';
-  assert.throws(()=>connector(f).getData({configParams:{spreadsheetId:hub,segmento:'FARMA',tabela:'BI_Itens'},fields:[{name:'produto_codigo'}]}),/numérico/);
+  assert.throws(()=>connector(f).getData({configParams:{spreadsheetId:hub,segmento:'FARMA',tabela:'BI_Itens'},fields:[{name:'produto_codigo'}],dateRange:{startDate:'2026-11-01',endDate:'2026-11-03'}}),/numérico/);
 });
 
 function filterRequest(groups,start='01',end='03'){
@@ -268,4 +268,42 @@ test('filtro aplicado não encobre WRITING nem chave inválida em linha excluíd
   assert.throws(()=>connector(writing).getData(filterRequest([[skuEquals()]])),/atualiza/);
   const duplicate=skuFixture();duplicate.physical[hub][3][0]=duplicate.physical[hub][1][0];
   assert.throws(()=>connector(duplicate).getData(filterRequest([[skuEquals()]])),/chave/);
+});
+
+function configHarness(){
+  const ctx=connector(skuFixture()), factory=ctx.DataStudioApp.createCommunityConnector, result={};
+  function config(){
+    result.items=[];
+    function item(){const f={};result.items.push(f);return {setId(v){f.id=v;return this;},setName(){return this;},setIsDynamic(v){f.dynamic=v;return this;},addOption(){return this;}};}
+    return {newTextInput:item,newSelectSingle:item,newOptionBuilder:()=>({setLabel(){return this;},setValue(){return this;}}),setIsSteppedConfig(v){result.stepped=v;},setDateRangeRequired(v){result.dateRequired=v;},build:()=>structuredClone(result)};
+  }
+  ctx.DataStudioApp.createCommunityConnector=()=>({...factory(),getConfig:config});return ctx;
+}
+test('getConfig em etapas exige período só após escolher BI_Itens FARMA',()=>{
+  const ctx=configHarness(), initial=ctx.getConfig({});
+  assert.equal(initial.stepped,true);assert.equal(initial.dateRequired,false);
+  const selected=ctx.getConfig({configParams:{segmento:'FARMA',tabela:'BI_Itens'}});
+  assert.equal(selected.stepped,false);assert.equal(selected.dateRequired,true);
+  assert.deepEqual(Array.from(selected.items,x=>x.id),Array.from(initial.items,x=>x.id));
+  assert.equal(selected.items.find(x=>x.id==='tabela').dynamic,true);
+  for(const [segmento,tabela] of [['PET','BI_Itens'],['FARMA','BI_Clientes'],['FARMA','BI_Historico_Resumo']]){
+    const c=ctx.getConfig({configParams:{segmento,tabela}});assert.equal(c.stepped,false);assert.equal(c.dateRequired,false);
+  }
+});
+test('chamada v5 sem período é recusada antes de qualquer leitura, sem usar todo histórico como recorte',()=>{
+  for(const dateRange of [undefined,{}, {startDate:'2026-11-01'}, {startDate:'2026-11-03',endDate:'2026-11-01'}, {startDate:'2026-11-31',endDate:'2026-11-31'}]){
+    const f=skuFixture(), request=filterRequest(undefined);request.dateRange=dateRange;
+    const ctx=connector(f), api=ctx.api_;let opened=0;ctx.api_=()=>{opened++;return api();};
+    assert.throws(()=>ctx.getData(request),/período|Data inválida/);assert.equal(f.reads,0);assert.equal(opened,0);
+  }
+});
+test('dia e três dias recebidos sem filtro são recortados no conector; filtro ausente não é inventado',()=>{
+  for(const [start,end,length] of [['02','02',3],['01','03',6],['30','30',0]]){
+    const ctx=connector(skuFixture()), request=filterRequest(undefined,start,end), response=ctx.getData(request);
+    assert.equal(response.rows.length,length);assert.equal(response.filtersApplied,false);
+    assert.equal(response.schema.some(s=>s.name==='sku_informado'),true);
+    const trace=ctx.queryTrace_(request,request.configParams,ctx.itemFilters_(request,request.configParams),length);
+    assert.equal(trace.periodo_exigido,true);assert.equal(trace.amostra,false);
+    request.scriptParams={sampleExtraction:true};assert.equal(ctx.queryTrace_(request,request.configParams,ctx.itemFilters_(request,request.configParams),length).amostra,true);
+  }
 });

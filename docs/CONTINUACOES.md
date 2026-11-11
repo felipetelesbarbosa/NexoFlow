@@ -60,7 +60,7 @@ O conector confere cabeçalhos, segmento, origem e contagens de todas as partes.
 
 Cada consulta pode examinar até 1 milhão de linhas e retornar até 200 mil, com orçamento de 240 segundos. Não há amostragem ou corte silencioso. Para detalhes volumosos, restrinja o período ou use tabelas de resumo; se ultrapassar esses limites, planeje um armazenamento analítico adequado. O Apps Script/Google também pode impor quotas menores. A leitura usa `batchGet` com até oito intervalos, recuperação limitada no mesmo prazo e diagnósticos sanitizados de cota, acesso, serviço e tempo. Consulte [a investigação de getData em 500 mil linhas](DIAGNOSTICO%20GETDATA%20BI%20ITENS.md); a redução de chamadas não autoriza omitir blocos vazios ou devolver totais parciais.
 
-O conector geral não impõe uma janela automática de 30 dias. Tabelas de clientes sem coluna `data` permanecem completas; tabelas com data respeitam o período solicitado pelo relatório. As agregações dos gráficos e o período escolhido continuam exigindo conferência.
+BI_Itens FARMA solicita período ao concluir a configuração em etapas; a fonte precisa ser reconectada ou criada na implantação correspondente. O Google usa por padrão os últimos 28 dias, excluindo hoje, se o componente não selecionar outro intervalo: conferir explicitamente as datas dos recortes. As demais tabelas mantêm o contrato anterior de período opcional. Consulte o [seguimento da v5](PRODUTOS%20DISTINTOS%20BI%20ITENS.md#seguimento-após-a-versão-privada-v5-período-ausente). Tabelas de clientes sem coluna `data` permanecem completas; tabelas com data respeitam o período solicitado pelo relatório. As agregações dos gráficos e o período escolhido continuam exigindo conferência.
 
 ## Falhas e retomada
 

@@ -4,18 +4,22 @@ function getAuthType() {
   return cc.newAuthTypeResponse().setAuthType(cc.AuthType.NONE).build();
 }
 function isAdminUser() { return false; }
-function getConfig() {
+function getConfig(request) {
+  var params=request && request.configParams || {};
   var cc = DataStudioApp.createCommunityConnector(), config = cc.getConfig();
   config.newTextInput().setId('spreadsheetId').setName('ID do Dashboard NexoFlow');
-  var segment = config.newSelectSingle().setId('segmento').setName('Segmento');
+  var segment = config.newSelectSingle().setId('segmento').setName('Segmento').setIsDynamic(true);
   ['FARMA', 'PET'].forEach(function (value) { segment.addOption(config.newOptionBuilder().setLabel(value).setValue(value)); });
-  var table = config.newSelectSingle().setId('tabela').setName('Tabela BI');
+  var table = config.newSelectSingle().setId('tabela').setName('Tabela BI').setIsDynamic(true);
   Object.keys(NexoSchemas).forEach(function (title) { table.addOption(config.newOptionBuilder().setLabel(title).setValue(title)); });
   var cut=config.newSelectSingle().setId('recorte_historico').setName('Resumo histórico: grão (somente BI_Historico_Resumo)');
   ['MES','ANO','TOTAL','SEM_EMISSAO'].forEach(function (value) {cut.addOption(config.newOptionBuilder().setLabel(value).setValue(value));});
-  config.setDateRangeRequired(false);
+  var complete=['FARMA','PET'].includes(params.segmento) && Object.prototype.hasOwnProperty.call(NexoSchemas,params.tabela);
+  config.setIsSteppedConfig(!complete);
+  config.setDateRangeRequired(requiresPeriod_(params));
   return config.build();
 }
+function requiresPeriod_(params) { return params.segmento==='FARMA' && params.tabela==='BI_Itens'; }
 function fields_(title) {
   if (!NexoSchemas[title]) throw new Error('Selecione uma tabela BI válida.');
   var cc = DataStudioApp.createCommunityConnector(), fields = cc.getFields();
@@ -86,13 +90,20 @@ function queryTrace_(request,params,plan,count) {
   // Só estrutura autorizada: sem valores de filtros, registros ou ID de destino.
   function day(value){var text=String(value || '');return /^\d{4}-\d{2}-\d{2}$/.test(text)?text:null;}
   var shape=Array.isArray(request.dimensionsFilters)?request.dimensionsFilters.slice(0,25).map(function(group){return Array.isArray(group)?group.slice(0,25).map(function(f){f=f || {};return {campo:NexoSchemas.BI_Itens.some(function(s){return s[0]===f.fieldName;})?f.fieldName:'OUTRO',operador:['EQUALS','IN_LIST','CONTAINS','REGEXP_PARTIAL_MATCH','BETWEEN','IS_NULL'].includes(f.operator)?f.operator:'OUTRO',tipo:['INCLUDE','EXCLUDE'].includes(f.type)?f.type:'OUTRO'};}):[];}):[];
-  return {diagnostico:'consulta_bi_itens_v1',filtros:shape,segmento:params.segmento,campos:request.fields.map(function(f){return {nome:f.name,somente_filtro:f.forFilterOnly===true};}),inicio:day(request.dateRange && request.dateRange.startDate),fim:day(request.dateRange && request.dateRange.endDate),grupos_filtro:Array.isArray(request.dimensionsFilters)?request.dimensionsFilters.length:0,filtros_aplicados:plan.applied,tratamento:plan.reason,linhas_resposta:count};
+  return {diagnostico:'consulta_bi_itens_v1',periodo_exigido:requiresPeriod_(params),amostra:!!(request.scriptParams && request.scriptParams.sampleExtraction===true),filtros:shape,segmento:params.segmento,campos:request.fields.map(function(f){return {nome:f.name,somente_filtro:f.forFilterOnly===true};}),inicio:day(request.dateRange && request.dateRange.startDate),fim:day(request.dateRange && request.dateRange.endDate),grupos_filtro:Array.isArray(request.dimensionsFilters)?request.dimensionsFilters.length:0,filtros_aplicados:plan.applied,tratamento:plan.reason,linhas_resposta:count};
 }
 function getData(request) {
   var cc = DataStudioApp.createCommunityConnector();
   try {
     var params = request.configParams || {}, spec = NexoSchemas[params.tabela];
     if (!spec || !['FARMA', 'PET'].includes(params.segmento)) throw new Error('Selecione tabela e segmento válidos.');
+    if (requiresPeriod_(params)) {
+      var period=request.dateRange;
+      if (!period || !period.startDate || !period.endDate) throw new Error('Continuações: período não recebido para BI_Itens FARMA. Reconecte a fonte com a configuração de período atualizada e confira a dimensão data do componente.');
+      if (typeof period.startDate!=='string' || typeof period.endDate!=='string' || !/^\d{4}-\d{2}-\d{2}$/.test(period.startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(period.endDate)) throw new Error('Data inválida no período de BI_Itens FARMA.');
+      var periodStart=date_(period.startDate), periodEnd=date_(period.endDate);
+      if (!periodStart || !periodEnd || periodStart>periodEnd) throw new Error('Data inválida no período de BI_Itens FARMA.');
+    }
     var fields = fields_(params.tabela), names = request.fields.map(function (f) { return f.name; });
     if (names.some(function (name) { return !spec.some(function (s) { return s[0] === name; }); })) throw new Error('Campo solicitado não pertence à tabela.');
     var itemFilters=itemFilters_(request,params);

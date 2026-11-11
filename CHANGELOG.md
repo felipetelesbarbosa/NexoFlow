@@ -1,5 +1,10 @@
 # NexoFlow — Changelog
 
+## Conector posterior à 1.5.33 — período da consulta BI_Itens FARMA
+
+- Corrige a declaração de período em getConfig por configuração em etapas, restrita ao piloto FARMA; recusa getData sem datas válidas antes de acessar o Sheets. Preserva o modo das outras tabelas e PET.
+- Distingue extração de amostra na trilha estrutural. Ausência de filtro não autoriza inventá-lo; a origem interna da contagem divergente ainda exige comparação privada após reconectar a fonte. [Diagnóstico e roteiro v6](docs/PRODUTOS%20DISTINTOS%20BI%20ITENS.md#seguimento-após-a-versão-privada-v5-período-ausente).
+
 ## Conector posterior à 1.5.33 — filtro antes da contagem distinta
 
 - Aplica filtros suportados de `sku_informado` em BI_Itens FARMA antes da resposta, com contrato all-or-none e tratamento correto de `forFilterOnly`. Mantém itens separados, guardas, demais tabelas e PET.
