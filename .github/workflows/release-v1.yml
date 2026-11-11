@@ -14,6 +14,10 @@ on:
         description: Publicar release após validação
         type: boolean
         default: false
+      validated_run_id:
+        description: ID da execução aprovada cujos pacotes serão publicados sem novo build
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -26,6 +30,7 @@ concurrency:
 
 jobs:
   qualidade:
+    if: ${{ !inputs.validated_run_id }}
     name: Qualidade e dependências
     runs-on: ubuntu-latest
     steps:
@@ -49,6 +54,7 @@ jobs:
         run: pip-audit -r requirements.txt -r dependencias/requirements-webhook.txt
 
   verificar-segredos:
+    if: ${{ !inputs.validated_run_id }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -79,6 +85,7 @@ jobs:
             --mode history --repo "$GITHUB_WORKSPACE"
 
   validar-python:
+    if: ${{ !inputs.validated_run_id }}
     name: Testes Python ${{ matrix.python-version }}
     runs-on: windows-latest
     permissions:
@@ -125,7 +132,7 @@ jobs:
 
   validar-e-publicar:
     # Integrações preparatórias explicitamente autorizadas sem release.
-    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip release]')
+    if: ${{ !inputs.validated_run_id && (github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip release]') || contains(github.event.head_commit.message, '[preparar pacotes]')) }}
     needs: [qualidade, verificar-segredos, validar-python]
     runs-on: windows-latest
     permissions:
@@ -190,11 +197,8 @@ jobs:
           python -m pip install "setuptools>=77" wheel
           python -m pip install -r requirements.txt -r dependencias/requirements-webhook.txt
 
-      - name: Executar testes
-        shell: pwsh
-        run: |
-          python -m unittest discover -s tests -t . -p "test_*.py" -v
-
+      # A suíte completa já passou na matriz 3.11/3.14, nas duas codificações.
+      # Este job mantém os testes do pacote/executáveis/Setup, sem uma quinta suíte.
       - name: Executar check-up operacional
         shell: pwsh
         run: |
@@ -268,7 +272,7 @@ jobs:
           Get-Content "dist/SHA256SUMS-1.5.33.txt"
 
   verificar-pacotes:
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: ${{ !inputs.validated_run_id && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
     needs: [verificar-segredos, validar-e-publicar]
     runs-on: ubuntu-latest
     permissions:
@@ -306,24 +310,50 @@ jobs:
             --mode packages --repo "$GITHUB_WORKSPACE" --assets-dir "$GITHUB_WORKSPACE/dist"
 
   publicar:
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.publish_release)
+    if: ${{ !inputs.validated_run_id && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip release]') && (github.event_name != 'workflow_dispatch' || inputs.publish_release) }}
     needs: [verificar-segredos, validar-e-publicar, verificar-pacotes]
     runs-on: windows-latest
     permissions:
       contents: write
+      actions: read
 
-    steps:
+    steps: &publicar_steps
       - name: Checkout do commit validado
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ github.sha }}
           fetch-depth: 1
 
+      - name: Python para conferir os pacotes sem reinstalar dependências
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+
+      - name: Conferir a execução reutilizada antes de receber os pacotes
+        if: inputs.validated_run_id
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VALIDATED_RUN_ID: ${{ inputs.validated_run_id }}
+          PUBLISH_REQUESTED: ${{ inputs.publish_release }}
+        run: |
+          if ($env:PUBLISH_REQUESTED -cne 'true') { throw 'Reutilização exige publish_release=true.' }
+          python scripts/validate_release_run.py --repo "$env:GITHUB_REPOSITORY" --sha "$env:GITHUB_SHA" --run-id "$env:VALIDATED_RUN_ID"
+          if ($LASTEXITCODE -ne 0) { throw 'A execução de origem não autoriza publicação.' }
+
       - name: Receber pacotes validados
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           name: NexoFlow-1.5.33-pacotes
           path: dist
+          run-id: ${{ inputs.validated_run_id || github.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Revalidar os bytes dos pacotes antes de publicar
+        shell: pwsh
+        run: |
+          python scripts/validate_release_run.py --assets-dir dist
+          if ($LASTEXITCODE -ne 0) { throw 'Pacotes recebidos não foram confirmados.' }
 
       - name: Conferir o commit atual da main
         shell: pwsh
@@ -388,3 +418,11 @@ jobs:
         shell: pwsh
         run: |
           Get-Content "dist/SHA256SUMS-1.5.33.txt"
+
+  publicar-validado:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.validated_run_id }}
+    runs-on: windows-latest
+    permissions:
+      contents: write
+      actions: read
+    steps: *publicar_steps
