@@ -82,3 +82,7 @@ configuração das três origens, inclui reconhecimento de rede e logs do Setup 
 mantém continuações, piloto, retomada e rollback. Após o pacote aprovado, o Work
 inicia FARMA comercial com um lote e conferência, sem nova carga anual. PET
 comercial permanece posterior. Consulte o [roteiro atualizado](PUBLICADOR%20HISTORICO%20SQLITE%20SHEETS.md).
+
+### Produtos distintos de BI_Itens
+
+O indicador `sku_informado` é uma dimensão numérica por item, sem Soma/Max. Ao atualizar a fonte privada, confira o papel e recrie o filtro se a mudança o desativar. Consulte [diagnóstico e validação do cartão](PRODUTOS%20DISTINTOS%20BI%20ITENS.md). A contagem distinta deve ocorrer sobre o período inteiro após o filtro; não somar contagens por dia ou parte.

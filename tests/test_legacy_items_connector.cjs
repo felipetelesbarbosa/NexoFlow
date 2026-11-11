@@ -8,7 +8,7 @@ const hub = 'dashboard_legado_1234567890';
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 function fixture(reader, segment='FARMA') {
   const specs=schemas.BI_Itens, header=specs.map(s=>s[0]);
-  const row=specs.map(([name,type])=>type==='number'?2:name==='data'?'2026-11-02':name==='item_chave'?'item-sintetico':'sintetico');
+  const row=specs.map(([name,type])=>type.startsWith('number')?2:name==='data'?'2026-11-02':name==='item_chave'?'item-sintetico':'sintetico');
   const rows=[row];
   const root={sheets:[{properties:{sheetId:7,title:'NexoFlow_Continuidade',gridProperties:{rowCount:100,columnCount:3}}},{properties:{sheetId:8,title:'BI_Itens',gridProperties:{rowCount:2,columnCount:12}}}],developerMetadata:[{metadataKey:'nexoflow_continuation_origin_v1',metadataValue:JSON.stringify({hub,segment,role:'dashboard'}),visibility:'DOCUMENT',location:{spreadsheet:true}}]};
   const index=[['tipo','chave','valor'],['config','principal',JSON.stringify({format:1,hub,enabled:true,segment,roots:{dashboard:hub,operacao:'operations_fixture_1234567890',historico:'history_fixture_1234567890'},connector_tables:[]})],['parte','BI_Itens#0',JSON.stringify({title:'BI_Itens',number:0,book_id:hub,sheet_id:8,width:12,schema:hash(reader.stable(header))})]];

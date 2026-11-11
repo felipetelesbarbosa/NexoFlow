@@ -69,7 +69,7 @@ test('publicação parcial e cabeçalho alterado nunca retornam total incompleto
 function connector(f) {
   const all=[];
   const field=()=>({setId(x){this.id=x;return this;},setName(){return this;},setType(value){this.type=value;return this;},setAggregation(value){this.aggregation=value;return this;},getId(){return this.id;}});
-  const fields={build:()=>all,newMetric:()=>{const x=field();all.push(x);return x;},newDimension:()=>{const x=field();all.push(x);return x;},
+  const fields={build:()=>all,newMetric:()=>{const x=field();x.role='metric';all.push(x);return x;},newDimension:()=>{const x=field();x.role='dimension';all.push(x);return x;},
     forIds:n=>{const selected=all.filter(f=>n.includes(f.id));return {asArray:()=>selected,build:()=>selected.map(f=>({name:f.id}))};}};
   const ctx={NexoSchemas:schemas,NexoTables:reader,Date,Intl,Sheets:{},Utilities:{},DataStudioApp:{createCommunityConnector:()=>({getFields:()=>fields,FieldType:{YEAR_MONTH_DAY:'date',NUMBER:'number',TEXT:'text'},AggregationType:{MAX:'max',SUM:'sum'},newUserError:()=>({setText:t=>({throwException:()=>{throw Error(t);}})})})}};
   vm.createContext(ctx);vm.runInContext(fs.readFileSync('connectors/continuacoes/Code.js','utf8'),ctx);
@@ -176,4 +176,48 @@ test('métricas aditivas históricas e idade mantêm semânticas distintas',()=>
   assert.equal(age.type,'number');assert.equal(age.aggregation,undefined);
   const ctx=connector(fixture());ctx.NexoSchemas={Teste:[['idade','number'],['quantidade','number']]};
   const metrics=ctx.fields_('Teste').build();assert.equal(metrics[0].aggregation,'max');assert.equal(metrics[1].aggregation,'sum');
+});
+
+test('SKU informado é dimensão numérica, sem SUM/MAX; quantidade e receita permanecem somáveis',()=>{
+  const ctx=connector(fixture('BI_Itens'));
+  const specs=ctx.fields_('BI_Itens').build();
+  const flag=specs.find(f=>f.id==='sku_informado');
+  assert.equal(flag.role,'dimension');assert.equal(flag.type,'number');assert.equal(flag.aggregation,undefined);
+  for(const id of ['quantidade','receita_item']){
+    const field=specs.find(f=>f.id===id);assert.equal(field.role,'metric');assert.equal(field.aggregation,'sum');
+  }
+  assert.equal(specs.find(f=>f.id==='produto_codigo').type,'text');
+  assert.equal(specs.find(f=>f.id==='atualizado_em').type,'text');
+});
+function skuFixture(){
+  const f=fixture('BI_Itens');
+  const row=(id,sku,day,flag,q,r)=>f.row(id,{item_chave:'item-'+id,produto_codigo:sku,data:'2026-11-'+day,sku_informado:flag,quantidade:q,receita_item:r});
+  f.physical[hub]=[f.header,row(1,'001','01',1,2,10),row(2,'001','02',1,1,5),row(3,'sem-sku-a','02',0,1,2)];
+  f.physical[extra]=[f.header,row(4,'001','03',1,3,15),row(5,'002','02',1,1,7),row(6,'sem-sku-b','03',0,1,1)];
+  for(const [i,book] of [hub,extra].entries()){
+    f.files[book].sheets.find(s=>s.properties.title==='BI_Itens').properties.gridProperties.rowCount=4;
+    f.counts[i].rows=3;
+  }
+  f.state[2]=JSON.stringify({state:'READY',revision:'a',parts:f.counts});return f;
+}
+test('getData preserva grão de item e campos forFilterOnly para filtro anterior ao COUNT_DISTINCT',()=>{
+  for(const [start,end,distinct,units,cents,unfiltered] of [['01','03',2,7,3700,4],['02','02',2,2,1200,3],['30','30',0,0,0,0]]){
+    const ctx=connector(skuFixture());
+    const request={configParams:{spreadsheetId:hub,segmento:'FARMA',tabela:'BI_Itens'},fields:[{name:'produto_codigo'},{name:'quantidade'},{name:'receita_item'},{name:'sku_informado',forFilterOnly:true}],dateRange:{startDate:'2026-11-'+start,endDate:'2026-11-'+end},dimensionsFilters:[[{fieldName:'sku_informado',type:'INCLUDE',operator:'EQUALS',values:['1']}]]};
+    const result=ctx.getData(request), names=result.schema.map(s=>s.name), pos=name=>names.indexOf(name);
+    assert.equal(result.filtersApplied,false);assert.ok(pos('sku_informado')>=0);
+    const all=result.rows.map(r=>r.values), eligible=all.filter(r=>r[pos('sku_informado')]===1);
+    // Modelo da regra de negócio, não uma emulação do otimizador do Data Studio.
+    assert.equal(new Set(all.map(r=>r[pos('produto_codigo')])).size,unfiltered);
+    assert.equal(new Set(eligible.map(r=>r[pos('produto_codigo')])).size,distinct);
+    assert.equal(eligible.reduce((s,r)=>s+r[pos('quantidade')],0),units);
+    assert.equal(eligible.reduce((s,r)=>s+Math.round(r[pos('receita_item')]*100),0),cents);
+    const card=connector(skuFixture()).getData({...request,fields:[{name:'produto_codigo'},{name:'sku_informado',forFilterOnly:true}]});
+    assert.equal(new Set(card.rows.filter(r=>r.values[1]===1).map(r=>r.values[0])).size,distinct);
+    if(start==='01')assert.equal(card.rows.length,6); // Não colapsar itens ou somar contagens diárias/por parte.
+  }
+});
+test('dimensão numérica de SKU continua validada mesmo ausente dos campos solicitados',()=>{
+  const f=skuFixture();f.physical[hub][1][f.header.indexOf('sku_informado')]='1';
+  assert.throws(()=>connector(f).getData({configParams:{spreadsheetId:hub,segmento:'FARMA',tabela:'BI_Itens'},fields:[{name:'produto_codigo'}]}),/numérico/);
 });

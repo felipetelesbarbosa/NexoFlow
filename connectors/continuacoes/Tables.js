@@ -231,7 +231,7 @@ var NexoTables = (function () {
               keys.add(itemKey);
               options.schemas[title].forEach(function(spec,i) {
                 var value=row[i]; if (value==='' || value===null) return;
-                if (spec[1]==='number' && (typeof value!=='number' || !Number.isFinite(value))) fail('medida legada sem tipo numérico.');
+                if (spec[1].startsWith('number') && (typeof value!=='number' || !Number.isFinite(value))) fail('medida legada sem tipo numérico.');
                 if (spec[1]==='text' && typeof value!=='string') fail('identificador legado sem tipo texto.');
                 if (spec[1]==='date' && options.date) options.date(value);
               });

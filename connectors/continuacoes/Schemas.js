@@ -683,7 +683,7 @@ var NexoSchemas = {
     ],
     [
       "sku_informado",
-      "number"
+      "number_dimension"
     ],
     [
       "atualizado_em",

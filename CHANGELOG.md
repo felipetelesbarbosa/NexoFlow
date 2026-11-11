@@ -1,5 +1,10 @@
 # NexoFlow — Changelog
 
+## Conector posterior à 1.5.33 — produtos distintos
+
+- Corrige `BI_Itens.sku_informado` para dimensão numérica, preservando valores, cabeçalhos e validação de tipos. Mantém campos de filtro e a resposta no grão de item; não soma distintos por dia/parte.
+- 70 testes Node aprovados. A causa exata do aviso comercial de reagregação e a aprovação do cartão continuam dependentes da comparação privada no Google. [Roteiro controlado para o Work](docs/PRODUTOS%20DISTINTOS%20BI%20ITENS.md).
+
 ## Conector posterior à 1.5.33 — diagnóstico e cota de getData
 
 - Agrupa 125 intervalos de uma grade de 500 mil linhas em 16 chamadas de dados, com recuperação limitada de quota/timeout/5xx dentro de 4 minutos e diagnóstico sanitizado no Data Studio. Reconfere cabeçalhos, origens, manifesto, trava e chaves; nunca devolve total parcial.

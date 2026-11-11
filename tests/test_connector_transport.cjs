@@ -21,7 +21,7 @@ function fixture({dense=false, quota=Infinity, batch=true}={}) {
     if(requests.length>=quota){counts.quota++;throw error(429,'Quota exceeded '+secret);}
     requests.push(clock.ms);clock.ms+=10;
   }
-  function row(n) { return schemas.BI_Itens.map(([name,type])=>name==='item_chave'?'item-'+n:name==='data'?(dense && n%1000?'2026-10-01':'2026-11-02'):name==='quantidade'?2:name==='receita_item'?1.25:name==='valor_unitario'?0.625:name==='atualizado_em'?'2026-11-11T00:00:00-03:00':type==='number'?1:'sintetico'); }
+  function row(n) { return schemas.BI_Itens.map(([name,type])=>name==='item_chave'?'item-'+n:name==='data'?(dense && n%1000?'2026-10-01':'2026-11-02'):name==='quantidade'?2:name==='receita_item'?1.25:name==='valor_unitario'?0.625:name==='atualizado_em'?'2026-11-11T00:00:00-03:00':type.startsWith('number')?1:'sintetico'); }
   function values(range) {
     if(range.includes('NexoFlow_Continuidade'))return structuredClone(index);
     if(/!A1:L1$/.test(range))return [structuredClone(header)];
