@@ -193,6 +193,106 @@ def test_sql_distinct_across_days_empty_and_no_partial(store):
         reader.query("Controle", ["chave"], "", "", [], {})
 
 
+def test_report_summary_grains_dates_vigencia_and_distinct_buyers(store):
+    rev = begin(store)
+
+    # Um comprador nos dois meses: TOTAL/ANO=1, nunca a soma mensal=2.
+    def summary(grain, period, start, end, revenue, buyers="1", **extra):
+        return row(
+            "BI_Historico_Resumo",
+            chave="FARMA:" + grain + ":" + period,
+            segmento="FARMA",
+            tipo_recorte=grain,
+            competencia=period,
+            periodo_inicio=start,
+            periodo_fim=end,
+            faturamento=revenue,
+            clientes=buyers,
+            vigente="Sim",
+            **extra,
+        )
+
+    batch(
+        store,
+        rev,
+        "BI_Historico_Resumo",
+        [
+            summary("MES", "2026-10", "2026-10-01", "2026-10-31", "10.10"),
+            summary("MES", "2026-11", "2026-11-01", "2026-11-30", "20.20"),
+            summary("ANO", "2026", "2026-10-01", "2026-11-30", "30.30"),
+            summary("TOTAL", "TOTAL", "2026-10-01", "2026-11-30", "30.30"),
+            summary("SEM_EMISSAO", "SEM_EMISSAO", "", "", "0", "0", pendentes="1"),
+            dict(
+                summary("MES", "2025-01", "2025-01-01", "2025-01-31", "999"),
+                vigente="Não",
+            ),
+        ],
+    )
+    finish(store, rev)
+    reader = Reader(DSN, "homologacao", "FARMA")
+
+    def query(grain, start="", end="", fields=None, aggregation=None):
+        return reader.query(
+            "BI_Historico_Resumo",
+            fields or ["competencia", "clientes", "faturamento"],
+            start,
+            end,
+            [dict(field="tipo_recorte", values=[grain])],
+            aggregation or {},
+        )["rows"]
+
+    assert query("TOTAL") == [["TOTAL", "1", "30.30"]]
+    assert query("ANO", "2026-01-01", "2026-12-31") == [["2026", "1", "30.30"]]
+    assert sorted(query("MES")) == [
+        ["2026-10", "1", "10.10"],
+        ["2026-11", "1", "20.20"],
+    ]
+    assert query("SEM_EMISSAO", fields=["pendentes", "faturamento"]) == [["1", "0"]]
+    assert query("MES", "2027-01-01", "2027-01-31") == []
+    for grain, start, end in [
+        ("MES", "2026-11-02", "2026-11-30"),
+        ("MES", "2026-11-01", "2026-11-03"),
+        ("ANO", "2026-11-01", "2026-11-30"),
+    ]:
+        with pytest.raises(StorageError, match="DS_FILTRO_CORTA_RECORTE"):
+            query(grain, start, end)
+    with pytest.raises(StorageError, match="DS_COMPRADORES_EXIGEM_COMPETENCIA"):
+        query("MES", fields=["clientes"], aggregation={"clientes": "max"})
+    with pytest.raises(StorageError, match="DS_COMPRADORES_NAO_SOMAVEIS"):
+        query("MES", fields=["clientes"], aggregation={"clientes": "sum"})
+
+
+def test_report_ads_farma_filter_and_missing_cost_preserved(store):
+    rev = begin(store)
+    rows = [
+        row(
+            "BI_Meta_Resultados",
+            chave="FARMA:" + key,
+            segmento="FARMA",
+            data="2026-11-02",
+            classificacao=label,
+            receita_confirmada=revenue,
+            investimento_atribuivel=cost,
+            moeda="BRL",
+        )
+        for key, label, revenue, cost in [
+            ("a", "FARMA", "12.34", ""),
+            ("b", "INDEFINIDO", "900", "10"),
+        ]
+    ]
+    batch(store, rev, "BI_Meta_Resultados", rows)
+    finish(store, rev)
+    reader = Reader(DSN, "homologacao", "FARMA")
+    assert reader.query(
+        "BI_Meta_Resultados",
+        ["receita_confirmada", "investimento_atribuivel", "roas_confirmado"],
+        "2026-11-01",
+        "2026-11-03",
+        [dict(field="classificacao", values=["FARMA"])],
+        {},
+    )["rows"] == [["12.34", None, None]]
+
+
 def test_api_auth_destination_no_secrets_and_reader_is_not_writer(store):
     token = "synthetic-only-token-not-used-elsewhere-12345"
     app = TestClient(create_app(store, token))

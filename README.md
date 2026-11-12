@@ -12,6 +12,8 @@ O NexoFlow identifica pedidos registrados na API **independentemente de terem si
 
 O novo contrato privado separa publicação e leitura, com catálogo por segmento, revisões atômicas e retomada. A migração comercial depende do corte READY completo e da conferência das fontes pelo Work. Sheets continua padrão; nenhum destino é ativado automaticamente. Ver [guia](docs/MIGRACAO%20WINDOWS%20POSTGRESQL%20DATA%20STUDIO.md), [mapa](docs/ESTRUTURA%20POSTGRESQL%20DATA%20STUDIO.md) e [relatório](docs/RELATORIO%20BACKEND%20DATA%20STUDIO.md).
 
+O [inventário real e roteiro do relatório FARMA](docs/ROTEIRO%20INVENTARIO%20FARMA%20POSTGRESQL.md) preservam as 37 fontes e cinco mesclagens; registram os aliases ainda sem substituição direta e a conferência de TOTAL/MES/ANO, anúncios e moeda. Não confundir disponibilidade do armazenamento com migração das fontes do painel.
+
 ## Integração BI_Itens FARMA 1.5.36 — código publicado; ativação pendente
 
 Destino opcional PostgreSQL por API privada com staging, reconciliação por venda, planos/recibos, outbox e retomada sem nova coleta. Leitura do Data Studio por outro serviço/usuário, consultando a visão do piloto; PostgreSQL não é exposto publicamente. O padrão continua Sheets e PET mantém o fluxo anterior. [Contrato, homologação, ativação, rollback e roteiro do Work](docs/BI%20ITENS%20POSTGRESQL%20FARMA.md). Setup não implanta VPS, Access ou Apps Script.

@@ -48,3 +48,8 @@ SHA-256 Setup: `53f2410e9f8c0a3aeb48196d23c35f5d8f2c81fd5ec0b570222d245060f227fd
 SHA-256 projeto completo: `81feee7ff472d286d4837307657bcd9646fa5f51b364e4cb03ab5920f04a0480`.
 
 Os mesmos bytes aprovados na preparação foram baixados da release pública e conferidos novamente. O commit documental posterior não altera a tag ou seus pacotes.
+
+
+## Complemento — inventário real do relatório
+
+O [roteiro posterior](ROTEIRO%20INVENTARIO%20FARMA%20POSTGRESQL.md) confronta 37 aliases, cinco mesclagens (duas sem gráficos), 75 componentes, oito controles, 14 filtros e três substituições de IDs. Identifica 28 aliases com tabela leitora disponível e nove sem substituição direta, evitando declarar o corte completo. Corrige no leitor a inclusão de resumo não vigente e o filtro parcial de competências, protege compradores distintos e configura BRL no conector. São mudanças de servidor/conector, sem alteração da distribuição 1.5.37, do contrato de publicação ou do hash do catálogo. Evidência de Google vem do Work; testes do Codex são sintéticos.

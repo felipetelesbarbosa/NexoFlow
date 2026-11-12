@@ -8,7 +8,7 @@ Contrato novo `nexoflow_datastudio_1`: produção em `nexoflow_datastudio`, test
 
 O Work confirmou o 001 já aplicado em `/opt/nexoflow/datastudio/migrations/001_base.sql`: banco/schema pertencentes a nfds_admin e PUBLIC restrito. **Não reaplicar seus CREATE SCHEMA não idempotentes.** O novo `integrations/datastudio/002_backend.sql` é aditivo/idempotente e precisa do comando admin para completar hash do contrato, visões e grants.
 
-A origem inicial é **histórico READY + base operacional acumulada dos três arquivos**, com leitura de todas as continuações. O SQLite recente não substitui o histórico publicado. O [inventário](ESTRUTURA%20POSTGRESQL%20DATA%20STUDIO.md) e `app/ds_backend/registry.json` documentam cada tabela/chave/grão/campo. A lista real das 37 fontes do relatório, inclusive as usadas só por mesclagens, precisa ser confrontada pelo Work. Abas ausentes são registradas separadamente de abas vazias; entradas manuais não são presumidas inexistentes.
+A origem inicial é **histórico READY + base operacional acumulada dos três arquivos**, com leitura de todas as continuações. O SQLite recente não substitui o histórico publicado. O [inventário](ESTRUTURA%20POSTGRESQL%20DATA%20STUDIO.md) e `app/ds_backend/registry.json` documentam cada tabela/chave/grão/campo. A lista real fornecida pelo Work está no [inventário e roteiro de corte](ROTEIRO%20INVENTARIO%20FARMA%20POSTGRESQL.md), com 37 aliases, cinco mesclagens e 75 componentes. As correspondências executáveis e os nove aliases ainda sem substituição direta estão separados; não liberar o corte integral só porque o armazenamento foi populado. Abas ausentes são registradas separadamente de abas vazias; entradas manuais não são presumidas inexistentes.
 
 Referências fornecidas: histórico 267.722 pedidos/552.261 itens; SQLite recente 38.877 pedidos; simulação BI_Itens 552.826 linhas, com 484.610 inserções, 181 atualizações e 68.035 mantidas. A diferença de 565 linhas é aritmética, **não causa comprovada**. Os 68.273 itens do piloto não são todo o histórico financeiro. A composição real depende da exportação/auditoria privada; nenhuma carga anual adicional foi executada.
 
@@ -171,7 +171,7 @@ Conferir todos os campos/formatos, filtros de período, rankings, períodos vazi
 
 Consulta detalhada acima de 50 mil linhas/7 MB exige resumo/período menor e falha explicitamente. Trava/schema/permissão/erro SQL nunca libera total parcial. O READY anterior continua disponível durante WRITING; o contrato antigo do piloto mantém suas guardas próprias.
 
-Antes da migração, preservar e conferir as 37 fontes, incluindo as três mesclagens informadas: pedidos/produtos por cliente (BI_Clientes_Vendas + BI_Itens), anúncios/contatos/pedidos (Base_Contatos + BI_Pedidos), e LTV por cliente (fontes integrantes ainda a reconferir). Zero gráficos diretos não autoriza remover fonte. Após teste curto, corte completo READY e totais objetivos conciliados, o Work troca as conexões oficiais preservando componentes e a fonte anterior para reversão.
+Antes da migração, preservar e conferir as 37 fontes e as cinco mesclagens do inventário: Produtos de pedidos válidos, Público e compras identificadas (ambas de zero uso), pedidos/produtos por cliente, anúncios/contatos/pedidos e LTV por cliente (ds175 + ds123). Zero gráficos diretos não autoriza remover fonte. Após teste curto, corte completo READY e totais objetivos conciliados, o Work troca as conexões oficiais preservando componentes e a fonte anterior para reversão.
 
 Retomada de publicação preparada não chama APIs comerciais:
 

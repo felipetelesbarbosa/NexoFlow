@@ -1,5 +1,11 @@
 # NexoFlow — Changelog
 
+## Leitor e inventário FARMA — após a distribuição 1.5.37
+
+- Inventário do Work preservado: 37 aliases, cinco mesclagens (duas sem gráficos), 75 componentes, oito controles, 14 filtros e três substituições de IDs. Auditoria offline identifica correspondências e dependências sem presumir homologação.
+- Leitor PostgreSQL exclui resumos não vigentes, recusa filtros que cortam agregados e cartões de compradores de múltiplas competências sem grão adequado. Conector mantém erro sanitizado e moeda BRL nos campos financeiros explícitos.
+- [Roteiro de migração e pendências](docs/ROTEIRO%20INVENTARIO%20FARMA%20POSTGRESQL.md). Servidor/conector exigem implantação pelo Work; nenhuma carga ou troca comercial executada. Pacotes Windows 1.5.37 preservados.
+
 ## 1.5.37 — publicada em 12/11/2026, 19:18:38 (America/Fortaleza)
 
 - Backend PostgreSQL por API privada para o Windows e conector Data Studio separado, com contrato definitivo e isolamento FARMA/PET.

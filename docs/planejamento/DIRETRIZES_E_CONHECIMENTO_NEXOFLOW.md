@@ -232,3 +232,8 @@ A auditoria do Work confirmou sete campos em `farma.produtos_itens` (Metabase), 
 Implementação opt-in 1.5.37 em validação: ver [contrato e comandos](../MIGRACAO%20WINDOWS%20POSTGRESQL%20DATA%20STUDIO.md), [inventário](../ESTRUTURA%20POSTGRESQL%20DATA%20STUDIO.md) e [relatório](../RELATORIO%20BACKEND%20DATA%20STUDIO.md). Sheets permanece padrão; PostgreSQL selecionado explicitamente usa o banco definitivo dedicado por API privada, sem depender do Hub ou exigir credenciais Google para a operação nova. A exportação inicial Sheets é leitura controlada de migração.
 
 O Work informou que a 001 foi aplicada com schemas vazios; não a repetir. A 002 é aditiva. Preservar piloto e Metabase. As 37 fontes e três mesclagens observadas são dependências de corte, sem comprovação de ausência de células manuais. Não usar a base SQLite parcial para substituir a revisão histórica READY. Implantação e migração comercial são etapas distintas da distribuição do código.
+
+
+### Complemento do inventário FARMA — 12/11/2026
+
+O inventário posterior fornecido pelo Work identifica 37 aliases, **cinco** mesclagens, 75 componentes com fonte e oito controles; amplia as três mesclagens antes conhecidas, sem autorizar apagar as duas sem gráficos. Ver [roteiro e gaps do contrato](../ROTEIRO%20INVENTARIO%20FARMA%20POSTGRESQL.md). A lista de fontes não prova ausência de células manuais. Atualização do leitor/conector posterior à 1.5.37 preserva pacotes Windows e contratos de publicação. Nenhuma nova homologação ou migração comercial foi executada pelo Codex.

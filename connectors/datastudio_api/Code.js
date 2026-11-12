@@ -1,4 +1,12 @@
 /* Contrato definitivo PostgreSQL. Somente leitura, sem dependência do Sheets. */
+// Formato de exibição, sem converter o valor em texto "R$" nem alterar centavos.
+// Não presumir BRL para gastos Meta: a moeda da conta precisa ser conferida.
+var NexoDSCurrencyBRL={
+  BI_Clientes_Vendas:['faturamento','faturamento_produtos','frete'],
+  BI_Itens:['valor_unitario','receita_item'],
+  BI_Historico_Resumo:['produtos','frete','faturamento'],
+  BI_LTV_Clientes:['ltv_observado','ticket_medio']
+};
 function getAuthType() {var cc=DataStudioApp.createCommunityConnector();return cc.newAuthTypeResponse().setAuthType(cc.AuthType.NONE).build();}
 function isAdminUser(){return false;}
 function getConfig(request){
@@ -32,6 +40,11 @@ function dsCall_(c,path,payload){
     if(payload!==undefined){options.method='post';options.contentType='application/json';options.payload=JSON.stringify(payload);}
     var response=UrlFetchApp.fetch(c.endpoint.replace(/\/$/,'')+path,options),status=response.getResponseCode();
     if(status===200){var result=JSON.parse(response.getContentText());return result;}
+    if(status===409){
+      var rejection={};try{rejection=JSON.parse(response.getContentText());}catch(ignored){}
+      // Só códigos conhecidos, nunca texto livre/payload de erro do servidor.
+      if(['DS_FILTRO_CORTA_RECORTE_USE_DETALHE','DS_COMPRADORES_EXIGEM_COMPETENCIA_OU_RECORTE_UNICO','DS_COMPRADORES_NAO_SOMAVEIS_ENTRE_MESES','DS_RESUMO_EXIGE_GRAO','DS_RESUMO_TOTAL_NAO_APLICA_DATA','DS_CONSULTA_EXCEDE_LIMITE_USE_RESUMO_OU_PERIODO','DS_RESPOSTA_EXCEDE_LIMITE_USE_RESUMO','DS_SEM_PUBLICACAO_CONFIRMADA'].includes(rejection.error))throw new Error(rejection.error);
+    }
     if(![429,502,503,504].includes(status)||attempt===2||Date.now()-started>45000)throw new Error('DS_HTTP_'+status);
     Utilities.sleep(Math.min(4000,1000*Math.pow(2,attempt)));
   }
@@ -47,7 +60,8 @@ function dsFields_(table){
   if(!spec)throw new Error('DS_TABELA_NAO_AUTORIZADA');
   spec.columns.forEach(function(name){
     var kind=spec.types[name],metric=kind==='number'&&!spec.dimensions.includes(name),field=metric?fields.newMetric():fields.newDimension();
-    field.setId(name).setName(name).setType(kind==='date'?cc.FieldType.YEAR_MONTH_DAY:kind==='number'?cc.FieldType.NUMBER:cc.FieldType.TEXT);
+    var brl=(NexoDSCurrencyBRL[table]||[]).includes(name);
+    field.setId(name).setName(name).setType(kind==='date'?cc.FieldType.YEAR_MONTH_DAY:kind==='number'?(brl?cc.FieldType.CURRENCY_BRL:cc.FieldType.NUMBER):cc.FieldType.TEXT);
     if(metric)field.setAggregation(/taxa|pct|idade|ranking|ticket_medio|^clientes$/.test(name)?cc.AggregationType.MAX:cc.AggregationType.SUM);
   });
   if(table==='BI_Itens')fields.newMetric().setId('produtos_distintos_periodo').setName('Produtos distintos no período (SKU informado)').setType(cc.FieldType.NUMBER).setIsReaggregatable(false);

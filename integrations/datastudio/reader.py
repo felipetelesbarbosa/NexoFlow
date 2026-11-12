@@ -7,6 +7,7 @@ from datetime import date
 from decimal import Decimal
 
 from psycopg import sql
+from psycopg.rows import dict_row
 
 from ds_backend.contract import (
     PROTOCOL,
@@ -80,8 +81,11 @@ class Reader(Store):
                 raise StorageError("DS_RESUMO_TOTAL_NAO_APLICA_DATA")
             if aggregation.get("clientes") == "sum":
                 raise StorageError("DS_COMPRADORES_NAO_SOMAVEIS_ENTRE_MESES")
-        clauses = []
+        clauses: list[sql.Composable] = []
         params = []
+        summary = table == "BI_Historico_Resumo"
+        if summary:
+            clauses.append(sql.SQL("vigente='Sim'"))
         if bool(start) != bool(end):
             raise StorageError("DS_PERIODO_INVALIDO")
         if start:
@@ -93,10 +97,19 @@ class Reader(Store):
                 raise StorageError("DS_PERIODO_INVALIDO") from None
             if spec["period"] is None:
                 raise StorageError("DS_PERIODO_NAO_APLICAVEL")
-            clauses.append(
-                sql.SQL("{} BETWEEN %s AND %s").format(sql.Identifier(spec["period"]))
-            )
-            params.extend((first, last))
+            if summary:
+                # Selecionar sobreposição, mas recusar cortes parciais antes de
+                # devolver dados. BETWEEN só no início perdia meses ou os somava
+                # integralmente a um intervalo de poucos dias.
+                clauses.append(sql.SQL("periodo_fim >= %s AND periodo_inicio <= %s"))
+                params.extend((first, last))
+            else:
+                clauses.append(
+                    sql.SQL("{} BETWEEN %s AND %s").format(
+                        sql.Identifier(spec["period"])
+                    )
+                )
+                params.extend((first, last))
         for item in filters:
             if (
                 not isinstance(item, dict)
@@ -134,13 +147,41 @@ class Reader(Store):
         dimensions = [sql.Identifier(f) for f in fields if f not in aggregation]
         if aggregation and dimensions:
             statement += sql.SQL(" GROUP BY ") + sql.SQL(",").join(dimensions)
-        statement += sql.SQL(" LIMIT %s")
-        params.append(MAX_RESULT_ROWS + 1)
         with self.connect(readonly=True) as conn:
             version = self.active(conn)
             if not version:
                 raise StorageError("DS_SEM_PUBLICACAO_CONFIRMADA")
-            rows = conn.execute(statement, params).fetchall()
+            if summary:
+                with conn.cursor(row_factory=dict_row) as cursor:
+                    bounds = cursor.execute(
+                        sql.SQL(
+                            "SELECT min(periodo_inicio) AS first,max(periodo_fim) AS last,count(*) AS n FROM {}.{} WHERE {}"
+                        ).format(
+                            sql.Identifier(self.schema),
+                            sql.Identifier(view_name(table)),
+                            sql.SQL(" AND ").join(clauses),
+                        ),
+                        params,
+                    ).fetchone()
+                if bounds is None:
+                    raise StorageError("DS_RESUMO_NAO_CONFIRMADO")
+                if (
+                    start
+                    and bounds["n"]
+                    and (bounds["first"] < first or bounds["last"] > last)
+                ):
+                    raise StorageError("DS_FILTRO_CORTA_RECORTE_USE_DETALHE")
+                if (
+                    "clientes" in fields
+                    and bounds["n"] > 1
+                    and ("competencia" not in fields or "competencia" in aggregation)
+                ):
+                    raise StorageError(
+                        "DS_COMPRADORES_EXIGEM_COMPETENCIA_OU_RECORTE_UNICO"
+                    )
+            rows = conn.execute(
+                statement + sql.SQL(" LIMIT %s"), [*params, MAX_RESULT_ROWS + 1]
+            ).fetchall()
         if len(rows) > MAX_RESULT_ROWS:
             raise StorageError("DS_CONSULTA_EXCEDE_LIMITE_USE_RESUMO_OU_PERIODO")
 
