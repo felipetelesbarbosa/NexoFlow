@@ -1,6 +1,6 @@
 # Migração Windows/PostgreSQL/Data Studio
 
-**1.5.37 em validação.** Base: `5b21d4799115a490447c483d5a40788cd59eb100`; distribuição anterior: 1.5.36. Código, teste, release, instalação, implantação e conciliação comercial são etapas distintas. O Codex não acessou C: nem executou carga comercial. O Work implanta/concilia VPS e relatório; o operador executa o Terminal Windows.
+**1.5.37 publicada; migração comercial pendente.** Base: `5b21d4799115a490447c483d5a40788cd59eb100`; distribuição anterior: 1.5.36. Código, teste, release, instalação, implantação e conciliação comercial são etapas distintas. O Codex não acessou C: nem executou carga comercial. O Work implanta/concilia VPS e relatório; o operador executa o Terminal Windows.
 
 ## Contrato e fronteiras
 
@@ -192,3 +192,7 @@ Revisão não selada não pode ser declarada completa. Recuperar evidências/che
 Incluir o banco definitivo inteiro, papéis/grants, imagem/SHA, configs privadas, exportações/revisões e `credentials/datastudio/backup-configuracao` nas rotinas existentes. `pg_dump` consistente, SHA/catálogo, criptografia/R2 privado e restore em banco descartável. Não excluir volumes/backups antigos. Restore administrativo é distinto do rollback do aplicativo.
 
 Os testes locais/CI usam dados sintéticos e serviços simulados/PostgreSQL descartável. Ainda dependem do Work/operador: conciliação dos cortes reais, fontes/campos do relatório, presença de dados manuais, Access implantado, capacidade física, estados atuais e troca de fontes. PET tem contrato/credenciais/isolamento preparados; seu corte ocorre depois da validação FARMA. Não declarar migração comercial concluída por causa de release ou teste aprovado.
+
+## Distribuição conferida
+
+Publicada em **12/11/2026, 19:18:38 (America/Fortaleza)**, SHA `2683717431b1c4313efaaaef35cfaaf20236958a`. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.37), [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43314024652), [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43314024795), [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43314026009) e [publicação reutilizando os artefatos](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43318519275). Downloads públicos conferidos: hashes, CRC, 571 entradas do manifesto, 123 módulos e versões dos executáveis. Sem implantação ou migração comercial.

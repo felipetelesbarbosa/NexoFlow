@@ -1,6 +1,6 @@
 # Backend definitivo Data Studio — entrega 1.5.37
 
-Estado: implementação e distribuição em validação. Referência de partida: `5b21d4799115a490447c483d5a40788cd59eb100`. O SHA entregue deve ser obtido do commit desta entrega e dos checks GitHub; não confundir com o SHA do piloto. Sem carga comercial, acesso ao C: do operador, implantação VPS ou troca de relatório neste trabalho.
+Estado: código e distribuição publicados; implantação e conciliação comercial pendentes. Referência de partida: `5b21d4799115a490447c483d5a40788cd59eb100`. O SHA entregue deve ser obtido do commit desta entrega e dos checks GitHub; não confundir com o SHA do piloto. Sem carga comercial, acesso ao C: do operador, implantação VPS ou troca de relatório neste trabalho.
 
 ## Implementado
 
@@ -38,3 +38,13 @@ Suíte Linux final desta implementação: **1.943 aprovados, 144 ignorados e 1.4
 Revisão final de concorrência: a paginação da API publicadora também usa REPEATABLE READ. O teste força um commit de outra revisão entre a seleção da versão e das linhas e exige que ambas permaneçam no mesmo snapshot. A API leitora já utilizava esse isolamento.
 
 A matriz Windows detectou um erro na fixture do backup de configuração: `write_text` gerava CRLF e a asserção comparava com uma string LF. O backup estava correto. A fixture agora grava CRLF explicitamente e compara os bytes originais, exercitando a preservação também em Linux. Nenhuma guarda foi removida; exige nova validação do SHA corrigido antes do build/publicação.
+
+## Evidência final da distribuição
+
+Publicada em **12/11/2026, 19:18:38 (America/Fortaleza)**, SHA `2683717431b1c4313efaaaef35cfaaf20236958a`. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.37), [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43314024652), [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43314024795), [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43314026009) e [publicação reutilizando os artefatos](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43318519275). Downloads públicos conferidos: hashes, CRC, 571 entradas do manifesto, 123 módulos e versões dos executáveis. Sem implantação ou migração comercial.
+
+SHA-256 Setup: `53f2410e9f8c0a3aeb48196d23c35f5d8f2c81fd5ec0b570222d245060f227fd`.
+
+SHA-256 projeto completo: `81feee7ff472d286d4837307657bcd9646fa5f51b364e4cb03ab5920f04a0480`.
+
+Os mesmos bytes aprovados na preparação foram baixados da release pública e conferidos novamente. O commit documental posterior não altera a tag ou seus pacotes.

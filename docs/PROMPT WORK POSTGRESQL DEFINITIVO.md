@@ -1,6 +1,6 @@
 # Roteiro para o Work — PostgreSQL definitivo FARMA
 
-Trabalhe com o SHA validado desta entrega e a distribuição 1.5.37 somente depois da publicação e dos checks aprovados. Leia AGENTS.md, MIGRACAO WINDOWS POSTGRESQL DATA STUDIO.md, ESTRUTURA POSTGRESQL DATA STUDIO.md e RELATORIO BACKEND DATA STUDIO.md. Execute os comandos reais do guia, sem adaptar o contrato piloto por simples troca de DSN.
+Trabalhe com o SHA validado `2683717431b1c4313efaaaef35cfaaf20236958a`, tag `v1.5.37`, cuja distribuição e downloads foram conferidos. Leia AGENTS.md, MIGRACAO WINDOWS POSTGRESQL DATA STUDIO.md, ESTRUTURA POSTGRESQL DATA STUDIO.md e RELATORIO BACKEND DATA STUDIO.md. Execute os comandos reais do guia, sem adaptar o contrato piloto por simples troca de DSN.
 
 1. Conferir backup/restauração privada, espaço real e rede da implantação Data Studio. A 001 já aplicada não deve ser repetida. Aplicar 002 pelo módulo administrativo do SHA conferido e criar os serviços dedicados do banco definitivo, mantendo piloto, Metabase, Hub, Métricas e n8n intactos. Não publicar porta PostgreSQL.
 2. Provisionar segredos por canais privados: JSON Windows de publicação por segmento/ambiente; DSN somente na VPS; Apps Script apenas credencial leitora. Configurar Cloudflare Access separado para publicação e leitura. Nunca enviar tokens ao chat ou incluí-los nas evidências.

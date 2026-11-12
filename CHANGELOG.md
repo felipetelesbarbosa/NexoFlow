@@ -1,6 +1,6 @@
 # NexoFlow — Changelog
 
-## 1.5.37 — em validação
+## 1.5.37 — publicada em 12/11/2026, 19:18:38 (America/Fortaleza)
 
 - Backend PostgreSQL por API privada para o Windows e conector Data Studio separado, com contrato definitivo e isolamento FARMA/PET.
 - Exportação controlada do corte READY, exclusões preservadas, staging, recibos idempotentes, retomada, revisão atômica e rollback protegido.
