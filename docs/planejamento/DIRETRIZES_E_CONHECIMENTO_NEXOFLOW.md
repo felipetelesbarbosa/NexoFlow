@@ -226,3 +226,9 @@ Ver [implementação e homologação](../BI%20ITENS%20POSTGRESQL%20FARMA.md) e [
 ### Auditoria Work e correção da visão API — 12/11/2026
 
 A auditoria do Work confirmou sete campos em `farma.produtos_itens` (Metabase), doze em `farma.bi_itens` e PK `item_chave`. A correção posterior à release Windows 1.5.36 (`2cc09b8`) cria a visão dedicada `farma.produtos_itens_datastudio` pela migração aditiva 002; preserva a visão e os privilégios Metabase. Servidor e conector usam o SHA validado dessa correção, com publicação incompleta ainda bloqueante. Ver [diagnóstico e roteiro](../CORRECAO%20VISAO%20API%20BI%20ITENS.md). A evidência real é do Work; testes Codex são sintéticos. Manter Windows em `sheets` e Analytics/Noturno FARMA pausados nesta etapa; não editar manifesto, ativar PET ou executar carga comercial por causa dessa migração.
+
+## Atualização autorizada — backend definitivo Data Studio, 12/11/2026
+
+Implementação opt-in 1.5.37 em validação: ver [contrato e comandos](../MIGRACAO%20WINDOWS%20POSTGRESQL%20DATA%20STUDIO.md), [inventário](../ESTRUTURA%20POSTGRESQL%20DATA%20STUDIO.md) e [relatório](../RELATORIO%20BACKEND%20DATA%20STUDIO.md). Sheets permanece padrão; PostgreSQL selecionado explicitamente usa o banco definitivo dedicado por API privada, sem depender do Hub ou exigir credenciais Google para a operação nova. A exportação inicial Sheets é leitura controlada de migração.
+
+O Work informou que a 001 foi aplicada com schemas vazios; não a repetir. A 002 é aditiva. Preservar piloto e Metabase. As 37 fontes e três mesclagens observadas são dependências de corte, sem comprovação de ausência de células manuais. Não usar a base SQLite parcial para substituir a revisão histórica READY. Implantação e migração comercial são etapas distintas da distribuição do código.

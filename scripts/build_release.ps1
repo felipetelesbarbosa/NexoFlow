@@ -423,30 +423,15 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-BI_Itens FARMA pode publicar diretamente no piloto PostgreSQL por API privada protegida por Cloudflare Access, sem gravar essa BI no Sheets primeiro. Staging, upsert por item, reconciliação por venda, recibos e planos em transação, revisão monotônica e outbox preservam idempotência e retomada. Cargas parciais não removem itens. O destino padrão permanece Sheets, e PET conserva o fluxo anterior.
+Backend definitivo PostgreSQL opt-in para o NexoFlow Windows, separado do piloto BI_Itens. FARMA e PET possuem catálogo, credenciais, estados e revisões isolados. Sheets continua sendo o padrão; não há fallback automático quando PostgreSQL estiver selecionado.
 
-O novo conector consulta uma API de leitura separada, sobre farma.produtos_itens. Não abrir PostgreSQL público nem reutilizar credenciais de publicação. O Setup não implanta VPS/Cloudflare/Apps Script. Manter produção Data Studio na fonte atual até o Work validar o canal, schema, totais, filtros, rankings e os nove usos. [Procedimento completo](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/BI%20ITENS%20POSTGRESQL%20FARMA.md).
+Publicação e leitura usam APIs privadas separadas e Cloudflare Access; PostgreSQL permanece sem porta pública. Staging, recibos idempotentes, checkpoints confirmados, selagem e revisão atômica preservam a última versão READY durante uma carga. O leitor usa projeção indexada, filtros e agregações SQL, sem retornar totais parciais em falhas. Os dez módulos assinados do publicador Sheets permanecem preservados.
 
-Atualize em Preserve e confira nexo versao. Após ativação autorizada, nexo bi-itens-postgres status consulta a publicação e nexo bi-itens-postgres retomar recupera apenas a outbox, sem repetir Weni/API/Sheets. Novos segredos do usuário ficam fora dos pacotes públicos. A base comercial de 68.273 itens é referência do usuário, não homologação feita nesta release.
+A migração inicial exige o corte histórico READY completo, a base operacional acumulada e as exclusões comprovadas. O SQLite recente parcial não substitui o histórico publicado. Migração 002 aditiva preserva a 001 aplicada, o banco piloto, a visão Metabase, Hub e n8n. Não executar carga comercial por causa desta release.
 
+Atualize pelo Setup em Preserve, confira nexo versao e siga o [guia com comandos](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/MIGRACAO%20WINDOWS%20POSTGRESQL%20DATA%20STUDIO.md), o [mapa das tabelas](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/ESTRUTURA%20POSTGRESQL%20DATA%20STUDIO.md) e o [roteiro Work](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/PROMPT%20WORK%20POSTGRESQL%20DEFINITIVO.md). Não substituir módulos avulsos nem editar manifestos/assinaturas para concluir revisões incompletas.
 
-Analytics e nexo looker verificam a necessidade de continuações antes das substituições grandes do BI. A prévia considera as grades dos arquivos, as partes e o crescimento conjunto. Fontes que precisam de expansão sem confirmação no Data Studio geram pendência clara (código 3), sem traceback nem avanço do checkpoint de sucesso. Gravações anteriores permanecem preservadas.
-
-Atualize pelo Setup em Preserve, com as rotinas encerradas, e confira nexo versao. A instalação não confirma fontes nem resolve o aviso de reagregação do cartão BI_Itens. Enquanto a fonte não for validada e ligada ao conector pelo Work, mantenha a carga FARMA pausada; não use confirmação local para contornar a proteção. [Diagnóstico e roteiro](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/INICIALIZACAO%20BI%20ITENS.md).
-
-A prévia ocorre depois da coleta e das primeiras etapas; não é uma transação global ou retomada exata por linha. A publicação mantém a recuperação da trava da 1.5.34. Não criar READY manualmente, apagar journals, remover travas ou ampliar permissões. Testes sintéticos e release não comprovam homologação comercial.
-
-O publicador histórico agrupa linhas vizinhas no batchGet: 200 linhas contíguas passam de 201 intervalos para dois, mantendo as mesmas células, cabeçalho e geometria novos. Isso reduz endereços e metadados, sem aumentar quota ou prometer redução proporcional do tempo. Linhas esparsas, vazios, fórmulas, edição concorrente e retomada permanecem protegidos. [Medição e limites](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/OTIMIZACAO%20INTERVALOS%20HISTORICO.md).
-
-Analytics integra a coleta recente (hoje até D-20) e o publicador das cinco fontes históricas, quando habilitado no perfil. Carga histórica exige período explícito. Revisões interrompidas retomam o mesmo snapshot; novas mudanças ficam para a carga seguinte. Cópias, exclusões autorizadas, conferência financeira, rollback por lote e isolamento FARMA/PET permanecem protegidos.
-
-Frações de 25/50/75/100% permitem limitar cada execução. Cabeçalho e células são relidos em conjunto, mantendo geometria, assinaturas e verificações. Durações do terminal usam minutos e horas; os dados numéricos continuam em segundos. Quota preventiva do publicador histórico permanece ativa; outras rotinas e aplicações ainda podem consumir a mesma cota e causar 429.
-
-Os dez módulos do contrato mantêm os bytes oficiais Windows 1.5.29/30, conferidos nos dois pacotes. Atualize em Preserve com cargas encerradas. Não apagar snapshots, journals, recibos ou revisões. Nenhum fato comercial foi publicado nestes testes.
-
-Consulte [ativação e roteiro do Work](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/ANALYTICS%20HISTORICO%20AUTOMATICO.md). Primeiro FARMA; PET exige ativação e destinos próprios. A revisão manual ainda em publicação deve ser concluída no Terminal antes da automação.
-
-Analytics e Noturno usam a integração Meta nativa, sem exigir MCP ou Codex CLI. As rotinas FARMA/PET e as funcionalidades da versão anterior permanecem preservadas. A atualização Preserve mantém configurações e dados. Esta versão não comprova autenticação no proxy corporativo ou aprovação pelo antivírus no PC do usuário; consulte os relatórios e o guia de homologação.
+O Setup não implanta VPS, Cloudflare ou Apps Script. O Work executa um lote curto, confere o corte completo e preserva as fontes anteriores durante a troca. As 37 conexões e mesclagens reais continuam exigindo conferência; teste sintético não comprova migração comercial. Nenhuma credencial ou dado real acompanha os pacotes. LIMITES_DA_API_NAO_HOMOLOGADOS e pendências financeiras são preservados.
 
 [Guia Meta nativo](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/META%20ADS%20NATIVO.md) · [Planejamento Hub](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/planejamento/README.md)
 
