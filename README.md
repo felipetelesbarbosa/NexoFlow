@@ -1,10 +1,10 @@
-# NexoFlow 1.5.34
+# NexoFlow 1.5.35
 
 Aplicativos operacionais e autônomos para Windows que integram **Weni e a API FarmaLíder nos segmentos FarmaLíder e Pets Líder**, atualizam contatos e pedidos e organizam os dados no **Google Sheets** para análise no **Data Studio**.
 
 O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
 
-[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.34/NexoFlow-Setup-1.5.34.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
+[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.35/NexoFlow-Setup-1.5.35.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
 
 [Base Mestre permanente de conhecimento e diretrizes](docs/planejamento/DIRETRIZES_E_CONHECIMENTO_NEXOFLOW.md) — ponto de consulta compartilhado entre Codex e Work antes de novas tarefas.
 
@@ -19,11 +19,11 @@ O NexoFlow identifica pedidos registrados na API **independentemente de terem si
 | **NexoFlow Recompra** | Mantém a elegibilidade da Recompra FarmaLíder D+25 e Pets Líder D+30; os envios ficam na campanha Weni. |
 | **NexoFlow Terminal** | Oferece comandos, consultas e diagnóstico pelo comando `nexo`. |
 
-## Atualização 1.5.34
+## Atualização 1.5.35
 
-Recupera falhas de transporte na leitura da trava Sheets e impede nova renovação quando a resposta anterior ficou incerta. Confere o valor remoto e sua validade antes de autorizar novas escritas; preserva manifesto, journals e dados. [Diagnóstico e retomada](docs/RECUPERACAO%20TRAVA%20SHEETS.md).
+Antecipação da pendência de fontes não confirmadas: Analytics e nexo looker verificam a expansão por arquivo e parte antes das substituições grandes do BI. O bloqueio conhecido aparece como pendência (código 3), preservando gravações anteriores e o checkpoint de sucesso. As guardas de capacidade, segmento, manifesto e publicação continuam ativas. [Diagnóstico e roteiro](docs/INICIALIZACAO%20BI%20ITENS.md).
 
-Publicada em 11/11/2026, 19:12:49 (America/Fortaleza). Instalar pelo Setup em **Preserve**, com cargas encerradas. Para retomar somente Analytics, selecione FARMA no Terminal, confira `nexo versao` e execute `nexo analytics`. Isso evita repetir Weni/Recompra, mas pode regravar BI_Pedidos e realizar as consultas próprias do Analytics. A validação do cartão BI_Itens no Data Studio continua separada.
+Distribuição em validação. Atualize pelo Setup em **Preserve**, com cargas encerradas. O Setup não valida nem liga fontes no Data Studio. Enquanto BI_Itens depender dessa migração, não repetir Analytics/Noturno nem confirmar a fonte sem a conferência real pelo Work. A 1.5.34 e os releases anteriores permanecem intactos.
 
 ## NexoFlow Hub em homologação
 
@@ -84,7 +84,7 @@ As continuações automáticas no Meu Drive exigem autorização Google local. O
 
 ## Versões e atualizações
 
-A versão desta entrega é **1.5.34**, publicada em 10/11/2026, 23:28:34 (America/Fortaleza). A release 1.5.32 e as anteriores permanecem intactas. Os pacotes públicos são disponibilizados após a validação do mesmo commit. As próximas correções seguem **1.5.34, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md) e a [rotina eficiente de publicação](docs/RELEASE%20EFICIENTE.md).
+A versão desta entrega é **1.5.35**, em validação para publicação. A release 1.5.34 e as anteriores permanecem intactas. As próximas correções seguem **1.5.36, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md) e a [rotina eficiente de publicação](docs/RELEASE%20EFICIENTE.md).
 
 ## NexoFlow Hub: homologação e evolução paralela
 

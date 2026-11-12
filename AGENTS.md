@@ -1,4 +1,6 @@
-# NexoFlow 1.5.34
+# NexoFlow 1.5.35
+
+A distribuição 1.5.35 está em preparação autorizada: antecipa a pendência de confirmação de fontes antes das substituições grandes do BI. A migração comercial BI_Itens continua dependente da validação e ligação no Data Studio; o Setup não confirma fontes. Publicar somente depois de todos os checks e pacotes aprovados no mesmo SHA.
 
 A distribuição 1.5.34 foi publicada em 11/11/2026, 19:12:49 (America/Fortaleza), no SHA a25ae828b6dc732ecfcafa60db145e8cf27c84f5. A recuperação de resposta incerta da trava Sheets foi validada nos pacotes Windows; downloads públicos conferidos. A 1.5.33 e anteriores permanecem intactas. Isso não comprova recuperação da carga comercial nem resolve o aviso de reagregação do Data Studio.
 
@@ -27,7 +29,7 @@ Reutilizar os planos, journals, capacidade e guardas existentes. Preservar byte 
 
 - Use mensagens de commit curtas em português que descrevam a área ou a alteração, como `Automação`, `Documentação`, `Instalador` ou `Corrigir revisão da Recompra`. `NexoFlow 1.5.28` identifica a versão, não é uma mensagem obrigatória de commit. Separe alterações por área quando isso tornar a navegação do GitHub mais clara; não reescreva o histórico apenas para mudar os textos exibidos.
 - A `main` é a única branch de trabalho do repositório. Atualize diretamente a `main`; não crie nem mantenha branches adicionais.
-- A distribuição publicada usa NexoFlow 1.5.34, tag v1.5.34 e pacotes com sufixo 1.5.34. Novas publicações exigem autorização e validação. Para cada próxima publicação de atualização/hotfix/patch, incremente uma única vez: 1.5.35, ... 1.5.99; depois 1.6, 1.6.1, ... 1.6.99. Não incremente por commit ou tentativa de CI da mesma entrega. Preserve tags e releases anteriores; nunca sobrescreva uma versão anterior com um novo patch. Confira `VERSION` e `docs/VERSIONAMENTO.md`.
+- A distribuição publicada usa NexoFlow 1.5.34; a 1.5.35 está em preparação autorizada, com tag prevista v1.5.35 e pacotes com sufixo 1.5.35. Novas publicações exigem autorização e validação. Para cada próxima publicação de atualização/hotfix/patch, incremente uma única vez: 1.5.35, ... 1.5.99; depois 1.6, 1.6.1, ... 1.6.99. Não incremente por commit ou tentativa de CI da mesma entrega. Preserve tags e releases anteriores; nunca sobrescreva uma versão anterior com um novo patch. Confira `VERSION` e `docs/VERSIONAMENTO.md`.
 - Cada release deve mostrar a data da sua publicação. Não reutilize uma versão já publicada para código novo.
 - O NexoFlow Windows é operacional e autônomo; Analytics e Noturno usam a integração Meta nativa, sem exigir Codex ou MCP. MCP é opcional. O **NexoFlow Hub** tem desenvolvimento e homologação Linux expressamente autorizados na Etapa 2, isolados em `hub/`, com dados sintéticos, PostgreSQL temporário e escrita real bloqueada. Consulte [o núcleo](hub/README.md) e o [planejamento](docs/planejamento/README.md). Não transformar o Windows em cliente dependente do Hub, não alterar serviços/volumes da VPS nem abrir portas públicas nesta fase. Commits Hub usam `[skip release]`, sem incrementar a versão ou publicar releases Windows. Alterações compartilhadas exigem regressão Windows.
 - Preserve as credenciais e os diagnósticos privados fora do Git e dos pacotes públicos.

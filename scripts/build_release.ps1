@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.34",
+    [string]$Version = "1.5.35",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -414,9 +414,11 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-Corrige a recuperação da trava Sheets após resposta perdida: repete somente leituras seguras, confirma valor e prazo e impede novas gravações quando a confirmação é incerta. Preserva dados, journals, manifesto e proprietário. Após instalar em Preserve, retome apenas Analytics com nexo analytics no perfil correto; isso não é retomada exata por linha. [Diagnóstico e limites](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/RECUPERACAO%20TRAVA%20SHEETS.md). A validação comercial do cartão BI_Itens no Data Studio continua pendente e separada.
+Analytics e nexo looker verificam a necessidade de continuações antes das substituições grandes do BI. A prévia considera as grades dos arquivos, as partes e o crescimento conjunto. Fontes que precisam de expansão sem confirmação no Data Studio geram pendência clara (código 3), sem traceback nem avanço do checkpoint de sucesso. Gravações anteriores permanecem preservadas.
 
-Não comprova eliminação do HTTP 500 da leitura integral de partes grandes, ausência de novos 429 ou conclusão das cargas comerciais do operador. Atualize em Preserve, com as rotinas encerradas; confira nexo versao e retome nexo analytics no segmento correto. Não recriar planilhas, alterar estados WRITING manualmente ou apagar journals.
+Atualize pelo Setup em Preserve, com as rotinas encerradas, e confira nexo versao. A instalação não confirma fontes nem resolve o aviso de reagregação do cartão BI_Itens. Enquanto a fonte não for validada e ligada ao conector pelo Work, mantenha a carga FARMA pausada; não use confirmação local para contornar a proteção. [Diagnóstico e roteiro](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/INICIALIZACAO%20BI%20ITENS.md).
+
+A prévia ocorre depois da coleta e das primeiras etapas; não é uma transação global ou retomada exata por linha. A publicação mantém a recuperação da trava da 1.5.34. Não criar READY manualmente, apagar journals, remover travas ou ampliar permissões. Testes sintéticos e release não comprovam homologação comercial.
 
 O publicador histórico agrupa linhas vizinhas no batchGet: 200 linhas contíguas passam de 201 intervalos para dois, mantendo as mesmas células, cabeçalho e geometria novos. Isso reduz endereços e metadados, sem aumentar quota ou prometer redução proporcional do tempo. Linhas esparsas, vazios, fórmulas, edição concorrente e retomada permanecem protegidos. [Medição e limites](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/OTIMIZACAO%20INTERVALOS%20HISTORICO.md).
 
@@ -442,7 +444,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.34
+# NexoFlow 1.5.35
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"
