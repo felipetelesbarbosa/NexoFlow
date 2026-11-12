@@ -20,7 +20,7 @@ function getConfig(request) {
   return config.build();
 }
 function requiresPeriod_(params) { return params.segmento==='FARMA' && params.tabela==='BI_Itens'; }
-function fields_(title) {
+function fields_(title,params) {
   if (!NexoSchemas[title]) throw new Error('Selecione uma tabela BI válida.');
   var cc = DataStudioApp.createCommunityConnector(), fields = cc.getFields();
   NexoSchemas[title].forEach(function (spec) {
@@ -29,6 +29,10 @@ function fields_(title) {
     field.setType(spec[1] === 'date' ? cc.FieldType.YEAR_MONTH_DAY : spec[1].startsWith('number') ? cc.FieldType.NUMBER : cc.FieldType.TEXT);
     if (spec[1] === 'number') field.setAggregation(title==='BI_Historico_Resumo' ? (spec[0]==='clientes' ? cc.AggregationType.MAX : cc.AggregationType.SUM) : /((?:^|_)idade(?:$|_)|ranking|taxa|pct|disponivel|informada|identificada|pendente|ticket_medio|historico_completo|^clientes$)/.test(spec[0]) ? cc.AggregationType.MAX : cc.AggregationType.SUM);
   });
+  // Distintos são calculados uma vez no universo filtrado, nunca somados por dia/parte.
+  if (title==='BI_Itens' && params && params.segmento==='FARMA') {
+    fields.newMetric().setId('produtos_distintos_periodo').setName('Produtos distintos no período (SKU informado)').setType(cc.FieldType.NUMBER).setIsReaggregatable(false);
+  }
   return fields;
 }
 function getSchema(request) {
@@ -38,7 +42,7 @@ function getSchema(request) {
   NexoTables.read(String(params.spreadsheetId||'').trim(),[title],{
     api:api,hash:hash_,schemas:NexoSchemas,segment:params.segmento,schemaOnly:true
   });
-  return {schema:fields_(title).build()};
+  return {schema:fields_(title,params).build()};
   } catch(error) { reportError_(DataStudioApp.createCommunityConnector(),error,api); }
 }
 function api_(startedAt) {
@@ -90,7 +94,7 @@ function queryTrace_(request,params,plan,count) {
   // Só estrutura autorizada: sem valores de filtros, registros ou ID de destino.
   function day(value){var text=String(value || '');return /^\d{4}-\d{2}-\d{2}$/.test(text)?text:null;}
   var shape=Array.isArray(request.dimensionsFilters)?request.dimensionsFilters.slice(0,25).map(function(group){return Array.isArray(group)?group.slice(0,25).map(function(f){f=f || {};return {campo:NexoSchemas.BI_Itens.some(function(s){return s[0]===f.fieldName;})?f.fieldName:'OUTRO',operador:['EQUALS','IN_LIST','CONTAINS','REGEXP_PARTIAL_MATCH','BETWEEN','IS_NULL'].includes(f.operator)?f.operator:'OUTRO',tipo:['INCLUDE','EXCLUDE'].includes(f.type)?f.type:'OUTRO'};}):[];}):[];
-  return {diagnostico:'consulta_bi_itens_v1',periodo_exigido:requiresPeriod_(params),amostra:!!(request.scriptParams && request.scriptParams.sampleExtraction===true),filtros:shape,segmento:params.segmento,campos:request.fields.map(function(f){return {nome:f.name,somente_filtro:f.forFilterOnly===true};}),inicio:day(request.dateRange && request.dateRange.startDate),fim:day(request.dateRange && request.dateRange.endDate),grupos_filtro:Array.isArray(request.dimensionsFilters)?request.dimensionsFilters.length:0,filtros_aplicados:plan.applied,tratamento:plan.reason,linhas_resposta:count};
+  return {diagnostico:'consulta_bi_itens_v1',resultado:request.fields.some(function(f){return f.name==='produtos_distintos_periodo';})?'DISTINTOS_CALCULADOS':'ITENS_DETALHADOS',periodo_exigido:requiresPeriod_(params),amostra:!!(request.scriptParams && request.scriptParams.sampleExtraction===true),filtros:shape,segmento:params.segmento,campos:request.fields.map(function(f){return {nome:f.name,somente_filtro:f.forFilterOnly===true};}),inicio:day(request.dateRange && request.dateRange.startDate),fim:day(request.dateRange && request.dateRange.endDate),grupos_filtro:Array.isArray(request.dimensionsFilters)?request.dimensionsFilters.length:0,filtros_aplicados:plan.applied,tratamento:plan.reason,linhas_resposta:count};
 }
 function getData(request) {
   var cc = DataStudioApp.createCommunityConnector();
@@ -104,9 +108,14 @@ function getData(request) {
       var periodStart=date_(period.startDate), periodEnd=date_(period.endDate);
       if (!periodStart || !periodEnd || periodStart>periodEnd) throw new Error('Data inválida no período de BI_Itens FARMA.');
     }
-    var fields = fields_(params.tabela), names = request.fields.map(function (f) { return f.name; });
-    if (names.some(function (name) { return !spec.some(function (s) { return s[0] === name; }); })) throw new Error('Campo solicitado não pertence à tabela.');
+    var fields = fields_(params.tabela,params), names = request.fields.map(function (f) { return f.name; });
+    var exactCount=params.segmento==='FARMA' && params.tabela==='BI_Itens' && names.includes('produtos_distintos_periodo');
+    if (names.some(function (name) { return !(exactCount && name==='produtos_distintos_periodo') && !spec.some(function (s) { return s[0] === name; }); })) throw new Error('Campo solicitado não pertence à tabela.');
     var itemFilters=itemFilters_(request,params);
+    if (exactCount) {
+      if (request.fields.some(function(f){return f.name!=='produtos_distintos_periodo' && !(f.name==='sku_informado' && f.forFilterOnly===true && itemFilters.applied);} )) throw new Error('Continuações: use produtos_distintos_periodo em cartão separado, sem dimensões ou outras métricas.');
+      if (request.dimensionsFilters && (!Array.isArray(request.dimensionsFilters) || request.dimensionsFilters.length && !itemFilters.applied)) throw new Error('Continuações: filtro não suportado para o cartão exato; nenhum total foi retornado.');
+    }
     if (itemFilters.applied) names=names.filter(function(name){return request.fields.some(function(f){return f.name===name && f.forFilterOnly!==true;});});
     var selected = fields.forIds(names);
     names = selected.asArray().map(function (f) { return f.getId(); });
@@ -151,6 +160,18 @@ function getData(request) {
     }})[0];
     if (NexoTables.stable(table[0]) !== NexoTables.stable(spec.map(function (s) { return s[0]; }))) throw new Error('Cabeçalho da tabela difere da versão do conector.');
     if (params.tabela==='BI_Historico_Resumo' && names.includes('clientes') && table.length>2 && !names.includes('competencia')) throw new Error('Continuações: clientes distintos não são aditivos. Use ANO ou TOTAL em um único recorte, ou detalhe por competência.');
+    if (exactCount) {
+      var distinct=new Set(),codeIndex=table[0].indexOf('produto_codigo'),flagIndex=table[0].indexOf('sku_informado');
+      table.slice(1).forEach(function(row){
+        var code=row[codeIndex];
+        if (row[flagIndex]===1 && code!=='' && code!==null && code!==undefined) distinct.add(String(code));
+      });
+      var metric=fields.forIds(['produtos_distintos_periodo']);
+      var exactResponse={schema:metric.build(),rows:distinct.size?[{values:[distinct.size]}]:[],filtersApplied:itemFilters.applied};
+      if (typeof console.info==='function') console.info(JSON.stringify(queryTrace_(request,params,itemFilters,exactResponse.rows.length)));
+      if (api.checkDeadline) api.checkDeadline('RESULTADO');
+      return exactResponse;
+    }
     var positions = names.map(function (name) { return table[0].indexOf(name); });
     var response={schema: selected.build(), rows: table.slice(1).map(function (row) {
       return {values: positions.map(function (i) {

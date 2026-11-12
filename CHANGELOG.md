@@ -1,5 +1,10 @@
 # NexoFlow — Changelog
 
+## Conector BI_Itens — em validação privada, após 1.5.35
+
+- Métrica virtual FARMA `produtos_distintos_periodo`, calculada pela união de SKUs no período e nas partes; cartão não reagregável, sem alterar o schema físico. Filtros não suportados e agrupamentos são recusados.
+- [Evidências, testes e roteiro privado do Work](docs/CARTAO%20PRODUTOS%20DISTINTOS.md). O aviso interno do Google ainda exige validação real; não confirma fontes nem altera a distribuição Windows 1.5.35.
+
 ## 1.5.35 — publicada em 11/11/2026, 21:23:49 (America/Fortaleza)
 
 - Analytics e `nexo looker`: prévia da expansão por arquivo/parte antes das substituições grandes do BI. Detecta fontes não confirmadas, considera grades reservadas e crescimento conjunto; preserva o publicador e suas guardas.

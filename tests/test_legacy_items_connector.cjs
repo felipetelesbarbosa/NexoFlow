@@ -66,7 +66,7 @@ test('leitor de continuações e ABC continuam idênticos',()=>assert.equal(fs.r
 test('getData real confere recortes e tipos com a raiz legada, sem estado fabricado',()=>{
  const vm=require('node:vm'), reader=require(paths[0]);
  const f=fixture(reader), fields=[];
- function field(){return {id:'',setId(id){this.id=id;return this;},setName(){return this;},setType(){return this;},setAggregation(){return this;},getId(){return this.id;}};}
+ function field(){return {id:'',setId(id){this.id=id;return this;},setName(){return this;},setType(){return this;},setAggregation(){return this;},setIsReaggregatable(value){this.reaggregatable=value;return this;},getId(){return this.id;}};}
  const builder={newMetric(){const x=field();fields.push(x);return x;},newDimension(){const x=field();fields.push(x);return x;},forIds(names){const selected=fields.filter(x=>names.includes(x.id));return {asArray:()=>selected,build:()=>selected.map(x=>({name:x.id}))};}};
  const ctx={NexoSchemas:schemas,NexoTables:reader,Date,Utilities:{DigestAlgorithm:{SHA_256:'sha256'},Charset:{UTF_8:'utf8'},computeDigest:(_algorithm,text)=>[...crypto.createHash('sha256').update(text).digest()]},Sheets:{Spreadsheets:{get:id=>f.api.meta(id),Values:{get:(id,range)=>({values:f.api.values(id,range)})}}},DataStudioApp:{createCommunityConnector:()=>({getFields:()=>builder,FieldType:{YEAR_MONTH_DAY:'date',NUMBER:'number',TEXT:'text'},AggregationType:{MAX:'max',SUM:'sum'},newUserError:()=>({setText:text=>({throwException:()=>{throw Error(text);}})})})}};
  vm.createContext(ctx);vm.runInContext(fs.readFileSync('connectors/continuacoes/Code.js','utf8'),ctx);

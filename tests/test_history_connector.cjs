@@ -68,7 +68,7 @@ test('publicação parcial e cabeçalho alterado nunca retornam total incompleto
 });
 function connector(f) {
   const all=[];
-  const field=()=>({setId(x){this.id=x;return this;},setName(){return this;},setType(value){this.type=value;return this;},setAggregation(value){this.aggregation=value;return this;},getId(){return this.id;}});
+  const field=()=>({setId(x){this.id=x;return this;},setName(){return this;},setType(value){this.type=value;return this;},setAggregation(value){this.aggregation=value;return this;},setIsReaggregatable(value){this.reaggregatable=value;return this;},getId(){return this.id;}});
   const fields={build:()=>all,newMetric:()=>{const x=field();x.role='metric';all.push(x);return x;},newDimension:()=>{const x=field();x.role='dimension';all.push(x);return x;},
     forIds:n=>{const selected=all.filter(f=>n.includes(f.id));return {asArray:()=>selected,build:()=>selected.map(f=>({name:f.id}))};}};
   const ctx={NexoSchemas:schemas,NexoTables:reader,Date,Intl,Sheets:{},Utilities:{},DataStudioApp:{createCommunityConnector:()=>({getFields:()=>fields,FieldType:{YEAR_MONTH_DAY:'date',NUMBER:'number',TEXT:'text'},AggregationType:{MAX:'max',SUM:'sum'},newUserError:()=>({setText:t=>({throwException:()=>{throw Error(t);}})})})}};
@@ -305,5 +305,41 @@ test('dia e três dias recebidos sem filtro são recortados no conector; filtro 
     const trace=ctx.queryTrace_(request,request.configParams,ctx.itemFilters_(request,request.configParams),length);
     assert.equal(trace.periodo_exigido,true);assert.equal(trace.amostra,false);
     request.scriptParams={sampleExtraction:true};assert.equal(ctx.queryTrace_(request,request.configParams,ctx.itemFilters_(request,request.configParams),length).amostra,true);
+  }
+});
+
+function distinctRequest(start='01',end='03',groups=[[skuEquals()]]){
+  return {...filterRequest(groups,start,end),fields:[{name:'produtos_distintos_periodo'},{name:'sku_informado',forFilterOnly:true}]};
+}
+test('cartão exato expõe métrica não reagregável só no piloto FARMA, sem alterar schema físico',()=>{
+  const ctx=connector(skuFixture());
+  const schema=ctx.fields_('BI_Itens',distinctRequest().configParams).build();
+  const metric=schema.find(f=>f.id==='produtos_distintos_periodo');
+  assert.ok(metric);assert.equal(metric.role,'metric');assert.equal(metric.type,'number');assert.equal(metric.reaggregatable,false);assert.equal(metric.aggregation,undefined);
+  assert.equal(connector(skuFixture()).fields_('BI_Itens',{segmento:'PET'}).build().some(f=>f.id==='produtos_distintos_periodo'),false);
+  assert.equal(schemas.BI_Itens.length,12);
+});
+test('cartão exato calcula união de SKUs entre dias e partes, com vazio sem dados',()=>{
+  for(const [begin,end,expected] of [['01','03',2],['02','02',2],['30','30',null]]){
+    const f=skuFixture(),ctx=connector(f), response=ctx.getData(distinctRequest(begin,end));
+    assert.equal(response.schema.length,1);assert.equal(response.schema[0].name,'produtos_distintos_periodo');
+    assert.deepEqual(JSON.parse(JSON.stringify(response.rows)),expected===null?[]:[{values:[expected]}]);
+    assert.equal(response.filtersApplied,true);
+  }
+});
+test('cartão exato sem filtro mantém regra SKU informado e preserva caminhos de detalhe',()=>{
+  const ctx=connector(skuFixture()),request=distinctRequest();delete request.dimensionsFilters;request.fields.pop();
+  const result=ctx.getData(request);assert.equal(result.rows[0].values[0],2);
+  const detail=ctx.getData(filterRequest([[skuEquals()]]));assert.equal(detail.rows.length,4);
+  assert.equal(detail.rows.reduce((n,r)=>n+Math.round(r.values[2]*100),0),3700);
+});
+test('cartão exato recusa filtros delegados, mistura de dimensões/métricas e uso PET',()=>{
+  for(const modify of [r=>r.dimensionsFilters=[[{fieldName:'produto_codigo',operator:'CONTAINS',type:'INCLUDE',values:['0']}]],r=>r.fields.push({name:'produto_codigo'}),r=>r.fields.push({name:'quantidade'}),r=>r.fields.push({name:'produto_nome',forFilterOnly:true}),r=>r.dimensionsFilters={invalid:true},r=>r.configParams.segmento='PET']){
+    const f=skuFixture(),r=distinctRequest();modify(r);assert.throws(()=>connector(f).getData(r),/Campo solicitado|cartão|filtro/);assert.equal(f.reads,0);
+  }
+});
+test('cartão exato mantém recusa de WRITING, chave duplicada, tipo inválido e parte ausente',()=>{
+  for(const change of [f=>f.state[2]=JSON.stringify({state:'WRITING'}),f=>f.physical[extra][1][0]=f.physical[hub][1][0],f=>f.physical[hub][3][f.header.indexOf('quantidade')]='inválido',f=>delete f.files[extra]]){
+    const f=skuFixture();change(f);assert.throws(()=>connector(f).getData(distinctRequest()),/Continuações:|parte ausente|NF_BI_INTERNO/);
   }
 });

@@ -125,7 +125,7 @@ test('durante leitura em blocos: cabeçalho, manifesto, origem, trava e chave al
 });
 function connector(f) {
   const fields=[], messages=[];
-  function field(){return {setId(id){this.id=id;return this;},setName(){return this;},setType(){return this;},setAggregation(){return this;},getId(){return this.id;}};}
+  function field(){return {setId(id){this.id=id;return this;},setName(){return this;},setType(){return this;},setAggregation(){return this;},setIsReaggregatable(value){this.reaggregatable=value;return this;},getId(){return this.id;}};}
   const builder={newMetric(){const x=field();fields.push(x);return x;},newDimension(){const x=field();fields.push(x);return x;},forIds(names){const all=fields.filter(x=>names.includes(x.id));return {asArray:()=>all,build:()=>all.map(x=>({name:x.id}))};}};
   const Values={get:(id,range)=>({values:f.raw.values(id,range)})};
   // Um batchGet = uma requisição, não uma para cada valueRange da resposta.
@@ -199,4 +199,16 @@ test('getData ABC real usa batchGet, preserva representação de datas e confere
   f.raw.meta=()=>{throw error(403);};
   assert.throws(()=>ctx.getData(request),/NF_BI_PERMISSAO; etapa=METADADOS/);
   assert.ok(!messages.join().includes(secret));
+});
+
+test('cartão exato percorre grade de 500 mil linhas com 22 chamadas, sem leitura adicional',()=>{
+  const f=fixture({quota:60}),{ctx,request}=connector(f);
+  request.fields=[{name:'produtos_distintos_periodo'},{name:'sku_informado',forFilterOnly:true}];
+  request.dimensionsFilters=[[{fieldName:'sku_informado',operator:'EQUALS',type:'INCLUDE',values:['1']}]];
+  const response=ctx.getData(request);
+  assert.deepEqual(JSON.parse(JSON.stringify(response.rows)),[{values:[1]}]);
+  assert.equal(f.counts.calls,22);assert.equal(f.counts.bodies,16);assert.equal(f.counts.quota,0);
+  const broken=fixture(),other=connector(broken),batch=broken.raw.batchValues;let calls=0;
+  broken.raw.batchValues=(id,ranges)=>{if(++calls>1)throw error(503);return batch(id,ranges);};
+  assert.throws(()=>other.ctx.getData({...other.request,fields:request.fields,dimensionsFilters:request.dimensionsFilters}),/NF_BI_SERVICO.*Nenhum total parcial/);
 });

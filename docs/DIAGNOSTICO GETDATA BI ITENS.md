@@ -72,3 +72,7 @@ As 22 regressões novas acompanham as 45 anteriores. O caminho real de `getData`
 Consulte também [a conferência inicial](INICIALIZACAO%20BI%20ITENS.md) e [o contrato de continuações](CONTINUACOES.md). Os dez módulos de assinatura Windows, a versão 1.5.33 e seus pacotes permanecem byte a byte preservados. A correção deve ser implantada no Apps Script pelo Work; código no GitHub não atualiza a implantação Google automaticamente.
 
 Verificações locais complementares: Ruff, Pyright (zero erros/avisos), auditoria de consistência, actionlint, sintaxe JavaScript, scanner Gitleaks dos arquivos alterados e 31 testes do fluxo de validação/distribuição aprovados. Os dez módulos de assinatura foram comparados em bytes à tag pública `v1.5.33`. A aprovação do CI e CodeQL deve ser consultada no SHA efetivamente enviado, sem inferir sucesso desta lista local.
+
+## Cartões A/B da v6 e próximo ensaio
+
+O Work confirmou o aviso em ambos os cartões, com contagens conciliadas. A causa interna permanece não comprovada. Foi implementada uma métrica virtual de distintos calculada no conector para um cartão separado, sem reagregação de dimensões no Google. Consulte [contrato, limites e roteiro de validação privada](CARTAO%20PRODUTOS%20DISTINTOS.md). A migração e a confirmação no Terminal continuam pendentes.

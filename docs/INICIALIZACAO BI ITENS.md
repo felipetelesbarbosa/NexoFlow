@@ -71,3 +71,7 @@ Somente depois da validação e ligação real da fonte, o operador usa os coman
 Testes sintéticos novos cobrem FARMA/PET, crescimento conjunto, grade de 500 mil linhas, fonte já confirmada com duas continuações, cabeçalho/manifesto alterados, nenhuma escrita no bloqueio e preservação do checkpoint. As regressões dos comandos Analytics e looker falham contra os respectivos pontos de entrada anteriores. Os dez módulos de assinatura foram preservados. Evidências comerciais permanecem exclusivamente nos anexos privados do operador.
 
 Validação local desta correção: 2.009 testes Python, 95 ignorados por dependências/plataforma; 78 testes Node; Ruff, Pyright (zero erros/avisos), auditoria de consistência, documentação gerada e pip-audit aprovados. São testes sintéticos em Linux; os checks Windows/CodeQL devem ser consultados no commit enviado. Na etapa de desenvolvimento não houve publicação, instalação Windows ou homologação comercial. A distribuição 1.5.35 exige suas próprias validações de release.
+
+## Cartões A/B da v6 e próximo ensaio
+
+O Work confirmou o aviso em ambos os cartões, com contagens conciliadas. A causa interna permanece não comprovada. Foi implementada uma métrica virtual de distintos calculada no conector para um cartão separado, sem reagregação de dimensões no Google. Consulte [contrato, limites e roteiro de validação privada](CARTAO%20PRODUTOS%20DISTINTOS.md). A migração e a confirmação no Terminal continuam pendentes.
