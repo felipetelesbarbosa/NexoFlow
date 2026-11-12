@@ -1549,7 +1549,7 @@ def main() -> int:
         if pg_publisher is not None:
             pg_publication = pg_publisher.publish(
                 looker_tables["BI_Itens"],
-                sales_scope(all_order_records + order_rows),
+                sales_scope(all_order_records + order_rows, looker_tables["BI_Itens"]),
                 complete=not (
                     cliente_stats.api_errors
                     or order_stats.api_errors

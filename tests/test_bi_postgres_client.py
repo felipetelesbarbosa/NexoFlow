@@ -40,10 +40,18 @@ class BiPostgresClientTests(unittest.TestCase):
         self.assertEqual(normalize_rows(corrected)[0]["produto_codigo"], "0009")
         cancelled = self.built([order(1, status="3")], old_items)["BI_Itens"]
         self.assertEqual(cancelled, [])
-        self.assertEqual(sales_scope([order(1)]), [initial[0][1]])
+        self.assertEqual(sales_scope([order(1)], initial), [initial[0][1]])
         cancel = order(1, status="3")
         cancel["status_confirmacao"] = "CANCELADO_API"
         self.assertEqual(sales_scope([cancel]), [initial[0][1]])
+
+    def test_sale_omitted_by_builder_does_not_authorize_removal(self):
+        future = order(1)
+        future["data_hora"] = "2099-01-01T10:00:00-03:00"
+        rows = self.built([future], [item(1)])["BI_Itens"]
+        self.assertEqual(rows, [])
+        self.assertEqual(sales_scope([future]), [])
+        self.assertEqual(sales_scope([future], rows), [])
 
     def test_batches_keep_whole_sale_and_partial_does_not_authorize_removal(self):
         rows = self.built(
@@ -52,7 +60,11 @@ class BiPostgresClientTests(unittest.TestCase):
         from uuid import uuid4
 
         parts = batches(
-            rows, sales_scope([order(1), order(2)]), str(uuid4()), False, target_rows=1
+            rows,
+            sales_scope([order(1), order(2)], rows),
+            str(uuid4()),
+            False,
+            target_rows=1,
         )
         self.assertEqual(sorted(len(p["rows"]) for p in parts), [1, 2])
         self.assertTrue(all(p["complete"] is False for p in parts))

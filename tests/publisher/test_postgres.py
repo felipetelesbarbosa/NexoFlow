@@ -89,7 +89,7 @@ def payload(store, rows=None, complete=True, sales=None, session=None):
         "batch_id": str(uuid4()),
         "session_id": session,
         "complete": complete,
-        "sales": sales or [f"{1:032x}"],
+        "sales": sales if sales is not None else [f"{1:032x}"],
         "rows": rows if rows is not None else [row()],
     }
 
@@ -860,3 +860,32 @@ def test_reader_optional_blank_text_keeps_sheet_semantics_without_inventing_iden
         )
     result = reader.query(query(["produto_codigo", "categoria", "receita_item"]))
     assert result["rows"] == [{"values": ["000123", "", "2.50"]}]
+
+
+def test_builder_omission_does_not_delete_previous_facts_even_in_complete_plan(store):
+    from bi_postgres_client import batches, sales_scope
+    from looker_bi import build_looker_tables
+    from tests.test_looker_bi import item, order
+
+    def built(o):
+        return build_looker_tables(
+            [],
+            [o],
+            [item(1)],
+            snapshot_date="2026-11-12",
+            updated_at="2026-11-12T10:00:00-03:00",
+        )["BI_Itens"]
+
+    original = order(1)
+    initial = built(original)
+    assert initial
+    submit(store, payload(store, initial, sales=[initial[0][1]]))
+    previous = facts(store)
+    future = dict(original, data_hora="2099-01-01T10:00:00-03:00")
+    omitted = built(future)
+    assert omitted == []
+    sid = store.session(str(uuid4()))["session_id"]
+    batch = batches(omitted, sales_scope([future], omitted), sid, True)[0]
+    receipt = submit(store, batch)
+    assert receipt["removidos"] == 0 and receipt["atualizados"] == 0
+    assert facts(store) == previous

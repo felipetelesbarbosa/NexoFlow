@@ -29,9 +29,9 @@ Os dez módulos de assinatura do histórico permanecem byte a byte preservados. 
 
 ## Evidências locais
 
-- Suíte Python Linux: **2.017 testes, 95 ignorados, zero falhas**. Inclui integração real da CLI/Analytics com serviços simulados.
+- Suíte Python Linux: **2.018 testes, 95 ignorados, zero falhas**. Inclui integração real da CLI/Analytics com serviços simulados.
 - Node: **90 testes aprovados**, incluindo seis casos do novo conector com SDK/UrlFetch simulados.
-- PostgreSQL 18.6 temporário: 26 casos de staging, persistência, reaplicação, correção, cancelamento, perdas antes/depois do commit, recuperação, concorrência, autorização, parcial, revisão antiga, rollback, leitura e limites. Docker e HTTP são reais; dados são sintéticos.
+- PostgreSQL 18.6 temporário: 27 casos de staging, persistência, reaplicação, correção, cancelamento, perdas antes/depois do commit, recuperação, concorrência, autorização, parcial, revisão antiga, rollback, leitura e limites. Docker e HTTP são reais; dados são sintéticos.
 - Regressão adicional: disputa local da outbox reproduzida antes da proteção e aprovada após o lock do SO. A retomada simula encerramento do processo anterior e usa uma nova sessão HTTP.
 - Leitura volumosa: 200.001 linhas sintéticas; detalhe acima do limite é recusado e resumo agregado fecha sem truncamento. Códigos com zeros, quantidade e dinheiro são preservados.
 - Ruff, Pyright, consistência e auditorias de dependências Windows/API aprovados. O CI do SHA final ainda precisa confirmar Windows 3.11/3.14 nas duas codificações, executáveis, Setup Preserve/Clean/rollback, pacote instalado, CodeQL e segredos.
@@ -47,3 +47,5 @@ O Work deve inspecionar schema/PK, origem e cabeçalhos da visão real antes da 
 A configuração privada preserva os tokens anteriores e contém Bearers novos separados. Hostnames e credenciais Cloudflare Access só podem ser preenchidos após emissão real; DSNs permanecem exclusivamente no servidor. Nenhum segredo particular entra no Git ou release.
 
 Ver [guia técnico e operacional](BI%20ITENS%20POSTGRESQL%20FARMA.md) e [prompt do Work](PROMPT%20WORK%20BI%20ITENS%20POSTGRESQL.md). A cópia do Data Studio deve ser comparada ao Metabase, incluindo datas, rankings, vazio, nove usos e mesclagens. Migrar produção só após envio homologado, plano READY e resultados aprovados. A correção Windows exige instalar o Setup novo em Preserve.
+
+Revisão adicional: ausência no builder BI (inclusive pedido com data futura) não autoriza remover fatos anteriores. O escopo de reconciliação é a união das vendas nas linhas validadas e dos cancelamentos oficiais explícitos. Regressão reproduzida antes do ajuste e conferida também no PostgreSQL com plano completo, preservando os fatos anteriores.

@@ -186,3 +186,5 @@ Windows continua autônomo quando a opção fica desabilitada. O Setup não impl
 Passagem resumida: [prompt operacional para o Work](PROMPT%20WORK%20BI%20ITENS%20POSTGRESQL.md).
 
 A outbox local é protegida pelo lock de arquivo do sistema operacional, compartilhado entre Analytics e os comandos de retomada. Uma segunda rotina não pode regravar seu estado; caminhos dos perfis são separados. A trava PostgreSQL continua necessária para coordenação entre instalações. Não remover arquivos de lock para forçar retomada.
+
+Revisão adicional: ausência no builder BI (inclusive pedido com data futura) não autoriza remover fatos anteriores. O escopo de reconciliação é a união das vendas nas linhas validadas e dos cancelamentos oficiais explícitos. Regressão reproduzida antes do ajuste e conferida também no PostgreSQL com plano completo, preservando os fatos anteriores.

@@ -37,26 +37,24 @@ def _save(path: Path, value):
     os.replace(temporary, path)
 
 
-def sales_scope(orders):
-    from analytics import _order_customer_identity_verified, _sales_order_is_valid
+def sales_scope(orders, rows=None):
+    from analytics import _order_customer_identity_verified
     from looker_bi import opaque_key
     from pedido_utils import is_order_cancelled
 
+    # Ausência no builder não equivale a cancelamento. Só vendas efetivamente
+    # publicáveis e cancelamentos oficiais explícitos autorizam reconciliação.
     return sorted(
-        {
+        {r[1] for r in (rows or [])}
+        | {
             opaque_key("venda", str(o["pedido_chave"]))
             for o in orders
             if o.get("pedido_chave")
+            and o.get("status_confirmacao") == "CANCELADO_API"
+            and _order_customer_identity_verified(o)
             and (
-                _sales_order_is_valid(o)
-                or (
-                    o.get("status_confirmacao") == "CANCELADO_API"
-                    and _order_customer_identity_verified(o)
-                    and (
-                        is_order_cancelled(o)
-                        or o.get("status_validacao") == "CANCELADO_SEM_ITENS"
-                    )
-                )
+                is_order_cancelled(o)
+                or o.get("status_validacao") == "CANCELADO_SEM_ITENS"
             )
         }
     )
