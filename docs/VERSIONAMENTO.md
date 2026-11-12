@@ -6,7 +6,7 @@ A **1.5.32 foi publicada em 10/11/2026, 19:16:49 (America/Fortaleza)**, no SHA `
 
 A **1.5.33 foi publicada em 10/11/2026, 23:28:34 (America/Fortaleza)**, no SHA `7884d7007fd0c65cbf90bfc30c5c35dc6c9056fb`, com recuperação da leitura da trava Sheets. [Release e pacotes conferidos](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.33).
 
-As próximas publicações de atualização, hotfix ou patch seguem **1.5.35 → ... → 1.5.99 → 1.6 → 1.6.1**. Cada publicação incrementa uma única vez; commits e novas tentativas de CI da mesma entrega não mudam a numeração. Não há salto automático de versão principal.
+As próximas publicações de atualização, hotfix ou patch seguem **1.5.36 → ... → 1.5.99 → 1.6 → 1.6.1**. Cada publicação incrementa uma única vez; commits e novas tentativas de CI da mesma entrega não mudam a numeração. Não há salto automático de versão principal.
 
 A versão da distribuição fica em `VERSION`. A tag é `v{versao}`, o título é `NexoFlow {versao}` e os pacotes são `NexoFlow-{versao}.zip` e `NexoFlow-Setup-{versao}.zip`. Nunca sobrescreva os arquivos de uma versão pública para entregar código novo. O workflow permite retomar somente um rascunho da mesma entrega.
 
@@ -39,3 +39,9 @@ Publicada em 11/11/2026, 19:12:49 (America/Fortaleza), no SHA `a25ae828b6dc732ec
 ## Preparação 1.5.35
 
 Publicação autorizada para distribuir a prévia de expansão BI e o tratamento de fonte não confirmada. Manter uma única geração no SHA final, preservando a tag e os pacotes 1.5.34. A migração comercial da BI_Itens não é autorizada nem realizada pela publicação desta versão.
+
+## Publicação 1.5.35
+
+Publicada em 11/11/2026, 21:23:49 (America/Fortaleza), no SHA `c6204f0535914c48fec71ce5c009f0e8f9a1884a`. Checks, pacotes e downloads públicos conferidos. A 1.5.34 e anteriores permanecem intactas. A validação comercial da BI_Itens no Data Studio continua pendente.
+
+Preparação aprovada: https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43124192209. Os mesmos artefatos foram usados na publicação oficial, sem novo build.

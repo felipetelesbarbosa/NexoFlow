@@ -23,7 +23,7 @@ O NexoFlow identifica pedidos registrados na API **independentemente de terem si
 
 Antecipação da pendência de fontes não confirmadas: Analytics e nexo looker verificam a expansão por arquivo e parte antes das substituições grandes do BI. O bloqueio conhecido aparece como pendência (código 3), preservando gravações anteriores e o checkpoint de sucesso. As guardas de capacidade, segmento, manifesto e publicação continuam ativas. [Diagnóstico e roteiro](docs/INICIALIZACAO%20BI%20ITENS.md).
 
-Distribuição em validação. Atualize pelo Setup em **Preserve**, com cargas encerradas. O Setup não valida nem liga fontes no Data Studio. Enquanto BI_Itens depender dessa migração, não repetir Analytics/Noturno nem confirmar a fonte sem a conferência real pelo Work. A 1.5.34 e os releases anteriores permanecem intactos.
+Publicada em 11/11/2026, 21:23:49 (America/Fortaleza), no SHA `c6204f0535914c48fec71ce5c009f0e8f9a1884a`. Checks, pacotes e downloads públicos conferidos. A 1.5.34 e anteriores permanecem intactas. A validação comercial da BI_Itens no Data Studio continua pendente. Atualize pelo Setup em **Preserve**, com cargas encerradas. O Setup não valida nem liga fontes no Data Studio. Enquanto BI_Itens depender dessa migração, não repetir Analytics/Noturno nem confirmar a fonte sem a conferência real pelo Work. A 1.5.34 e os releases anteriores permanecem intactos.
 
 ## NexoFlow Hub em homologação
 
@@ -84,7 +84,7 @@ As continuações automáticas no Meu Drive exigem autorização Google local. O
 
 ## Versões e atualizações
 
-A versão desta entrega é **1.5.35**, em validação para publicação. A release 1.5.34 e as anteriores permanecem intactas. As próximas correções seguem **1.5.36, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md) e a [rotina eficiente de publicação](docs/RELEASE%20EFICIENTE.md).
+A versão desta entrega é **1.5.35**, publicada em 11/11/2026, 21:23:49 (America/Fortaleza). A release 1.5.34 e as anteriores permanecem intactas. As próximas correções seguem **1.5.36, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md) e a [rotina eficiente de publicação](docs/RELEASE%20EFICIENTE.md).
 
 ## NexoFlow Hub: homologação e evolução paralela
 

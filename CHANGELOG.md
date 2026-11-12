@@ -1,10 +1,10 @@
 # NexoFlow — Changelog
 
-## 1.5.35 — em validação para publicação
+## 1.5.35 — publicada em 11/11/2026, 21:23:49 (America/Fortaleza)
 
 - Analytics e `nexo looker`: prévia da expansão por arquivo/parte antes das substituições grandes do BI. Detecta fontes não confirmadas, considera grades reservadas e crescimento conjunto; preserva o publicador e suas guardas.
 - Dependência de migração do Data Studio retorna pendência (código 3), sem traceback ou avanço do checkpoint de sucesso. Etapas anteriores podem já estar gravadas; não declarar todas as fontes atualizadas.
-- Correção da detecção tardia não confirma fontes nem resolve o aviso de reagregação no Google. Distribuição prevista nos pacotes 1.5.35 após validação; a 1.5.34 permanece intacta.
+- Correção da detecção tardia não confirma fontes nem resolve o aviso de reagregação no Google. Distribuída nos pacotes 1.5.35 validados; a 1.5.34 permanece intacta.
 
 ## 1.5.34 — publicada em 11/11/2026, 19:12:49 (America/Fortaleza)
 
