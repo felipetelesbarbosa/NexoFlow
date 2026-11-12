@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nexoflow"
-version = "1.5.36"
+version = "1.5.37"
 description = "Sincronização de contatos e pedidos entre Weni, a API FarmaLíder e Google Sheets nos segmentos FarmaLíder e Pets Líder."
 requires-python = ">=3.11"
 dynamic = ["dependencies", "optional-dependencies"]
 
 [tool.setuptools]
 package-dir = {"" = "app", "connectors.meta_ads_mcp" = "connectors/meta_ads_mcp"}
-packages = ["connectors.meta_ads_mcp"]
+packages = ["connectors.meta_ads_mcp", "ds_backend"]
 # Módulos públicos explícitos: configuração privada e pastas de dados ficam fora.
 py-modules = [
   "ad_attribution",
@@ -29,6 +29,7 @@ py-modules = [
   "bi_postgres_client",
   "bi_postgres_contract",
   "run_bi_postgres",
+  "run_datastudio",
   "duration_display",
   "versioning",
   "auditar_consistencia",
@@ -138,3 +139,6 @@ extend-exclude = [
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 ignore = ["E501"]
+
+[tool.setuptools.package-data]
+ds_backend = ["registry.json", "cache_schema.json"]

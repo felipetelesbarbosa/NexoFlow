@@ -52,3 +52,7 @@ Publicação autorizada para o destino PostgreSQL BI_Itens FARMA e leitura priva
 
 
 A **1.5.36 foi publicada em 12/11/2026, 03:06:30 (America/Fortaleza)**, SHA `2cc09b864efedbb0ca2d2dc10c62c6bc23091e61`. [release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.36), [preparação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43163283247), [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43163283110) e [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43163597855). Pacotes, hashes e downloads conferidos; a 1.5.35 permanece intacta. Esta publicação não implanta nem homologa a integração comercial PostgreSQL/Data Studio.
+
+## Preparação 1.5.37
+
+Backend definitivo PostgreSQL opt-in, separado do piloto. Manter uma única geração de pacotes no SHA final, publicação somente após checks completos e conferência independente. Implantação e migração comercial pelo Work.

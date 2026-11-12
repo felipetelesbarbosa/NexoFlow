@@ -20,7 +20,7 @@ from project_paths import load_private_settings
 from webhook_runtime import WEBHOOK_WRITE_LOCK, shared_secret_matches
 
 _settings = load_private_settings()
-GOOGLE_SPREADSHEET_ID = _settings.GOOGLE_SPREADSHEET_ID
+GOOGLE_SPREADSHEET_ID = getattr(_settings, "GOOGLE_SPREADSHEET_ID", "")
 WEBHOOK_SHARED_SECRET = _settings.WEBHOOK_SHARED_SECRET
 
 app = FastAPI(title="Weni Meta Ads Events")
@@ -79,11 +79,14 @@ def receive_event(
             detail="Estrutura do evento incompatível com a planilha.",
         )
     with WEBHOOK_WRITE_LOCK:
-        store = GoogleSheetsStore(GOOGLE_SPREADSHEET_ID)
+        from ds_backend.runtime import complete, open_store
+
+        store = open_store(_settings, GoogleSheetsStore, purpose="delivery")
         try:
             if event_id in store.existing_event_ids():
                 return {"status": "duplicate", "event_id": event_id}
             store.append_event(row)
+            complete(store)
         finally:
             store.close()
 

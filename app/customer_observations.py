@@ -17,6 +17,28 @@ DB_ROOT: Path | None = None
 @contextmanager
 def connect():
     from config import LOG_DIR
+    from ds_backend.client import configured as postgres_configured
+
+    if postgres_configured():
+        from ds_backend import runtime
+        from ds_backend.cache import connect as postgres_cache
+
+        if runtime.CURRENT_STORE is None:
+            raise RuntimeError(
+                "DS_CACHE_EXIGE_SESSAO_POSTGRES; inicie pelo fluxo oficial."
+            )
+        db = postgres_cache(runtime.CURRENT_STORE)
+        try:
+            with db:
+                stored = db.execute("SELECT segment FROM profile").fetchall()
+                if not stored:
+                    db.execute("INSERT INTO profile VALUES(?)", (segment(),))
+                elif stored != [(segment(),)]:
+                    raise RuntimeError("DS_CACHE_SEGMENTO_DIVERGENTE")
+                yield db
+        finally:
+            db.close()
+        return
 
     root = DB_ROOT / segment() if DB_ROOT is not None else LOG_DIR / "privado"
     root.mkdir(parents=True, exist_ok=True)

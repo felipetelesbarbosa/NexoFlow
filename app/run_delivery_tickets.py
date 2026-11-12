@@ -149,9 +149,12 @@ def main():
             spreadsheet_id = str(getattr(secrets, "GOOGLE_SPREADSHEET_ID", ""))
 
             def store_factory():
-                if not spreadsheet_id:
+                from ds_backend.client import enabled as postgres_enabled
+                from ds_backend.runtime import open_store
+
+                if not postgres_enabled(secrets) and not spreadsheet_id:
                     raise RuntimeError("ID da planilha Google não configurado.")
-                return GoogleSheetsStore(spreadsheet_id)
+                return open_store(secrets, GoogleSheetsStore, purpose="delivery")
 
             result = apply_delivery_review(
                 args.require_review,

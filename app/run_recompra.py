@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from requests import RequestException
 
+from ds_backend.runtime import backend_session
 from runtime_profile import segment as active_segment
 from versioning import CURRENT_VERSION
 
@@ -119,6 +120,7 @@ def build_parser():
     return parser
 
 
+@backend_session("recompra")
 def main(argv=None):
     parser = build_parser()
     args = parser.parse_args(argv)

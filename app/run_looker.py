@@ -36,11 +36,17 @@ def run(argv: list[str] | None = None) -> int:
 
     configure_logging()
     spreadsheet_id = str(getattr(secrets, "GOOGLE_SPREADSHEET_ID", "") or "").strip()
-    if not spreadsheet_id or "COLE_" in spreadsheet_id:
+    from ds_backend.client import enabled as postgres_enabled
+
+    if not postgres_enabled(secrets) and (
+        not spreadsheet_id or "COLE_" in spreadsheet_id
+    ):
         raise ValueError(
             "Configure o ID da planilha Google antes de atualizar o Data Studio."
         )
-    store = GoogleSheetsStore(spreadsheet_id)
+    from ds_backend.runtime import complete, open_store
+
+    store = open_store(secrets, GoogleSheetsStore, purpose="bi")
     try:
         _, base, _ = store.load_base_snapshot()
         orders, items = store.load_order_records(), store.load_order_item_records()
@@ -57,6 +63,7 @@ def run(argv: list[str] | None = None) -> int:
         check_replacements(store, looker_replacements(store, tables))
         store.migrate_bi_summary_numbers()
         store.replace_looker_tables(tables)
+        complete(store)
         logging.info(
             "Tabelas comerciais atualizadas para %s a %s. Histórico operacional preservado.",
             start,

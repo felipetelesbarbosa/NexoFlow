@@ -22,6 +22,7 @@ from contact_dedup_guard import (
 )
 from dedup_io import digest, execution_lock, save_private
 from dedup_sheets import DedupSheets, record, requests_for
+from ds_backend.dedup import open_dedup
 from farmalider_client import FarmaliderError
 from farmalider_integration import (
     _cliente_candidates,
@@ -832,7 +833,9 @@ def run_with_dedup(*, apply, full, quarter, review_path, update):
                     result = prepare(
                         contacts,
                         farm,
-                        lambda: DedupSheets(str(settings.GOOGLE_SPREADSHEET_ID)),
+                        lambda: __import__(
+                            "ds_backend.dedup", fromlist=["open_dedup"]
+                        ).open_dedup(settings, DedupSheets),
                         scope=scope,
                     )
                 except Exception as exc:
@@ -911,7 +914,7 @@ def run_with_dedup(*, apply, full, quarter, review_path, update):
                     )
             if jobs:
                 try:
-                    store = DedupSheets(str(settings.GOOGLE_SPREADSHEET_ID))
+                    store = open_dedup(settings, DedupSheets)
                     farm = _open_farmalider()
                     if farm is None:
                         raise ValueError(

@@ -75,6 +75,11 @@ def merge_purchase_checks(*maps: Any) -> dict[str, dict[str, str]]:
 
 def load_purchase_check_state(path: Path | None = None) -> dict[str, Any]:
     path = Path(path or WENI_UPDATE_STATE_FILE)
+    from ds_backend.states import load as remote_load
+
+    remote, state = remote_load(path, {}, name="weni_update")
+    if remote:
+        return state
     if not path.exists():
         return {}
     try:
@@ -109,6 +114,9 @@ def register_pending_purchase_checks(
         if pending.get(uid) == check:
             pending.pop(uid)
     state["pending_purchase_checks"] = pending
+    from ds_backend.states import save as remote_save
+
+    remote_save(path, state)
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, name = tempfile.mkstemp(
         prefix="purchase-checks-", suffix=".json", dir=path.parent

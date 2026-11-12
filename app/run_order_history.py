@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import json
 from contextlib import closing
 from datetime import datetime, timedelta
 from pathlib import Path
 from time import perf_counter
 from typing import Any
 
+from ds_backend.runtime import backend_session
 from order_history import HistoryError, HistoryQuery
 from pedido_utils import BUSINESS_TIMEZONE
 
@@ -264,9 +266,25 @@ def print_summary(summary):
     )
 
 
+@backend_session("historico")
 def run(argv=None):
     summary: dict[str, Any] = {}
     args = parser().parse_args(argv)
+    from ds_backend.client import enabled as postgres_enabled
+    from project_paths import load_private_settings
+
+    if args.planilhas and postgres_enabled(load_private_settings()):
+        raise HistoryError(
+            "DS_USAR_ARMAZENAMENTO_POSTGRES; revisões Sheets não são convertidas automaticamente"
+        )
+    if args.somente_resumo and postgres_enabled(load_private_settings()):
+        from ds_backend.runtime import CURRENT_STORE
+
+        if CURRENT_STORE is None:
+            raise HistoryError("DS_SESSAO_AUSENTE")
+        result = CURRENT_STORE.client.call("/v1/conferencia")
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
     if args.excluir_pedidos is not None:
         if any(
             (

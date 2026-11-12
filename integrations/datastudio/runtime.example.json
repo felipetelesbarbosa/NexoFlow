@@ -1,0 +1,7 @@
+{
+  "mode": "publish",
+  "environment": "homologacao",
+  "segment": "FARMA",
+  "dsn_file": "/run/secrets/dsn",
+  "token_file": "/run/secrets/token"
+}

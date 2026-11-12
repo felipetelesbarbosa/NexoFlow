@@ -4,6 +4,7 @@ import argparse
 import logging
 import sys
 
+from ds_backend.runtime import backend_session
 from proxy_config import configure_proxy
 from runtime_profile import scoped_path
 
@@ -60,6 +61,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+@backend_session("weni")
 def main() -> int:
     args = build_parser().parse_args()
     if args.quarter is not None and not args.full:

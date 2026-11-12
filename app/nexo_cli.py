@@ -857,6 +857,21 @@ def run(argv: list[str] | None = None) -> int:
                 parser.parse_args(["weni", "-h"])
             return _run_windows_target(mapping[args.weni_op])
         if args.command == "armazenamento":
+            if args.storage_args and args.storage_args[0] == "postgres":
+                from run_datastudio import run as postgres_run
+
+                return postgres_run(args.storage_args[1:])
+            from ds_backend.client import enabled as postgres_enabled
+            from project_paths import load_private_settings
+
+            if postgres_enabled(load_private_settings()):
+                if args.storage_args == ["status"]:
+                    from run_datastudio import run as postgres_run
+
+                    return postgres_run(["diagnosticar"])
+                raise ValueError(
+                    "Backend PostgreSQL: use nexo armazenamento postgres --help. Nenhum fallback para Sheets."
+                )
             from run_sheets_continuation import run as storage_run
 
             return storage_run(args.storage_args)

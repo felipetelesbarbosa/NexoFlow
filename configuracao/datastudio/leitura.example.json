@@ -1,0 +1,9 @@
+{
+  "protocol": "nexoflow_datastudio_1",
+  "segment": "FARMA",
+  "environment": "homologacao",
+  "endpoint": "",
+  "api_token": "",
+  "access_client_id": "",
+  "access_client_secret": ""
+}

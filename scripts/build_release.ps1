@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.36",
+    [string]$Version = "1.5.37",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -372,6 +372,10 @@ foreach ($command in @("limpar_cancelados_recompra.bat", "atualizar_recompra_pet
     Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/comandos/$command"
     Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/comandos/$command"
 }
+foreach ($relative in @("app/ds_backend/registry.json", "app/ds_backend/cache_schema.json", "app/ds_backend/adapter.py", "app/run_datastudio.py", "integrations/datastudio/002_backend.sql", "connectors/datastudio_api/Code.js", "configuracao/datastudio/publicacao.example.json")) {
+    Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/$relative"
+    Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/$relative"
+}
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/task_progress.py"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/app/task_progress.py"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/observed_orders.py"
@@ -456,7 +460,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.36
+# NexoFlow 1.5.37
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"

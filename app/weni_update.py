@@ -912,6 +912,11 @@ def _message_sort_key(message: dict[str, Any]) -> tuple[datetime, str]:
 
 
 def _load_state(path: Path = WENI_UPDATE_STATE_FILE) -> dict[str, Any]:
+    from ds_backend.states import load as remote_load
+
+    remote, payload = remote_load(path, {}, name="weni_update")
+    if remote:
+        return payload
     if not path.exists():
         return {}
     try:
@@ -953,6 +958,9 @@ def _save_state(payload: dict[str, Any], path: Path = WENI_UPDATE_STATE_FILE) ->
             pending.pop(uid)
     if pending or "pending_purchase_checks" in payload:
         payload["pending_purchase_checks"] = pending
+    from ds_backend.states import save as remote_save
+
+    remote_save(path, payload)
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temp_name = tempfile.mkstemp(
         prefix="weni-update-", suffix=".json", dir=path.parent
@@ -1382,8 +1390,13 @@ def _apply_purchase_candidate(
             continue
         _set_field_if_changed(plan, current_fields, field_name, value, reason=reason)
 
-    if segment() == "PET" and plan.purchase_confirmed and (
-        available_weni_fields is None or LAST_PURCHASE_FIELD in available_weni_fields
+    if (
+        segment() == "PET"
+        and plan.purchase_confirmed
+        and (
+            available_weni_fields is None
+            or LAST_PURCHASE_FIELD in available_weni_fields
+        )
     ):
         current_last_purchase = business_order_datetime(
             normalize_value(current_fields.get(LAST_PURCHASE_FIELD))
@@ -1542,7 +1555,7 @@ def _build_contact_plan(
     if preserve_distinct_orders:
         # O mesmo CPF pode conservar perfis com pedidos diferentes por regra
         # explícita. O último pedido cadastral não pode substituir todos eles.
-        plan.order_resolution_status = 'CPF_IDENTIDADE_AMBIGUA'
+        plan.order_resolution_status = "CPF_IDENTIDADE_AMBIGUA"
         for key in PURCHASE_FIELDS:
             plan.guards.setdefault(key, fields.get(key))
     else:
@@ -1805,10 +1818,14 @@ def audit_plans(
             if segment() != "PET":
                 expected = "sim" if isinstance(age, int) and age >= 18 else "não"
                 majority = (
-                    str(plan.fields.get("maior_de_18_anos", expected)).strip().casefold()
+                    str(plan.fields.get("maior_de_18_anos", expected))
+                    .strip()
+                    .casefold()
                 )
                 if age is not None and majority != expected:
-                    errors.append(f"{plan.contact_uuid}: idade e maioridade inconsistentes")
+                    errors.append(
+                        f"{plan.contact_uuid}: idade e maioridade inconsistentes"
+                    )
 
         if "maior_de_18_anos" in plan.fields:
             if segment() == "PET":
@@ -2935,7 +2952,9 @@ def check_update_connections() -> dict[str, Any]:
         return result
     finally:
         _close_audit_handles()
-        logging.info('Weni: diagnóstico HTTP da atualização: %s.', weni.metrics_snapshot())
+        logging.info(
+            "Weni: diagnóstico HTTP da atualização: %s.", weni.metrics_snapshot()
+        )
         weni.close()
         if farm is not None:
             farm.close()

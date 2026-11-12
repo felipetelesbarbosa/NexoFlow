@@ -227,6 +227,11 @@ class MetaNativePackagingTests(unittest.TestCase):
                     ROOT / "app" / (module + ".py"), source / "app" / (module + ".py")
                 )
             shutil.copytree(ROOT / "dependencias", source / "dependencias")
+            shutil.copytree(
+                ROOT / "app/ds_backend",
+                source / "app/ds_backend",
+                ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+            )
             connector = source / "connectors/meta_ads_mcp"
             connector.parent.mkdir(parents=True)
             shutil.copytree(

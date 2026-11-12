@@ -58,3 +58,10 @@ A fonte do guia de operação é `docs/Documentacao NexoFlow.md`; seu [HTML](Doc
 - [Relatório técnico da integração BI_Itens PostgreSQL](RELATORIO%20BI%20ITENS%20POSTGRESQL.md).
 
 - [Correção da visão API de doze campos, preservando Metabase](CORRECAO%20VISAO%20API%20BI%20ITENS.md).
+
+## Backend definitivo Data Studio
+
+- [Migração Windows/PostgreSQL e comandos](MIGRACAO%20WINDOWS%20POSTGRESQL%20DATA%20STUDIO.md)
+- [Catálogo de tabelas e fluxos](ESTRUTURA%20POSTGRESQL%20DATA%20STUDIO.md)
+- [Relatório técnico](RELATORIO%20BACKEND%20DATA%20STUDIO.md)
+- [Roteiro para o Work](PROMPT%20WORK%20POSTGRESQL%20DEFINITIVO.md)

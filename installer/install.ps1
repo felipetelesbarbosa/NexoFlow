@@ -10,7 +10,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
 $AppName = 'NexoFlow'
-$AppVersion = '1.5.36'
+$AppVersion = '1.5.37'
 $Publisher = 'Grupo Lider'
 $InstallDir = 'C:\NexoFlow'
 $DataDir = 'C:\NexoFlow Data'
@@ -1764,13 +1764,15 @@ try {
     Write-Host "[INFO] Modo aplicado: $selectedMode. FARMA e PET usam a mesma instalação, com configurações separadas."
     Write-Host "[INFO] Meta Ads MCP: $script:MetaOptionalStatus."
     Write-Host '[INFO] Coleta Meta nativa: disponível no Analytics/Noturno; depende do token e das contas autorizadas, sem exigir MCP.'
-    Write-Host '[INFO] Integridade local aprovada não confirma acesso às APIs nem às planilhas.'
+    Write-Host '[INFO] Credencial Google Sheets é exigida apenas no backend Sheets; PostgreSQL usa credentials\datastudio\<segmento>\<ambiente>\publicacao.json.'
+    Write-Host '[INFO] Preserve mantém configurações, credenciais, SQLite, journals e logs. O Setup não ativa PostgreSQL nem altera a VPS.'
+    Write-Host '[INFO] Integridade local aprovada não confirma acesso às APIs nem ao armazenamento.'
     Write-Host '[PRÓXIMO] Execute check-up.bat e testar_conexoes.bat no segmento desejado antes da carga.'
     Write-Host "[INFO] Log desta instalação: $SetupLogPath"
     if ($hasSecrets -and $hasGoogle) {
         Show-Info "NexoFlow foi instalado/atualizado com sucesso.`nMCP opcional: $script:MetaOptionalStatus.`n`nOs atalhos NexoFlow Analytics, NexoFlow Weni, NexoFlow Recompra, NexoFlow Terminal, NexoFlow Planilha e NexoFlow Noturno foram criados na Área de Trabalho.`n`nNexoFlow Weni executa check-up, teste de conexões, dry-run/auditoria obrigatória e somente depois permite aplicar as alterações."
     } else {
-        Show-Info "NexoFlow foi instalado.`nMCP opcional: $script:MetaOptionalStatus.`n`nOs atalhos NexoFlow Analytics, NexoFlow Weni, NexoFlow Recompra, NexoFlow Terminal, NexoFlow Planilha e NexoFlow Noturno foram criados na Área de Trabalho.`n`nAntes da primeira execução, configure:`n- secrets_config.py`n- credentials\google_credentials.json"
+        Show-Info "NexoFlow foi instalado.`nMCP opcional: $script:MetaOptionalStatus.`n`nOs atalhos NexoFlow Analytics, NexoFlow Weni, NexoFlow Recompra, NexoFlow Terminal, NexoFlow Planilha e NexoFlow Noturno foram criados na Área de Trabalho.`n`nAntes da primeira execução, configure:`n- secrets_config.py`n- credentials\google_credentials.json (backend Sheets) ou credentials\datastudio\<segmento>\<ambiente>\publicacao.json (backend PostgreSQL)"
     }
     try { Stop-Transcript | Out-Null } catch { }
     exit 0
@@ -1816,4 +1818,4 @@ finally {
     if ($null -eq $previousNetworkMode) { Remove-Item Env:NEXOFLOW_NETWORK_MODE -ErrorAction SilentlyContinue }
     else { $env:NEXOFLOW_NETWORK_MODE = $previousNetworkMode }
 }
-# NexoFlow 1.5.36
+# NexoFlow 1.5.37

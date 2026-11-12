@@ -964,6 +964,9 @@ def apply_delivery_review(path, weni, *, store_factory=None, target=None):
         )
         if not history_started:
             store.set_controls({"historico_observado_desde": snapshot_date})
+        from ds_backend.runtime import complete
+
+        complete(store, success=not conflicts)
     finally:
         store.close()
 

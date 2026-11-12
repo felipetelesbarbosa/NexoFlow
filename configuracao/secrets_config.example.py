@@ -99,8 +99,23 @@ PERFIS = {
 
 # Publicação BI_Itens FARMA via API privada (não é conexão PostgreSQL direta).
 # Manter sheets até homologar API/Access. PET não participa desta integração.
-PERFIS["FARMA"].update({
-    "BI_ITENS_DESTINO": "sheets",  # depois: postgres
-    "BI_ITENS_POSTGRES_MODO": "simular",  # depois da conferência: aplicar
-    "BI_ITENS_POSTGRES_CREDENTIALS_FILE": "credentials/bi_itens_farma_publicador.json",
-})
+PERFIS["FARMA"].update(
+    {
+        "BI_ITENS_DESTINO": "sheets",  # depois: postgres
+        "BI_ITENS_POSTGRES_MODO": "simular",  # depois da conferência: aplicar
+        "BI_ITENS_POSTGRES_CREDENTIALS_FILE": "credentials/bi_itens_farma_publicador.json",
+    }
+)
+
+# Backend definitivo Data Studio; independente dos contratos do piloto BI_Itens.
+# O padrão permanece Sheets até o corte autorizado e conferido pelo Work.
+for _segmento in ("FARMA", "PET"):
+    PERFIS[_segmento].update(
+        {
+            "ARMAZENAMENTO_BACKEND": "sheets",  # postgres após migração READY
+            "DATASTUDIO_AMBIENTE": "homologacao",  # depois: producao
+            "DATASTUDIO_CREDENTIALS_FILE": f"credentials/datastudio/{_segmento}/homologacao/publicacao.json",
+            "FARMALIDER_HISTORY_STORAGE_ENABLED": False,
+        }
+    )
+del _segmento

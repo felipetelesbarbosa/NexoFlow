@@ -41,12 +41,28 @@ def select_settings(settings):
                 'Configure PERFIS["PET"]; credenciais Farma não serão reutilizadas.'
             )
         overrides = profiles["PET"]
-        for key in ("WENI_API_TOKEN", "FARMALIDER_API_TOKEN", "GOOGLE_SPREADSHEET_ID"):
+        for key in (
+            ("WENI_API_TOKEN", "FARMALIDER_API_TOKEN", "DATASTUDIO_CREDENTIALS_FILE")
+            if overrides.get(
+                "ARMAZENAMENTO_BACKEND",
+                getattr(settings, "ARMAZENAMENTO_BACKEND", "sheets"),
+            )
+            == "postgres"
+            else ("WENI_API_TOKEN", "FARMALIDER_API_TOKEN", "GOOGLE_SPREADSHEET_ID")
+        ):
             if not str(overrides.get(key) or "").strip():
                 raise ValueError("Configuração PET ausente: " + key)
         if any(
             overrides.get(k) == profiles.get("FARMA", {}).get(k)
-            for k in ("WENI_API_TOKEN", "GOOGLE_SPREADSHEET_ID")
+            for k in (
+                ("WENI_API_TOKEN", "DATASTUDIO_CREDENTIALS_FILE")
+                if overrides.get(
+                    "ARMAZENAMENTO_BACKEND",
+                    getattr(settings, "ARMAZENAMENTO_BACKEND", "sheets"),
+                )
+                == "postgres"
+                else ("WENI_API_TOKEN", "GOOGLE_SPREADSHEET_ID")
+            )
         ):
             raise ValueError(
                 "Weni e Dashboard precisam ser exclusivos de cada segmento."

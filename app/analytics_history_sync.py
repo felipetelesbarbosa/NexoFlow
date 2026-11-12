@@ -189,8 +189,15 @@ def synchronize(adapter, source, directory, segment, publication, *, percent=100
     return result
 
 
-def run(settings):
+def run(settings, *, storage=None):
     """Falha histórica é explícita e isolada; não declara sucesso das cinco fontes."""
+    from ds_backend.client import enabled as postgres_enabled
+
+    if postgres_enabled(settings):
+        from ds_backend.history import synchronize_postgres
+
+        return synchronize_postgres(settings, storage)
+
     from config import LOG_DIR
     from customer_observations import DB_ROOT
     from history_sheets_quota import google_store_type

@@ -749,6 +749,9 @@ def digest(value):
 
 def atomic_json(path, value):
     path = Path(path)
+    from ds_backend.states import save as remote_save
+
+    remote_save(path, value)
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, filename = tempfile.mkstemp(prefix="recompra-", suffix=".json", dir=path.parent)
     try:
@@ -788,7 +791,15 @@ def atomic_json(path, value):
 
 def load_state(path=STATE, *, purchase_checks_path=None):
     path = Path(path)
-    if not path.exists():
+    from ds_backend.states import load as remote_load
+
+    remote, data = remote_load(path, {"schema": 1, "contacts": {}}, name="recompra")
+    if remote:
+        if data.get("schema") != 1 or not isinstance(data.get("contacts"), dict):
+            raise RuntimeError(
+                "Estado remoto da Recompra inválido; aplicação bloqueada."
+            )
+    elif not path.exists():
         data = {"schema": 1, "contacts": {}}
     else:
         try:

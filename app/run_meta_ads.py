@@ -162,11 +162,17 @@ def _real(args):
             )
         expected = review["schema_manifest"]
     dashboard = str(getattr(settings, "GOOGLE_SPREADSHEET_ID", "") or "").strip()
-    if not dashboard:
+    from ds_backend.client import enabled as postgres_enabled
+
+    if not postgres_enabled(settings) and not dashboard:
         raise ValueError("Dashboard do perfil não configurado.")
     # Ao contrário do construtor operacional, esta abertura não cria ou migra
     # nenhuma aba, mesmo durante simulações com fontes reais.
-    store = GoogleSheetsStore.open_native_readonly(dashboard)
+    from ds_backend.runtime import complete, open_store
+
+    store = open_store(
+        settings, GoogleSheetsStore, purpose="meta", readonly=not args.apply
+    )
     try:
         inputs = store.native_meta_inputs()
         result = sync_native_meta(
@@ -194,6 +200,8 @@ def _real(args):
                     "schema_manifest": result["schema_manifest"],
                 },
             )
+        if args.apply:
+            complete(store, success=not result.get("partial", False))
         return result
     finally:
         store.close()

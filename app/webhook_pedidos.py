@@ -116,7 +116,12 @@ def receive_order(
         )
 
     with WEBHOOK_WRITE_LOCK:
-        store = GoogleSheetsStore(_spreadsheet_id())
+        from ds_backend.runtime import complete, open_store
+        from project_paths import load_private_settings
+
+        store = open_store(
+            load_private_settings(), GoogleSheetsStore, purpose="delivery"
+        )
         try:
             orders_result, items_result = store.upsert_pharmacy_orders([order], items)
             scope = plan_pharmacy_scope(
@@ -138,6 +143,7 @@ def receive_order(
             # Reenvios ainda comparam/reparam a aba de métricas caso uma gravação
             # anterior tenha falhado depois de persistir os pedidos ou itens.
             store.replace_sales_metrics(build_sales_metrics(scope.orders, scope.items))
+            complete(store)
 
         finally:
             store.close()

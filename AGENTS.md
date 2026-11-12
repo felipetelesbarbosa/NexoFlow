@@ -1,3 +1,7 @@
+# Implementação 1.5.37 em validação
+
+Contrato definitivo Data Studio opt-in: `app/ds_backend`, `integrations/datastudio`, `connectors/datastudio_api`. Preservar o piloto e a migração 001 já aplicada; usar a 002 aditiva. Sheets continua padrão. Publicação de código não autoriza afirmar migração comercial. Ver docs/MIGRACAO WINDOWS POSTGRESQL DATA STUDIO.md.
+
 # NexoFlow 1.5.36
 
 A correção de leitura posterior à 1.5.36 usa a visão dedicada `farma.produtos_itens_datastudio` (migração aditiva 002). A visão de sete campos `farma.produtos_itens` e suas permissões Metabase são preservadas. Checkout Linux e Apps Script exigem o SHA validado da correção; Windows/publicador continuam 1.5.36. Ver docs/CORRECAO VISAO API BI ITENS.md. Não executar migração/carga comercial no trabalho Codex nem desbloquear estados à mão.

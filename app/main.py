@@ -263,7 +263,11 @@ def validate_configuration() -> None:
         raise RuntimeError(
             "Cole o token da Weni em secrets_config.py antes de executar."
         )
-    if not spreadsheet_id or spreadsheet_id == SHEET_PLACEHOLDER:
+    from ds_backend.client import enabled as postgres_enabled
+
+    if not postgres_enabled(secrets) and (
+        not spreadsheet_id or spreadsheet_id == SHEET_PLACEHOLDER
+    ):
         raise RuntimeError(
             "Cole o ID da planilha Google em secrets_config.py antes de executar."
         )
@@ -1116,7 +1120,9 @@ def main() -> int:
         if full_quarter is not None:
             validate_full_load_quarter(part=full_quarter, component="analytics")
 
-        pg_publisher = open_publisher(secrets)
+        from ds_backend.client import enabled as postgres_enabled
+
+        pg_publisher = None if postgres_enabled(secrets) else open_publisher(secrets)
         if pg_publisher is not None:
             pg_publisher.start()
 
@@ -1130,14 +1136,18 @@ def main() -> int:
             os.getenv("NEXOFLOW_BI_INICIO") or None,
             os.getenv("NEXOFLOW_BI_FIM") or None,
         )
-        logging.info("Iniciando sincronização Weni → FarmaLíder → Google Sheets.")
+        logging.info(
+            "Iniciando sincronização Weni → FarmaLíder → %s.",
+            "PostgreSQL" if postgres_enabled(secrets) else "Google Sheets",
+        )
 
-        spreadsheet_id = str(getattr(secrets, "GOOGLE_SPREADSHEET_ID", "")).strip()
         weni_token = str(getattr(secrets, "WENI_API_TOKEN", "")).strip()
         farm_settings = load_farmalider_settings()
         farm_client = open_farmalider_client(farm_settings)
         sheets_started = time.monotonic()
-        sheets = GoogleSheetsStore(spreadsheet_id)
+        from ds_backend.runtime import open_store
+
+        sheets = open_store(secrets, GoogleSheetsStore)
         logging.info(
             "Google Sheets inicializado em %.2fs.",
             time.monotonic() - sheets_started,
@@ -1284,6 +1294,9 @@ def main() -> int:
                     request_stats["writes"],
                     request_stats["total"],
                 )
+                from ds_backend.runtime import complete as complete_storage
+
+                complete_storage(sheets)
                 return 0
 
             # Uma única leitura integral alimenta cache FarmaLíder incremental,
@@ -1599,7 +1612,11 @@ def main() -> int:
 
         from analytics_history_sync import run as publish_history
 
-        historical_publication = publish_history(secrets)
+        historical_publication = (
+            publish_history(secrets, storage=sheets)
+            if postgres_enabled(secrets)
+            else publish_history(secrets)
+        )
 
         # O status é gravado por último para refletir a própria execução do BI.
         completion_status, completion_controls = _completion_controls(
@@ -1770,6 +1787,12 @@ def main() -> int:
             }
         )
 
+        from ds_backend.runtime import complete as complete_storage
+
+        if postgres_enabled(secrets):
+            acknowledge(history_receipts)
+        complete_storage(sheets, success=completion_status == "sucesso")
+
         if (
             full_quarter is not None
             and quarter_context is not None
@@ -1841,7 +1864,8 @@ def main() -> int:
                 "20 dias da data do pedido. A pendência não bloqueia esta parte.",
                 order_stats.pending_without_items,
             )
-        acknowledge(history_receipts)
+        if not postgres_enabled(secrets):
+            acknowledge(history_receipts)
         partial = _log_final_summary(
             total_elapsed=total_elapsed,
             contact_counts=(inserted, updated, contact_result.unchanged),
@@ -1858,10 +1882,19 @@ def main() -> int:
         return PARTIAL_SYNC_EXIT_CODE if partial else 0
 
     except Exception as exc:
-        source_pending = isinstance(exc, (BIContinuationPending, PublicationError))
+        from ds_backend.contract import StorageError
+
+        source_pending = isinstance(
+            exc, (BIContinuationPending, PublicationError, StorageError)
+        )
         if source_pending:
             logging.warning("[PENDÊNCIA] %s", exc)
-            if isinstance(exc, PublicationError):
+            if isinstance(exc, StorageError):
+                logging.warning(
+                    "PostgreSQL: confirmação pendente. Consulte a revisão %s antes de retomar; o servidor preserva recibos e a última versão confirmada.",
+                    getattr(sheets, "revision", "não iniciada"),
+                )
+            elif isinstance(exc, PublicationError):
                 logging.warning(
                     "Destino PostgreSQL pendente; outbox preservada. "
                     "Checkpoint de sucesso mantido. Confira o diagnóstico e retome "

@@ -1,0 +1,51 @@
+# Overlay dos serviços novos. Não define PostgreSQL, volumes existentes ou portas.
+# Work deve conferir a rede real e o compose operacional antes de anexar este arquivo.
+x-service: &service
+  image: ${NEXOFLOW_DATASTUDIO_IMAGE:?Use a imagem do SHA conferido}
+  restart: unless-stopped
+  read_only: true
+  user: "10001:10001"
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs: [/tmp:rw,noexec,nosuid,size=64m]
+  pids_limit: 100
+  mem_limit: 512m
+  networks: [datastudio-private]
+  logging:
+    driver: json-file
+    options: {max-size: "10m", max-file: "3"}
+services:
+  datastudio-farma-publish:
+    <<: *service
+    environment: {DATASTUDIO_CONFIG_FILE: /run/secrets/config.json}
+    volumes:
+      - ${NEXOFLOW_DATASTUDIO_SECRETS:?}/FARMA/publicacao-config.json:/run/secrets/config.json:ro
+      - ${NEXOFLOW_DATASTUDIO_SECRETS}/FARMA/publicacao-token:/run/secrets/token:ro
+      - ${NEXOFLOW_DATASTUDIO_SECRETS}/FARMA/publicacao-dsn:/run/secrets/dsn:ro
+  datastudio-farma-read:
+    <<: *service
+    environment: {DATASTUDIO_CONFIG_FILE: /run/secrets/config.json}
+    volumes:
+      - ${NEXOFLOW_DATASTUDIO_SECRETS}/FARMA/leitura-config.json:/run/secrets/config.json:ro
+      - ${NEXOFLOW_DATASTUDIO_SECRETS}/FARMA/leitura-token:/run/secrets/token:ro
+      - ${NEXOFLOW_DATASTUDIO_SECRETS}/FARMA/leitura-dsn:/run/secrets/dsn:ro
+  datastudio-pet-publish:
+    <<: *service
+    profiles: [pet]
+    environment: {DATASTUDIO_CONFIG_FILE: /run/secrets/config.json}
+    volumes:
+      - ${NEXOFLOW_DATASTUDIO_SECRETS}/PET/publicacao-config.json:/run/secrets/config.json:ro
+      - ${NEXOFLOW_DATASTUDIO_SECRETS}/PET/publicacao-token:/run/secrets/token:ro
+      - ${NEXOFLOW_DATASTUDIO_SECRETS}/PET/publicacao-dsn:/run/secrets/dsn:ro
+  datastudio-pet-read:
+    <<: *service
+    profiles: [pet]
+    environment: {DATASTUDIO_CONFIG_FILE: /run/secrets/config.json}
+    volumes:
+      - ${NEXOFLOW_DATASTUDIO_SECRETS}/PET/leitura-config.json:/run/secrets/config.json:ro
+      - ${NEXOFLOW_DATASTUDIO_SECRETS}/PET/leitura-token:/run/secrets/token:ro
+      - ${NEXOFLOW_DATASTUDIO_SECRETS}/PET/leitura-dsn:/run/secrets/dsn:ro
+networks:
+  datastudio-private:
+    external: true
+    name: ${NEXOFLOW_DATASTUDIO_NETWORK:?Informe a rede privada existente, conferida pelo Work}

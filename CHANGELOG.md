@@ -1,5 +1,12 @@
 # NexoFlow — Changelog
 
+## 1.5.37 — em validação
+
+- Backend PostgreSQL por API privada para o Windows e conector Data Studio separado, com contrato definitivo e isolamento FARMA/PET.
+- Exportação controlada do corte READY, exclusões preservadas, staging, recibos idempotentes, retomada, revisão atômica e rollback protegido.
+- Cache e estados operacionais remotos; nenhum fallback silencioso para Sheets. Datas e finanças tipadas, projeção ativa indexada e distintos no SQL.
+- Migração 002 aditiva: não reexecuta 001, não altera banco piloto, Metabase, Hub ou n8n. Implantação e conciliação comercial permanecem com o Work.
+
 ## API leitora BI_Itens — correção posterior à 1.5.36 Windows
 
 - Visão dedicada `farma.produtos_itens_datastudio` com os doze campos originais; migração aditiva e idempotente, sem alterar dados/visão/permissões Metabase.

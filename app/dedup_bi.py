@@ -525,6 +525,8 @@ def backup_native(hub, tables, backup_dir):
 
 def refresh(store, removed_uuids, delivery_keys, directory):
     """Cada plano é imutável; reenvio de transação incerta nunca é automático."""
+    if callable(getattr(type(store), "refresh_bi", None)):
+        return store.refresh_bi(removed_uuids, delivery_keys, directory)
     if vars(store).get("continuity") is not None:
         from dedup_partitions import refresh as refresh_partitions
 

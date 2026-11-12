@@ -1,0 +1,131 @@
+{
+  "profile": {
+    "columns": [
+      "segment"
+    ],
+    "keys": [
+      "segment"
+    ],
+    "sql": "CREATE TABLE profile(segment TEXT NOT NULL)"
+  },
+  "orders": {
+    "columns": [
+      "id",
+      "owner",
+      "cpf",
+      "payload",
+      "digest",
+      "first_seen",
+      "last_seen",
+      "synced",
+      "linked"
+    ],
+    "keys": [
+      "id"
+    ],
+    "sql": "CREATE TABLE orders(id TEXT PRIMARY KEY,owner TEXT NOT NULL,cpf TEXT NOT NULL,payload TEXT NOT NULL,digest TEXT NOT NULL,first_seen TEXT NOT NULL,last_seen TEXT NOT NULL,synced TEXT NOT NULL DEFAULT '',linked TEXT NOT NULL DEFAULT '')"
+  },
+  "creations": {
+    "columns": [
+      "id",
+      "status",
+      "uuid"
+    ],
+    "keys": [
+      "id"
+    ],
+    "sql": "CREATE TABLE creations(id TEXT PRIMARY KEY,status TEXT NOT NULL,uuid TEXT NOT NULL DEFAULT '')"
+  },
+  "history_run_receipts": {
+    "columns": [
+      "run",
+      "segment",
+      "id",
+      "occurrences",
+      "fresh",
+      "changed",
+      "state"
+    ],
+    "keys": [
+      "run",
+      "segment",
+      "id"
+    ],
+    "sql": "CREATE TABLE history_run_receipts (\n run TEXT NOT NULL, segment TEXT NOT NULL, id TEXT NOT NULL,\n occurrences INTEGER NOT NULL, fresh INTEGER NOT NULL, changed INTEGER NOT NULL,\n state TEXT NOT NULL, PRIMARY KEY(run,segment,id))"
+  },
+  "history_windows": {
+    "columns": [
+      "key",
+      "segment",
+      "start",
+      "end",
+      "page_limit",
+      "next_page",
+      "total",
+      "pages",
+      "status",
+      "reason",
+      "updated"
+    ],
+    "keys": [
+      "key"
+    ],
+    "sql": "CREATE TABLE history_windows (\n key TEXT PRIMARY KEY, segment TEXT NOT NULL, start TEXT NOT NULL, end TEXT NOT NULL,\n page_limit INTEGER NOT NULL, next_page INTEGER NOT NULL DEFAULT 1,\n total INTEGER, pages INTEGER, status TEXT NOT NULL DEFAULT 'incompleta',\n reason TEXT NOT NULL DEFAULT '', updated TEXT NOT NULL)"
+  },
+  "history_seen": {
+    "columns": [
+      "window_key",
+      "id",
+      "page"
+    ],
+    "keys": [
+      "window_key",
+      "id"
+    ],
+    "sql": "CREATE TABLE history_seen (\n window_key TEXT NOT NULL, id TEXT NOT NULL, page INTEGER NOT NULL,\n PRIMARY KEY(window_key,id))"
+  },
+  "history_orders": {
+    "columns": [
+      "segment",
+      "id",
+      "owner",
+      "record",
+      "first_seen",
+      "updated"
+    ],
+    "keys": [
+      "segment",
+      "id"
+    ],
+    "sql": "CREATE TABLE history_orders (\n segment TEXT NOT NULL, id TEXT NOT NULL, owner TEXT NOT NULL,\n record TEXT NOT NULL, first_seen TEXT NOT NULL, updated TEXT NOT NULL,\n PRIMARY KEY(segment,id))"
+  },
+  "history_issues": {
+    "columns": [
+      "segment",
+      "id",
+      "reason"
+    ],
+    "keys": [
+      "segment",
+      "id"
+    ],
+    "sql": "CREATE TABLE history_issues (\n segment TEXT NOT NULL, id TEXT NOT NULL, reason TEXT NOT NULL,\n PRIMARY KEY(segment,id))"
+  },
+  "history_revisions": {
+    "columns": [
+      "segment",
+      "id",
+      "old_digest",
+      "new_digest",
+      "mode",
+      "at"
+    ],
+    "keys": [
+      "segment",
+      "id",
+      "old_digest",
+      "new_digest"
+    ],
+    "sql": "CREATE TABLE history_revisions (\n segment TEXT NOT NULL, id TEXT NOT NULL, old_digest TEXT NOT NULL,\n new_digest TEXT NOT NULL, mode TEXT NOT NULL, at TEXT NOT NULL,\n UNIQUE(segment,id,old_digest,new_digest))"
+  }
+}

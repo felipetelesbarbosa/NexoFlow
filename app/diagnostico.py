@@ -65,13 +65,20 @@ def main() -> int:
         fail("Token da Weni ainda não foi preenchido")
         errors += 1
 
-    if GOOGLE_CREDENTIALS_FILE.exists():
+    from ds_backend.client import enabled as postgres_enabled
+
+    postgres = postgres_enabled(secrets)
+    if postgres:
+        ok("Backend PostgreSQL: credencial Sheets dispensada; sem fallback automático.")
+    elif GOOGLE_CREDENTIALS_FILE.exists():
         ok(f"Credencial Google encontrada: {GOOGLE_CREDENTIALS_FILE}")
     else:
         fail("Arquivo credentials/google_credentials.json não encontrado")
         errors += 1
 
-    if spreadsheet_id and spreadsheet_id != "COLE_O_ID_DA_PLANILHA_GOOGLE_AQUI":
+    if postgres:
+        pass
+    elif spreadsheet_id and spreadsheet_id != "COLE_O_ID_DA_PLANILHA_GOOGLE_AQUI":
         ok("ID da planilha Google preenchido")
     else:
         fail("ID da planilha Google ainda não foi preenchido")
@@ -148,12 +155,28 @@ def main() -> int:
         finally:
             farm.close()
 
-    print("\nTestando Google Sheets...")
+    print("\nTestando armazenamento...")
     try:
-        GoogleSheetsStore(spreadsheet_id, validate_structure=True)
-        ok("Conexão com Google Sheets funcionando e estrutura completa validada")
+        if postgres:
+            from ds_backend.client import Client
+
+            client = Client.from_settings(secrets)
+            try:
+                info = client.info
+                ok(
+                    "Contrato PostgreSQL confirmado; segmento="
+                    + info["segment"]
+                    + "; versão="
+                    + str(info["version"])
+                )
+            finally:
+                client.close()
+        else:
+            store = GoogleSheetsStore(spreadsheet_id, validate_structure=True)
+            store.close()
+            ok("Conexão com Google Sheets e estrutura validadas")
     except Exception as exc:
-        fail(f"Falha no Google Sheets: {safe_failure(exc)}")
+        fail(f"Falha no armazenamento: {safe_failure(exc)}")
         errors += 1
 
     print()

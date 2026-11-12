@@ -1,0 +1,161 @@
+"""Única leitura Sheets do corte; não grava dados, origem, lease ou manifesto."""
+
+from __future__ import annotations
+
+from contextlib import closing
+
+from ds_backend.contract import REGISTRY, StorageError, digest
+from ds_backend.migration import Export
+
+
+def export_sheets(store, path, segment, revision, exclusions):
+    if (
+        exclusions.get("segment") != segment
+        or exclusions.get("revision") != revision
+        or not isinstance(exclusions.get("rows"), list)
+        or not exclusions.get("source_sha256")
+    ):
+        raise StorageError("DS_EXCLUSOES_NAO_CONFERIDAS")
+    from gspread.utils import rowcol_to_a1
+
+    from sheets_continuation import ContinuationIndex, fingerprint, verify_book_stamp
+    from sheets_partitions import role_for, roots_for
+
+    manager = store._continuity
+    if manager is None:
+        raise StorageError("DS_ORIGEM_SEM_MANIFESTO")
+
+    def guard():
+        # Sem assumir que expiração de lease autoriza adotar um gravador interrompido.
+        if manager.lease._lookup() is not None:
+            raise StorageError("DS_ORIGEM_COM_GRAVADOR_OU_RECUPERACAO")
+        values = store._read_with_retry(
+            "conferir manifesto do corte PostgreSQL", manager.sheet.get_all_values
+        )
+        index = ContinuationIndex.parse(
+            values, hub=store._hub_id, segment=segment, roots=roots_for(store)
+        )
+        if index.config.get("history_publication") != {
+            "state": "READY",
+            "revision": revision,
+        }:
+            raise StorageError("DS_REVISAO_ORIGEM_DIVERGENTE")
+        if any(s.get("state") != "READY" for s in index.status.values()):
+            raise StorageError("DS_ORIGEM_COM_PUBLICACAO_INCOMPLETA")
+        return index, digest(values)
+
+    index, manifest_hash = guard()
+    from order_history_sheets import SCHEMAS as HISTORY_SCHEMAS
+
+    if any(not index.table_parts(name) for name in HISTORY_SCHEMAS):
+        raise StorageError("DS_FONTE_HISTORICA_AUSENTE")
+    roots = roots_for(store)
+    books = {**{v: manager._book(v) for v in roots.values()}}
+    for part in index.parts.values():
+        books.setdefault(part.book_id, manager._book(part.book_id))
+    versions = {}
+    for bid, book in books.items():
+        role = next((r for r, value in roots.items() if value == bid), None)
+        if role is None:
+            file = index.files.get(bid)
+            if file is None:
+                raise StorageError("DS_PARTE_ORFA")
+            role = file["role"]
+        if not verify_book_stamp(book, hub=store._hub_id, segment=segment, role=role):
+            raise StorageError("DS_ORIGEM_NAO_COMPROVADA")
+        response = store._read_with_retry(
+            "conferir versão Drive do corte",
+            lambda bid=bid: store.client.http_client.request(
+                "get",
+                "https://www.googleapis.com/drive/v3/files/" + bid,
+                params={"fields": "id,version,trashed"},
+            ).json(),
+        )
+        if response.get("trashed") or not response.get("version"):
+            raise StorageError("DS_VERSAO_DRIVE_NAO_COMPROVADA")
+        versions[bid] = response["version"]
+    missing = []
+    present = []
+    with closing(Export(path, create=True)) as output:
+        output.add("Exclusoes_Publicacao", exclusions["rows"], segment)
+        for name, spec in REGISTRY.items():
+            if name.startswith("Cache_") or name == "Exclusoes_Publicacao":
+                continue
+            parts = index.table_parts(name)
+            physical = []
+            if parts:
+                if any(p.schema != fingerprint(spec["columns"]) for p in parts):
+                    raise StorageError("DS_SCHEMA_ORIGEM_DIVERGENTE")
+                physical = [manager.worksheet(p) for p in parts]
+            else:
+                book = manager._book(roots[role_for(name)])
+                physical = [
+                    ws
+                    for ws in store._read_with_retry(
+                        "localizar tabela do corte", book.worksheets
+                    )
+                    if ws.title == name
+                ]
+                if not physical:
+                    # Ausência é documentada no manifesto, nunca inventa uma métrica zero.
+                    missing.append(name)
+                    continue
+            present.append(name)
+            for ws in physical:
+                header = store._read_with_retry(
+                    "conferir cabeçalho do corte",
+                    lambda ws=ws, spec=spec: ws.get(
+                        "A1:" + rowcol_to_a1(1, len(spec["columns"])),
+                        value_render_option="UNFORMATTED_VALUE",
+                    ),
+                )
+                if header != [spec["columns"]]:
+                    raise StorageError("DS_SCHEMA_ORIGEM_DIVERGENTE")
+                for offset in range(2, ws.row_count + 1, 1000):
+                    end = min(offset + 999, ws.row_count)
+                    values = store._read_with_retry(
+                        "exportar bloco do corte",
+                        lambda ws=ws, offset=offset, end=end, spec=spec: ws.get(
+                            rowcol_to_a1(offset, 1)
+                            + ":"
+                            + rowcol_to_a1(end, len(spec["columns"])),
+                            value_render_option="UNFORMATTED_VALUE",
+                        ),
+                    )
+                    rows = []
+                    for values_row in values:
+                        if not any(v not in ("", None) for v in values_row):
+                            continue
+                        if len(values_row) > len(spec["columns"]):
+                            raise StorageError("DS_SCHEMA_ORIGEM_DIVERGENTE")
+                        padded = list(values_row) + [""] * (
+                            len(spec["columns"]) - len(values_row)
+                        )
+                        rows.append(dict(zip(spec["columns"], padded, strict=True)))
+                    output.add(name, rows, segment)
+        for bid, version in versions.items():
+            current = store._read_with_retry(
+                "reconferir versão Drive do corte",
+                lambda bid=bid: store.client.http_client.request(
+                    "get",
+                    "https://www.googleapis.com/drive/v3/files/" + bid,
+                    params={"fields": "version"},
+                ).json(),
+            )
+            if current.get("version") != version:
+                raise StorageError("DS_ORIGEM_ALTERADA_DURANTE_EXPORTACAO")
+        if guard()[1] != manifest_hash:
+            raise StorageError("DS_MANIFESTO_ORIGEM_ALTERADO")
+        return output.seal(
+            segment,
+            dict(
+                state="READY",
+                scope="CORTE_COMPLETO",
+                revision=revision,
+                manifest_hash=manifest_hash,
+                versions=versions,
+                exclusions_source_hash=exclusions["source_sha256"],
+                missing_tables=missing,
+                present_tables=present,
+            ),
+        )

@@ -74,6 +74,9 @@ def _full_load_25_digest(uuids: list[str]) -> str:
 
 def _full_load_25_write(payload: dict[str, Any]) -> None:
     path = FULL_LOAD_25_MANIFEST
+    from ds_backend.states import save as remote_save
+
+    remote_save(path, payload)
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temp_name = tempfile.mkstemp(
         prefix="full-load-25-", suffix=".json", dir=path.parent
@@ -92,8 +95,12 @@ def _full_load_25_write(payload: dict[str, Any]) -> None:
 
 def _full_load_25_load() -> dict[str, Any]:
     path = FULL_LOAD_25_MANIFEST
+    from ds_backend.states import load as remote_load
+
+    remote, payload = remote_load(path, {}, name="carga_fracionada")
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        if not remote:
+            payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise RuntimeError(
             f"Manifesto da carga completa 25% inválido: {path}."
@@ -111,6 +118,13 @@ def _full_load_25_load() -> dict[str, Any]:
     if _full_load_25_digest(canonical) != str(payload.get("contacts_sha256") or ""):
         raise RuntimeError("Manifesto da carga completa 25% falhou no SHA-256.")
     return payload
+
+
+def _full_load_25_exists():
+    from ds_backend.states import load as remote_load
+
+    remote, payload = remote_load(FULL_LOAD_25_MANIFEST, {}, name="carga_fracionada")
+    return bool(payload) if remote else FULL_LOAD_25_MANIFEST.exists()
 
 
 def _full_load_25_completed(
@@ -162,7 +176,7 @@ def validate_full_load_quarter(*, part: int, component: str) -> None:
         raise ValueError(f"Componente inválido na carga 25%: {component}")
     if part not in range(1, FULL_LOAD_25_PARTS + 1):
         raise ValueError("A parte da carga completa 25% deve ser 1, 2, 3 ou 4.")
-    if not FULL_LOAD_25_MANIFEST.exists():
+    if not _full_load_25_exists():
         if part != 1:
             raise RuntimeError(
                 "A carga completa 25% ainda não foi iniciada. "
@@ -191,7 +205,7 @@ def prepare_full_load_quarter(
     if part not in range(1, FULL_LOAD_25_PARTS + 1):
         raise ValueError("A parte da carga completa 25% deve ser 1, 2, 3 ou 4.")
 
-    if FULL_LOAD_25_MANIFEST.exists():
+    if _full_load_25_exists():
         payload = _full_load_25_load()
         completed = _full_load_25_completed(payload, component)
         if part == 1 and part in completed:
