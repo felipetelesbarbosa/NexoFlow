@@ -6,7 +6,7 @@ A **1.5.32 foi publicada em 10/11/2026, 19:16:49 (America/Fortaleza)**, no SHA `
 
 A **1.5.33 foi publicada em 10/11/2026, 23:28:34 (America/Fortaleza)**, no SHA `7884d7007fd0c65cbf90bfc30c5c35dc6c9056fb`, com recuperação da leitura da trava Sheets. [Release e pacotes conferidos](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.33).
 
-As próximas publicações de atualização, hotfix ou patch seguem **1.5.36 → ... → 1.5.99 → 1.6 → 1.6.1**. Cada publicação incrementa uma única vez; commits e novas tentativas de CI da mesma entrega não mudam a numeração. Não há salto automático de versão principal.
+As próximas publicações de atualização, hotfix ou patch seguem **1.5.37 → ... → 1.5.99 → 1.6 → 1.6.1**. Cada publicação incrementa uma única vez; commits e novas tentativas de CI da mesma entrega não mudam a numeração. Não há salto automático de versão principal.
 
 A versão da distribuição fica em `VERSION`. A tag é `v{versao}`, o título é `NexoFlow {versao}` e os pacotes são `NexoFlow-{versao}.zip` e `NexoFlow-Setup-{versao}.zip`. Nunca sobrescreva os arquivos de uma versão pública para entregar código novo. O workflow permite retomar somente um rascunho da mesma entrega.
 
@@ -49,3 +49,6 @@ Preparação aprovada: https://github.com/felipetelesbarbosa/NexoFlow/actions/ru
 ## Preparação 1.5.36
 
 Publicação autorizada para o destino PostgreSQL BI_Itens FARMA e leitura privada Data Studio. Uma única geração no SHA final, incluindo o novo job PostgreSQL/Docker obrigatório; reutilizar os mesmos pacotes aprovados. A 1.5.35 e anteriores permanecem intactas. Implantação na VPS e homologação comercial são etapas do Work, distintas da release Windows.
+
+
+A **1.5.36 foi publicada em 12/11/2026, 03:06:30 (America/Fortaleza)**, SHA `2cc09b864efedbb0ca2d2dc10c62c6bc23091e61`. [release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.36), [preparação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43163283247), [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43163283110) e [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43163597855). Pacotes, hashes e downloads conferidos; a 1.5.35 permanece intacta. Esta publicação não implanta nem homologa a integração comercial PostgreSQL/Data Studio.

@@ -1,6 +1,6 @@
 # NexoFlow — Changelog
 
-## 1.5.36 — em validação para publicação
+## 1.5.36 — publicada em 12/11/2026, 03:06:30 (America/Fortaleza)
 
 - Analytics: destino explícito FARMA/BI_Itens via API privada, com staging/upsert transacional, reconciliação por venda, precisão decimal, revisão monotônica, plano e recibos idempotentes. Partial nunca remove.
 - Outbox privada e comandos `nexo bi-itens-postgres status|retomar|arquivar-encerrada`, sem recolher Weni/Sheets para a retomada. Checkpoint depende da confirmação do banco.

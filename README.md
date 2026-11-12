@@ -8,7 +8,7 @@ O NexoFlow identifica pedidos registrados na API **independentemente de terem si
 
 [Base Mestre permanente de conhecimento e diretrizes](docs/planejamento/DIRETRIZES_E_CONHECIMENTO_NEXOFLOW.md) — ponto de consulta compartilhado entre Codex e Work antes de novas tarefas.
 
-## Integração BI_Itens FARMA 1.5.36 — em validação
+## Integração BI_Itens FARMA 1.5.36 — código publicado; ativação pendente
 
 Destino opcional PostgreSQL por API privada com staging, reconciliação por venda, planos/recibos, outbox e retomada sem nova coleta. Leitura do Data Studio por outro serviço/usuário, consultando a visão do piloto; PostgreSQL não é exposto publicamente. O padrão continua Sheets e PET mantém o fluxo anterior. [Contrato, homologação, ativação, rollback e roteiro do Work](docs/BI%20ITENS%20POSTGRESQL%20FARMA.md). Setup não implanta VPS, Access ou Apps Script.
 

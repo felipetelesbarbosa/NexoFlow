@@ -1,6 +1,6 @@
 # Relatório técnico — BI_Itens FARMA PostgreSQL 1.5.36
 
-Data de implementação: 12/11/2026 (America/Fortaleza). Publicação ainda depende dos checks e dos pacotes do mesmo SHA. A evidência factual de distribuição será registrada após conferência dos downloads públicos.
+Data de implementação: 12/11/2026 (America/Fortaleza). Release publicada em 12/11/2026, 03:06:30 (America/Fortaleza), SHA `2cc09b864efedbb0ca2d2dc10c62c6bc23091e61`. [release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.36), [preparação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43163283247), [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43163283110) e [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43163597855). Distribuição conferida independentemente, sem implantação ou escrita comercial.
 
 ## Resultado implementado
 
@@ -49,3 +49,11 @@ A configuração privada preserva os tokens anteriores e contém Bearers novos s
 Ver [guia técnico e operacional](BI%20ITENS%20POSTGRESQL%20FARMA.md) e [prompt do Work](PROMPT%20WORK%20BI%20ITENS%20POSTGRESQL.md). A cópia do Data Studio deve ser comparada ao Metabase, incluindo datas, rankings, vazio, nove usos e mesclagens. Migrar produção só após envio homologado, plano READY e resultados aprovados. A correção Windows exige instalar o Setup novo em Preserve.
 
 Revisão adicional: ausência no builder BI (inclusive pedido com data futura) não autoriza remover fatos anteriores. O escopo de reconciliação é a união das vendas nas linhas validadas e dos cancelamentos oficiais explícitos. Regressão reproduzida antes do ajuste e conferida também no PostgreSQL com plano completo, preservando os fatos anteriores.
+
+## Evidência da distribuição pública
+
+- O commit de integração `698b996` foi sucedido por `2cc09b8`, que limita o escopo de reconciliação às vendas efetivamente geradas e cancelamentos oficiais. A primeira preparação foi cancelada por substituição de código; não foi uma falha dos testes nem gerou release.
+- No SHA distribuído, os sete jobs obrigatórios, CodeQL e Meta passaram. A matriz Windows 3.11/3.14 nas duas codificações, launchers, Setup Preserve/Clean/rollback e pacote instalado foram aprovados no workflow oficial.
+- Dois ZIPs públicos: SHA-256, CRC, manifesto do Setup, todos os módulos Python, código servidor/conector e versões PE x64 1.5.36.0 conferidos contra o commit, tolerando somente conversão LF/CRLF. Dez módulos assinados do histórico preservados.
+- `NexoFlow-Setup-1.5.36.zip`: `5ef32135c7653eaf624028ba0c3e032730431fa947c9905b3f46af25464fda88`; 108 módulos Python; 515 arquivos comparados ao commit; 8 executáveis x64; 522 entradas de manifesto.
+- `NexoFlow-1.5.36.zip`: `53f83ca8b4b022e2c150143a1332a206d341baabb559187e54e858254155ca55`; 108 módulos Python; 515 arquivos comparados ao commit; 7 executáveis x64; 0 entradas de manifesto.

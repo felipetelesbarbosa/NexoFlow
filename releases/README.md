@@ -1,6 +1,8 @@
-# NexoFlow 1.5.36 — em validação
+# NexoFlow 1.5.36 — Downloads
 
-Pacotes corretivos autorizados após testes/CI/CodeQL e conferência dos mesmos bytes. Integração privada BI_Itens FARMA, opt-in, sem implantação comercial automática. Ver [guia](../docs/BI%20ITENS%20POSTGRESQL%20FARMA.md). A 1.5.35 e anteriores permanecem intactas.
+Publicada em 12/11/2026, 03:06:30 (America/Fortaleza), SHA `2cc09b864efedbb0ca2d2dc10c62c6bc23091e61`. Código e pacotes aprovados; implantação privada e homologação comercial ainda dependem do Work. A 1.5.35 permanece intacta.
+
+[Setup](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.36/NexoFlow-Setup-1.5.36.zip) · [Projeto completo](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.36/NexoFlow-1.5.36.zip) · [SHA-256](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.36/SHA256SUMS-1.5.36.txt) · [Guia](../docs/BI%20ITENS%20POSTGRESQL%20FARMA.md).
 
 # NexoFlow 1.5.35 — Downloads
 
@@ -35,3 +37,7 @@ ed7165d11179c36fb1a0db1b161f2816b7d63bc425e56011f66d20609e95ab63  NexoFlow-1.5.3
 ```
 
 Nenhum dado comercial, manifesto remoto ou implantação do Data Studio foi alterado durante a validação e publicação.
+
+## Evidências da publicação 1.5.36
+
+Publicada em 12/11/2026, 03:06:30 (America/Fortaleza), SHA `2cc09b864efedbb0ca2d2dc10c62c6bc23091e61`. [release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.36), [preparação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43163283247), [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43163283110) e [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43163597855). Dois ZIPs públicos conferidos independentemente.
