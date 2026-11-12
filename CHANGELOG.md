@@ -1,5 +1,11 @@
 # NexoFlow — Changelog
 
+## API leitora BI_Itens — correção posterior à 1.5.36 Windows
+
+- Visão dedicada `farma.produtos_itens_datastudio` com os doze campos originais; migração aditiva e idempotente, sem alterar dados/visão/permissões Metabase.
+- Leitor, conector, grants e auditorias atualizados; fixture legada de sete campos e regressões de tipos, ACLs, conflito/rollback e publicação incompleta. [Diagnóstico e retomada](docs/CORRECAO%20VISAO%20API%20BI%20ITENS.md).
+- Atualização do servidor/conector por SHA; Windows 1.5.36 e seus pacotes preservados. Sem implantação ou escrita comercial nesta correção.
+
 ## 1.5.36 — publicada em 12/11/2026, 03:06:30 (America/Fortaleza)
 
 - Analytics: destino explícito FARMA/BI_Itens via API privada, com staging/upsert transacional, reconciliação por venda, precisão decimal, revisão monotônica, plano e recibos idempotentes. Partial nunca remove.

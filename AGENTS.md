@@ -1,5 +1,7 @@
 # NexoFlow 1.5.36
 
+A correção de leitura posterior à 1.5.36 usa a visão dedicada `farma.produtos_itens_datastudio` (migração aditiva 002). A visão de sete campos `farma.produtos_itens` e suas permissões Metabase são preservadas. Checkout Linux e Apps Script exigem o SHA validado da correção; Windows/publicador continuam 1.5.36. Ver docs/CORRECAO VISAO API BI ITENS.md. Não executar migração/carga comercial no trabalho Codex nem desbloquear estados à mão.
+
 A distribuição 1.5.36 foi publicada em 12/11/2026, 03:06:30 (America/Fortaleza), no SHA `2cc09b864efedbb0ca2d2dc10c62c6bc23091e61`. CI, PostgreSQL/Docker, matriz Windows, Setup Preserve/Clean/rollback e pacotes aprovados; downloads públicos conferidos. O envio BI_Itens FARMA e a leitura Data Studio pelo piloto PostgreSQL continuam opt-in e dependem da implantação/homologação do Work. Não houve carga comercial, mudança na VPS ou migração da fonte de produção nesta entrega. Ver docs/BI ITENS POSTGRESQL FARMA.md.
 
 A 1.5.35 foi publicada em 11/11/2026, 21:23:49 (America/Fortaleza), no SHA `c6204f0535914c48fec71ce5c009f0e8f9a1884a`. Checks, pacotes e downloads públicos conferidos. A 1.5.34 e anteriores permanecem intactas. A validação comercial da BI_Itens no Data Studio continua pendente.

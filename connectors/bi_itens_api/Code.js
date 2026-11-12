@@ -1,6 +1,6 @@
 /* Fonte privada FARMA: exclusivamente API de leitura, sem credenciais de publicação. */
 var PG_READ_PROTOCOL='bi_itens_farma_leitura_1';
-var PG_READ_TARGET='nexoflow_datastudio_piloto.farma.produtos_itens';
+var PG_READ_TARGET='nexoflow_datastudio_piloto.farma.produtos_itens_datastudio';
 var PG_DISTINCT='produtos_distintos_periodo';
 var PG_READ_ERRORS=['BI_PG_CONSULTA_INVALIDA','BI_PG_DESTINO_DIVERGENTE','BI_PG_CAMPOS_INVALIDOS','BI_PG_PERIODO_INVALIDO','BI_PG_FILTRO_NAO_SUPORTADO','BI_PG_CARTAO_EXATO_SEPARADO','BI_PG_VISAO_SCHEMA_DIVERGENTE','BI_PG_LEITURA_PUBLICACAO_PENDENTE','BI_PG_VISAO_GRAO_INVALIDO','BI_PG_LEITURA_LIMITE','BI_PG_VISAO_LINHAGEM_NAO_CONFIRMADA'];
 function getAuthType(){var cc=DataStudioApp.createCommunityConnector();return cc.newAuthTypeResponse().setAuthType(cc.AuthType.KEY).build();}

@@ -2,9 +2,9 @@
 
 ## Escopo e estado
 
-Implementação autorizada em 12/11/2026 (America/Fortaleza). Windows opt-in; FARMA/BI_Itens exclusivamente. Banco `nexoflow_datastudio_piloto`, tabela `farma.bi_itens`, chave `item_chave`. Leitura do Data Studio pela visão **existente** `farma.produtos_itens`, usando outro serviço, outro login e outras credenciais Cloudflare Access. PostgreSQL permanece privado.
+Implementação autorizada em 12/11/2026 (America/Fortaleza). Windows opt-in; FARMA/BI_Itens exclusivamente. Banco `nexoflow_datastudio_piloto`, tabela `farma.bi_itens`, chave `item_chave`. Leitura do Data Studio pela visão dedicada `farma.produtos_itens_datastudio`, usando outro serviço, outro login e outras credenciais Cloudflare Access. PostgreSQL permanece privado.
 
-O usuário informou base conciliada de **68.273 linhas**, entre 20/04/2020 e 06/11/2026. É referência fornecida, não uma releitura comercial feita nesta entrega. O MCP Hostinger confirmou a VPS 2132956 em execução, mas não oferece terminal remoto; Docker Manager respondeu que o sistema não é suportado. Nenhum comando, migração ou carga foi executado na VPS pelo Codex. A estrutura real da visão e suas permissões precisam da conferência do Work antes de ativar. Se diferirem do contrato abaixo, a API bloqueia; não completar campos por suposição.
+O usuário informou base conciliada de **68.273 linhas**, entre 20/04/2020 e 06/11/2026. É referência fornecida, não uma releitura comercial feita nesta entrega. O MCP Hostinger confirmou a VPS 2132956 em execução, mas não oferece terminal remoto; Docker Manager respondeu que o sistema não é suportado. Nenhum comando, migração ou carga foi executado na VPS pelo Codex. A auditoria posterior do Work confirmou que a visão Metabase `farma.produtos_itens` contém sete campos; os doze originais estão na tabela. A correção posterior à release cria uma visão exclusiva da API por migração aditiva 002. O Codex não reconsultou a VPS nesta correção. Ver [diagnóstico e retomada](CORRECAO%20VISAO%20API%20BI%20ITENS.md).
 
 Não acessar bancos Métricas, Hub, n8n ou configuração do Metabase. Não recriar a infraestrutura, seus volumes ou o PostgreSQL. Não alterar o relatório Data Studio de produção durante a homologação. O Metabase é referência independente para conferir a visão.
 
@@ -74,12 +74,12 @@ Sem Swagger, rotas administrativas ou SQL arbitrário. Corpo limitado a 8 MB; cr
 
 ## API e conector de leitura
 
-O segundo processo usa `READ_DSN_FILE`, `READ_TOKEN_FILE`, login **nf_bi_itens_reader** e apenas `SELECT` em `farma.produtos_itens` e na visão de estado. Não recebe o DSN/token do publicador e não oferece suas rotas.
+O segundo processo usa `READ_DSN_FILE`, `READ_TOKEN_FILE`, login **nf_bi_itens_reader** e apenas `SELECT` em `farma.produtos_itens_datastudio` e na visão de estado. Não recebe o DSN/token do publicador e não oferece suas rotas.
 
 - `GET /consulta/destino`: contrato/schema/autenticação; informa estado, inclusive enquanto não estiver pronto, sem devolver fatos.
 - `POST /consulta/farma/bi-itens`: período obrigatório, campos e filtros autorizados. Segmento e visão fixos. Não aceita tabela/database configurável pelo relatório.
 
-A visão precisa oferecer os 12 campos originais de BI_Itens: `item_chave`, `venda_chave`, `cliente_chave`, `data`, `produto_codigo`, `produto_nome`, `categoria`, `quantidade`, `valor_unitario`, `receita_item`, `sku_informado`, `atualizado_em`. Códigos/chaves são Texto, data é DATE, quantidade e valores são NUMERIC. Campos adicionais da visão não são expostos. Uma visão agregada sem essas identidades não pode ser usada silenciosamente no lugar do detalhe: devolver o schema ao Codex para adaptar o contrato, sem alterar a visão comercial às cegas.
+A visão precisa oferecer os 12 campos originais de BI_Itens: `item_chave`, `venda_chave`, `cliente_chave`, `data`, `produto_codigo`, `produto_nome`, `categoria`, `quantidade`, `valor_unitario`, `receita_item`, `sku_informado`, `atualizado_em`. Códigos/chaves são Texto, data é DATE, quantidade e valores são NUMERIC. A migração projeta diretamente os doze campos, sem casts, filtro, join ou agregação, preservando tipos, precisão/escala, collation e uma linha por item. Uma visão agregada sem essas identidades não pode ser usada silenciosamente no lugar do detalhe: devolver o schema ao Codex para adaptar o contrato, sem alterar a visão comercial às cegas.
 
 Consultas usam transação REPEATABLE READ/READ ONLY, validam grão único por item e números antes do filtro, e consultam o estado confirmado na mesma fotografia do banco. `WRITING`, `PARCIAL` e `REVERTIDO` recusam os totais. Sem plano novo, `LEGADO` representa a base existente, cuja conciliação inicial precisa ser confirmada pelo Work. Isso não fabrica `READY` no manifesto Sheets.
 
@@ -102,8 +102,8 @@ São credenciais distintas das do Windows. Nunca colar no código ou no Git. O m
 1. Manter as cargas Windows encerradas e produção Data Studio na fonte atual. Consultar os Compose/containers/redes reais e o helper de seis arquivos. Não substituir os serviços existentes. Localizar o PostgreSQL do projeto **nexoflow-datastudio-piloto**, a visão, o usuário Metabase somente leitura e os backups existentes.
 2. Fazer backup consistente do **banco piloto**, com pg_dump custom pela rotina já autorizada e SHA-256 privado. Não apagar volumes/backups. Executar `integrations/bi_itens_publisher/audit.sql` em leitura: conferir schema/chave, números, datas, visão, permissões, RLS e triggers. Confirmar os 68.273 itens no corte inicial ou explicar a atualização efetiva. Registrar mês/TOTAL e os mesmos recortes do Metabase. Não enviar DSNs, senhas ou linhas comerciais ao Git/CI.
 3. Compilar a imagem do commit aprovado. Dockerfile fixa a imagem base por digest e as dependências transitivas; não atualiza pip automaticamente. Em ambiente com CA corporativa, usar o secret opcional `build_ca_bundle` com a cadeia confiável autorizada, sem desativar TLS. Código/segredos privados não entram na imagem.
-4. A migração é aditiva: cria somente `nexoflow_publicacao`, tabelas de sessão/plano/recibos/imagens privadas, visão de estado e índices de venda/data. Não cria, trunca, renomeia ou troca `farma.bi_itens`/`farma.produtos_itens`.
-5. Criar logins dedicados sem privilégios administrativos, com senhas novas geradas no servidor. Aplicar `grants.sql` ao publicador e `reader-grants.sql` ao leitor. Não usar postgres, dono do banco, usuário Hub/n8n/Métricas ou do Metabase. O login de publicação recebe apenas DML da tabela alvo, metadados necessários, sequência e TEMP; leitor recebe SELECT nas duas visões, sem DML/DDL da tabela-base.
+4. `admin --migrar` valida a tabela/PK e aplica `migration.sql` e `migration_002_read_view.sql` na mesma transação. Além dos metadados/índices existentes, cria **somente a nova visão** `farma.produtos_itens_datastudio`. Não altera fatos, a definição/OID/owner/ACL de `farma.produtos_itens` ou permissões Metabase. Repetir preserva a visão API correta; objeto/definição conflitante bloqueia e reverte toda a transação, sem `CREATE OR REPLACE` desse objeto.
+5. Rodar `audit_read_view.sql` após a migração, por conexão administrativa somente leitura: exigir 12 tipos preservados, zero linhas divergentes e igualdade por mês/TOTAL entre tabela, visão API e visão Metabase nos campos comuns. Comparar OID/owner/ACL legados ao préflight. Criar logins dedicados sem privilégios administrativos, com senhas novas geradas no servidor. Aplicar `grants.sql` ao publicador e `reader-grants.sql` ao leitor. Não usar postgres, dono do banco, usuário Hub/n8n/Métricas ou do Metabase. O login de publicação recebe apenas DML da tabela alvo, metadados necessários, sequência e TEMP; leitor recebe SELECT nas duas visões, sem DML/DDL da tabela-base.
 6. Guardar DSNs/segredos em arquivos privados fora do checkout, adequados ao UID 10001 dos serviços. O admin DSN não é segredo de runtime. Os arquivos montados no runtime devem ser legíveis pelo UID 10001, com 0400 e proprietário apropriado; não tornar credenciais de produção legíveis por todos.
 7. Usar `compose.overlay.example.yaml` como referência adicional, apontando à rede existente validada e **sem ports**. Se o Tunnel não compartilhar essa rede, adaptar somente a extensão autorizada após inspecionar a configuração real. Não expor 5432/8080, não recriar PG/n8n/Hub/Metabase e não substituir seus Compose. Ambos os serviços usam filesystem somente leitura, UID sem root, capabilities removidas, healthchecks e rotação de logs.
 8. Criar duas aplicações Cloudflare Access do tipo Service Auth, com dois Service Tokens distintos, políticas sem bypass público. Sugestões de hostname (não afirmadas como existentes): `bi-publicacao.nexoflowhub.com.br` e `bi-consulta.nexoflowhub.com.br`. Ativar a proteção antes de ligar DNS/ingress ao Tunnel. O primeiro ingress aponta somente ao publicador, o segundo ao leitor. Não reutilizar o token administrativo da Cloudflare/Hostinger como credencial do Windows.
@@ -124,7 +124,7 @@ Não colocar DSN/senha no comando. Se executado dentro de contêiner, montar som
 Primeiro aprovar os testes locais/CI e o pacote instalado. Depois homologar o canal e o schema reais, inicialmente sem fatos comerciais novos. O usuário autorizou preparar a integração; esta entrega não executa a carga comercial automaticamente.
 
 1. Atualizar pelo Setup **Preserve**, com rotinas encerradas; conferir `nexo versao`. Copiar o secrets atualizado mantendo os tokens existentes. O exemplo público não contém suas credenciais. Manter `BI_ITENS_DESTINO="sheets"` até os serviços estarem prontos.
-2. Com a API leitora, conferir a base conciliada no relatório privado antes de mudar produção. Não precisa repetir coleta histórica anual nem enviar SQLite à VPS.
+2. Nesta etapa, manter FARMA em `sheets` e Analytics/Noturno pausados. Com a API leitora, conferir a base conciliada no relatório privado antes de mudar produção. Não precisa repetir coleta histórica anual nem enviar SQLite à VPS.
 3. Quando o canal estiver validado, selecionar FARMA e configurar `BI_ITENS_DESTINO="postgres"`, modo `simular`, credenciais dedicadas preenchidas. Executar uma atualização Analytics normal; o resultado informa o delta PostgreSQL, sem checkpoint de publicação, e mantém BI_Itens Sheets intacta. As demais etapas normais permanecem operacionais.
 4. Conferir os números esperados, incluindo as diferenças justificadas desde a base inicial, e somente então mudar para `aplicar`. Executar Analytics na rotina autorizada. Ele valida as mesmas linhas, publica em lotes e recebe os recibos antes de avançar. Não executar Weni/Recompra/Noturno só para retomar a outbox.
 
@@ -188,3 +188,22 @@ Passagem resumida: [prompt operacional para o Work](PROMPT%20WORK%20BI%20ITENS%2
 A outbox local é protegida pelo lock de arquivo do sistema operacional, compartilhado entre Analytics e os comandos de retomada. Uma segunda rotina não pode regravar seu estado; caminhos dos perfis são separados. A trava PostgreSQL continua necessária para coordenação entre instalações. Não remover arquivos de lock para forçar retomada.
 
 Revisão adicional: ausência no builder BI (inclusive pedido com data futura) não autoriza remover fatos anteriores. O escopo de reconciliação é a união das vendas nas linhas validadas e dos cancelamentos oficiais explícitos. Regressão reproduzida antes do ajuste e conferida também no PostgreSQL com plano completo, preservando os fatos anteriores.
+
+
+## Retomada da implantação após a auditoria das sete colunas
+
+Windows permanece 1.5.36; o protocolo de publicação e `farma.bi_itens` não mudaram. Usar o **SHA validado da correção** para o checkout Linux, imagem e arquivos do conector. Não usar o servidor/conector contidos na tag 1.5.36 para essa retomada, pois ainda apontam à visão antiga. Atualizar os dois lados da leitura juntos; uma combinação antiga/nova é recusada por alvo divergente.
+
+1. Preservar o backup e as evidências já conferidas pelo Work; revalidar hash/catálogo/corte antes da migração. Rodar `audit.sql` em leitura e guardar OID/owner/ACL de `farma.produtos_itens`.
+2. Com DSN administrativo do piloto em arquivo privado, executar no checkout do SHA validado:
+
+```bash
+PYTHONPATH=app:. python -m integrations.bi_itens_publisher.admin --dsn-file /caminho/privado/admin-dsn --migrar
+```
+
+3. Aplicar `reader-grants.sql` após criar o login exclusivo. O SELECT novo aponta somente à visão API e à visão de estado. Não conceder dados extras ao Metabase nem usar seu login na API. O script não revoga nem concede privilégios na visão antiga; conferir separadamente qualquer grant preexistente inesperado da conta leitora.
+4. Rodar `audit_read_view.sql` por conexão administrativa em leitura. A conta runtime não precisa de SELECT na tabela-base ou na visão Metabase para essa auditoria. Exigir zero divergências dos doze campos e grão; os agregados incluem todos os meses e TOTAL, sem IDs individuais.
+5. Repetir a migração e conferir ausência de mudanças de OID/owner/ACL/dados. Não fabricar READY: WRITING/PARCIAL/REVERTIDO continuam bloqueantes; LEGADO identifica a base conciliada anterior à primeira publicação automática.
+6. Implantar as APIs/Cloudflare e o conector do mesmo SHA em cópia privada; comparar com Metabase nos mesmos cortes. Retomar o envio Windows somente na etapa posterior aprovada. Nesta correção não executar Analytics/Noturno nem publicação comercial.
+
+Reversão desta migração: parar a API leitora e manter a fonte de produção anterior; deixar a nova visão e metadados preservados e sem consumo até investigar. Não alterar a visão Metabase, apagar fatos ou executar down destrutivo.

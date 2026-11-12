@@ -472,5 +472,7 @@ class Store:
 
 
 def migrate(dsn):
-    with psycopg.connect(dsn) as conn:
-        conn.execute(Path(__file__).with_name("migration.sql").read_text())
+    with psycopg.connect(dsn, row_factory=dict_row) as conn:
+        Store(dsn).check(conn)
+        for name in ("migration.sql", "migration_002_read_view.sql"):
+            conn.execute(Path(__file__).with_name(name).read_text(encoding="utf-8"))

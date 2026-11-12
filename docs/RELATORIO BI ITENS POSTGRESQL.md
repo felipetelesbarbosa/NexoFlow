@@ -10,7 +10,7 @@ A chave do item deriva da posição produzida pelo parser oficial, posteriorment
 
 Outbox imutável, lock local do SO, sessão reservada antes da coleta, revisão do servidor, plano de lotes e recibos duráveis protegem retomada e ordenação. Staging, conferência de precisão, upsert somente do conteúdo alterado, auditoria antes/depois e recibo ocorrem numa transação PostgreSQL. O checkpoint Windows só avança após confirmar digest e commit. Rollback de lote recusa alterações posteriores.
 
-O serviço separado de leitura usa SELECT na visão existente `farma.produtos_itens`, outro login e outros segredos. O conector privado do Data Studio recebe período/filtros, agrega no PostgreSQL e oferece distintos globais do período. Publicação incompleta, esquema/origem/grão incompatível, limites ou falhas geram indisponibilidade explícita, sem totais parciais. Não altera o manifesto Sheets nem o relatório comercial.
+A entrega original apontava a leitura à visão existente `farma.produtos_itens`; a auditoria posterior do Work identificou que ela tem sete campos. A correção posterior usa uma visão exclusiva `farma.produtos_itens_datastudio`, preservando a visão Metabase. Ver [correção e evidências](CORRECAO%20VISAO%20API%20BI%20ITENS.md). O conector privado do Data Studio recebe período/filtros, agrega no PostgreSQL e oferece distintos globais do período. Publicação incompleta, esquema/origem/grão incompatível, limites ou falhas geram indisponibilidade explícita, sem totais parciais. Não altera o manifesto Sheets nem o relatório comercial.
 
 ## Arquivos e componentes
 

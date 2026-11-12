@@ -221,3 +221,8 @@ O usuário autorizou integrar somente FARMA/BI_Itens ao banco piloto `nexoflow_d
 Data Studio é o painel prioritário. O novo conector privado lê a visão existente `farma.produtos_itens` por API de somente leitura; Metabase é referência para comparar. A visão real, seus tipos/origem, as credenciais Access e a infraestrutura ainda dependem da conferência do Work. Testes sintéticos/Docker não são implantação ou homologação comercial. Não editar o manifesto Sheets, criar READY manualmente, ativar PET ou migrar produção por causa desta nota. A referência de 68.273 itens é um corte fornecido pelo usuário, sem nova leitura comercial nesta entrega.
 
 Ver [implementação e homologação](../BI%20ITENS%20POSTGRESQL%20FARMA.md) e [roteiro do Work](../PROMPT%20WORK%20BI%20ITENS%20POSTGRESQL.md). Segredos particulares permanecem fora do Git e da distribuição; hostnames e Service Tokens só podem ser preenchidos após emissão real.
+
+
+### Auditoria Work e correção da visão API — 12/11/2026
+
+A auditoria do Work confirmou sete campos em `farma.produtos_itens` (Metabase), doze em `farma.bi_itens` e PK `item_chave`. A correção posterior à release Windows 1.5.36 (`2cc09b8`) cria a visão dedicada `farma.produtos_itens_datastudio` pela migração aditiva 002; preserva a visão e os privilégios Metabase. Servidor e conector usam o SHA validado dessa correção, com publicação incompleta ainda bloqueante. Ver [diagnóstico e roteiro](../CORRECAO%20VISAO%20API%20BI%20ITENS.md). A evidência real é do Work; testes Codex são sintéticos. Manter Windows em `sheets` e Analytics/Noturno FARMA pausados nesta etapa; não editar manifesto, ativar PET ou executar carga comercial por causa dessa migração.

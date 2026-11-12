@@ -75,7 +75,9 @@ def store():
          produto_nome text NOT NULL,categoria text NOT NULL,quantidade numeric NOT NULL,
          valor_unitario numeric NOT NULL,receita_item numeric NOT NULL,sku_informado integer NOT NULL,
          atualizado_em timestamptz NOT NULL)""")
-        c.execute("CREATE VIEW farma.produtos_itens AS SELECT * FROM farma.bi_itens")
+        c.execute(
+            "CREATE VIEW farma.produtos_itens AS SELECT data,produto_codigo,produto_nome,categoria,quantidade,receita_item,sku_informado FROM farma.bi_itens"
+        )
     migrate(dsn)
     return Store(dsn)
 
@@ -611,7 +613,9 @@ print(json.dumps({'code':response.status,'body':json.load(response)}))
 
 def test_staging_never_silently_rounds_precision(store):
     with store.connect() as c:
-        c.execute("DROP VIEW farma.produtos_itens")  # Somente fixture descartável.
+        c.execute(
+            "DROP VIEW farma.produtos_itens_datastudio, farma.produtos_itens"
+        )  # Somente fixture descartável.
         c.execute("ALTER TABLE farma.bi_itens ALTER quantidade TYPE numeric(18,2)")
     with pytest.raises(PublicationError, match="PRECISAO"):
         submit(store, payload(store, [row(quantidade="1.123456")]))
@@ -756,7 +760,7 @@ def test_reader_detects_duplicated_view_grain_without_deduplicating_revenue(
     submit(store, payload(store))
     with store.connect() as c:
         c.execute(
-            "CREATE OR REPLACE VIEW farma.produtos_itens AS SELECT * FROM farma.bi_itens UNION ALL SELECT * FROM farma.bi_itens"
+            "CREATE OR REPLACE VIEW farma.produtos_itens_datastudio AS SELECT * FROM farma.bi_itens UNION ALL SELECT * FROM farma.bi_itens"
         )
     with pytest.raises(PublicationError, match="GRAO_INVALIDO"):
         reader.query(query(["receita_item"]))
@@ -855,7 +859,7 @@ def test_reader_optional_blank_text_keeps_sheet_semantics_without_inventing_iden
         ]
         c.execute(
             sql.SQL(
-                "CREATE OR REPLACE VIEW farma.produtos_itens AS SELECT {} FROM farma.bi_itens"
+                "CREATE OR REPLACE VIEW farma.produtos_itens_datastudio AS SELECT {} FROM farma.bi_itens"
             ).format(sql.SQL(",").join(fields))
         )
     result = reader.query(query(["produto_codigo", "categoria", "receita_item"]))
@@ -889,3 +893,191 @@ def test_builder_omission_does_not_delete_previous_facts_even_in_complete_plan(s
     receipt = submit(store, batch)
     assert receipt["removidos"] == 0 and receipt["atualizados"] == 0
     assert facts(store) == previous
+
+
+def test_dedicated_view_exposes_twelve_fields_with_legacy_seven_unchanged(
+    store, reader
+):
+    from bi_postgres_contract import COLUMNS
+
+    with store.connect() as c:
+        legacy = c.execute(
+            "SELECT column_name FROM information_schema.columns WHERE table_schema='farma' AND table_name='produtos_itens' ORDER BY ordinal_position"
+        ).fetchall()
+        assert len(legacy) == 7
+        dedicated = c.execute(
+            "SELECT column_name FROM information_schema.columns WHERE table_schema='farma' AND table_name='produtos_itens_datastudio' ORDER BY ordinal_position"
+        ).fetchall()
+        assert [r["column_name"] for r in dedicated] == list(COLUMNS)
+    assert reader.query(query(["receita_item"]))["rows"] == []
+
+
+def relation_snapshot(conn, name):
+    return conn.execute(
+        "SELECT oid,relowner,relacl,pg_get_viewdef(oid,false) AS definition FROM pg_class WHERE oid=%s::regclass",
+        (name,),
+    ).fetchone()
+
+
+def test_read_view_migration_preserves_metabase_acl_data_and_existing_reader_acl(
+    store, reader
+):
+    submit(
+        store,
+        payload(store, [row(1), row(2, sale=2)], sales=[f"{i:032x}" for i in (1, 2)]),
+    )
+    with store.connect() as c:
+        if not c.execute(
+            "SELECT 1 FROM pg_roles WHERE rolname='nf_metabase_fixture'"
+        ).fetchone():
+            c.execute("CREATE ROLE nf_metabase_fixture NOLOGIN")
+        c.execute("GRANT USAGE ON SCHEMA farma TO nf_metabase_fixture")
+        c.execute("GRANT SELECT ON farma.produtos_itens TO nf_metabase_fixture")
+        old = relation_snapshot(c, "farma.produtos_itens")
+        api = relation_snapshot(c, "farma.produtos_itens_datastudio")
+        before = facts(store)
+        for role, relation, expected in [
+            ("nf_metabase_fixture", "farma.produtos_itens", True),
+            ("nf_metabase_fixture", "farma.produtos_itens_datastudio", False),
+            ("nf_bi_itens_reader", "farma.produtos_itens_datastudio", True),
+            ("nf_bi_itens_reader", "farma.produtos_itens", False),
+            ("nf_bi_itens_reader", "farma.bi_itens", False),
+        ]:
+            assert (
+                c.execute(
+                    "SELECT has_table_privilege(%s,%s,'SELECT') AS allowed",
+                    (role, relation),
+                ).fetchone()["allowed"]
+                is expected
+            )
+        complete = c.execute(
+            "SELECT * FROM farma.produtos_itens_datastudio ORDER BY item_chave"
+        ).fetchall()
+        assert complete == before
+    migrate(store.dsn)
+    migrate(store.dsn)
+    assert facts(store) == before
+    with store.connect() as c:
+        assert relation_snapshot(c, "farma.produtos_itens") == old
+        assert relation_snapshot(c, "farma.produtos_itens_datastudio") == api
+    assert reader.query(query(["receita_item"]))["rows"] == [{"values": ["5.00"]}]
+
+
+@pytest.mark.parametrize(
+    "projection",
+    [
+        "SELECT * FROM farma.bi_itens WHERE false",
+        "SELECT * FROM farma.bi_itens UNION ALL SELECT * FROM farma.bi_itens",
+        "SELECT data,produto_codigo,produto_nome,categoria,quantidade,receita_item,sku_informado FROM farma.bi_itens",
+    ],
+)
+def test_conflicting_api_view_blocks_migration_without_replacing_it_or_partial_ddl(
+    store, projection
+):
+    submit(store, payload(store))
+    before = facts(store)
+    with store.connect() as c:
+        old = relation_snapshot(c, "farma.produtos_itens")
+        c.execute("DROP VIEW farma.produtos_itens_datastudio")
+        c.execute("CREATE VIEW farma.produtos_itens_datastudio AS " + projection)
+        conflict = relation_snapshot(c, "farma.produtos_itens_datastudio")
+        c.execute(
+            "DROP SCHEMA nexoflow_publicacao CASCADE"
+        )  # Banco sintético descartável.
+    with pytest.raises(
+        psycopg.errors.RaiseException, match="BI_PG_VISAO_API_CONFLITANTE"
+    ):
+        migrate(store.dsn)
+    with store.connect() as c:
+        assert relation_snapshot(c, "farma.produtos_itens") == old
+        assert relation_snapshot(c, "farma.produtos_itens_datastudio") == conflict
+        assert (
+            c.execute(
+                "SELECT to_regclass('nexoflow_publicacao.sessions') AS object"
+            ).fetchone()["object"]
+            is None
+        )
+    assert facts(store) == before
+
+
+def test_migration_keeps_original_numeric_text_and_timestamp_typmods(store):
+    with store.connect() as c:
+        c.execute("DROP VIEW farma.produtos_itens_datastudio, farma.produtos_itens")
+        c.execute("""ALTER TABLE farma.bi_itens
+         ALTER quantidade TYPE numeric(18,4), ALTER receita_item TYPE numeric(18,2),
+         ALTER valor_unitario TYPE numeric(18,2), ALTER produto_codigo TYPE varchar(32),
+         ALTER atualizado_em TYPE timestamptz(3)""")
+        c.execute(
+            "CREATE VIEW farma.produtos_itens AS SELECT data,produto_codigo,produto_nome,categoria,quantidade,receita_item,sku_informado FROM farma.bi_itens"
+        )
+        old = relation_snapshot(c, "farma.produtos_itens")
+    migrate(store.dsn)
+    with store.connect() as c:
+        mismatch = c.execute("""SELECT a.attname FROM pg_attribute a JOIN pg_attribute b ON a.attname=b.attname
+         WHERE a.attrelid='farma.bi_itens'::regclass AND b.attrelid='farma.produtos_itens_datastudio'::regclass
+         AND a.attnum>0 AND b.attnum>0 AND NOT a.attisdropped AND NOT b.attisdropped
+         AND (a.atttypid,a.atttypmod,a.attcollation) IS DISTINCT FROM (b.atttypid,b.atttypmod,b.attcollation)""").fetchall()
+        assert mismatch == []
+        assert relation_snapshot(c, "farma.produtos_itens") == old
+    assert submit(store, payload(store, [row(quantidade="1.1234")]))["inseridos"] == 1
+
+
+def test_migration_does_not_clear_writing_or_partial_state(store, reader):
+    p = payload(store)
+    store.plan(
+        p["session_id"],
+        [{"batch_id": p["batch_id"], "digest": digest(validate_payload(p))}],
+        True,
+    )
+    migrate(store.dsn)
+    with pytest.raises(PublicationError, match="PUBLICACAO_PENDENTE"):
+        reader.query(query(["receita_item"]))
+    store.apply(p)
+    submit(store, payload(store, complete=False))
+    migrate(store.dsn)
+    with pytest.raises(PublicationError, match="PUBLICACAO_PENDENTE"):
+        reader.query(query(["receita_item"]))
+
+
+def test_legacy_metabase_target_is_rejected_instead_of_returning_seven_field_subset(
+    store, reader
+):
+    with pytest.raises(PublicationError, match="DESTINO_DIVERGENTE"):
+        reader.query(
+            {
+                **query(["receita_item"]),
+                "target": "nexoflow_datastudio_piloto.farma.produtos_itens",
+            }
+        )
+
+
+def test_readonly_audit_scripts_execute_and_conference_exact_twelve_columns(store):
+    submit(store, payload(store))
+    for name in ("audit.sql", "audit_read_view.sql"):
+        with psycopg.connect(
+            store.dsn, autocommit=True, row_factory=psycopg.rows.dict_row
+        ) as c:
+            cursor = c.execute(
+                Path("integrations/bi_itens_publisher", name).read_text(
+                    encoding="utf-8"
+                )
+            )
+            results = []
+            while True:
+                if cursor.description:
+                    results.extend(cursor.fetchall())
+                if not cursor.nextset():
+                    break
+        if name == "audit_read_view.sql":
+            assert [
+                r["linhas_divergentes"] for r in results if "linhas_divergentes" in r
+            ] == [0]
+            assert len([r for r in results if r.get("tipo_preservado") is True]) == 12
+            totals = [r for r in results if r.get("periodo") == "TOTAL"]
+            assert {r["fonte"] for r in totals} == {"tabela", "api", "metabase"}
+            assert all(
+                (r["linhas"], r["unidades"], r["receita"])
+                == (1, Decimal("2"), Decimal("2.50"))
+                for r in totals
+            )
+    assert len(facts(store)) == 1

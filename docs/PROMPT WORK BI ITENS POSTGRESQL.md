@@ -1,21 +1,21 @@
 # Prompt para o Work — BI_Itens FARMA privada no PostgreSQL e Data Studio
 
-Atue no ambiente autorizado do NexoFlow. Leia primeiro `AGENTS.md`, `docs/planejamento/DIRETRIZES_E_CONHECIMENTO_NEXOFLOW.md` e **docs/BI ITENS POSTGRESQL FARMA.md** do commit validado da release Windows 1.5.36. Não confunda release de código com implantação/homologação comercial.
+Atue no ambiente autorizado do NexoFlow. Leia primeiro `AGENTS.md`, `docs/planejamento/DIRETRIZES_E_CONHECIMENTO_NEXOFLOW.md` e **docs/BI ITENS POSTGRESQL FARMA.md** do SHA validado da correção da visão API, posterior à tag Windows 1.5.36. Não confunda release de código com implantação/homologação comercial.
 
 ## Missão
 
 Implantar e homologar as APIs privadas de publicação e leitura da BI_Itens FARMA no piloto já existente; validar o novo conector numa cópia do Data Studio e só depois migrar a fonte comercial aprovada. O usuário autorizou esse caminho. Não expor PostgreSQL, não misturar bancos, não alterar PET e não recriar infraestrutura.
 
-Destino exato: projeto PostgreSQL `nexoflow-datastudio-piloto`, banco `nexoflow_datastudio_piloto`, tabela `farma.bi_itens`, PK `item_chave`; visão de leitura existente `farma.produtos_itens`. Metabase consulta a visão em modo somente leitura e é referência para comparar. Métricas, Hub, n8n e banco de configuração do Metabase ficam fora desta tarefa.
+Destino exato: projeto PostgreSQL `nexoflow-datastudio-piloto`, banco `nexoflow_datastudio_piloto`, tabela `farma.bi_itens`, PK `item_chave`; visão API dedicada `farma.produtos_itens_datastudio`. Metabase continua consultando a visão original de sete campos `farma.produtos_itens` em modo somente leitura e é referência para comparar. Métricas, Hub, n8n e banco de configuração do Metabase ficam fora desta tarefa.
 
-Referência inicial fornecida: 68.273 linhas, de 20/04/2020 a 06/11/2026. Confirmar o corte atual, não presumir que continuou idêntico. Não repetir a carga anual, transferir SQLite ao servidor ou coletar APIs comerciais para testar o transporte.
+Referência já fornecida: 68.273 linhas, de 20/04/2020 a 06/11/2026. A auditoria posterior do Work, em 12/11/2026, 08h23 de Belém, confirmou grão e conciliação por mês/TOTAL; usar seus totais e evidências privados. Confirmar o corte atual, não presumir que continuou idêntico. Não repetir a carga anual, transferir SQLite ao servidor ou coletar APIs comerciais para testar o transporte.
 
 ## Pré-requisitos reais
 
-1. Confirmar no GitHub tag/SHA, CI/CodeQL e pacotes 1.5.36 efetivamente publicados. Não usar um SHA local diferente do distribuído.
+1. Confirmar a release Windows 1.5.36 (`2cc09b864efedbb0ca2d2dc10c62c6bc23091e61`) e, separadamente, o SHA validado da correção servidor/conector entregue pelo Codex. Checkout Linux e Apps Script devem usar esse novo SHA; não presumir que o pacote Windows contém o servidor corrigido.
 2. Identificar a configuração Compose real e os seis arquivos usados pelo helper da infraestrutura. Conferir redes, nomes dos containers, volumes e backups antes de qualquer extensão.
 3. Fazer backup consistente do banco piloto com SHA-256 privado. Rodar `integrations/bi_itens_publisher/audit.sql` somente em leitura. Conferir schema/PK, cabeçalhos/tipos da visão, origem e grão, RLS/triggers, privilégios, contagens, produtos/unidades/receita por mês e TOTAL. Preservar a base atual.
-4. A visão precisa expor os 12 IDs originais de BI_Itens, com códigos/chaves Texto, data DATE e medidas NUMERIC. Se não oferecer esse contrato ou tiver dependências adicionais, devolver o diagnóstico sanitizado ao Codex. Não inventar colunas, alterar a visão do Metabase ou retirar a guarda para liberar.
+4. A auditoria confirmou sete campos na visão do Metabase e doze na tabela. Executar a migração aditiva 002 pelo fluxo `admin --migrar`, depois `reader-grants.sql` e `audit_read_view.sql`, conforme o guia. Exigir doze tipos originais, uma linha por item, zero divergências e OID/owner/ACL/dados da visão Metabase intactos. Repetir a migração deve ser idempotente; conflito é bloqueante.
 
 ## Implantação privada
 
@@ -28,9 +28,9 @@ Referência inicial fornecida: 68.273 linhas, de 20/04/2020 a 06/11/2026. Confir
 
 Felipe possui configuração privada preparada. Ela preserva os tokens Weni/Farma/Google fornecidos e deixa o destino padrão em `sheets`. Os novos segredos Bearer de publicação/leitura são independentes, mas os campos de hostname e Service Tokens Access dependem da emissão/configuração real. Preencher pela via privada; não pedir tokens no chat e não colocar no Git/CI. Não enviar o `secrets_config.py` inteiro à VPS: os serviços só precisam de seus próprios arquivos.
 
-## Homologação do envio Windows
+## Homologação do envio Windows — etapa posterior
 
-Não presuma acesso ao C: ou PowerShell. Se o Windows não estiver disponível, entregue a Felipe os comandos exatos para executar.
+**Nesta retomada, manter destino `sheets` e Analytics/Noturno FARMA pausados.** Priorizar migração aditiva, APIs/Cloudflare e leitura da base na cópia do Data Studio. Os passos de simulação/aplicação abaixo pertencem à etapa posterior; não os executar automaticamente por causa da correção da visão. Não presuma acesso ao C: ou PowerShell.
 
 1. Atualizar Windows com Setup Preserve; `nexo versao` deve mostrar 1.5.36.
 2. Validar primeiro os serviços e a leitura da base atual, sem nova escrita comercial.

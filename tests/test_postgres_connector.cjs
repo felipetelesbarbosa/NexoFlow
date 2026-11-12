@@ -9,7 +9,7 @@ function fixture(callback){
  return {ctx,calls,logs,sleeps,script,stored};
 }
 function request(fields=['produtos_distintos_periodo']){return {fields:fields.map(name=>({name})),dateRange:{startDate:'2026-11-01',endDate:'2026-11-03'},dimensionsFilters:[[{fieldName:'sku_informado',operator:'EQUALS',type:'INCLUDE',values:['1']}]]};}
-function response(options,rows){const p=JSON.parse(options.payload);return {protocol:'bi_itens_farma_leitura_1',target:'nexoflow_datastudio_piloto.farma.produtos_itens',fields:p.fields,rows,filtersApplied:true,revision:3,state:'READY',cut_at:'2026-11-12T12:00:00Z'};}
+function response(options,rows){const p=JSON.parse(options.payload);return {protocol:'bi_itens_farma_leitura_1',target:'nexoflow_datastudio_piloto.farma.produtos_itens_datastudio',fields:p.fields,rows,filtersApplied:true,revision:3,state:'READY',cut_at:'2026-11-12T12:00:00Z'};}
 test('novo leitor preserva IDs da BI_Itens e métrica exata não reagregável',()=>{
  const f=fixture(),fields=f.ctx.pgFields_().build();
  const old=require('../connectors/continuacoes/Schemas.js').BI_Itens.map(s=>s[0]);
@@ -33,7 +33,7 @@ test('detalhe, moeda, códigos com zero e campos usados apenas em filtros',()=>{
 });
 test('período vazio não vira zero fictício; alteração de estado/schema nunca retorna parcial',()=>{
  const f=fixture((_u,o)=>({body:response(o,[])}));assert.equal(f.ctx.getData(request()).rows.length,0);
- for(const mutation of [r=>r.state='WRITING',r=>r.fields=['receita_item'],r=>r.target='nexoflow_hub',r=>r.rows=[{values:['NaN']}],r=>r.rows=[{values:[1,2]}]]){
+ for(const mutation of [r=>r.state='WRITING',r=>r.fields=['receita_item'],r=>r.target='nexoflow_hub',r=>r.target='nexoflow_datastudio_piloto.farma.produtos_itens',r=>r.rows=[{values:['NaN']}],r=>r.rows=[{values:[1,2]}]]){
   const broken=fixture((_u,o)=>{const r=response(o,[{values:[216]}]);mutation(r);return {body:r};});
   assert.throws(()=>broken.ctx.getData(request()),/Nenhum total parcial/);
  }

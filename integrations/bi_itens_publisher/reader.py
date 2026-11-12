@@ -12,7 +12,7 @@ from psycopg.rows import dict_row
 
 from bi_postgres_contract import COLUMNS, PublicationError
 
-READ_TARGET = "nexoflow_datastudio_piloto.farma.produtos_itens"
+READ_TARGET = "nexoflow_datastudio_piloto.farma.produtos_itens_datastudio"
 READ_PROTOCOL = "bi_itens_farma_leitura_1"
 METRICS = {"quantidade", "valor_unitario", "receita_item"}
 DISTINCT = "produtos_distintos_periodo"
@@ -63,7 +63,7 @@ class Reader:
         ):
             raise PublicationError("BI_PG_LEITOR_PRIVILEGIOS")
         columns = conn.execute(
-            "SELECT column_name,data_type FROM information_schema.columns WHERE table_schema='farma' AND table_name='produtos_itens'"
+            "SELECT column_name,data_type FROM information_schema.columns WHERE table_schema='farma' AND table_name='produtos_itens_datastudio'"
         ).fetchall()
         types = {r["column_name"]: r["data_type"] for r in columns}
         if (
@@ -86,13 +86,13 @@ class Reader:
         lineage = conn.execute("""SELECT DISTINCT n.nspname,c.relname FROM pg_rewrite r
           JOIN pg_depend d ON d.classid='pg_rewrite'::regclass AND d.objid=r.oid AND d.refclassid='pg_class'::regclass
           JOIN pg_class c ON c.oid=d.refobjid JOIN pg_namespace n ON n.oid=c.relnamespace
-          WHERE r.ev_class='farma.produtos_itens'::regclass AND d.refobjid<>r.ev_class""").fetchall()
+          WHERE r.ev_class='farma.produtos_itens_datastudio'::regclass AND d.refobjid<>r.ev_class""").fetchall()
         if {(r["nspname"], r["relname"]) for r in lineage} != {("farma", "bi_itens")}:
             raise PublicationError("BI_PG_VISAO_LINHAGEM_NAO_CONFIRMADA")
         custom = conn.execute("""SELECT 1 FROM pg_rewrite r JOIN pg_depend d
           ON d.classid='pg_rewrite'::regclass AND d.objid=r.oid AND d.refclassid='pg_proc'::regclass
           JOIN pg_proc p ON p.oid=d.refobjid JOIN pg_namespace n ON n.oid=p.pronamespace
-          WHERE r.ev_class='farma.produtos_itens'::regclass AND n.nspname<>'pg_catalog' LIMIT 1""").fetchone()
+          WHERE r.ev_class='farma.produtos_itens_datastudio'::regclass AND n.nspname<>'pg_catalog' LIMIT 1""").fetchone()
         if (
             custom
             or conn.execute(
@@ -231,7 +231,7 @@ class Reader:
                 OR quantidade::text IN ('NaN','Infinity','-Infinity')
                 OR receita_item::text IN ('NaN','Infinity','-Infinity')
                 OR valor_unitario::text IN ('NaN','Infinity','-Infinity')) AS invalid
-                FROM farma.produtos_itens WHERE data IS NULL OR data BETWEEN %s AND %s""",
+                FROM farma.produtos_itens_datastudio WHERE data IS NULL OR data BETWEEN %s AND %s""",
                 (start, end),
             ).fetchone()
             if checked["n"] != checked["keys"] or checked["invalid"]:
@@ -253,7 +253,7 @@ class Reader:
                     for f in fields
                 ]
             statement = sql.SQL(
-                "SELECT {},count(*) AS _nf_count FROM farma.produtos_itens WHERE {}"
+                "SELECT {},count(*) AS _nf_count FROM farma.produtos_itens_datastudio WHERE {}"
             ).format(sql.SQL(",").join(expressions), where)
             if dimensions:
                 identifiers = sql.SQL(",").join(map(dimension, dimensions))

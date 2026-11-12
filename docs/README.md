@@ -56,3 +56,5 @@ A fonte do guia de operação é `docs/Documentacao NexoFlow.md`; seu [HTML](Doc
 - [Prompt do Work: implantação e homologação BI_Itens PostgreSQL](PROMPT%20WORK%20BI%20ITENS%20POSTGRESQL.md).
 
 - [Relatório técnico da integração BI_Itens PostgreSQL](RELATORIO%20BI%20ITENS%20POSTGRESQL.md).
+
+- [Correção da visão API de doze campos, preservando Metabase](CORRECAO%20VISAO%20API%20BI%20ITENS.md).
