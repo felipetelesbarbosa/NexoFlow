@@ -212,7 +212,7 @@ class Store:
             or not isinstance(after, str)
         ):
             raise StorageError("DS_LIMITE_LEITURA")
-        with self.connect() as conn:
+        with self.connect(readonly=True) as conn:
             version = self.active(conn)
             if revision:
                 rev = self.revision(conn, revision)

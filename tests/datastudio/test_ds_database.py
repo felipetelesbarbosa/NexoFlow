@@ -675,3 +675,27 @@ def test_current_projection_date_index_and_stable_work_bound(store):
         assert any("Index" in n["Node Type"] for n in scans)
         assert sum(n.get("Rows Removed by Filter", 0) for n in scans) < 50
         assert plan["Actual Rows"] == 12
+
+
+def test_publisher_read_keeps_snapshot_when_commit_occurs_between_version_and_rows(
+    store,
+):
+    revision = begin(store)
+    item = row("BI_Itens", item_chave="one", quantidade="1")
+    batch(store, revision, "BI_Itens", [item])
+    ready = finish(store, revision)
+    next_revision = begin(store)
+    batch(store, next_revision, "BI_Itens", [dict(item, quantidade="2")])
+    reader = Store(DSN, "homologacao", "FARMA")
+    select = reader.effective
+
+    def interleaved(conn, name, version):
+        query = select(conn, name, version)
+        finish(store, next_revision)
+        return query
+
+    reader.effective = interleaved
+    page = reader.rows("BI_Itens")
+    assert page["version"] == ready["version"]
+    assert page["rows"] == [item]
+    assert store.rows("BI_Itens")["rows"] == [dict(item, quantidade="2")]
