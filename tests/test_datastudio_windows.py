@@ -176,7 +176,8 @@ class DatastudioWindowsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "secrets_config.py"
             original = 'WENI_API_TOKEN = "synthetic-secret-retained"\nPERFIS = {"PET": {"WENI_API_TOKEN": "synthetic-pet"}}\nraise RuntimeError("não executar configuração ao editar")\n'
-            path.write_text(original, encoding="utf-8")
+            path.write_bytes(original.replace("\n", "\r\n").encode("utf-8"))
+            original_bytes = path.read_bytes()
             result = configure(
                 path,
                 "FARMA",
@@ -191,7 +192,7 @@ class DatastudioWindowsTests(unittest.TestCase):
                 next(
                     Path(temp).glob("credentials/datastudio/backup-configuracao/*.bak")
                 ).read_bytes(),
-                original.encode("utf-8"),
+                original_bytes,
             )
             with self.assertRaises(StorageError):
                 configure(path, "FARMA", "producao", "private.json", backend="postgres")

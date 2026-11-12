@@ -36,3 +36,5 @@ Validação local em 12/11/2026: 27 testes do contrato definitivo aprovados com 
 Suíte Linux final desta implementação: **1.943 aprovados, 144 ignorados e 1.475 subtestes aprovados**. Os ignorados correspondem a plataformas/integrações que exigem seus próprios ambientes; não são comprovação de Windows. PostgreSQL/Docker definitivo: **27 aprovados**. CI/CodeQL, matriz Windows, Setup e pacotes ainda exigem conferência no SHA enviado; não declarar publicação antes disso.
 
 Revisão final de concorrência: a paginação da API publicadora também usa REPEATABLE READ. O teste força um commit de outra revisão entre a seleção da versão e das linhas e exige que ambas permaneçam no mesmo snapshot. A API leitora já utilizava esse isolamento.
+
+A matriz Windows detectou um erro na fixture do backup de configuração: `write_text` gerava CRLF e a asserção comparava com uma string LF. O backup estava correto. A fixture agora grava CRLF explicitamente e compara os bytes originais, exercitando a preservação também em Linux. Nenhuma guarda foi removida; exige nova validação do SHA corrigido antes do build/publicação.
