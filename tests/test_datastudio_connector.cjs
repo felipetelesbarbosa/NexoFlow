@@ -3,9 +3,9 @@ function fixture(callback){
  const calls=[],logs=[],sleeps=[];
  const secret={protocol:'nexoflow_datastudio_1',segment:'FARMA',environment:'homologacao',endpoint:'https://reader.example.invalid',api_token:'synthetic-reader-only-token',access_client_id:'synthetic.access',access_client_secret:'synthetic-access-secret'};
  function fields(){const all=[];function field(role){const f={role,setId(v){this.id=v;return this;},setName(){return this;},setType(v){this.type=v;return this;},setAggregation(v){this.aggregation=v;return this;},setIsReaggregatable(v){this.reaggregatable=v;return this;}};all.push(f);return f;}return {newMetric:()=>field('metric'),newDimension:()=>field('dimension'),build:()=>all,forIds:n=>({build:()=>all.filter(f=>n.includes(f.id)).map(f=>({name:f.id,type:f.type}))})};}
- const cc={getFields:fields,FieldType:{YEAR_MONTH_DAY:'date',NUMBER:'number',TEXT:'text',CURRENCY_BRL:'currency_brl'},AggregationType:{SUM:'sum',MAX:'max'},newUserError:()=>({setText(t){return {throwException(){throw Error(t)}}}})};
+ const cc={getFields:fields,FieldType:{YEAR_MONTH_DAY:'date',NUMBER:'number',TEXT:'text',CURRENCY_BRL:'currency_brl',PERCENT:'percent'},AggregationType:{SUM:'sum',MAX:'max'},newUserError:()=>({setText(t){return {throwException(){throw Error(t)}}}})};
  const ctx={Date,DataStudioApp:{createCommunityConnector:()=>cc},console:{error:v=>logs.push(v)},Utilities:{sleep:v=>sleeps.push(v)},PropertiesService:{getScriptProperties:()=>({getProperty:()=>JSON.stringify(secret)})},UrlFetchApp:{fetch:(url,options)=>{calls.push({url,options});let reply;if(url.endsWith('/v1/destino'))reply={body:{protocol:secret.protocol,target:'nexoflow_datastudio_homologacao.farma',segment:'FARMA',environment:'homologacao',schema_hash:ctx.NexoDSSchemaHash}};else reply=callback(JSON.parse(options.payload),calls.length);return {getResponseCode:()=>reply.status||200,getContentText:()=>JSON.stringify(reply.body||{})};}}};
- vm.createContext(ctx);for(const f of ['Schemas.js','Code.js'])vm.runInContext(fs.readFileSync('connectors/datastudio_api/'+f,'utf8'),ctx);return {ctx,calls,logs,sleeps,secret};
+ vm.createContext(ctx);for(const f of ['Schemas.js','AbcCore.js','Code.js'])vm.runInContext(fs.readFileSync('connectors/datastudio_api/'+f,'utf8'),ctx);return {ctx,calls,logs,sleeps,secret};
 }
 function request(names=['produtos_distintos_periodo']){return {configParams:{segmento:'FARMA',ambiente:'homologacao',tabela:'BI_Itens'},fields:names.map(name=>({name})),dateRange:{startDate:'2026-11-01',endDate:'2026-11-03'},dimensionsFilters:[[{fieldName:'sku_informado',operator:'EQUALS',type:'INCLUDE',values:['1']}]]};}
 function result(p,rows){return {body:{protocol:"nexoflow_datastudio_1",target:"nexoflow_datastudio_homologacao.farma",segment:"FARMA",environment:"homologacao",schema_hash:require("../connectors/datastudio_api/Schemas.js").hash,fields:p.fields,rows:rows,complete:true,version:1}};}
@@ -74,4 +74,48 @@ test('guarda de recorte chega ao Work sem expor mensagem livre do servidor',()=>
  const bad=fixture(()=>({status:409,body:{error:'DS_PRIVATE-MUST-NOT-APPEAR'}}));
  assert.throws(()=>bad.ctx.getData(request()),/DS_HTTP_409/);
  assert.ok(!bad.logs.join().includes('PRIVATE-MUST-NOT-APPEAR'));
+});
+
+test('ABC PostgreSQL muda com o período; pares não somam item duplicado',()=>{
+ function run(mode,start,end){
+  const f=fixture(p=>result(p,p.table==='BI_Itens'?
+    [['i1','s1','2026-11-01','01','A','','1','80'],['i2','s1','2026-11-01','02','B','','1','20'],['i3','s2','2026-11-02','02','B','','1','100']].filter(r=>r[2]>=start&&r[2]<=end):
+    [['s1','2026-11-01','100'],['s2','2026-11-02','100']].filter(r=>r[1]>=start&&r[1]<=end)));
+  const r=request(mode==='abc'?['produto_codigo','receita_produtos','classe_abc']:mode==='juntos'?['produto_a_codigo','produto_b_codigo','pedidos_juntos']:['skus_distintos','faturamento_produtos']);
+  r.configParams.tabela='ABC_'+mode;r.dateRange={startDate:start,endDate:end};r.dimensionsFilters=[];
+  return JSON.parse(JSON.stringify(f.ctx.getData(r)));
+ }
+ assert.deepEqual(run('abc','2026-11-01','2026-11-01').rows.map(r=>r.values),[['01',80,'A'],['02',20,'B']]);
+ assert.deepEqual(run('abc','2026-11-01','2026-11-02').rows.map(r=>r.values),[['02',120,'A'],['01',80,'A']]);
+ assert.deepEqual(run('juntos','2026-11-01','2026-11-02').rows.map(r=>r.values),[['01','02',1]]);
+ assert.deepEqual(run('resumo','2026-11-01','2026-11-02').rows.map(r=>r.values),[[2,200]]);
+ assert.deepEqual(run('abc','2026-11-30','2026-11-30').rows,[]);
+});
+test('ABC recusa falha, limite, resposta parcial e versões diferentes',()=>{
+ for(const variant of ['version','partial','failure','limit']){
+  const f=fixture((p,n)=>{
+   if(variant==='failure')return {status:403};
+   if(variant==='limit')return {status:409,body:{error:'DS_CONSULTA_EXCEDE_LIMITE_USE_RESUMO_OU_PERIODO'}};
+   const r=result(p,[]);r.body.version=variant==='version'?n:1;r.body.complete=variant!=='partial';return r;
+  });
+  const r=request(['produto_codigo']);r.configParams.tabela='ABC_abc';r.dimensionsFilters=[];
+  assert.throws(()=>f.ctx.getData(r),/Nenhum total parcial/);
+ }
+});
+test('projeções do inventário são tipadas sem expor payloads privados',()=>{
+ const f=fixture();
+ assert.equal(f.ctx.dsFields_('Itens_Pedidos_FarmaLider').build().find(f=>f.id==='quantidade').type,'number');
+ for(const bad of ['cpf','telefone','ultimo_pedido_raw','primeiro_anuncio_clique_id'])assert.ok(!f.ctx.NexoDSSchemas.Pedidos_FarmaLider.columns.includes(bad));
+ const original={};vm.createContext(original);vm.runInContext(fs.readFileSync('connectors/looker_abc/Code.js','utf8'),original);
+ for(const mode of ['abc','resumo','juntos'])assert.deepEqual(Array.from(f.ctx.NexoDSSchemas['ABC_'+mode].columns),Array.from(original.fieldSpecs_(mode),f=>f[0]));
+});
+
+test('ABC não devolve totais de itens sem pedido completo e alinha ordem do SDK',()=>{
+ const f=fixture(p=>result(p,p.table==='BI_Itens'?[['i1','s1','2026-11-01','01','A','','1','10']]:[['s1','2026-11-01','20']]));
+ const r=request(['classe_abc','produto_codigo']);r.configParams.tabela='ABC_abc';r.dimensionsFilters=[];
+ assert.throws(()=>f.ctx.getData(r),/DS_ABC_BASE_INCOMPLETA/);
+ const good=fixture(p=>result(p,p.table==='BI_Itens'?[['i1','s1','2026-11-01','01','A','','1','10']]:[['s1','2026-11-01','10']]));
+ const response=good.ctx.getData(r);
+ assert.deepEqual(Array.from(response.schema,f=>f.name),['produto_codigo','classe_abc']);
+ assert.deepEqual(Array.from(response.rows[0].values),['01','A']);
 });

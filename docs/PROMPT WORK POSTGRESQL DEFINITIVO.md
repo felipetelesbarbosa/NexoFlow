@@ -1,5 +1,7 @@
 # Roteiro para o Work — PostgreSQL definitivo FARMA
 
+**Complemento posterior:** [contratos dos nove aliases](CONTRATOS%20NOVE%20ALIASES%20FARMA.md). As quatro projeções operacionais e o adaptador ABC foram implementados; as fórmulas/configurações reais e a origem/chave de ds136 continuam pendentes. As contagens de gaps abaixo descrevem a base 83692b6.
+
 O Windows usa a distribuição `v1.5.37`, SHA `2683717431b1c4313efaaaef35cfaaf20236958a`, cujos downloads foram conferidos. Para servidor/conector, usar o SHA posterior validado da entrega do inventário, identificado no GitHub. Não confundir os pacotes publicados com os novos arquivos do leitor. Leia AGENTS.md, MIGRACAO WINDOWS POSTGRESQL DATA STUDIO.md, ESTRUTURA POSTGRESQL DATA STUDIO.md e RELATORIO BACKEND DATA STUDIO.md. Execute os comandos reais do guia, sem adaptar o contrato piloto por simples troca de DSN.
 
 1. Conferir backup/restauração privada, espaço real e rede da implantação Data Studio. A 001 já aplicada não deve ser repetida. Aplicar 002 pelo módulo administrativo do SHA conferido e criar os serviços dedicados do banco definitivo, mantendo piloto, Metabase, Hub, Métricas e n8n intactos. Não publicar porta PostgreSQL.

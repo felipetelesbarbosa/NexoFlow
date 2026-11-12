@@ -11,12 +11,15 @@ import argparse
 import hashlib
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 INVENTORY = ROOT / "docs/inventarios/FARMA_DATA_STUDIO_2026-11-12.md"
-REGISTRY = ROOT / "app/ds_backend/registry.json"
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "app"))
+from integrations.datastudio.read_catalog import READ_REGISTRY  # noqa: E402
 
 
 def cells(line):
@@ -119,7 +122,7 @@ def parse(text: str) -> dict[str, Any]:
 def audit(path=INVENTORY):
     raw = path.read_bytes()
     report = parse(raw.decode("utf-8-sig"))
-    registry = json.loads(REGISTRY.read_text(encoding="utf-8"))
+    registry = READ_REGISTRY
     for source in report["sources"]:
         match = re.match(r"`([^`]+)`", source["logical_source"])
         table = match[1] if match else None
@@ -145,6 +148,15 @@ def audit(path=INVENTORY):
         columns = spec.get("read_columns", spec.get("columns", []))
         source["exact_fields_in_contract"] = [f for f in observed if f in columns]
         source["labels_or_fields_to_check"] = [f for f in observed if f not in columns]
+        if source["alias"] in ("ds106", "ds107", "ds109", "ds110"):
+            source["contract_status"] = "ADAPTADOR_ABC_DISPONIVEL_CONFIRMAR_PARAMETROS"
+            source["adapter_candidates"] = {
+                "ds106": ["ABC_abc", "ABC_resumo", "ABC_juntos"],
+                "ds107": ["ABC_abc"], "ds109": ["ABC_resumo"], "ds110": ["ABC_juntos"],
+            }[source["alias"]]
+        if source["alias"] == "ds136":
+            source["confirmed_header"] = "data segmento conversas_weni resolvidas nao_resolvidas transferidas origem fuso".split()
+            source["missing_evidence"] = ["produtor", "chave", "politica_atualizacao", "preenchimento_manual"]
         source["preserve_even_if_unused"] = True
     aliases = {s["alias"] for s in report["sources"]}
     names = {b["name"] for b in report["blends"]}

@@ -1,5 +1,11 @@
 # NexoFlow — Changelog
 
+## Leitor FARMA — contratos dos nove aliases
+
+- Quatro projeções autenticadas e tipadas para métricas/pedidos/itens, com campos restritos e chaves das mesclagens preservadas.
+- Adaptador ABC por período sobre API PostgreSQL, reutilizando cálculo e IDs oficiais, com igualdade da versão READY e falha sem total parcial.
+- [Contratos, pendências de metadados e roteiro privado](docs/CONTRATOS%20NOVE%20ALIASES%20FARMA.md). Sem alteração do contrato Windows, troca de fontes ou implantação comercial.
+
 ## Leitor e inventário FARMA — após a distribuição 1.5.37
 
 - Inventário do Work preservado: 37 aliases, cinco mesclagens (duas sem gráficos), 75 componentes, oito controles, 14 filtros e três substituições de IDs. Auditoria offline identifica correspondências e dependências sem presumir homologação.

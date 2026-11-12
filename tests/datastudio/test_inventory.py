@@ -44,7 +44,7 @@ def test_observed_label_is_not_invented_formula_or_permission_to_expose():
     assert (
         aliases["ds136"]["target_table"] is None
     )  # Não aliasar Conversas_Diarias à força.
-    assert aliases["ds72"]["contract_status"] == "PRIVADA_NAO_EXPOSTA"
+    assert aliases["ds72"]["target_table"] == "Pedidos_FarmaLider"
     assert aliases["ds109"]["target_table"] is None  # Resumo ABC dinâmico ≠ snapshot.
     assert not report["permits_cutover"]
     assert report["commercial_validation"] == "PENDENTE_NO_GOOGLE"
@@ -76,3 +76,21 @@ def test_real_inventory_cli_no_credentials_and_no_overwrite(tmp_path):
     assert json.loads(original)["counts"]["sources"] == 37
     assert subprocess.run(command, capture_output=True).returncode != 0
     assert target.read_bytes() == original
+
+
+def test_new_alias_contract_does_not_mutate_windows_storage_or_guess_conversations():
+    from ds_backend.contract import REGISTRY
+    from integrations.datastudio.read_catalog import READ_REGISTRY
+
+    assert not REGISTRY["Pedidos_FarmaLider"]["public"]
+    assert READ_REGISTRY["Pedidos_FarmaLider"]["public"]
+    assert REGISTRY["Itens_Pedidos_FarmaLider"]["types"]["quantidade"] == "text"
+    assert READ_REGISTRY["Itens_Pedidos_FarmaLider"]["types"]["quantidade"] == "number"
+    sources = {s["alias"]: s for s in audit()["sources"]}
+    assert sources["ds106"]["target_table"] is None
+    assert len(sources["ds106"]["adapter_candidates"]) == 3
+    assert (
+        sources["ds136"]["confirmed_header"]
+        == "data segmento conversas_weni resolvidas nao_resolvidas transferidas origem fuso".split()
+    )
+    assert sources["ds136"]["target_table"] is None

@@ -10,7 +10,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "app"))
-from ds_backend.contract import REGISTRY, SCHEMA_HASH  # noqa: E402
+sys.path.insert(0, str(ROOT))
+from ds_backend.contract import SCHEMA_HASH  # noqa: E402
+from integrations.datastudio.read_catalog import READ_REGISTRY as REGISTRY  # noqa: E402
 
 
 def run():
@@ -44,6 +46,36 @@ def run():
             dimensions=dims,
             types={f: spec["types"][f] for f in columns},
         )
+    abc = json.loads(
+        subprocess.check_output(
+            [
+                "node",
+                "-e",
+                "const fs=require('fs'),vm=require('vm'),c={};vm.createContext(c);vm.runInContext(fs.readFileSync('connectors/looker_abc/Code.js','utf8'),c);console.log(JSON.stringify(Object.fromEntries(['abc','resumo','juntos'].map(m=>[m,c.fieldSpecs_(m)]))))",
+            ],
+            cwd=ROOT,
+            text=True,
+        )
+    )
+    for mode, fields in abc.items():
+        public["ABC_" + mode] = dict(
+            columns=[f for f, _ in fields],
+            types={
+                f: "date" if k == "date" else "text" if k == "text" else "number"
+                for f, k in fields
+            },
+            dimensions=[],
+            period="periodo_inicio",
+            abc_mode=mode,
+            abc_kinds=dict(fields),
+        )
+    core = ROOT / "connectors/datastudio_api/AbcCore.js"
+    original = (ROOT / "connectors/looker_abc/AbcCore.js").read_text(encoding="utf-8")
+    if args.check:
+        if core.read_text(encoding="utf-8") != original:
+            raise SystemExit("Cálculo ABC diverge da referência oficial.")
+    else:
+        core.write_text(original, encoding="utf-8")
     content = (
         "/* Gerado pelo contrato; executar scripts/sync_datastudio_schema.py --check. */\nvar NexoDSSchemaHash="
         + json.dumps(SCHEMA_HASH)

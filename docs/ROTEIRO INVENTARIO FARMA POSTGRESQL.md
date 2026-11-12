@@ -1,5 +1,7 @@
 # Roteiro de migração do relatório FARMA — inventário de 12/11/2026
 
+**Complemento posterior:** [contratos dos nove aliases](CONTRATOS%20NOVE%20ALIASES%20FARMA.md). As quatro projeções operacionais e o adaptador ABC foram implementados; as fórmulas/configurações reais e a origem/chave de ds136 continuam pendentes. As contagens de gaps abaixo descrevem a base 83692b6.
+
 Complemento ao [guia de implantação e carga](MIGRACAO%20WINDOWS%20POSTGRESQL%20DATA%20STUDIO.md). A distribuição Windows continua 1.5.37. Esta entrega atualiza o **leitor na VPS, o conector privado e o roteiro**; não instala serviços nem troca fontes comerciais.
 
 ## Evidência e preservação

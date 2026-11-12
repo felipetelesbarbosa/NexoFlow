@@ -9,6 +9,7 @@ from pathlib import Path
 from psycopg import sql
 
 from ds_backend.contract import REGISTRY, StorageError, digest
+from integrations.datastudio.read_catalog import READ_REGISTRY
 from integrations.datastudio.reader import create_views, view_name
 from integrations.datastudio.store import Store, migrate
 
@@ -136,7 +137,7 @@ def grants(conn, segment):
                 )
             )
     # O leitor só enxerga visões públicas; Store.info usa esta função restrita na implantação.
-    for name, spec in REGISTRY.items():
+    for name, spec in READ_REGISTRY.items():
         if spec["public"]:
             conn.execute(
                 sql.SQL("GRANT SELECT ON {}.{} TO {}").format(
@@ -145,7 +146,7 @@ def grants(conn, segment):
                     sql.Identifier(reader),
                 )
             )
-    for name, spec in REGISTRY.items():
+    for name, spec in READ_REGISTRY.items():
         if spec["public"]:
             conn.execute(
                 sql.SQL("GRANT SELECT ON {}.{} TO {}").format(

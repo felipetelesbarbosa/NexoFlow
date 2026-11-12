@@ -799,3 +799,62 @@ def test_publisher_read_keeps_snapshot_when_commit_occurs_between_version_and_ro
     assert page["version"] == ready["version"]
     assert page["rows"] == [item]
     assert store.rows("BI_Itens")["rows"] == [dict(item, quantidade="2")]
+
+
+def test_inventory_restricted_projections_preserve_join_keys(store):
+    from integrations.datastudio.admin import grants
+
+    rev = begin(store)
+    batch(
+        store,
+        rev,
+        "Pedidos_FarmaLider",
+        [row("Pedidos_FarmaLider", pedido_chave="p1", contact_uuid="c1")],
+    )
+    batch(
+        store,
+        rev,
+        "Itens_Pedidos_FarmaLider",
+        [
+            row(
+                "Itens_Pedidos_FarmaLider",
+                item_chave="i1",
+                pedido_chave="p1",
+                produto_codigo="001",
+                quantidade="2",
+                valor_total="10.10",
+            )
+        ],
+    )
+    batch(
+        store,
+        rev,
+        "Base_Contatos",
+        [
+            row("Base_Contatos", contact_uuid="c1"),
+            row("Base_Contatos", contact_uuid="c2"),
+        ],
+    )
+    finish(store, rev)
+    with store.connect() as conn:
+        grants(conn, "FARMA")
+    dsn = DSN + "&options=-c%20role%3Dnf_ds_farma_read"
+    with psycopg.connect(dsn) as conn:
+        assert conn.execute(
+            "SELECT i.produto_codigo,i.quantidade,i.valor_total FROM farma.ds_itens_pedidos_farmalider i INNER JOIN farma.ds_pedidos_farmalider p USING(pedido_chave)"
+        ).fetchall() == [
+            (
+                "001",
+                __import__("decimal").Decimal("2"),
+                __import__("decimal").Decimal("10.10"),
+            )
+        ]
+        assert conn.execute(
+            "SELECT b.contact_uuid,p.pedido_chave FROM farma.ds_base_contatos b LEFT JOIN farma.ds_pedidos_farmalider p USING(contact_uuid) ORDER BY b.contact_uuid"
+        ).fetchall() == [("c1", "p1"), ("c2", None)]
+    reader = Reader(dsn, "homologacao", "FARMA", require_dedicated_role=True)
+    assert reader.query(
+        "Itens_Pedidos_FarmaLider", ["quantidade", "valor_total"], "", "", [], {}
+    )["rows"] == [["2", "10.10"]]
+    with pytest.raises(StorageError, match="CAMPOS_NAO_AUTORIZADOS"):
+        reader.query("Pedidos_FarmaLider", ["ultimo_pedido_raw"], "", "", [], {})

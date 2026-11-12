@@ -183,6 +183,169 @@ var NexoDSSchemas={
     ],
     "dimensions": []
   },
+  "Metricas_Diarias": {
+    "columns": [
+      "data",
+      "tipo_atribuicao",
+      "anuncio_id",
+      "anuncio_titulo",
+      "contatos"
+    ],
+    "types": {
+      "data": "date",
+      "tipo_atribuicao": "text",
+      "anuncio_id": "text",
+      "anuncio_titulo": "text",
+      "contatos": "number"
+    },
+    "keys": [
+      "data",
+      "tipo_atribuicao",
+      "anuncio_id"
+    ],
+    "period": "data",
+    "public": true,
+    "grain": "data+tipo_atribuicao+anuncio_id",
+    "source": "Analytics/integração oficial",
+    "full_history": false,
+    "read_columns": [
+      "data",
+      "tipo_atribuicao",
+      "anuncio_id",
+      "anuncio_titulo",
+      "contatos"
+    ],
+    "dimensions": []
+  },
+  "Pedidos_FarmaLider": {
+    "columns": [
+      "pedido_chave",
+      "pedido_id",
+      "contact_uuid",
+      "data",
+      "origem_pedido",
+      "status_confirmacao",
+      "status_validacao",
+      "farmalider_status_pedido",
+      "farmalider_forma_pagamento"
+    ],
+    "types": {
+      "pedido_chave": "text",
+      "pedido_id": "text",
+      "contact_uuid": "text",
+      "data": "date",
+      "origem_pedido": "text",
+      "status_confirmacao": "text",
+      "status_validacao": "text",
+      "farmalider_status_pedido": "text",
+      "farmalider_forma_pagamento": "text"
+    },
+    "keys": [
+      "pedido_chave"
+    ],
+    "period": "data",
+    "public": true,
+    "grain": "pedido_chave",
+    "source": "Analytics/integração oficial",
+    "full_history": false,
+    "read_columns": [
+      "pedido_chave",
+      "pedido_id",
+      "contact_uuid",
+      "data",
+      "origem_pedido",
+      "status_confirmacao",
+      "status_validacao",
+      "farmalider_status_pedido",
+      "farmalider_forma_pagamento"
+    ],
+    "dimensions": []
+  },
+  "Itens_Pedidos_FarmaLider": {
+    "columns": [
+      "item_chave",
+      "pedido_chave",
+      "data",
+      "produto_codigo",
+      "produto_nome",
+      "quantidade",
+      "valor_unitario",
+      "valor_total"
+    ],
+    "types": {
+      "item_chave": "text",
+      "pedido_chave": "text",
+      "data": "date",
+      "produto_codigo": "text",
+      "produto_nome": "text",
+      "quantidade": "number",
+      "valor_unitario": "number",
+      "valor_total": "number"
+    },
+    "keys": [
+      "item_chave"
+    ],
+    "period": "data",
+    "public": true,
+    "grain": "item_chave",
+    "source": "Analytics/integração oficial",
+    "full_history": false,
+    "read_columns": [
+      "item_chave",
+      "pedido_chave",
+      "data",
+      "produto_codigo",
+      "produto_nome",
+      "quantidade",
+      "valor_unitario",
+      "valor_total"
+    ],
+    "dimensions": []
+  },
+  "Metricas_Vendas": {
+    "columns": [
+      "data",
+      "pedidos",
+      "pedidos_confirmados_api",
+      "clientes_compradores",
+      "unidades_vendidas",
+      "faturamento_produtos",
+      "faturamento_frete",
+      "faturamento",
+      "faturamento_confirmado_api"
+    ],
+    "types": {
+      "data": "date",
+      "pedidos": "number",
+      "pedidos_confirmados_api": "number",
+      "clientes_compradores": "number",
+      "unidades_vendidas": "number",
+      "faturamento_produtos": "number",
+      "faturamento_frete": "number",
+      "faturamento": "number",
+      "faturamento_confirmado_api": "number"
+    },
+    "keys": [
+      "data"
+    ],
+    "period": "data",
+    "public": true,
+    "grain": "data",
+    "source": "Analytics/integração oficial",
+    "full_history": false,
+    "read_columns": [
+      "data",
+      "pedidos",
+      "pedidos_confirmados_api",
+      "clientes_compradores",
+      "unidades_vendidas",
+      "faturamento_produtos",
+      "faturamento_frete",
+      "faturamento",
+      "faturamento_confirmado_api"
+    ],
+    "dimensions": []
+  },
   "BI_Resumo_Diario": {
     "columns": [
       "data",
@@ -1307,6 +1470,168 @@ var NexoDSSchemas={
     "source": "insumo manual Weni; confirmar mapeamento na migração",
     "full_history": false,
     "dimensions": []
+  },
+  "ABC_abc": {
+    "columns": [
+      "periodo_inicio",
+      "periodo_fim",
+      "periodo_rotulo",
+      "produto_chave",
+      "produto_codigo",
+      "produto_nome",
+      "categoria",
+      "unidades",
+      "receita_produtos",
+      "pedidos",
+      "ranking_receita",
+      "ranking_unidades",
+      "participacao_receita",
+      "participacao_acumulada",
+      "participacao_receita_pct",
+      "participacao_acumulada_pct",
+      "classe_abc",
+      "abc_disponivel",
+      "atualizado_em"
+    ],
+    "types": {
+      "periodo_inicio": "date",
+      "periodo_fim": "date",
+      "periodo_rotulo": "text",
+      "produto_chave": "text",
+      "produto_codigo": "text",
+      "produto_nome": "text",
+      "categoria": "text",
+      "unidades": "number",
+      "receita_produtos": "number",
+      "pedidos": "number",
+      "ranking_receita": "number",
+      "ranking_unidades": "number",
+      "participacao_receita": "number",
+      "participacao_acumulada": "number",
+      "participacao_receita_pct": "number",
+      "participacao_acumulada_pct": "number",
+      "classe_abc": "text",
+      "abc_disponivel": "number",
+      "atualizado_em": "text"
+    },
+    "dimensions": [],
+    "period": "periodo_inicio",
+    "abc_mode": "abc",
+    "abc_kinds": {
+      "periodo_inicio": "date",
+      "periodo_fim": "date",
+      "periodo_rotulo": "text",
+      "produto_chave": "text",
+      "produto_codigo": "text",
+      "produto_nome": "text",
+      "categoria": "text",
+      "unidades": "sum",
+      "receita_produtos": "money",
+      "pedidos": "sum",
+      "ranking_receita": "number",
+      "ranking_unidades": "number",
+      "participacao_receita": "percent",
+      "participacao_acumulada": "percent",
+      "participacao_receita_pct": "sum",
+      "participacao_acumulada_pct": "number",
+      "classe_abc": "text",
+      "abc_disponivel": "number",
+      "atualizado_em": "text"
+    }
+  },
+  "ABC_resumo": {
+    "columns": [
+      "periodo_inicio",
+      "periodo_fim",
+      "periodo_rotulo",
+      "produtos_classe_a",
+      "produtos_classe_b",
+      "produtos_classe_c",
+      "receita_classe_a",
+      "receita_classe_b",
+      "receita_classe_c",
+      "participacao_top5_receita",
+      "skus_distintos",
+      "faturamento_produtos",
+      "participacao_top5_receita_pct",
+      "abc_disponivel",
+      "atualizado_em"
+    ],
+    "types": {
+      "periodo_inicio": "date",
+      "periodo_fim": "date",
+      "periodo_rotulo": "text",
+      "produtos_classe_a": "number",
+      "produtos_classe_b": "number",
+      "produtos_classe_c": "number",
+      "receita_classe_a": "number",
+      "receita_classe_b": "number",
+      "receita_classe_c": "number",
+      "participacao_top5_receita": "number",
+      "skus_distintos": "number",
+      "faturamento_produtos": "number",
+      "participacao_top5_receita_pct": "number",
+      "abc_disponivel": "number",
+      "atualizado_em": "text"
+    },
+    "dimensions": [],
+    "period": "periodo_inicio",
+    "abc_mode": "resumo",
+    "abc_kinds": {
+      "periodo_inicio": "date",
+      "periodo_fim": "date",
+      "periodo_rotulo": "text",
+      "produtos_classe_a": "sum",
+      "produtos_classe_b": "sum",
+      "produtos_classe_c": "sum",
+      "receita_classe_a": "percent",
+      "receita_classe_b": "percent",
+      "receita_classe_c": "percent",
+      "participacao_top5_receita": "percent",
+      "skus_distintos": "sum",
+      "faturamento_produtos": "money",
+      "participacao_top5_receita_pct": "number",
+      "abc_disponivel": "number",
+      "atualizado_em": "text"
+    }
+  },
+  "ABC_juntos": {
+    "columns": [
+      "periodo_inicio",
+      "periodo_fim",
+      "periodo_rotulo",
+      "produto_a_codigo",
+      "produto_a_nome",
+      "produto_b_codigo",
+      "produto_b_nome",
+      "pedidos_juntos",
+      "atualizado_em"
+    ],
+    "types": {
+      "periodo_inicio": "date",
+      "periodo_fim": "date",
+      "periodo_rotulo": "text",
+      "produto_a_codigo": "text",
+      "produto_a_nome": "text",
+      "produto_b_codigo": "text",
+      "produto_b_nome": "text",
+      "pedidos_juntos": "number",
+      "atualizado_em": "text"
+    },
+    "dimensions": [],
+    "period": "periodo_inicio",
+    "abc_mode": "juntos",
+    "abc_kinds": {
+      "periodo_inicio": "date",
+      "periodo_fim": "date",
+      "periodo_rotulo": "text",
+      "produto_a_codigo": "text",
+      "produto_a_nome": "text",
+      "produto_b_codigo": "text",
+      "produto_b_nome": "text",
+      "pedidos_juntos": "sum",
+      "atualizado_em": "text"
+    }
   }
 };
 if(typeof module!=="undefined")module.exports={hash:NexoDSSchemaHash,tables:NexoDSSchemas};

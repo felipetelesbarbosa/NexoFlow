@@ -11,11 +11,10 @@ from psycopg.rows import dict_row
 
 from ds_backend.contract import (
     PROTOCOL,
-    REGISTRY,
     SCHEMA_HASH,
     StorageError,
-    table_contract,
 )
+from integrations.datastudio.read_catalog import READ_REGISTRY, read_contract
 from integrations.datastudio.store import Store
 
 MAX_RESULT_ROWS = 50_000
@@ -40,7 +39,7 @@ class Reader(Store):
         )
 
     def query(self, table, fields, start, end, filters, aggregation):
-        spec = table_contract(table)
+        spec = read_contract(table)
         allowed = spec.get("read_columns", spec["columns"])
         if (
             not spec["public"]
@@ -212,7 +211,7 @@ class Reader(Store):
 def create_views(conn):
     for segment in ("FARMA", "PET"):
         schema = segment.lower()
-        for name, spec in REGISTRY.items():
+        for name, spec in READ_REGISTRY.items():
             if not spec["public"] and name != "Exclusoes_Publicacao":
                 continue
             columns = []
