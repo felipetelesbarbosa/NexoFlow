@@ -63,7 +63,7 @@ function dsFields_(table){
     var kind=spec.types[name],metric=kind==='number'&&!spec.dimensions.includes(name),field=metric?fields.newMetric():fields.newDimension();
     var abcKind=spec.abc_kinds&&spec.abc_kinds[name];
     var brl=(NexoDSCurrencyBRL[table]||[]).includes(name)||abcKind==='money';
-    field.setId(name).setName(spec.abc_mode?(NexoDSAbcLabels[name]||name):name).setType(kind==='date'?cc.FieldType.YEAR_MONTH_DAY:kind==='number'?(brl?cc.FieldType.CURRENCY_BRL:cc.FieldType.NUMBER):cc.FieldType.TEXT);
+    field.setId(name).setName(spec.abc_mode?(NexoDSAbcLabels[name]||name):((spec.labels||{})[name]||name)).setType(kind==='date'?cc.FieldType.YEAR_MONTH_DAY:kind==='number'?(brl?cc.FieldType.CURRENCY_BRL:cc.FieldType.NUMBER):cc.FieldType.TEXT);
     if(abcKind==='percent')field.setType(cc.FieldType.PERCENT);
     if(metric)field.setAggregation(abcKind?(['sum','money'].includes(abcKind)?cc.AggregationType.SUM:cc.AggregationType.MAX):(/taxa|pct|idade|ranking|ticket_medio|^clientes$/.test(name)?cc.AggregationType.MAX:cc.AggregationType.SUM));
   });

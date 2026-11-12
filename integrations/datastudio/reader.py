@@ -14,7 +14,11 @@ from ds_backend.contract import (
     SCHEMA_HASH,
     StorageError,
 )
-from integrations.datastudio.read_catalog import READ_REGISTRY, read_contract
+from integrations.datastudio.read_catalog import (
+    DERIVED_SQL,
+    READ_REGISTRY,
+    read_contract,
+)
 from integrations.datastudio.store import Store
 
 MAX_RESULT_ROWS = 50_000
@@ -216,7 +220,11 @@ def create_views(conn):
                 continue
             columns = []
             for field in spec.get("read_columns", spec["columns"]):
-                value = sql.SQL("registro ->> {}").format(sql.Literal(field))
+                value = (
+                    sql.SQL(DERIVED_SQL[name, field])
+                    if (name, field) in DERIVED_SQL
+                    else sql.SQL("registro ->> {}").format(sql.Literal(field))
+                )
                 kind = spec["types"][field]
                 if kind in ("number", "date"):
                     value = (

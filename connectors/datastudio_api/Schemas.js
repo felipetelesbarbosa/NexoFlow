@@ -227,7 +227,8 @@ var NexoDSSchemas={
       "status_confirmacao",
       "status_validacao",
       "farmalider_status_pedido",
-      "farmalider_forma_pagamento"
+      "farmalider_forma_pagamento",
+      "calc_gf73fvq57d"
     ],
     "types": {
       "pedido_chave": "text",
@@ -238,7 +239,8 @@ var NexoDSSchemas={
       "status_confirmacao": "text",
       "status_validacao": "text",
       "farmalider_status_pedido": "text",
-      "farmalider_forma_pagamento": "text"
+      "farmalider_forma_pagamento": "text",
+      "calc_gf73fvq57d": "text"
     },
     "keys": [
       "pedido_chave"
@@ -257,8 +259,12 @@ var NexoDSSchemas={
       "status_confirmacao",
       "status_validacao",
       "farmalider_status_pedido",
-      "farmalider_forma_pagamento"
+      "farmalider_forma_pagamento",
+      "calc_gf73fvq57d"
     ],
+    "labels": {
+      "calc_gf73fvq57d": "Venda elegível"
+    },
     "dimensions": []
   },
   "Itens_Pedidos_FarmaLider": {

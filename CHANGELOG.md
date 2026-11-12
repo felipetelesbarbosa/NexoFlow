@@ -1,5 +1,11 @@
 # NexoFlow — Changelog
 
+## Leitor FARMA — metadados confirmados das mesclagens e ABC
+
+- Projeção de Venda elegível com ID comprovado e fórmula específica do relatório; preserva fatos, regra financeira global, LTV e contrato Windows.
+- Filtro Sim antes de INNER/LEFT e clientes distintos protegidos por regressões PostgreSQL/conector. Modos e catálogos dos quatro aliases ABC registrados sem fundir fontes.
+- Produtor/chave/política de ds136 continuam pendentes; 15 minutos de atualização da fonte não comprovam frequência de escrita. Sem troca ou implantação comercial.
+
 ## Leitor FARMA — contratos dos nove aliases
 
 - Quatro projeções autenticadas e tipadas para métricas/pedidos/itens, com campos restritos e chaves das mesclagens preservadas.

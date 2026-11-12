@@ -1,6 +1,6 @@
 # Roteiro de migração do relatório FARMA — inventário de 12/11/2026
 
-**Complemento posterior:** [contratos dos nove aliases](CONTRATOS%20NOVE%20ALIASES%20FARMA.md). As quatro projeções operacionais e o adaptador ABC foram implementados; as fórmulas/configurações reais e a origem/chave de ds136 continuam pendentes. As contagens de gaps abaixo descrevem a base 83692b6.
+**Complemento posterior:** [contratos dos nove aliases](CONTRATOS%20NOVE%20ALIASES%20FARMA.md). As quatro projeções operacionais e o adaptador ABC foram implementados; a fórmula ds72 e os modos ABC foram confirmados e incorporados. IDs locais/implantação ABC e produtor/chave/política de ds136 continuam pendentes. As contagens de gaps abaixo descrevem a base 83692b6.
 
 Complemento ao [guia de implantação e carga](MIGRACAO%20WINDOWS%20POSTGRESQL%20DATA%20STUDIO.md). A distribuição Windows continua 1.5.37. Esta entrega atualiza o **leitor na VPS, o conector privado e o roteiro**; não instala serviços nem troca fontes comerciais.
 
@@ -12,7 +12,7 @@ O inventário corrige a lista anterior de três mesclagens conhecidas. As cinco 
 
 | Mesclagem | Usos observados | Fontes e junção observada |
 |---|---:|---|
-| Produtos de pedidos válidos | 0 | ds73 INNER ds72 por pedido_chave; filtro Venda elegível ainda precisa de fórmula |
+| Produtos de pedidos válidos | 0 | ds73 INNER ds72 por pedido_chave; filtro Venda elegível = Sim confirmado no complemento |
 | Público e compras identificadas | 0 | ds74 LEFT ds72 por contact_uuid |
 | NexoFlow - Pedidos e produtos por cliente | 1 | ds80 LEFT ds83 por data e venda_chave |
 | Anúncios - contatos e pedidos identificados | 2 | ds123 LEFT ds121 por Pedido após anúncio = pedido_id; cálculo temporal a conferir |

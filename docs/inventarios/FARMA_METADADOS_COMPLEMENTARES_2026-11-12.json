@@ -1,0 +1,152 @@
+{
+  "evidence": "Metadados informados pelo Work e encaminhados pelo operador em 12/11/2026; sem leitura comercial nesta entrega",
+  "ds72": {
+    "calculated_field": {
+      "id": "calc_gf73fvq57d",
+      "name": "Venda elegível",
+      "type": "text",
+      "default_aggregation": null,
+      "formula": "CASE WHEN status_confirmacao = \"CONFIRMADO_API\"\n  AND status_validacao IN (\"OK\", \"ATENÇÃO_TOTAL_DIVERGENTE\")\n  AND farmalider_status_pedido IN (\"4\", \"1\", \"2\")\n  AND farmalider_forma_pagamento != \"0\"\nTHEN \"Sim\" ELSE \"Não\" END"
+    },
+    "filter": {
+      "name": "Pedidos confirmados e elegíveis",
+      "include": "Sim",
+      "blends": [
+        "Produtos de pedidos válidos",
+        "Público e compras identificadas"
+      ]
+    },
+    "buyers_metric": {
+      "name": "Clientes que já compraram",
+      "source_field": "contact_uuid",
+      "source_field_id": "_1277959290_",
+      "aggregation": "COUNT_DISTINCT",
+      "blend_output_id": null
+    }
+  },
+  "abc": {
+    "ds106": {
+      "legacy_mode": "abc",
+      "target_table": "ABC_abc",
+      "visible_fields": [
+        "abc_disponivel",
+        "atualizado_em",
+        "categoria",
+        "classe_abc",
+        "participacao_acumulada_pct",
+        "participacao_receita_pct",
+        "pedidos",
+        "periodo_fim",
+        "periodo_inicio",
+        "produto_chave",
+        "produto_codigo",
+        "produto_nome",
+        "ranking_receita",
+        "ranking_unidades",
+        "receita_produtos",
+        "unidades"
+      ],
+      "deployment_id": null,
+      "deployment_version": null,
+      "local_field_overrides_confirmed": false
+    },
+    "ds107": {
+      "legacy_mode": "abc",
+      "target_table": "ABC_abc",
+      "visible_fields": [
+        "abc_disponivel",
+        "atualizado_em",
+        "categoria",
+        "classe_abc",
+        "participacao_acumulada_pct",
+        "participacao_receita_pct",
+        "pedidos",
+        "periodo_fim",
+        "periodo_inicio",
+        "produto_chave",
+        "produto_codigo",
+        "produto_nome",
+        "ranking_receita",
+        "ranking_unidades",
+        "receita_produtos",
+        "unidades",
+        "periodo_rotulo",
+        "participacao_receita",
+        "participacao_acumulada"
+      ],
+      "deployment_id": null,
+      "deployment_version": null,
+      "local_field_overrides_confirmed": false
+    },
+    "ds109": {
+      "legacy_mode": "resumo",
+      "target_table": "ABC_resumo",
+      "visible_fields": [
+        "abc_disponivel",
+        "atualizado_em",
+        "participacao_top5_receita_pct",
+        "periodo_rotulo",
+        "periodo_fim",
+        "periodo_inicio",
+        "skus_distintos",
+        "produtos_classe_a",
+        "produtos_classe_b",
+        "produtos_classe_c",
+        "receita_classe_a",
+        "receita_classe_b",
+        "receita_classe_c",
+        "faturamento_produtos",
+        "participacao_top5_receita"
+      ],
+      "deployment_id": null,
+      "deployment_version": null,
+      "local_field_overrides_confirmed": false
+    },
+    "ds110": {
+      "legacy_mode": "juntos",
+      "target_table": "ABC_juntos",
+      "visible_fields": [
+        "atualizado_em",
+        "pedidos_juntos",
+        "periodo_rotulo",
+        "periodo_fim",
+        "periodo_inicio",
+        "produto_a_nome",
+        "produto_b_nome",
+        "produto_a_codigo",
+        "produto_b_codigo"
+      ],
+      "deployment_id": null,
+      "deployment_version": null,
+      "local_field_overrides_confirmed": false
+    }
+  },
+  "abc_legacy_config": {
+    "connector": "NexoFlow 1.0 - Curva ABC",
+    "spreadsheetId": "1eBO9Dt86mEDptzsijiufb8AjtxrAZhBLxXKjI25Re6s",
+    "date_range_required": true
+  },
+  "ds136": {
+    "confirmed_header": [
+      "data",
+      "segmento",
+      "conversas_weni",
+      "resolvidas",
+      "nao_resolvidas",
+      "transferidas",
+      "origem",
+      "fuso"
+    ],
+    "observed_write_period": [
+      "2026-11-01",
+      "2026-11-06"
+    ],
+    "reader_refresh_minutes": 15,
+    "producer": null,
+    "unique_key": null,
+    "project_in_key": null,
+    "write_and_revision_policy": null,
+    "manual_edits": null,
+    "target_table": null
+  }
+}

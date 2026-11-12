@@ -119,3 +119,21 @@ test('ABC não devolve totais de itens sem pedido completo e alinha ordem do SDK
  assert.deepEqual(Array.from(response.schema,f=>f.name),['produto_codigo','classe_abc']);
  assert.deepEqual(Array.from(response.rows[0].values),['01','A']);
 });
+
+test('ds72 mantém ID e Texto sem agregação, aplicando elegibilidade antes da resposta',()=>{
+ const f=fixture(p=>{
+   assert.equal(p.table,'Pedidos_FarmaLider');
+   assert.deepEqual(p.filters,[{field:'calc_gf73fvq57d',values:['Sim']}]);
+   assert.deepEqual(p.fields,['contact_uuid']);
+   return result(p,[['synthetic-contact'],['synthetic-contact']]);
+ });
+ const field=f.ctx.dsFields_('Pedidos_FarmaLider').build().find(f=>f.id==='calc_gf73fvq57d');
+ assert.equal(field.type,'text');assert.equal(field.role,'dimension');assert.equal(field.aggregation,undefined);
+ const r=request(['contact_uuid']);r.configParams.tabela='Pedidos_FarmaLider';
+ r.dimensionsFilters=[[{fieldName:'calc_gf73fvq57d',operator:'EQUALS',type:'INCLUDE',values:['Sim']}]];
+ r.fields.push({name:'calc_gf73fvq57d',forFilterOnly:true});
+ const resultData=f.ctx.getData(r);assert.equal(resultData.filtersApplied,true);
+ assert.equal(resultData.schema.length,1);assert.equal(resultData.rows.length,2);
+ // COUNT_DISTINCT pertence à métrica da mesclagem: o leitor não apaga pedidos repetidos por contato.
+ assert.equal(new Set(resultData.rows.map(r=>r.values[0])).size,1);
+});

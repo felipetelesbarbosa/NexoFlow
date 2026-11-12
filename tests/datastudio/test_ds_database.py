@@ -858,3 +858,92 @@ def test_inventory_restricted_projections_preserve_join_keys(store):
     )["rows"] == [["2", "10.10"]]
     with pytest.raises(StorageError, match="CAMPOS_NAO_AUTORIZADOS"):
         reader.query("Pedidos_FarmaLider", ["ultimo_pedido_raw"], "", "", [], {})
+
+
+def test_ds72_report_eligibility_filters_blends_without_changing_facts(store):
+    """Fórmula comprovada do editor, distinta da regra financeira global."""
+    from integrations.datastudio.admin import grants
+
+    field = "calc_gf73fvq57d"
+    rev = begin(store)
+    records = []
+    variants = [
+        ("4", "1", "CONFIRMADO_API", "OK", "Sim"),
+        ("1", "6", "CONFIRMADO_API", "ATENÇÃO_TOTAL_DIVERGENTE", "Sim"),
+        ("2", "3", "CONFIRMADO_API", "OK", "Sim"),
+        ("0", "1", "CONFIRMADO_API", "OK", "Não"),
+        ("-1", "1", "CONFIRMADO_API", "OK", "Não"),
+        ("-2", "1", "CONFIRMADO_API", "OK", "Não"),
+        ("3", "1", "CONFIRMADO_API", "OK", "Não"),
+        ("2", "0", "CONFIRMADO_API", "OK", "Não"),
+        ("2", "1", "PENDENTE", "OK", "Não"),
+        ("2", "1", "CONFIRMADO_API", "ERRO", "Não"),
+        ("", "1", "CONFIRMADO_API", "OK", "Não"),
+    ]
+    for i, (status, payment, confirmation, validation, _) in enumerate(variants):
+        records.append(
+            row(
+                "Pedidos_FarmaLider",
+                pedido_chave=f"p{i:02}",
+                contact_uuid="c1" if i < 3 else "c2",
+                data="2026-11-02",
+                farmalider_status_pedido=status,
+                farmalider_forma_pagamento=payment,
+                status_confirmacao=confirmation,
+                status_validacao=validation,
+            )
+        )
+    batch(store, rev, "Pedidos_FarmaLider", records)
+    batch(
+        store,
+        rev,
+        "Itens_Pedidos_FarmaLider",
+        [
+            row(
+                "Itens_Pedidos_FarmaLider",
+                item_chave=f"i{i:02}",
+                pedido_chave=r["pedido_chave"],
+                produto_codigo="0001",
+                quantidade="2",
+                valor_total="10.10",
+            )
+            for i, r in enumerate(records)
+        ],
+    )
+    batch(
+        store,
+        rev,
+        "Base_Contatos",
+        [row("Base_Contatos", contact_uuid=c) for c in ("c1", "c2", "c3")],
+    )
+    finish(store, rev)
+    with store.connect() as conn:
+        create_views(conn)  # reaplicação aditiva, sem duplicar ou modificar fatos
+        grants(conn, "FARMA")
+    dsn = DSN + "&options=-c%20role%3Dnf_ds_farma_read"
+    reader = Reader(dsn, "homologacao", "FARMA", require_dedicated_role=True)
+    result = reader.query("Pedidos_FarmaLider", ["pedido_chave", field], "", "", [], {})
+    assert dict(result["rows"]) == {f"p{i:02}": v[-1] for i, v in enumerate(variants)}
+    filtered = [{"field": field, "values": ["Sim"]}]
+    assert reader.query(
+        "Pedidos_FarmaLider",
+        ["contact_uuid"],
+        "2026-11-01",
+        "2026-11-03",
+        filtered,
+        {"contact_uuid": "count_distinct"},
+    )["rows"] == [[1]]
+    with psycopg.connect(dsn) as conn:
+        assert conn.execute(
+            "SELECT count(*),sum(i.quantidade),sum(i.valor_total) FROM farma.ds_itens_pedidos_farmalider i INNER JOIN (SELECT * FROM farma.ds_pedidos_farmalider WHERE calc_gf73fvq57d='Sim') p USING(pedido_chave)"
+        ).fetchone() == (3, 6, __import__("decimal").Decimal("30.30"))
+        assert conn.execute(
+            "SELECT b.contact_uuid,count(p.pedido_chave) FROM farma.ds_base_contatos b LEFT JOIN (SELECT * FROM farma.ds_pedidos_farmalider WHERE calc_gf73fvq57d='Sim') p USING(contact_uuid) GROUP BY b.contact_uuid ORDER BY b.contact_uuid"
+        ).fetchall() == [("c1", 3), ("c2", 0), ("c3", 0)]
+    assert (
+        sorted(
+            store.rows("Pedidos_FarmaLider")["rows"], key=lambda r: r["pedido_chave"]
+        )
+        == records
+    )
+    assert field not in records[0]  # campo derivado nunca entra no contrato Windows
