@@ -1,5 +1,12 @@
 # NexoFlow — Changelog
 
+## 1.5.36 — em validação para publicação
+
+- Analytics: destino explícito FARMA/BI_Itens via API privada, com staging/upsert transacional, reconciliação por venda, precisão decimal, revisão monotônica, plano e recibos idempotentes. Partial nunca remove.
+- Outbox privada e comandos `nexo bi-itens-postgres status|retomar|arquivar-encerrada`, sem recolher Weni/Sheets para a retomada. Checkpoint depende da confirmação do banco.
+- Serviço e conector Data Studio somente leitura separados, sobre a visão do piloto. Grão, filtros, contagem global de SKUs, rankings, limites e publicações incompletas conferidos no PostgreSQL.
+- [Homologação e roteiro Work](docs/BI%20ITENS%20POSTGRESQL%20FARMA.md). Padrão desabilitado, PET preservado, sem implantação ou carga comercial nesta entrega.
+
 ## Conector BI_Itens — em validação privada, após 1.5.35
 
 - Métrica virtual FARMA `produtos_distintos_periodo`, calculada pela união de SKUs no período e nas partes; cartão não reagregável, sem alterar o schema físico. Filtros não suportados e agrupamentos são recusados.

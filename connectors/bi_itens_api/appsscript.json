@@ -1,0 +1,16 @@
+{
+  "timeZone": "America/Belem",
+  "dependencies": {},
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "oauthScopes": ["https://www.googleapis.com/auth/script.external_request"],
+  "dataStudio": {
+    "name": "NexoFlow — BI_Itens FARMA PostgreSQL",
+    "logoUrl": "https://www.gstatic.com/images/branding/product/1x/data_connector_48dp.png",
+    "company": "NexoFlow",
+    "companyUrl": "https://github.com/felipetelesbarbosa/NexoFlow",
+    "addonUrl": "https://github.com/felipetelesbarbosa/NexoFlow",
+    "supportUrl": "https://github.com/felipetelesbarbosa/NexoFlow/issues",
+    "description": "Conector privado somente leitura da BI_Itens FARMA; consulta a visão do piloto PostgreSQL por API protegida."
+  }
+}

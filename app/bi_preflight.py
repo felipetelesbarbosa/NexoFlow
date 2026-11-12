@@ -165,12 +165,15 @@ def check_replacements(store, replacements: Sequence[Replacement]) -> None:
         )
 
 
-def looker_replacements(store, tables) -> list[Replacement]:
+def looker_replacements(store, tables, *, skip_tables=None) -> list[Replacement]:
     from looker_bi import SCHEMAS
 
     if set(tables) != set(SCHEMAS):
         raise ValueError("Conjunto de tabelas comerciais BI incompleto.")
+    if skip_tables and skip_tables != {"BI_Itens"}:
+        raise ValueError("Prévia: desvio de destino inválido.")
     return [
         Replacement(getattr(store, "looker_" + title), headers, len(tables[title]))
         for title, headers in SCHEMAS.items()
+        if not skip_tables or title not in skip_tables
     ]

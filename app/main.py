@@ -36,6 +36,12 @@ from analytics import (
     prepare_full_load_quarter,
     validate_full_load_quarter,
 )
+from bi_postgres_client import (
+    open_publisher,
+    publish_other_looker_tables,
+    sales_scope,
+)
+from bi_postgres_contract import PublicationError
 from bi_preflight import (
     BIContinuationPending,
     Replacement,
@@ -314,6 +320,7 @@ def _log_final_summary(
     full_quarter,
     native_meta_result,
     historical_publication=None,
+    pg_publication=None,
 ):
     """Apresenta resultados confirmados e a retomada de cada fonte separadamente."""
     native_partial = bool(native_meta_result.get("partial")) or (
@@ -321,7 +328,10 @@ def _log_final_summary(
     )
     history_partial = bool((historical_publication or {}).get("partial"))
     primary_partial = bool(
-        cliente_stats.api_errors or order_stats.api_errors or history_partial
+        cliente_stats.api_errors
+        or order_stats.api_errors
+        or history_partial
+        or bool(pg_publication and pg_publication.get("simulated"))
     )
     log_result = logging.warning if primary_partial or native_partial else logging.info
     log_result("=== Resumo final Analytics | duração=%.2fs ===", total_elapsed)
@@ -333,7 +343,21 @@ def _log_final_summary(
     logging.info("Pedidos gravados: novos=%s; atualizados=%s.", *order_counts)
     logging.info("Itens gravados: novos=%s; atualizados=%s.", *item_counts)
     logging.info("--- STATUS E PRÓXIMA CARGA ---")
-    if primary_partial:
+    if pg_publication:
+        logging.info(
+            "BI_Itens PostgreSQL: %s; lotes=%s. BI_Itens Sheets preservada.",
+            "simulada, sem avanço de checkpoint"
+            if pg_publication.get("simulated")
+            else "confirmada no banco",
+            len(pg_publication.get("receipts", [])),
+        )
+    if primary_partial and not (
+        cliente_stats.api_errors or order_stats.api_errors or history_partial
+    ):
+        logging.warning(
+            "BI_Itens PostgreSQL em simulação: publicação não confirmada; checkpoint mantido."
+        )
+    elif primary_partial:
         logging.warning(
             "FarmaLíder para revalidar: consultas de clientes=%s; pedidos=%s. "
             "As gravações confirmadas foram preservadas.",
@@ -1066,6 +1090,7 @@ def main() -> int:
     configure_logging()
     farm_client: FarmaliderClient | None = None
     sheets: GoogleSheetsStore | None = None
+    pg_publisher = None
 
     try:
         validate_configuration()
@@ -1090,6 +1115,10 @@ def main() -> int:
 
         if full_quarter is not None:
             validate_full_load_quarter(part=full_quarter, component="analytics")
+
+        pg_publisher = open_publisher(secrets)
+        if pg_publisher is not None:
+            pg_publisher.start()
 
         total_started_monotonic = time.monotonic()
         sync_started = datetime.now(UTC)
@@ -1516,13 +1545,27 @@ def main() -> int:
             period_end=looker_end,
             history_observed_since=history_started,
         )
+        pg_publication = None
+        if pg_publisher is not None:
+            pg_publication = pg_publisher.publish(
+                looker_tables["BI_Itens"],
+                sales_scope(all_order_records + order_rows),
+                complete=not (
+                    cliente_stats.api_errors
+                    or order_stats.api_errors
+                    or order_stats.pending_without_items
+                    or order_stats.parse_errors
+                    or full_quarter not in (None, 4)
+                ),
+            )
+        skipped_bi = {"BI_Itens"} if pg_publisher is not None else set()
         check_replacements(
             sheets,
             [
                 Replacement(sheets.bi_sales, BI_SALES_COLUMNS, len(bi_sales)),
                 Replacement(sheets.bi_ads, BI_ADS_COLUMNS, len(bi_ads)),
                 Replacement(sheets.bi_orders, BI_ORDERS_COLUMNS, len(bi_orders)),
-                *looker_replacements(sheets, looker_tables),
+                *looker_replacements(sheets, looker_tables, skip_tables=skipped_bi),
             ],
         )
         sheets.replace_bi_sales(bi_sales)
@@ -1531,7 +1574,10 @@ def main() -> int:
         logging.info("Google Sheets: BI 5/7 - BI_Ads atualizado.")
         sheets.replace_bi_orders(bi_orders)
         logging.info("Google Sheets: BI 6/7 - BI_Pedidos atualizado.")
-        sheets.replace_looker_tables(looker_tables)
+        if skipped_bi:
+            publish_other_looker_tables(sheets, looker_tables)
+        else:
+            sheets.replace_looker_tables(looker_tables)
         sheets.set_controls(
             {
                 "historico_observado_desde": history_started,
@@ -1560,7 +1606,8 @@ def main() -> int:
             sync_started,
             api_errors=cliente_stats.api_errors
             + order_stats.api_errors
-            + int(bool(historical_publication.get("partial"))),
+            + int(bool(historical_publication.get("partial")))
+            + int(bool(pg_publication and pg_publication.get("simulated"))),
         )
         if full_quarter is not None:
             # Partes 1-3 não podem avançar o cursor incremental. Na Parte 4,
@@ -1806,17 +1853,25 @@ def main() -> int:
             full_quarter=full_quarter,
             native_meta_result=native_meta_result,
             historical_publication=historical_publication,
+            pg_publication=pg_publication,
         )
         return PARTIAL_SYNC_EXIT_CODE if partial else 0
 
     except Exception as exc:
-        source_pending = isinstance(exc, BIContinuationPending)
+        source_pending = isinstance(exc, (BIContinuationPending, PublicationError))
         if source_pending:
             logging.warning("[PENDÊNCIA] %s", exc)
-            logging.warning(
-                "Gravações anteriores preservadas; BI e etapas seguintes pendentes. "
-                "Checkpoint de sucesso mantido. Não repita a carga antes de validar a fonte."
-            )
+            if isinstance(exc, PublicationError):
+                logging.warning(
+                    "Destino PostgreSQL pendente; outbox preservada. "
+                    "Checkpoint de sucesso mantido. Confira o diagnóstico e retome "
+                    "pelo Analytics com a mesma configuração."
+                )
+            else:
+                logging.warning(
+                    "Gravações anteriores preservadas; BI e etapas seguintes pendentes. "
+                    "Checkpoint de sucesso mantido. Não repita a carga antes de validar a fonte."
+                )
         else:
             logging.exception("Falha na sincronização: %s", exc)
 
@@ -1824,7 +1879,9 @@ def main() -> int:
             try:
                 sheets.set_controls(
                     {
-                        "ultima_execucao_status": "parcial" if source_pending else "erro",
+                        "ultima_execucao_status": "parcial"
+                        if source_pending
+                        else "erro",
                         "ultima_execucao_erro_tipo": exc.__class__.__name__,
                         "ultima_execucao_erro_em_utc": utc_iso(datetime.now(UTC)),
                     }
@@ -1836,6 +1893,8 @@ def main() -> int:
                 )
         return PARTIAL_SYNC_EXIT_CODE if source_pending else 1
     finally:
+        if pg_publisher is not None:
+            pg_publisher.close()
         if farm_client is not None:
             farm_client.close()
         if sheets is not None:

@@ -1,0 +1,58 @@
+# Extensão opt-in. Não substitui os seis Compose existentes nem cria PostgreSQL.
+services:
+  publicador-bi-farma:
+    build:
+      context: ../..
+      dockerfile: integrations/bi_itens_publisher/Dockerfile
+      args:
+        NEXOFLOW_SOURCE_SHA: ${NEXOFLOW_SOURCE_SHA:?Informe o SHA aprovado do código}
+    restart: unless-stopped
+    read_only: true
+    user: "10001:10001"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp:size=32m,noexec,nosuid]
+    environment:
+      PUBLISH_TOKEN_FILE: /run/secrets/publish_token
+      PUBLISH_DSN_FILE: /run/secrets/publish_dsn
+    secrets: [publish_token, publish_dsn]
+    networks: [piloto]
+    # Sem ports. Cloudflared acessa publicador-bi-farma:8080 nesta rede.
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+  leitor-bi-farma:
+    build:
+      context: ../..
+      dockerfile: integrations/bi_itens_publisher/Dockerfile
+      args:
+        NEXOFLOW_SOURCE_SHA: ${NEXOFLOW_SOURCE_SHA:?Informe o SHA aprovado do código}
+    command: ["uvicorn", "integrations.bi_itens_publisher.read_api:app_factory", "--factory", "--host", "0.0.0.0", "--port", "8080", "--no-access-log"]
+    restart: unless-stopped
+    read_only: true
+    user: "10001:10001"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp:size=32m,noexec,nosuid]
+    environment:
+      READ_TOKEN_FILE: /run/secrets/read_token
+      READ_DSN_FILE: /run/secrets/read_dsn
+    secrets: [read_token, read_dsn]
+    networks: [piloto]
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+secrets:
+  read_token:
+    file: ${READ_TOKEN_PATH:?Informe segredo privado exclusivo de leitura}
+  read_dsn:
+    file: ${READ_DSN_PATH:?Informe DSN somente leitura do piloto}
+  publish_token:
+    file: ${PUBLISH_TOKEN_PATH:?Informe arquivo privado existente}
+  publish_dsn:
+    file: ${PUBLISH_DSN_PATH:?Informe arquivo privado existente}
+networks:
+  piloto:
+    external: true
+    name: ${PILOT_NETWORK:?Confira a rede real do projeto nexoflow-datastudio-piloto}

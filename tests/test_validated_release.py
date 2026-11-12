@@ -211,7 +211,7 @@ class ValidatedReleaseTests(unittest.TestCase):
         )[0]
         self.assertIn('python-version: ["3.11", "3.14"]', matrix)
         self.assertEqual(matrix.count("python -m unittest discover"), 2)
-        self.assertIn("needs: [qualidade, verificar-segredos, validar-python]", build)
+        self.assertIn("needs: [qualidade, verificar-segredos, validar-python, publicador-postgres]", build)
         self.assertNotIn("python -m unittest discover", build)
         for required in [
             "Executar check-up operacional",

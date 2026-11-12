@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.35",
+    [string]$Version = "1.5.36",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -344,6 +344,11 @@ foreach ($relative in @("VERSION", "app/versioning.py", "app/sheets_continuation
     Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/$relative"
     Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/$relative"
 }
+foreach ($relative in @('app/bi_postgres_client.py', 'app/bi_postgres_contract.py', 'app/run_bi_postgres.py', 'integrations/bi_itens_publisher/Dockerfile', 'integrations/bi_itens_publisher/reader.py', 'connectors/bi_itens_api/Code.js', 'connectors/bi_itens_api/Schema.js')) {
+    Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/$relative"
+    Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/$relative"
+}
+
 foreach ($relative in @('app/run_mcp_pip.py', 'connectors/meta_ads_mcp/__init__.py', 'connectors/meta_ads_mcp/client.py', 'connectors/meta_ads_mcp/settings.py', 'configuracao/meta_ads_credentials.example.json', 'scripts/instalar_meta_ads_mcp.ps1', 'scripts/instalar_codex_cli.ps1')) {
     Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/$relative"
     Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/$relative"
@@ -414,6 +419,13 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
+BI_Itens FARMA pode publicar diretamente no piloto PostgreSQL por API privada protegida por Cloudflare Access, sem gravar essa BI no Sheets primeiro. Staging, upsert por item, reconciliação por venda, recibos e planos em transação, revisão monotônica e outbox preservam idempotência e retomada. Cargas parciais não removem itens. O destino padrão permanece Sheets, e PET conserva o fluxo anterior.
+
+O novo conector consulta uma API de leitura separada, sobre farma.produtos_itens. Não abrir PostgreSQL público nem reutilizar credenciais de publicação. O Setup não implanta VPS/Cloudflare/Apps Script. Manter produção Data Studio na fonte atual até o Work validar o canal, schema, totais, filtros, rankings e os nove usos. [Procedimento completo](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/BI%20ITENS%20POSTGRESQL%20FARMA.md).
+
+Atualize em Preserve e confira nexo versao. Após ativação autorizada, nexo bi-itens-postgres status consulta a publicação e nexo bi-itens-postgres retomar recupera apenas a outbox, sem repetir Weni/API/Sheets. Novos segredos do usuário ficam fora dos pacotes públicos. A base comercial de 68.273 itens é referência do usuário, não homologação feita nesta release.
+
+
 Analytics e nexo looker verificam a necessidade de continuações antes das substituições grandes do BI. A prévia considera as grades dos arquivos, as partes e o crescimento conjunto. Fontes que precisam de expansão sem confirmação no Data Studio geram pendência clara (código 3), sem traceback nem avanço do checkpoint de sucesso. Gravações anteriores permanecem preservadas.
 
 Atualize pelo Setup em Preserve, com as rotinas encerradas, e confira nexo versao. A instalação não confirma fontes nem resolve o aviso de reagregação do cartão BI_Itens. Enquanto a fonte não for validada e ligada ao conector pelo Work, mantenha a carga FARMA pausada; não use confirmação local para contornar a proteção. [Diagnóstico e roteiro](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/INICIALIZACAO%20BI%20ITENS.md).
@@ -444,7 +456,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.35
+# NexoFlow 1.5.36
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"

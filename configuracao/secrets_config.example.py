@@ -96,3 +96,11 @@ PERFIS = {
         "RECOMPRA_ENABLED": False,
     },
 }
+
+# Publicação BI_Itens FARMA via API privada (não é conexão PostgreSQL direta).
+# Manter sheets até homologar API/Access. PET não participa desta integração.
+PERFIS["FARMA"].update({
+    "BI_ITENS_DESTINO": "sheets",  # depois: postgres
+    "BI_ITENS_POSTGRES_MODO": "simular",  # depois da conferência: aplicar
+    "BI_ITENS_POSTGRES_CREDENTIALS_FILE": "credentials/bi_itens_farma_publicador.json",
+})

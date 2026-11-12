@@ -1,0 +1,12 @@
+**
+!VERSION
+!app/
+!app/**
+!integrations/
+!integrations/**
+**/__pycache__/
+**/*.pyc
+**/secrets_config.py
+**/.env
+**/*.sqlite*
+**/credentials/

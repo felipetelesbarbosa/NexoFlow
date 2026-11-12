@@ -1,3 +1,7 @@
+# NexoFlow 1.5.36 — em validação
+
+Pacotes corretivos autorizados após testes/CI/CodeQL e conferência dos mesmos bytes. Integração privada BI_Itens FARMA, opt-in, sem implantação comercial automática. Ver [guia](../docs/BI%20ITENS%20POSTGRESQL%20FARMA.md). A 1.5.35 e anteriores permanecem intactas.
+
 # NexoFlow 1.5.35 — Downloads
 
 Publicada em 11/11/2026, 21:23:49 (America/Fortaleza), no SHA `c6204f0535914c48fec71ce5c009f0e8f9a1884a`. Checks, pacotes e downloads públicos conferidos. A 1.5.34 e anteriores permanecem intactas. A validação comercial da BI_Itens no Data Studio continua pendente.

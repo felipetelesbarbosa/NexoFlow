@@ -50,3 +50,9 @@ A fonte do guia de operação é `docs/Documentacao NexoFlow.md`; seu [HTML](Doc
 - [Analytics e histórico automático 1.5.31](ANALYTICS%20HISTORICO%20AUTOMATICO.md)
 
 - [Otimização de intervalos do histórico — desenvolvimento posterior à 1.5.31](OTIMIZACAO%20INTERVALOS%20HISTORICO.md).
+
+- [BI_Itens FARMA: APIs privadas, PostgreSQL e Data Studio](BI%20ITENS%20POSTGRESQL%20FARMA.md): contrato, testes e passagem ao Work; ativação pendente.
+
+- [Prompt do Work: implantação e homologação BI_Itens PostgreSQL](PROMPT%20WORK%20BI%20ITENS%20POSTGRESQL.md).
+
+- [Relatório técnico da integração BI_Itens PostgreSQL](RELATORIO%20BI%20ITENS%20POSTGRESQL.md).

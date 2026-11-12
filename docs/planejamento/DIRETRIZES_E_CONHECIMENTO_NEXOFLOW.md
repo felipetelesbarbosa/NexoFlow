@@ -212,3 +212,12 @@ Nesta tarefa: somente consolidação documental, sem código, testes alterados, 
 - **10/11/2026, 23:28:34, publicação 1.5.33:** checks, Setup e downloads públicos conferidos no SHA `7884d7007fd0c65cbf90bfc30c5c35dc6c9056fb`. 1.5.32 preservada. A otimização de CI posterior usa uma geração e reutilização dos mesmos pacotes; não altera a versão Windows nem seus artefatos. Ver [guia](../RELEASE%20EFICIENTE.md).
 
 - **11/11/2026, conferência inicial de BI_Itens:** o Work encontrou raiz registrada sem estado e não confirmou a fonte. O leitor Apps Script foi ajustado para conferir exclusivamente o legado principal estável, sem fabricar READY, mantendo bloqueios de escrita, partes pendentes e cruzamentos. Ver [diagnóstico e passagem](../INICIALIZACAO%20BI%20ITENS.md). Os testes são sintéticos; atualização da implantação e comparação comercial permanecem com o Work. Pacotes Windows preservados.
+
+
+## Atualização autorizada — piloto BI_Itens PostgreSQL (12/11/2026)
+
+O usuário autorizou integrar somente FARMA/BI_Itens ao banco piloto `nexoflow_datastudio_piloto`, preservando Windows, Sheets das demais tabelas e PET. Implementação 1.5.36 em preparação: Analytics reutiliza as linhas oficiais, outbox local com exclusão mútua, API transacional de publicação, staging/upsert, recibos e reconciliação explícita por venda. Carga parcial não autoriza remoções. Serviços de leitura e publicação usam logins, Bearers e aplicações Cloudflare Access separados; o PostgreSQL continua privado.
+
+Data Studio é o painel prioritário. O novo conector privado lê a visão existente `farma.produtos_itens` por API de somente leitura; Metabase é referência para comparar. A visão real, seus tipos/origem, as credenciais Access e a infraestrutura ainda dependem da conferência do Work. Testes sintéticos/Docker não são implantação ou homologação comercial. Não editar o manifesto Sheets, criar READY manualmente, ativar PET ou migrar produção por causa desta nota. A referência de 68.273 itens é um corte fornecido pelo usuário, sem nova leitura comercial nesta entrega.
+
+Ver [implementação e homologação](../BI%20ITENS%20POSTGRESQL%20FARMA.md) e [roteiro do Work](../PROMPT%20WORK%20BI%20ITENS%20POSTGRESQL.md). Segredos particulares permanecem fora do Git e da distribuição; hostnames e Service Tokens só podem ser preenchidos após emissão real.

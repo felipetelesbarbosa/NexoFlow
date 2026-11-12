@@ -45,3 +45,7 @@ Publicação autorizada para distribuir a prévia de expansão BI e o tratamento
 Publicada em 11/11/2026, 21:23:49 (America/Fortaleza), no SHA `c6204f0535914c48fec71ce5c009f0e8f9a1884a`. Checks, pacotes e downloads públicos conferidos. A 1.5.34 e anteriores permanecem intactas. A validação comercial da BI_Itens no Data Studio continua pendente.
 
 Preparação aprovada: https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43124192209. Os mesmos artefatos foram usados na publicação oficial, sem novo build.
+
+## Preparação 1.5.36
+
+Publicação autorizada para o destino PostgreSQL BI_Itens FARMA e leitura privada Data Studio. Uma única geração no SHA final, incluindo o novo job PostgreSQL/Docker obrigatório; reutilizar os mesmos pacotes aprovados. A 1.5.35 e anteriores permanecem intactas. Implantação na VPS e homologação comercial são etapas do Work, distintas da release Windows.

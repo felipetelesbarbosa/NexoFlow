@@ -628,6 +628,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fração dos lotes históricos por execução",
     )
 
+    pg_bi = sub.add_parser(
+        "bi-itens-postgres",
+        help="consulta/retoma a outbox privada FARMA sem Weni ou Sheets",
+    )
+    pg_bi.add_argument("operacao", choices=["status", "retomar", "arquivar-encerrada"])
+
     looker = sub.add_parser(
         "looker",
         help="recalcula os KPIs do Data Studio usando o histórico do Google Sheets",
@@ -796,6 +802,10 @@ def run(argv: list[str] | None = None) -> int:
                     if args.analytics_op == "planilhas"
                     else "NexoFlow Analytics.exe"
                 )
+        if args.command == "bi-itens-postgres":
+            from run_bi_postgres import run as pg_run
+
+            return pg_run([args.operacao])
         if args.command == "looker":
             from run_looker import run as looker_run
 

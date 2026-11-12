@@ -18,7 +18,7 @@ echo [ERRO] Destino inválido. Use os comandos nexo weni planilhas ou nexo analy
 exit /b 1
 
 :destino_ok
-title NexoFlow 1.5.35 - Carga por planilhas
+title NexoFlow 1.5.36 - Carga por planilhas
 set "REVIEW_JSON=%PROFILE_LOG%\delivery_%DESTINO%_review.json"
 set "REVIEW_TXT=%PROFILE_LOG%\delivery_%DESTINO%_review.txt"
 set "ARCHIVE_ARG="
@@ -29,7 +29,7 @@ if not exist ".venv\Scripts\python.exe" (
     goto :fim
 )
 echo ==========================================================
-echo NexoFlow 1.5.35 - Carga por planilhas - %DESTINO%
+echo NexoFlow 1.5.36 - Carga por planilhas - %DESTINO%
 echo ==========================================================
 echo Coloque os exports originais na pasta %IMPORT_DIR%:
 echo   Conversas_Delivery.xlsx

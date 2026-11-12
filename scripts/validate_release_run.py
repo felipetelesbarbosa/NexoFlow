@@ -19,6 +19,7 @@ REQUIRED = {
     "Testes Python 3.14",
     "validar-e-publicar",
     "verificar-pacotes",
+    "Publicador PostgreSQL FARMA",
 }
 
 

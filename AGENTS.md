@@ -1,6 +1,8 @@
-# NexoFlow 1.5.35
+# NexoFlow 1.5.36
 
-Publicada em 11/11/2026, 21:23:49 (America/Fortaleza), no SHA `c6204f0535914c48fec71ce5c009f0e8f9a1884a`. Checks, pacotes e downloads públicos conferidos. A 1.5.34 e anteriores permanecem intactas. A validação comercial da BI_Itens no Data Studio continua pendente.
+A distribuição 1.5.36 está em preparação autorizada: publica BI_Itens FARMA por API privada no piloto PostgreSQL e oferece leitura privada ao Data Studio. Destino padrão continua Sheets; ativação depende do Work validar VPS, Access, visão e fontes. Não publicar antes dos checks/pacotes do mesmo SHA. Ver docs/BI ITENS POSTGRESQL FARMA.md.
+
+A 1.5.35 foi publicada em 11/11/2026, 21:23:49 (America/Fortaleza), no SHA `c6204f0535914c48fec71ce5c009f0e8f9a1884a`. Checks, pacotes e downloads públicos conferidos. A 1.5.34 e anteriores permanecem intactas. A validação comercial da BI_Itens no Data Studio continua pendente.
 
 A distribuição 1.5.34 foi publicada em 11/11/2026, 19:12:49 (America/Fortaleza), no SHA a25ae828b6dc732ecfcafa60db145e8cf27c84f5. A recuperação de resposta incerta da trava Sheets foi validada nos pacotes Windows; downloads públicos conferidos. A 1.5.33 e anteriores permanecem intactas. Isso não comprova recuperação da carga comercial nem resolve o aviso de reagregação do Data Studio.
 
