@@ -14,11 +14,11 @@ O registro canônico e seu hash, as assinaturas do publicador, os manifestos exi
 
 Regressão de reordenação falhou antes da correção com DS_SCHEMA_ORIGEM_DIVERGENTE. Cobertura: cinco tabelas históricas e múltiplas partes, comparação integral dos hashes/contagens canônicos e centavos/LTV, grade de 500 mil linhas com blocos de até mil, cabeçalhos ausentes/extras/duplicados/vazios/desconhecidos, hash físico divergente em uma continuação, tabela legada reordenada com linha curta, alteração Drive/revisão/manifesto e CLI real sobre serviços simulados. O teste da CLI conserva o exclusoes.json original.
 
-Resultados locais: 47 testes da suíte Data Studio aprovados, incluindo os 13 testes de migração; um smoke HTTP de imagem Docker ignorado nesta rodada. Regressão do transporte histórico/continuações: 35 testes e 19 subtestes aprovados. Ruff, Pyright do módulo alterado, consistência, documentação e diff aprovados. CI/CodeQL do commit devem ser conferidos no GitHub; estes resultados não são homologação comercial.
+Resultados locais: 47 testes da suíte Data Studio aprovados, incluindo os 13 testes de migração; um smoke HTTP de imagem Docker ignorado nesta rodada. Regressão do transporte histórico/continuações: 35 testes e 19 subtestes aprovados. Ruff, Pyright do módulo alterado, consistência, documentação e diff aprovados. CI, CodeQL, Meta e PostgreSQL/Docker do SHA distribuído aprovados. Matriz Windows Python 3.11/3.14 nas duas codificações, executáveis, Setup Preserve/Clean/rollback e pacote instalado aprovados. Estes resultados não são homologação comercial.
 
 ## Atualização Windows
 
-A correção altera código operacional e exige **nova release/Setup** para chegar ao Windows instalado. A 1.5.37 publicada não contém este ajuste. A distribuição corretiva 1.5.38 está em preparação autorizada; aguardar sua publicação comprovada antes de atualizar. Depois de disponibilizado o Setup validado que inclua o commit, encerrar as rotinas, instalar em Preserve, preservar configuração/credenciais/SQLite/journals e conferir `nexo versao`. Não copiar módulo avulso sobre C:\NexoFlow.
+A correção altera código operacional e exige **nova release/Setup** para chegar ao Windows instalado. A 1.5.37 publicada não contém este ajuste. A distribuição corretiva **1.5.38 está publicada**. Encerrar as rotinas, instalar o [Setup oficial](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.38/NexoFlow-Setup-1.5.38.zip) em Preserve, preservar configuração/credenciais/SQLite/journals e conferir `nexo versao` (1.5.38). Não copiar módulo avulso sobre C:\NexoFlow.
 
 ## Repetir a exportação
 
@@ -50,3 +50,16 @@ Selecionar FARMA no Terminal atualizado. Encerrar as rotinas que possam gravar n
 ```
 
 A exportação exige credenciais Google existentes, mas não publicacao.json. Depois do corte e da auditoria aprovados, usar o novo caminho no recorte de um pedido completo e gerar o piloto-manifesto.json para o Work. A simulação/publicação posterior na API exige credenciais e aprovação da origem em homologação; não é executada por estes comandos.
+
+## Evidência da distribuição
+
+Publicação: 12/11/2026, 22:39:37 (America/Fortaleza). Tag v1.5.38 no SHA `ace7c8f12361fe2bc0256323cb59f3b56b55cd0d`. [Preparação validada](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43343660933), [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43343660702) e [publicação sem recompilar](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43346458099).
+
+Os dois downloads públicos passaram em CRC e comparação com o commit (normalização CRLF apenas para texto): 123 módulos Python e 572 arquivos versionados por pacote, 579 entradas no manifesto do Setup, sete executáveis x64 do aplicativo e o Setup 1.5.38.0.
+
+SHA-256 recalculado dos downloads:
+
+- Setup: `a1d29adcad9940efe5bbf151f1c642dbdb249008e6eea383dbd2a1b5be679b1d`.
+- Projeto: `9928d5b110719ded704e40dabeb5029569f4c70ba9936b7105b1e8b22f734c7a`.
+
+Não houve leitura das planilhas comerciais nem confirmação da exportação real. O operador deve repetir exportação e auditoria conforme o roteiro acima; publicação de software não aprova automaticamente o corte comercial.

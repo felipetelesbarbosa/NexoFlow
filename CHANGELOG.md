@@ -1,6 +1,6 @@
 # NexoFlow — Changelog
 
-## 1.5.38 — em preparação
+## 1.5.38 — publicada em 12/11/2026, 22:39:37 (America/Fortaleza)
 
 - Cabeçalhos reordenados são conferidos contra o hash físico de cada parte; valores associados por nome, com conjunto canônico exato e rejeição de duplicatas/campos inválidos.
 - Revisão, manifesto e versões Drive continuam protegidos. [Retomada em pasta nova com exclusões conferidas](docs/CORRECAO%20EXPORTACAO%20CABECALHOS%20POSTGRESQL.md). Setup Preserve corretivo; 1.5.37 preservada.
