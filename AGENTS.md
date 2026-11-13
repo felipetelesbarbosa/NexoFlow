@@ -1,3 +1,7 @@
+# NexoFlow 1.5.38 em preparação
+
+Release corretiva autorizada: exportação Sheets para PostgreSQL aceita campos canônicos reordenados, valida hash físico e mantém guardas de origem. Publicação depende dos checks e pacotes do mesmo SHA. A 1.5.37 abaixo permanece como última distribuição comprovada até a publicação.
+
 # NexoFlow 1.5.37 publicada
 
 Publicada em **12/11/2026, 19:18:38 (America/Fortaleza)**, SHA `2683717431b1c4313efaaaef35cfaaf20236958a`. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.37), [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43314024652), [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43314024795), [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43314026009) e [publicação reutilizando os artefatos](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43318519275). Downloads públicos conferidos: hashes, CRC, 571 entradas do manifesto, 123 módulos e versões dos executáveis. Sem implantação ou migração comercial.

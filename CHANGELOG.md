@@ -1,9 +1,9 @@
 # NexoFlow — Changelog
 
-## Correção pendente de distribuição — exportação Sheets para PostgreSQL
+## 1.5.38 — em preparação
 
 - Cabeçalhos reordenados são conferidos contra o hash físico de cada parte; valores associados por nome, com conjunto canônico exato e rejeição de duplicatas/campos inválidos.
-- Revisão, manifesto e versões Drive continuam protegidos. [Retomada em pasta nova com exclusões conferidas](docs/CORRECAO%20EXPORTACAO%20CABECALHOS%20POSTGRESQL.md). Exige novo Setup; 1.5.37 preservada.
+- Revisão, manifesto e versões Drive continuam protegidos. [Retomada em pasta nova com exclusões conferidas](docs/CORRECAO%20EXPORTACAO%20CABECALHOS%20POSTGRESQL.md). Setup Preserve corretivo; 1.5.37 preservada.
 
 ## Leitor FARMA — metadados confirmados das mesclagens e ABC
 

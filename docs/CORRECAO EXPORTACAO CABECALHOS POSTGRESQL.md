@@ -18,7 +18,7 @@ Resultados locais: 47 testes da suíte Data Studio aprovados, incluindo os 13 te
 
 ## Atualização Windows
 
-A correção altera código operacional e exige **nova release/Setup** para chegar ao Windows instalado. A 1.5.37 publicada não contém este ajuste. Próxima versão prevista: 1.5.38, se não houver outra publicada. Este commit preparatório não publica nem substitui pacotes. Depois de disponibilizado o Setup validado que inclua o commit, encerrar as rotinas, instalar em Preserve, preservar configuração/credenciais/SQLite/journals e conferir `nexo versao`. Não copiar módulo avulso sobre C:\NexoFlow.
+A correção altera código operacional e exige **nova release/Setup** para chegar ao Windows instalado. A 1.5.37 publicada não contém este ajuste. A distribuição corretiva 1.5.38 está em preparação autorizada; aguardar sua publicação comprovada antes de atualizar. Depois de disponibilizado o Setup validado que inclua o commit, encerrar as rotinas, instalar em Preserve, preservar configuração/credenciais/SQLite/journals e conferir `nexo versao`. Não copiar módulo avulso sobre C:\NexoFlow.
 
 ## Repetir a exportação
 

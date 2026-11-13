@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.37",
+    [string]$Version = "1.5.38",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -423,6 +423,12 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
+Correção da exportação Sheets para PostgreSQL: cabeçalhos com os mesmos campos em outra ordem são validados contra o hash físico de cada parte e os valores são associados pelo nome. Campos ausentes, extras, duplicados ou hash divergente continuam bloqueados. Registro canônico, revisão READY, manifesto e versões Drive são preservados.
+
+Após instalar em Preserve, repetir a exportação em pasta nova usando o exclusoes.json já conferido da mesma revisão. Não reaproveitar o corte interrompido. [Comandos de retomada](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/CORRECAO%20EXPORTACAO%20CABECALHOS%20POSTGRESQL.md).
+
+Inclui as projeções privadas do relatório FARMA, o campo Venda elegível específico das mesclagens e o adaptador ABC por período. A implantação na VPS/Apps Script e a homologação comercial continuam etapas separadas do Setup.
+
 Backend definitivo PostgreSQL opt-in para o NexoFlow Windows, separado do piloto BI_Itens. FARMA e PET possuem catálogo, credenciais, estados e revisões isolados. Sheets continua sendo o padrão; não há fallback automático quando PostgreSQL estiver selecionado.
 
 Publicação e leitura usam APIs privadas separadas e Cloudflare Access; PostgreSQL permanece sem porta pública. Staging, recibos idempotentes, checkpoints confirmados, selagem e revisão atômica preservam a última versão READY durante uma carga. O leitor usa projeção indexada, filtros e agregações SQL, sem retornar totais parciais em falhas. Os dez módulos assinados do publicador Sheets permanecem preservados.
@@ -445,7 +451,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.37
+# NexoFlow 1.5.38
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"
