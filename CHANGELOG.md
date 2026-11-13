@@ -1,6 +1,6 @@
 # NexoFlow — Changelog
 
-## Após 1.5.38 — diagnóstico de conflitos na exportação
+## 1.5.39 — em preparação
 
 - Conflitos de chave informam tabela e campos divergentes; exportação registra as duas posições físicas em diagnóstico privado sem valores comerciais.
 - Mantém bloqueio de divergências e deduplicação de linhas idênticas. Causa da ocorrência comercial ainda depende da evidência das posições. Mudança operacional ainda não distribuída.

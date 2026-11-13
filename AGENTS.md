@@ -1,3 +1,7 @@
+# NexoFlow 1.5.39 em preparação
+
+Diagnóstico de conflitos de chave na exportação autorizado para distribuição após checks e pacotes do mesmo SHA. A 1.5.38 permanece como última release comprovada.
+
 # NexoFlow 1.5.38 publicada
 
 Publicada em **12/11/2026, 22:39:37 (America/Fortaleza)**, SHA `ace7c8f12361fe2bc0256323cb59f3b56b55cd0d`. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.38), [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43343660933), [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43343660702), [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43343660704) e [publicação com os mesmos artefatos](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43346458099). Downloads públicos conferidos: SHA-256, CRC, 579 entradas do manifesto, 123 módulos por pacote e versões x64 dos executáveis. Corrige cabeçalhos reordenados na exportação Sheets/PostgreSQL. Nenhuma carga, alteração de planilha ou implantação comercial executada. A 1.5.37 e anteriores permanecem intactas.

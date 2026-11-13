@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.38",
+    [string]$Version = "1.5.39",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -423,6 +423,8 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
+Diagnóstico de conflitos na exportação: informa a tabela e os campos divergentes e grava corte.diagnostico.json privado com as duas posições físicas. Não descarta registros nem escolhe arbitrariamente uma versão. A causa do conflito comercial ainda depende dessa evidência; o bloqueio continua protegido.
+
 Correção da exportação Sheets para PostgreSQL: cabeçalhos com os mesmos campos em outra ordem são validados contra o hash físico de cada parte e os valores são associados pelo nome. Campos ausentes, extras, duplicados ou hash divergente continuam bloqueados. Registro canônico, revisão READY, manifesto e versões Drive são preservados.
 
 Após instalar em Preserve, repetir a exportação em pasta nova usando o exclusoes.json já conferido da mesma revisão. Não reaproveitar o corte interrompido. [Comandos de retomada](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/CORRECAO%20EXPORTACAO%20CABECALHOS%20POSTGRESQL.md).
@@ -451,7 +453,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.38
+# NexoFlow 1.5.39
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"
