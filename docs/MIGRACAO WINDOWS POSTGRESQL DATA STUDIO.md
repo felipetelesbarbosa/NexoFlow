@@ -196,3 +196,7 @@ Os testes locais/CI usam dados sintéticos e serviços simulados/PostgreSQL desc
 ## Distribuição conferida
 
 Publicada em **12/11/2026, 19:18:38 (America/Fortaleza)**, SHA `2683717431b1c4313efaaaef35cfaaf20236958a`. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.37), [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43314024652), [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43314024795), [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43314026009) e [publicação reutilizando os artefatos](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43318519275). Downloads públicos conferidos: hashes, CRC, 571 entradas do manifesto, 123 módulos e versões dos executáveis. Sem implantação ou migração comercial.
+
+## Cabeçalhos físicos em outra ordem
+
+A correção posterior à 1.5.37 permite a ordem física registrada no manifesto com validação por nome, hash e conjunto canônico. Ver [correção e comandos de nova exportação](CORRECAO%20EXPORTACAO%20CABECALHOS%20POSTGRESQL.md). Reutilizar exclusoes.json conferido da mesma revisão e uma pasta nova; não editar o manifesto ou o corte interrompido. A instalação Windows exige Setup que incorpore o ajuste.

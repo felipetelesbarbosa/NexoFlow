@@ -84,13 +84,11 @@ def export_sheets(store, path, segment, revision, exclusions):
             parts = index.table_parts(name)
             physical = []
             if parts:
-                if any(p.schema != fingerprint(spec["columns"]) for p in parts):
-                    raise StorageError("DS_SCHEMA_ORIGEM_DIVERGENTE")
-                physical = [manager.worksheet(p) for p in parts]
+                physical = [(manager.worksheet(p), p) for p in parts]
             else:
                 book = manager._book(roots[role_for(name)])
                 physical = [
-                    ws
+                    (ws, None)
                     for ws in store._read_with_retry(
                         "localizar tabela do corte", book.worksheets
                     )
@@ -101,15 +99,31 @@ def export_sheets(store, path, segment, revision, exclusions):
                     missing.append(name)
                     continue
             present.append(name)
-            for ws in physical:
+            for ws, part in physical:
                 header = store._read_with_retry(
                     "conferir cabeçalho do corte",
-                    lambda ws=ws, spec=spec: ws.get(
-                        "A1:" + rowcol_to_a1(1, len(spec["columns"])),
+                    lambda ws=ws: ws.get(
+                        "A1:" + rowcol_to_a1(1, ws.col_count),
                         value_render_option="UNFORMATTED_VALUE",
                     ),
                 )
-                if header != [spec["columns"]]:
+                if len(header) != 1:
+                    raise StorageError("DS_SCHEMA_ORIGEM_DIVERGENTE")
+                columns = list(header[0])
+                # A grade pode reservar colunas vazias além do cabeçalho real.
+                # Ler toda a primeira linha também detecta campos extras à direita.
+                while columns and columns[-1] in ("", None):
+                    columns.pop()
+                if part is not None and (
+                    fingerprint(columns) != part.schema or len(columns) != part.width
+                ):
+                    raise StorageError("DS_SCHEMA_ORIGEM_DIVERGENTE")
+                if (
+                    any(not isinstance(field, str) or not field for field in columns)
+                    or len(columns) != len(spec["columns"])
+                    or len(set(columns)) != len(columns)
+                    or set(columns) != set(spec["columns"])
+                ):
                     raise StorageError("DS_SCHEMA_ORIGEM_DIVERGENTE")
                 for offset in range(2, ws.row_count + 1, 1000):
                     end = min(offset + 999, ws.row_count)
@@ -131,7 +145,7 @@ def export_sheets(store, path, segment, revision, exclusions):
                         padded = list(values_row) + [""] * (
                             len(spec["columns"]) - len(values_row)
                         )
-                        rows.append(dict(zip(spec["columns"], padded, strict=True)))
+                        rows.append(dict(zip(columns, padded, strict=True)))
                     output.add(name, rows, segment)
         for bid, version in versions.items():
             current = store._read_with_retry(
