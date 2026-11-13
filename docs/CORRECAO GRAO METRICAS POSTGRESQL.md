@@ -47,7 +47,7 @@ Work: pausar os serviços definitivos antes da migração, fazer backup privado 
 
 ## Windows e próxima evidência
 
-Esta mudança exige nova release/Setup para chegar ao Windows; 1.5.39 não contém a correção de grão ou de cota. Não substituir módulos avulsos. Após distribuir o Setup validado, instalar em Preserve, confirmar a versão e repetir exportação e auditoria em pasta nova com o mesmo exclusoes.json confirmado. Preservar tentativas anteriores. Não executar API comercial, Weni, Noturno ou carga PostgreSQL para investigar.
+Esta mudança está distribuída na **1.5.40**; instalar o Setup em Preserve. A 1.5.39 não contém a correção de grão ou de cota. Não substituir módulos avulsos. Após distribuir o Setup validado, instalar em Preserve, confirmar a versão e repetir exportação e auditoria em pasta nova com o mesmo exclusoes.json confirmado. Preservar tentativas anteriores. Não executar API comercial, Weni, Noturno ou carga PostgreSQL para investigar.
 
 ## Resultados desta correção
 
@@ -62,3 +62,12 @@ Não houve acesso às planilhas comerciais, atualização da VPS nem nova coleta
 ## Distribuição corretiva em preparação
 
 Windows 1.5.40 em validação: inclui as correções de grão, o controle de cota na exportação e os pacotes sem o instalador Python. O Setup reutiliza Python existente ou oferece download do site oficial com hash fixado. Testes Windows novos cobrem reaproveitamento, download simulado, hash divergente e falha de rede; aprovação e downloads devem ser conferidos antes de anunciar a publicação. A mudança de contrato exige atualização coordenada dos serviços/conector pelo Work, sem executar cargas automaticamente.
+
+## Publicação comprovada 1.5.40
+
+Publicado em 13/11/2026, 00:41:51 (America/Fortaleza), SHA `c5da21c05c9a8c220bb55538b74957e8052e8624`. [CI](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43357598802), [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43357599045) e [publicação sem recompilar](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43360624111) aprovados. Windows 3.11/3.14 nas duas codificações, PostgreSQL/Docker, executáveis, Setup Preserve/Clean/rollback e testes simulados do download Python aprovados. Downloads públicos iguais aos preparados: hashes, CRC, módulos, manifesto e versões conferidos. Os dois ZIPs não contêm instalador Python.
+
+- Setup: `1c9d41b6d9d184a4530f35fe7971d2b79a68e16840460359e8defd586d9dc877` (13.526.371 bytes).
+- Projeto: `cefcf3976eb0758970ce15954a47524c5797a4c26375f1a6edb98c47890183d1` (12.424.393 bytes).
+
+Operador: instalar Preserve, confirmar `nexo versao` = 1.5.40, selecionar FARMA e executar exportação/auditoria em pasta nova com o mesmo exclusoes.json. Preservar todas as tentativas anteriores. A exportação Sheets não exige implantação da API, mas o envio posterior ao PostgreSQL exige a atualização coordenada deste contrato pelo Work conforme a seção acima. Nenhuma publicação real ou homologação financeira comercial foi executada pelo Codex.

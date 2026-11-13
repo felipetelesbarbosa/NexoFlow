@@ -94,7 +94,7 @@ As continuações automáticas no Meu Drive exigem autorização Google local. O
 
 ## Versões e atualizações
 
-A versão desta entrega é **1.5.40**, em preparação. A 1.5.39 foi publicada em 12/11/2026, 23:42:16 (America/Fortaleza). A 1.5.38 foi publicada em 12/11/2026, 22:39:37 (America/Fortaleza). A 1.5.36 já foi publicada. A 1.5.35 foi publicada em 11/11/2026, 21:23:49 (America/Fortaleza). A release 1.5.34 e as anteriores permanecem intactas. As próximas correções seguem **1.5.40, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md) e a [rotina eficiente de publicação](docs/RELEASE%20EFICIENTE.md).
+A versão desta entrega é **1.5.40**, publicada em 13/11/2026, 00:41:51 (America/Fortaleza). A 1.5.39 foi publicada em 12/11/2026, 23:42:16 (America/Fortaleza). A 1.5.38 foi publicada em 12/11/2026, 22:39:37 (America/Fortaleza). A 1.5.36 já foi publicada. A 1.5.35 foi publicada em 11/11/2026, 21:23:49 (America/Fortaleza). A release 1.5.34 e as anteriores permanecem intactas. As próximas correções seguem **1.5.41, ... 1.5.99; depois 1.6**. A numeração muda por publicação, sem saltos por commit ou nova tentativa de build. Veja a [política de versionamento](docs/VERSIONAMENTO.md) e a [rotina eficiente de publicação](docs/RELEASE%20EFICIENTE.md).
 
 ## NexoFlow Hub: homologação e evolução paralela
 

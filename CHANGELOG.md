@@ -1,6 +1,6 @@
 # NexoFlow — Changelog
 
-## 1.5.40 — em preparação
+## 1.5.40 — publicada em 13/11/2026, 00:41:51 (America/Fortaleza)
 
 - Metricas_Diarias e BI_Ads incluem o título já utilizado pelos geradores nas chaves; preservam contagens e grupos sem descartar divergências.
 - Exportação ativa ritmo HTTP compartilhado antes da primeira leitura. Contrato/conector sincronizados; atualização do banco bloqueia métricas existentes ou publicação incompleta.
