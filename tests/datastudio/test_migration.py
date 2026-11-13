@@ -348,3 +348,67 @@ def test_export_cli_accepts_reordered_existing_manifest(
     )
     assert proof.read_bytes() == original
     assert json.loads((tmp_path / "manifesto.json").read_text())["state"] == "READY"
+
+
+def test_conflicting_keys_report_both_physical_rows_without_values(
+    ready_sheets, tmp_path
+):
+    store, revision, exclusions = ready_sheets
+    manager = store._continuity
+    parts = manager.index.table_parts("Historico_Pedidos")
+    first, second = (manager.worksheet(p) for p in parts[:2])
+    columns = first.values[0]
+    original = first.values[1][:]
+    # Mesmo pedido em outra parte, com divergência apenas no vínculo.
+    altered = original[:]
+    field = next(
+        c
+        for c in columns
+        if c
+        not in (
+            "chave",
+            "segmento",
+            "pedido_id",
+            "cliente_id",
+            "data",
+            "estado",
+            "produtos",
+            "frete",
+            "faturamento",
+        )
+    )
+    altered[columns.index(field)] = "VALOR_PRIVADO_NAO_DEVE_APARECER"
+    second.values.append(altered)
+    second.row_count = max(second.row_count, len(second.values))
+    path = tmp_path / "conflict.sqlite"
+    with pytest.raises(StorageError, match="DS_ORIGEM_CHAVE_DIVERGENTE") as error:
+        export_sheets(store, path, "FARMA", revision, exclusions)
+    diagnostic = json.loads(
+        path.with_suffix(".diagnostico.json").read_text(encoding="utf-8")
+    )
+    conflict = diagnostic["conflict"]
+    assert conflict["table"] == "Historico_Pedidos"
+    assert conflict["fields"] == [field]
+    assert conflict["first"] == dict(part=parts[0].number, sheet_id=first.id, row=2)
+    assert conflict["second"] == dict(
+        part=parts[1].number, sheet_id=second.id, row=len(second.values)
+    )
+    assert "VALOR_PRIVADO_NAO_DEVE_APARECER" not in str(error.value) + json.dumps(
+        diagnostic
+    )
+    assert diagnostic["source_consistency"] == "NAO_CONCLUIDA"
+    with closing(Export(path)) as result:
+        with pytest.raises(StorageError, match="INCOMPLETA"):
+            result.manifest()
+
+
+def test_duplicate_identical_rows_remain_idempotent_with_locations(tmp_path):
+    from ds_backend.contract import REGISTRY
+
+    name = "Base_Contatos"
+    row = dict.fromkeys(REGISTRY[name]["columns"], "")
+    row["contact_uuid"] = "synthetic-contact"
+    with closing(Export(tmp_path / "identical.sqlite", create=True)) as result:
+        result.add(name, [row], "FARMA", locations=[dict(part=0, sheet_id=1, row=2)])
+        result.add(name, [row], "FARMA", locations=[dict(part=1, sheet_id=2, row=3)])
+        assert result.db.execute("SELECT COUNT(*) FROM linhas").fetchone()[0] == 1

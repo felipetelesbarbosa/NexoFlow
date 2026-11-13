@@ -63,3 +63,13 @@ SHA-256 recalculado dos downloads:
 - Projeto: `9928d5b110719ded704e40dabeb5029569f4c70ba9936b7105b1e8b22f734c7a`.
 
 Não houve leitura das planilhas comerciais nem confirmação da exportação real. O operador deve repetir exportação e auditoria conforme o roteiro acima; publicação de software não aprova automaticamente o corte comercial.
+
+## Bloqueio posterior: chave divergente
+
+O operador relatou `DS_ORIGEM_CHAVE_DIVERGENTE` após retentativas HTTP 429 na 1.5.38. A condição no código é duas linhas normalizadas com a mesma chave canônica e conteúdos distintos. Os logs fornecidos não identificam a tabela, a parte ou os campos; não permitem concluir duplicidade comercial nem erro no contrato da chave. O corte interrompido não é uma exportação READY e não deve ser enviado.
+
+O diagnóstico posterior à 1.5.38 identifica tabela e nomes dos campos na exceção. Durante exportação Sheets, grava ao lado do corte `corte.diagnostico.json`, com segmento, revisão, nomes dos campos da chave, campos divergentes e posições físicas das duas ocorrências (parte, ID numérico da aba e linha). Não inclui valores de células, IDs de pedidos/clientes, tokens ou hashes de identidade. A consistência final da origem aparece como `NAO_CONCLUIDA`: o conflito é detectado antes da reconferência final de versões Drive/manifesto. Posições são evidência daquela tentativa, não autorização para editar a origem.
+
+O índice de posições é temporário no SQLite durante a exportação; não muda o schema canônico ou o pacote definitivo. Duplicatas idênticas continuam idempotentes. Divergências continuam bloqueando o corte e não são resolvidas escolhendo a última linha nem descartando revisões.
+
+Testes sintéticos cobrem conflito entre partes, posição das duas ocorrências, ausência de valores privados no diagnóstico, corte sem READY e repetição idêntica sem duplicação. O diagnóstico exige nova distribuição Windows; não substituir módulos avulsos. A causa da ocorrência comercial permanece pendente de evidência. Manter a pasta interrompida e o exclusoes.json; não repetir a carga somente para reproduzir o mesmo erro genérico.

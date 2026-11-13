@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from contextlib import closing
+from pathlib import Path
 
 from ds_backend.contract import REGISTRY, StorageError, digest
-from ds_backend.migration import Export
+from ds_backend.migration import Export, SourceKeyConflict, private_json
 
 
 def export_sheets(store, path, segment, revision, exclusions):
@@ -137,7 +138,8 @@ def export_sheets(store, path, segment, revision, exclusions):
                         ),
                     )
                     rows = []
-                    for values_row in values:
+                    locations = []
+                    for position, values_row in enumerate(values, start=offset):
                         if not any(v not in ("", None) for v in values_row):
                             continue
                         if len(values_row) > len(spec["columns"]):
@@ -146,7 +148,28 @@ def export_sheets(store, path, segment, revision, exclusions):
                             len(spec["columns"]) - len(values_row)
                         )
                         rows.append(dict(zip(columns, padded, strict=True)))
-                    output.add(name, rows, segment)
+                        locations.append(
+                            dict(
+                                part=part.number if part else None,
+                                sheet_id=ws.id,
+                                row=position,
+                            )
+                        )
+                    try:
+                        output.add(name, rows, segment, locations=locations)
+                    except SourceKeyConflict as error:
+                        private_json(
+                            Path(path).with_suffix(".diagnostico.json"),
+                            dict(
+                                diagnostic="conflito_chave_v1",
+                                segment=segment,
+                                revision=revision,
+                                state="BLOQUEADO",
+                                source_consistency="NAO_CONCLUIDA",
+                                conflict=error.diagnostic,
+                            ),
+                        )
+                        raise
         for bid, version in versions.items():
             current = store._read_with_retry(
                 "reconferir versão Drive do corte",

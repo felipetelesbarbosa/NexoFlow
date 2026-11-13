@@ -1,5 +1,10 @@
 # NexoFlow — Changelog
 
+## Após 1.5.38 — diagnóstico de conflitos na exportação
+
+- Conflitos de chave informam tabela e campos divergentes; exportação registra as duas posições físicas em diagnóstico privado sem valores comerciais.
+- Mantém bloqueio de divergências e deduplicação de linhas idênticas. Causa da ocorrência comercial ainda depende da evidência das posições. Mudança operacional ainda não distribuída.
+
 ## 1.5.38 — publicada em 12/11/2026, 22:39:37 (America/Fortaleza)
 
 - Cabeçalhos reordenados são conferidos contra o hash físico de cada parte; valores associados por nome, com conjunto canônico exato e rejeição de duplicatas/campos inválidos.

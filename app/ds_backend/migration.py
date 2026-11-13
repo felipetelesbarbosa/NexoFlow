@@ -31,6 +31,26 @@ def private_json(path, data):
     temporary.replace(path)
 
 
+class SourceKeyConflict(StorageError):
+    """Conflito sem valores, hashes de identidade ou identificadores comerciais."""
+
+    def __init__(self, name, fields, first=None, second=None):
+        super().__init__(
+            "DS_ORIGEM_CHAVE_DIVERGENTE; tabela="
+            + name
+            + "; campos="
+            + ",".join(fields)
+        )
+        self.diagnostic = dict(
+            code="DS_ORIGEM_CHAVE_DIVERGENTE",
+            table=name,
+            key_fields=REGISTRY[name]["keys"],
+            fields=fields,
+            first=first,
+            second=second,
+        )
+
+
 class Export:
     """SQLite é apenas pacote/outbox de transporte, não a fonte operacional nova."""
 
@@ -50,9 +70,15 @@ class Export:
         else:
             self.db.execute("PRAGMA query_only=ON")
 
-    def add(self, name, rows, segment):
+    def add(self, name, rows, segment, *, locations=None):
         normalized = normalize(name, rows, segment)
-        for row in normalized:
+        if locations is not None:
+            if len(locations) != len(normalized):
+                raise StorageError("DS_LOCALIZACAO_ORIGEM_INVALIDA")
+            self.db.execute(
+                "CREATE TEMP TABLE IF NOT EXISTS origens(t TEXT,k TEXT,v TEXT,PRIMARY KEY(t,k))"
+            )
+        for index, row in enumerate(normalized):
             key = record_key(name, row)
             encoded = json.dumps(
                 row, sort_keys=True, ensure_ascii=False, separators=(",", ":")
@@ -61,10 +87,31 @@ class Export:
                 "SELECT v FROM linhas WHERE t=? AND k=?", (name, key)
             ).fetchone()
             if prior and prior[0] != encoded:
-                raise StorageError("DS_ORIGEM_CHAVE_DIVERGENTE")
+                previous = json.loads(prior[0])
+                first = None
+                if locations is not None:
+                    saved = self.db.execute(
+                        "SELECT v FROM origens WHERE t=? AND k=?", (name, key)
+                    ).fetchone()
+                    first = json.loads(saved[0]) if saved else None
+                raise SourceKeyConflict(
+                    name,
+                    [
+                        field
+                        for field in REGISTRY[name]["columns"]
+                        if previous[field] != row[field]
+                    ],
+                    first,
+                    locations[index] if locations is not None else None,
+                )
             self.db.execute(
                 "INSERT OR IGNORE INTO linhas VALUES(?,?,?)", (name, key, encoded)
             )
+            if locations is not None:
+                self.db.execute(
+                    "INSERT OR IGNORE INTO origens VALUES(?,?,?)",
+                    (name, key, json.dumps(locations[index])),
+                )
 
     def seal(self, segment, evidence):
         if evidence.get("scope") not in ("CORTE_COMPLETO", "PILOTO_PEDIDO"):
