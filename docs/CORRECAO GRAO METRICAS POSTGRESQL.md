@@ -58,3 +58,7 @@ Esta mudança exige nova release/Setup para chegar ao Windows; 1.5.39 não cont�
 - 104 testes Node dos conectores aprovados. Ruff, sincronização do catálogo, documentação e consistência aprovados. Tipos dos arquivos operacionais e do módulo novo aprovados.
 
 Não houve acesso às planilhas comerciais, atualização da VPS nem nova coleta. A inspeção do JSON confirma a localização do conflito; a nova exportação comercial após distribuição continua pendente. A 1.5.39 permanece intacta.
+
+## Distribuição corretiva em preparação
+
+Windows 1.5.40 em validação: inclui as correções de grão, o controle de cota na exportação e os pacotes sem o instalador Python. O Setup reutiliza Python existente ou oferece download do site oficial com hash fixado. Testes Windows novos cobrem reaproveitamento, download simulado, hash divergente e falha de rede; aprovação e downloads devem ser conferidos antes de anunciar a publicação. A mudança de contrato exige atualização coordenada dos serviços/conector pelo Work, sem executar cargas automaticamente.

@@ -3,7 +3,7 @@
 ## Requisitos
 
 - Windows x64.
-- Python 3.11 ou superior, 64 bits. O Setup oferece o Python 3.14.8 x64 incluído se não encontrar um compatível.
+- Python 3.11 ou superior, 64 bits. O Setup oferece baixar o Python 3.14.8 x64 do site oficial, com SHA-256 conferido, se não encontrar um compatível. O instalador Python não acompanha os ZIPs.
 - Acesso à Weni, à API FarmaLíder e ao Google Sheets, com suas próprias credenciais para FarmaLíder e/ou Pets Líder.
 
 ## Instalar

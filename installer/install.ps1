@@ -10,14 +10,15 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
 $AppName = 'NexoFlow'
-$AppVersion = '1.5.39'
+$AppVersion = '1.5.40'
 $Publisher = 'Grupo Lider'
 $InstallDir = 'C:\NexoFlow'
 $DataDir = 'C:\NexoFlow Data'
 $PackageRoot = Split-Path -Parent $PSScriptRoot
 $PayloadDir = Join-Path $PackageRoot 'payload'
 $ManifestPath = Join-Path $PayloadDir 'payload manifest.json'
-$BundledPythonInstaller = Join-Path $PackageRoot 'prerequisites\python-3.14.8-amd64.exe'
+$PythonInstallerUrl = 'https://www.python.org/ftp/python/3.14.8/python-3.14.8-amd64.exe'
+$script:DownloadedPythonDirectory = $null
 $BundledPythonSha256 = '759be887b96e736a3ca886daf8d575f18fcae1a09efab6902f42d59e8999f8ef'
 $UninstallKey = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\NexoFlow'
 $AppKey = 'HKLM:\Software\Grupo Lider\NexoFlow'
@@ -684,7 +685,7 @@ Nenhuma instalação compatível do Python foi localizada pelo NexoFlow.
 
 O NexoFlow Analytics requer Python 3.11 ou superior, 64 bits.
 
-Este pacote já inclui o instalador do Python 3.14.8 x64. Deseja abri-lo agora?
+O Setup pode baixar o instalador oficial do Python 3.14.8 x64 pela internet e conferir sua integridade. Deseja continuar?
 
 Se o Python 3.14.8 já estiver instalado, o próprio instalador poderá oferecer opções de manutenção/reparo. Enquanto você conclui a instalação ou o reparo, o NexoFlow verificará o interpretador em segundo plano e continuará assim que ele estiver disponível.
 
@@ -706,6 +707,25 @@ O NexoFlow NÃO instalará Python 3.12 e NÃO usará WinGet.
     }
 }
 
+function Get-VerifiedPythonInstaller {
+    $directory = Join-Path ([IO.Path]::GetTempPath()) ('NexoFlow-Python-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $directory -ErrorAction Stop | Out-Null
+    $script:DownloadedPythonDirectory = $directory
+    $installer = Join-Path $directory 'python-3.14.8-amd64.exe'
+    try {
+        Write-Step 'Baixando Python 3.14.8 x64 do site oficial'
+        Invoke-WebRequest -Uri $PythonInstallerUrl -OutFile $installer -UseBasicParsing -TimeoutSec 180 -ErrorAction Stop
+        if ((Get-Sha256File -Path $installer) -ne $BundledPythonSha256) {
+            throw 'Falha de integridade no instalador oficial do Python 3.14.8.'
+        }
+        return $installer
+    } catch {
+        Remove-Item -LiteralPath $directory -Recurse -Force -ErrorAction SilentlyContinue
+        $script:DownloadedPythonDirectory = $null
+        throw 'Não foi possível obter e validar o Python oficial. Confira a conexão ou instale Python 3.11 ou superior x64 pelo site python.org e execute o Setup novamente.'
+    }
+}
+
 function Install-PythonIfNeeded {
     $python = Get-CompatiblePython
     if ($python) {
@@ -722,16 +742,14 @@ function Install-PythonIfNeeded {
         throw 'O Python 3.11 ou superior, 64 bits, é necessário para executar o NexoFlow Analytics. A instalação foi cancelada pelo usuário.'
     }
 
-    if (-not (Test-Path -LiteralPath $BundledPythonInstaller -PathType Leaf)) {
-        throw "O instalador incluído do Python 3.14.8 não foi encontrado em: $BundledPythonInstaller"
-    }
+    $BundledPythonInstaller = Get-VerifiedPythonInstaller
 
     $actualHash = Get-Sha256File -Path $BundledPythonInstaller
     if ($actualHash -ne $BundledPythonSha256) {
-        throw 'Falha de integridade no instalador incluído do Python 3.14.8.'
+        throw 'Falha de integridade no instalador oficial do Python 3.14.8.'
     }
 
-    Write-Step 'Abrindo Python 3.14.8 x64 incluído no pacote'
+    Write-Step 'Abrindo Python 3.14.8 x64 verificado'
     Write-Host '[INFO] Conclua a instalação ou o reparo do Python na janela que será aberta.' -ForegroundColor Yellow
     Write-Host '[INFO] O NexoFlow verificará o Python em segundo plano e continuará assim que ele estiver disponível.' -ForegroundColor Yellow
 
@@ -1814,8 +1832,11 @@ catch {
     exit 1
 }
 finally {
+    if ($script:DownloadedPythonDirectory) {
+        Remove-Item -LiteralPath $script:DownloadedPythonDirectory -Recurse -Force -ErrorAction SilentlyContinue
+    }
     Exit-NexoMaintenance
     if ($null -eq $previousNetworkMode) { Remove-Item Env:NEXOFLOW_NETWORK_MODE -ErrorAction SilentlyContinue }
     else { $env:NEXOFLOW_NETWORK_MODE = $previousNetworkMode }
 }
-# NexoFlow 1.5.39
+# NexoFlow 1.5.40

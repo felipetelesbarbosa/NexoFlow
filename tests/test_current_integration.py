@@ -880,8 +880,8 @@ class CurrentIntegrationTests(unittest.TestCase):
         self.assertIn("function Get-Sha256File", install)
         self.assertIn("CurrentVersion\\Uninstall\\NexoFlow", install)
         self.assertIn("NexoFlow Analytics.lnk", install)
-        # O fluxo atual aceita Python 3.11+ e inclui o instalador 3.14.8 como
-        # fallback local. O teste antigo ainda exigia o identificador WinGet
+        # O fluxo atual aceita Python 3.11+ e baixa o instalador 3.14.8 como
+        # fallback verificado. O teste antigo ainda exigia o identificador WinGet
         # Python.Python.3.12, que foi removido deliberadamente do instalador.
         self.assertNotIn("Python.Python.3.12", install)
         self.assertIn("python-3.14.8-amd64.exe", install)

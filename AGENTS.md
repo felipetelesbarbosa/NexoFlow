@@ -1,3 +1,7 @@
+# NexoFlow 1.5.40 em preparação
+
+Correções das chaves Metricas_Diarias/BI_Ads e cota de exportação. Pacotes sem instalador Python; download oficial verificado somente quando necessário. Publicação exige checks e pacotes do mesmo SHA.
+
 # NexoFlow 1.5.39 publicada
 
 Publicada em **12/11/2026, 23:42:16 (America/Fortaleza)**, SHA `25f287dbc21a51e3702eeb04fda27469cbe2a27a`. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.39), [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43351527380), [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43351527378), [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43351527469) e [publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43353932051). Downloads públicos conferidos: SHA-256, CRC, 579 entradas do manifesto, 123 módulos por pacote, código do diagnóstico e versões x64. Diagnóstico identifica tabela/campos/posições do conflito sem escolher uma linha divergente. Causa comercial ainda pendente; nenhuma carga comercial executada. Releases anteriores preservadas.

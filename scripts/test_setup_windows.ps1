@@ -148,9 +148,9 @@ function Assert-Installed {
 
     Assert-True (Test-Path -LiteralPath $UninstallKey) "Registro de desinstalação não foi criado."
     $installedVersion = (Get-Content -Raw -LiteralPath (Join-Path $InstallDir "VERSION")).Trim()
-    Assert-True ($installedVersion -eq "1.5.39") "Versão instalada inesperada: $installedVersion"
+    Assert-True ($installedVersion -eq "1.5.40") "Versão instalada inesperada: $installedVersion"
     $displayVersion = (Get-ItemProperty -LiteralPath $UninstallKey -Name DisplayVersion -ErrorAction Stop).DisplayVersion
-    Assert-True ($displayVersion -eq "1.5.39") "DisplayVersion inesperada: $displayVersion"
+    Assert-True ($displayVersion -eq "1.5.40") "DisplayVersion inesperada: $displayVersion"
 }
 
 Remove-TestArtifacts
@@ -165,7 +165,7 @@ try {
     $importsPayload = Join-Path $SetupDir 'payload\importacoes'
     Assert-True (Test-Path -LiteralPath $importsPayload -PathType Container) 'Pasta importacoes ausente no ZIP do Setup.'
     Assert-True (@(Get-ChildItem -LiteralPath $importsPayload -Force -Recurse).Count -eq 0) 'O pacote deve conter importacoes vazia, sem exports.'
-    $projectZip = Join-Path (Split-Path -Parent $resolvedZip) 'NexoFlow-1.5.39.zip'
+    $projectZip = Join-Path (Split-Path -Parent $resolvedZip) 'NexoFlow-1.5.40.zip'
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $projectArchive = [IO.Compression.ZipFile]::OpenRead($projectZip)
     try {
@@ -386,7 +386,7 @@ public static class NexoFlowSetupRootLock {
         else { $env:PYTHONPATH = $previousPythonPath }
     }
 
-    Write-Host "[OK] Smoke test do NexoFlow Setup 1.5.39 concluído."
+    Write-Host "[OK] Smoke test do NexoFlow Setup 1.5.40 concluído."
 }
 finally {
     if ($null -eq $previousTestNetworkMode) { Remove-Item Env:NEXOFLOW_NETWORK_MODE -ErrorAction SilentlyContinue }
@@ -397,4 +397,4 @@ finally {
     Remove-TestArtifacts
     Remove-Item -LiteralPath $TempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
-# NexoFlow 1.5.39
+# NexoFlow 1.5.40

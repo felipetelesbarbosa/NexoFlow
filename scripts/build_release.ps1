@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.39",
+    [string]$Version = "1.5.40",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -86,6 +86,7 @@ function Copy-TrackedFiles {
             if (-not $relative) { continue }
             if ($relative -like "releases/*") { continue }
             if ($relative -like "hub/*") { continue }
+            if ($relative -like "prerequisites/*") { continue }
             if ($relative -like "native_launcher/prebuilt/*") { continue }
             if ($relative -like ".github/*") { continue }
             if ($relative -like "scripts/*" -and $relative -notin @("scripts/reconhecer_rede.ps1", "scripts/confirmar_revisao_weni.ps1", "scripts/resultado_carga_weni.ps1", "scripts/check_release_secrets.py", "scripts/build_documentation.py", "scripts/instalar_meta_ads_mcp.ps1", "scripts/instalar_codex_cli.ps1")) { continue }
@@ -248,8 +249,6 @@ Write-PayloadManifest -Payload $PayloadDir
 New-Item -ItemType Directory -Force -Path (Join-Path $SetupRoot "installer") | Out-Null
 Copy-Item -LiteralPath (Join-Path $RepoRoot "installer\install.ps1") -Destination (Join-Path $SetupRoot "installer\install.ps1") -Force
 
-New-Item -ItemType Directory -Force -Path (Join-Path $SetupRoot "prerequisites") | Out-Null
-Copy-Item -LiteralPath (Join-Path $RepoRoot "prerequisites\python-3.14.8-amd64.exe") -Destination (Join-Path $SetupRoot "prerequisites\python-3.14.8-amd64.exe") -Force
 
 $readme = @"
 NexoFlow $Version - SETUP
@@ -423,6 +422,10 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
+Corrige as chaves de Metricas_Diarias e BI_Ads para incluir o título usado pelos geradores; preserva grupos e contagens. A exportação usa o ritmo HTTP compartilhado para reduzir 429. Contrato PostgreSQL e conector atualizados exigem implantação coordenada pelo Work antes de publicar dados; migração bloqueia métricas já armazenadas e escrita incompleta.
+
+Os ZIPs não incluem o instalador Python. O Setup reutiliza Python compatível ou oferece download oficial com SHA-256 verificado.
+
 Diagnóstico de conflitos na exportação: informa a tabela e os campos divergentes e grava corte.diagnostico.json privado com as duas posições físicas. Não descarta registros nem escolhe arbitrariamente uma versão. A causa do conflito comercial ainda depende dessa evidência; o bloqueio continua protegido.
 
 Correção da exportação Sheets para PostgreSQL: cabeçalhos com os mesmos campos em outra ordem são validados contra o hash físico de cada parte e os valores são associados pelo nome. Campos ausentes, extras, duplicados ou hash divergente continuam bloqueados. Registro canônico, revisão READY, manifesto e versões Drive são preservados.
@@ -453,7 +456,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.39
+# NexoFlow 1.5.40
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"
