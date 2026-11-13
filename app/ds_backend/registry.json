@@ -334,11 +334,12 @@
     "keys": [
       "data",
       "tipo_atribuicao",
-      "anuncio_id"
+      "anuncio_id",
+      "anuncio_titulo"
     ],
     "period": "data",
     "public": false,
-    "grain": "data+tipo_atribuicao+anuncio_id",
+    "grain": "data+tipo_atribuicao+anuncio_id + anuncio_titulo",
     "source": "Analytics/integração oficial",
     "full_history": false
   },
@@ -847,11 +848,12 @@
       "origem",
       "tipo_campanha",
       "canal_destino",
-      "anuncio_id"
+      "anuncio_id",
+      "anuncio_titulo"
     ],
     "period": "data_snapshot",
     "public": true,
-    "grain": "data_snapshot+tipo_atribuicao+origem+tipo_campanha+canal_destino+anuncio_id",
+    "grain": "data_snapshot+tipo_atribuicao+origem+tipo_campanha+canal_destino+anuncio_id + anuncio_titulo",
     "source": "Analytics/integração oficial",
     "full_history": false
   },

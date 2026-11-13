@@ -1,5 +1,5 @@
 /* Gerado pelo contrato; executar scripts/sync_datastudio_schema.py --check. */
-var NexoDSSchemaHash="5ea6c5d0abd428a6b00c9d6a8fabe31c051a11dd3c127e17842947f708ac5ac8";
+var NexoDSSchemaHash="50aa2e50b669c1ab218aa5b3b7239ad306905a2916767ec1275f1fd760d71963";
 var NexoDSSchemas={
   "Base_Contatos": {
     "columns": [
@@ -201,11 +201,12 @@ var NexoDSSchemas={
     "keys": [
       "data",
       "tipo_atribuicao",
-      "anuncio_id"
+      "anuncio_id",
+      "anuncio_titulo"
     ],
     "period": "data",
     "public": true,
-    "grain": "data+tipo_atribuicao+anuncio_id",
+    "grain": "data+tipo_atribuicao+anuncio_id + anuncio_titulo",
     "source": "Analytics/integração oficial",
     "full_history": false,
     "read_columns": [
@@ -581,11 +582,12 @@ var NexoDSSchemas={
       "origem",
       "tipo_campanha",
       "canal_destino",
-      "anuncio_id"
+      "anuncio_id",
+      "anuncio_titulo"
     ],
     "period": "data_snapshot",
     "public": true,
-    "grain": "data_snapshot+tipo_atribuicao+origem+tipo_campanha+canal_destino+anuncio_id",
+    "grain": "data_snapshot+tipo_atribuicao+origem+tipo_campanha+canal_destino+anuncio_id + anuncio_titulo",
     "source": "Analytics/integração oficial",
     "full_history": false,
     "dimensions": []

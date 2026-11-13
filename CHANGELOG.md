@@ -1,5 +1,11 @@
 # NexoFlow — Changelog
 
+## Após 1.5.39 — grão de métricas e cota na exportação
+
+- Metricas_Diarias e BI_Ads incluem o título já utilizado pelos geradores nas chaves; preservam contagens e grupos sem descartar divergências.
+- Exportação ativa ritmo HTTP compartilhado antes da primeira leitura. Contrato/conector sincronizados; atualização do banco bloqueia métricas existentes ou publicação incompleta.
+- [Causa, revisão das chaves e sequência Windows/VPS](docs/CORRECAO%20GRAO%20METRICAS%20POSTGRESQL.md). Ainda não distribuído; nenhuma alteração comercial executada.
+
 ## 1.5.39 — publicada em 12/11/2026, 23:42:16 (America/Fortaleza)
 
 - Conflitos de chave informam tabela e campos divergentes; exportação registra as duas posições físicas em diagnóstico privado sem valores comerciais.

@@ -81,3 +81,7 @@ Publicado em 12/11/2026, 23:42:16 (America/Fortaleza), SHA `25f287dbc21a51e3702e
 Instalar o Setup 1.5.39 em Preserve e confirmar a versão. Repetir o bloco de exportação deste guia em pasta nova, usando `C:\NexoFlow\logs\privado\migracao-postgres\exclusoes.json` já conferido. Se o conflito reaparecer, manter a pasta e enviar somente `corte.diagnostico.json` para investigação. Não editar as linhas de origem, enviar o SQLite incompleto nem publicar o corte bloqueado. A auditoria encadeada continua executando somente após exportação bem-sucedida.
 
 Hashes recalculados: Setup `3134183a44466c624cb8153c7aa184e00c57d56594c04b50b745ae5f72b8c295`; projeto `f8911f94ea36e83ee7affb03348a1c44273dcfcc4874956bc8845778eb1eb646`.
+
+## Diagnóstico recebido e correção do contrato
+
+O JSON da tentativa 1.5.39 localizou a colisão em Metricas_Diarias. A revisão ampliada confirmou omissão de anuncio_titulo nas chaves de Metricas_Diarias e BI_Ads. Ver [causa, correções conjuntas, testes e compatibilidade VPS](CORRECAO%20GRAO%20METRICAS%20POSTGRESQL.md). Não repetir a exportação na 1.5.39 para obter o mesmo diagnóstico.

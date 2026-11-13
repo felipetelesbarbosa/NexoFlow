@@ -350,6 +350,47 @@ class QuotaTests(unittest.TestCase):
             with self.assertRaises(HistoryError):
                 self.gate(read_rpm=value)
 
+    def test_export_factory_paces_general_readonly_store(
+        self,
+    ):
+        session, server = self.session(paced=False)
+        client = gspread.Client(auth=AnonymousCredentials(), session=session)
+        client.http_client.auth = SimpleNamespace(
+            service_account_email="synthetic@example.invalid",
+            project_id="synthetic-project",
+        )
+        from google_sheets import GoogleSheetsStore
+
+        Store = google_store_type(GoogleSheetsStore)
+        store = Store.__new__(Store)
+        store.client = client
+        real_gate = QuotaGate
+
+        def gate(path, **kwargs):
+            self.assertEqual(
+                path, Path(self.tmp.name) / "logs" / "privado" / "sheets_quota.sqlite"
+            )
+            return real_gate(path, **kwargs, now=self.clock.now, sleep=self.clock.sleep)
+
+        with (
+            patch("project_paths.ROOT", Path(self.tmp.name)),
+            patch("history_sheets_quota.QuotaGate", side_effect=gate),
+            redirect_stdout(io.StringIO()) as output,
+        ):
+            for _ in range(70):
+                store._read_with_retry(
+                    "conferir chamada sintética",
+                    lambda: client.http_client.request(
+                        "get", "https://sheets.googleapis.com/v4/spreadsheets/synthetic"
+                    ),
+                )
+        self.assertEqual(server.errors, 0)
+        self.assertEqual(len(server.calls), 70)
+        self.assertEqual(output.getvalue().count("ritmo preventivo compartilhado"), 1)
+        self.assertIs(
+            Store._native_meta_headers, GoogleSheetsStore._native_meta_headers
+        )
+
     def test_factory_installs_before_first_gspread_read_and_preserves_schema_guard(
         self,
     ):

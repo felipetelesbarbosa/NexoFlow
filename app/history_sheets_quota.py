@@ -251,11 +251,14 @@ class QuotaAdapter(BaseAdapter):
         pass
 
 
-def google_store_type():
+def google_store_type(base: type | None = None):
     # Import tardio: perfil/rede precisam estar definidos antes de config.
-    from order_history_sheets import google_store_type as base_store_type
+    if base is None:
+        from order_history_sheets import google_store_type as base_store_type
 
-    class HistoryQuotaStore(base_store_type()):
+        base = base_store_type()
+
+    class HistoryQuotaStore(base):
         def _read_with_retry(self, description, func):
             session = self.client.http_client.session
             prefix = "https://sheets.googleapis.com/"

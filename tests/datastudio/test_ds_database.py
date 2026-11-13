@@ -947,3 +947,82 @@ def test_ds72_report_eligibility_filters_blends_without_changing_facts(store):
         == records
     )
     assert field not in records[0]  # campo derivado nunca entra no contrato Windows
+
+
+def test_metric_contract_upgrade_preserves_unrelated_data_and_rejects_old_clients(
+    store,
+):
+    from integrations.datastudio.metric_contract_upgrade import PREVIOUS_HASH
+
+    with psycopg.connect(DSN) as conn:
+        conn.execute("UPDATE controle.nf_contrato SET schema_hash=%s", (PREVIOUS_HASH,))
+        conn.execute(
+            "INSERT INTO pet.nf_registros VALUES('BI_Itens','private-key',1,%s)",
+            ('{"item_chave":"synthetic-existing"}',),
+        )
+    migrate(DSN, "homologacao")
+    migrate(DSN, "homologacao")
+    with psycopg.connect(DSN) as conn:
+        assert (
+            conn.execute("SELECT schema_hash FROM controle.nf_contrato").fetchone()[0]
+            == SCHEMA_HASH
+        )
+        assert conn.execute("SELECT registro FROM pet.nf_registros").fetchone()[
+            0
+        ] == dict(item_chave="synthetic-existing")
+
+
+@pytest.mark.parametrize("blocked", ["WRITING", "metric", "unknown"])
+def test_metric_contract_upgrade_never_rekeys_existing_metrics_or_adopts_writer(
+    store, blocked
+):
+    from integrations.datastudio.metric_contract_upgrade import PREVIOUS_HASH
+
+    rev = begin(store)
+    with psycopg.connect(DSN) as conn:
+        conn.execute(
+            "UPDATE controle.nf_contrato SET schema_hash=%s",
+            (PREVIOUS_HASH if blocked != "unknown" else "unknown",),
+        )
+        if blocked != "WRITING":
+            conn.execute(
+                "UPDATE controle.nf_execucoes SET estado='ABORTADA' WHERE id=%s", (rev,)
+            )
+        if blocked == "metric":
+            conn.execute("INSERT INTO farma.nf_atuais VALUES('BI_Ads','old-key','{}')")
+    expected = {
+        "WRITING": "COM_PUBLICACAO_INCOMPLETA",
+        "metric": "METRICAS_REQUER_REVISAO",
+        "unknown": "CONTRATO_DIVERGENTE",
+    }[blocked]
+    with pytest.raises(StorageError, match=expected):
+        migrate(DSN, "homologacao")
+    with psycopg.connect(DSN) as conn:
+        assert (
+            conn.execute("SELECT schema_hash FROM controle.nf_contrato").fetchone()[0]
+            != SCHEMA_HASH
+        )
+
+
+def test_corrected_metric_grains_roundtrip_on_postgres(store):
+    from analytics import build_bi_ads_rows, build_daily_metrics
+    from ds_backend.contract import REGISTRY
+    from tests.datastudio.test_metric_grains import contacts
+
+    rev = begin(store)
+    for table, values in [
+        ("Metricas_Diarias", build_daily_metrics(contacts())),
+        (
+            "BI_Ads",
+            build_bi_ads_rows(
+                contacts(), [], snapshot_date="2026-11-02", updated_at="2026-11-03"
+            ),
+        ),
+    ]:
+        records = [
+            dict(zip(REGISTRY[table]["columns"], r, strict=True)) for r in values
+        ]
+        assert batch(store, rev, table, records)["inserted"] == 2
+    finish(store, rev)
+    for table in ("Metricas_Diarias", "BI_Ads"):
+        assert len(store.rows(table)["rows"]) == 2

@@ -141,7 +141,9 @@ def run(argv=None):
                 if args.exclusoes is None:
                     parser.error("Informe --exclusoes geradas da revisão publicada.")
                 exclusions = json.loads(args.exclusoes.read_text(encoding="utf-8-sig"))
-                google = GoogleSheetsStore.open_native_readonly(
+                from history_sheets_quota import google_store_type
+
+                google = google_store_type(GoogleSheetsStore).open_native_readonly(
                     settings.GOOGLE_SPREADSHEET_ID
                 )
                 try:

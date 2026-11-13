@@ -52,7 +52,11 @@ def migrate(dsn, environment):
             "SELECT schema_hash FROM controle.nf_contrato WHERE id=1"
         ).fetchone()
         if previous and previous[0] != SCHEMA_HASH:
-            raise StorageError("DS_MIGRACAO_CONTRATO_DIVERGENTE")
+            from integrations.datastudio.metric_contract_upgrade import (
+                upgrade_empty_metrics,
+            )
+
+            upgrade_empty_metrics(conn, previous[0])
         conn.execute(
             "INSERT INTO controle.nf_contrato VALUES(1,%s) ON CONFLICT DO NOTHING",
             (SCHEMA_HASH,),
