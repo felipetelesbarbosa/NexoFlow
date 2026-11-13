@@ -1,6 +1,8 @@
-# NexoFlow 1.5.39 em preparação
+# NexoFlow 1.5.39 publicada
 
-Diagnóstico de conflitos de chave na exportação autorizado para distribuição após checks e pacotes do mesmo SHA. A 1.5.38 permanece como última release comprovada.
+Publicada em **12/11/2026, 23:42:16 (America/Fortaleza)**, SHA `25f287dbc21a51e3702eeb04fda27469cbe2a27a`. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.39), [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43351527380), [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43351527378), [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43351527469) e [publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43353932051). Downloads públicos conferidos: SHA-256, CRC, 579 entradas do manifesto, 123 módulos por pacote, código do diagnóstico e versões x64. Diagnóstico identifica tabela/campos/posições do conflito sem escolher uma linha divergente. Causa comercial ainda pendente; nenhuma carga comercial executada. Releases anteriores preservadas.
+
+Diretriz do usuário para os próximos releases: não incluir o instalador do Python nos pacotes publicados. A 1.5.39 foi gerada antes dessa mudança; implementar e validar no próximo release a obtenção do Python quando necessário, preservando instalação, integridade, Preserve/Clean e rollback.
 
 # NexoFlow 1.5.38 publicada
 
@@ -50,7 +52,7 @@ Reutilizar os planos, journals, capacidade e guardas existentes. Preservar byte 
 
 - Use mensagens de commit curtas em português que descrevam a área ou a alteração, como `Automação`, `Documentação`, `Instalador` ou `Corrigir revisão da Recompra`. `NexoFlow 1.5.28` identifica a versão, não é uma mensagem obrigatória de commit. Separe alterações por área quando isso tornar a navegação do GitHub mais clara; não reescreva o histórico apenas para mudar os textos exibidos.
 - A `main` é a única branch de trabalho do repositório. Atualize diretamente a `main`; não crie nem mantenha branches adicionais.
-- A distribuição publicada usa NexoFlow 1.5.38, tag v1.5.38 e pacotes com sufixo 1.5.38. Novas publicações exigem autorização e validação. Para cada próxima publicação de atualização/hotfix/patch, incremente uma única vez: 1.5.39, ... 1.5.99; depois 1.6, 1.6.1, ... 1.6.99. Não incremente por commit ou tentativa de CI da mesma entrega. Preserve tags e releases anteriores; nunca sobrescreva uma versão anterior com um novo patch. Confira `VERSION` e `docs/VERSIONAMENTO.md`.
+- A distribuição publicada usa NexoFlow 1.5.39, tag v1.5.39 e pacotes com sufixo 1.5.39. Novas publicações exigem autorização e validação. Para cada próxima publicação de atualização/hotfix/patch, incremente uma única vez: 1.5.40, ... 1.5.99; depois 1.6, 1.6.1, ... 1.6.99. Não incremente por commit ou tentativa de CI da mesma entrega. Preserve tags e releases anteriores; nunca sobrescreva uma versão anterior com um novo patch. Confira `VERSION` e `docs/VERSIONAMENTO.md`.
 - Cada release deve mostrar a data da sua publicação. Não reutilize uma versão já publicada para código novo.
 - O NexoFlow Windows é operacional e autônomo; Analytics e Noturno usam a integração Meta nativa, sem exigir Codex ou MCP. MCP é opcional. O **NexoFlow Hub** tem desenvolvimento e homologação Linux expressamente autorizados na Etapa 2, isolados em `hub/`, com dados sintéticos, PostgreSQL temporário e escrita real bloqueada. Consulte [o núcleo](hub/README.md) e o [planejamento](docs/planejamento/README.md). Não transformar o Windows em cliente dependente do Hub, não alterar serviços/volumes da VPS nem abrir portas públicas nesta fase. Commits Hub usam `[skip release]`, sem incrementar a versão ou publicar releases Windows. Alterações compartilhadas exigem regressão Windows.
 - Preserve as credenciais e os diagnósticos privados fora do Git e dos pacotes públicos.

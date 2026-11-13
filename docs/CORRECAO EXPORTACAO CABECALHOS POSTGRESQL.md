@@ -72,4 +72,12 @@ O diagnóstico posterior à 1.5.38 identifica tabela e nomes dos campos na exce�
 
 O índice de posições é temporário no SQLite durante a exportação; não muda o schema canônico ou o pacote definitivo. Duplicatas idênticas continuam idempotentes. Divergências continuam bloqueando o corte e não são resolvidas escolhendo a última linha nem descartando revisões.
 
-Testes sintéticos cobrem conflito entre partes, posição das duas ocorrências, ausência de valores privados no diagnóstico, corte sem READY e repetição idêntica sem duplicação. O diagnóstico exige nova distribuição Windows; não substituir módulos avulsos. A causa da ocorrência comercial permanece pendente de evidência. Manter a pasta interrompida e o exclusoes.json; não repetir a carga somente para reproduzir o mesmo erro genérico.
+Testes sintéticos cobrem conflito entre partes, posição das duas ocorrências, ausência de valores privados no diagnóstico, corte sem READY e repetição idêntica sem duplicação. O diagnóstico está distribuído na **1.5.39**; instalar pelo Setup em Preserve e conferir `nexo versao`. Não substituir módulos avulsos. A causa da ocorrência comercial permanece pendente de evidência. Manter a pasta interrompida e o exclusoes.json; não repetir a carga somente para reproduzir o mesmo erro genérico.
+
+### Distribuição do diagnóstico 1.5.39
+
+Publicado em 12/11/2026, 23:42:16 (America/Fortaleza), SHA `25f287dbc21a51e3702eeb04fda27469cbe2a27a`. [CI](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43351527380), [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43351527378) e [publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43353932051) aprovados. Downloads públicos conferidos por SHA-256, CRC e comparação dos módulos ao commit, incluindo o diagnóstico. Setup Preserve/Clean/rollback e executáveis aprovados no CI.
+
+Instalar o Setup 1.5.39 em Preserve e confirmar a versão. Repetir o bloco de exportação deste guia em pasta nova, usando `C:\NexoFlow\logs\privado\migracao-postgres\exclusoes.json` já conferido. Se o conflito reaparecer, manter a pasta e enviar somente `corte.diagnostico.json` para investigação. Não editar as linhas de origem, enviar o SQLite incompleto nem publicar o corte bloqueado. A auditoria encadeada continua executando somente após exportação bem-sucedida.
+
+Hashes recalculados: Setup `3134183a44466c624cb8153c7aa184e00c57d56594c04b50b745ae5f72b8c295`; projeto `f8911f94ea36e83ee7affb03348a1c44273dcfcc4874956bc8845778eb1eb646`.

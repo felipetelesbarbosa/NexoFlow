@@ -1,9 +1,9 @@
 # NexoFlow — Changelog
 
-## 1.5.39 — em preparação
+## 1.5.39 — publicada em 12/11/2026, 23:42:16 (America/Fortaleza)
 
 - Conflitos de chave informam tabela e campos divergentes; exportação registra as duas posições físicas em diagnóstico privado sem valores comerciais.
-- Mantém bloqueio de divergências e deduplicação de linhas idênticas. Causa da ocorrência comercial ainda depende da evidência das posições. Mudança operacional ainda não distribuída.
+- Mantém bloqueio de divergências e deduplicação de linhas idênticas. Causa da ocorrência comercial ainda depende da evidência das posições. Mudança distribuída na 1.5.39; ocorrência comercial ainda não diagnosticada.
 
 ## 1.5.38 — publicada em 12/11/2026, 22:39:37 (America/Fortaleza)
 
