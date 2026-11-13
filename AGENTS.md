@@ -26,6 +26,9 @@ Reutilizar os planos, journals, capacidade e guardas existentes. Preservar byte 
 
 ## Conferência antes da entrega
 
+- Antes de orientar ou executar um procedimento, confira os comandos e o fluxo no código e na documentação da versão em uso no ambiente alvo. Defina quais evidências demonstram a conclusão. Valide os pré-requisitos e os contratos das entradas reais que podem impedir a execução, como versão, perfil, caminhos, revisão, permissões e esquema dos dados. Antecipe verificações rápidas e de leitura quando disponíveis, especialmente antes de operações longas ou com escrita.
+- Em scripts e procedimentos encadeados, interrompa a sequência diante de uma falha bloqueante, trate explicitamente os códigos de saída de comandos externos e só informe sucesso após verificar o estado ou o artefato esperado. Quando a etapa exigir auditoria ou conferência, valide o resultado da mesma tentativa.
+- Na entrega, identifique o que foi executado, o que foi conferido por inspeção e o que depende de validação no ambiente alvo. Indique qualquer pré-requisito que ainda esteja sem comprovação.
 - Reproduza a falha relatada com dados sintéticos e registre uma regressão que falhe antes da correção, quando houver comportamento executável alterado.
 - Valide a integração da rotina afetada: argumentos da CLI, simulação, revisão, aplicação, estado persistido, códigos de saída e continuidade das etapas. Simule APIs e recursos externos; execute a lógica real de decisão e validação.
 - Cubra sucesso, falha isolada, falha crítica, alteração após a revisão e retomada sem duplicidade, conforme o risco da mudança. Launchers exigem testes Windows do console e do executável distribuído.
