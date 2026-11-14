@@ -182,8 +182,55 @@ def run(argv=None):
     p.add_argument("--ambiente", choices=("homologacao", "producao"), required=True)
     p.add_argument("--segmento", choices=("FARMA", "PET"), required=True)
     p.add_argument("--aprovar-origem", type=Path)
+    p.add_argument("--finalizar-selada")
+    p.add_argument("--saida", type=Path)
+    p.add_argument("--recibos-esperados", type=int)
+    p.add_argument("--registros-esperados", type=int)
     args = p.parse_args(argv)
+    if args.finalizar_selada and (args.saida is None or args.aprovar_origem):
+        p.error("Fechamento exige --saida privada e não aceita --aprovar-origem.")
     dsn = args.dsn_file.read_text(encoding="utf-8-sig").strip()
+    if args.finalizar_selada:
+        from ds_backend.migration import private_json
+
+        store = Store(dsn, args.ambiente, args.segmento)
+        status = store.inspect(args.finalizar_selada)
+        manifest = status.get("sealed_manifest")
+        if manifest is None:
+            raise StorageError("DS_REVISAO_NAO_SELADA")
+        if any(
+            value is not None and value < 0
+            for value in (args.recibos_esperados, args.registros_esperados)
+        ):
+            p.error("Contagens esperadas não podem ser negativas.")
+        with store.connect(readonly=True) as conn:
+            # A revisão selada não admite novos lotes; conferir o segmento antes
+            # das contagens. Não editar ou reconstruir a intenção conservada.
+            store.revision(conn, args.finalizar_selada)
+            receipts = conn.execute(
+                "SELECT count(*) AS n FROM controle.nf_lotes WHERE execucao=%s",
+                (args.finalizar_selada,),
+            ).fetchone()["n"]
+            # READY pode ter tombstones adicionados no fechamento. A repetição
+            # devolve o recibo conservado sem reinterpretar a contagem pré-commit.
+            records = None
+            if status["state"] != "READY":
+                records = conn.execute(
+                    f"SELECT count(*) AS n FROM {store.schema}.nf_stage WHERE execucao=%s",
+                    (args.finalizar_selada,),
+                ).fetchone()["n"]
+        if (
+            args.recibos_esperados is not None and receipts != args.recibos_esperados
+        ) or (
+            records is not None
+            and args.registros_esperados is not None
+            and records != args.registros_esperados
+        ):
+            raise StorageError("DS_CONTAGENS_SELADAS_DIVERGENTES")
+        result = store.finish(args.finalizar_selada, manifest, complete=True)
+        private_json(args.saida, result)
+        print("[OK] Fechamento verificado; recibo READY privado gravado.")
+        return result
     migrate(dsn, args.ambiente)
     store = Store(dsn, args.ambiente, args.segmento)
     with store.connect() as conn:
@@ -207,4 +254,28 @@ def run(argv=None):
 
 
 if __name__ == "__main__":
-    run()
+    import logging
+
+    import psycopg
+
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    try:
+        run()
+    except StorageError as error:
+        print("[PENDÊNCIA] " + str(error))
+        raise SystemExit(3) from None
+    except psycopg.Error as error:
+        code = (
+            "DS_FECHAMENTO_TEMPO_LIMITE"
+            if isinstance(error, psycopg.errors.QueryCanceled)
+            else "DS_BANCO_INDISPONIVEL"
+        )
+        print(
+            "[PENDÊNCIA] " + code + "; confira a mesma revisão e preserve os recibos."
+        )
+        raise SystemExit(3) from None
+    except OSError:
+        print(
+            "[PENDÊNCIA] DS_ARQUIVO_PRIVADO_INDISPONIVEL; consulte o estado da mesma revisão antes de repetir."
+        )
+        raise SystemExit(3) from None

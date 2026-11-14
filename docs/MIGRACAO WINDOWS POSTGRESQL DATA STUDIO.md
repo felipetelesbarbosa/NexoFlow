@@ -22,7 +22,7 @@ Weni/Recompra/campanha 25% usam estados CAS remotos. Estado ausente exige import
 
 O transporte reutiliza os validadores existentes. Cache incompleto não apaga compra válida; fechamento antigo continua exigindo reconciliação. Exclusões migram com hash do fato original e não são reaplicadas a fatos alterados. Item usa chave própria, mesmo com SKU repetido; correção/cancelamento é conciliado por venda completa. Ausência em coleta parcial não autoriza remoção.
 
-Detalhes usam deltas e ignoram alteração só do marcador `atualizado_em`. As visões BI_Itens/BI_Clientes_Vendas/BI_Clientes/BI_Pedidos acrescentam o histórico ausente do BI operacional sem somar pedidos aos itens. Chaves operacionais existentes têm precedência por venda completa. Itens somente históricos têm namespace próprio; preço unitário, hora ou pagamento não conservados ficam indisponíveis. O commit bloqueia divergência de produtos por pedido ou LTV por cliente.
+Detalhes usam deltas e ignoram alteração só do marcador `atualizado_em`. As visões BI_Itens/BI_Clientes_Vendas/BI_Clientes/BI_Pedidos acrescentam o histórico ausente do BI operacional sem somar pedidos aos itens. Chaves operacionais reconciliadas têm precedência por venda completa; projeção operacional incompleta usa a venda histórica inteira somente se os produtos históricos válidos fecharem exatamente com o cabeçalho. Itens somente históricos têm namespace próprio; preço unitário, hora ou pagamento não conservados ficam indisponíveis. O commit bloqueia divergência de produtos por pedido ou LTV por cliente.
 
 Dinheiro permanece decimal/centavos; frete oficial entra uma vez; frete técnico não é produto/unidade. Cancelados não geram faturamento. LTV usa cliente oficial, inclusive sem Weni, e independe do filtro mensal. `LIMITES_DA_API_NAO_HOMOLOGADOS` permanece.
 
@@ -200,3 +200,7 @@ Publicada em **12/11/2026, 19:18:38 (America/Fortaleza)**, SHA `2683717431b1c431
 ## Cabeçalhos físicos em outra ordem
 
 A correção posterior à 1.5.37 permite a ordem física registrada no manifesto com validação por nome, hash e conjunto canônico. Ver [correção e comandos de nova exportação](CORRECAO%20EXPORTACAO%20CABECALHOS%20POSTGRESQL.md). Reutilizar exclusoes.json conferido da mesma revisão e uma pasta nova; não editar o manifesto ou o corte interrompido. A instalação Windows exige Setup que incorpore o ajuste.
+
+## Fechamento selado em volume — correção de servidor
+
+Para a revisão FARMA já selada e o caso de itens operacionais incompletos, seguir o [procedimento administrativo local validado](FECHAMENTO%20SELADO%20FARMA%20ITENS%20HISTORICOS.md). O fechamento HTTP pode exceder o prazo do cliente/proxy para milhões de registros. O comando local usa a mesma intenção e validações, escreve em blocos na mesma transação e emite o recibo READY sem nova exportação ou coleta.

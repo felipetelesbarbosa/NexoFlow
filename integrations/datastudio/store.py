@@ -483,19 +483,9 @@ class Store:
                   ON CONFLICT DO NOTHING""",
                     (revision, name, row["base"], name, revision, name),
                 )
-            count = conn.execute(
-                f"""INSERT INTO {self.schema}.nf_registros(tabela,chave,versao,registro)
-              SELECT tabela,chave,%s,registro FROM {self.schema}.nf_stage WHERE execucao=%s""",
-                (row["versao"], revision),
-            ).rowcount
-            conn.execute(
-                f"INSERT INTO {self.schema}.nf_atuais(tabela,chave,registro) SELECT tabela,chave,registro FROM {self.schema}.nf_stage WHERE execucao=%s AND registro IS NOT NULL ON CONFLICT(tabela,chave) DO UPDATE SET registro=excluded.registro",
-                (revision,),
-            )
-            conn.execute(
-                f"DELETE FROM {self.schema}.nf_atuais a USING {self.schema}.nf_stage s WHERE s.execucao=%s AND s.registro IS NULL AND a.tabela=s.tabela AND a.chave=s.chave",
-                (revision,),
-            )
+            from integrations.datastudio.finalize_batches import write_stage
+
+            count = write_stage(conn, self.schema, revision, row["versao"])
             if initial_manifest is not None:
                 actual = self.fingerprints(conn, row["versao"])
                 if initial_manifest["tables"] != actual:

@@ -1,6 +1,6 @@
 """Detalhe acumulado sem descartar o histórico que não estava no BI operacional.
 
-As chaves operacionais existentes têm precedência por venda completa. Itens só
+As chaves operacionais reconciliadas têm precedência por venda completa. Itens só
 conservados no histórico usam namespace próprio; não se inventa preço unitário.
 """
 
@@ -13,23 +13,51 @@ def create_financial_views(conn):
         def run(statement, schema=schema):
             conn.execute(sql.SQL(statement).format(s=sql.Identifier(schema)))
 
+        # Escolha por venda inteira. Uma projeção operacional com soma menor
+        # só pode ser substituída quando TODOS os produtos históricos válidos
+        # reconciliam exatamente com o cabeçalho. Divergência acima do cabeçalho
+        # continua sendo erro financeiro, não prova de projeção incompleta.
         run("""CREATE OR REPLACE VIEW {s}.ds_bi_itens WITH(security_barrier=true) AS
+        WITH cabecalhos AS MATERIALIZED (
+          SELECT h.*,substring(encode(sha256(convert_to('venda:FARMALIDER:'||h.pedido_id,'UTF8')),'hex'),1,32) AS venda_chave
+          FROM {s}.ds_historico_pedidos h
+          WHERE h.vigente='Sim' AND h.estado='valido'
+          AND NOT EXISTS(SELECT 1 FROM {s}.ds_exclusoes_publicacao x WHERE x.pedido_id=h.pedido_id)
+        ), historicos AS MATERIALIZED (
+          SELECT i.*,h.venda_chave,h.cliente_id,h.data
+          FROM {s}.ds_historico_itens i JOIN cabecalhos h
+            ON h.pedido_id=i.pedido_id AND h.segmento=i.segmento
+          WHERE i.vigente='Sim' AND i.estado='valido' AND i.frete='Não'
+        ), totais_historicos AS (
+          SELECT venda_chave,sum(valor) AS produtos,
+            bool_and(coalesce(quantidade>0 AND valor>=0,false)) AS validos
+          FROM historicos GROUP BY venda_chave
+        ), totais_operacionais AS (
+          SELECT venda_chave,sum(receita_item) AS produtos,
+            bool_and(coalesce(quantidade>0 AND receita_item>=0,false)) AS validos
+          FROM {s}.ds_bi_itens_operacional GROUP BY venda_chave
+        ), usar_historico AS MATERIALIZED (
+          SELECT h.venda_chave FROM cabecalhos h
+          JOIN totais_historicos i USING(venda_chave)
+          LEFT JOIN totais_operacionais b USING(venda_chave)
+          WHERE i.validos AND i.produtos=h.produtos
+          AND (b.venda_chave IS NULL OR (b.validos AND b.produtos<h.produtos))
+        )
         SELECT b.* FROM {s}.ds_bi_itens_operacional b
         WHERE NOT EXISTS(SELECT 1 FROM {s}.ds_exclusoes_publicacao x WHERE b.venda_chave=substring(encode(sha256(convert_to('venda:FARMALIDER:'||x.pedido_id,'UTF8')),'hex'),1,32))
         AND NOT EXISTS(SELECT 1 FROM {s}.ds_historico_pedidos h
           WHERE substring(encode(sha256(convert_to('venda:FARMALIDER:'||h.pedido_id,'UTF8')),'hex'),1,32)=b.venda_chave
           AND (h.vigente<>'Sim' OR h.estado<>'valido'))
+        AND NOT EXISTS(SELECT 1 FROM usar_historico h WHERE h.venda_chave=b.venda_chave)
         UNION ALL
         SELECT substring(encode(sha256(convert_to('historico_item:'||i.chave,'UTF8')),'hex'),1,32) AS item_chave,
-        substring(encode(sha256(convert_to('venda:FARMALIDER:'||h.pedido_id,'UTF8')),'hex'),1,32) AS venda_chave,
-        substring(encode(sha256(convert_to('farmalider:'||h.cliente_id,'UTF8')),'hex'),1,32) AS cliente_chave,
-        h.data, i.sku AS produto_codigo,i.produto AS produto_nome,''::text AS categoria,
-        i.quantidade,NULL::numeric AS valor_unitario,i.valor AS receita_item,
-        CASE WHEN coalesce(i.sku,'')<>'' THEN 1 ELSE 0 END::numeric AS sku_informado,
-        ''::text AS atualizado_em
-        FROM {s}.ds_historico_itens i JOIN {s}.ds_historico_pedidos h ON h.pedido_id=i.pedido_id AND h.segmento=i.segmento
-        WHERE h.vigente='Sim' AND h.estado='valido' AND NOT EXISTS(SELECT 1 FROM {s}.ds_exclusoes_publicacao x WHERE x.pedido_id=h.pedido_id) AND i.vigente='Sim' AND i.estado='valido' AND i.frete='Não'
-        AND NOT EXISTS(SELECT 1 FROM {s}.ds_bi_itens_operacional b WHERE b.venda_chave=substring(encode(sha256(convert_to('venda:FARMALIDER:'||h.pedido_id,'UTF8')),'hex'),1,32))""")
+          i.venda_chave,
+          substring(encode(sha256(convert_to('farmalider:'||i.cliente_id,'UTF8')),'hex'),1,32) AS cliente_chave,
+          i.data,i.sku AS produto_codigo,i.produto AS produto_nome,''::text AS categoria,
+          i.quantidade,NULL::numeric AS valor_unitario,i.valor AS receita_item,
+          CASE WHEN coalesce(i.sku,'')<>'' THEN 1 ELSE 0 END::numeric AS sku_informado,
+          ''::text AS atualizado_em
+        FROM historicos i JOIN usar_historico h USING(venda_chave)""")
         # Uma linha por venda oficial. Nomes só são reaproveitados pela identidade
         # oficial; ausência de contato/nome não altera o universo financeiro.
         run("""CREATE OR REPLACE VIEW {s}.ds_bi_clientes_vendas WITH(security_barrier=true) AS

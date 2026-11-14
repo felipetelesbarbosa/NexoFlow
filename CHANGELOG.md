@@ -1,5 +1,11 @@
 # NexoFlow — Changelog
 
+## Servidor Data Studio — itens completos e fechamento selado em volume
+
+- BI_Itens usa a venda histórica inteira quando a projeção operacional está incompleta e o histórico reconcilia exatamente com o cabeçalho, preservando chaves e guardas financeiras.
+- Fechamento escreve projeções em blocos limitados na mesma transação; comando administrativo local recupera a intenção e os recibos existentes sem reenvio HTTP.
+- [Roteiro para o Work e revisão selada FARMA](docs/FECHAMENTO%20SELADO%20FARMA%20ITENS%20HISTORICOS.md). Sem implantação/carga comercial pelo Codex; pacote Windows 1.5.40 preservado.
+
 ## 1.5.40 — publicada em 13/11/2026, 00:41:51 (America/Fortaleza)
 
 - Metricas_Diarias e BI_Ads incluem o título já utilizado pelos geradores nas chaves; preservam contagens e grupos sem descartar divergências.

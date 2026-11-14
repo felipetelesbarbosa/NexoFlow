@@ -1026,3 +1026,390 @@ def test_corrected_metric_grains_roundtrip_on_postgres(store):
     finish(store, rev)
     for table in ("Metricas_Diarias", "BI_Ads"):
         assert len(store.rows(table)["rows"]) == 2
+
+
+@pytest.mark.parametrize("segment", ["FARMA", "PET"])
+@pytest.mark.parametrize(
+    "fault", [None, "history_total", "inactive", "cancelled", "operational_excess"]
+)
+def test_partial_operational_sale_uses_complete_reconciled_history(
+    store, segment, fault
+):
+    from looker_bi import opaque_key
+
+    s = Store(DSN, "homologacao", segment)
+    rev = begin(s)
+    sale = opaque_key("venda", "FARMALIDER:synthetic-sale")
+    batch(
+        s,
+        rev,
+        "Historico_Pedidos",
+        [
+            row(
+                "Historico_Pedidos",
+                chave=segment + ":synthetic-sale",
+                segmento=segment,
+                pedido_id="synthetic-sale",
+                cliente_id="owner",
+                data="2026-11-02",
+                estado="valido",
+                produtos="162.80",
+                frete="5.00",
+                faturamento="167.80",
+                vigente="Sim",
+            )
+        ],
+    )
+    batch(
+        s,
+        rev,
+        "BI_LTV_Clientes",
+        [
+            row(
+                "BI_LTV_Clientes",
+                chave=segment + ":owner",
+                segmento=segment,
+                cliente_id="owner",
+                ltv_observado="167.80",
+                vigente="Sim",
+            )
+        ],
+    )
+    batch(
+        s,
+        rev,
+        "BI_Itens",
+        [
+            row(
+                "BI_Itens",
+                item_chave="operational-item",
+                venda_chave=sale,
+                quantidade="1",
+                receita_item="400.00" if fault == "operational_excess" else "149.90",
+                data="2026-11-02",
+                sku_informado="1",
+            )
+        ],
+    )
+    items = [
+        row(
+            "Historico_Itens",
+            chave=segment + ":synthetic-sale:" + iid,
+            segmento=segment,
+            pedido_id="synthetic-sale",
+            item_id=iid,
+            sku="0007",
+            produto="Synthetic",
+            quantidade="1",
+            valor=amount,
+            frete=freight,
+            estado="valido",
+            vigente="Sim",
+        )
+        for iid, amount, freight in [
+            ("1", "149.90", "Não"),
+            ("2", "12.90", "Não"),
+            ("3", "5.00", "Sim"),
+        ]
+    ]
+    if fault == "history_total":
+        items[1]["valor"] = "12.89"
+    elif fault == "inactive":
+        items[1]["vigente"] = "Não"
+    elif fault == "cancelled":
+        items[1]["estado"] = "cancelado"
+    batch(s, rev, "Historico_Itens", items)
+    if fault:
+        with pytest.raises(StorageError, match="ITENS_PEDIDO_DIVERGENTE"):
+            finish(s, rev)
+        assert s.inspect(rev)["state"] == "WRITING"
+        assert s.info()["version"] == 0
+        return
+    receipt = finish(s, rev)
+    reader = Reader(DSN, "homologacao", segment)
+    result = reader.query(
+        "BI_Itens",
+        ["item_chave", "quantidade", "receita_item", "valor_unitario"],
+        "2026-11-02",
+        "2026-11-02",
+        [],
+        {},
+    )["rows"]
+    assert len(result) == 2
+    assert {r[0] for r in result} == {
+        opaque_key("historico_item", r["chave"]) for r in items[:2]
+    }
+    from decimal import Decimal
+
+    assert sum(Decimal(r[1]) for r in result) == 2
+    assert sum(Decimal(r[2]) for r in result) == Decimal("162.80")
+    assert all(r[3] is None for r in result)
+    assert s.inspect(rev)["receipt"] == receipt
+    # A projeção não reescreve os fatos recebidos nem a chave operacional.
+    assert len(s.rows("BI_Itens")["rows"]) == 1
+    assert len(s.rows("Historico_Itens")["rows"]) == 3
+
+
+def sealed(s, rev):
+    with s.connect() as conn:
+        receipts = conn.execute(
+            "SELECT id,hash FROM controle.nf_lotes WHERE execucao=%s", (rev,)
+        ).fetchall()
+    manifest = dict(
+        schema_hash=SCHEMA_HASH,
+        batches={str(r["id"]): r["hash"] for r in receipts},
+        complete_sources=True,
+    )
+    s.seal(rev, manifest)
+    return manifest
+
+
+def test_bounded_finish_rolls_back_interruption_and_reuses_sealed_receipts(
+    store, monkeypatch
+):
+    from integrations.datastudio import finalize_batches as bulk
+
+    monkeypatch.setattr(bulk, "FINALIZE_ROWS", 3)
+    rev = begin(store)
+    rows = [row("Controle", chave=f"key-{i}", valor="old") for i in range(7)]
+    batch(store, rev, "Controle", rows)
+    first = finish(store, rev)
+    rev = begin(store)
+    newer = [dict(rows[0], valor="new"), row("Controle", chave="key-new", valor="new")]
+    from ds_backend.contract import record_key
+
+    store.replace(
+        rev,
+        "Controle",
+        dict(count=2, sha256=digest(sorted(record_key("Controle", r) for r in newer))),
+    )
+    batch(store, rev, "Controle", newer)
+    manifest = sealed(store, rev)
+    original = bulk.write_stage
+
+    class Broken:
+        def __init__(self, conn):
+            self.conn = conn
+
+        def execute(self, query, params=None):
+            if "INSERT INTO farma.nf_atuais" in str(query):
+                self.conn.execute(query, params)
+                raise psycopg.errors.QueryCanceled("synthetic-timeout")
+            return self.conn.execute(query, params)
+
+    def interrupted(conn, *args):
+        return original(Broken(conn), *args)
+
+    monkeypatch.setattr(bulk, "write_stage", interrupted)
+    with pytest.raises(psycopg.errors.QueryCanceled):
+        store.finish(rev, manifest, complete=True)
+    assert store.info()["version"] == first["version"]
+    assert len(store.rows("Controle")["rows"]) == 7
+    assert all(r["valor"] == "old" for r in store.rows("Controle")["rows"])
+    assert store.inspect(rev)["sealed_manifest"] == manifest
+    assert store.inspect(rev)["state"] == "WRITING"
+    monkeypatch.setattr(bulk, "write_stage", original)
+    receipt = store.finish(rev, manifest, complete=True)
+    assert receipt["changed_rows"] == 8
+    assert store.finish(rev, manifest, complete=True) == receipt
+    assert sorted(r["chave"] for r in store.rows("Controle")["rows"]) == [
+        "key-0",
+        "key-new",
+    ]
+    with store.connect() as conn:
+        assert (
+            conn.execute(
+                "SELECT count(*) AS n FROM controle.nf_lotes WHERE execucao=%s", (rev,)
+            ).fetchone()["n"]
+            == 1
+        )
+
+
+def test_admin_finishes_same_sealed_revision_and_recovers_receipt_file_failure(
+    store, tmp_path, monkeypatch
+):
+    from ds_backend import migration
+    from integrations.datastudio import admin
+
+    rev = begin(store)
+    batch(
+        store, rev, "Controle", [row("Controle", chave="synthetic", valor="unchanged")]
+    )
+    manifest = sealed(store, rev)
+    dsn = tmp_path / "dsn"
+    dsn.write_text(DSN)
+    path = tmp_path / "receipt.json"
+    argv = [
+        "--dsn-file",
+        str(dsn),
+        "--ambiente",
+        "homologacao",
+        "--segmento",
+        "FARMA",
+        "--finalizar-selada",
+        rev,
+        "--saida",
+        str(path),
+        "--recibos-esperados",
+        "1",
+        "--registros-esperados",
+        "1",
+    ]
+    monkeypatch.setattr(
+        admin, "migrate", lambda *_: pytest.fail("Não migrar ao retomar revisão selada")
+    )
+    with pytest.raises(StorageError, match="CONTAGENS_SELADAS_DIVERGENTES"):
+        admin.run(argv[:-1] + ["2"])
+    assert store.inspect(rev)["state"] == "WRITING"
+    save = migration.private_json
+
+    def fail_save(*_):
+        raise OSError("synthetic-response-lost")
+
+    monkeypatch.setattr(migration, "private_json", fail_save)
+    with pytest.raises(OSError):
+        admin.run(argv)
+    assert store.inspect(rev)["state"] == "READY"
+    receipt = store.inspect(rev)["receipt"]
+    monkeypatch.setattr(migration, "private_json", save)
+    assert admin.run(argv) == receipt
+    import json
+
+    assert json.loads(path.read_text()) == receipt
+    assert store.inspect(rev)["sealed_manifest"] == manifest
+
+
+def test_real_volume_finish_limits_each_statement_and_preserves_manifest(
+    store, monkeypatch
+):
+    from integrations.datastudio import finalize_batches as bulk
+
+    rev = begin(store)
+    count = 12001
+    for start in range(0, count, 1000):
+        batch(
+            store,
+            rev,
+            "Controle",
+            [
+                row("Controle", chave=f"synthetic-{i:06}", valor="unchanged")
+                for i in range(start, min(start + 1000, count))
+            ],
+        )
+    manifest = sealed(store, rev)
+    sizes = []
+    original = bulk.write_stage
+
+    class Observed:
+        def __init__(self, conn):
+            self.conn = conn
+
+        def execute(self, query, params=None):
+            result = self.conn.execute(query, params)
+            if str(query).startswith(("INSERT INTO", "DELETE FROM")):
+                assert result.rowcount <= bulk.FINALIZE_ROWS
+                sizes.append(result.rowcount)
+            return result
+
+    monkeypatch.setattr(
+        bulk, "write_stage", lambda conn, *args: original(Observed(conn), *args)
+    )
+    with store.connect() as conn:
+        assert (
+            conn.execute("SHOW statement_timeout").fetchone()["statement_timeout"]
+            == "50s"
+        )
+    receipt = store.finish(rev, manifest, complete=True)
+    assert receipt["changed_rows"] == count
+    assert len(sizes) == 9  # três blocos, três escritas por bloco
+    with store.connect() as conn:
+        assert (
+            conn.execute("SELECT count(*) AS n FROM farma.nf_atuais").fetchone()["n"]
+            == count
+        )
+    assert store.inspect(rev)["sealed_manifest"] == manifest
+
+
+def test_item_fallback_respects_exclusion_and_header_state(store):
+    from psycopg.types.json import Jsonb
+
+    from looker_bi import opaque_key
+
+    sale = opaque_key("venda", "FARMALIDER:synthetic")
+    records = {
+        "Historico_Pedidos": [
+            row(
+                "Historico_Pedidos",
+                chave="FARMA:synthetic",
+                segmento="FARMA",
+                pedido_id="synthetic",
+                cliente_id="owner",
+                data="2026-11-02",
+                estado="valido",
+                produtos="162.80",
+                frete="0",
+                faturamento="162.80",
+                vigente="Sim",
+            )
+        ],
+        "Historico_Itens": [
+            row(
+                "Historico_Itens",
+                chave=f"FARMA:synthetic:{i}",
+                segmento="FARMA",
+                pedido_id="synthetic",
+                item_id=str(i),
+                quantidade="1",
+                valor=amount,
+                frete="Não",
+                estado="valido",
+                vigente="Sim",
+            )
+            for i, amount in [(1, "149.90"), (2, "12.90")]
+        ],
+        "BI_Itens": [
+            row(
+                "BI_Itens",
+                item_chave="op",
+                venda_chave=sale,
+                quantidade="1",
+                receita_item="149.90",
+            )
+        ],
+        "Exclusoes_Publicacao": [
+            row("Exclusoes_Publicacao", segmento="FARMA", pedido_id="synthetic")
+        ],
+    }
+    # Fixture SQL sintética: examina a projeção, sem simular READY para fatos excluídos.
+    with store.connect() as conn:
+        for name, rows in records.items():
+            for index, r in enumerate(rows):
+                conn.execute(
+                    "INSERT INTO farma.nf_atuais VALUES(%s,%s,%s)",
+                    (name, str(index), Jsonb(r)),
+                )
+        assert (
+            conn.execute("SELECT count(*) AS n FROM farma.ds_bi_itens").fetchone()["n"]
+            == 0
+        )
+        conn.execute("DELETE FROM farma.nf_atuais WHERE tabela='Exclusoes_Publicacao'")
+        assert (
+            conn.execute("SELECT count(*) AS n FROM farma.ds_bi_itens").fetchone()["n"]
+            == 2
+        )
+        for field, value in [
+            ("vigente", "Não"),
+            ("estado", "cancelado"),
+            ("estado", "pendente"),
+        ]:
+            r = dict(records["Historico_Pedidos"][0], **{field: value})
+            conn.execute(
+                "UPDATE farma.nf_atuais SET registro=%s WHERE tabela='Historico_Pedidos'",
+                (Jsonb(r),),
+            )
+            assert (
+                conn.execute("SELECT count(*) AS n FROM farma.ds_bi_itens").fetchone()[
+                    "n"
+                ]
+                == 0
+            )
