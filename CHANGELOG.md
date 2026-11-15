@@ -1,5 +1,10 @@
 # NexoFlow — Changelog
 
+## 1.5.41 — em validação
+
+- Distribui guardas contra BI_Itens defasada e simulação direcionada de recuperação; incorpora as correções de projeção financeira, fechamento e ABC posteriores à 1.5.40.
+- Setup Preserve, dados privados e versões anteriores preservados. Sem instalador Python nos ZIPs. Publicação comercial e implantação são etapas separadas.
+
 ## Corte PostgreSQL — BI_Itens defasada e recuperação em dry-run (15/11/2026)
 
 - Bloqueio `DS_BI_ITENS_DEFASADOS` na exportação, auditoria/preparo e antes do envio de planos antigos; fechamento transacional protege novas revisões sem invalidar recibos READY existentes.

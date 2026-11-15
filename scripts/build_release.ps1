@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.40",
+    [string]$Version = "1.5.41",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -422,27 +422,13 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-Corrige as chaves de Metricas_Diarias e BI_Ads para incluir o título usado pelos geradores; preserva grupos e contagens. A exportação usa o ritmo HTTP compartilhado para reduzir 429. Contrato PostgreSQL e conector atualizados exigem implantação coordenada pelo Work antes de publicar dados; migração bloqueia métricas já armazenadas e escrita incompleta.
+Bloqueia cortes com BI_Itens defasada na exportação, auditoria, preparo e antes do envio de planos antigos. Novas revisões PostgreSQL exigem conciliação de itens operacionais por pedido antes de READY. Preserva recibos READY existentes, cancelamentos, exclusões, frete separado e LTV.
 
-Os ZIPs não incluem o instalador Python. O Setup reutiliza Python compatível ou oferece download oficial com SHA-256 verificado.
+Inclui diagnóstico privado e recuperação dirigida somente em dry-run dos pedidos com itens operacionais conservados. A simulação verifica identidade, data, centavos, duplicidades e colisões, sem reenviar lotes nem refazer fechamento. [Roteiro do Work](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/CORTE%20BI%20ITENS%20DEFASADOS%20E%20RECUPERACAO.md).
 
-Diagnóstico de conflitos na exportação: informa a tabela e os campos divergentes e grava corte.diagnostico.json privado com as duas posições físicas. Não descarta registros nem escolhe arbitrariamente uma versão. A causa do conflito comercial ainda depende dessa evidência; o bloqueio continua protegido.
+Também incorpora as correções posteriores à 1.5.40: projeção financeira com itens históricos da venda inteira, fechamento transacional em volume, agregação ABC no servidor e escopo Top de compras juntas explicitamente identificado. Preserva DS_ABC_BASE_INCOMPLETA e LIMITES_DA_API_NAO_HOMOLOGADOS. Implantação dos serviços e conector pelo Work é separada do Setup.
 
-Correção da exportação Sheets para PostgreSQL: cabeçalhos com os mesmos campos em outra ordem são validados contra o hash físico de cada parte e os valores são associados pelo nome. Campos ausentes, extras, duplicados ou hash divergente continuam bloqueados. Registro canônico, revisão READY, manifesto e versões Drive são preservados.
-
-Após instalar em Preserve, repetir a exportação em pasta nova usando o exclusoes.json já conferido da mesma revisão. Não reaproveitar o corte interrompido. [Comandos de retomada](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/CORRECAO%20EXPORTACAO%20CABECALHOS%20POSTGRESQL.md).
-
-Inclui as projeções privadas do relatório FARMA, o campo Venda elegível específico das mesclagens e o adaptador ABC por período. A implantação na VPS/Apps Script e a homologação comercial continuam etapas separadas do Setup.
-
-Backend definitivo PostgreSQL opt-in para o NexoFlow Windows, separado do piloto BI_Itens. FARMA e PET possuem catálogo, credenciais, estados e revisões isolados. Sheets continua sendo o padrão; não há fallback automático quando PostgreSQL estiver selecionado.
-
-Publicação e leitura usam APIs privadas separadas e Cloudflare Access; PostgreSQL permanece sem porta pública. Staging, recibos idempotentes, checkpoints confirmados, selagem e revisão atômica preservam a última versão READY durante uma carga. O leitor usa projeção indexada, filtros e agregações SQL, sem retornar totais parciais em falhas. Os dez módulos assinados do publicador Sheets permanecem preservados.
-
-A migração inicial exige o corte histórico READY completo, a base operacional acumulada e as exclusões comprovadas. O SQLite recente parcial não substitui o histórico publicado. Migração 002 aditiva preserva a 001 aplicada, o banco piloto, a visão Metabase, Hub e n8n. Não executar carga comercial por causa desta release.
-
-Atualize pelo Setup em Preserve, confira nexo versao e siga o [guia com comandos](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/MIGRACAO%20WINDOWS%20POSTGRESQL%20DATA%20STUDIO.md), o [mapa das tabelas](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/ESTRUTURA%20POSTGRESQL%20DATA%20STUDIO.md) e o [roteiro Work](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/PROMPT%20WORK%20POSTGRESQL%20DEFINITIVO.md). Não substituir módulos avulsos nem editar manifestos/assinaturas para concluir revisões incompletas.
-
-O Setup não implanta VPS, Cloudflare ou Apps Script. O Work executa um lote curto, confere o corte completo e preserva as fontes anteriores durante a troca. As 37 conexões e mesclagens reais continuam exigindo conferência; teste sintético não comprova migração comercial. Nenhuma credencial ou dado real acompanha os pacotes. LIMITES_DA_API_NAO_HOMOLOGADOS e pendências financeiras são preservados.
+Instale em Preserve e confira nexo versao. O Setup conserva configurações, credenciais, SQLite, logs, checkpoints e journals. Os ZIPs não incluem instalador Python nem dados comerciais. Não substitua módulos avulsos. A publicação do software não comprova recuperação ou homologação comercial e não executa cargas.
 
 [Guia Meta nativo](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/META%20ADS%20NATIVO.md) · [Planejamento Hub](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/planejamento/README.md)
 
@@ -456,7 +442,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.40
+# NexoFlow 1.5.41
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"

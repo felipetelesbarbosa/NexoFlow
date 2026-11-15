@@ -1,5 +1,9 @@
 # Versionamento do NexoFlow
 
+## Preparação 1.5.41
+
+Publicação autorizada em 15/11/2026. Uma geração no SHA final, checks e pacotes conferidos antes de publicar os mesmos artefatos. Preservar 1.5.40 e anteriores. Nenhuma recuperação de dados ou implantação comercial nesta entrega.
+
 A **1.5.40 foi publicada em 13/11/2026, 00:41:51 (America/Fortaleza)**, no SHA `c5da21c05c9a8c220bb55538b74957e8052e8624`. [Release e pacotes conferidos](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.40). Sem instalador Python nos ZIPs; versões anteriores preservadas.
 
 A **1.5.39 foi publicada em 12/11/2026, 23:42:16 (America/Fortaleza)**, no SHA `25f287dbc21a51e3702eeb04fda27469cbe2a27a`. [Release e downloads conferidos](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.39). Versões anteriores preservadas.

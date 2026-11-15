@@ -1,3 +1,7 @@
+# NexoFlow 1.5.41 em validação
+
+Publicação autorizada em 15/11/2026. Usar uma geração no SHA final e reutilizar os pacotes aprovados. A 1.5.40 e anteriores permanecem intactas. Guardas Windows exigem instalação Preserve; diagnóstico e implantação comercial são etapas distintas.
+
 # NexoFlow 1.5.40 publicada
 
 Publicada em **13/11/2026, 00:41:51 (America/Fortaleza)**, SHA `c5da21c05c9a8c220bb55538b74957e8052e8624`. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.40), [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43357598802), [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43357599045), [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43357598808) e [publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43360624111). Downloads públicos conferidos: SHA-256, CRC, 580 entradas do manifesto, 123 módulos e 573 arquivos do commit por pacote, executáveis x64 1.5.40.0. Sem instalador Python nos dois ZIPs; fallback oficial com hash fixado e testes Windows aprovados. Corrige chaves de Metricas_Diarias/BI_Ads e ativa quota na exportação. Contrato exige serviços/conector alinhados pelo Work antes da publicação de dados. Nenhuma implantação ou carga comercial executada; versões anteriores preservadas.
