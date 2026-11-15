@@ -211,3 +211,113 @@ class DatastudioWindowsTests(unittest.TestCase):
                 run_order_history.run(["--inicio", "data-inválida"])
             with self.assertRaises(SystemExit):
                 run_order_history.run(["--opcao-inexistente"])
+
+
+class ExportItemConsistencyWindowsTests(unittest.TestCase):
+    """Guarda executada em Python 3.11/3.14 e ambas as codificações Windows."""
+
+    def test_legacy_cut_is_readable_but_cannot_prepare_or_send_without_items(self):
+        import hashlib
+        import json
+        import tempfile
+        from contextlib import closing
+        from pathlib import Path
+
+        from ds_backend.migration import Export, apply, prepare
+
+        with tempfile.TemporaryDirectory() as folder:
+            cut_path = Path(folder) / "corte.sqlite"
+            plan_path = Path(folder) / "plano.json"
+            sale = dict.fromkeys(REGISTRY["BI_Clientes_Vendas"]["columns"], "")
+            sale.update(
+                venda_chave="sale",
+                cliente_chave="c",
+                data="2026-11-09",
+                faturamento_produtos="10",
+                frete="2",
+                faturamento="12",
+            )
+            with closing(Export(cut_path, create=True)) as cut:
+                cut.add("BI_Clientes_Vendas", [sale], "FARMA")
+                manifest = cut.seal(
+                    "FARMA",
+                    dict(scope="CORTE_COMPLETO", state="READY", revision="legacy"),
+                )
+            before = hashlib.sha256(cut_path.read_bytes()).hexdigest()
+            client = ClientMemory()
+            client.config["environment"] = "producao"
+            client.info = {}
+            with patch.object(
+                client, "call", side_effect=AssertionError("HTTP não autorizado")
+            ):
+                with self.assertRaisesRegex(StorageError, "DS_BI_ITENS_DEFASADOS"):
+                    prepare(cut_path, plan_path, client)
+                self.assertFalse(plan_path.exists())
+                plan_path.write_text(
+                    json.dumps(
+                        dict(
+                            target=client.expected_target,
+                            source=str(cut_path),
+                            source_hash=digest(manifest),
+                        )
+                    ),
+                    encoding="utf-8",
+                )
+                for simulate in (True, False):
+                    with self.subTest(simulate=simulate):
+                        with self.assertRaisesRegex(
+                            StorageError, "DS_BI_ITENS_DEFASADOS"
+                        ):
+                            apply(plan_path, client, simulate=simulate)
+            with closing(Export(cut_path)) as cut:
+                self.assertEqual(cut.manifest(), manifest)
+            self.assertEqual(hashlib.sha256(cut_path.read_bytes()).hexdigest(), before)
+
+    def test_exact_products_and_owner_with_freight_separate(self):
+        import tempfile
+        from contextlib import closing
+        from pathlib import Path
+
+        from ds_backend.item_consistency import assert_export_items
+        from ds_backend.migration import Export
+
+        for amount, customer, valid in [
+            ("10.00", "c", True),
+            ("9.99", "c", False),
+            ("12.00", "c", False),
+            ("10.00", "other", False),
+        ]:
+            with (
+                self.subTest(amount=amount, customer=customer),
+                tempfile.TemporaryDirectory() as folder,
+            ):
+                with closing(Export(Path(folder) / "corte.sqlite", create=True)) as cut:
+                    sale = dict.fromkeys(REGISTRY["BI_Clientes_Vendas"]["columns"], "")
+                    sale.update(
+                        venda_chave="sale",
+                        cliente_chave="c",
+                        data="2026-11-09",
+                        faturamento_produtos="10",
+                        frete="2",
+                        faturamento="12",
+                    )
+                    item = dict.fromkeys(REGISTRY["BI_Itens"]["columns"], "")
+                    item.update(
+                        item_chave="i",
+                        venda_chave="sale",
+                        cliente_chave=customer,
+                        data="2026-11-09",
+                        quantidade="1",
+                        receita_item=amount,
+                    )
+                    cut.add("BI_Clientes_Vendas", [sale], "FARMA")
+                    cut.add("BI_Itens", [item], "FARMA")
+                    cut.db.commit()
+                    cut.db.execute("PRAGMA query_only=ON")
+                    if valid:
+                        assert_export_items(cut.db)
+                    else:
+                        with self.assertRaisesRegex(
+                            StorageError, "DS_BI_ITENS_DEFASADOS"
+                        ):
+                            assert_export_items(cut.db)
