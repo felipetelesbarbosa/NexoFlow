@@ -94,7 +94,7 @@ As continuações automáticas no Meu Drive exigem autorização Google local. O
 
 ## Versões e atualizações
 
-A versão desta entrega é **1.5.41**, em preparação e validação. A 1.5.40 e todas as versões anteriores permanecem preservadas. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
+A versão desta entrega é **1.5.41**, publicada em 15/11/2026, 12:53:30 (America/Fortaleza). A 1.5.40 e todas as versões anteriores permanecem preservadas. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
 
 ## NexoFlow Hub: homologação e evolução paralela
 

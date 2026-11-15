@@ -1,6 +1,6 @@
 # NexoFlow — Changelog
 
-## 1.5.41 — em validação
+## 1.5.41 — publicada em 15/11/2026, 12:53:30 (America/Fortaleza)
 
 - Distribui guardas contra BI_Itens defasada e simulação direcionada de recuperação; incorpora as correções de projeção financeira, fechamento e ABC posteriores à 1.5.40.
 - Setup Preserve, dados privados e versões anteriores preservados. Sem instalador Python nos ZIPs. Publicação comercial e implantação são etapas separadas.

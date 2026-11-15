@@ -94,3 +94,9 @@ Validação local: suíte PostgreSQL descartável com 133 aprovados e um smoke D
 O primeiro CI sinalizou como generic-api-key o identificador literal `faturamento_produtos=` em uma chamada de teste sintético, sem credencial. O teste usa dicionário explícito; a varredura de todo o histórico conserva exceção ancorada somente para esse texto exato. Nenhum arquivo, commit ou regra foi ignorado.
 
 A suíte Windows `tests/test_datastudio_windows.py` inclui os casos novos de corte legado bloqueado no preparo/envio (simulado e real, antes de HTTP), SHA preservado, soma exata de produtos sem frete e identidade divergente. Os oito testes unittest desse módulo passaram localmente; o CI do SHA final executa o módulo nas quatro combinações Windows.
+
+## Distribuição Windows publicada
+
+Publicada em **15/11/2026, 12:53:30 (America/Fortaleza)**, SHA `abdb789c20c42f4e0c22799c47a73993f23b2d04`. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.41), [preparação e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43730215188), [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43730215202), [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43730215178) e [publicação com os mesmos artefatos](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43732329821) aprovados. Downloads públicos conferidos: SHA-256, CRC, 593 entradas do manifesto, 124 módulos e 586 arquivos do commit por pacote, executáveis x64 1.5.41.0. Sem instalador Python ou dados comerciais nos ZIPs. A 1.5.40 e anteriores preservadas. Nenhuma implantação/recuperação comercial executada.
+
+Instalar o Setup 1.5.41 em Preserve e conferir `nexo versao`. Não executar nova exportação ou carga dos 204 pedidos: o Work usa o dry-run acima com o corte original. A guarda transacional no servidor exige implantação própria; instalar Windows não atualiza a VPS.

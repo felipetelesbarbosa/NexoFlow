@@ -1,5 +1,10 @@
 # Versionamento do NexoFlow
 
+## Publicação 1.5.41
+
+Publicada em **15/11/2026, 12:53:30 (America/Fortaleza)**, SHA `abdb789c20c42f4e0c22799c47a73993f23b2d04`. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.41), [preparação e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43730215188), [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43730215202), [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43730215178) e [publicação com os mesmos artefatos](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43732329821) aprovados. Downloads públicos conferidos: SHA-256, CRC, 593 entradas do manifesto, 124 módulos e 586 arquivos do commit por pacote, executáveis x64 1.5.41.0. Sem instalador Python ou dados comerciais nos ZIPs. A 1.5.40 e anteriores preservadas. Nenhuma implantação/recuperação comercial executada.
+
+
 ## Preparação 1.5.41
 
 Publicação autorizada em 15/11/2026. Uma geração no SHA final, checks e pacotes conferidos antes de publicar os mesmos artefatos. Preservar 1.5.40 e anteriores. Nenhuma recuperação de dados ou implantação comercial nesta entrega.
@@ -16,7 +21,7 @@ A **1.5.32 foi publicada em 10/11/2026, 19:16:49 (America/Fortaleza)**, no SHA `
 
 A **1.5.33 foi publicada em 10/11/2026, 23:28:34 (America/Fortaleza)**, no SHA `7884d7007fd0c65cbf90bfc30c5c35dc6c9056fb`, com recuperação da leitura da trava Sheets. [Release e pacotes conferidos](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.33).
 
-As próximas publicações de atualização, hotfix ou patch seguem **1.5.41 → ... → 1.5.99 → 1.6 → 1.6.1**. Cada publicação incrementa uma única vez; commits e novas tentativas de CI da mesma entrega não mudam a numeração. Não há salto automático de versão principal.
+As próximas publicações de atualização, hotfix ou patch seguem **1.5.42 → ... → 1.5.99 → 1.6 → 1.6.1**. Cada publicação incrementa uma única vez; commits e novas tentativas de CI da mesma entrega não mudam a numeração. Não há salto automático de versão principal.
 
 A versão da distribuição fica em `VERSION`. A tag é `v{versao}`, o título é `NexoFlow {versao}` e os pacotes são `NexoFlow-{versao}.zip` e `NexoFlow-Setup-{versao}.zip`. Nunca sobrescreva os arquivos de uma versão pública para entregar código novo. O workflow permite retomar somente um rascunho da mesma entrega.
 
