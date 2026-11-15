@@ -339,7 +339,7 @@ def test_duplicate_raw_items_are_not_silently_collapsed(store, tmp_path):
         item(1, revenue="5"),
     ]
     result = candidate(
-        dict(venda_chave=key, faturamento_produtos="10"), source, "FARMA"
+        {"venda_chave": key, "faturamento_produtos": "10"}, source, "FARMA"
     )
     assert result == dict(action="DUPLICIDADE_OPERACIONAL_BLOQUEADA", items=[])
 

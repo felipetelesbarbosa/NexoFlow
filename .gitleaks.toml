@@ -8,4 +8,7 @@ useDefault = true
 description = "URL pública da API FarmaLíder (porta e caminho), sem credencial"
 regexTarget = "secret"
 # A URL interna do workflow sintético também não contém senha/token.
-regexes = ['''^3200/farmalider$''', '''^8000/tarefas/historico$''']
+# No commit 619fc57, generic-api-key classificou o identificador literal
+# faturamento_produtos= (teste sintético) como segredo. Exceção somente deste
+# texto exato; não ignora arquivo, commit, valores nem regra de segurança.
+regexes = ['''^3200/farmalider$''', '''^8000/tarefas/historico$''', '''^faturamento_produtos=$''']
