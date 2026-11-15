@@ -17,6 +17,8 @@ function getConfig(request){
   ['homologacao','producao'].forEach(function(v){env.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
   var table=config.newSelectSingle().setId('tabela').setName('Tabela lógica').setIsDynamic(true);
   Object.keys(NexoDSSchemas).forEach(function(v){table.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
+  var query=config.newSelectSingle().setId('modo_consulta').setName('Leitura: detalhe ou somas homologadas');
+  ['detalhe','somas'].forEach(function(v){query.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
   var grain=config.newSelectSingle().setId('recorte_historico').setName('Resumo histórico: grão');
   ['MES','ANO','TOTAL','SEM_EMISSAO'].forEach(function(v){grain.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
   config.setIsSteppedConfig(!NexoDSSchemas[p.tabela]);
@@ -43,7 +45,7 @@ function dsCall_(c,path,payload){
     if(status===409){
       var rejection={};try{rejection=JSON.parse(response.getContentText());}catch(ignored){}
       // Só códigos conhecidos, nunca texto livre/payload de erro do servidor.
-      if(['DS_FILTRO_CORTA_RECORTE_USE_DETALHE','DS_COMPRADORES_EXIGEM_COMPETENCIA_OU_RECORTE_UNICO','DS_COMPRADORES_NAO_SOMAVEIS_ENTRE_MESES','DS_RESUMO_EXIGE_GRAO','DS_RESUMO_TOTAL_NAO_APLICA_DATA','DS_CONSULTA_EXCEDE_LIMITE_USE_RESUMO_OU_PERIODO','DS_RESPOSTA_EXCEDE_LIMITE_USE_RESUMO','DS_SEM_PUBLICACAO_CONFIRMADA'].includes(rejection.error))throw new Error(rejection.error);
+      if(['DS_FILTRO_CORTA_RECORTE_USE_DETALHE','DS_COMPRADORES_EXIGEM_COMPETENCIA_OU_RECORTE_UNICO','DS_COMPRADORES_NAO_SOMAVEIS_ENTRE_MESES','DS_RESUMO_EXIGE_GRAO','DS_RESUMO_TOTAL_NAO_APLICA_DATA','DS_CONSULTA_EXCEDE_LIMITE_USE_RESUMO_OU_PERIODO','DS_RESPOSTA_EXCEDE_LIMITE_USE_RESUMO','DS_SEM_PUBLICACAO_CONFIRMADA','DS_ABC_BASE_INCOMPLETA','DS_ABC_PEDIDO_EXCEDE_LIMITE_PARES','DS_ABC_PRECISAO_EXCEDIDA','DS_CONSULTA_TEMPO_LIMITE'].includes(rejection.error))throw new Error(rejection.error);
     }
     if(![429,502,503,504].includes(status)||attempt===2||Date.now()-started>45000)throw new Error('DS_HTTP_'+status);
     Utilities.sleep(Math.min(4000,1000*Math.pow(2,attempt)));
@@ -95,49 +97,66 @@ function getData(request){try{
     filters.push({field:'tipo_recorte',values:[p.recorte_historico]});
     if(['TOTAL','SEM_EMISSAO'].includes(p.recorte_historico))range={};
   }
-  var payload={table:p.tabela,fields:distinct?['produto_codigo']:names,start:spec.period?(range.startDate||''):'',end:spec.period?(range.endDate||''):'',filters:filters,aggregation:distinct?{produto_codigo:'count_distinct'}:{}};
+  names=dsFields_(p.tabela).forIds(names).build().map(function(f){return f.name;});
+  var sumAggregation=dsSums_(p,spec,names,groups,supported,distinct);
+  var payload={table:p.tabela,fields:distinct?['produto_codigo']:names,start:spec.period?(range.startDate||''):'',end:spec.period?(range.endDate||''):'',filters:filters,aggregation:distinct?{produto_codigo:'count_distinct'}:sumAggregation};
   if(spec.period&&!(p.tabela==='BI_Historico_Resumo'&&['TOTAL','SEM_EMISSAO'].includes(p.recorte_historico))&&(!payload.start||!payload.end)&&!(request.scriptParams&&request.scriptParams.sampleExtraction))throw new Error('DS_PERIODO_OBRIGATORIO');
   if(request.scriptParams&&request.scriptParams.sampleExtraction&&spec.period&&!payload.start){payload.start='2000-01-01';payload.end='2000-01-01';}
   var result=dsCall_(c,'/v1/consulta',payload);
   var expectedDB=c.environment==='producao'?'nexoflow_datastudio':'nexoflow_datastudio_homologacao';
   if(result.protocol!=='nexoflow_datastudio_1'||result.target!==expectedDB+'.'+c.segment.toLowerCase()||result.segment!==c.segment||result.environment!==c.environment||result.schema_hash!==NexoDSSchemaHash)throw new Error('DS_CONTRATO_DESTINO_DIVERGENTE');
-  if(result.complete!==true||!Array.isArray(result.rows)||JSON.stringify(result.fields)!==JSON.stringify(payload.fields))throw new Error('DS_RESPOSTA_INCOMPLETA');
+  if(!Number.isSafeInteger(result.version)||result.version<1||result.complete!==true||!Array.isArray(result.rows)||JSON.stringify(result.fields)!==JSON.stringify(payload.fields))throw new Error('DS_RESPOSTA_INCOMPLETA');
   var fields=dsFields_(p.tabela).forIds(names);
   var rows=result.rows.map(function(r){if(r.length!==payload.fields.length)throw new Error('DS_SCHEMA_DIVERGENTE');return {values:r.map(function(v,i){if(v===null||v==='')return null;var kind=distinct?'number':spec.types[names[i]];if(kind==='number'){var n=Number(v);if(!Number.isFinite(n))throw new Error('DS_NUMERO_INVALIDO');return n;}if(kind==='date'){if(!/^\d{4}-\d{2}-\d{2}$/.test(v))throw new Error('DS_DATA_INVALIDA');return v.replace(/-/g,'');}return String(v);})};});
   return {schema:fields.build(),rows:rows,filtersApplied:!!applied};
 }catch(error){return dsError_(error);}}
 if(typeof module!=='undefined')module.exports={getData:getData,dsCall:dsCall_,dsConfig:dsConfig_};
 
-// Mesma regra ABC do conector legado, sobre duas projeções da mesma versão READY.
+// Modo explícito: não inferir SUM para taxas, compradores, LTV ou métricas Meta.
+// Fontes existentes sem parâmetro continuam em detalhe; não mudar blends por inferência.
+var NexoDSSums={
+  BI_Itens:['quantidade','receita_item'],
+  BI_Clientes_Vendas:['pedidos','faturamento_produtos','frete','faturamento'],
+  Itens_Pedidos_FarmaLider:['quantidade','valor_total'],
+  BI_Pedidos:['pedido_valor','pedido_frete','pedido_faturamento_total','venda_valida'],
+  Historico_Pedidos:['produtos','frete','faturamento'],
+  Historico_Itens:['quantidade','valor']
+};
+function dsSums_(p,spec,names,groups,supported,distinct){
+  if(!p.modo_consulta||p.modo_consulta==='detalhe'||distinct)return {};
+  if(p.modo_consulta!=='somas'||!NexoDSSums[p.tabela])throw new Error('DS_MODO_AGREGACAO_NAO_SUPORTADO');
+  if(groups.length&&!supported)throw new Error('DS_FILTRO_AGREGACAO_NAO_SUPORTADO');
+  var aggregation={};
+  names.forEach(function(n){
+    if(spec.types[n]==='number'&&!spec.dimensions.includes(n)){
+      if(!NexoDSSums[p.tabela].includes(n))throw new Error('DS_METRICA_NAO_ADITIVA');
+      aggregation[n]='sum';
+    }
+  });
+  if(!Object.keys(aggregation).length)throw new Error('DS_SOMAS_EXIGEM_METRICA_ADITIVA');
+  return aggregation;
+}
+// O servidor agrega produtos/pares e valida itens/vendas no mesmo snapshot READY.
+// Filtros de classe são posteriores ao cálculo completo, como no conector legado.
 function dsAbcData_(request,c,spec){
-  var started=Date.now(),range=request.dateRange||{},names=request.fields.map(function(f){return f.name;});
+  var started=Date.now();
+  var range=request.dateRange||{},names=request.fields.map(function(f){return f.name;});
   if(!range.startDate||!range.endDate)throw new Error('DS_PERIODO_OBRIGATORIO');
   if(names.some(function(n){return !spec.columns.includes(n);}))throw new Error('DS_CAMPOS_NAO_AUTORIZADOS');
-  var version=null;
-  function load(table,fields){
-    if(Date.now()-started>45000)throw new Error('DS_PRAZO_CONSULTA');
-    var r=dsCall_(c,'/v1/consulta',{table:table,fields:fields,start:range.startDate,end:range.endDate,filters:[],aggregation:{}});
-    var db=c.environment==='producao'?'nexoflow_datastudio':'nexoflow_datastudio_homologacao';
-    if(r.protocol!==c.protocol||r.target!==db+'.'+c.segment.toLowerCase()||r.segment!==c.segment||r.environment!==c.environment||r.schema_hash!==NexoDSSchemaHash)throw new Error('DS_CONTRATO_DESTINO_DIVERGENTE');
-    if(r.complete!==true||!Array.isArray(r.rows)||JSON.stringify(r.fields)!==JSON.stringify(fields)||!Number.isSafeInteger(r.version)||r.version<1)throw new Error('DS_RESPOSTA_INCOMPLETA');
-    if(version!==null&&version!==r.version)throw new Error('DS_VERSAO_ALTERADA_DURANTE_LEITURA');
-    version=r.version;
-    return [fields.concat(['atualizado_em'])].concat(r.rows.map(function(row){
-      if(row.length!==fields.length)throw new Error('DS_SCHEMA_DIVERGENTE');
-      return row.concat(['READY:'+version]);
-    }));
-  }
-  var items=load('BI_Itens',['item_chave','venda_chave','data','produto_codigo','produto_nome','categoria','quantidade','receita_item']);
-  var orders=load('BI_Clientes_Vendas',['venda_chave','data','faturamento_produtos']);
-  var result=NexoAbc.calculate(items,orders,range.startDate,range.endDate);
-  if(!result.diagnostics.complete)throw new Error('DS_ABC_BASE_INCOMPLETA');
-  if(Date.now()-started>45000)throw new Error('DS_PRAZO_CONSULTA');
   var responseSchema=dsFields_(request.configParams.tabela).forIds(names).build();
   names=responseSchema.map(function(f){return f.name;});
-  return {schema:responseSchema,filtersApplied:false,
-    rows:result[spec.abc_mode].map(function(row){return {values:names.map(function(n){
-      // A versão READY comprova consistência; não inventa horário de atualização.
-      if(n==='atualizado_em')return '';
-      return spec.types[n]==='date'?row[n].replace(/-/g,''):row[n];
-    })};})};
+  var r=dsCall_(c,'/v1/abc',{mode:spec.abc_mode,fields:names,start:range.startDate,end:range.endDate});
+  if(Date.now()-started>45000)throw new Error('DS_PRAZO_CONSULTA');
+  var db=c.environment==='producao'?'nexoflow_datastudio':'nexoflow_datastudio_homologacao';
+  if(r.protocol!==c.protocol||r.target!==db+'.'+c.segment.toLowerCase()||r.segment!==c.segment||r.environment!==c.environment||r.schema_hash!==NexoDSSchemaHash)throw new Error('DS_CONTRATO_DESTINO_DIVERGENTE');
+  if(r.complete!==true||!Array.isArray(r.rows)||JSON.stringify(r.fields)!==JSON.stringify(names)||!Number.isSafeInteger(r.version)||r.version<1)throw new Error('DS_RESPOSTA_INCOMPLETA');
+  return {schema:responseSchema,filtersApplied:false,rows:r.rows.map(function(row){
+    if(row.length!==names.length)throw new Error('DS_SCHEMA_DIVERGENTE');
+    return {values:row.map(function(v,i){
+      if(v===null)return null;
+      if(spec.types[names[i]]==='number'){var n=Number(v);if(v===''||!Number.isFinite(n))throw new Error('DS_NUMERO_INVALIDO');return n;}
+      if(spec.types[names[i]]==='date'){if(!/^\d{4}-\d{2}-\d{2}$/.test(v))throw new Error('DS_DATA_INVALIDA');return v.replace(/-/g,'');}
+      return String(v);
+    })};
+  })};
 }

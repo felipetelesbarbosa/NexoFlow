@@ -1,5 +1,7 @@
 # Roteiro de migração do relatório FARMA — inventário de 12/11/2026
 
+**Correção posterior de volume do leitor (15/11/2026):** [ABC, resumo e pares no servidor](ABC%20POSTGRESQL%20EM%20VOLUME.md). Preserva fechamento READY existente; implantação somente do leitor FARMA e dos quatro arquivos do conector. ds136 permanece na fonte atual.
+
 **Complemento posterior:** [contratos dos nove aliases](CONTRATOS%20NOVE%20ALIASES%20FARMA.md). As quatro projeções operacionais e o adaptador ABC foram implementados; a fórmula ds72 e os modos ABC foram confirmados e incorporados. IDs locais/implantação ABC e produtor/chave/política de ds136 continuam pendentes. As contagens de gaps abaixo descrevem a base 83692b6.
 
 Complemento ao [guia de implantação e carga](MIGRACAO%20WINDOWS%20POSTGRESQL%20DATA%20STUDIO.md). A distribuição Windows continua 1.5.37. Esta entrega atualiza o **leitor na VPS, o conector privado e o roteiro**; não instala serviços nem troca fontes comerciais.
@@ -71,7 +73,7 @@ O campo `faturamento` de BI_Clientes_Vendas e os campos financeiros explícitos 
 
 ## Sequência do Work
 
-1. Conferir SHA/CI desta entrega e os comandos do guia. Usar o novo leitor e os três arquivos do conector (`Code.js`, `Schemas.js`, `appsscript.json`) num projeto/implantação privada. Windows/publicador continuam com o contrato 1.5.37; hash do contrato de publicação, migração 002 e permissões atuais não foram alterados. Não atualizar o projeto piloto ou fonte direta por cima.
+1. Conferir SHA/CI desta entrega e os comandos do guia. Usar o novo leitor e os quatro arquivos do conector (`Code.js`, `Schemas.js`, `AbcCore.js`, `appsscript.json`) num projeto/implantação privada. Windows/publicador continuam com o contrato 1.5.37; hash do contrato de publicação, migração 002 e permissões atuais não foram alterados. Não atualizar o projeto piloto ou fonte direta por cima.
 2. Preservar cópia do relatório oficial e suas fontes/implantações. Gerar a matriz offline. Para cada alias, registrar privadamente conexão original, nova conexão candidata, tabela, campo de período e campos/IDs, sem renomear/fundir/remover os aliases existentes. Se o Google emitir outro ID para a nova fonte, guardar a correspondência e manter a original para reversão; não prometer reuso do ID interno nem recriar todos os componentes.
 3. Conferir as cinco mesclagens, inclusive as duas sem gráficos, seus lados LEFT/INNER, ordem, chaves, períodos e filtros. Capturar fórmulas dos rótulos como Novo campo, Pedido após anúncio, Venda elegível, CPA e ROAS, sem deduzi-las do nome. Preservar `nxf_canal`, `nxf_faixa` e a substituição de ID de contact_canal_principal registrada no anexo.
 4. Resolver os nove aliases sinalizados antes do corte integral. Devolver apenas schema/configuração/fórmulas e contagens agregadas necessárias; nunca registros de clientes, tokens ou payload de compras. Ausência de uma fonte não pode virar zero silencioso.

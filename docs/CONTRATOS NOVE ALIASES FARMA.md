@@ -17,11 +17,13 @@ Sem CPF, telefone, dados brutos, mensagens de erro privadas ou IDs individuais d
 
 ## ABC dinâmica via PostgreSQL
 
+**Atualização 15/11/2026:** o caminho bruto descrito abaixo foi substituído por agregação no servidor; ver [ABC em volume](ABC%20POSTGRESQL%20EM%20VOLUME.md). Preservados os IDs, o cálculo de referência e as pendências de homologação.
+
 O conector definitivo ganha as seleções `ABC_abc`, `ABC_resumo` e `ABC_juntos`. Os IDs e tipos vêm de `fieldSpecs_` do conector `connectors/looker_abc`. `AbcCore.js` é uma cópia conferida byte a byte do cálculo oficial; `scripts/sync_datastudio_schema.py --check` verifica cálculo e schema. Não utiliza snapshots BI_Produtos_ABC/BI_KPIs_Periodo/BI_Produtos_Juntos como substitutos.
 
 O adaptador lê BI_Itens e BI_Clientes_Vendas pela API, no período selecionado, com o mesmo destino/segmento/ambiente/hash e **a mesma versão READY positiva**. Divergência de versão, falha de rede, resposta incompleta ou falta de reconciliação entre itens e vendas aborta toda a resposta. O prazo é conferido antes de cada leitura e após o cálculo. O núcleo mantém classes, empates, SKU sem informação, resumo e pares únicos por pedido. Filtros de classe continuam aplicados no Data Studio após o cálculo, sem recalcular ABC só para a classe filtrada.
 
-As consultas mantêm os limites de 50 mil linhas e 7 MB por resposta. Não há paginação silenciosa nem truncamento: intervalos grandes podem exigir futura agregação SQL especializada. Esta entrega não prova que uma consulta anual da base real caiba nesse limite. Cota/limite/erro não vira período vazio. No vazio válido, ABC/pares têm zero linhas e o resumo segue o contrato legado (zero produtos/receita, classes indisponíveis). O marcador READY é usado apenas internamente para provar a geração; `atualizado_em` permanece Texto e vazio na saída dinâmica quando não há um horário único comprovado. Não fabricar timestamp da carga.
+Na implementação inicial, as consultas mantinham os limites de 50 mil linhas e 7 MB sobre o detalhe. A correção de volume aplica esses limites à saída agregada; resumo é calculado integralmente no SQL. Não há paginação silenciosa nem truncamento. Esta entrega não prova que uma consulta anual da base real caiba nesse limite. Cota/limite/erro não vira período vazio. No vazio válido, ABC/pares têm zero linhas e o resumo segue o contrato legado (zero produtos/receita, classes indisponíveis). O marcador READY é usado apenas internamente para provar a geração; `atualizado_em` permanece Texto e vazio na saída dinâmica quando não há um horário único comprovado. Não fabricar timestamp da carga.
 
 ## Metadados recebidos e contrato executável
 

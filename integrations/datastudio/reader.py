@@ -30,6 +30,35 @@ def view_name(name):
 
 
 class Reader(Store):
+    def abc(self, mode, fields, start, end):
+        from integrations.datastudio.abc_reader import FIELDS, aggregates, calculate
+
+        if not isinstance(mode, str) or mode not in FIELDS:
+            raise StorageError("DS_TABELA_NAO_AUTORIZADA")
+        if (
+            not isinstance(fields, list)
+            or not fields
+            or any(not isinstance(f, str) for f in fields)
+            or len(fields) != len(set(fields))
+            or set(fields) - set(FIELDS[mode])
+        ):
+            raise StorageError("DS_CAMPOS_NAO_AUTORIZADOS")
+        try:
+            if date.fromisoformat(start) > date.fromisoformat(end):
+                raise ValueError
+        except (TypeError, ValueError):
+            raise StorageError("DS_PERIODO_INVALIDO") from None
+        with self.connect(readonly=True) as conn:
+            version = self.active(conn)
+            if not version:
+                raise StorageError("DS_SEM_PUBLICACAO_CONFIRMADA")
+            # Preserva o hotfix bba86d0 também no caminho ABC. A mesma transação
+            # REPEATABLE READ contém versão, itens, vendas e validações.
+            conn.execute("SET LOCAL enable_nestloop=off")
+            records = aggregates(conn, self.schema, start, end, mode, MAX_RESULT_ROWS)
+        rows = calculate(records, start, end, mode)
+        return self.result(version, fields, rows)
+
     def info(self):
         with self.connect() as conn:
             version = self.active(conn)
@@ -189,6 +218,9 @@ class Reader(Store):
             rows = conn.execute(
                 statement + sql.SQL(" LIMIT %s"), [*params, MAX_RESULT_ROWS + 1]
             ).fetchall()
+        return self.result(version, fields, rows)
+
+    def result(self, version, fields, rows):
         if len(rows) > MAX_RESULT_ROWS:
             raise StorageError("DS_CONSULTA_EXCEDE_LIMITE_USE_RESUMO_OU_PERIODO")
 

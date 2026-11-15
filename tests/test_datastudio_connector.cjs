@@ -76,27 +76,27 @@ test('guarda de recorte chega ao Work sem expor mensagem livre do servidor',()=>
  assert.ok(!bad.logs.join().includes('PRIVATE-MUST-NOT-APPEAR'));
 });
 
-test('ABC PostgreSQL muda com o período; pares não somam item duplicado',()=>{
- function run(mode,start,end){
-  const f=fixture(p=>result(p,p.table==='BI_Itens'?
-    [['i1','s1','2026-11-01','01','A','','1','80'],['i2','s1','2026-11-01','02','B','','1','20'],['i3','s2','2026-11-02','02','B','','1','100']].filter(r=>r[2]>=start&&r[2]<=end):
-    [['s1','2026-11-01','100'],['s2','2026-11-02','100']].filter(r=>r[1]>=start&&r[1]<=end)));
-  const r=request(mode==='abc'?['produto_codigo','receita_produtos','classe_abc']:mode==='juntos'?['produto_a_codigo','produto_b_codigo','pedidos_juntos']:['skus_distintos','faturamento_produtos']);
-  r.configParams.tabela='ABC_'+mode;r.dateRange={startDate:start,endDate:end};r.dimensionsFilters=[];
-  return JSON.parse(JSON.stringify(f.ctx.getData(r)));
+test('ABC consulta apenas agregados no servidor, sem baixar itens/pedidos',()=>{
+ for(const mode of ['abc','resumo','juntos']){
+  const f=fixture(p=>{
+   assert.equal(p.mode,mode);assert.equal(p.start,'2026-11-01');assert.equal(p.end,'2026-11-03');
+   assert.equal(p.table,undefined);assert.equal(p.aggregation,undefined);
+   return result(p,[[mode==='abc'?'001':mode==='resumo'?'2':'001']]);
+  });
+  const r=request([mode==='abc'?'produto_codigo':mode==='resumo'?'skus_distintos':'produto_a_codigo']);
+  r.configParams.tabela='ABC_'+mode;r.dimensionsFilters=[];
+  const response=f.ctx.getData(r);
+  assert.equal(response.rows.length,1);assert.equal(response.filtersApplied,false);
+  assert.equal(f.calls.length,1);assert.ok(f.calls[0].url.endsWith('/v1/abc'));
  }
- assert.deepEqual(run('abc','2026-11-01','2026-11-01').rows.map(r=>r.values),[['01',80,'A'],['02',20,'B']]);
- assert.deepEqual(run('abc','2026-11-01','2026-11-02').rows.map(r=>r.values),[['02',120,'A'],['01',80,'A']]);
- assert.deepEqual(run('juntos','2026-11-01','2026-11-02').rows.map(r=>r.values),[['01','02',1]]);
- assert.deepEqual(run('resumo','2026-11-01','2026-11-02').rows.map(r=>r.values),[[2,200]]);
- assert.deepEqual(run('abc','2026-11-30','2026-11-30').rows,[]);
 });
-test('ABC recusa falha, limite, resposta parcial e versões diferentes',()=>{
- for(const variant of ['version','partial','failure','limit']){
-  const f=fixture((p,n)=>{
+test('ABC recusa falha, limite, resposta parcial e versão ausente',()=>{
+ for(const variant of ['version','partial','failure','limit','target']){
+  const f=fixture(p=>{
    if(variant==='failure')return {status:403};
    if(variant==='limit')return {status:409,body:{error:'DS_CONSULTA_EXCEDE_LIMITE_USE_RESUMO_OU_PERIODO'}};
-   const r=result(p,[]);r.body.version=variant==='version'?n:1;r.body.complete=variant!=='partial';return r;
+   const r=result(p,[]);r.body.version=variant==='version'?0:1;r.body.complete=variant!=='partial';
+   if(variant==='target')r.body.segment='PET';return r;
   });
   const r=request(['produto_codigo']);r.configParams.tabela='ABC_abc';r.dimensionsFilters=[];
   assert.throws(()=>f.ctx.getData(r),/Nenhum total parcial/);
@@ -110,14 +110,16 @@ test('projeções do inventário são tipadas sem expor payloads privados',()=>{
  for(const mode of ['abc','resumo','juntos'])assert.deepEqual(Array.from(f.ctx.NexoDSSchemas['ABC_'+mode].columns),Array.from(original.fieldSpecs_(mode),f=>f[0]));
 });
 
-test('ABC não devolve totais de itens sem pedido completo e alinha ordem do SDK',()=>{
- const f=fixture(p=>result(p,p.table==='BI_Itens'?[['i1','s1','2026-11-01','01','A','','1','10']]:[['s1','2026-11-01','20']]));
+test('ABC propaga validação financeira e alinha ordem do SDK sem recalcular classe filtrada',()=>{
+ const f=fixture(()=>({status:409,body:{error:'DS_ABC_BASE_INCOMPLETA'}}));
  const r=request(['classe_abc','produto_codigo']);r.configParams.tabela='ABC_abc';r.dimensionsFilters=[];
  assert.throws(()=>f.ctx.getData(r),/DS_ABC_BASE_INCOMPLETA/);
- const good=fixture(p=>result(p,p.table==='BI_Itens'?[['i1','s1','2026-11-01','01','A','','1','10']]:[['s1','2026-11-01','10']]));
+ const good=fixture(p=>{assert.deepEqual(p.fields,['produto_codigo','classe_abc']);return result(p,[['01','A']]);});
+ r.dimensionsFilters=[[{fieldName:'classe_abc',operator:'EQUALS',type:'INCLUDE',values:['A']}]];
  const response=good.ctx.getData(r);
  assert.deepEqual(Array.from(response.schema,f=>f.name),['produto_codigo','classe_abc']);
  assert.deepEqual(Array.from(response.rows[0].values),['01','A']);
+ assert.equal(response.filtersApplied,false);
 });
 
 test('ds72 mantém ID e Texto sem agregação, aplicando elegibilidade antes da resposta',()=>{
@@ -136,4 +138,40 @@ test('ds72 mantém ID e Texto sem agregação, aplicando elegibilidade antes da 
  assert.equal(resultData.schema.length,1);assert.equal(resultData.rows.length,2);
  // COUNT_DISTINCT pertence à métrica da mesclagem: o leitor não apaga pedidos repetidos por contato.
  assert.equal(new Set(resultData.rows.map(r=>r.values[0])).size,1);
+});
+
+
+test('somas SQL explícitas reduzem volume sem inferir médias/distintos ou alterar fontes antigas',()=>{
+ const r=request(['receita_item','produto_codigo','quantidade']);
+ r.configParams.modo_consulta='somas';
+ const f=fixture(p=>{
+  assert.deepEqual(p.fields,['produto_codigo','quantidade','receita_item']);
+  assert.deepEqual(p.aggregation,{quantidade:'sum',receita_item:'sum'});
+  assert.equal(p.filters[0].field,'sku_informado');return result(p,[['001','60003','6000.30']]);
+ });
+ const response=f.ctx.getData(r);
+ assert.deepEqual(Array.from(response.rows[0].values),['001',60003,6000.3]);
+ assert.equal(response.filtersApplied,true);
+ const direct=fixture(p=>{assert.deepEqual(p.aggregation,{});return result(p,[]);});
+ delete r.configParams.modo_consulta;direct.ctx.getData(r);
+ r.configParams.modo_consulta='somas';r.fields=[{name:'valor_unitario'}];
+ assert.throws(()=>f.ctx.getData(r),/DS_METRICA_NAO_ADITIVA/);
+ r.fields=[{name:'quantidade'}];r.dimensionsFilters[0][0].operator='CONTAINS';
+ assert.throws(()=>f.ctx.getData(r),/DS_FILTRO_AGREGACAO_NAO_SUPORTADO/);
+ r.configParams.tabela='BI_LTV_Clientes';r.fields=[{name:'ltv_observado'}];
+ assert.throws(()=>f.ctx.getData(r),/DS_MODO_AGREGACAO_NAO_SUPORTADO/);
+});
+
+test('ABC vazio válido continua vazio; valores malformados não viram zero',()=>{
+ const r=request(['produto_codigo']);r.configParams.tabela='ABC_abc';r.dimensionsFilters=[];
+ const empty=fixture(p=>result(p,[]));assert.equal(empty.ctx.getData(r).rows.length,0);
+ r.fields=[{name:'unidades'}];
+ const invalid=fixture(p=>result(p,[['NaN']]));assert.throws(()=>invalid.ctx.getData(r),/DS_NUMERO_INVALIDO/);
+});
+
+test('ABC mantém prazo e recusa resultado completo que chegou tarde',()=>{
+ const f=fixture(p=>result(p,[['001']]));
+ let now=0;f.ctx.Date={now:()=>{now+=23000;return now;}};
+ const r=request(['produto_codigo']);r.configParams.tabela='ABC_abc';r.dimensionsFilters=[];
+ assert.throws(()=>f.ctx.getData(r),/DS_PRAZO_CONSULTA/);
 });

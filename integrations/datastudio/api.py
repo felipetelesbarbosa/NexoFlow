@@ -38,6 +38,8 @@ def create_app(store, token, *, reader=False):
 
     @api.exception_handler(psycopg.Error)
     async def database_error(_request, error):
+        if reader and isinstance(error, psycopg.errors.QueryCanceled):
+            return JSONResponse({"error": "DS_CONSULTA_TEMPO_LIMITE"}, status_code=409)
         code = (
             "DS_PERMISSAO"
             if isinstance(error, psycopg.errors.InsufficientPrivilege)
@@ -65,6 +67,10 @@ def create_app(store, token, *, reader=False):
         return await run_in_threadpool(func, **data)
 
     if reader:
+
+        @api.post("/v1/abc")
+        async def abc(request: Request):
+            return await invoke(request, store.abc, ("mode", "fields", "start", "end"))
 
         @api.post("/v1/consulta")
         async def query(request: Request):

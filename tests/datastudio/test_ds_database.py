@@ -1144,6 +1144,13 @@ def test_partial_operational_sale_uses_complete_reconciled_history(
     assert sum(Decimal(r[1]) for r in result) == 2
     assert sum(Decimal(r[2]) for r in result) == Decimal("162.80")
     assert all(r[3] is None for r in result)
+    abc = reader.abc(
+        "abc",
+        ["produto_codigo", "unidades", "receita_produtos", "pedidos"],
+        "2026-11-02",
+        "2026-11-02",
+    )
+    assert abc["rows"] == [["0007", 2, "162.8", 1]]
     assert s.inspect(rev)["receipt"] == receipt
     # A projeção não reescreve os fatos recebidos nem a chave operacional.
     assert len(s.rows("BI_Itens")["rows"]) == 1

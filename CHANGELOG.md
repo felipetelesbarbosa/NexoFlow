@@ -1,5 +1,12 @@
 # NexoFlow — Changelog
 
+## Leitor PostgreSQL — ABC em volume (15/11/2026; sem distribuição Windows)
+
+- Agregação ABC, resumo e compras juntas no servidor, com leitura consistente da mesma revisão READY e paridade do núcleo legado; preservado o hotfix de plano SQL bba86d0.
+- Resumo suporta mais de 50 mil SKUs sem baixar fatos; limites de saída e timeout continuam explícitos, sem totais parciais.
+- Modo opcional de somas SQL para métricas aditivas homologadas; fontes existentes continuam em detalhe. Preservados aliases, filtros, grãos, frete, cancelamentos e contratos.
+- Roteiro: docs/ABC POSTGRESQL EM VOLUME.md. Código/testes sintéticos; nenhuma carga, fechamento, alteração de credenciais ou relatório comercial.
+
 ## Servidor Data Studio — itens completos e fechamento selado em volume
 
 - BI_Itens usa a venda histórica inteira quando a projeção operacional está incompleta e o histórico reconcilia exatamente com o cabeçalho, preservando chaves e guardas financeiras.
