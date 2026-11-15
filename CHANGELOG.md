@@ -1,5 +1,10 @@
 # NexoFlow — Changelog
 
+## Diagnóstico PostgreSQL — consulta histórica em volume (15/11/2026)
+
+- CHECK usa LEFT JOIN com chaves históricas distintas materializadas uma vez, preservando semântica, centavos e timeout.
+- Regressão mede varreduras em 50.003 históricos e 204 vendas; simulação real do Work registrada no roteiro. Recuperação segue em dry-run, sem alterar READY. Não requer distribuição Windows para executar na VPS.
+
 ## 1.5.41 — publicada em 15/11/2026, 12:53:30 (America/Fortaleza)
 
 - Distribui guardas contra BI_Itens defasada e simulação direcionada de recuperação; incorpora as correções de projeção financeira, fechamento e ABC posteriores à 1.5.40.

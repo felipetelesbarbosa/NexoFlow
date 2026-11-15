@@ -36,7 +36,13 @@ TABLES = (
 
 # Esta mesma verificação pode ser usada como preflight de publicações futuras.
 # Não altera o publicador instalado nem reabre o READY existente.
-CHECK = """WITH i AS MATERIALIZED (
+# Materializar chaves distintas uma vez evita varrer o histórico por venda.
+# DISTINCT preserva a semântica EXISTS sem multiplicar pedidos no LEFT JOIN.
+CHECK = """WITH h AS MATERIALIZED (
+ SELECT DISTINCT substring(encode(sha256(convert_to(
+ 'venda:FARMALIDER:'||pedido_id,'UTF8')),'hex'),1,32) AS venda_chave
+ FROM {s}.ds_historico_pedidos
+), i AS MATERIALIZED (
  SELECT venda_chave,count(*) AS n,sum(round(receita_item*100)) AS centavos,
  bool_and(coalesce(quantidade>0 AND receita_item>=0 AND
  receita_item::text NOT IN ('NaN','Infinity','-Infinity') AND
@@ -45,9 +51,9 @@ CHECK = """WITH i AS MATERIALIZED (
  FROM {s}.ds_bi_itens GROUP BY venda_chave
 ) SELECT v.venda_chave,v.cliente_chave,v.data,v.faturamento_produtos,v.frete,v.faturamento,
  coalesce(i.n,0) AS itens, i.centavos,
- EXISTS(SELECT 1 FROM {s}.ds_historico_pedidos h WHERE
- substring(encode(sha256(convert_to('venda:FARMALIDER:'||h.pedido_id,'UTF8')),'hex'),1,32)=v.venda_chave) AS historico
+ (h.venda_chave IS NOT NULL) AS historico
  FROM {s}.ds_bi_clientes_vendas v LEFT JOIN i USING(venda_chave)
+ LEFT JOIN h USING(venda_chave)
  WHERE v.data BETWEEN %s AND %s AND
  (i.n IS NULL OR NOT i.validos OR v.faturamento_produtos IS NULL OR
  v.faturamento_produtos::text IN ('NaN','Infinity','-Infinity') OR

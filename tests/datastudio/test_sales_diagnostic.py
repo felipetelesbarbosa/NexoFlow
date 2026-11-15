@@ -2,6 +2,7 @@
 
 import json
 from contextlib import closing
+from decimal import Decimal
 from uuid import uuid4
 
 import pytest
@@ -228,7 +229,6 @@ def test_diagnostic_cli_hash_private_file_and_nonzero_block(
 
 def test_recovery_204_sales_579_items_exact_daily_control_dry_run(store, tmp_path):
     """Mesmas contagens de controle, com pedidos/itens inteiramente fictícios."""
-    from decimal import Decimal
     from unittest.mock import patch
 
     expected_days = {
@@ -361,3 +361,68 @@ def test_candidate_key_owned_by_another_sale_is_blocked(store, tmp_path):
         == "CHAVE_BI_VINCULADA_A_OUTRA_VENDA"
     )
     assert not report["recuperacao"]["todos_candidatos_conciliados"]
+
+
+def test_check_history_scanned_once_at_volume_without_duplicate_sales(store):
+    """Mede trabalho pelo plano real, sem depender de um cronômetro."""
+    from psycopg import sql
+
+    from integrations.datastudio.sales_diagnostic import CHECK
+    from looker_bi import opaque_key
+
+    with store.connect() as conn:
+        conn.execute("CREATE SCHEMA diagnostic_volume")
+        conn.execute("""CREATE TABLE diagnostic_volume.ds_historico_pedidos(pedido_id text);
+            CREATE TABLE diagnostic_volume.ds_bi_clientes_vendas(
+                venda_chave text,cliente_chave text,data date,
+                faturamento_produtos numeric,frete numeric,faturamento numeric);
+            CREATE TABLE diagnostic_volume.ds_bi_itens(
+                venda_chave text,quantidade numeric,receita_item numeric,data date)""")
+        conn.execute(
+            "INSERT INTO diagnostic_volume.ds_historico_pedidos SELECT n::text FROM generate_series(1,50003) n"
+        )
+        conn.execute(
+            "INSERT INTO diagnostic_volume.ds_historico_pedidos VALUES('1'),('1')"
+        )
+        with conn.cursor().copy(
+            "COPY diagnostic_volume.ds_bi_clientes_vendas FROM STDIN"
+        ) as copy:
+            for n in range(204):
+                copy.write_row(
+                    (
+                        opaque_key("venda", f"FARMALIDER:{n}"),
+                        "c",
+                        "2026-11-09",
+                        "10.01",
+                        "2",
+                        "12.01",
+                    )
+                )
+        conn.execute("ANALYZE diagnostic_volume.ds_historico_pedidos")
+        conn.execute("ANALYZE diagnostic_volume.ds_bi_clientes_vendas")
+        conn.execute("SET LOCAL enable_nestloop=off")
+        query = sql.SQL(CHECK).format(s=sql.Identifier("diagnostic_volume"))
+        args = ("2026-11-09", "2026-11-12", 1001)
+        plan = conn.execute(
+            sql.SQL("EXPLAIN (ANALYZE, FORMAT JSON) ") + query, args
+        ).fetchone()["QUERY PLAN"][0]["Plan"]
+
+        def scans(node):
+            result = (
+                [node] if node.get("Relation Name") == "ds_historico_pedidos" else []
+            )
+            return result + [n for child in node.get("Plans", []) for n in scans(child)]
+
+        history = scans(plan)
+        assert history and sum(n["Actual Loops"] for n in history) == 1
+        rows = conn.execute(query, args).fetchall()
+        assert [r["venda_chave"] for r in rows] == sorted(
+            r["venda_chave"] for r in rows
+        )
+        assert len(rows) == len({r["venda_chave"] for r in rows}) == 204
+        assert sum(r["historico"] for r in rows) == 203
+        assert sum(r["faturamento_produtos"] for r in rows) == 204 * Decimal("10.01")
+        assert all(r["itens"] == 0 and r["centavos"] is None for r in rows)
+        assert conn.execute(query, ("2026-11-30", "2026-11-30", 1001)).fetchall() == []
+        assert len(conn.execute(query, ("2026-11-09", "2026-11-12", 5)).fetchall()) == 5
+        conn.execute("DROP SCHEMA diagnostic_volume CASCADE")
