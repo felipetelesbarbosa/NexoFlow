@@ -29,7 +29,7 @@ def main():
             "--name",
             name,
             "--tmpfs",
-            "/var/lib/postgresql:rw,size=512m",
+            "/var/lib/postgresql:rw,size=1g",
             "-e",
             "POSTGRES_DB=nexoflow_datastudio_homologacao",
             "-e",

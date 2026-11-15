@@ -51,8 +51,12 @@ def broken(store, tmp_path):
     ]
     for table, rows in datasets.items():
         batch(store, rev, table, rows)
-    # Reproduz a lacuna existente; não muda o publicador nem refaz READY real.
-    finish(store, rev)
+    # Fixture de READY legado: emula exclusivamente a versão anterior à guarda.
+    # A produção não tem flag/bypass; a nova guarda é exercitada em teste separado.
+    from unittest.mock import patch
+
+    with patch("integrations.datastudio.financial_views.assert_operational_items"):
+        finish(store, rev)
     return rev, path
 
 
@@ -185,7 +189,27 @@ def test_diagnostic_cli_hash_private_file_and_nonzero_block(
     with pytest.raises(StorageError, match="TRANSFERENCIA_NAO_CONFERIDA"):
         main()
     assert not out.exists()
-    monkeypatch.setattr(sys, "argv", argv + ["--export-sha256", file_hash(path)])
+    expected = tmp_path / "expected.json"
+    expected.write_text(
+        json.dumps(
+            dict(
+                segment="FARMA",
+                revision=rev,
+                version=1,
+                days={
+                    "2026-11-09": dict(
+                        orders=1, operational_items=1, product_cents=1000
+                    )
+                },
+            )
+        )
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        argv
+        + ["--export-sha256", file_hash(path), "--expected-summary", str(expected)],
+    )
     assert main() == 3
     stdout = capsys.readouterr().out
     assert (
@@ -193,9 +217,147 @@ def test_diagnostic_cli_hash_private_file_and_nonzero_block(
     )
     assert out.stat().st_mode & 0o777 == 0o600
     report = json.loads(out.read_text())
+    assert report["recuperacao"]["referencia_confere"] is True
     assert report["camadas_por_dia"]["2026-11-09"]["BI_Itens"] == dict(
         atuais=0, fatos=0, corte=0
     )
     with pytest.raises(StorageError, match="SAIDA_JA_EXISTE"):
         main()
     assert store.rows("BI_Itens")["rows"] == []
+
+
+def test_recovery_204_sales_579_items_exact_daily_control_dry_run(store, tmp_path):
+    """Mesmas contagens de controle, com pedidos/itens inteiramente fictícios."""
+    from decimal import Decimal
+    from unittest.mock import patch
+
+    expected_days = {
+        "2026-11-09": dict(orders=63, operational_items=174, product_cents=1326034),
+        "2026-11-10": dict(orders=63, operational_items=196, product_cents=1445984),
+        "2026-11-11": dict(orders=56, operational_items=148, product_cents=895343),
+        "2026-11-12": dict(orders=22, operational_items=61, product_cents=516617),
+    }
+    orders, items = [], []
+    for day, control in expected_days.items():
+        n = control["orders"]
+        for index in range(n):
+            number = len(orders) + 1
+            amount = control["product_cents"] // n + int(
+                index < control["product_cents"] % n
+            )
+            count = control["operational_items"] // n + int(
+                index < control["operational_items"] % n
+            )
+            o = order(number, day=day, revenue=str(Decimal(amount) / 100))
+            o.update(
+                farmalider_frete="7.90",
+                valor_total_faturamento=str(Decimal(amount + 790) / 100),
+            )
+            orders.append(row("Pedidos_FarmaLider", **o))
+            for position in range(count):
+                value = amount // count + int(position < amount % count)
+                items.append(
+                    row(
+                        "Itens_Pedidos_FarmaLider",
+                        **item(
+                            number,
+                            product="MESMO-SKU",
+                            revenue=str(Decimal(value) / 100),
+                            position=position + 1,
+                        ),
+                    )
+                )
+    generated = build_looker_tables(
+        [],
+        orders,
+        [],
+        snapshot_date="2026-11-12",
+        updated_at="",
+        period_start="2026-11-09",
+        period_end="2026-11-12",
+    )
+    datasets = {
+        "Pedidos_FarmaLider": orders,
+        "Itens_Pedidos_FarmaLider": items,
+        "BI_Clientes_Vendas": records(generated, "BI_Clientes_Vendas"),
+    }
+    path = tmp_path / "cut.sqlite"
+    with closing(Export(path, create=True)) as cut:
+        for table, rows in datasets.items():
+            cut.add(table, rows, "FARMA")
+        manifest = cut.seal(
+            "FARMA", dict(scope="CORTE_COMPLETO", state="READY", revision="legacy")
+        )
+    rev = store.begin(str(uuid4()), "teste", {"source_hash": digest(manifest)})[
+        "revision"
+    ]
+    for table, rows in datasets.items():
+        batch(store, rev, table, rows)
+    with patch("integrations.datastudio.financial_views.assert_operational_items"):
+        receipt = finish(store, rev)
+    proof = dict(segment="FARMA", revision=rev, version=1, days=expected_days)
+    r = diagnose(store, rev, 1, "2026-11-09", "2026-11-12", export=path, expected=proof)
+    assert (
+        r["recuperacao"]["referencia_confere"]
+        and r["recuperacao"]["todos_candidatos_conciliados"]
+    )
+    assert len(r["pedidos"]) == 204
+    assert r == diagnose(
+        store, rev, 1, "2026-11-09", "2026-11-12", export=path, expected=proof
+    )
+    summary = r["recuperacao"]["por_dia"]
+    assert sum(v["candidate_items"] for v in summary.values()) == 579
+    assert sum(v["candidate_cents"] for v in summary.values()) == 4183978
+    assert sum(v["inserted"] for v in summary.values()) == 579
+    assert all(v["candidate_cents"] == v["product_cents"] for v in summary.values())
+    assert all(v["updated"] == v["unchanged"] == 0 for v in summary.values())
+    keys = [i["item_chave"] for d in r["pedidos"] for i in d["recuperacao"]["items"]]
+    assert len(set(keys)) == 579 and store.rows("BI_Itens")["rows"] == []
+    assert (
+        finish(store, rev) == receipt
+    )  # READY legado devolve o recibo sem novo fechamento.
+    proof["days"] = dict(
+        expected_days, **{"2026-11-12": dict(expected_days["2026-11-12"], orders=23)}
+    )
+    assert not diagnose(
+        store, rev, 1, "2026-11-09", "2026-11-12", export=path, expected=proof
+    )["recuperacao"]["referencia_confere"]
+
+
+def test_duplicate_raw_items_are_not_silently_collapsed(store, tmp_path):
+    from collections import defaultdict
+
+    from integrations.datastudio.sales_diagnostic import TABLES, candidate
+
+    rev, path = broken(store, tmp_path)
+    report = diagnose(store, rev, 1, "2026-11-09", "2026-11-12", export=path)
+    key = report["pedidos"][0]["venda_chave"]
+    source = {t: defaultdict(list) for t in TABLES}
+    source["Pedidos_FarmaLider"][key] = [order(1, day="2026-11-09", revenue="10")]
+    source["Itens_Pedidos_FarmaLider"][key] = [
+        item(1, revenue="5"),
+        item(1, revenue="5"),
+    ]
+    result = candidate(
+        dict(venda_chave=key, faturamento_produtos="10"), source, "FARMA"
+    )
+    assert result == dict(action="DUPLICIDADE_OPERACIONAL_BLOQUEADA", items=[])
+
+
+def test_candidate_key_owned_by_another_sale_is_blocked(store, tmp_path):
+    from unittest.mock import patch
+
+    rev, path = broken(store, tmp_path)
+    proposal = diagnose(store, rev, 1, "2026-11-09", "2026-11-12")["pedidos"][0][
+        "recuperacao"
+    ]["items"][0]
+    new = begin(store)
+    batch(store, new, "BI_Itens", [dict(proposal, venda_chave="another-sale")])
+    with patch("integrations.datastudio.financial_views.assert_operational_items"):
+        finish(store, new)
+    report = diagnose(store, new, 2, "2026-11-09", "2026-11-12")
+    assert (
+        report["pedidos"][0]["recuperacao"]["action"]
+        == "CHAVE_BI_VINCULADA_A_OUTRA_VENDA"
+    )
+    assert not report["recuperacao"]["todos_candidatos_conciliados"]

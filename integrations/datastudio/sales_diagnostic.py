@@ -13,7 +13,7 @@ import os
 from collections import Counter, defaultdict
 from contextlib import closing
 from datetime import date
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -131,6 +131,33 @@ def candidate(sale, sources, segment) -> dict[str, Any]:
         return dict(action="RECONCILIAR_HISTORICO_OU_EXCLUSAO", items=[])
     if len(orders) != 1 or not items:
         return dict(action="EXIGE_FONTE_OFICIAL_COMPLETA", items=[])
+    item_keys = [r.get("item_chave", "") for r in items]
+    if not all(item_keys) or len(item_keys) != len(set(item_keys)):
+        return dict(action="DUPLICIDADE_OPERACIONAL_BLOQUEADA", items=[])
+    order_key = orders[0].get("pedido_chave", "")
+    if opaque_key("venda", order_key) != key or any(
+        r.get("pedido_chave") != order_key for r in items
+    ):
+        return dict(action="IDENTIDADE_OPERACIONAL_DIVERGENTE", items=[])
+    try:
+        for r in items:
+            qty, unit, amount = (
+                Decimal(str(r.get(f, "")))
+                for f in ("quantidade", "valor_unitario", "valor_total")
+            )
+            if (
+                not all(v.is_finite() for v in (qty, unit, amount))
+                or qty <= 0
+                or unit < 0
+                or amount < 0
+            ):
+                raise ValueError
+        if sum(cents(r["valor_total"]) for r in items) != cents(
+            sale["faturamento_produtos"]
+        ):
+            raise ValueError
+    except (ValueError, InvalidOperation):
+        return dict(action="EXIGE_RECONCILIACAO_FINANCEIRA_IDENTIDADE", items=[])
     tables = build_looker_tables(
         [],
         orders,
@@ -147,7 +174,7 @@ def candidate(sale, sources, segment) -> dict[str, Any]:
     built_items = [
         dict(zip(SCHEMAS["BI_Itens"], r, strict=True)) for r in tables["BI_Itens"]
     ]
-    if len(built_sales) != 1 or not built_items:
+    if len(built_sales) != 1 or len(built_items) != len(items):
         return dict(action="EXIGE_FONTE_OFICIAL_COMPLETA", items=[])
     built = built_sales[0]
     if (
@@ -178,7 +205,9 @@ def file_hash(path):
         return hashlib.file_digest(f, "sha256").hexdigest()
 
 
-def diagnose(store, revision, version, start, end, *, export=None) -> dict[str, Any]:
+def diagnose(
+    store, revision, version, start, end, *, export=None, expected=None
+) -> dict[str, Any]:
     if date.fromisoformat(start) > date.fromisoformat(end):
         raise StorageError("DS_PERIODO_INVALIDO")
     with store.connect(readonly=True) as conn:
@@ -196,6 +225,23 @@ def diagnose(store, revision, version, start, end, *, export=None) -> dict[str, 
         active = raw_layer(conn, store.schema, keys)
         facts = raw_layer(conn, store.schema, keys, version=version)
         source_hash = rev["evidencia"].get("source_hash")
+        proposed_keys = sorted(
+            {
+                opaque_key("item", r.get("item_chave", ""))
+                for rows in facts["Itens_Pedidos_FarmaLider"].values()
+                for r in rows
+            }
+        )
+        owners = {
+            r["registro"]["item_chave"]: r["registro"]["venda_chave"]
+            for r in conn.execute(
+                sql.SQL(
+                    "SELECT registro FROM {s}.nf_atuais WHERE tabela='BI_Itens' AND registro->>'item_chave'=ANY(%s)"
+                ).format(s=sql.Identifier(store.schema)),
+                (proposed_keys,),
+            )
+        }
+
     cut, cut_sha = None, None
     if export:
         cut_sha = file_hash(export)
@@ -269,6 +315,8 @@ def diagnose(store, revision, version, start, end, *, export=None) -> dict[str, 
         plan: dict[str, Any] = candidate(sale, facts, store.segment)
         if different_current or different_cut:
             plan = dict(action="RECONCILIAR_CAMADAS_ANTES_DE_RECUPERAR", items=[])
+        if any(owners.get(r["item_chave"], key) != key for r in plan["items"]):
+            plan = dict(action="CHAVE_BI_VINCULADA_A_OUTRA_VENDA", items=[])
         existing = {r["item_chave"]: r for r in active["BI_Itens"][key]}
         inserts = sum(r["item_chave"] not in existing for r in plan["items"])
         updates = sum(
@@ -301,6 +349,73 @@ def diagnose(store, revision, version, start, end, *, export=None) -> dict[str, 
             ("faturamento", "faturamento_centavos"),
         ):
             d[target] += cents(sale[field])
+    # Não há descarte silencioso de propostas com a mesma chave entre pedidos.
+    duplicates = Counter(
+        r["item_chave"] for d in details for r in d["recuperacao"]["items"]
+    )
+    for d in details:
+        plan = d["recuperacao"]
+        if any(duplicates[r["item_chave"]] > 1 for r in plan["items"]):
+            plan.update(
+                action="DUPLICIDADE_ENTRE_CANDIDATOS",
+                items=[],
+                inseridos=0,
+                atualizados=0,
+                mantidos=0,
+            )
+    recovery_days = {}
+    for d in details:
+        day = recovery_days.setdefault(
+            d["data"],
+            dict(
+                orders=0,
+                operational_items=0,
+                product_cents=0,
+                candidate_orders=0,
+                candidate_items=0,
+                candidate_cents=0,
+                inserted=0,
+                updated=0,
+                unchanged=0,
+            ),
+        )
+        day["orders"] += 1
+        originals = facts["Itens_Pedidos_FarmaLider"][d["venda_chave"]]
+        day["operational_items"] += len(originals)
+        day["product_cents"] = days[d["data"]]["produtos_centavos"]
+        plan = d["recuperacao"]
+        day["candidate_orders"] += bool(plan["items"])
+        day["candidate_items"] += len(plan["items"])
+        day["candidate_cents"] += sum(cents(r["receita_item"]) for r in plan["items"])
+        for origin, target in (
+            ("inseridos", "inserted"),
+            ("atualizados", "updated"),
+            ("mantidos", "unchanged"),
+        ):
+            day[target] += plan[origin]
+    matched = None
+    if expected is not None:
+        if not export or any(
+            expected.get(k) != v
+            for k, v in (
+                ("segment", store.segment),
+                ("revision", revision),
+                ("version", version),
+            )
+        ):
+            raise StorageError("DS_RECUPERACAO_REFERENCIA_DIVERGENTE")
+        matched = expected.get("days") == {
+            d: {k: v[k] for k in ("orders", "operational_items", "product_cents")}
+            for d, v in recovery_days.items()
+        }
+    recovery = dict(
+        por_dia=recovery_days,
+        referencia_confere=matched,
+        todos_candidatos_conciliados=bool(details)
+        and all(d["recuperacao"]["items"] for d in details),
+        aplicavel=False,
+        exige_nova_revisao=True,
+    )
     result = dict(
         protocol="ds_diagnostico_vendas_1",
         segment=store.segment,
@@ -320,6 +435,7 @@ def diagnose(store, revision, version, start, end, *, export=None) -> dict[str, 
         causas=dict(Counter(r["causa"] for r in details)),
         pedidos=details,
         escrita_real=False,
+        recuperacao=recovery,
     )
     result["plan_hash"] = digest(result)
     return result
@@ -341,6 +457,11 @@ def main():
     parser.add_argument(
         "--export-sha256", help="SHA-256 conferido no Windows antes da transferência"
     )
+    parser.add_argument(
+        "--expected-summary",
+        type=Path,
+        help="Referência privada de contagens por dia para o dry-run",
+    )
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
     if args.export and (
@@ -351,7 +472,15 @@ def main():
         raise StorageError("DS_SAIDA_JA_EXISTE")
     store = Store(args.dsn_file.read_text().strip(), args.environment, args.segment)
     result = diagnose(
-        store, args.revision, args.version, args.start, args.end, export=args.export
+        store,
+        args.revision,
+        args.version,
+        args.start,
+        args.end,
+        export=args.export,
+        expected=json.loads(args.expected_summary.read_text(encoding="utf-8-sig"))
+        if args.expected_summary
+        else None,
     )
     private_json(args.output, result)
     print(
@@ -364,6 +493,7 @@ def main():
                 por_dia=result["por_dia"],
                 camadas_por_dia=result["camadas_por_dia"],
                 causas=result["causas"],
+                recuperacao=result["recuperacao"],
             )
         )
     )

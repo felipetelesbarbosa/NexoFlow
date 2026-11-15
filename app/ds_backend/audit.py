@@ -17,6 +17,9 @@ def audit(path):
 
     with closing(Export(path)) as source:
         manifest = source.manifest()
+        from ds_backend.item_consistency import assert_export_items
+
+        assert_export_items(source.db)
         with tempfile.TemporaryDirectory(prefix="nexoflow-auditoria-pg-") as directory:
             with closing(sqlite3.connect(directory + "/conferencia.sqlite")) as db:
                 # A cópia recebe os índices auxiliares; a evidência permanece query_only.

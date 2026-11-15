@@ -1,5 +1,8 @@
 # Migração Windows/PostgreSQL/Data Studio
 
+**Cortes com BI_Itens defasada:** [guarda de exportação, preparo e fechamento; simulação direcionada dos 204 pedidos](CORTE%20BI%20ITENS%20DEFASADOS%20E%20RECUPERACAO.md). A correção na main requer nova distribuição Windows; não modifica o corte comercial selado nem refaz READY.
+
+
 **Correção posterior de volume do leitor (15/11/2026):** [ABC, resumo e pares no servidor](ABC%20POSTGRESQL%20EM%20VOLUME.md). Preserva fechamento READY existente; implantação somente do leitor FARMA e dos quatro arquivos do conector. ds136 permanece na fonte atual.
 
 **1.5.37 publicada; migração comercial pendente.** Base: `5b21d4799115a490447c483d5a40788cd59eb100`; distribuição anterior: 1.5.36. Código, teste, release, instalação, implantação e conciliação comercial são etapas distintas. O Codex não acessou C: nem executou carga comercial. O Work implanta/concilia VPS e relatório; o operador executa o Terminal Windows.

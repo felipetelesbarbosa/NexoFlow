@@ -1,5 +1,12 @@
 # NexoFlow — Changelog
 
+## Corte PostgreSQL — BI_Itens defasada e recuperação em dry-run (15/11/2026)
+
+- Bloqueio `DS_BI_ITENS_DEFASADOS` na exportação, auditoria/preparo e antes do envio de planos antigos; fechamento transacional protege novas revisões sem invalidar recibos READY existentes.
+- Simulação dirigida usa itens operacionais, concilia cada venda e compara controles por dia; bloqueia duplicidades e chaves de outra venda, sem aplicar dados.
+- [Evidência, testes e comando privado para o Work](docs/CORTE%20BI%20ITENS%20DEFASADOS%20E%20RECUPERACAO.md). Requer nova release/Setup para as guardas Windows; 1.5.40 preservada. Nenhuma recuperação ou implantação comercial executada.
+
+
 ## Leitor PostgreSQL — diagnóstico de vendas e Top de pares (15/11/2026)
 
 - Diagnóstico privado somente leitura compara projeções, fatos versionados e corte original; gera plano determinístico de recuperação em dry-run com cálculo oficial do Analytics, sem aplicar dados ou reabrir READY.

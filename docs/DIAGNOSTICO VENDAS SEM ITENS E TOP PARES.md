@@ -1,5 +1,7 @@
 # FARMA: vendas sem itens e compras juntas em volume
 
+**Atualização posterior:** o Work confirmou o corte e os 579 itens operacionais dos 204 pedidos. A guarda automática e o dry-run reforçado estão no [roteiro de corte defasado](CORTE%20BI%20ITENS%20DEFASADOS%20E%20RECUPERACAO.md). As limitações de prevenção abaixo descrevem a entrega anterior; não a main atual. O escopo Top permanece independente.
+
 Entrega de código de 15/11/2026, continuando `8e8e7c734ca82d4e382e3178208300879fafe0af`. Não implanta serviços, não altera fatos, READY, cortes, assinaturas, publicador, credenciais, ds136 ou relatório oficial. A distribuição Windows permanece 1.5.40.
 
 ## Evidência recebida versus causa comprovada

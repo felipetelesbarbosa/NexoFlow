@@ -209,6 +209,9 @@ def apply(plan_path, client, *, max_batches=None, simulate=False):
         manifest = source.manifest()
         if digest(manifest) != plan["source_hash"]:
             raise StorageError("DS_PLANO_ORIGEM_ALTERADA")
+        from ds_backend.item_consistency import assert_export_items
+
+        assert_export_items(source.db)
         client.call(
             "/v1/revisoes",
             dict(

@@ -183,6 +183,25 @@ def export_sheets(store, path, segment, revision, exclusions):
                 raise StorageError("DS_ORIGEM_ALTERADA_DURANTE_EXPORTACAO")
         if guard()[1] != manifest_hash:
             raise StorageError("DS_MANIFESTO_ORIGEM_ALTERADO")
+        from ds_backend.item_consistency import StaleItems, assert_export_items
+
+        try:
+            assert_export_items(output.db)
+        except StaleItems as error:
+            # Conservar o novo corte como evidência INCOMPLETA, sem selo READY.
+            output.db.commit()
+            private_json(
+                Path(path).with_suffix(".diagnostico.json"),
+                dict(
+                    diagnostic="bi_itens_defasados_v1",
+                    segment=segment,
+                    revision=revision,
+                    state="BLOQUEADO",
+                    por_dia=error.counts,
+                    source_consistency="DRIVE_E_MANIFESTO_CONFERIDOS",
+                ),
+            )
+            raise
         return output.seal(
             segment,
             dict(

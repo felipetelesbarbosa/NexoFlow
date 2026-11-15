@@ -117,6 +117,8 @@ def create_financial_views(conn):
 def assert_financial(conn, schema):
     from ds_backend.contract import StorageError
 
+    assert_operational_items(conn, schema)
+
     # Agregar cada grão antes do relacionamento: não multiplicar o cabeçalho
     # pelo número de itens nem somar LTV por mês/contato.
     mismatch = conn.execute(
@@ -140,3 +142,37 @@ def assert_financial(conn, schema):
     ).fetchone()
     if mismatch:
         raise StorageError("DS_CONFERENCIA_LTV_DIVERGENTE")
+
+
+def assert_operational_items(conn, schema):
+    """Guarda transacional de novos READY; históricos têm validação própria."""
+    from ds_backend.contract import StorageError
+
+    mismatch = conn.execute(
+        sql.SQL("""WITH omitidas AS MATERIALIZED (
+      SELECT substring(encode(sha256(convert_to('venda:FARMALIDER:'||pedido_id,'UTF8')),'hex'),1,32) AS venda_chave
+      FROM {s}.ds_historico_pedidos UNION
+      SELECT substring(encode(sha256(convert_to('venda:FARMALIDER:'||pedido_id,'UTF8')),'hex'),1,32)
+      FROM {s}.ds_exclusoes_publicacao
+    ), itens AS MATERIALIZED (
+      SELECT venda_chave,count(*) AS n,count(DISTINCT item_chave) AS chaves,
+      sum(round(receita_item*100)) AS centavos,
+      bool_and(coalesce(quantidade>0 AND receita_item>=0 AND
+        quantidade::text NOT IN ('NaN','Infinity','-Infinity') AND
+        receita_item::text NOT IN ('NaN','Infinity','-Infinity') AND
+        nullif(item_chave,'') IS NOT NULL,false)) AS validos,
+      min(data) AS inicio,max(data) AS fim,min(cliente_chave) AS cliente_min,max(cliente_chave) AS cliente_max
+      FROM {s}.ds_bi_itens_operacional GROUP BY venda_chave
+    ) SELECT 1 FROM {s}.ds_bi_clientes_vendas_operacional v
+    LEFT JOIN omitidas h USING(venda_chave) LEFT JOIN itens i USING(venda_chave)
+    WHERE h.venda_chave IS NULL AND (nullif(v.venda_chave,'') IS NULL OR v.data IS NULL
+      OR v.faturamento_produtos IS NULL OR v.faturamento_produtos<0
+      OR v.faturamento_produtos::text IN ('NaN','Infinity','-Infinity')
+      OR i.n IS NULL OR NOT i.validos OR i.n<>i.chaves
+      OR round(v.faturamento_produtos*100) IS DISTINCT FROM i.centavos
+      OR v.data IS DISTINCT FROM i.inicio OR v.data IS DISTINCT FROM i.fim
+      OR v.cliente_chave IS DISTINCT FROM i.cliente_min OR v.cliente_chave IS DISTINCT FROM i.cliente_max)
+    LIMIT 1""").format(s=sql.Identifier(schema))
+    ).fetchone()
+    if mismatch:
+        raise StorageError("DS_BI_ITENS_DEFASADOS")
