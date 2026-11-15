@@ -227,7 +227,7 @@ def test_diagnostic_cli_hash_private_file_and_nonzero_block(
     assert store.rows("BI_Itens")["rows"] == []
 
 
-def test_recovery_204_sales_579_items_exact_daily_control_dry_run(store, tmp_path):
+def recovery_fixture_204(store, tmp_path):
     """Mesmas contagens de controle, com pedidos/itens inteiramente fictícios."""
     from unittest.mock import patch
 
@@ -322,6 +322,12 @@ def test_recovery_204_sales_579_items_exact_daily_control_dry_run(store, tmp_pat
     assert not diagnose(
         store, rev, 1, "2026-11-09", "2026-11-12", export=path, expected=proof
     )["recuperacao"]["referencia_confere"]
+
+    return rev, path, r
+
+
+def test_recovery_204_sales_579_items_exact_daily_control_dry_run(store, tmp_path):
+    recovery_fixture_204(store, tmp_path)
 
 
 def test_duplicate_raw_items_are_not_silently_collapsed(store, tmp_path):

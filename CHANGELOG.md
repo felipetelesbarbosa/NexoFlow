@@ -1,5 +1,10 @@
 # NexoFlow — Changelog
 
+## Recuperação FARMA em nova revisão — código e testes isolados
+
+- Comando administrativo verifica o hash do dry-run e reproduz evidências antes de criar revisão nova; insere somente BI_Itens ausentes em lotes determinísticos, com retomada por recibos e fechamento financeiro transacional.
+- Conferência consistente do ABC e controles por dia; abort/rollback preservam a origem READY, fatos e corte. [Roteiro de aplicação futura e reversão](docs/RECUPERACAO%20FARMA%20NOVA%20REVISAO.md). Nenhuma aplicação em produção.
+
 ## Diagnóstico PostgreSQL — consulta histórica em volume (15/11/2026)
 
 - CHECK usa LEFT JOIN com chaves históricas distintas materializadas uma vez, preservando semântica, centavos e timeout.

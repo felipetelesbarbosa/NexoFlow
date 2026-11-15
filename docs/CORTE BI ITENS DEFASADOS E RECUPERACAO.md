@@ -112,3 +112,5 @@ A regressão PostgreSQL usa 50.003 pedidos históricos distintos, chaves repetid
 Para usar o ajuste, o Work deve construir apenas uma imagem temporária do novo SHA aprovado e executar o MESMO comando do dry-run, em outra pasta de saída. Não exige nova exportação, coleta, migração, reenvio, fechamento ou troca de serviços ativos. Preservar a simulação anterior, o corte, seus hashes e a revisão READY. O Windows 1.5.41 continua utilizável: este ajuste é do diagnóstico executado no contêiner; não exige nova release Windows para o roteiro da VPS.
 
 Validação desta otimização: 134 testes PostgreSQL aprovados, um smoke de imagem ignorado localmente e executado no CI; Ruff, tipos app e segredos aprovados. O teste de volume falhou antes da correção por 204 varreduras e passou após a mudança com uma única varredura.
+
+O fluxo de aplicação em revisão NOVA foi implementado posteriormente e testado somente em PostgreSQL isolado. Ver [roteiro de recuperação e reversão](RECUPERACAO%20FARMA%20NOVA%20REVISAO.md). O dry-run original continua não aplicável por si só, e não há aplicação comercial autorizada nesta etapa.

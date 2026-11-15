@@ -24,22 +24,26 @@ pytestmark = pytest.mark.skipif(
 def test_image_health_private_http_and_no_reader_write(store):  # noqa: F811
     assert DSN and "application_name=nexoflow-datastudio-tests" in DSN
     # O diagnóstico deve importar também o cálculo oficial na imagem mínima.
-    subprocess.run(
-        [
-            "docker",
-            "run",
-            "--rm",
-            "--network=none",
-            "--read-only",
-            IMAGE,
-            "python",
-            "-m",
-            "integrations.datastudio.sales_diagnostic",
-            "--help",
-        ],
-        check=True,
-        capture_output=True,
-    )
+    for module in (
+        "integrations.datastudio.sales_diagnostic",
+        "integrations.datastudio.sales_recovery",
+    ):
+        subprocess.run(
+            [
+                "docker",
+                "run",
+                "--rm",
+                "--network=none",
+                "--read-only",
+                IMAGE,
+                "python",
+                "-m",
+                module,
+                "--help",
+            ],
+            check=True,
+            capture_output=True,
+        )
     token = "synthetic-test-" + secrets.token_hex(24)
     password = secrets.token_hex(24)
     with store.connect() as conn:

@@ -157,7 +157,7 @@ class Store:
         )
         return row
 
-    def begin(self, revision, purpose, evidence):
+    def begin(self, revision, purpose, evidence, *, expected_base=None):
         revision = identifier(revision)
         if purpose == "teste" and self.environment != "homologacao":
             raise StorageError("DS_TESTE_EM_PRODUCAO")
@@ -175,6 +175,8 @@ class Store:
             raise StorageError("DS_ESCOPO_INVALIDO")
         with self.connect() as conn:
             base = self.active(conn, lock=True)
+            if expected_base is not None and base != expected_base:
+                raise StorageError("DS_BASE_RECUPERACAO_ALTERADA")
             if not base and purpose not in ("migracao", "teste"):
                 raise StorageError("DS_CORTE_INICIAL_NAO_CONFIRMADO")
             old = conn.execute(
