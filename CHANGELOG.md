@@ -1,5 +1,11 @@
 # NexoFlow — Changelog
 
+## Leitor PostgreSQL — diagnóstico de vendas e Top de pares (15/11/2026)
+
+- Diagnóstico privado somente leitura compara projeções, fatos versionados e corte original; gera plano determinístico de recuperação em dry-run com cálculo oficial do Analytics, sem aplicar dados ou reabrir READY.
+- Compras juntas ganha escopo Top N explícito, calculado sobre o universo completo, com quantidade de pares e versão verificadas. Modo completo, limites, guardas financeiras e base incompleta preservados.
+- Publicador, fatos, ds136 e fontes oficiais não alterados. [Roteiro de execução e reversão](docs/DIAGNOSTICO%20VENDAS%20SEM%20ITENS%20E%20TOP%20PARES.md).
+
 ## Leitor PostgreSQL — ABC em volume (15/11/2026; sem distribuição Windows)
 
 - Agregação ABC, resumo e compras juntas no servidor, com leitura consistente da mesma revisão READY e paridade do núcleo legado; preservado o hotfix de plano SQL bba86d0.

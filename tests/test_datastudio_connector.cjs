@@ -175,3 +175,14 @@ test('ABC mantém prazo e recusa resultado completo que chegou tarde',()=>{
  const r=request(['produto_codigo']);r.configParams.tabela='ABC_abc';r.dimensionsFilters=[];
  assert.throws(()=>f.ctx.getData(r),/DS_PRAZO_CONSULTA/);
 });
+
+test('Top pares é explícito, tem universo verificado e não permite filtro silencioso',()=>{
+ const req=request(['produto_a_codigo','pedidos_juntos']);
+ req.configParams.tabela='ABC_juntos';req.configParams.pares_escopo='TOP';req.configParams.pares_limite='25';req.dimensionsFilters=[];
+ const f=fixture(p=>{assert.equal(p.top,25);assert.equal(p.mode,undefined);const r=result(p,[['001',2]]);r.body.scope={kind:'TOP_PARES',requested:25,universe_pairs:1,selected_pairs:1,all_pairs_returned:true};return r;});
+ assert.equal(f.ctx.getData(req).rows.length,1);assert.ok(f.calls[0].url.endsWith('/v1/abc/pares'));
+ assert.ok(f.logs.some(x=>x.includes('top_pares_v1')));
+ const bad=fixture(p=>result(p,[['001',2]]));assert.throws(()=>bad.ctx.getData(req),/DS_RESPOSTA_INCOMPLETA/);
+ req.dimensionsFilters=[[{fieldName:'produto_a_codigo',operator:'EQUALS',values:['001'],type:'INCLUDE'}]];
+ assert.throws(()=>f.ctx.getData(req),/DS_TOP_PARES_FILTRO_NAO_SUPORTADO/);
+});

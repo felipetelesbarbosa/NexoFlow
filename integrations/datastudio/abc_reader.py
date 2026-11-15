@@ -68,22 +68,39 @@ def decimal_json(value):
     return json.loads(value, parse_float=Decimal)
 
 
-def aggregates(conn, schema, start, end, mode, limit):
+def aggregates(conn, schema, start, end, mode, limit, *, top=None):
     """Uma instrução, resultado limitado por produtos/pares, nunca por itens."""
     if mode == "juntos":
+        # Top N seleciona somente depois de agregar todos os pares do período.
+        # As cláusulas abaixo são constantes; datas/limite continuam parâmetros.
+        universe = (
+            ", universo AS (SELECT count(*) AS n FROM pares)" if top is not None else ""
+        )
+        ordering = (
+            'ORDER BY p.pedidos DESC,p.a COLLATE "C",p.b COLLATE "C"'
+            if top is not None
+            else ""
+        )
+        scope = "(SELECT n FROM universo) AS universo," if top is not None else ""
         query = (
             BASE
             + """, skus AS MATERIALIZED (
           SELECT DISTINCT venda_chave,sku FROM i,validacao
           WHERE sku<>'' AND ok AND NOT pares_excessivos
-        ), pares AS (
+        ), pares AS MATERIALIZED (
           SELECT a.sku AS a,b.sku AS b,count(*) AS pedidos
           FROM skus a JOIN skus b ON a.venda_chave=b.venda_chave AND a.sku COLLATE "C"<b.sku COLLATE "C"
           GROUP BY a.sku,b.sku
-        ), saida AS (
+        )"""
+            + universe
+            + """, saida AS (
           SELECT p.*,na.nome AS nome_a,nb.nome AS nome_b FROM pares p
-          JOIN nomes na ON na.produto=p.a JOIN nomes nb ON nb.produto=p.b LIMIT %s
-        ) SELECT v.ok,v.pares_excessivos,v.precisao_excedida,to_jsonb(o) AS registro
+          JOIN nomes na ON na.produto=p.a JOIN nomes nb ON nb.produto=p.b """
+            + ordering
+            + """ LIMIT %s
+        ) SELECT v.ok,v.pares_excessivos,v.precisao_excedida,"""
+            + scope
+            + """to_jsonb(o) AS registro
           FROM validacao v LEFT JOIN saida o ON true"""
         )
     elif mode == "resumo":
@@ -143,7 +160,7 @@ def aggregates(conn, schema, start, end, mode, limit):
     set_json_loads(decimal_json, conn)
     rows = conn.execute(
         sql.SQL(query).format(s=sql.Identifier(schema)),
-        (start, end, start, end, limit + 1),
+        (start, end, start, end, top if top is not None else limit + 1),
     ).fetchall()
     if not rows or not rows[0]["ok"]:
         raise StorageError("DS_ABC_BASE_INCOMPLETA")
@@ -154,7 +171,7 @@ def aggregates(conn, schema, start, end, mode, limit):
     result = [r["registro"] for r in rows if r["registro"] is not None]
     if len(result) > limit:
         raise StorageError("DS_CONSULTA_EXCEDE_LIMITE_USE_RESUMO_OU_PERIODO")
-    return result
+    return (result, rows[0]["universo"]) if top is not None else result
 
 
 def js_order(value):

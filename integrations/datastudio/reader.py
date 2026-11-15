@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from datetime import date
 from decimal import Decimal
+from typing import Any
 
 from psycopg import sql
 from psycopg.rows import dict_row
@@ -30,7 +31,15 @@ def view_name(name):
 
 
 class Reader(Store):
+    def pairs(self, fields, start, end, top):
+        if type(top) is not int or not 1 <= top <= 1000:
+            raise StorageError("DS_TOP_PARES_INVALIDO")
+        return self._abc("juntos", fields, start, end, top=top)
+
     def abc(self, mode, fields, start, end):
+        return self._abc(mode, fields, start, end)
+
+    def _abc(self, mode, fields, start, end, *, top=None):
         from integrations.datastudio.abc_reader import FIELDS, aggregates, calculate
 
         if not isinstance(mode, str) or mode not in FIELDS:
@@ -55,9 +64,26 @@ class Reader(Store):
             # Preserva o hotfix bba86d0 também no caminho ABC. A mesma transação
             # REPEATABLE READ contém versão, itens, vendas e validações.
             conn.execute("SET LOCAL enable_nestloop=off")
-            records = aggregates(conn, self.schema, start, end, mode, MAX_RESULT_ROWS)
+            records = aggregates(
+                conn, self.schema, start, end, mode, MAX_RESULT_ROWS, top=top
+            )
+        universe = None
+        if top is not None:
+            records, universe = records
         rows = calculate(records, start, end, mode)
-        return self.result(version, fields, rows)
+        if top is not None:
+            for row in rows:
+                row["periodo_rotulo"] += f" | Top {len(rows)} de {universe} pares"
+        result: dict[str, Any] = self.result(version, fields, rows)
+        if top is not None:
+            result["scope"] = dict(
+                kind="TOP_PARES",
+                requested=top,
+                universe_pairs=universe,
+                selected_pairs=len(rows),
+                all_pairs_returned=universe == len(rows),
+            )
+        return result
 
     def info(self):
         with self.connect() as conn:

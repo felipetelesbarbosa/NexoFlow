@@ -206,3 +206,7 @@ A correção posterior à 1.5.37 permite a ordem física registrada no manifesto
 ## Fechamento selado em volume — correção de servidor
 
 Para a revisão FARMA já selada e o caso de itens operacionais incompletos, seguir o [procedimento administrativo local validado](FECHAMENTO%20SELADO%20FARMA%20ITENS%20HISTORICOS.md). O fechamento HTTP pode exceder o prazo do cliente/proxy para milhões de registros. O comando local usa a mesma intenção e validações, escreve em blocos na mesma transação e emite o recibo READY sem nova exportação ou coleta.
+
+## Complemento: vendas sem itens e Top de pares
+
+Ver [diagnóstico privado, escopo explícito de volume e roteiro do Work](DIAGNOSTICO%20VENDAS%20SEM%20ITENS%20E%20TOP%20PARES.md). Preservados publicador, READY, contratos, aliases e ds136. A investigação dos 204 casos exige comparar o corte original confirmado com os fatos; o diagnóstico não aplica recuperação. O modo COMPLETO de compras juntas continua padrão, e Top exige escolha explícita na cópia.

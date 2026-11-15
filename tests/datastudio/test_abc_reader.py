@@ -222,7 +222,8 @@ def test_inconsistent_base_fails_instead_of_empty_or_partial(store, problem):
             reader.abc(mode, ["periodo_inicio"], "2026-11-01", "2026-11-02")
 
 
-def test_abc_version_change_reads_one_complete_ready_snapshot(store, monkeypatch):
+@pytest.mark.parametrize("top", [False, True])
+def test_abc_version_change_reads_one_complete_ready_snapshot(store, monkeypatch, top):
     from tests.datastudio.test_ds_database import batch
 
     items, _ = seed(store, 6)
@@ -237,11 +238,19 @@ def test_abc_version_change_reads_one_complete_ready_snapshot(store, monkeypatch
         return version
 
     monkeypatch.setattr(reader, "active", active)
-    old = reader.abc("resumo", ["skus_distintos"], "2026-11-01", "2026-11-02")
+    old = (
+        reader.pairs(["pedidos_juntos"], "2026-11-01", "2026-11-02", 25)
+        if top
+        else reader.abc("resumo", ["skus_distintos"], "2026-11-01", "2026-11-02")
+    )
     assert old["version"] == 1 and old["rows"] == [[2]]
     monkeypatch.setattr(reader, "active", original)
-    new = reader.abc("resumo", ["skus_distintos"], "2026-11-01", "2026-11-02")
-    assert new["version"] == 2 and new["rows"] == [[3]]
+    new = (
+        reader.pairs(["pedidos_juntos"], "2026-11-01", "2026-11-02", 25)
+        if top
+        else reader.abc("resumo", ["skus_distintos"], "2026-11-01", "2026-11-02")
+    )
+    assert new["version"] == 2 and new["rows"] == ([[2], [1], [1]] if top else [[3]])
     pet = Reader(DSN, "homologacao", "PET")
     with pytest.raises(StorageError, match="SEM_PUBLICACAO"):
         pet.abc("abc", ["produto_codigo"], "2026-11-01", "2026-11-02")
@@ -277,6 +286,14 @@ def test_abc_endpoint_permissions_no_write_and_no_partial_limit(store, monkeypat
     response = client.post("/v1/abc", json=payload, headers=headers)
     assert response.status_code == 200 and len(response.json()["rows"]) == 2
     assert client.post("/v1/lotes", json={}, headers=headers).status_code == 404
+    pairs_payload = dict(
+        fields=["pedidos_juntos"], start="2026-11-01", end="2026-11-02", top=25
+    )
+    assert client.post("/v1/abc/pares", json=pairs_payload).status_code == 401
+    pairs_response = client.post("/v1/abc/pares", json=pairs_payload, headers=headers)
+    assert pairs_response.status_code == 200
+    assert pairs_response.json()["scope"]["universe_pairs"] == 1
+    assert pairs_response.json()["rows"] == [[2]]
     monkeypatch.setattr("integrations.datastudio.reader.MAX_RESULT_ROWS", 1)
     response = client.post("/v1/abc", json=payload, headers=headers)
     assert response.status_code == 409 and "rows" not in response.json()
@@ -404,7 +421,7 @@ def test_abc_timeout_is_explicit_not_empty(store, monkeypatch):
 
     seed(store, 3)
 
-    def fail(*args):
+    def fail(*args, **kwargs):
         raise psycopg.errors.QueryCanceled("private SQL must not leak")
 
     monkeypatch.setattr("integrations.datastudio.abc_reader.aggregates", fail)
@@ -522,3 +539,56 @@ def test_sql_summary_class_boundaries_match_core(store, revenues):
             assert float(value) == pytest.approx(expected[key], abs=1e-12)
         else:
             assert value == expected[key]
+
+
+def test_pairs_explicit_top_validates_entire_universe(store):
+    seed(store, 975)
+    with store.connect() as conn:
+        conn.execute("""UPDATE farma.nf_atuais SET registro=registro||
+          jsonb_build_object('venda_chave','s0','produto_codigo',
+          lpad((substring(registro->>'item_chave',2)::int % 325)::text,3,'0'))
+          WHERE tabela='BI_Itens'""")
+        conn.execute("DELETE FROM farma.nf_atuais WHERE tabela='BI_Clientes_Vendas'")
+        r = row(
+            "BI_Clientes_Vendas",
+            venda_chave="s0",
+            data="2026-11-01",
+            faturamento_produtos="97.50",
+            frete="99",
+            faturamento="196.50",
+        )
+        conn.execute(
+            "INSERT INTO farma.nf_atuais VALUES(%s,%s,%s)",
+            ("BI_Clientes_Vendas", record_key("BI_Clientes_Vendas", r), Jsonb(r)),
+        )
+        conn.execute(
+            "UPDATE farma.nf_atuais SET registro=registro||'{\"data\":\"2026-11-01\"}'::jsonb WHERE tabela='BI_Itens'"
+        )
+    reader = Reader(DSN, "homologacao", "FARMA")
+    with pytest.raises(StorageError, match="EXCEDE_LIMITE"):
+        reader.abc("juntos", ["pedidos_juntos"], "2026-01-01", "2026-11-08")
+    r = reader.pairs(
+        ["produto_a_codigo", "produto_b_codigo", "pedidos_juntos", "periodo_rotulo"],
+        "2026-01-01",
+        "2026-11-08",
+        25,
+    )
+    assert r["complete"] and r["version"] == 1
+    assert r["scope"] == dict(
+        kind="TOP_PARES",
+        requested=25,
+        universe_pairs=52650,
+        selected_pairs=25,
+        all_pairs_returned=False,
+    )
+    assert len(r["rows"]) == 25 and r["rows"][0][:3] == ["000", "001", 1]
+    assert "Top 25 de 52650 pares" in r["rows"][0][3]
+    empty = reader.pairs(["pedidos_juntos"], "2026-11-30", "2026-11-30", 25)
+    assert empty["rows"] == [] and empty["scope"]["universe_pairs"] == 0
+    for invalid in (True, 0, 1001, "25"):
+        with pytest.raises(StorageError, match="TOP_PARES_INVALIDO"):
+            reader.pairs(["pedidos_juntos"], "2026-01-01", "2026-11-08", invalid)
+    with store.connect() as conn:
+        conn.execute("DELETE FROM farma.nf_atuais WHERE tabela='BI_Itens'")
+    with pytest.raises(StorageError, match="DS_ABC_BASE_INCOMPLETA"):
+        reader.pairs(["pedidos_juntos"], "2026-01-01", "2026-11-08", 25)

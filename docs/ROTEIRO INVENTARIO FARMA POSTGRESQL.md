@@ -111,3 +111,7 @@ Inventário real: fornecido pelo Work, não nova inspeção Google do Codex. Có
 - A primeira tentativa de smoke Docker não iniciou o contêiner em um workspace quase cheio. Removidas somente imagens de teste antigas desta sessão; reconstrução e repetição completas aprovadas. Nenhum volume/backup da VPS foi acessado ou removido.
 
 CI/CodeQL devem ser conferidos no SHA informado na entrega. Nenhum pacote Windows novo foi gerado, e a release 1.5.37 permanece intacta.
+
+## Complemento: vendas sem itens e Top de pares
+
+Ver [diagnóstico privado, escopo explícito de volume e roteiro do Work](DIAGNOSTICO%20VENDAS%20SEM%20ITENS%20E%20TOP%20PARES.md). Preservados publicador, READY, contratos, aliases e ds136. A investigação dos 204 casos exige comparar o corte original confirmado com os fatos; o diagnóstico não aplica recuperação. O modo COMPLETO de compras juntas continua padrão, e Top exige escolha explícita na cópia.

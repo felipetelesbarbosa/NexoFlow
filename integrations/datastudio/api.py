@@ -68,6 +68,10 @@ def create_app(store, token, *, reader=False):
 
     if reader:
 
+        @api.post("/v1/abc/pares")
+        async def pairs(request: Request):
+            return await invoke(request, store.pairs, ("fields", "start", "end", "top"))
+
         @api.post("/v1/abc")
         async def abc(request: Request):
             return await invoke(request, store.abc, ("mode", "fields", "start", "end"))

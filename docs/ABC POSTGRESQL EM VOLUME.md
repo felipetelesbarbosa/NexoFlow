@@ -79,3 +79,7 @@ Testar também `abc` (produto_codigo, unidades, receita_produtos, pedidos, class
 7. Registrar horários America/Belem, SHA do leitor e da implantação, versão READY, parâmetros, duração, número de linhas de saída, resultados e divergências sanitizadas. Somente os testes na cópia liberam a decisão posterior sobre o relatório oficial; esta tarefa não faz a troca.
 
 **Reversão:** restaurar a imagem anterior apenas do leitor FARMA e a implantação anterior do conector na cópia. O leitor anterior não tem `/v1/abc`, portanto os dois componentes devem voltar juntos. Voltar `modo_consulta` a `detalhe` onde tiver sido testado. Não executar rollback de fatos, admin, reenvio, nova exportação, nova coleta ou novo fechamento: a revisão READY e os 2.775 recibos / 2.750.730 registros informados pelo Work são preservados.
+
+## Complemento: vendas sem itens e Top de pares
+
+Ver [diagnóstico privado, escopo explícito de volume e roteiro do Work](DIAGNOSTICO%20VENDAS%20SEM%20ITENS%20E%20TOP%20PARES.md). Preservados publicador, READY, contratos, aliases e ds136. A investigação dos 204 casos exige comparar o corte original confirmado com os fatos; o diagnóstico não aplica recuperação. O modo COMPLETO de compras juntas continua padrão, e Top exige escolha explícita na cópia.

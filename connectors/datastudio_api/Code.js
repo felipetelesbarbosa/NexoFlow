@@ -19,6 +19,12 @@ function getConfig(request){
   Object.keys(NexoDSSchemas).forEach(function(v){table.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
   var query=config.newSelectSingle().setId('modo_consulta').setName('Leitura: detalhe ou somas homologadas');
   ['detalhe','somas'].forEach(function(v){query.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
+  if(p.tabela==='ABC_juntos'){
+    var scope=config.newSelectSingle().setId('pares_escopo').setName('Compras juntas: universo completo ou Top explícito');
+    ['COMPLETO','TOP'].forEach(function(v){scope.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
+    var top=config.newSelectSingle().setId('pares_limite').setName('Top de pares (exibir o escopo no título do gráfico)');
+    ['10','25','50','100','250','500','1000'].forEach(function(v){top.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
+  }
   var grain=config.newSelectSingle().setId('recorte_historico').setName('Resumo histórico: grão');
   ['MES','ANO','TOTAL','SEM_EMISSAO'].forEach(function(v){grain.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
   config.setIsSteppedConfig(!NexoDSSchemas[p.tabela]);
@@ -145,7 +151,20 @@ function dsAbcData_(request,c,spec){
   if(names.some(function(n){return !spec.columns.includes(n);}))throw new Error('DS_CAMPOS_NAO_AUTORIZADOS');
   var responseSchema=dsFields_(request.configParams.tabela).forIds(names).build();
   names=responseSchema.map(function(f){return f.name;});
-  var r=dsCall_(c,'/v1/abc',{mode:spec.abc_mode,fields:names,start:range.startDate,end:range.endDate});
+  var p=request.configParams,top=null;
+  if(spec.abc_mode==='juntos'&&p.pares_escopo&&p.pares_escopo!=='COMPLETO'){
+    if(p.pares_escopo!=='TOP'||!['10','25','50','100','250','500','1000'].includes(p.pares_limite))throw new Error('DS_TOP_PARES_INVALIDO');
+    if((request.dimensionsFilters||[]).length)throw new Error('DS_TOP_PARES_FILTRO_NAO_SUPORTADO');
+    top=Number(p.pares_limite);
+  }
+  var payload={fields:names,start:range.startDate,end:range.endDate};
+  if(top===null)payload.mode=spec.abc_mode;else payload.top=top;
+  var r=dsCall_(c,top===null?'/v1/abc':'/v1/abc/pares',payload);
+  if(top!==null){
+    var sc=r.scope;
+    if(!sc||sc.kind!=='TOP_PARES'||sc.requested!==top||!Number.isSafeInteger(sc.universe_pairs)||sc.universe_pairs<0||sc.selected_pairs!==Math.min(top,sc.universe_pairs)||!Array.isArray(r.rows)||r.rows.length!==sc.selected_pairs||sc.all_pairs_returned!==(sc.universe_pairs===sc.selected_pairs))throw new Error('DS_RESPOSTA_INCOMPLETA');
+    console.error(JSON.stringify({diagnostico:'top_pares_v1',versao:r.version,selecionados:sc.selected_pairs,universo:sc.universe_pairs}));
+  }else if(r.scope)throw new Error('DS_RESPOSTA_INCOMPLETA');
   if(Date.now()-started>45000)throw new Error('DS_PRAZO_CONSULTA');
   var db=c.environment==='producao'?'nexoflow_datastudio':'nexoflow_datastudio_homologacao';
   if(r.protocol!==c.protocol||r.target!==db+'.'+c.segment.toLowerCase()||r.segment!==c.segment||r.environment!==c.environment||r.schema_hash!==NexoDSSchemaHash)throw new Error('DS_CONTRATO_DESTINO_DIVERGENTE');
