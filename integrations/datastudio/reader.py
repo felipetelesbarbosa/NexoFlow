@@ -182,6 +182,10 @@ class Reader(Store):
                     raise StorageError(
                         "DS_COMPRADORES_EXIGEM_COMPETENCIA_OU_RECORTE_UNICO"
                     )
+            if table == "BI_Itens":
+                # As visões históricas sobre JSONB subestimam a cardinalidade
+                # dos itens por venda e podem escolher laços quadráticos.
+                conn.execute("SET LOCAL enable_nestloop=off")
             rows = conn.execute(
                 statement + sql.SQL(" LIMIT %s"), [*params, MAX_RESULT_ROWS + 1]
             ).fetchall()
