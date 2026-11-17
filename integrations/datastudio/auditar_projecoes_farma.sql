@@ -85,6 +85,8 @@ WITH grupos AS (
            count(nullif(btrim(pedido_id),'')) -
                count(DISTINCT nullif(btrim(pedido_id),'')) AS linhas_duplicadas,
            count(*) FILTER (WHERE venda_valida=1 AND nullif(btrim(pedido_id),'') IS NULL) AS validos_sem_id,
+           coalesce(sum(round(pedido_faturamento_total*100) - round(pedido_frete*100))
+               FILTER (WHERE venda_valida=1),0) AS produtos,
            coalesce(sum(round(pedido_frete*100)) FILTER (WHERE venda_valida=1),0) AS frete,
            coalesce(sum(round(pedido_faturamento_total*100)) FILTER (WHERE venda_valida=1),0) AS total
     FROM farma.ds_bi_pedidos WHERE data BETWEEN :'inicio' AND :'fim'
@@ -103,24 +105,30 @@ WITH fontes AS (
 ), diferencas AS (
     SELECT recorte, r AS resumo, v AS vendas, i AS itens, p AS pedidos,
            coalesce((r->>'produtos')::numeric,0) - coalesce((i->>'produtos')::numeric,0) AS resumo_menos_itens_centavos,
-           coalesce((r->>'produtos')::numeric,0) - coalesce((v->>'produtos')::numeric,0) AS resumo_menos_vendas_centavos,
            coalesce((r->>'unidades')::numeric,0) - coalesce((i->>'unidades')::numeric,0) AS delta_unidades,
-           coalesce((r->>'pedidos')::numeric,0) = coalesce((v->>'pedidos')::numeric,0)
-               AND coalesce((r->>'pedidos')::numeric,0) = coalesce((i->>'pedidos')::numeric,0)
-               AND coalesce((r->>'pedidos')::numeric,0) = coalesce((p->>'pedidos')::numeric,0) AS contagens_ok,
-           coalesce((r->>'frete')::numeric,0) = coalesce((v->>'frete')::numeric,0)
-               AND coalesce((r->>'frete')::numeric,0) = coalesce((p->>'frete')::numeric,0) AS frete_ok,
-           coalesce((r->>'total')::numeric,0) = coalesce((v->>'total')::numeric,0)
-               AND coalesce((r->>'total')::numeric,0) = coalesce((p->>'total')::numeric,0)
-               AND coalesce((r->>'total')::numeric,0) = coalesce((r->>'produtos')::numeric,0) + coalesce((r->>'frete')::numeric,0) AS total_ok,
+           coalesce((i->>'pedidos')::bigint,0) = coalesce((v->>'pedidos')::bigint,0) AS pedidos_com_itens_ok,
+           coalesce((r->>'pedidos')::numeric,0) - coalesce((v->>'pedidos')::numeric,0) AS resumo_menos_vendas_pedidos,
+           coalesce((r->>'produtos')::numeric,0) - coalesce((v->>'produtos')::numeric,0) AS resumo_menos_vendas_produtos_centavos,
+           coalesce((r->>'frete')::numeric,0) - coalesce((v->>'frete')::numeric,0) AS resumo_menos_vendas_frete_centavos,
+           coalesce((r->>'total')::numeric,0) - coalesce((v->>'total')::numeric,0) AS resumo_menos_vendas_total_centavos,
+           coalesce((p->>'pedidos')::bigint,0) - coalesce((v->>'pedidos')::bigint,0) AS pedidos_menos_vendas_linhas_validas,
+           coalesce((p->>'produtos')::numeric,0) - coalesce((v->>'produtos')::numeric,0) AS pedidos_menos_vendas_produtos_centavos,
+           coalesce((p->>'frete')::numeric,0) - coalesce((v->>'frete')::numeric,0) AS pedidos_menos_vendas_frete_centavos,
+           coalesce((p->>'total')::numeric,0) - coalesce((v->>'total')::numeric,0) AS pedidos_menos_vendas_total_centavos,
+           coalesce((p->>'linhas_duplicadas')::bigint,0) AS linhas_duplicadas_por_id,
+           coalesce((r->>'total')::numeric,0) = coalesce((r->>'produtos')::numeric,0) + coalesce((r->>'frete')::numeric,0) AS total_ok,
            coalesce((p->>'validos_sem_id')::bigint,0) + coalesce((p->>'linhas_duplicadas')::bigint,0)
                + coalesce((v->>'chaves_invalidas')::bigint,0) + coalesce((i->>'chaves_invalidas')::bigint,0) = 0 AS chaves_ok,
            coalesce((r->>'campos_ausentes')::bigint,0) + coalesce((v->>'campos_ausentes')::bigint,0)
                + coalesce((i->>'campos_ausentes')::bigint,0) + coalesce((p->>'campos_ausentes')::bigint,0) = 0 AS campos_ok
     FROM dias
 ), relatorio AS (
-    SELECT *, resumo_menos_itens_centavos=0 AND resumo_menos_vendas_centavos=0
-        AND delta_unidades=0 AND contagens_ok AND frete_ok AND total_ok AND chaves_ok AND campos_ok AS confere
+    SELECT *, resumo_menos_itens_centavos=0 AND delta_unidades=0 AND pedidos_com_itens_ok
+        AND resumo_menos_vendas_pedidos=0 AND resumo_menos_vendas_produtos_centavos=0
+        AND resumo_menos_vendas_frete_centavos=0 AND resumo_menos_vendas_total_centavos=0
+        AND pedidos_menos_vendas_linhas_validas=0 AND pedidos_menos_vendas_produtos_centavos=0
+        AND pedidos_menos_vendas_frete_centavos=0 AND pedidos_menos_vendas_total_centavos=0
+        AND total_ok AND chaves_ok AND campos_ok AS confere
     FROM diferencas
 )
 SELECT jsonb_agg(to_jsonb(r) ORDER BY recorte) AS dias, bool_and(confere) AS financeiro_ok
@@ -130,7 +138,16 @@ FROM relatorio r \gset
 -- com o mesmo UUID e esse intervalo: o TOTAL traz os quatro dias combinados.
 SELECT d->>'recorte' AS recorte, d->'resumo' AS bi_vendas, d->'vendas' AS bi_clientes_vendas,
        d->'itens' AS bi_itens, d->'pedidos' AS bi_pedidos,
-       d->'resumo_menos_itens_centavos' AS resumo_menos_itens_centavos, d->'confere' AS confere
+       d->'resumo_menos_itens_centavos' AS resumo_menos_itens_centavos,
+       d->'resumo_menos_vendas_pedidos' AS resumo_menos_vendas_pedidos,
+       d->'resumo_menos_vendas_produtos_centavos' AS resumo_menos_vendas_produtos_centavos,
+       d->'resumo_menos_vendas_frete_centavos' AS resumo_menos_vendas_frete_centavos,
+       d->'resumo_menos_vendas_total_centavos' AS resumo_menos_vendas_total_centavos,
+       d->'pedidos_menos_vendas_linhas_validas' AS pedidos_menos_vendas_linhas_validas,
+       d->'pedidos_menos_vendas_produtos_centavos' AS pedidos_menos_vendas_produtos_centavos,
+       d->'pedidos_menos_vendas_frete_centavos' AS pedidos_menos_vendas_frete_centavos,
+       d->'pedidos_menos_vendas_total_centavos' AS pedidos_menos_vendas_total_centavos,
+       d->'linhas_duplicadas_por_id' AS linhas_duplicadas_por_id, d->'confere' AS confere
 FROM jsonb_array_elements(:'dias'::jsonb) AS d
 WHERE NOT :'somente_diferencas'::boolean OR d->>'recorte'='TOTAL' OR NOT (d->>'confere')::boolean;
 

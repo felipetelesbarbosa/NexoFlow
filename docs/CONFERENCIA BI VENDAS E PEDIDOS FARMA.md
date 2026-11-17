@@ -11,7 +11,7 @@ O Work encontrou um resumo diário acima da receita de produtos e um pedido dupl
 
 ## Procedimento para o Work
 
-Executar na VPS pelo canal privado existente. Registrar SHA da imagem anterior do **leitor FARMA**, cópia do relatório, data de corte em America/Belem e UUID/versão da recuperação **atualmente READY**. O UUID da v1 anterior à recuperação não serve para este procedimento. Usar primeiro o ambiente de homologação representativo quando disponível. Em banco compartilhado, instalar as definições altera imediatamente a leitura daqueles que já consultam essas duas visões PostgreSQL.
+Executar na VPS pelo canal privado existente. O Work registrou os cinco desvios na READY v2. Conferir seu UUID no recibo da recuperação e na publicação ativa, e registrar SHA da imagem anterior do **leitor FARMA**, cópia do relatório e corte em America/Belem. Se a versão já mudou, obter os controles do novo corte antes de prosseguir. Usar primeiro o ambiente de homologação representativo quando disponível. Em banco compartilhado, instalar as definições altera imediatamente a leitura daqueles que já consultam essas duas visões PostgreSQL.
 
 No checkout limpo do SHA aprovado, conferir CI e CodeQL. No shell Linux, definir `sha`, `REVISAO`, `AMBIENTE` (`homologacao` ou `producao`), `BANCO`, `PG_CONTAINER`, `PG_ADMIN`, `REDE_PG` e `DSN_ADMIN` com o ambiente e o arquivo de DSN privados já conferidos. O cliente psql abaixo usa a autenticação local já provisionada no contêiner PostgreSQL. Os comandos exigem acesso administrativo ao banco Data Studio correspondente e espaço para evidências agregadas.
 
@@ -85,7 +85,17 @@ auditar 2026-04-29 2026-04-29 false > "$EVIDENCIA/conferencia-29-04.txt"
 auditar 2026-11-09 2026-11-12 false > "$EVIDENCIA/conferencia-recuperacao.txt"
 ```
 
-5. Na cópia do Looker, atualizar as cinco fontes PostgreSQL na mesma revisão e conferir produtos, frete, faturamento e pedidos por dia. Em Pedidos, usar `venda_valida = 1` para receita e comparar contagem de linhas com distintos de `pedido_id`. Em Itens usar `SUM(receita_item)`. Em Vendas comparar `SUM(faturamento_produtos)` com Itens e ABC; somar frete separadamente. Conferir exatamente os cinco dias que o Work identificou, inclusive o pedido excluído em 29/04 e o frete repetido em 11/04. Conferir as vendas por cliente e o LTV acumulado no próprio universo histórico.
+5. Na cópia do Looker, atualizar as cinco fontes PostgreSQL na mesma revisão e conferir produtos, frete, faturamento e pedidos por dia. Em Pedidos, usar `venda_valida = 1` para receita e comparar contagem de linhas com distintos de `pedido_id`. Em Itens usar `SUM(receita_item)`. Em Vendas comparar `SUM(faturamento_produtos)` com Itens e ABC. Conferir o frete separadamente. Usar a seguinte matriz junto à evidência privada da READY v2. Todos os deltas de pedidos, produtos e frete devem chegar a zero em cada dia e no TOTAL anual.
+
+   | Dia de 2026 | Conferência que o Work deve repetir |
+   |---|---|
+   | 11/04 | BI_Vendas menos BI_Clientes_Vendas para a correção de produtos. Separadamente, BI_Pedidos menos BI_Clientes_Vendas para linhas, frete e faturamento do cabeçalho duplicado. |
+   | 29/04 | O pedido com exclusão explícita fica fora da receita e da contagem. |
+   | 04/05 | Três pedidos válidos presentes só no histórico entram no dia. |
+   | 22/06 | Produtos refletem o cabeçalho histórico vigente. |
+   | 30/07 | Um pedido válido presente só no histórico entra no dia. |
+
+   Conferir as vendas por cliente e o LTV acumulado no próprio universo histórico.
 6. Repetir no gráfico de Compras juntas, de 01/01 a 15/11/2026, com `pares_escopo=TOP`, `pares_limite=25` e escopo explícito no título. Conferir ordenação, contagens por par, versão e universo com o leitor do mesmo corte. Validar também o período curto e o período vazio. Só liberar a troca dos gráficos após conferir as evidências na cópia.
 
 Comparar com a planilha de controles e o recibo privados do Work para o mesmo corte. Usar o recibo para isolar o subconjunto recuperado quando houver outras vendas nas mesmas datas. Um acordo entre Planilhas e PostgreSQL no agregado importado não demonstra sua consistência com os itens. O alias ds1 (Metricas_Vendas) é outra fonte operacional; conferir suas dependências separadamente antes de usá-lo como resumo financeiro.
@@ -98,20 +108,30 @@ Usar uma janela administrativa sem outras alterações de visões. Conferir nova
 (cd "$EVIDENCIA" && sha256sum -c antes.sha256)
 definicoes > "$EVIDENCIA/conferencia-reversao.sql"
 cmp "$EVIDENCIA/instaladas.sql" "$EVIDENCIA/conferencia-reversao.sql"
+hash_instaladas=$(sha256sum "$EVIDENCIA/instaladas.sql" | cut -d' ' -f1)
 {
   cat <<'SQL'
 SET LOCAL statement_timeout='50s';
 SET LOCAL lock_timeout='5s';
+SET LOCAL search_path=pg_catalog;
 SET LOCAL nexoflow.revisao = :'revisao';
+SET LOCAL nexoflow.definicoes = :'def_hash';
 DO $$BEGIN
   PERFORM 1 FROM controle.nf_publicacoes WHERE segmento='FARMA'
     AND execucao=current_setting('nexoflow.revisao')::uuid FOR UPDATE;
   IF NOT FOUND OR EXISTS (SELECT 1 FROM controle.nf_execucoes WHERE segmento='FARMA' AND estado='WRITING')
     THEN RAISE EXCEPTION 'DS_REVISAO_FORA_DE_ORDEM'; END IF;
+  IF (SELECT encode(sha256(convert_to(string_agg(
+        format('CREATE OR REPLACE VIEW %s WITH (security_barrier=true) AS %s',v,pg_get_viewdef(v,false)),
+        chr(10) ORDER BY v::text) || chr(10),'UTF8')),'hex')
+      FROM (VALUES ('farma.ds_bi_pedidos'::regclass),('farma.ds_bi_vendas'::regclass)) AS views(v))
+     IS DISTINCT FROM current_setting('nexoflow.definicoes') THEN
+    RAISE EXCEPTION 'DS_DEFINICOES_ALTERADAS';
+  END IF;
 END$$;
 SQL
   cat "$EVIDENCIA/antes.sql"
-} | pg -1 -v revisao="$REVISAO" -f -
+} | pg -1 -v revisao="$REVISAO" -v def_hash="$hash_instaladas" -f -
 definicoes > "$EVIDENCIA/restauradas.sql"
 cmp "$EVIDENCIA/antes.sql" "$EVIDENCIA/restauradas.sql"
 ```
@@ -121,3 +141,5 @@ Voltar a imagem anterior **somente do leitor FARMA** no Compose privado e verifi
 ## Evidência sintética
 
 Em PostgreSQL 18.6, oito dos nove casos de regressão da projeção falharam sobre a versão anterior ao ajuste. As fixtures exercitam o cabeçalho repetido com frete, a venda excluída, cancelamento, correção histórica em valor e quantidade, venda presente só no operacional, cliente que compra duas vezes no dia, campos desconhecidos e dias vazios. A conta leitora restrita executou o próprio roteiro psql. Os testes administrativos verificam repetição, revisão incorreta, escritor pendente e rollback da transação caso a segunda visão falhe.
+
+Uma regressão adicional reproduz os cinco dias no mesmo banco sintético, inclusive três vendas exclusivamente históricas em um dia e uma em outro. O teste compara o agregado importado e as quatro projeções, por dia e ao todo, e verifica que o recibo se conserva. A mesma prova foi executada em ambiente privado com os deltas em centavos informados pelo Work. A reversão das duas definições pelo procedimento acima também foi exercitada em PostgreSQL descartável.
