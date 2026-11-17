@@ -1,8 +1,13 @@
 # Versionamento do NexoFlow
 
-## Preparação 1.5.42
+## Publicação 1.5.42
 
-O Setup e os pacotes Windows 1.5.42 estão em validação. A automação gera os ZIPs no SHA final com `[skip release] [preparar pacotes]`. A publicação reutiliza a execução aprovada e registra a data de `publishedAt` no fuso America/Fortaleza. A versão 1.5.41 continua disponível.
+Publicada em **17/11/2026, 20:52:15 (America/Fortaleza)**, no [commit `f4a9ecf78bdff2158a7f2e9451248bc784c54879`](https://github.com/felipetelesbarbosa/NexoFlow/commit/f4a9ecf78bdff2158a7f2e9451248bc784c54879). [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.42) · [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44199455757) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44199455758) · [Meta nativo](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44199455745) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44203002028).
+
+A conferência dos downloads públicos validou o CRC dos dois ZIPs, 589 entradas do manifesto do Setup, 125 módulos Python por pacote e a versão x64 1.5.42.0 dos executáveis. Os arquivos publicados são idênticos aos da preparação aprovada.
+
+- NexoFlow-Setup-1.5.42.zip · SHA-256 `7be5519f0880f60f6d2f5b02e332d091637a9e0a29c9d36849d76aaa8b593f74`
+- NexoFlow-1.5.42.zip · SHA-256 `99e10b2014c7c94386a82ade06a1ac6036190a8e86b63770dbad0d19664bd2c2`
 
 ## Publicação 1.5.41
 
@@ -25,7 +30,7 @@ A **1.5.32 foi publicada em 10/11/2026, 19:16:49 (America/Fortaleza)**, no SHA `
 
 A **1.5.33 foi publicada em 10/11/2026, 23:28:34 (America/Fortaleza)**, no SHA `7884d7007fd0c65cbf90bfc30c5c35dc6c9056fb`, com recuperação da leitura da trava Sheets. [Release e pacotes conferidos](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.33).
 
-As próximas publicações de atualização, hotfix ou patch seguem **1.5.42 → ... → 1.5.99 → 1.6 → 1.6.1**. Cada publicação incrementa uma única vez; commits e novas tentativas de CI da mesma entrega não mudam a numeração. Não há salto automático de versão principal.
+As próximas publicações de atualização, hotfix ou patch seguem **1.5.43 → ... → 1.5.99 → 1.6 → 1.6.1**. Cada publicação incrementa uma única vez; commits e novas tentativas de CI da mesma entrega não mudam a numeração. Não há salto automático de versão principal.
 
 A versão da distribuição fica em `VERSION`. A tag é `v{versao}`, o título é `NexoFlow {versao}` e os pacotes são `NexoFlow-{versao}.zip` e `NexoFlow-Setup-{versao}.zip`. Nunca sobrescreva os arquivos de uma versão pública para entregar código novo. O workflow permite retomar somente um rascunho da mesma entrega.
 

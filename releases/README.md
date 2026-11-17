@@ -1,3 +1,11 @@
+# NexoFlow 1.5.42 — Downloads
+
+Publicada em **17/11/2026, 20:52:15 (America/Fortaleza)**, no [commit `f4a9ecf78bdff2158a7f2e9451248bc784c54879`](https://github.com/felipetelesbarbosa/NexoFlow/commit/f4a9ecf78bdff2158a7f2e9451248bc784c54879). [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.42) · [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44199455757) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44199455758) · [Meta nativo](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44199455745) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44203002028).
+
+[Setup Windows](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.42/NexoFlow-Setup-1.5.42.zip) · [Projeto completo](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.42/NexoFlow-1.5.42.zip) · [SHA-256](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.42/SHA256SUMS-1.5.42.txt)
+
+A conferência dos downloads públicos validou o CRC dos dois ZIPs, 589 entradas do manifesto do Setup, 125 módulos Python por pacote e a versão x64 1.5.42.0 dos executáveis. Os arquivos publicados são idênticos aos da preparação aprovada. Atualize pelo Setup em Preserve e confira `nexo versao`.
+
 # NexoFlow 1.5.36 — Downloads
 
 Publicada em 12/11/2026, 03:06:30 (America/Fortaleza), SHA `2cc09b864efedbb0ca2d2dc10c62c6bc23091e61`. Código e pacotes aprovados; implantação privada e homologação comercial ainda dependem do Work. A 1.5.35 permanece intacta.

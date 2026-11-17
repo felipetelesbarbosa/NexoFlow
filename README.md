@@ -94,7 +94,7 @@ As continuações automáticas no Meu Drive exigem autorização Google local. O
 
 ## Versões e atualizações
 
-A distribuição **1.5.42** está em validação. A última release publicada é a [1.5.41](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.41), de 15/11/2026, 12:53:30 (America/Fortaleza). Veja a [política de versionamento](docs/VERSIONAMENTO.md).
+O NexoFlow **1.5.42** foi publicado em 17/11/2026, 20:52:15 (America/Fortaleza). [Release Windows](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.42) · [Evidências e hashes](docs/VERSIONAMENTO.md).
 
 ## NexoFlow Hub: homologação e evolução paralela
 
