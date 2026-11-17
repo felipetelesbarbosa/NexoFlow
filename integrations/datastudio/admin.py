@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from psycopg import sql
+from psycopg.rows import scalar_row
 
 from ds_backend.contract import REGISTRY, StorageError, digest
 from integrations.datastudio.read_catalog import READ_REGISTRY
@@ -174,6 +175,29 @@ def grants(conn, segment):
         )
 
 
+def update_farma_report(store, expected_revision):
+    from integrations.datastudio.financial_views import (
+        create_farma_orders_view,
+        create_farma_sales_view,
+    )
+
+    if store.segment != "FARMA":
+        raise StorageError("DS_SEGMENTO_DIVERGENTE")
+    with store.connect() as conn:
+        # Mesma trava de begin/finish. As duas definições passam a valer juntas.
+        active = store.active(conn, lock=True)
+        target = store.revision(conn, expected_revision)
+        if target["estado"] != "READY" or target["versao"] != active:
+            raise StorageError("DS_REVISAO_FORA_DE_ORDEM")
+        if conn.execute(
+            "SELECT 1 FROM controle.nf_execucoes WHERE segmento='FARMA' AND estado='WRITING'"
+        ).fetchone():
+            raise StorageError("DS_MIGRACAO_COM_PUBLICACAO_INCOMPLETA")
+        create_farma_orders_view(conn)
+        create_farma_sales_view(conn)
+    return active
+
+
 def run(argv=None):
     p = argparse.ArgumentParser(
         description="Migração aditiva do contrato definitivo Data Studio"
@@ -182,11 +206,32 @@ def run(argv=None):
     p.add_argument("--ambiente", choices=("homologacao", "producao"), required=True)
     p.add_argument("--segmento", choices=("FARMA", "PET"), required=True)
     p.add_argument("--aprovar-origem", type=Path)
+    p.add_argument("--atualizar-visoes-farma", metavar="UUID_READY")
     p.add_argument("--finalizar-selada")
     p.add_argument("--saida", type=Path)
     p.add_argument("--recibos-esperados", type=int)
     p.add_argument("--registros-esperados", type=int)
     args = p.parse_args(argv)
+    if args.atualizar_visoes_farma is not None:
+        if any(
+            value is not None
+            for value in (
+                args.finalizar_selada,
+                args.aprovar_origem,
+                args.saida,
+                args.recibos_esperados,
+                args.registros_esperados,
+            )
+        ):
+            p.error("A atualização de visões deve ser executada isoladamente.")
+        dsn = args.dsn_file.read_text(encoding="utf-8-sig").strip()
+        version = update_farma_report(
+            Store(dsn, args.ambiente, args.segmento), args.atualizar_visoes_farma
+        )
+        print(
+            f"[OK] Visões BI_Pedidos e BI_Vendas FARMA instaladas na versão READY {version}."
+        )
+        return version
     if args.finalizar_selada and (args.saida is None or args.aprovar_origem):
         p.error("Fechamento exige --saida privada e não aceita --aprovar-origem.")
     dsn = args.dsn_file.read_text(encoding="utf-8-sig").strip()
@@ -207,18 +252,21 @@ def run(argv=None):
             # A revisão selada não admite novos lotes; conferir o segmento antes
             # das contagens. Não editar ou reconstruir a intenção conservada.
             store.revision(conn, args.finalizar_selada)
-            receipts = conn.execute(
-                "SELECT count(*) AS n FROM controle.nf_lotes WHERE execucao=%s",
-                (args.finalizar_selada,),
-            ).fetchone()["n"]
-            # READY pode ter tombstones adicionados no fechamento. A repetição
-            # devolve o recibo conservado sem reinterpretar a contagem pré-commit.
-            records = None
-            if status["state"] != "READY":
-                records = conn.execute(
-                    f"SELECT count(*) AS n FROM {store.schema}.nf_stage WHERE execucao=%s",
+            with conn.cursor(row_factory=scalar_row) as counts:
+                receipts = counts.execute(
+                    "SELECT count(*) FROM controle.nf_lotes WHERE execucao=%s",
                     (args.finalizar_selada,),
-                ).fetchone()["n"]
+                ).fetchall()[0]
+                # READY pode ter tombstones adicionados no fechamento. A repetição
+                # devolve o recibo conservado sem reinterpretar a contagem pré-commit.
+                records = None
+                if status["state"] != "READY":
+                    records = counts.execute(
+                        sql.SQL(
+                            "SELECT count(*) FROM {}.nf_stage WHERE execucao=%s"
+                        ).format(sql.Identifier(store.schema)),
+                        (args.finalizar_selada,),
+                    ).fetchall()[0]
         if (
             args.recibos_esperados is not None and receipts != args.recibos_esperados
         ) or (

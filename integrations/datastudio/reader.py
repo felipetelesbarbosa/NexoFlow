@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import Any
 
 from psycopg import sql
+from psycopg.errors import CardinalityViolation
 from psycopg.rows import dict_row
 
 from ds_backend.contract import (
@@ -195,6 +196,20 @@ class Reader(Store):
                 expressions.append(sql.SQL("{} AS {}").format(expr, column))
             else:
                 expressions.append(column)
+        daily_metrics = (
+            [f for f in fields if spec["types"][f] == "number"]
+            if table == "BI_Vendas" and self.segment == "FARMA"
+            else []
+        )
+        if daily_metrics:
+            # SUM no SQL e a reagregação do Looker ignoram NULL. Conferir a
+            # cobertura dos campos pedidos no mesmo snapshot e na mesma leitura.
+            incomplete = sql.SQL(" OR ").join(
+                sql.SQL("{} IS NULL").format(sql.Identifier(f)) for f in daily_metrics
+            )
+            if aggregation:
+                incomplete = sql.SQL("bool_or({})").format(incomplete)
+            expressions.append(sql.SQL("({}) AS nf_incompleto").format(incomplete))
         statement = sql.SQL("SELECT {} FROM {}.{}").format(
             sql.SQL(",").join(expressions),
             sql.Identifier(self.schema),
@@ -237,13 +252,23 @@ class Reader(Store):
                     raise StorageError(
                         "DS_COMPRADORES_EXIGEM_COMPETENCIA_OU_RECORTE_UNICO"
                     )
-            if table == "BI_Itens":
+            if table == "BI_Itens" or (
+                self.segment == "FARMA" and table in ("BI_Pedidos", "BI_Vendas")
+            ):
                 # As visões históricas sobre JSONB subestimam a cardinalidade
                 # dos itens por venda e podem escolher laços quadráticos.
                 conn.execute("SET LOCAL enable_nestloop=off")
-            rows = conn.execute(
-                statement + sql.SQL(" LIMIT %s"), [*params, MAX_RESULT_ROWS + 1]
-            ).fetchall()
+            try:
+                with conn.cursor(row_factory=dict_row) as cursor:
+                    rows = cursor.execute(
+                        statement + sql.SQL(" LIMIT %s"), [*params, MAX_RESULT_ROWS + 1]
+                    ).fetchall()
+            except CardinalityViolation:
+                if table == "BI_Pedidos" and self.segment == "FARMA":
+                    raise StorageError("DS_BI_PEDIDO_OPERACIONAL_AMBIGUO") from None
+                raise
+            if daily_metrics and any(row["nf_incompleto"] for row in rows):
+                raise StorageError("DS_BI_VENDAS_INCOMPLETA")
         return self.result(version, fields, rows)
 
     def result(self, version, fields, rows):

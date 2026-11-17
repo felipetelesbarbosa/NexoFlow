@@ -59,6 +59,70 @@ def finish(s, rev):
     )
 
 
+def test_scoped_report_view_install_pins_ready_and_rolls_back_ddl(
+    store, tmp_path, monkeypatch
+):
+    from integrations.datastudio import admin, financial_views
+
+    revision = begin(store)
+    ready = finish(store, revision)
+    path = tmp_path / "admin-dsn"
+    path.write_text(store.dsn, encoding="utf-8")
+    args = [
+        "--dsn-file",
+        str(path),
+        "--ambiente",
+        "homologacao",
+        "--segmento",
+        "FARMA",
+        "--atualizar-visoes-farma",
+        revision,
+    ]
+
+    def definitions():
+        with store.connect(readonly=True) as conn:
+            return conn.execute(
+                "SELECT schemaname,viewname,definition FROM pg_views "
+                "WHERE schemaname IN ('farma','pet') ORDER BY schemaname,viewname"
+            ).fetchall()
+
+    current = definitions()
+    with store.connect() as conn:
+        conn.execute(
+            "CREATE OR REPLACE VIEW farma.ds_bi_pedidos WITH(security_barrier=true) "
+            "AS SELECT * FROM farma.ds_bi_pedidos_operacional"
+        )
+        conn.execute(
+            "CREATE OR REPLACE VIEW farma.ds_bi_vendas WITH(security_barrier=true) "
+            "AS SELECT * FROM pet.ds_bi_vendas WHERE false"
+        )
+    prior = definitions()
+    assert current != prior
+
+    with pytest.raises(StorageError, match="SEGMENTO"):
+        admin.update_farma_report(Store(store.dsn, "homologacao", "PET"), revision)
+    with pytest.raises(StorageError, match="REVISAO_AUSENTE"):
+        admin.update_farma_report(store, str(uuid4()))
+    with monkeypatch.context() as scoped:
+
+        def fail_after_orders(conn):
+            raise RuntimeError("falha sintética")
+
+        scoped.setattr(financial_views, "create_farma_sales_view", fail_after_orders)
+        with pytest.raises(RuntimeError, match="sintética"):
+            admin.run(args)
+    assert definitions() == prior
+    pending = begin(store)
+    with pytest.raises(StorageError, match="COM_PUBLICACAO_INCOMPLETA"):
+        admin.run(args)
+    assert definitions() == prior
+    store.abort(pending)
+    assert admin.run(args) == ready["version"]
+    assert admin.run(args) == ready["version"]
+    assert definitions() == current
+    assert store.inspect(revision)["state"] == "READY"
+
+
 def test_atomic_revision_repeat_and_rollback(store):
     rev = begin(store)
     item = row(

@@ -1,5 +1,10 @@
 # NexoFlow — Changelog
 
+## PostgreSQL FARMA — conciliação do resumo de vendas e dos pedidos
+
+- BI_Vendas calcula o movimento diário com vendas e itens confirmados na mesma revisão. BI_Pedidos preserva um cabeçalho por pedido oficial e respeita as exclusões ao cruzar histórico e operacional.
+- Atualização transacional das duas visões em uma revisão READY identificada, com conferência diária em centavos e reversão das definições. [Roteiro para o Work](docs/CONFERENCIA%20BI%20VENDAS%20E%20PEDIDOS%20FARMA.md).
+
 ## Recuperação FARMA em nova revisão — código e testes isolados
 
 - Comando administrativo verifica o hash do dry-run e reproduz evidências antes de criar revisão nova; insere somente BI_Itens ausentes em lotes determinísticos, com retomada por recibos e fechamento financeiro transacional.

@@ -65,6 +65,7 @@ def main():
         ).strip()
         environment = dict(
             os.environ,
+            NEXOFLOW_DATASTUDIO_TEST_CONTAINER=name,
             NEXOFLOW_DATASTUDIO_TEST_DSN=f"postgresql://postgres:{password}@{ip}/nexoflow_datastudio_homologacao?application_name=nexoflow-datastudio-tests",
         )
         if args.image:
