@@ -81,6 +81,26 @@ function Invoke-Setup {
     }
 }
 
+# Arquivos da instalação antiga gerenciados pelo NexoFlow.
+$legacyToolFiles = @(
+    'scripts\instalar_codex_cli.ps1',
+    'scripts\instalar_meta_ads_mcp.ps1',
+    'connectors\meta_ads_mcp\server.py',
+    'connectors\meta_ads_mcp\.venv\pyvenv.cfg'
+)
+function Add-LegacyToolFixtures {
+    foreach ($relative in $legacyToolFiles) {
+        $path = Join-Path $InstallDir $relative
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path) | Out-Null
+        [IO.File]::WriteAllText($path, 'fixture legado')
+    }
+}
+function Assert-LegacyToolsRemoved {
+    foreach ($relative in $legacyToolFiles) {
+        Assert-True (-not (Test-Path -LiteralPath (Join-Path $InstallDir $relative))) "Componente antigo ainda instalado: $relative"
+    }
+}
+
 function Assert-Installed {
     param([bool]$ExpectNightExe = $true)
     foreach ($relative in @(
@@ -148,9 +168,9 @@ function Assert-Installed {
 
     Assert-True (Test-Path -LiteralPath $UninstallKey) "Registro de desinstalação não foi criado."
     $installedVersion = (Get-Content -Raw -LiteralPath (Join-Path $InstallDir "VERSION")).Trim()
-    Assert-True ($installedVersion -eq "1.5.41") "Versão instalada inesperada: $installedVersion"
+    Assert-True ($installedVersion -eq "1.5.42") "Versão instalada inesperada: $installedVersion"
     $displayVersion = (Get-ItemProperty -LiteralPath $UninstallKey -Name DisplayVersion -ErrorAction Stop).DisplayVersion
-    Assert-True ($displayVersion -eq "1.5.41") "DisplayVersion inesperada: $displayVersion"
+    Assert-True ($displayVersion -eq "1.5.42") "DisplayVersion inesperada: $displayVersion"
 }
 
 Remove-TestArtifacts
@@ -165,7 +185,7 @@ try {
     $importsPayload = Join-Path $SetupDir 'payload\importacoes'
     Assert-True (Test-Path -LiteralPath $importsPayload -PathType Container) 'Pasta importacoes ausente no ZIP do Setup.'
     Assert-True (@(Get-ChildItem -LiteralPath $importsPayload -Force -Recurse).Count -eq 0) 'O pacote deve conter importacoes vazia, sem exports.'
-    $projectZip = Join-Path (Split-Path -Parent $resolvedZip) 'NexoFlow-1.5.41.zip'
+    $projectZip = Join-Path (Split-Path -Parent $resolvedZip) 'NexoFlow-1.5.42.zip'
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $projectArchive = [IO.Compression.ZipFile]::OpenRead($projectZip)
     try {
@@ -204,6 +224,7 @@ public static class NexoFlowPayloadTestLock {
     $env:NEXOFLOW_PERFIL = 'FARMA'
     Assert-Installed
 
+    Assert-LegacyToolsRemoved
     Write-Host "==> Criando dados privados para testar preservação"
     $secretText = @'
 WENI_API_TOKEN = "TOKEN_TESTE_WENI"
@@ -226,6 +247,11 @@ PROXY_DETECTION_TIMEOUT = 1.0
     [IO.File]::WriteAllText((Join-Path $InstallDir "logs\setup-smoke-marker.txt"), "preservar", (New-Object Text.UTF8Encoding($false)))
     [IO.File]::WriteAllText((Join-Path $InstallDir 'importacoes\planilha-teste.txt'), 'export privado sintético', (New-Object Text.UTF8Encoding($false)))
 
+    $metaCredential = Join-Path $InstallDir 'credentials\mcp\meta_ads_credentials.json'
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $metaCredential) | Out-Null
+    [IO.File]::WriteAllText($metaCredential, '{"smoke_test":true}')
+    $metaCredentialHash = (Get-FileHash -LiteralPath $metaCredential).Hash
+    Add-LegacyToolFixtures
     # Simular sobras da estrutura anterior; a atualização deve substituí-las.
     [IO.File]::WriteAllText((Join-Path $InstallDir 'main.py'), '# código antigo sintético', [Text.Encoding]::UTF8)
     [IO.File]::WriteAllText((Join-Path $InstallDir 'executar_manual.bat'), '@echo off', [Text.Encoding]::ASCII)
@@ -254,6 +280,8 @@ public static class NexoFlowSetupRootLock {
     try {
         Invoke-Setup "Atualização com raiz, logs, credenciais e importações bloqueados para renomeação"
     } finally { $compatibleLock.Dispose(); $secretsLock.Dispose(); $importsLock.Dispose(); $credentialsLock.Dispose(); $logsLock.Dispose(); $rootLock.Dispose() }
+    Assert-LegacyToolsRemoved
+    Assert-True ((Get-FileHash -LiteralPath $metaCredential).Hash -eq $metaCredentialHash) 'Preserve alterou a credencial Meta nativa.'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $InstallDir 'main.py'))) 'Módulo antigo permaneceu na raiz.'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $InstallDir 'executar_manual.bat'))) 'Comando antigo permaneceu na raiz.'
     Assert-True (Test-Path -LiteralPath (Join-Path $InstallDir 'app\main.py')) 'Módulo organizado ausente.'
@@ -293,6 +321,7 @@ public static class NexoFlowSetupRootLock {
     Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir 'secrets_config.py') -Raw) -match 'TOKEN_TESTE_WENI') 'Cancelar alterou a configuração.'
     Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir 'logs\setup-smoke-marker.txt') -Raw).Trim() -eq 'preservar') 'Cancelar alterou os logs.'
 
+    Add-LegacyToolFixtures
     # Falha sintética após preparar a instalação limpa: o rollback precisa devolver tudo.
     $payloadBat = Join-Path $SetupDir 'payload\instalar.bat'
     $payloadManifest = Join-Path $SetupDir 'payload\payload manifest.json'
@@ -319,10 +348,15 @@ public static class NexoFlowSetupRootLock {
     Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir 'logs\setup-smoke-marker.txt') -Raw).Trim() -eq 'preservar') 'Falha da instalação limpa perdeu os logs.'
     Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir 'credentials\google_credentials.json') -Raw) -match 'smoke_test') 'Falha da instalação limpa perdeu credenciais.'
 
+    foreach ($relative in $legacyToolFiles) {
+        Assert-True ((Get-Content -LiteralPath (Join-Path $InstallDir $relative) -Raw) -eq 'fixture legado') "Rollback perdeu o arquivo anterior: $relative"
+    }
     $env:NEXOFLOW_PERFIL = 'PET'
-    Invoke-Setup 'Instalação limpa bem-sucedida mantendo somente importações'
+    Invoke-Setup 'Instalação limpa preservando importações e credencial Meta nativa'
     $env:NEXOFLOW_PERFIL = 'FARMA'
     Assert-Installed
+    Assert-LegacyToolsRemoved
+    Assert-True ((Get-FileHash -LiteralPath $metaCredential).Hash -eq $metaCredentialHash) 'Clean alterou a credencial Meta nativa.'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $InstallDir 'secrets_config.py'))) 'A instalação limpa restaurou a configuração anterior.'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $InstallDir 'credentials\google_credentials.json'))) 'A instalação limpa restaurou credenciais anteriores.'
     Assert-True (@(Get-ChildItem -LiteralPath (Join-Path $InstallDir '__pycache__') -Filter 'secrets_config*.pyc' -ErrorAction SilentlyContinue).Count -eq 0) 'A instalação limpa reteve bytecode da configuração anterior.'
@@ -386,7 +420,7 @@ public static class NexoFlowSetupRootLock {
         else { $env:PYTHONPATH = $previousPythonPath }
     }
 
-    Write-Host "[OK] Smoke test do NexoFlow Setup 1.5.41 concluído."
+    Write-Host "[OK] Smoke test do NexoFlow Setup 1.5.42 concluído."
 }
 finally {
     if ($null -eq $previousTestNetworkMode) { Remove-Item Env:NEXOFLOW_NETWORK_MODE -ErrorAction SilentlyContinue }
@@ -397,4 +431,4 @@ finally {
     Remove-TestArtifacts
     Remove-Item -LiteralPath $TempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
-# NexoFlow 1.5.41
+# NexoFlow 1.5.42

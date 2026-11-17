@@ -95,18 +95,8 @@ Na opção de atualizar mantendo dados, o Setup conserva `secrets_config.py`, `c
 
 A instalação limpa reinicia configuração/estado e precisa conseguir mover os dados anteriores para a recuperação. Se houver bloqueio, ela aborta preservando a instalação anterior; não é convertida silenciosamente em atualização.
 
-## Meta Ads MCP opcional
+## Conclusão e coleta Meta Ads
 
-A oferta do Setup prepara somente o MCP, sem instalar, validar ou registrar Codex CLI. A coleta Meta nativa é independente. O MCP carrega a configuração de rede NexoFlow para instalar suas dependências; HTTP 407 indica falha de autenticação no proxy, sem comprovar ausência de uma versão do pacote. Confira [instalação MCP e homologação pessoal/corporativa](META%20ADS%20MCP%20LOCAL.md).
+Confira no resumo do Setup o modo de instalação, a pasta de destino, o log e os seis atalhos de Analytics, Weni, Recompra, Terminal, Planilha e Noturno. Use `comandos/check-up.bat` para verificar os componentes locais e `comandos/testar_conexoes.bat` para o diagnóstico de conexão antes da carga.
 
-### Mensagens e componentes opcionais
-
-O resumo do Setup informa instalação principal, modo Preserve/Clean, caminho,
-seis atalhos (Analytics, Weni, Recompra, Terminal, Planilha e Noturno), estado do
-MCP e log da execução. A validação de integridade local não confirma acesso às
-APIs. Execute `check-up.bat` e `testar_conexoes.bat` antes da carga.
-
-A pergunta do MCP usa `[S/N]`, sem resposta implícita: entradas diferentes repetem
-a pergunta. O componente serve a clientes de IA e continua opcional; a integração
-Meta nativa do Analytics/Noturno funciona sem MCP ou Codex. Uma falha do componente
-opcional permanece identificada como pendência, preservando a instalação principal.
+Na 1.5.42, o Setup instala o cliente nativo de leitura da Meta junto com o Analytics e encerra sem oferecer Meta Ads MCP ou Codex CLI. Na atualização em modo **Preserve**, mantenha a credencial Meta já existente em `credentials/mcp/meta_ads_credentials.json` e a configuração dos perfis em `secrets_config.py`. O nome histórico da pasta `mcp` continua sendo usado pelo cliente nativo. [Guia de ativação e revisão da coleta Meta](META%20ADS%20NATIVO.md).

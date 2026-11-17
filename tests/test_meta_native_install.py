@@ -97,7 +97,7 @@ function Get-Content { throw 'Build tentou interpretar uma credencial.' }
 $blocked=$false
 try { Assert-PublicTrackedFiles -Paths @('credentials/mcp/meta_ads_credentials.json') } catch { $blocked=$true }
 Assert-Native $blocked 'Build aceitou credencial Meta privada.'
-Assert-PublicTrackedFiles -Paths @('connectors/meta_ads_mcp/client.py','connectors/meta_ads_mcp/settings.py','credentials/mcp/README.md')
+Assert-PublicTrackedFiles -Paths @('app/meta_ads_client.py','app/meta_ads_settings.py','credentials/mcp/README.md')
 """)
 
     def test_absent_meta_file_does_not_create_default_token(self):
@@ -173,12 +173,10 @@ class MetaNativePackagingTests(unittest.TestCase):
     def test_packaged_client_is_explicit_and_sdk_is_not_a_core_requirement(self):
         data = tomllib.loads((ROOT / "pyproject.toml").read_text())
         tools = data["tool"]["setuptools"]
-        self.assertIn("connectors.meta_ads_mcp", tools.get("packages", []))
-        self.assertEqual(
-            tools["package-dir"].get("connectors.meta_ads_mcp"),
-            "connectors/meta_ads_mcp",
-        )
+        self.assertNotIn("connectors.meta_ads_mcp", tools.get("packages", []))
         for name in (
+            "meta_ads_client",
+            "meta_ads_settings",
             "meta_ads_native",
             "meta_ads_model",
             "meta_ads_sheets",
@@ -232,13 +230,6 @@ class MetaNativePackagingTests(unittest.TestCase):
                 source / "app/ds_backend",
                 ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
             )
-            connector = source / "connectors/meta_ads_mcp"
-            connector.parent.mkdir(parents=True)
-            shutil.copytree(
-                ROOT / "connectors/meta_ads_mcp",
-                connector,
-                ignore=shutil.ignore_patterns("__pycache__", "tests", "*.pyc"),
-            )
             dist = temp / "dist"
             dist.mkdir()
             target = temp / "site"
@@ -269,10 +260,14 @@ class MetaNativePackagingTests(unittest.TestCase):
                     "meta_ads_sheets.py",
                     "meta_ads_evidence.py",
                     "run_meta_ads.py",
-                    "connectors/meta_ads_mcp/client.py",
-                    "connectors/meta_ads_mcp/settings.py",
+                    "meta_ads_client.py",
+                    "meta_ads_settings.py",
                 ):
                     self.assertIn(name, names)
+                self.assertFalse(
+                    any(n.startswith("connectors/meta_ads_mcp/") for n in names)
+                )
+                self.assertNotIn("run_mcp_pip.py", names)
                 self.assertFalse(
                     any(
                         "/credentials/" in n or n.endswith("secrets_config.py")
@@ -313,7 +308,8 @@ class MetaNativePackagingTests(unittest.TestCase):
                             raise AssertionError('Native importou SDK MCP')
                 sys.meta_path.insert(0,NoMcp())
                 sys.path.insert(0,sys.argv[1])
-                from connectors.meta_ads_mcp import client,settings
+                import meta_ads_client as client
+                import meta_ads_settings as settings
                 import meta_ads_native,meta_ads_model,meta_ads_sheets,meta_ads_evidence,run_meta_ads
                 assert client.__file__.startswith(sys.argv[1])
                 assert settings.__file__.startswith(sys.argv[1])

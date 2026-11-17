@@ -7,7 +7,7 @@ A preparação da 1.5.33 executou desnecessariamente a preparação completa e o
 1. Revisar o diff e executar os testes locais pertinentes uma vez. Alteração de Windows usa o versionamento vigente; correções de CI/documentação não criam uma nova versão do aplicativo.
 2. No commit final de preparação autorizado, usar **`[skip release] [preparar pacotes]`**. Um único push executa qualidade, dependências, segredos, matriz Windows 3.11/3.14 com duas codificações, build, executáveis, Setup, Preserve/Clean/rollback e análise dos ZIPs. O marcador não autoriza publicação automática.
 3. Acompanhar a execução com `gh run watch ID --exit-status --interval 60`. Usar os resultados e logs existentes; não repetir a suíte, a auditoria completa ou a análise do diff sem nova alteração/falha. O monitoramento determinístico evita consultas repetidas do modelo e mensagens sem mudança de estado.
-4. Conferir o mesmo SHA na main, CodeQL, Meta nativo/MCP e a aprovação da geração. Não fazer um novo commit entre preparação e publicação.
+4. Conferir o mesmo SHA na main, CodeQL, integração Meta nativa e a aprovação da geração. Não fazer um novo commit entre preparação e publicação.
 5. Publicar os MESMOS artefatos, sem novo build:
 
 ```powershell

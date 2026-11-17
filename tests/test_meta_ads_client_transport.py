@@ -6,9 +6,9 @@ from unittest.mock import Mock
 
 import requests
 
-from connectors.meta_ads_mcp.client import MetaAdsClient, MetaReadError
-from connectors.meta_ads_mcp.settings import MetaSettings
-from connectors.meta_ads_mcp.tests.test_client import FakeResponse, FakeSession
+from meta_ads_client import MetaAdsClient, MetaReadError
+from meta_ads_settings import MetaSettings
+from tests.test_meta_ads_client import FakeResponse, FakeSession
 
 ACCOUNT = "898435729140540"
 
@@ -33,10 +33,16 @@ class NativeClientTests(unittest.TestCase):
 
     def test_native_catalog_exhausts_more_than_ten_pages(self):
         responses = [
-            FakeResponse({"data": [{"id": str(i)}], "paging": {
-                "next": "https://graph.facebook.com/ignored",
-                "cursors": {"after": str(i + 1)},
-            }}) for i in range(12)
+            FakeResponse(
+                {
+                    "data": [{"id": str(i)}],
+                    "paging": {
+                        "next": "https://graph.facebook.com/ignored",
+                        "cursors": {"after": str(i + 1)},
+                    },
+                }
+            )
+            for i in range(12)
         ]
         responses.append(FakeResponse({"data": [{"id": "last"}]}))
         cli, _ = self.client(responses)

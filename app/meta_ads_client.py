@@ -1,4 +1,4 @@
-"""Cliente reutilizável pela aplicação NexoFlow e pelo servidor MCP.
+"""Cliente de leitura da Graph API para a sincronização nativa Meta Ads.
 
 Somente GET; sem endpoints de escrita, sem escopo ads_management e sem suporte
 para URLs arbitrárias. Cada conta exige inclusão explícita na allowlist local.
@@ -17,7 +17,7 @@ from urllib.parse import quote, quote_plus
 
 import requests
 
-from connectors.meta_ads_mcp.settings import MetaSettings, account_number
+from meta_ads_settings import MetaSettings, account_number
 
 
 class MetaReadError(RuntimeError):
@@ -101,7 +101,9 @@ class MetaAdsClient:
     def _account(self, account_id: str) -> str:
         number = account_number(account_id)
         if number not in self.settings.allowed_account_ids:
-            raise MetaReadError("Conta fora da lista autorizada do MCP local.")
+            raise MetaReadError(
+                "Conta fora da lista autorizada para a sincronização Meta Ads."
+            )
         return number
 
     @staticmethod
@@ -281,7 +283,10 @@ class MetaAdsClient:
             result.extend(items)
             current += 1
             logging.getLogger(__name__).info(
-                "Meta %s: páginas=%d; registros=%d", path.split("/")[-1], current, len(result)
+                "Meta %s: páginas=%d; registros=%d",
+                path.split("/")[-1],
+                current,
+                len(result),
             )
             paging = body.get("paging") or {}
             cursors = paging.get("cursors") if isinstance(paging, dict) else None
@@ -333,7 +338,9 @@ class MetaAdsClient:
             pages,
         )
 
-    def ads(self, account_id: str, limit: int = 50, pages: int | None = 2) -> dict[str, Any]:
+    def ads(
+        self, account_id: str, limit: int = 50, pages: int | None = 2
+    ) -> dict[str, Any]:
         account_id = self._account(account_id)
         return self._pages(
             f"act_{account_id}/ads",

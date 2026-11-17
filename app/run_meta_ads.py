@@ -1,4 +1,4 @@
-"""Entrada nativa Meta Ads: simulação por padrão, sem Codex CLI ou servidor MCP."""
+"""Sincronização nativa Meta Ads, com simulação por padrão."""
 
 from __future__ import annotations
 

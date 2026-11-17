@@ -4,23 +4,19 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 import tempfile
 from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from time import monotonic
 from zoneinfo import ZoneInfo
 
+from meta_ads_client import MetaAdsClient, MetaReadError
+from meta_ads_evidence import collect_weni_evidence
+from meta_ads_model import build_native_tables
+from meta_ads_settings import SettingsError, load_settings
+from meta_ads_sheets import NativeMetaSheets
+
 ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-from connectors.meta_ads_mcp.client import MetaAdsClient, MetaReadError  # noqa: E402
-from connectors.meta_ads_mcp.settings import SettingsError, load_settings  # noqa: E402
-from meta_ads_evidence import collect_weni_evidence  # noqa: E402
-from meta_ads_model import build_native_tables  # noqa: E402
-from meta_ads_sheets import NativeMetaSheets  # noqa: E402
-
 TZ = ZoneInfo("America/Belem")
 POLICY = "META_AD_DAY_LAST_OBSERVED_V1"
 

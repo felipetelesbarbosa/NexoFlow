@@ -27,7 +27,7 @@ Evite abrir apenas um arquivo `.py` isolado. O workspace deve ser a pasta raiz d
 [2/2] auditoria de consistência
 ```
 
-A suíte completa de desenvolvimento é executada separadamente no CI ou com `python app/run_checkup_tests.py --development-tests`. O check-up operacional não inicia scripts opcionais do instalador/Codex/MCP e não comprova conexão às APIs. Veja [Check-up](CHECK-UP.md).
+A suíte completa de desenvolvimento é executada separadamente no CI ou com `python app/run_checkup_tests.py --development-tests`. O check-up operacional verifica os componentes locais. O diagnóstico de conexões confere o acesso às APIs. Veja [Check-up](CHECK-UP.md).
 
 A auditoria verifica, entre outros pontos:
 

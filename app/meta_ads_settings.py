@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
+ROOT_DIR = Path(__file__).resolve().parents[1]
 CREDENTIALS_FILE = ROOT_DIR / "credentials" / "mcp" / "meta_ads_credentials.json"
 _VERSION = re.compile(r"^v[0-9]+\.[0-9]+$")
 _DIGITS = re.compile(r"^[0-9]{5,25}$")

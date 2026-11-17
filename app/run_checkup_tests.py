@@ -27,8 +27,8 @@ REQUIRED_FILES = (
     "app/run_noturno.py",
     "app/auditar_consistencia.py",
     "app/meta_ads_native.py",
-    "connectors/meta_ads_mcp/client.py",
-    "connectors/meta_ads_mcp/settings.py",
+    "app/meta_ads_client.py",
+    "app/meta_ads_settings.py",
 )
 RUNTIME_IMPORTS = (
     "requests",
@@ -51,13 +51,8 @@ def operational_checkup(root: Path) -> int:
         if not (root / relative).is_file():
             errors.append(f"Componente obrigatório ausente: {relative}.")
     # Escopo público explícito: nunca percorrer credentials, logs, importações,
-    # secrets_config.py nem a .venv opcional do MCP. Compilar não executa código
-    # e, ao contrário de compileall, não grava bytecode na instalação.
-    sources = sorted(
-        path
-        for folder in (root / "app", root / "connectors/meta_ads_mcp")
-        for path in folder.glob("*.py")
-    )
+    # ou secrets_config.py. Compilar em memória evita gravar bytecode na instalação.
+    sources = sorted((root / "app").glob("*.py"))
     for path in sources:
         try:
             compile(path.read_text(encoding="utf-8-sig"), path.name, "exec")
@@ -124,7 +119,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--development-tests",
         action="store_true",
-        help="Executar toda a suíte de desenvolvimento, incluindo instaladores opcionais.",
+        help="Executar toda a suíte de desenvolvimento, incluindo os testes do Setup.",
     )
     args = parser.parse_args([] if argv is None else argv)
     if args.development_tests:

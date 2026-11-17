@@ -4,7 +4,7 @@ Execute **NexoFlow Noturno.exe** para atualizar Weni, Analytics e Recompra sem c
 
 A sequência é: check-up → Weni no modo escolhido (simulação, auditoria e aplicação) → Analytics no modo escolhido → Recompra (simulação, validação e aplicação) → Analytics incremental para refletir as mudanças finais.
 
-O [check-up operacional](CHECK-UP.md) verifica componentes, sintaxe pública e dependências locais, seguido da auditoria de consistência. Não executa testes de instaladores/Codex/MCP; a suíte completa permanece no CI. Os diagnósticos de conexão e as guardas de cada integração continuam obrigatórios.
+O [check-up operacional](CHECK-UP.md) verifica componentes, sintaxe pública e dependências locais, seguido da auditoria de consistência. O CI executa a suíte de desenvolvimento e os testes do instalador. Os diagnósticos de conexão e as guardas de cada integração continuam obrigatórios.
 
 Os snapshots são gerados novamente a cada execução e aplicados sem abrir Bloco de Notas ou pedir autorização. A Weni também pode excluir duplicados comprovados pelas regras existentes. Identidade, recusa de marketing, escopo dos produtos de cada segmento, propriedade dos pedidos, conflitos e validade do evento D+25/D+30 continuam sendo conferidos. A campanha Weni continua responsável pelo envio das mensagens.
 
@@ -67,4 +67,4 @@ A etapa Analytics também executa a integração nativa Meta quando habilitada n
 
 Com Meta habilitada, o Analytics prepara ou retoma as cinco abas adicionais de cada segmento nos arquivos Sheets já configurados, somente com cabeçalhos canônicos. Divergências exigem revisão manual; históricos e destinos existentes são preservados. O resumo final identifica gravações confirmadas, pendências, causa e checkpoint de cada fonte. Uma etapa parcial mantém código 3 e não apaga as operações concluídas. A Recompra distingue planos aplicados, estado local e escritas reais na Weni.
 
-O Noturno Windows continua autônomo e pode ser agendado localmente. Codex e MCP são opcionais; o [NexoFlow Hub](planejamento/README.md), em homologação Linux isolada para VPS, Docker e n8n, permanece independente e sem integração comercial ativada com o Windows.
+O Noturno Windows continua autônomo e pode ser agendado localmente. O [NexoFlow Hub](planejamento/README.md), em homologação Linux isolada para VPS, Docker e n8n, permanece independente e sem integração comercial ativada com o Windows.

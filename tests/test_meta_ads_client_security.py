@@ -7,9 +7,9 @@ from pathlib import Path
 
 import requests
 
-from connectors.meta_ads_mcp.client import MetaAdsClient, MetaReadError
-from connectors.meta_ads_mcp.settings import MetaSettings, SettingsError, load_settings
-from connectors.meta_ads_mcp.tests.test_client import FakeResponse, FakeSession
+from meta_ads_client import MetaAdsClient, MetaReadError
+from meta_ads_settings import MetaSettings, SettingsError, load_settings
+from tests.test_meta_ads_client import FakeResponse, FakeSession
 
 ACCOUNT = "898435729140540"
 TOKEN = "TOKEN_FICTICIO"

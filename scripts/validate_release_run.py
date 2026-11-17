@@ -9,7 +9,7 @@ import re
 import subprocess
 import sys
 import zipfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 REPO = "felipetelesbarbosa/NexoFlow"
 REQUIRED = {
@@ -70,7 +70,7 @@ def validate_run(repo, sha, run_id, version, fetch=api):
         )
     ):
         raise ValueError("Artefato ausente, expirado, duplicado ou sem digest.")
-    for workflow in ("codeql.yml", "meta-ads-mcp.yml"):
+    for workflow in ("codeql.yml", "meta-ads-native.yml"):
         runs = fetch(
             f"{base}/actions/workflows/{workflow}/runs?head_sha={sha}&per_page=100"
         )["workflow_runs"]
@@ -81,6 +81,24 @@ def validate_run(repo, sha, run_id, version, fetch=api):
         if latest.get("status") != "completed" or latest.get("conclusion") != "success":
             raise ValueError(f"Check do mesmo SHA não aprovado: {workflow}.")
     print(f"[OK] Execução {run_id}: checks e artefato comprovados no SHA {sha}.")
+
+
+def validate_meta_payload(archive, prefix):
+    required = {
+        prefix + "app/" + module
+        for module in ("meta_ads_client.py", "meta_ads_settings.py", "run_meta_ads.py")
+    }
+    if not required.issubset(archive.namelist()):
+        raise ValueError("Coletor nativo Meta Ads ausente do pacote.")
+    for name in archive.namelist():
+        path = PurePosixPath(name.replace("\\", "/").casefold())
+        if "meta_ads_mcp" in path.parts or path.name in {
+            "codex.exe",
+            "instalar_codex_cli.ps1",
+            "instalar_meta_ads_mcp.ps1",
+            "run_mcp_pip.py",
+        }:
+            raise ValueError("O pacote contém um componente local descontinuado.")
 
 
 def validate_assets(directory, version):
@@ -116,6 +134,7 @@ def validate_assets(directory, version):
             prefix = "NexoFlow Setup/payload/" if "Setup" in name else "NexoFlow/"
             if archive.read(prefix + "VERSION").decode().strip() != version:
                 raise ValueError("Versão do pacote divergente.")
+            validate_meta_payload(archive, prefix)
     subprocess.run(
         [
             sys.executable,

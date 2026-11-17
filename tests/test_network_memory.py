@@ -1,14 +1,41 @@
 """Reconhecimento local com redes fictícias; sem sondagens comerciais."""
+import shutil
+import subprocess
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
-from tests import test_meta_optional_install as optional_tests
 from tests import test_proxy_config as proxy_tests
 
+ROOT = Path(__file__).resolve().parents[1]
+POWERSHELL = shutil.which("pwsh") or shutil.which("powershell")
+if not POWERSHELL:
+    private = Path("/workspace/private/powershell/pwsh")
+    POWERSHELL = str(private) if private.is_file() else None
 
-@unittest.skipUnless(optional_tests.POWERSHELL, "PowerShell necessário")
+
+@unittest.skipUnless(POWERSHELL, "PowerShell necessário")
 class WindowsNetworkMemoryTests(unittest.TestCase):
-    run_ps = optional_tests.OptionalInstallTests.run_ps
+    def run_ps(self, code):
+        with tempfile.TemporaryDirectory(prefix="nexo_network_") as directory:
+            path = Path(directory) / "harness.ps1"
+            prefix = (
+                "$ErrorActionPreference='Stop'\n$repo="
+                + "'"
+                + str(ROOT).replace("'", "''")
+                + "'\n"
+            )
+            path.write_text(prefix + code, encoding="utf-8-sig")
+            result = subprocess.run(
+                [POWERSHELL, "-NoProfile", "-File", str(path)],
+                capture_output=True,
+                text=True,
+                timeout=40,
+            )
+            self.assertEqual(
+                result.returncode, 0, (result.stdout + result.stderr)[-4000:]
+            )
 
     def test_network_memory_is_scoped_and_domain_never_selects_personal(self):
         self.run_ps(r'''
@@ -38,14 +65,28 @@ try {
 }finally{Remove-Item $env:LOCALAPPDATA -Force -Recurse}
 ''')
 
-    def test_setup_unknown_network_retries_and_mcp_requires_s_or_n(self):
-        self.run_ps(r''' 
+    def test_setup_network_choice_propagates_to_children_without_settings_write(self):
+        self.run_ps(r"""
 $tokens=$null;$errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'installer/install.ps1'),[ref]$tokens,[ref]$errors)
-foreach($name in @('Select-SetupNetwork','Invoke-OptionalMetaAdsSetup')) {
- $f=$ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true)
- . ([scriptblock]::Create($f.Extent.Text))
-}
+$f=$ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Select-SetupNetwork'},$true)
+. ([scriptblock]::Create($f.Extent.Text))
+$NonInteractive=$true
+function Read-Host { throw 'Não deveria solicitar entrada.' }
+$NetworkMode='Personal'
+Select-SetupNetwork
+if($env:NEXOFLOW_NETWORK_MODE -ne 'personal'){throw 'Rota pessoal não propagada.'}
+$NetworkMode='Corporate'
+Select-SetupNetwork
+if($env:NEXOFLOW_NETWORK_MODE -ne 'corporate'){throw 'Rota corporativa não propagada.'}
+""")
+
+    def test_setup_unknown_network_retries(self):
+        self.run_ps(r'''
+$tokens=$null;$errors=$null
+$ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'installer/install.ps1'),[ref]$tokens,[ref]$errors)
+$f=$ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Select-SetupNetwork'},$true)
+. ([scriptblock]::Create($f.Extent.Text))
 $PayloadDir=Join-Path ([IO.Path]::GetTempPath()) ([Guid]::NewGuid().ToString('N'))
 $NetworkMode='Auto';$NonInteractive=$false
 Remove-Item Env:NEXOFLOW_NETWORK_MODE -ErrorAction SilentlyContinue
@@ -54,9 +95,6 @@ $script:answers=[Collections.Generic.Queue[string]]::new()
 function Read-Host {param($Prompt) return $script:answers.Dequeue()}
 Select-SetupNetwork
 if($env:NEXOFLOW_NETWORK_MODE -ne 'personal' -or $script:answers.Count -ne 0){throw 'Seleção inválida não repetida'}
-@('','x','n')|ForEach-Object {$script:answers.Enqueue($_)}
-Invoke-OptionalMetaAdsSetup -Mode Clean
-if($script:answers.Count -ne 0 -or $script:MetaOptionalStatus -notlike 'não solicitado*'){throw 'MCP instalou implicitamente'}
 ''')
 
 

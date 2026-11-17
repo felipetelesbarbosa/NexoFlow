@@ -1,10 +1,10 @@
-# NexoFlow 1.5.41
+# NexoFlow 1.5.42
 
 Aplicativos operacionais e autônomos para Windows que integram **Weni e a API FarmaLíder nos segmentos FarmaLíder e Pets Líder**, atualizam contatos e pedidos e organizam os dados no **Google Sheets** para análise no **Data Studio**.
 
 O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
 
-[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.41/NexoFlow-Setup-1.5.41.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
+[Baixar instalador](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.42/NexoFlow-Setup-1.5.42.zip) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
 
 [Base Mestre permanente de conhecimento e diretrizes](docs/planejamento/DIRETRIZES_E_CONHECIMENTO_NEXOFLOW.md) — ponto de consulta compartilhado entre Codex e Work antes de novas tarefas.
 
@@ -94,7 +94,7 @@ As continuações automáticas no Meu Drive exigem autorização Google local. O
 
 ## Versões e atualizações
 
-A versão desta entrega é **1.5.41**, publicada em 15/11/2026, 12:53:30 (America/Fortaleza). A 1.5.40 e todas as versões anteriores permanecem preservadas. Veja a [política de versionamento](docs/VERSIONAMENTO.md).
+A distribuição **1.5.42** está em validação. A última release publicada é a [1.5.41](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.41), de 15/11/2026, 12:53:30 (America/Fortaleza). Veja a [política de versionamento](docs/VERSIONAMENTO.md).
 
 ## NexoFlow Hub: homologação e evolução paralela
 
@@ -120,9 +120,9 @@ Os três IDs de planilha podem ser configurados em cada perfil do `secrets_confi
 
 O Weni consulta eventos oficiais CTWA para completar e conferir os campos de anúncios de FARMA e PET. Oscarzinho e Lili podem tentar o preenchimento imediato; o NexoFlow reconcilia os dados disponíveis sem depender da decisão do agente. Analytics leva os campos à Base_Contatos e aos pedidos, e atualiza BI_Ads; o Noturno usa as mesmas etapas. Confira [regras, limites e instruções dos agentes](docs/RASTREAMENTO_META.md).
 
-### Meta Ads MCP local (opcional)
+### Coleta nativa de anúncios Meta
 
-O [conector Meta Ads](docs/META%20ADS%20MCP%20LOCAL.md) oferece seis ferramentas somente de leitura ao Codex por STDIO. A credencial fica exclusivamente no arquivo privado `credentials/mcp/meta_ads_credentials.json`. A [integração nativa Meta Ads](docs/META%20ADS%20NATIVO.md) reutiliza esse cliente diretamente no Analytics e no Noturno, sem exigir Codex ou servidor MCP. A ativação é explícita, mantém as fontes existentes e não altera campanhas. Novas tabelas e o procedimento de revisão estão documentados no guia.
+O Analytics e o Noturno consultam a Marketing API diretamente com o cliente nativo do NexoFlow. Para habilitar a coleta, configure o perfil e confira as contas permitidas no arquivo privado `credentials/mcp/meta_ads_credentials.json`. O Setup 1.5.42 retira o servidor MCP local e os auxiliares do Codex CLI da distribuição. [Configuração e revisão da integração Meta](docs/META%20ADS%20NATIVO.md).
 
 ## Histórico paginado e LTV observado
 

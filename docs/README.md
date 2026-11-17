@@ -39,7 +39,7 @@ O código fica em `app/`, as rotinas em `comandos/` e os modelos em `configuraca
 
 ## Operação atual e planejamento
 
-A [integração Meta nativa](META%20ADS%20NATIVO.md) funciona diretamente no Analytics e no Noturno quando habilitada. O [MCP local](META%20ADS%20MCP%20LOCAL.md) é opcional e não torna Codex um requisito das cargas. [Webhook Weni](WENI%20WEBHOOK.md) e [webhook de pedidos](WEBHOOK%20PEDIDOS%20FUTURO.md) mantêm seus estados e requisitos específicos.
+A [integração Meta nativa](META%20ADS%20NATIVO.md) consulta as contas autorizadas diretamente no Analytics e no Noturno quando habilitada no perfil. [Webhook Weni](WENI%20WEBHOOK.md) e [webhook de pedidos](WEBHOOK%20PEDIDOS%20FUTURO.md) mantêm seus estados e requisitos específicos.
 
 O [catálogo de planejamento](planejamento/README.md) separa o **NexoFlow Hub em homologação e sua evolução planejada**, para VPS, Docker e n8n, da operação Windows distribuída. O plano de [histórico, atribuição e LTV](planejamento/HISTORICO_PEDIDOS_ATRIBUICAO_LTV.md) não representa uma integração implantada.
 

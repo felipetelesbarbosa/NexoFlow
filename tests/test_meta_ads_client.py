@@ -7,8 +7,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from connectors.meta_ads_mcp.client import MetaAdsClient, MetaReadError
-from connectors.meta_ads_mcp.settings import MetaSettings, SettingsError, load_settings
+from meta_ads_client import MetaAdsClient, MetaReadError
+from meta_ads_settings import MetaSettings, SettingsError, load_settings
 
 
 class FakeResponse:

@@ -121,7 +121,7 @@ A [Base Weni CLI, IA Manager, agentes e Flows](../WENI%20CLI%20AGENTES%20E%20FLU
 
 ## 9. Mídia e atribuição
 
-[Meta nativo](../META%20ADS%20NATIVO.md), [rastreamento](../RASTREAMENTO_META.md) e [Google Ads](../GOOGLE%20ADS.md) distinguem coleta oficial e metadados de origem. Meta usa o cliente Python compartilhado com MCP opcional e somente leitura; `ads_read`, sem `ads_management`. Token apenas no JSON privado previsto. Google `gclid`, `gbraid` e `wbraid` não comprovam coleta autenticada de investimento ou campanhas.
+[Meta nativo](../META%20ADS%20NATIVO.md), [rastreamento](../RASTREAMENTO_META.md) e [Google Ads](../GOOGLE%20ADS.md) distinguem coleta oficial e metadados de origem. O cliente Python nativo usa consultas GET com a permissão `ads_read` e exige a lista explícita de contas permitidas no JSON privado. O Setup 1.5.42 retira o servidor Meta Ads MCP local e os instaladores de Codex CLI. Google `gclid`, `gbraid` e `wbraid` não comprovam coleta autenticada de investimento ou campanhas.
 
 O projeto Weni comprova FARMA/PET, não o nome da campanha. Anúncio sem evidência permanece não classificado; anúncio compartilhado não recebe 100% do custo em cada marca. Preservar primeiro/último toque, IDs oficiais versus clique, canal, data e janela comprovada. Não somar modelos nem atribuir pedido a toque posterior. Sem evidência, manter compra sem crédito de anúncio.
 

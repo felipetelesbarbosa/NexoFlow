@@ -1,12 +1,12 @@
 # Meta Ads no NexoFlow Analytics
 
-A integração nativa consulta a Marketing API da Meta pelo próprio NexoFlow Windows, de forma autônoma. **Não exige Codex CLI, SDK MCP, servidor MCP ou ChatGPT para executar a carga.** Usa o cliente HTTP compartilhado de `connectors/meta_ads_mcp/client.py`, sem importar o servidor. O nome dessa pasta não torna o SDK MCP uma dependência da operação nativa.
+O Analytics e o Noturno consultam a Marketing API da Meta pelo cliente HTTP nativo `app/meta_ads_client.py`. O Setup 1.5.42 retira a oferta de servidor MCP local e os instaladores de Codex CLI.
 
-Use a instalação normal em `C:\NexoFlow`, com o Python e as dependências principais preparados pelo Setup. Não é necessário manter uma segunda instalação em `C:\NexoFlow-Codigo` nem executar o programa a partir de uma pasta específica. O pacote Python também inclui os módulos nativos e o cliente compartilhado.
+Use a instalação em `C:\NexoFlow`, com o Python e as dependências preparados pelo Setup. O pacote Python inclui o cliente e o módulo de configuração `app/meta_ads_settings.py`.
 
 ## Credencial local e contas permitidas
 
-Se já utiliza Meta Ads MCP neste computador, a integração nativa reutiliza o mesmo arquivo local:
+O coletor nativo lê a credencial privada no caminho usado nas versões anteriores. Em uma atualização, mantenha o JSON existente neste local.
 
 ```text
 C:\NexoFlow\credentials\mcp\meta_ads_credentials.json
@@ -78,6 +78,5 @@ Os dados são escritos nos destinos analíticos do segmento e nas tabelas própr
 - **Atualizar mantendo dados:** token Meta, allowlist e demais dados privados permanecem no lugar, conforme a política geral do Setup.
 - **Instalação limpa:** o Setup recupera somente a credencial Meta, além dos documentos de importação já preservados pela regra existente. Não restaura automaticamente credenciais Google, `secrets_config.py` ou estados antigos por causa dessa exceção.
 - **Arquivo bloqueado no Windows:** a instalação não ignora falhas nem apaga o token para continuar. A atualização com preservação mantém os dados no lugar; uma instalação limpa que não consiga mover a instalação anterior aborta com os dados preservados.
-- **Codex/MCP opcionais:** os auxiliares continuam disponíveis para quem quiser usar ferramentas interativas. Não são pré-requisito da carga nativa; a falha de sua instalação opcional não torna o SDK obrigatório para o Analytics.
 
 Depois de reinstalar ou trocar de computador, confira localmente o arquivo de credencial, a allowlist, os perfis e as permissões de edição das planilhas. Nunca envie o token como diagnóstico. Testes de empacotamento usam credenciais fictícias e não executam uma instalação real ou campanha em produção.

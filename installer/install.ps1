@@ -1,7 +1,6 @@
 ﻿[CmdletBinding()]
 param(
     [switch]$NonInteractive,
-    [switch]$InstallMetaAdsMcp,
     [ValidateSet('Auto','Personal','Corporate')][string]$NetworkMode = 'Auto',
     [ValidateSet('Preserve', 'Clean', 'Cancel')][string]$InstallMode = 'Preserve'
 )
@@ -10,7 +9,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
 $AppName = 'NexoFlow'
-$AppVersion = '1.5.41'
+$AppVersion = '1.5.42'
 $Publisher = 'Grupo Lider'
 $InstallDir = 'C:\NexoFlow'
 $DataDir = 'C:\NexoFlow Data'
@@ -64,57 +63,6 @@ function Exit-NexoMaintenance {
     }
 }
 
-function Invoke-OptionalMetaAdsSetup {
-    param([switch]$Selected, [switch]$Unattended, [string]$Mode = 'Preserve')
-    $script:MetaOptionalStatus = 'não solicitado (opcional)'
-    $requested = [bool]$Selected
-    if (-not $requested -and -not $Unattended) {
-        Write-Host '[INFO] MCP é opcional para clientes de IA. Analytics e Noturno coletam Meta Ads sem MCP.'
-        do {
-            $answer = (Read-Host 'Instalar/validar Meta Ads MCP local opcional (somente leitura)? [S/N]').Trim().ToUpperInvariant()
-            if ($answer -notin @('S','N')) { Write-Host 'Digite S para instalar ou N para continuar sem MCP.' }
-        } until ($answer -in @('S','N'))
-        $requested = ($answer -eq 'S')
-    }
-    if (-not $requested) { return }
-    $statusFile = Join-Path $InstallDir 'logs/meta_ads_mcp_instalacao.json'
-    try {
-        $helper = Join-Path $InstallDir 'scripts/instalar_meta_ads_mcp.ps1'
-        if (-not (Test-Path -LiteralPath $helper -PathType Leaf)) { throw 'Auxiliar Meta Ads MCP não encontrado na instalação.' }
-        # O SDK MCP é um componente opcional e executa ferramentas
-        # nativas de terceiros. Mantenha-os fora do processo do Setup: uma
-        # terminação fatal do filho (por exemplo 0x40000015) não pode encerrar
-        # a instalação principal depois que o NexoFlow já foi instalado.
-        $powershellExe = $null
-        if (-not [string]::IsNullOrWhiteSpace($env:SystemRoot)) {
-            $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-            if (Test-Path -LiteralPath $windowsPowerShell -PathType Leaf) { $powershellExe = $windowsPowerShell }
-        }
-        if (-not $powershellExe) {
-            try { $powershellExe = [Diagnostics.Process]::GetCurrentProcess().MainModule.FileName } catch { }
-        }
-        if (-not $powershellExe) { $powershellExe = 'powershell.exe' }
-        $helperArguments = @('-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f $helper))
-        if ($Mode -eq 'Clean') { $helperArguments += '-Reinstall' }
-        $helperProcess = Start-Process -FilePath $powershellExe -ArgumentList $helperArguments -Wait -PassThru -NoNewWindow -ErrorAction Stop
-        if ($helperProcess.ExitCode -ne 0) {
-            throw "A instalação opcional MCP foi encerrada com o código $($helperProcess.ExitCode)."
-        }
-        $status = @{ componente = 'Meta Ads MCP'; status = 'instalado'; registro_cliente = 'manual_opcional'; acesso_meta = 'nao_validado'; diagnostico_dependencias = 'logs/meta_ads_mcp_dependencias.json'; atualizado_em = (Get-Date).ToUniversalTime().ToString('o') }
-        $status | ConvertTo-Json | Set-Content -LiteralPath $statusFile -Encoding UTF8
-        $script:MetaOptionalStatus = 'instalado; acesso Meta ainda não validado'
-        Write-Host '[OK] Meta Ads MCP instalado/validado. Registro em cliente de IA é manual e opcional.' -ForegroundColor Green
-        Write-Host '[INFO] Status: logs/meta_ads_mcp_instalacao.json. Diagnóstico da última etapa pip, quando executada: logs/meta_ads_mcp_dependencias.json.'
-    } catch {
-        $script:MetaOptionalStatus = 'pendente; instalação principal preservada'
-        # O programa principal já foi instalado. Não restaurar/apagar NexoFlow
-        # nem credenciais porque uma integração opcional ficou pendente.
-        $status = @{ componente = 'Meta Ads MCP'; status = 'pendente'; proxima_acao = 'Executar scripts/instalar_meta_ads_mcp.ps1 -Perfil FARMA ou PET, após conferir a configuração de rede'; diagnostico_dependencias = 'logs/meta_ads_mcp_dependencias.json'; atualizado_em = (Get-Date).ToUniversalTime().ToString('o') }
-        try { $status | ConvertTo-Json | Set-Content -LiteralPath $statusFile -Encoding UTF8 } catch { }
-        Write-Warning 'NexoFlow instalado. Meta Ads MCP ficou pendente. Execute o auxiliar na sessão Windows do usuário final; confira logs/meta_ads_mcp_instalacao.json e logs/meta_ads_mcp_dependencias.json (última etapa pip, quando executada). Configurações existentes foram preservadas.'
-    }
-}
-
 function Select-SetupNetwork {
     if ($NetworkMode -ne 'Auto') { $env:NEXOFLOW_NETWORK_MODE = $NetworkMode.ToLowerInvariant(); return }
     if ($env:NEXOFLOW_NETWORK_MODE -in @('personal','corporate')) { return }
@@ -141,7 +89,7 @@ function Select-SetupNetwork {
         '0' { throw 'Seleção de rede cancelada antes da instalação.' }
     }
     if (Test-Path -LiteralPath $recognizer) { & $recognizer -Action Salvar -Mode $env:NEXOFLOW_NETWORK_MODE }
-    Write-Host '[INFO] Rede selecionada para Setup, pip e MCP; credenciais preservadas.'
+    Write-Host '[INFO] Rede selecionada para o Setup e a instalação das dependências Python.'
 }
 
 function Write-Step([string]$Text) { Write-Host "`n==> $Text" -ForegroundColor Cyan }
@@ -851,7 +799,7 @@ function Show-InstallModeDialog {
         $label = New-Object System.Windows.Forms.Label
         $label.Location = New-Object System.Drawing.Point(20, 20)
         $label.Size = New-Object System.Drawing.Size(620, 185)
-        $label.Text = "Já existem arquivos do NexoFlow neste computador.`n`nAtualizar mantendo dados: conserva configurações, credenciais, logs e estado local.`n`nInstalação limpa: reinicia esses dados para FarmaLíder e Pets Líder, mas mantém a credencial Meta (token e contas permitidas). Os demais acessos precisam ser configurados novamente. Meta Ads MCP é opcional e será reinstalado se selecionado; clientes de IA são administrados separadamente.`n`nImportações são preservadas nas duas opções."
+        $label.Text = "Já existem arquivos do NexoFlow neste computador.`n`nAtualizar mantendo dados: conserva configurações, credenciais, logs e estado local.`n`nInstalação limpa: reinicia esses dados para FarmaLíder e Pets Líder, mas mantém a credencial Meta (token e contas permitidas). Os demais acessos precisam ser configurados novamente.`n`nImportações são preservadas nas duas opções."
         $form.Controls.Add($label)
 
         foreach ($choice in @(
@@ -880,7 +828,7 @@ function Show-InstallModeDialog {
 function Read-InstallModeFromConsole {
     while ($true) {
         Write-Host '[1] Atualizar mantendo configurações, credenciais, logs e estado local'
-        Write-Host '[2] Instalação limpa — reiniciar dados, mantendo token/contas Meta; MCP opcional'
+        Write-Host '[2] Instalação limpa — reiniciar dados, mantendo o token e as contas Meta'
         Write-Host '[0] Cancelar'
         Write-Host 'Os arquivos de importacoes serão preservados.'
         switch ((Read-Host 'Escolha uma opção')) {
@@ -1776,21 +1724,19 @@ try {
     $hasSecrets = Test-Path -LiteralPath (Join-Path $InstallDir 'secrets_config.py') -PathType Leaf
     $hasGoogle = Test-Path -LiteralPath (Join-Path $InstallDir 'credentials\google_credentials.json') -PathType Leaf
     Write-Host "`n[OK] $AppName instalado com sucesso." -ForegroundColor Green
-    Invoke-OptionalMetaAdsSetup -Selected:$InstallMetaAdsMcp -Unattended:$NonInteractive -Mode $selectedMode
     Write-Host "`n=== Resumo da instalação ===" -ForegroundColor Cyan
     Write-Host "[OK] Programa instalado em: $InstallDir"
     Write-Host "[INFO] Modo aplicado: $selectedMode. FARMA e PET usam a mesma instalação, com configurações separadas."
-    Write-Host "[INFO] Meta Ads MCP: $script:MetaOptionalStatus."
-    Write-Host '[INFO] Coleta Meta nativa: disponível no Analytics/Noturno; depende do token e das contas autorizadas, sem exigir MCP.'
+    Write-Host '[INFO] Analytics e Noturno consultam Meta Ads usando o token e as contas autorizadas do segmento.'
     Write-Host '[INFO] Credencial Google Sheets é exigida apenas no backend Sheets; PostgreSQL usa credentials\datastudio\<segmento>\<ambiente>\publicacao.json.'
     Write-Host '[INFO] Preserve mantém configurações, credenciais, SQLite, journals e logs. O Setup não ativa PostgreSQL nem altera a VPS.'
     Write-Host '[INFO] Integridade local aprovada não confirma acesso às APIs nem ao armazenamento.'
     Write-Host '[PRÓXIMO] Execute check-up.bat e testar_conexoes.bat no segmento desejado antes da carga.'
     Write-Host "[INFO] Log desta instalação: $SetupLogPath"
     if ($hasSecrets -and $hasGoogle) {
-        Show-Info "NexoFlow foi instalado/atualizado com sucesso.`nMCP opcional: $script:MetaOptionalStatus.`n`nOs atalhos NexoFlow Analytics, NexoFlow Weni, NexoFlow Recompra, NexoFlow Terminal, NexoFlow Planilha e NexoFlow Noturno foram criados na Área de Trabalho.`n`nNexoFlow Weni executa check-up, teste de conexões, dry-run/auditoria obrigatória e somente depois permite aplicar as alterações."
+        Show-Info "NexoFlow foi instalado/atualizado com sucesso.`n`nOs atalhos NexoFlow Analytics, NexoFlow Weni, NexoFlow Recompra, NexoFlow Terminal, NexoFlow Planilha e NexoFlow Noturno foram criados na Área de Trabalho.`n`nNexoFlow Weni executa check-up, teste de conexões, dry-run/auditoria obrigatória e somente depois permite aplicar as alterações."
     } else {
-        Show-Info "NexoFlow foi instalado.`nMCP opcional: $script:MetaOptionalStatus.`n`nOs atalhos NexoFlow Analytics, NexoFlow Weni, NexoFlow Recompra, NexoFlow Terminal, NexoFlow Planilha e NexoFlow Noturno foram criados na Área de Trabalho.`n`nAntes da primeira execução, configure:`n- secrets_config.py`n- credentials\google_credentials.json (backend Sheets) ou credentials\datastudio\<segmento>\<ambiente>\publicacao.json (backend PostgreSQL)"
+        Show-Info "NexoFlow foi instalado.`n`nOs atalhos NexoFlow Analytics, NexoFlow Weni, NexoFlow Recompra, NexoFlow Terminal, NexoFlow Planilha e NexoFlow Noturno foram criados na Área de Trabalho.`n`nAntes da primeira execução, configure:`n- secrets_config.py`n- credentials\google_credentials.json (backend Sheets) ou credentials\datastudio\<segmento>\<ambiente>\publicacao.json (backend PostgreSQL)"
     }
     try { Stop-Transcript | Out-Null } catch { }
     exit 0
@@ -1839,4 +1785,4 @@ finally {
     if ($null -eq $previousNetworkMode) { Remove-Item Env:NEXOFLOW_NETWORK_MODE -ErrorAction SilentlyContinue }
     else { $env:NEXOFLOW_NETWORK_MODE = $previousNetworkMode }
 }
-# NexoFlow 1.5.41
+# NexoFlow 1.5.42

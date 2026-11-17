@@ -10,7 +10,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 from zoneinfo import ZoneInfo
 
-from connectors.meta_ads_mcp.client import MetaReadError
+from meta_ads_client import MetaReadError
 from meta_ads_model import SCHEMAS
 from meta_ads_native import POLICY, sync_native_meta
 

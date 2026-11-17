@@ -1,5 +1,10 @@
 # NexoFlow — Changelog
 
+## 1.5.42 — em validação
+
+- O Setup e o pacote completo passam a distribuir somente o cliente nativo de leitura de Meta Ads. Removidos o servidor MCP, as dependências exclusivas dele e os instaladores de Codex CLI e MCP. Analytics e Noturno usam a credencial Meta já configurada.
+- Inclui as consultas financeiras FARMA e o roteiro de conferência no PostgreSQL. A implantação do leitor e a validação da cópia do Looker cabem ao Work.
+
 ## PostgreSQL FARMA — conciliação do resumo de vendas e dos pedidos
 
 - BI_Vendas calcula o movimento diário com vendas e itens confirmados na mesma revisão. BI_Pedidos preserva um cabeçalho por pedido oficial e respeita as exclusões ao cruzar histórico e operacional.

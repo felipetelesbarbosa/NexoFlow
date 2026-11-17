@@ -183,17 +183,17 @@ Com proxy configurado e modo auto, uma falha TCP mantém a rota proxy. A alterna
 
 ## Escolha da rede por sessão (desenvolvimento)
 
-O Setup pergunta qual rede será usada antes da instalação: pessoal com conexão direta autorizada ou corporativa com proxy obrigatório. Não altera secrets_config.py nem apaga as credenciais preservadas. A escolha é herdada por BAT, pip e MCP; o processo do Setup restaura seu ambiente ao encerrar. Instalações não interativas podem fornecer `-NetworkMode Personal` ou `-NetworkMode Corporate`. Sem escolha, Auto mantém a política existente; se a sondagem falhar, o modo sem interação encerra por REDE_AMBIGUA.
+O Setup pergunta qual rede será usada antes da instalação: pessoal com conexão direta autorizada ou corporativa com proxy obrigatório. Não altera secrets_config.py nem apaga as credenciais preservadas. Os BAT e o pip herdam a escolha. O Setup restaura seu ambiente ao encerrar. Instalações não interativas podem fornecer `-NetworkMode Personal` ou `-NetworkMode Corporate`. Sem escolha, Auto mantém a política existente; se a sondagem falhar, o modo sem interação encerra por REDE_AMBIGUA.
 
 Nos aplicativos, `PROXY_MODE=off` é uma escolha explícita de conexão direta; `on` exige proxy. Em auto, a porta acessível indica apenas um proxy candidato, não HTTPS validado. Se o proxy não responder e não houver autorização explícita de fallback, a execução interativa exige escolha; o modo sem interação falha. Falha TCP nunca identifica rede pessoal. A seleção explícita fica em NEXOFLOW_NETWORK_MODE apenas na sessão e nos filhos. Por exemplo, no PowerShell do PC pessoal autorizado: `$env:NEXOFLOW_NETWORK_MODE='personal'`; no trabalho: `'corporate'`. Remover com `Remove-Item Env:NEXOFLOW_NETWORK_MODE` ao trocar de ambiente. Não usar escolha pessoal para contornar política corporativa. Sem sinal confiável, o programa não tenta adivinhar a rede por SSID/IP privado.
 
-Pip principal e MCP compartilham preparação da rota/CA e preflight HTTPS HEAD do índice, com limite de 10 segundos e sem redirecionamentos. CONNECT 407/503, TLS ou timeout bloqueiam a etapa antes de solicitar dependências; não iniciam fallback direto. O preflight não comprova acesso aos hosts de todos os wheels. O pip principal limita retries a zero e timeout a 15 segundos; o BAT para na primeira etapa com erro. O MCP mantém seu limite de tentativas já documentado para falhas transitórias, sem trocar rota. Índices/CA fornecidos apenas em pip.ini exigem configuração de ambiente aprovada pela TI, pois a rota da sessão não pode ser sobrescrita por pip.ini.
+O pip usa a rota e a CA da sessão. Antes de instalar as dependências, o NexoFlow consulta o índice com HTTPS HEAD e limite de 10 segundos, sem redirecionamentos. CONNECT 407/503, TLS ou timeout bloqueiam a etapa antes de solicitar dependências; não iniciam fallback direto. O preflight não comprova acesso aos hosts de todos os wheels. O pip principal limita retries a zero e timeout a 15 segundos; o BAT para na primeira etapa com erro. Índices/CA fornecidos apenas em pip.ini exigem configuração de ambiente aprovada pela TI, pois a rota da sessão não pode ser sobrescrita por pip.ini.
 
 O Setup não executa mais upgrade automático do pip. Mantém o fornecido pelo Python/venv; eventual incompatibilidade deve ser diagnosticada e resolvida em manutenção versionada e validada. Setuptools/wheel e requisitos da aplicação continuam explícitos. Avisos de versão nova não autorizam upgrade.
 
 ### Homologação pessoal e corporativa
 
-1. PC pessoal: pacote do commit correto, backup privado, atualização Preserve e escolha Personal. Manter Kaspersky/SmartScreen/TLS ativos. Confirmar que as credenciais antigas do proxy continuam no arquivo, mas não são utilizadas nessa sessão. Conferir o preflight, instalação e tentativa MCP separada; validar PET e FARMA em processos próprios.
+1. PC pessoal: pacote do commit correto, backup privado, atualização Preserve e escolha Personal. Manter Kaspersky/SmartScreen/TLS ativos. Confirmar que as credenciais antigas do proxy continuam no arquivo, mas não são utilizadas nessa sessão. Conferir o preflight e a instalação. Validar PET e FARMA em processos próprios.
 2. Fechar a sessão antes de trocar rede. PC corporativo: Preserve e escolha Corporate, sem fallback. Confirmar CONNECT/TLS para os destinos necessários. Se o proxy estiver indisponível, a instalação deve parar rapidamente com diagnóstico, sem tentativas por dependência. Em 407, solicitar à TI método/credenciais; em TLS, cadeia de CA aprovada. Guardar horário, categoria e código, sem valores privados.
 3. Sem interação e sem escolha: simular falha TCP e confirmar REDE_AMBIGUA. A rotina agendada precisa de uma rota explicitamente autorizada, não de um fallback silencioso. Não usar Noturno para testar apenas conexão: ele pode gravar dados.
 
@@ -220,7 +220,7 @@ e `PROXY_MODE=on/off` nos processos Python continua prevalecendo. Para esquecer
 uma escolha, remova o arquivo local correspondente ou a pasta `rede` com as
 rotinas encerradas; a confirmação volta na próxima sessão.
 
-A rota é herdada durante toda a sessão por executáveis, BAT, pip e MCP. O proxy
+A rota é herdada durante toda a sessão por executáveis, BAT e pip. O proxy
 corporativo indisponível mantém três tentativas e não provoca troca direta
 silenciosa. O reconhecimento não comprova autenticação CONNECT, TLS ou acesso às
 APIs. UAC usando outra conta possui memória separada; confirme nessa conta também.

@@ -13,6 +13,7 @@ try:
         REPO,
         REQUIRED,
         validate_assets,
+        validate_meta_payload,
         validate_run,
     )
 except ModuleNotFoundError:
@@ -71,6 +72,18 @@ class ValidatedReleaseTests(unittest.TestCase):
 
     def test_accepts_same_sha_with_all_required_evidence(self):
         validate_run(REPO, SHA, "123", "1.5.33", self.fetcher(self.evidence()))
+
+    def test_requires_native_meta_check_on_the_release_sha(self):
+        fetch_other = self.fetcher(self.evidence())
+
+        def fetch(path):
+            if "/workflows/meta-ads-native.yml/runs?" in path:
+                self.assertIn("head_sha=" + SHA, path)
+                return {"workflow_runs": []}
+            return fetch_other(path)
+
+        with self.assertRaisesRegex(ValueError, "meta-ads-native"):
+            validate_run(REPO, SHA, "123", "1.5.33", fetch)
 
     def test_rejects_other_sha_branch_fork_workflow_and_unfinished_run(self):
         for key, value in (
@@ -148,6 +161,8 @@ class ValidatedReleaseTests(unittest.TestCase):
             ]:
                 with zipfile.ZipFile(root / name, "w") as archive:
                     archive.writestr(prefix + "VERSION", "1.5.33\n")
+                    for module in ("meta_ads_client", "meta_ads_settings", "run_meta_ads"):
+                        archive.writestr(prefix + f"app/{module}.py", "")
                 lines.append(
                     f"{hashlib.sha256((root / name).read_bytes()).hexdigest()}  {name}"
                 )
@@ -159,6 +174,30 @@ class ValidatedReleaseTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "Hash"):
                     validate_assets(root, "1.5.33")
                 self.assertEqual(contract.call_count, 1)
+
+    def test_blocks_retired_programs_in_setup_or_project_and_missing_native_meta(self):
+        import io
+
+        for prefix in ("NexoFlow/", "NexoFlow Setup/payload/"):
+            for retired in (
+                prefix + "connectors/meta_ads_mcp/server.py",
+                prefix + "scripts/instalar_meta_ads_mcp.ps1",
+                prefix + "scripts/instalar_codex_cli.ps1",
+                prefix + "app/run_mcp_pip.py",
+                "NexoFlow Setup/CODEX.EXE",
+            ):
+                with self.subTest(prefix=prefix, retired=retired):
+                    with zipfile.ZipFile(io.BytesIO(), "w") as archive:
+                        for module in ("meta_ads_client", "meta_ads_settings"):
+                            archive.writestr(prefix + f"app/{module}.py", "")
+                        with self.assertRaisesRegex(ValueError, "Coletor nativo"):
+                            validate_meta_payload(archive, prefix)
+                        archive.writestr(prefix + "app/run_meta_ads.py", "")
+                        archive.writestr(prefix + "credentials/mcp/README.md", "")
+                        validate_meta_payload(archive, prefix)
+                        archive.writestr(retired, "")
+                        with self.assertRaisesRegex(ValueError, "descontinuado"):
+                            validate_meta_payload(archive, prefix)
 
     def test_fast_job_reuses_exact_publication_steps_and_skips_heavy_jobs(self):
         import re

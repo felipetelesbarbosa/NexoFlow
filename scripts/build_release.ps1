@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.41",
+    [string]$Version = "1.5.42",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -89,7 +89,7 @@ function Copy-TrackedFiles {
             if ($relative -like "prerequisites/*") { continue }
             if ($relative -like "native_launcher/prebuilt/*") { continue }
             if ($relative -like ".github/*") { continue }
-            if ($relative -like "scripts/*" -and $relative -notin @("scripts/reconhecer_rede.ps1", "scripts/confirmar_revisao_weni.ps1", "scripts/resultado_carga_weni.ps1", "scripts/check_release_secrets.py", "scripts/build_documentation.py", "scripts/instalar_meta_ads_mcp.ps1", "scripts/instalar_codex_cli.ps1")) { continue }
+            if ($relative -like "scripts/*" -and $relative -notin @("scripts/reconhecer_rede.ps1", "scripts/confirmar_revisao_weni.ps1", "scripts/resultado_carga_weni.ps1", "scripts/check_release_secrets.py", "scripts/build_documentation.py")) { continue }
 
             $source = Join-Path $RepoRoot $relative
             if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { continue }
@@ -348,7 +348,7 @@ foreach ($relative in @('app/bi_postgres_client.py', 'app/bi_postgres_contract.p
     Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/$relative"
 }
 
-foreach ($relative in @('app/run_mcp_pip.py', 'connectors/meta_ads_mcp/__init__.py', 'connectors/meta_ads_mcp/client.py', 'connectors/meta_ads_mcp/settings.py', 'configuracao/meta_ads_credentials.example.json', 'scripts/instalar_meta_ads_mcp.ps1', 'scripts/instalar_codex_cli.ps1')) {
+foreach ($relative in @('app/meta_ads_client.py', 'app/meta_ads_settings.py', 'configuracao/meta_ads_credentials.example.json')) {
     Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/$relative"
     Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/$relative"
 }
@@ -422,11 +422,9 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-Bloqueia cortes com BI_Itens defasada na exportação, auditoria, preparo e antes do envio de planos antigos. Novas revisões PostgreSQL exigem conciliação de itens operacionais por pedido antes de READY. Preserva recibos READY existentes, cancelamentos, exclusões, frete separado e LTV.
+O Setup e o pacote completo passam a distribuir o cliente nativo de leitura da Meta. Removidos o servidor Meta Ads MCP local, seu ambiente dedicado e os instaladores opcionais do Codex CLI e do MCP. O Analytics e o Noturno continuam lendo a credencial já configurada. O Setup cuida dos componentes da pasta do NexoFlow; a instalação independente de Codex no perfil Windows é administrada pelo usuário.
 
-Inclui diagnóstico privado e recuperação dirigida somente em dry-run dos pedidos com itens operacionais conservados. A simulação verifica identidade, data, centavos, duplicidades e colisões, sem reenviar lotes nem refazer fechamento. [Roteiro do Work](https://github.com/felipetelesbarbosa/NexoFlow/blob/main/docs/CORTE%20BI%20ITENS%20DEFASADOS%20E%20RECUPERACAO.md).
-
-Também incorpora as correções posteriores à 1.5.40: projeção financeira com itens históricos da venda inteira, fechamento transacional em volume, agregação ABC no servidor e escopo Top de compras juntas explicitamente identificado. Preserva DS_ABC_BASE_INCOMPLETA e LIMITES_DA_API_NAO_HOMOLOGADOS. Implantação dos serviços e conector pelo Work é separada do Setup.
+No PostgreSQL FARMA, BI_Vendas passa a calcular o resumo diário com vendas válidas e itens conciliados, com frete separado. BI_Pedidos protege a contagem e o faturamento contra cabeçalhos repetidos. A conferência compara os dias e o período total na revisão READY escolhida. O Work instala o leitor e confere as cinco fontes na cópia do Looker. [Roteiro](https://github.com/felipetelesbarbosa/NexoFlow/blob/v$Version/docs/CONFERENCIA%20BI%20VENDAS%20E%20PEDIDOS%20FARMA.md).
 
 Instale em Preserve e confira nexo versao. O Setup conserva configurações, credenciais, SQLite, logs, checkpoints e journals. Os ZIPs não incluem instalador Python nem dados comerciais. Não substitua módulos avulsos. A publicação do software não comprova recuperação ou homologação comercial e não executa cargas.
 
@@ -442,7 +440,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.41
+# NexoFlow 1.5.42
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"

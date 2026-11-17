@@ -1,5 +1,9 @@
 # Versionamento do NexoFlow
 
+## Preparação 1.5.42
+
+O Setup e os pacotes Windows 1.5.42 estão em validação. A automação gera os ZIPs no SHA final com `[skip release] [preparar pacotes]`. A publicação reutiliza a execução aprovada e registra a data de `publishedAt` no fuso America/Fortaleza. A versão 1.5.41 continua disponível.
+
 ## Publicação 1.5.41
 
 Publicada em **15/11/2026, 12:53:30 (America/Fortaleza)**, SHA `abdb789c20c42f4e0c22799c47a73993f23b2d04`. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.41), [preparação e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43730215188), [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43730215202), [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43730215178) e [publicação com os mesmos artefatos](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/43732329821) aprovados. Downloads públicos conferidos: SHA-256, CRC, 593 entradas do manifesto, 124 módulos e 586 arquivos do commit por pacote, executáveis x64 1.5.41.0. Sem instalador Python ou dados comerciais nos ZIPs. A 1.5.40 e anteriores preservadas. Nenhuma implantação/recuperação comercial executada.
