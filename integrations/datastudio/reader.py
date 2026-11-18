@@ -24,6 +24,7 @@ from ds_backend.contract import (
 from integrations.datastudio.products_reader import ProductPeriods, projected
 from integrations.datastudio.read_catalog import (
     DERIVED_SQL,
+    PUBLIC_SUMMARY,
     READ_REGISTRY,
     read_contract,
 )
@@ -224,7 +225,11 @@ class Reader(Store):
     def query(self, table, fields, start, end, filters, aggregation):
         spec = read_contract(table)
         if spec.get("segment", self.segment) != self.segment:
-            raise StorageError("DS_INSIGHTS_SEGMENTO")
+            raise StorageError(
+                "DS_INSIGHTS_SEGMENTO"
+                if table == "BI_Weni_Conversas_Diarias"
+                else "DS_TABELA_NAO_AUTORIZADA"
+            )
         allowed = spec.get("read_columns", spec["columns"])
         if (
             not spec["public"]
@@ -245,6 +250,10 @@ class Reader(Store):
             for v in aggregation.values()
         ):
             raise StorageError("DS_AGREGACAO_INVALIDA")
+        if table == PUBLIC_SUMMARY and aggregation:
+            # Os grupos conjuntos permitem que a página aplique dimensões e
+            # fórmulas legadas, mesmo quando o Looker não encaminha os filtros.
+            raise StorageError("DS_PUBLICO_AGREGACAO_INVALIDA")
         for field, operation in aggregation.items():
             if operation == "sum" and spec["types"][field] != "number":
                 raise StorageError("DS_AGREGACAO_TIPO")
@@ -351,13 +360,28 @@ class Reader(Store):
             version = self.active(conn)
             if not version:
                 raise StorageError("DS_SEM_PUBLICACAO_CONFIRMADA")
+            if spec.get("optional") or table == "BI_Weni_Conversas_Diarias":
+                if (
+                    conn.execute(
+                        "SELECT to_regclass(%s) AS relation",
+                        (f"{self.schema}.{view_name(table)}",),
+                    ).fetchone()["relation"]
+                    is None
+                ):
+                    raise StorageError(
+                        "DS_INSIGHTS_VISAO_AUSENTE"
+                        if table == "BI_Weni_Conversas_Diarias"
+                        else "DS_PUBLICO_VISAO_AUSENTE"
+                    )
             if table == "BI_Weni_Conversas_Diarias":
                 coverage = conn.execute(
-                    "SELECT count(*) AS dias FROM farma.ds_bi_weni_conversas_diarias WHERE data BETWEEN %s AND %s",
+                    "SELECT count(*) AS linhas,count(DISTINCT data) AS dias "
+                    "FROM farma.ds_bi_weni_conversas_diarias WHERE data BETWEEN %s AND %s",
                     (start, end),
                 ).fetchone()
                 if (
-                    coverage["dias"]
+                    coverage["linhas"] != coverage["dias"]
+                    or coverage["dias"]
                     != (date.fromisoformat(end) - date.fromisoformat(start)).days + 1
                 ):
                     raise StorageError("DS_INSIGHTS_COBERTURA_INCOMPLETA")
@@ -440,8 +464,8 @@ def create_views(conn):
     for segment in ("FARMA", "PET"):
         schema = segment.lower()
         for name, spec in READ_REGISTRY.items():
-            if name == "BI_Weni_Conversas_Diarias":
-                continue  # Visão opcional instalada junto com o vínculo do projeto.
+            if name == "BI_Weni_Conversas_Diarias" or spec.get("optional"):
+                continue  # Visões de homologação têm instalação própria.
             if not spec["public"] and name != "Exclusoes_Publicacao":
                 continue
             columns = []
@@ -506,3 +530,16 @@ def create_views(conn):
     from integrations.datastudio.financial_views import create_financial_views
 
     create_financial_views(conn)
+
+
+def create_farma_public_summary(conn):
+    conn.execute("""CREATE OR REPLACE VIEW farma.ds_bi_publico_resumo
+        WITH (security_barrier=true) AS
+        SELECT nullif(btrim(cidade),'') AS cidade,canal,idade,idade_informada,
+          count(*) AS contatos,
+          count(*) FILTER (WHERE compra_identificada=1) AS compra_identificada,
+          count(*) FILTER (WHERE compra_identificada=0) AS sem_compra_identificada,
+          count(*) FILTER (WHERE idade_informada=1) AS contatos_idade_informada,
+          count(*) FILTER (WHERE nullif(btrim(cidade),'') IS NULL) AS contatos_sem_cidade
+        FROM farma.ds_bi_publico GROUP BY 1,2,3,4""")
+    conn.execute("GRANT SELECT ON farma.ds_bi_publico_resumo TO nf_ds_farma_read")

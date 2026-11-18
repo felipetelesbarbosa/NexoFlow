@@ -139,7 +139,11 @@ def grants(conn, segment):
             )
     # O leitor só enxerga visões públicas; Store.info usa esta função restrita na implantação.
     for name, spec in READ_REGISTRY.items():
-        if spec["public"] and name != "BI_Weni_Conversas_Diarias":
+        if (
+            spec["public"]
+            and name != "BI_Weni_Conversas_Diarias"
+            and not spec.get("optional")
+        ):
             conn.execute(
                 sql.SQL("GRANT SELECT ON {}.{} TO {}").format(
                     sql.Identifier(schema),
@@ -148,7 +152,11 @@ def grants(conn, segment):
                 )
             )
     for name, spec in READ_REGISTRY.items():
-        if spec["public"] and name != "BI_Weni_Conversas_Diarias":
+        if (
+            spec["public"]
+            and name != "BI_Weni_Conversas_Diarias"
+            and not spec.get("optional")
+        ):
             conn.execute(
                 sql.SQL("GRANT SELECT ON {}.{} TO {}").format(
                     sql.Identifier(schema),
@@ -175,7 +183,7 @@ def grants(conn, segment):
         )
 
 
-def update_farma_report(store, expected_revision):
+def update_farma_report(store, expected_revision, *, public_summary=False):
     from integrations.datastudio.financial_views import (
         create_farma_orders_view,
         create_farma_sales_view,
@@ -193,8 +201,13 @@ def update_farma_report(store, expected_revision):
             "SELECT 1 FROM controle.nf_execucoes WHERE segmento='FARMA' AND estado='WRITING'"
         ).fetchone():
             raise StorageError("DS_MIGRACAO_COM_PUBLICACAO_INCOMPLETA")
-        create_farma_orders_view(conn)
-        create_farma_sales_view(conn)
+        if public_summary:
+            from integrations.datastudio.reader import create_farma_public_summary
+
+            create_farma_public_summary(conn)
+        else:
+            create_farma_orders_view(conn)
+            create_farma_sales_view(conn)
     return active
 
 
@@ -206,8 +219,10 @@ def run(argv=None):
     p.add_argument("--ambiente", choices=("homologacao", "producao"), required=True)
     p.add_argument("--segmento", choices=("FARMA", "PET"), required=True)
     p.add_argument("--aprovar-origem", type=Path)
-    p.add_argument("--atualizar-visoes-farma", metavar="UUID_READY")
-    p.add_argument("--instalar-conversas-projeto", metavar="UUID_PROJETO_WENI")
+    mode = p.add_mutually_exclusive_group()
+    mode.add_argument("--atualizar-visoes-farma", metavar="UUID_READY")
+    mode.add_argument("--instalar-publico-farma", metavar="UUID_READY")
+    mode.add_argument("--instalar-conversas-projeto", metavar="UUID_PROJETO_WENI")
     p.add_argument("--finalizar-selada")
     p.add_argument("--saida", type=Path)
     p.add_argument("--recibos-esperados", type=int)
@@ -218,7 +233,6 @@ def run(argv=None):
             x is not None
             for x in (
                 args.aprovar_origem,
-                args.atualizar_visoes_farma,
                 args.finalizar_selada,
                 args.saida,
                 args.recibos_esperados,
@@ -238,7 +252,10 @@ def run(argv=None):
         )
         print("[OK] Projeto vinculado e visão FARMA de conversas instalada.")
         return
-    if args.atualizar_visoes_farma is not None:
+    if (
+        args.atualizar_visoes_farma is not None
+        or args.instalar_publico_farma is not None
+    ):
         if any(
             value is not None
             for value in (
@@ -251,12 +268,16 @@ def run(argv=None):
         ):
             p.error("A atualização de visões deve ser executada isoladamente.")
         dsn = args.dsn_file.read_text(encoding="utf-8-sig").strip()
+        public_summary = args.instalar_publico_farma is not None
         version = update_farma_report(
-            Store(dsn, args.ambiente, args.segmento), args.atualizar_visoes_farma
+            Store(dsn, args.ambiente, args.segmento),
+            args.instalar_publico_farma
+            if public_summary
+            else args.atualizar_visoes_farma,
+            public_summary=public_summary,
         )
-        print(
-            f"[OK] Visões BI_Pedidos e BI_Vendas FARMA instaladas na versão READY {version}."
-        )
+        views = "BI_Publico_Resumo" if public_summary else "BI_Pedidos e BI_Vendas"
+        print(f"[OK] Visões {views} FARMA instaladas na versão READY {version}.")
         return version
     if args.finalizar_selada and (args.saida is None or args.aprovar_origem):
         p.error("Fechamento exige --saida privada e não aceita --aprovar-origem.")

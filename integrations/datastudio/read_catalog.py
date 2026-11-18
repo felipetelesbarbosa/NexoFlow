@@ -17,6 +17,29 @@ READ_REGISTRY[TABLE] = dict(
         for f in COLUMNS
     },
 )
+PUBLIC_SUMMARY = "BI_Publico_Resumo"
+PUBLIC_DIMENSIONS = ("cidade", "canal", "idade", "idade_informada")
+PUBLIC_METRICS = {
+    "contatos": "Contatos",
+    "compra_identificada": "Com compra identificada",
+    "sem_compra_identificada": "Sem compra identificada",
+    "contatos_idade_informada": "Contatos com idade informada",
+    "contatos_sem_cidade": "Contatos sem cidade",
+}
+READ_REGISTRY[PUBLIC_SUMMARY] = dict(
+    public=True,
+    segment="FARMA",
+    optional=True,
+    columns=[*PUBLIC_DIMENSIONS, *PUBLIC_METRICS],
+    period=None,
+    types={
+        field: "text" if field in ("cidade", "canal") else "number"
+        for field in (*PUBLIC_DIMENSIONS, *PUBLIC_METRICS)
+    },
+    dimensions=["idade", "idade_informada"],
+    labels=PUBLIC_METRICS,
+    metric_kinds=dict.fromkeys(PUBLIC_METRICS, "sum"),
+)
 PROJECTIONS = {
     "Metricas_Diarias": (
         "data tipo_atribuicao anuncio_id anuncio_titulo contatos",

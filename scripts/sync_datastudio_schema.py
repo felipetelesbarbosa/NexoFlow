@@ -38,14 +38,17 @@ def run():
     for name, spec in READ_REGISTRY.items():
         if not spec["public"]:
             continue
-        dims = [
-            f
-            for f, kind in old.get(name, [])
-            if kind.startswith("number") and kind != "number"
-        ]
+        dims = spec.get(
+            "dimensions",
+            [
+                f
+                for f, kind in old.get(name, [])
+                if kind.startswith("number") and kind != "number"
+            ],
+        )
         columns = spec.get("read_columns", spec["columns"])
         public[name] = dict(
-            spec,
+            {key: value for key, value in spec.items() if key != "optional"},
             columns=columns,
             dimensions=dims,
             types={f: spec["types"][f] for f in columns},

@@ -279,3 +279,47 @@ test('ds136 preserva tipos e zero confirmado, bloqueia lacunas e separa PET',()=
 
 require('./datastudio/meta_orders.cjs');
 require('./datastudio/produtos_periodo.cjs')({fixture, result});
+
+test('Público entrega dimensões e contagens aditivas sem linhas de contatos',()=>{
+ const f=fixture(p=>{
+   assert.equal(p.table,'BI_Publico_Resumo');
+   assert.equal(p.start,'');
+   assert.deepEqual(JSON.parse(JSON.stringify(p.aggregation)),{});
+   assert.deepEqual(JSON.parse(JSON.stringify(p.filters)),[{field:'cidade',values:['Belém']}]);
+   return result(p,[p.fields.map(n=>({canal:'whatsapp',idade:'25',contatos:30,compra_identificada:20})[n])]);
+ });
+ const r=request(['canal','idade','contatos','compra_identificada']);
+ r.configParams.tabela='BI_Publico_Resumo';
+ r.fields.push({name:'cidade',forFilterOnly:true});
+ r.dimensionsFilters=[[{type:'INCLUDE',operator:'EQUALS',fieldName:'cidade',values:['Belém']}]];
+ const answer=f.ctx.getData(r);
+ assert.equal(answer.filtersApplied,true);
+ const row=Object.fromEntries(answer.schema.map((s,i)=>[s.name,answer.rows[0].values[i]]));
+ assert.deepEqual(row,{canal:'whatsapp',idade:25,contatos:30,compra_identificada:20});
+ const schema=f.ctx.dsFields_('BI_Publico_Resumo').build();
+ assert.equal(schema.find(x=>x.id==='idade').role,'dimension');
+ assert.equal(schema.find(x=>x.id==='contatos_idade_informada').aggregation,'sum');
+ assert.equal(schema.some(x=>x.id==='contato_chave'),false);
+});
+
+test('Público devolve a dimensão para filtros que o Looker avalia depois',()=>{
+ const f=fixture(p=>{
+   assert.deepEqual(JSON.parse(JSON.stringify(p.filters)),[]);
+   assert.ok(p.fields.includes('idade'));
+   return result(p,[p.fields.map(n=>({idade:25,contatos:30})[n])]);
+ });
+ const r=request(['contatos']);
+ r.configParams.tabela='BI_Publico_Resumo';
+ r.fields.push({name:'idade',forFilterOnly:true});
+ r.dimensionsFilters=[[{type:'EXCLUDE',operator:'EQUALS',fieldName:'idade',values:[20]}]];
+ const answer=f.ctx.getData(r);
+ assert.equal(answer.filtersApplied,false);
+ assert.equal(answer.schema.find(x=>x.name==='idade').type,'number');
+});
+
+test('visão Weni ausente é explícita e não se torna período zerado',()=>{
+ const f=fixture(()=>({status:409,body:{error:'DS_INSIGHTS_VISAO_AUSENTE'}}));
+ const r=request(['conversas_weni']);
+ r.configParams.tabela='BI_Weni_Conversas_Diarias';
+ assert.throws(()=>f.ctx.getData(r),/DS_INSIGHTS_VISAO_AUSENTE/);
+});

@@ -18,7 +18,7 @@ function getConfig(request){
   ['homologacao','producao'].forEach(function(v){env.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
   var table=config.newSelectSingle().setId('tabela').setName('Tabela lógica').setIsDynamic(true);
   Object.keys(NexoDSSchemas).filter(function(v){return !NexoDSSchemas[v].segment || NexoDSSchemas[v].segment===p.segmento;}).forEach(function(v){table.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
-  if (!['Compradores_Operacionais', 'Pedidos_Atribuiveis_Meta', 'Contatos_Atribuicao_Meta', 'Produtos_Mais_Vendidos'].includes(p.tabela)) {
+  if (!['Compradores_Operacionais', 'Pedidos_Atribuiveis_Meta', 'Contatos_Atribuicao_Meta', 'Produtos_Mais_Vendidos', 'BI_Publico_Resumo'].includes(p.tabela)) {
     var query=config.newSelectSingle().setId('modo_consulta').setName('Leitura: detalhe ou somas homologadas');
     ['detalhe','somas'].forEach(function(v){query.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
   }
@@ -63,7 +63,7 @@ function dsCall_(c,path,payload){
       if(status===503 && rejection.error==='DS_BANCO_INDISPONIVEL')failure='DS_BANCO_INDISPONIVEL';
       // Só códigos conhecidos, nunca texto livre/payload de erro do servidor.
       if(status===409 && path==='/v1/produtos' && ['DS_PRODUTOS_BASE_INVALIDA','DS_FILTRO_INVALIDO','DS_REVISAO_ALTERADA','DS_CAMPOS_NAO_AUTORIZADOS','DS_PERIODO_INVALIDO'].includes(rejection.error))throw new Error(rejection.error);
-      if(status===409 && ['DS_FILTRO_CORTA_RECORTE_USE_DETALHE','DS_COMPRADORES_EXIGEM_COMPETENCIA_OU_RECORTE_UNICO','DS_COMPRADORES_NAO_SOMAVEIS_ENTRE_MESES','DS_RESUMO_EXIGE_GRAO','DS_RESUMO_TOTAL_NAO_APLICA_DATA','DS_CONSULTA_EXCEDE_LIMITE_USE_RESUMO_OU_PERIODO','DS_RESPOSTA_EXCEDE_LIMITE_USE_RESUMO','DS_SEM_PUBLICACAO_CONFIRMADA','DS_ABC_BASE_INCOMPLETA','DS_INSIGHTS_COBERTURA_INCOMPLETA','DS_INSIGHTS_PERIODO_OBRIGATORIO','DS_ABC_PEDIDO_EXCEDE_LIMITE_PARES','DS_ABC_PRECISAO_EXCEDIDA','DS_BI_PEDIDO_OPERACIONAL_AMBIGUO','DS_CONSULTA_TEMPO_LIMITE'].includes(rejection.error))throw new Error(rejection.error);
+      if(status===409 && ['DS_FILTRO_CORTA_RECORTE_USE_DETALHE','DS_COMPRADORES_EXIGEM_COMPETENCIA_OU_RECORTE_UNICO','DS_COMPRADORES_NAO_SOMAVEIS_ENTRE_MESES','DS_RESUMO_EXIGE_GRAO','DS_RESUMO_TOTAL_NAO_APLICA_DATA','DS_CONSULTA_EXCEDE_LIMITE_USE_RESUMO_OU_PERIODO','DS_RESPOSTA_EXCEDE_LIMITE_USE_RESUMO','DS_SEM_PUBLICACAO_CONFIRMADA','DS_ABC_BASE_INCOMPLETA','DS_INSIGHTS_COBERTURA_INCOMPLETA','DS_INSIGHTS_VISAO_AUSENTE','DS_PUBLICO_VISAO_AUSENTE','DS_INSIGHTS_PERIODO_OBRIGATORIO','DS_ABC_PEDIDO_EXCEDE_LIMITE_PARES','DS_ABC_PRECISAO_EXCEDIDA','DS_BI_PEDIDO_OPERACIONAL_AMBIGUO','DS_CONSULTA_TEMPO_LIMITE'].includes(rejection.error))throw new Error(rejection.error);
     }
     if(![429,502,503,504].includes(status)||attempt===2||Date.now()-started>45000)throw new Error(failure);
     Utilities.sleep(Math.min(4000,1000*Math.pow(2,attempt)));
@@ -100,6 +100,8 @@ function dsError_(error){
 }
 function getData(request){try{
   var p=request.configParams,c=dsConfig_(p),spec=NexoDSSchemas[p.tabela];
+  var publicTable=['BI_Publico','BI_Publico_Resumo','Compradores_Operacionais'].includes(p.tabela);
+  var publicStarted=publicTable?Date.now():0;
   if(spec.product_modes)return dsProductsData_(request,c,spec);
   if(spec.abc_mode)return dsAbcData_(request,c,spec);
   if(p.tabela==='Pedidos_Atribuiveis_Meta'||p.tabela==='Contatos_Atribuicao_Meta')return dsAdData_(request,c,spec);
@@ -121,7 +123,7 @@ function getData(request){try{
   }
   names=dsFields_(p.tabela).forIds(names).build().map(function(f){return f.name;});
   var buyers = p.tabela === 'Compradores_Operacionais';
-  var sumAggregation=buyers ? {} : dsSums_(p,spec,names,groups,supported,distinct);
+  var sumAggregation=buyers||p.tabela==='BI_Publico_Resumo' ? {} : dsSums_(p,spec,names,groups,supported,distinct);
   var payload={table:p.tabela,fields:distinct?['produto_codigo']:names,start:spec.period?(range.startDate||''):'',end:spec.period?(range.endDate||''):'',filters:filters,aggregation:distinct?{produto_codigo:'count_distinct'}:sumAggregation};
   if (buyers) {
     // Agrupa no PostgreSQL antes dos limites de linhas e bytes. A coluna
@@ -139,9 +141,18 @@ function getData(request){try{
   }
   if(request.scriptParams&&request.scriptParams.sampleExtraction&&spec.period&&!payload.start){payload.start='2000-01-01';payload.end='2000-01-01';}
   var result=dsCheckedQuery_(c,payload);
+  var publicFetched=publicTable?Date.now():0;
   var fields=dsFields_(p.tabela).forIds(names);
   var data = buyers ? dsBuyerRows_(result.rows, payload.fields, names) : result.rows;
   var rows=dsFormatRows_(data,names,spec,distinct);
+  if(publicTable&&typeof console.info==='function'){
+    console.info(JSON.stringify({
+      diagnostico:'publico_farma',tabela:p.tabela,versao:result.version,
+      linhas:rows.length,campos:names.length,filtros:groups.length,
+      filtros_aplicados:!!applied,api_ms:publicFetched-publicStarted,
+      formato_ms:Date.now()-publicFetched
+    }));
+  }
   return {schema:fields.build(),rows:rows,filtersApplied:!!applied};
 }catch(error){return dsError_(error);}}
 if(typeof module!=='undefined')module.exports={getData:getData,dsCall:dsCall_,dsConfig:dsConfig_};

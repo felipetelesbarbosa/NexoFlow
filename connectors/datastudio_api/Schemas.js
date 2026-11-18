@@ -1505,6 +1505,51 @@ var NexoDSSchemas={
     },
     "dimensions": []
   },
+  "BI_Publico_Resumo": {
+    "public": true,
+    "segment": "FARMA",
+    "columns": [
+      "cidade",
+      "canal",
+      "idade",
+      "idade_informada",
+      "contatos",
+      "compra_identificada",
+      "sem_compra_identificada",
+      "contatos_idade_informada",
+      "contatos_sem_cidade"
+    ],
+    "period": null,
+    "types": {
+      "cidade": "text",
+      "canal": "text",
+      "idade": "number",
+      "idade_informada": "number",
+      "contatos": "number",
+      "compra_identificada": "number",
+      "sem_compra_identificada": "number",
+      "contatos_idade_informada": "number",
+      "contatos_sem_cidade": "number"
+    },
+    "dimensions": [
+      "idade",
+      "idade_informada"
+    ],
+    "labels": {
+      "contatos": "Contatos",
+      "compra_identificada": "Com compra identificada",
+      "sem_compra_identificada": "Sem compra identificada",
+      "contatos_idade_informada": "Contatos com idade informada",
+      "contatos_sem_cidade": "Contatos sem cidade"
+    },
+    "metric_kinds": {
+      "contatos": "sum",
+      "compra_identificada": "sum",
+      "sem_compra_identificada": "sum",
+      "contatos_idade_informada": "sum",
+      "contatos_sem_cidade": "sum"
+    }
+  },
   "Compradores_Operacionais": {
     "columns": [
       "contact_uuid",
