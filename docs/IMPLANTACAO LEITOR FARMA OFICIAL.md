@@ -35,7 +35,7 @@ O limite HTTP e o limite de conexões SQL controlam recursos diferentes. O Compo
    "${candidato[@]}" config --quiet
    ```
 
-   Compare os modelos efetivos em sessão privada. Somente `datastudio-farma-read` deve ganhar a imagem, o comando e `PGOPTIONS` do overlay. Preserve opções adicionais existentes na configuração de leitura quando aplicável e repita o teste de carga. Registre os hashes dos arquivos base e do overlay sem copiar os valores de segredos.
+   Compare os modelos efetivos em sessão privada. A renderização dos dois arquivos reais com e sem o overlay foi feita na VPS em 18/11. A comparação dos modelos confirmou alterações apenas na imagem, no comando e em `PGOPTIONS` de `datastudio-farma-read`. Nenhum contêiner foi recriado nessa simulação. Preserve opções adicionais existentes na configuração de leitura quando aplicável e repita o teste de carga. Registre os hashes dos arquivos base e do overlay sem copiar os valores de segredos.
 4. Após o aceite da cópia, faça a troca do leitor na janela operacional. Use `"${candidato[@]}" up -d --no-deps --pull never datastudio-farma-read`. Confira o estado saudável, a imagem efetiva, a rota padrão pelo conector, FARMA/produção, revisão ativa, zero rejeições HTTP e ausência de `53100`. Acompanhe tempo de resposta, CPU e memória. Mantenha o publicador e o banco no projeto existente.
 5. Troque as fontes no relatório oficial em grupos de páginas. Após cada grupo, valide os filtros, moeda, totais e mesclagens pelo endereço oficial. Pare e reverta o grupo se houver leitura incompleta, fonte inacessível, divergência de chaves ou erro de prazo.
 
@@ -47,7 +47,8 @@ O limite HTTP e o limite de conexões SQL controlam recursos diferentes. O Compo
 | ABC em 09/11/2026 | Conferir SKUs, unidades, receita de produtos e classes. O filtro B limita o ranking e preserva o total geral do período. |
 | ABC de 01/01 a 15/11/2026 | Conferir SKUs, unidades e receita. A ordem e a frequência dos 25 primeiros pares coincidiram com a VPS. |
 | ABC em 16 e 17/11/2026 | O primeiro ensaio exibiu `DS_PRAZO_CONSULTA` em parte dos gráficos. No reteste de 18/11, o resumo abriu com zero SKUs e R$ 0,00. O ranking e pares ficaram vazios e as classes exibiram “Não há dados”. Repetir a abertura conjunta pela rota oficial. |
-| Produtos mais vendidos | Os dois Top 5 e o filtro de nome foram conferidos na VPS. Comparar cada posição na cópia com o recibo privado. Um SKU com receita positiva, sozinho no filtro, deve atingir 100%. No vazio, são zero SKUs, unidades e receita e zero linhas nos rankings. |
+| Produtos mais vendidos | Os sete componentes foram vinculados à fonte privada integrada. Os dois Top 5 coincidiram posição a posição em receita e unidades no dia e no anual. O filtro de um único produto preservou os totais filtrados e exibiu 100% de participação. No vazio, os cartões zeraram e os rankings ficaram vazios, sem erro. |
+| Meus clientes | O ranking e os cartões de compradores, receita média e pedidos por comprador coincidiram com o controle privado de 09 a 12/11. Selecionar um comprador pelo nome reduziu o ranking a uma linha e conciliou os três cartões com os valores desse comprador. |
 | Resumo e Vendas | Entre 09 e 12/11, comparar pedidos, unidades e faturamento com frete com o recibo privado. Conferir moeda em BRL e preservar filtros. |
 | Mesclagens, público e anúncios | Conferir chaves, cardinalidade, filtros, custos, atribuição FARMA e LTV por cliente. Comparar agregados no mesmo período e mesma revisão. |
 
@@ -55,7 +56,7 @@ Para um 503, registre a janela, o gráfico e o erro sanitizado. Compare os logs 
 
 ## Fonte Weni ds136
 
-A instalação de homologação confirmou seis recibos e zero recibos novos no reenvio. O aceite de produção exige visão `farma.ds_bi_weni_conversas_diarias` e papel leitor verificados no banco correspondente, projeto FARMA e fuso `America/Belem`, e cobertura diária comprovada. Confira o período editável do relatório antes de trocar a fonte. A janela de 01 a 06/11 é o controle inicial de conversas, resolvidas, não resolvidas e transferidas. O roteiro comercial existente descreve a instalação de homologação e as guardas de cobertura. [Guia Weni](CONVERSAS%20DIARIAS%20WENI.md)
+A instalação de homologação confirmou seis recibos e zero recibos novos no reenvio. Em 18/11, os quatro totais da cópia coincidiram com as seis datas consultadas pelo papel leitor de homologação. Na mesma inspeção, a visão `farma.ds_bi_weni_conversas_diarias` ainda estava ausente no banco comercial. O aceite de produção exige a visão e o papel leitor conferidos no banco correspondente, projeto FARMA e fuso `America/Belem`, e cobertura diária comprovada. Confira o período editável do relatório antes de trocar a fonte. A janela de 01 a 06/11 é o controle inicial de conversas, resolvidas, não resolvidas e transferidas. O roteiro comercial existente descreve a instalação de homologação e as guardas de cobertura. [Guia Weni](CONVERSAS%20DIARIAS%20WENI.md)
 
 ## Reversão
 
