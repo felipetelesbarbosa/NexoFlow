@@ -17,8 +17,10 @@ function getConfig(request){
   ['homologacao','producao'].forEach(function(v){env.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
   var table=config.newSelectSingle().setId('tabela').setName('Tabela lógica').setIsDynamic(true);
   Object.keys(NexoDSSchemas).filter(function(v){return !NexoDSSchemas[v].segment || NexoDSSchemas[v].segment===p.segmento;}).forEach(function(v){table.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
-  var query=config.newSelectSingle().setId('modo_consulta').setName('Leitura: detalhe ou somas homologadas');
-  ['detalhe','somas'].forEach(function(v){query.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
+  if (p.tabela !== 'Compradores_Operacionais') {
+    var query=config.newSelectSingle().setId('modo_consulta').setName('Leitura: detalhe ou somas homologadas');
+    ['detalhe','somas'].forEach(function(v){query.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
+  }
   if(p.tabela==='ABC_juntos'){
     var scope=config.newSelectSingle().setId('pares_escopo').setName('Compras juntas: universo completo ou Top explícito');
     ['COMPLETO','TOP'].forEach(function(v){scope.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
@@ -105,8 +107,17 @@ function getData(request){try{
     if(['TOTAL','SEM_EMISSAO'].includes(p.recorte_historico))range={};
   }
   names=dsFields_(p.tabela).forIds(names).build().map(function(f){return f.name;});
-  var sumAggregation=dsSums_(p,spec,names,groups,supported,distinct);
+  var buyers = p.tabela === 'Compradores_Operacionais';
+  var sumAggregation=buyers ? {} : dsSums_(p,spec,names,groups,supported,distinct);
   var payload={table:p.tabela,fields:distinct?['produto_codigo']:names,start:spec.period?(range.startDate||''):'',end:spec.period?(range.endDate||''):'',filters:filters,aggregation:distinct?{produto_codigo:'count_distinct'}:sumAggregation};
+  if (buyers) {
+    // Agrupa no PostgreSQL antes dos limites de linhas e bytes. A coluna
+    // contada é a chave obrigatória do pedido; o vínculo continua pelo UUID.
+    payload.table = 'Pedidos_FarmaLider';
+    payload.fields = ['contact_uuid', 'calc_gf73fvq57d', 'pedido_chave'];
+    payload.filters.push({field: 'calc_gf73fvq57d', values: ['Sim']});
+    payload.aggregation = {pedido_chave: 'count'};
+  }
   if(spec.period&&!(p.tabela==='BI_Historico_Resumo'&&['TOTAL','SEM_EMISSAO'].includes(p.recorte_historico))&&(!payload.start||!payload.end)&&!(request.scriptParams&&request.scriptParams.sampleExtraction))throw new Error('DS_PERIODO_OBRIGATORIO');
   // Uma amostra de schema sem período não escolhe nem inventa um dia da Weni.
   if(p.tabela==='BI_Weni_Conversas_Diarias'&&request.scriptParams&&request.scriptParams.sampleExtraction&&!payload.start){
@@ -119,10 +130,28 @@ function getData(request){try{
   if(result.protocol!=='nexoflow_datastudio_1'||result.target!==expectedDB+'.'+c.segment.toLowerCase()||result.segment!==c.segment||result.environment!==c.environment||result.schema_hash!==NexoDSSchemaHash)throw new Error('DS_CONTRATO_DESTINO_DIVERGENTE');
   if(!Number.isSafeInteger(result.version)||result.version<1||result.complete!==true||!Array.isArray(result.rows)||JSON.stringify(result.fields)!==JSON.stringify(payload.fields))throw new Error('DS_RESPOSTA_INCOMPLETA');
   var fields=dsFields_(p.tabela).forIds(names);
-  var rows=result.rows.map(function(r){if(r.length!==payload.fields.length)throw new Error('DS_SCHEMA_DIVERGENTE');return {values:r.map(function(v,i){if(v===null||v==='')return null;var kind=distinct?'number':spec.types[names[i]];if(kind==='number'){var n=Number(v);if(!Number.isFinite(n))throw new Error('DS_NUMERO_INVALIDO');return n;}if(kind==='date'){if(!/^\d{4}-\d{2}-\d{2}$/.test(v))throw new Error('DS_DATA_INVALIDA');return v.replace(/-/g,'');}return String(v);})};});
+  var data = buyers ? dsBuyerRows_(result.rows, payload.fields, names) : result.rows;
+  var rows=data.map(function(r){if(r.length!==names.length)throw new Error('DS_SCHEMA_DIVERGENTE');return {values:r.map(function(v,i){if(v===null||v==='')return null;var kind=distinct?'number':spec.types[names[i]];if(kind==='number'){var n=Number(v);if(!Number.isFinite(n))throw new Error('DS_NUMERO_INVALIDO');return n;}if(kind==='date'){if(!/^\d{4}-\d{2}-\d{2}$/.test(v))throw new Error('DS_DATA_INVALIDA');return v.replace(/-/g,'');}return String(v);})};});
   return {schema:fields.build(),rows:rows,filtersApplied:!!applied};
 }catch(error){return dsError_(error);}}
 if(typeof module!=='undefined')module.exports={getData:getData,dsCall:dsCall_,dsConfig:dsConfig_};
+
+function dsBuyerRows_(rows, fields, names) {
+  var indices = names.map(function(name) { return fields.indexOf(name); });
+  var projected = [];
+  rows.forEach(function(row) {
+    if (!Array.isArray(row) || row.length !== fields.length || row[1] !== 'Sim' ||
+        !Number.isSafeInteger(row[2]) || row[2] < 1) {
+      throw new Error('DS_RESPOSTA_INCOMPLETA');
+    }
+    // Um grupo sem contato não identifica um comprador. Preserve a chave
+    // textual exata dos demais grupos para a igualdade com a Base_Contatos.
+    if (row[0] === null) return;
+    if (typeof row[0] !== 'string') throw new Error('DS_SCHEMA_DIVERGENTE');
+    if (row[0].trim()) projected.push(indices.map(function(i) { return row[i]; }));
+  });
+  return projected;
+}
 
 // Modo explícito: não inferir SUM para taxas, compradores, LTV ou métricas Meta.
 // Fontes existentes sem parâmetro continuam em detalhe; não mudar blends por inferência.

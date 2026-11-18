@@ -16,6 +16,36 @@ A auditoria estática encontra destino para 36 dos 37 aliases. O recibo comprova
 
 O relatório oficial permanece na etapa anterior até a decisão de corte. Esta conferência dispensa recoleta, reenvio e novo fechamento.
 
+### Homologação do público com compras identificadas
+
+Para a combinação histórica `ds74 LEFT ds72`, a fonte lógica
+`Compradores_Operacionais` pede à API de leitura já existente os campos
+`contact_uuid`, `calc_gf73fvq57d` e a contagem de `pedido_chave`. O PostgreSQL
+filtra `Venda elegível = Sim` antes de agrupar por contato. A consulta abrange
+todas as datas da READY ativa, inclusive novas datas em revisões posteriores.
+Os limites de leitura continuam incidindo sobre os grupos retornados.
+
+1. Na implantação privada de homologação do conector, use o `Code.js` e o
+   `Schemas.js` correspondentes a esta versão. O Windows, as visões e as permissões
+   da VPS podem permanecer nas versões que já oferecem a projeção de pedidos.
+2. Na **cópia** do relatório, adicione uma fonte FARMA com a tabela lógica
+   `Compradores_Operacionais`. Duplique a mesclagem de público. Mantenha
+   `Base_Contatos` à esquerda com seus campos e filtros de canal e faixa etária.
+   Substitua somente a entrada direita, reassocie `contact_uuid` dos dois lados,
+   mantenha a junção externa à esquerda e a métrica **Contar diferentes** do
+   `contact_uuid` **da direita** para “Clientes que já compraram”.
+   Se o filtro de elegibilidade da fonte antiga perdeu a referência, associe-o
+   novamente à dimensão `Venda elegível`. Os dois lados da combinação histórica
+   ficam sem dimensão de período. A mesclagem de produtos continua utilizando
+   `Pedidos_FarmaLider` no grão de pedido.
+3. Confira a versão ativa antes e depois da atualização do gráfico. Se mudou,
+   repita os controles na mesma revisão. Na READY v2 conferida em 17/11/2026,
+   o controle da VPS foi de 48.843 contatos, 28.868 compradores e 19.975 sem
+   compra, correspondentes a 157.711 pedidos elegíveis vinculados à base.
+   Compare também um segmento de canal ou faixa na cópia e na VPS. Uma revisão
+   posterior requer controles próprios. Registre apenas agregados. Para reverter
+   o ensaio, reassocie o gráfico da cópia à combinação anterior.
+
 
 **Correção posterior de volume do leitor (15/11/2026):** [ABC, resumo e pares no servidor](ABC%20POSTGRESQL%20EM%20VOLUME.md). Preserva fechamento READY existente; implantação somente do leitor FARMA e dos quatro arquivos do conector. ds136 permanece na fonte atual.
 

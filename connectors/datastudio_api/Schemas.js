@@ -1505,6 +1505,21 @@ var NexoDSSchemas={
     },
     "dimensions": []
   },
+  "Compradores_Operacionais": {
+    "columns": [
+      "contact_uuid",
+      "calc_gf73fvq57d"
+    ],
+    "types": {
+      "contact_uuid": "text",
+      "calc_gf73fvq57d": "text"
+    },
+    "labels": {
+      "calc_gf73fvq57d": "Venda elegível"
+    },
+    "dimensions": [],
+    "period": null
+  },
   "ABC_abc": {
     "columns": [
       "periodo_inicio",
