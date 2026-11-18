@@ -59,6 +59,23 @@ DERIVED_SQL: dict[tuple[str, str], LiteralString] = {
 }
 
 
+_PRODUCT = {
+    "produto_codigo",
+    "produto_nome",
+    "quantidade",
+    "receita_item",
+    "participacao_acumulada",
+    "registros",
+}
+PRODUCT_FIELDS = {
+    "ranking": _PRODUCT,
+    "receita": _PRODUCT | {"posicao_receita_top5"},
+    "unidades": _PRODUCT | {"posicao_unidades_top5"},
+    "resumo": {"produtos_distintos_periodo", "quantidade", "receita_item", "registros"},
+    "nomes": {"produto_nome", "registros"},
+}
+
+
 def read_contract(name):
     if name not in READ_REGISTRY:
         raise StorageError("DS_TABELA_NAO_AUTORIZADA")
