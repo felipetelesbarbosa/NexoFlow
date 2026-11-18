@@ -202,3 +202,4 @@ test('ds136 preserva tipos e zero confirmado, bloqueia lacunas e separa PET',()=
  r.configParams.segmento='PET';
  assert.throws(()=>f.ctx.getData(r),/DS_INSIGHTS_SEGMENTO/);
 });
+require('./datastudio/produtos_periodo.cjs')({fixture, result});

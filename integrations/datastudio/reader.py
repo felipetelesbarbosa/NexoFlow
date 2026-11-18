@@ -16,6 +16,7 @@ from ds_backend.contract import (
     SCHEMA_HASH,
     StorageError,
 )
+from integrations.datastudio.products_reader import ProductPeriods, projected
 from integrations.datastudio.read_catalog import (
     DERIVED_SQL,
     READ_REGISTRY,
@@ -32,6 +33,17 @@ def view_name(name):
 
 
 class Reader(Store):
+    def __init__(self, dsn, environment, segment, *, require_dedicated_role=False):
+        super().__init__(
+            dsn, environment, segment, require_dedicated_role=require_dedicated_role
+        )
+        self.product_periods = ProductPeriods()
+
+    def products(self, mode, fields, start, end, names=None):
+        return projected(
+            self, mode, fields, start, end, names, MAX_RESULT_ROWS, MAX_RESULT_BYTES
+        )
+
     def pairs(self, fields, start, end, top):
         if type(top) is not int or not 1 <= top <= 1000:
             raise StorageError("DS_TOP_PARES_INVALIDO")
