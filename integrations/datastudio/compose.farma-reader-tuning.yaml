@@ -1,0 +1,22 @@
+# Acrescentar por último aos arquivos do projeto FARMA de produção.
+# Usar com a imagem homologada que limita o Reader a quatro conexões.
+services:
+  datastudio-farma-read:
+    image: ${NEXOFLOW_FARMA_READER_IMAGE:?Informe a imagem do leitor FARMA homologado}
+    environment:
+      PGOPTIONS: "-c max_parallel_workers_per_gather=0"
+    command:
+      - uvicorn
+      - integrations.datastudio.runtime:app_factory
+      - --factory
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8080"
+      - --workers
+      - "1"
+      - --no-access-log
+      - --limit-concurrency
+      - "48"
+      - --timeout-keep-alive
+      - "5"
