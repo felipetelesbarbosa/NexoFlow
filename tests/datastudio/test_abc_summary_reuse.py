@@ -84,8 +84,11 @@ def test_seven_summary_cards_share_only_the_same_complete_snapshot(store, monkey
 
 
 @pytest.mark.parametrize("failure", ["timeout", "incomplete", "wait_timeout"])
-def test_failed_summary_releases_waiters_without_caching_a_partial_row(
-    store, monkeypatch, failure
+@pytest.mark.parametrize(
+    "mode,field", [("resumo", "skus_distintos"), ("abc", "produto_codigo")]
+)
+def test_failed_abc_releases_waiters_without_caching_a_partial_row(
+    store, monkeypatch, failure, mode, field
 ):
     from concurrent.futures import Future
 
@@ -122,7 +125,8 @@ def test_failed_summary_releases_waiters_without_caching_a_partial_row(
         return original(*args, **kwargs)
 
     monkeypatch.setattr(abc_reader, "aggregates", first)
-    args = ("resumo", ["skus_distintos"], "2026-11-01", "2026-11-02")
+    args = (mode, [field], "2026-11-01", "2026-11-02")
+    expected = [[2]] if mode == "resumo" else [["001"], ["002"]]
     with ThreadPoolExecutor(max_workers=2) as pool:
         leader = pool.submit(reader.abc, *args)
         assert owner.wait(10)
@@ -130,12 +134,12 @@ def test_failed_summary_releases_waiters_without_caching_a_partial_row(
         if failure == "wait_timeout":
             with pytest.raises(StorageError, match="DS_CONSULTA_TEMPO_LIMITE"):
                 follower.result(10)
-            assert leader.result(10)["rows"] == [[2]]
+            assert leader.result(10)["rows"] == expected
         else:
             error = QueryCanceled if failure == "timeout" else StorageError
             for task in (leader, follower):
                 with pytest.raises(error):
                     task.result(10)
     assert calls == 1
-    assert reader.abc(*args)["rows"] == [[2]]
+    assert reader.abc(*args)["rows"] == expected
     assert calls == (1 if failure == "wait_timeout" else 2)

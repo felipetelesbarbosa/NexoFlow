@@ -105,3 +105,24 @@ Na homologação isolada, confira primeiro a resposta de `/v1/abc` para
 cartões e a tabela para o mesmo dia e revisão na cópia. Registre as durações
 e o código sanitizado de qualquer erro. A alteração se limita ao processo
 leitor FARMA e o hash do contrato da API permanece o mesmo.
+
+## Ranking e seletor de classe FARMA
+
+A tabela de produtos e o seletor de classe pedem métricas diferentes do mesmo
+ranking. O leitor pode compartilhar o cálculo entre os dois componentes dentro
+do mesmo modo, recorte, destino e snapshot confirmado. Cada resposta verifica
+os limites de linhas e de bytes com sua própria lista de campos. Assim, o
+seletor pode receber todas as classes e unidades mesmo quando uma tabela que
+inclui nomes de produtos ultrapassa o limite de resposta.
+
+Para as chamadas em sequência, cada processo retém no máximo um ranking cujo
+conjunto de linhas calculadas caiba no orçamento de memória de 7.000.000
+bytes estimados. Rankings maiores podem ser compartilhados durante a consulta
+e são liberados ao fim das leituras. Os 32 resultados possíveis do resumo
+continuam em armazenamento separado e o Top de pares mantém sua validação
+específica.
+
+Na cópia de ensaio, confira em 09/11 a tabela isolada e depois a tabela com
+o seletor de classes na mesma página. Compare a lista, a ordem, as unidades,
+a receita em centavos e as participações na mesma READY, aguardando o fim das
+duas leituras. Repita com classe selecionada e com o período vazio.

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from collections import OrderedDict
 from concurrent.futures import Future
 from datetime import date
@@ -34,14 +35,27 @@ def view_name(name):
     return "ds_" + name.lower()
 
 
+def ranking_fits_cache(rows):
+    """Limita retenção entre chamadas. Campos pedidos têm seu próprio limite HTTP."""
+    size = sys.getsizeof(rows)
+    for row in rows:
+        size += sys.getsizeof(row) + sum(sys.getsizeof(value) for value in row.values())
+        if size > MAX_RESULT_BYTES:
+            return False
+    return True
+
+
 class Reader(Store):
     def __init__(self, dsn, environment, segment, *, require_dedicated_role=False):
         super().__init__(
             dsn, environment, segment, require_dedicated_role=require_dedicated_role
         )
-        self._summary_lock = Lock()
-        self._summary_pending: dict[tuple, Future] = {}
-        self._summary_ready: OrderedDict[tuple, dict] = OrderedDict()
+        self._abc_lock = Lock()
+        self._abc_pending: dict[tuple, Future] = {}
+        self._abc_ready: dict[str, OrderedDict[tuple, list]] = {
+            "resumo": OrderedDict(),
+            "abc": OrderedDict(),
+        }
 
     def pairs(self, fields, start, end, top):
         if type(top) is not int or not 1 <= top <= 1000:
@@ -69,8 +83,8 @@ class Reader(Store):
                 raise ValueError
         except (TypeError, ValueError):
             raise StorageError("DS_PERIODO_INVALIDO") from None
-        if mode == "resumo" and self.segment == "FARMA":
-            return self._summary(fields, start, end)
+        if mode in ("abc", "resumo") and self.segment == "FARMA":
+            return self._shared_abc(mode, fields, start, end)
         with self.connect(readonly=True) as conn:
             version = self.active(conn)
             if not version:
@@ -99,7 +113,7 @@ class Reader(Store):
             )
         return result
 
-    def _summary(self, fields, start, end):
+    def _shared_abc(self, mode, fields, start, end):
         from integrations.datastudio.abc_reader import FIELDS, aggregates, calculate
 
         # Cada requisição confirma contrato, usuário, READY e visibilidade MVCC.
@@ -120,6 +134,7 @@ class Reader(Store):
                     raise StorageError("DS_SEM_PUBLICACAO_CONFIRMADA")
                 key = (
                     self.target,
+                    mode,
                     version,
                     identity["execucao"],
                     identity["role"],
@@ -128,51 +143,49 @@ class Reader(Store):
                     start,
                     end,
                 )
-                with self._summary_lock:
-                    complete = self._summary_ready.get(key)
+                ready = self._abc_ready[mode]
+                with self._abc_lock:
+                    complete = ready.get(key)
                     if complete is not None:
-                        self._summary_ready.move_to_end(key)
+                        ready.move_to_end(key)
                     else:
-                        pending = self._summary_pending.get(key)
+                        pending = self._abc_pending.get(key)
                         if pending is None:
                             pending = Future()
-                            self._summary_pending[key] = pending
+                            self._abc_pending[key] = pending
                             leader = True
                 if leader:
                     conn.execute("SET LOCAL enable_nestloop=off")
                     records = aggregates(
-                        conn, self.schema, start, end, "resumo", MAX_RESULT_ROWS
+                        conn, self.schema, start, end, mode, MAX_RESULT_ROWS
                     )
-                    complete = self.result(
-                        version,
-                        FIELDS["resumo"],
-                        calculate(records, start, end, "resumo"),
-                    )
+                    complete = calculate(records, start, end, mode)
+                    if mode == "resumo":
+                        self.result(version, FIELDS[mode], complete)
+                    retain = mode == "resumo" or ranking_fits_cache(complete)
             # Uma consulta participante libera a conexão antes de esperar.
             # O responsável disponibiliza a linha só após o êxito da transação.
         except BaseException as error:
             if leader:
-                with self._summary_lock:
-                    self._summary_pending.pop(key).set_exception(error)
+                with self._abc_lock:
+                    self._abc_pending.pop(key).set_exception(error)
             raise
 
         if leader:
-            with self._summary_lock:
-                self._summary_ready[key] = complete
-                if len(self._summary_ready) > 32:
-                    self._summary_ready.popitem(last=False)
-                self._summary_pending.pop(key).set_result(complete)
+            with self._abc_lock:
+                if retain:
+                    ready[key] = complete
+                    if len(ready) > (32 if mode == "resumo" else 1):
+                        ready.popitem(last=False)
+                self._abc_pending.pop(key).set_result(complete)
         elif complete is None:
             try:
                 complete = pending.result(timeout=45)
             except TimeoutError:
                 raise StorageError("DS_CONSULTA_TEMPO_LIMITE") from None
-        indices = [complete["fields"].index(field) for field in fields]
-        return dict(
-            complete,
-            fields=list(fields),
-            rows=[[row[i] for i in indices] for row in complete["rows"]],
-        )
+        # Validar cada projeção por si: a tabela pode exceder o limite de bytes
+        # enquanto o seletor de classes do mesmo ranking continua válido.
+        return self.result(version, fields, complete)
 
     def info(self):
         with self.connect() as conn:
