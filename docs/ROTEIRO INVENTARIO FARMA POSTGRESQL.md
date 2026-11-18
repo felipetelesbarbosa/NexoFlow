@@ -1,5 +1,22 @@
 # Roteiro de migração do relatório FARMA — inventário de 12/11/2026
 
+## Homologação FARMA READY v2 · 17/11/2026
+
+O Work confirmou na VPS e na cópia do Looker o leitor do commit `e5eaeade106b8fa36a0fbac8eaff07890370f6a7`. A instalação das visões e a auditoria PostgreSQL concluíram com código 0. Entre 01/01 e 15/11/2026, todos os dias com movimento e o TOTAL reconciliaram pedidos, itens, unidades, produtos, frete e faturamento. A duplicação por ID chegou a zero. O comparativo direto na cópia abrangeu as quatro fontes diárias nas cinco datas que divergiam. O LTV acumulado foi conferido em seu universo histórico. O Work também conferiu ABC e o Top 25 de compras juntas contra a VPS em ordem, códigos e frequência, incluindo o recorte curto e a resposta vazia. O recibo e as cifras comerciais ficam na trilha privada. Esta etapa encerra a conferência da recuperação de novembro.
+
+### Continuação na cópia do Looker
+
+A auditoria estática encontra destino para 36 dos 37 aliases. O recibo comprova recortes e resultados específicos. Cada instância de fonte, cálculo local e mesclagem ainda precisa de evidência da sua própria configuração na cópia. Use a matriz reproduzível abaixo para localizar os componentes por ID.
+
+1. Começar por **Pedidos e produtos por cliente** (`ds80 LEFT ds83`). Conferir dia e chave de venda nos dois lados. Selecionar uma venda com vários itens e testar os totais do gráfico contra o detalhe no grão correto. Em **FARMA | LTV por cliente** (`ds175 LEFT ds123`), procurar multiplicação por contatos do mesmo cliente e confirmar que o controle mensal de receita conserva o LTV acumulado.
+2. Em **Anúncios - contatos e pedidos identificados** (`ds123 LEFT ds121`), conferir a fórmula e o ID de Pedido após anúncio, filtros FARMA e a ordem temporal. Validar as instâncias de Receita gerada com moeda BRL e duas casas. Conferir despesas conhecidas antes de validar CPA/ROAS. Registrar custos indisponíveis como tais.
+3. Preservar e exercitar as duas mesclagens com zero gráficos num componente temporário na cópia. Para `ds73 INNER ds72`, comparar linhas de produto após o filtro Venda elegível. Para `ds74 LEFT ds72`, filtrar a entrada direita antes da junção, conservar contatos sem compra e confrontar compradores por contagem distinta de `contact_uuid`.
+4. Conferir os aliases repetidos separadamente, o histórico TOTAL/MES/ANO/SEM_EMISSAO e a distinção entre ABC dinâmica e snapshots. Para cada alias e mesclagem, guardar origem efetiva, IDs, filtros, cardinalidade, período, controles de referência e resultado na cópia. Voltar ao inventário dos 75 componentes, oito controles de período, 14 filtros e três substituições de ID antes do corte.
+5. Manter `ds136` na fonte Weni atual. Para propor substituição, comprovar produtor, chave e participação do projeto, política de escrita/revisão e possíveis edições manuais. O intervalo de atualização do conector só descreve a leitura.
+
+O relatório oficial permanece na etapa anterior até a decisão de corte. Esta conferência dispensa recoleta, reenvio e novo fechamento.
+
+
 **Correção posterior de volume do leitor (15/11/2026):** [ABC, resumo e pares no servidor](ABC%20POSTGRESQL%20EM%20VOLUME.md). Preserva fechamento READY existente; implantação somente do leitor FARMA e dos quatro arquivos do conector. ds136 permanece na fonte atual.
 
 **Complemento posterior:** [contratos dos nove aliases](CONTRATOS%20NOVE%20ALIASES%20FARMA.md). As quatro projeções operacionais e o adaptador ABC foram implementados; a fórmula ds72 e os modos ABC foram confirmados e incorporados. IDs locais/implantação ABC e produtor/chave/política de ds136 continuam pendentes. As contagens de gaps abaixo descrevem a base 83692b6.
