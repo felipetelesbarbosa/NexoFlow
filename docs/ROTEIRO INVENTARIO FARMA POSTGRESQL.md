@@ -47,6 +47,38 @@ Os limites de leitura continuam incidindo sobre os grupos retornados.
    o ensaio, reassocie o gráfico da cópia à combinação anterior.
 
 
+### Homologação dos pedidos atribuídos a anúncios
+
+Na cópia FARMA, duplique a combinação `ds123 LEFT ds121`. À esquerda,
+use `Base_Contatos`, selecione exatamente a origem `Meta Ads` e filtre a
+coorte pela data do primeiro anúncio em Belém. A chave calculada devolve o
+`pedido_id` quando o último pedido ocorreu no mesmo instante do primeiro
+anúncio ou depois dele. Um contato sem compra continua na entrada esquerda.
+
+À direita, adicione a fonte lógica `Pedidos_Atribuiveis_Meta` da implantação
+privada de ensaio com os arquivos `Code.js` e `Schemas.js` deste commit.
+Associe a chave calculada ao `pedido_id` textual. Esta fonte busca os
+cabeçalhos na `BI_Pedidos` pelos IDs únicos dos contatos Meta elegíveis.
+O período é aplicado no lado dos contatos. Uma compra posterior ao fim da
+coorte pode ser atribuída a um anúncio dentro dela. A data de venda, os
+campos de cliente e produto e o faturamento com frete são os do cabeçalho.
+A fonte exige `venda_valida > 0` e uma linha elegível por ID. Cada consulta
+usa a versão ativa. Se ela mudar entre os lotes, atualize os dados do
+gráfico e repita na nova versão.
+
+1. Na tabela, exclua cabeçalhos com data nula e confira o máximo do
+   faturamento por pedido e anúncio. No seletor, exclua faturamento e chave
+   temporal nulos e confira a soma. Exiba os valores monetários em BRL com
+   duas casas. Confira separadamente os IDs atribuídos a múltiplos contatos
+   ou anúncios, que podem multiplicar o valor no seletor.
+2. Compare as duas visualizações com a VPS na mesma revisão. Para FARMA READY
+   v2, 01 a 17/11 e 01 a 15/11/2026 têm 39 contatos na coorte, três pedidos
+   e R$ 322,69. Em 06/11 são três contatos e uma compra de 09/11 por
+   R$ 130,90. Em 16 a 17/11 são zero contatos e zero pedidos. Confira também
+   o período anual contra os controles da revisão testada.
+3. Registre apenas agregados, revisão e período. Para reverter o ensaio,
+   reassocie a tabela e o seletor à combinação anterior na cópia.
+
 **Correção posterior de volume do leitor (15/11/2026):** [ABC, resumo e pares no servidor](ABC%20POSTGRESQL%20EM%20VOLUME.md). Preserva fechamento READY existente; implantação somente do leitor FARMA e dos quatro arquivos do conector. ds136 permanece na fonte atual.
 
 **Complemento posterior:** [contratos dos nove aliases](CONTRATOS%20NOVE%20ALIASES%20FARMA.md). As quatro projeções operacionais e o adaptador ABC foram implementados; a fórmula ds72 e os modos ABC foram confirmados e incorporados. IDs locais/implantação ABC e produtor/chave/política de ds136 continuam pendentes. As contagens de gaps abaixo descrevem a base 83692b6.

@@ -58,6 +58,22 @@ def run():
         dimensions=[],
         period=None,
     )
+    # A coorte é filtrada pelo primeiro anúncio no lado esquerdo da mesclagem.
+    ad_order_fields = [
+        "pedido_id",
+        "cliente",
+        "cliente_chave",
+        "data",
+        "pedido_produtos",
+        "pedido_faturamento_total",
+        "venda_valida",
+    ]
+    public["Pedidos_Atribuiveis_Meta"] = dict(
+        columns=ad_order_fields,
+        types={f: public["BI_Pedidos"]["types"][f] for f in ad_order_fields},
+        dimensions=[],
+        period=None,
+    )
     abc = json.loads(
         subprocess.check_output(
             [

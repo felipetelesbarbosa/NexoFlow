@@ -5,7 +5,8 @@ var NexoDSCurrencyBRL={
   BI_Clientes_Vendas:['faturamento','faturamento_produtos','frete'],
   BI_Itens:['valor_unitario','receita_item'],
   BI_Historico_Resumo:['produtos','frete','faturamento'],
-  BI_LTV_Clientes:['ltv_observado','ticket_medio']
+  BI_LTV_Clientes:['ltv_observado','ticket_medio'],
+  Pedidos_Atribuiveis_Meta:['pedido_faturamento_total']
 };
 function getAuthType() {var cc=DataStudioApp.createCommunityConnector();return cc.newAuthTypeResponse().setAuthType(cc.AuthType.NONE).build();}
 function isAdminUser(){return false;}
@@ -16,8 +17,12 @@ function getConfig(request){
   var env=config.newSelectSingle().setId('ambiente').setName('Ambiente').setIsDynamic(true);
   ['homologacao','producao'].forEach(function(v){env.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
   var table=config.newSelectSingle().setId('tabela').setName('Tabela lógica').setIsDynamic(true);
-  Object.keys(NexoDSSchemas).forEach(function(v){table.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
-  if (p.tabela !== 'Compradores_Operacionais') {
+  Object.keys(NexoDSSchemas).forEach(function(v){
+    if (v !== 'Pedidos_Atribuiveis_Meta' || p.segmento === 'FARMA') {
+      table.addOption(config.newOptionBuilder().setValue(v).setLabel(v));
+    }
+  });
+  if (!['Compradores_Operacionais', 'Pedidos_Atribuiveis_Meta'].includes(p.tabela)) {
     var query=config.newSelectSingle().setId('modo_consulta').setName('Leitura: detalhe ou somas homologadas');
     ['detalhe','somas'].forEach(function(v){query.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
   }
@@ -34,6 +39,7 @@ function getConfig(request){
   return config.build();
 }
 function dsConfig_(p){
+  if (p.tabela === 'Pedidos_Atribuiveis_Meta' && p.segmento !== 'FARMA') throw new Error('DS_CONFIGURACAO_INVALIDA');
   if(!['FARMA','PET'].includes(p.segmento)||!['producao','homologacao'].includes(p.ambiente)||!NexoDSSchemas[p.tabela])throw new Error('DS_CONFIGURACAO_INVALIDA');
   var raw=PropertiesService.getScriptProperties().getProperty('NFDS_'+p.segmento+'_'+p.ambiente.toUpperCase());
   if(!raw)throw new Error('DS_CREDENCIAL_AUSENTE');
@@ -53,7 +59,7 @@ function dsCall_(c,path,payload){
     if(status===409){
       var rejection={};try{rejection=JSON.parse(response.getContentText());}catch(ignored){}
       // Só códigos conhecidos, nunca texto livre/payload de erro do servidor.
-      if(['DS_FILTRO_CORTA_RECORTE_USE_DETALHE','DS_COMPRADORES_EXIGEM_COMPETENCIA_OU_RECORTE_UNICO','DS_COMPRADORES_NAO_SOMAVEIS_ENTRE_MESES','DS_RESUMO_EXIGE_GRAO','DS_RESUMO_TOTAL_NAO_APLICA_DATA','DS_CONSULTA_EXCEDE_LIMITE_USE_RESUMO_OU_PERIODO','DS_RESPOSTA_EXCEDE_LIMITE_USE_RESUMO','DS_SEM_PUBLICACAO_CONFIRMADA','DS_ABC_BASE_INCOMPLETA','DS_ABC_PEDIDO_EXCEDE_LIMITE_PARES','DS_ABC_PRECISAO_EXCEDIDA','DS_CONSULTA_TEMPO_LIMITE'].includes(rejection.error))throw new Error(rejection.error);
+      if(['DS_FILTRO_CORTA_RECORTE_USE_DETALHE','DS_COMPRADORES_EXIGEM_COMPETENCIA_OU_RECORTE_UNICO','DS_COMPRADORES_NAO_SOMAVEIS_ENTRE_MESES','DS_RESUMO_EXIGE_GRAO','DS_RESUMO_TOTAL_NAO_APLICA_DATA','DS_CONSULTA_EXCEDE_LIMITE_USE_RESUMO_OU_PERIODO','DS_RESPOSTA_EXCEDE_LIMITE_USE_RESUMO','DS_SEM_PUBLICACAO_CONFIRMADA','DS_ABC_BASE_INCOMPLETA','DS_ABC_PEDIDO_EXCEDE_LIMITE_PARES','DS_ABC_PRECISAO_EXCEDIDA','DS_BI_PEDIDO_OPERACIONAL_AMBIGUO','DS_CONSULTA_TEMPO_LIMITE'].includes(rejection.error))throw new Error(rejection.error);
     }
     if(![429,502,503,504].includes(status)||attempt===2||Date.now()-started>45000)throw new Error('DS_HTTP_'+status);
     Utilities.sleep(Math.min(4000,1000*Math.pow(2,attempt)));
@@ -89,6 +95,7 @@ function dsError_(error){
 function getData(request){try{
   var p=request.configParams,c=dsConfig_(p),spec=NexoDSSchemas[p.tabela];
   if(spec.abc_mode)return dsAbcData_(request,c,spec);
+  if(p.tabela==='Pedidos_Atribuiveis_Meta')return dsAdOrders_(request,c,spec);
   var names=request.fields.map(function(f){return f.name;}),distinct=names.includes('produtos_distintos_periodo');
 
   if(names.some(function(n){return n!=='produtos_distintos_periodo'&&!spec.columns.includes(n);}))throw new Error('DS_CAMPOS_NAO_AUTORIZADOS');
@@ -119,16 +126,115 @@ function getData(request){try{
   }
   if(spec.period&&!(p.tabela==='BI_Historico_Resumo'&&['TOTAL','SEM_EMISSAO'].includes(p.recorte_historico))&&(!payload.start||!payload.end)&&!(request.scriptParams&&request.scriptParams.sampleExtraction))throw new Error('DS_PERIODO_OBRIGATORIO');
   if(request.scriptParams&&request.scriptParams.sampleExtraction&&spec.period&&!payload.start){payload.start='2000-01-01';payload.end='2000-01-01';}
+  var result=dsCheckedQuery_(c,payload);
+  var fields=dsFields_(p.tabela).forIds(names);
+  var data = buyers ? dsBuyerRows_(result.rows, payload.fields, names) : result.rows;
+  var rows=dsFormatRows_(data,names,spec,distinct);
+  return {schema:fields.build(),rows:rows,filtersApplied:!!applied};
+}catch(error){return dsError_(error);}}
+if(typeof module!=='undefined')module.exports={getData:getData,dsCall:dsCall_,dsConfig:dsConfig_};
+
+function dsCheckedQuery_(c,payload){
   var result=dsCall_(c,'/v1/consulta',payload);
   var expectedDB=c.environment==='producao'?'nexoflow_datastudio':'nexoflow_datastudio_homologacao';
   if(result.protocol!=='nexoflow_datastudio_1'||result.target!==expectedDB+'.'+c.segment.toLowerCase()||result.segment!==c.segment||result.environment!==c.environment||result.schema_hash!==NexoDSSchemaHash)throw new Error('DS_CONTRATO_DESTINO_DIVERGENTE');
   if(!Number.isSafeInteger(result.version)||result.version<1||result.complete!==true||!Array.isArray(result.rows)||JSON.stringify(result.fields)!==JSON.stringify(payload.fields))throw new Error('DS_RESPOSTA_INCOMPLETA');
-  var fields=dsFields_(p.tabela).forIds(names);
-  var data = buyers ? dsBuyerRows_(result.rows, payload.fields, names) : result.rows;
-  var rows=data.map(function(r){if(r.length!==names.length)throw new Error('DS_SCHEMA_DIVERGENTE');return {values:r.map(function(v,i){if(v===null||v==='')return null;var kind=distinct?'number':spec.types[names[i]];if(kind==='number'){var n=Number(v);if(!Number.isFinite(n))throw new Error('DS_NUMERO_INVALIDO');return n;}if(kind==='date'){if(!/^\d{4}-\d{2}-\d{2}$/.test(v))throw new Error('DS_DATA_INVALIDA');return v.replace(/-/g,'');}return String(v);})};});
-  return {schema:fields.build(),rows:rows,filtersApplied:!!applied};
-}catch(error){return dsError_(error);}}
-if(typeof module!=='undefined')module.exports={getData:getData,dsCall:dsCall_,dsConfig:dsConfig_};
+  return result;
+}
+
+function dsFormatRows_(data,names,spec,distinct){
+  return data.map(function(r){if(r.length!==names.length)throw new Error('DS_SCHEMA_DIVERGENTE');return {values:r.map(function(v,i){if(v===null||v==='')return null;var kind=distinct?'number':spec.types[names[i]];if(kind==='number'){var n=Number(v);if(!Number.isFinite(n))throw new Error('DS_NUMERO_INVALIDO');return n;}if(kind==='date'){if(!/^\d{4}-\d{2}-\d{2}$/.test(v))throw new Error('DS_DATA_INVALIDA');return v.replace(/-/g,'');}return String(v);})};});
+}
+
+// A origem publica timestamps ISO com fuso. Compare o instante UTC e preserve
+// as frações: duas compras no mesmo segundo podem cair em lados opostos do anúncio.
+function dsAdInstant_(value) {
+  var timestamp = typeof value === 'string' &&
+    /^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d{1,9}))?(Z|[+-]\d\d:\d\d)$/.exec(value);
+  if (!timestamp) throw new Error('DS_DATA_INVALIDA');
+  var local = Date.parse(timestamp[1] + 'Z');
+  var utc = Date.parse(timestamp[1] + timestamp[3]);
+  if (!Number.isFinite(utc) || !Number.isFinite(local) ||
+      new Date(local).toISOString().slice(0, 19) !== timestamp[1]) {
+    throw new Error('DS_DATA_INVALIDA');
+  }
+  return new Date(utc).toISOString().slice(0, 19) + '.' + (timestamp[2] || '').padEnd(9, '0');
+}
+
+function dsAdOrders_(request, c, spec) {
+  var started = Date.now();
+  function read(table, fields, filters) {
+    if (Date.now() - started > 45000) throw new Error('DS_PRAZO_CONSULTA');
+    var result = dsCheckedQuery_(c, {table: table, fields: fields, filters: filters,
+      start: '', end: '', aggregation: {}});
+    if (Date.now() - started > 45000) throw new Error('DS_PRAZO_CONSULTA');
+    if (result.rows.length > 50000) throw new Error('DS_CONSULTA_EXCEDE_LIMITE_USE_RESUMO_OU_PERIODO');
+    if (!result.rows.every(function(row) { return Array.isArray(row) && row.length === fields.length; })) {
+      throw new Error('DS_SCHEMA_DIVERGENTE');
+    }
+    return result;
+  }
+
+  var requested = request.fields;
+  if (!requested.length || requested.some(function(f) { return !spec.columns.includes(f.name); })) {
+    throw new Error('DS_CAMPOS_NAO_AUTORIZADOS');
+  }
+  var groups = request.dimensionsFilters || [];
+  var idFilters = groups.filter(function(g) {
+    return Array.isArray(g) && g.length === 1 && g[0].type === 'INCLUDE' &&
+      g[0].fieldName === 'pedido_id' && ['EQUALS', 'IN_LIST'].includes(g[0].operator) &&
+      Array.isArray(g[0].values) && g[0].values.length && g[0].values.every(function(v) { return typeof v === 'string'; });
+  }).map(function(g) { return new Set(g[0].values); });
+  var applied = groups.length > 0 && idFilters.length === groups.length;
+  if (!applied) idFilters = [];
+  var selected = requested.filter(function(f) { return !applied || !f.forFilterOnly; });
+  var schema = dsFields_(request.configParams.tabela).forIds(selected.map(function(f) { return f.name; })).build();
+  var names = schema.map(function(f) { return f.name; });
+  var base = read('Base_Contatos', ['pedido_id', 'pedido_data', 'primeiro_anuncio_data'],
+    [{field: 'primeiro_anuncio_origem', values: ['Meta Ads']}]);
+  var candidates = new Set();
+  base.rows.forEach(function(row) {
+    var id = row[0];
+    if (id === null || id === '' || row[1] === null || row[1] === '' || row[2] === null || row[2] === '') return;
+    if (typeof id !== 'string') throw new Error('DS_SCHEMA_DIVERGENTE');
+    if (id.trim() && idFilters.every(function(allowed) { return allowed.has(id); }) &&
+        dsAdInstant_(row[1]) >= dsAdInstant_(row[2])) candidates.add(id);
+  });
+  // Sem período de venda aqui: inclusive o cabeçalho posterior ao fim da coorte.
+  // O limite de valores por filtro da API é 100. Nunca expor um lote parcial.
+  var ids = Array.from(candidates);
+  var orderFields = Array.from(new Set(['pedido_id', 'venda_valida'].concat(names)));
+  var indices = names.map(function(name) { return orderFields.indexOf(name); });
+  var response = {schema: schema, filtersApplied: applied, rows: []};
+  var bytes = Utilities.newBlob(JSON.stringify(response)).getBytes().length;
+  for (var i = 0; i < ids.length; i += 100) {
+    var batch = ids.slice(i, i + 100);
+    var headers = read('BI_Pedidos', orderFields, [{field: 'pedido_id', values: batch}]);
+    if (headers.version !== base.version) throw new Error('DS_REVISAO_ALTERADA');
+    var seen = new Set();
+    var eligible = [];
+    headers.rows.forEach(function(row) {
+      if (!batch.includes(row[0])) throw new Error('DS_RESPOSTA_INCOMPLETA');
+      var valid = row[1];
+      if (valid === null || valid === '') return;
+      if ((typeof valid !== 'string' && typeof valid !== 'number') || !Number.isFinite(Number(valid))) {
+        throw new Error('DS_NUMERO_INVALIDO');
+      }
+      if (Number(valid) <= 0) return;
+      if (seen.has(row[0])) throw new Error('DS_BI_PEDIDO_OPERACIONAL_AMBIGUO');
+      seen.add(row[0]);
+      eligible.push(indices.map(function(j) { return row[j]; }));
+    });
+    var rows = dsFormatRows_(eligible, names, spec, false);
+    if (rows.length) {
+      bytes += Utilities.newBlob(JSON.stringify(rows)).getBytes().length - 2 + (response.rows.length ? 1 : 0);
+      if (bytes > 7000000) throw new Error('DS_RESPOSTA_EXCEDE_LIMITE_USE_RESUMO');
+      rows.forEach(function(row) { response.rows.push(row); });
+    }
+  }
+  if (Date.now() - started > 45000) throw new Error('DS_PRAZO_CONSULTA');
+  return response;
+}
 
 function dsBuyerRows_(rows, fields, names) {
   var indices = names.map(function(name) { return fields.indexOf(name); });

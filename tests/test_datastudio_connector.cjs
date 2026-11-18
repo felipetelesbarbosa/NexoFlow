@@ -226,3 +226,5 @@ test('Top pares é explícito, tem universo verificado e não permite filtro sil
  req.dimensionsFilters=[[{fieldName:'produto_a_codigo',operator:'EQUALS',values:['001'],type:'INCLUDE'}]];
  assert.throws(()=>f.ctx.getData(req),/DS_TOP_PARES_FILTRO_NAO_SUPORTADO/);
 });
+
+require('./datastudio/meta_orders.cjs');

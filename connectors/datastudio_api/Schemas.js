@@ -1494,6 +1494,28 @@ var NexoDSSchemas={
     "dimensions": [],
     "period": null
   },
+  "Pedidos_Atribuiveis_Meta": {
+    "columns": [
+      "pedido_id",
+      "cliente",
+      "cliente_chave",
+      "data",
+      "pedido_produtos",
+      "pedido_faturamento_total",
+      "venda_valida"
+    ],
+    "types": {
+      "pedido_id": "text",
+      "cliente": "text",
+      "cliente_chave": "text",
+      "data": "date",
+      "pedido_produtos": "text",
+      "pedido_faturamento_total": "number",
+      "venda_valida": "number"
+    },
+    "dimensions": [],
+    "period": null
+  },
   "ABC_abc": {
     "columns": [
       "periodo_inicio",
