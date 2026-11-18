@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import json
+from collections import OrderedDict
+from concurrent.futures import Future
 from datetime import date
 from decimal import Decimal
+from threading import Lock
 from typing import Any
 
 from psycopg import sql
@@ -32,6 +35,14 @@ def view_name(name):
 
 
 class Reader(Store):
+    def __init__(self, dsn, environment, segment, *, require_dedicated_role=False):
+        super().__init__(
+            dsn, environment, segment, require_dedicated_role=require_dedicated_role
+        )
+        self._summary_lock = Lock()
+        self._summary_pending: dict[tuple, Future] = {}
+        self._summary_ready: OrderedDict[tuple, dict] = OrderedDict()
+
     def pairs(self, fields, start, end, top):
         if type(top) is not int or not 1 <= top <= 1000:
             raise StorageError("DS_TOP_PARES_INVALIDO")
@@ -58,6 +69,8 @@ class Reader(Store):
                 raise ValueError
         except (TypeError, ValueError):
             raise StorageError("DS_PERIODO_INVALIDO") from None
+        if mode == "resumo" and self.segment == "FARMA":
+            return self._summary(fields, start, end)
         with self.connect(readonly=True) as conn:
             version = self.active(conn)
             if not version:
@@ -85,6 +98,81 @@ class Reader(Store):
                 all_pairs_returned=universe == len(rows),
             )
         return result
+
+    def _summary(self, fields, start, end):
+        from integrations.datastudio.abc_reader import FIELDS, aggregates, calculate
+
+        # Cada requisição confirma contrato, usuário, READY e visibilidade MVCC.
+        # Uma escrita ou troca de visão invalida o reuso mesmo sob o mesmo UUID.
+        leader = False
+        try:
+            with self.connect(readonly=True) as conn:
+                version = self.active(conn)
+                if not version:
+                    raise StorageError("DS_SEM_PUBLICACAO_CONFIRMADA")
+                identity = conn.execute(
+                    "SELECT execucao, current_user AS role, pg_postmaster_start_time() AS boot, "
+                    "pg_current_snapshot()::text AS snapshot FROM controle.nf_publicacoes "
+                    "WHERE segmento=%s AND versao=%s AND execucao IS NOT NULL",
+                    (self.segment, version),
+                ).fetchone()
+                if not identity:
+                    raise StorageError("DS_SEM_PUBLICACAO_CONFIRMADA")
+                key = (
+                    self.target,
+                    version,
+                    identity["execucao"],
+                    identity["role"],
+                    identity["boot"],
+                    identity["snapshot"],
+                    start,
+                    end,
+                )
+                with self._summary_lock:
+                    complete = self._summary_ready.get(key)
+                    if complete is not None:
+                        self._summary_ready.move_to_end(key)
+                    else:
+                        pending = self._summary_pending.get(key)
+                        if pending is None:
+                            pending = Future()
+                            self._summary_pending[key] = pending
+                            leader = True
+                if leader:
+                    conn.execute("SET LOCAL enable_nestloop=off")
+                    records = aggregates(
+                        conn, self.schema, start, end, "resumo", MAX_RESULT_ROWS
+                    )
+                    complete = self.result(
+                        version,
+                        FIELDS["resumo"],
+                        calculate(records, start, end, "resumo"),
+                    )
+            # Uma consulta participante libera a conexão antes de esperar.
+            # O responsável disponibiliza a linha só após o êxito da transação.
+        except BaseException as error:
+            if leader:
+                with self._summary_lock:
+                    self._summary_pending.pop(key).set_exception(error)
+            raise
+
+        if leader:
+            with self._summary_lock:
+                self._summary_ready[key] = complete
+                if len(self._summary_ready) > 32:
+                    self._summary_ready.popitem(last=False)
+                self._summary_pending.pop(key).set_result(complete)
+        elif complete is None:
+            try:
+                complete = pending.result(timeout=45)
+            except TimeoutError:
+                raise StorageError("DS_CONSULTA_TEMPO_LIMITE") from None
+        indices = [complete["fields"].index(field) for field in fields]
+        return dict(
+            complete,
+            fields=list(fields),
+            rows=[[row[i] for i in indices] for row in complete["rows"]],
+        )
 
     def info(self):
         with self.connect() as conn:
