@@ -1,3 +1,11 @@
+# NexoFlow 1.5.43 — Downloads
+
+Publicada em **18/11/2026, 03:11:43 (America/Fortaleza)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.43) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/35764b7e1333bc6dc1fc2f45e5a54302c92c20b7) · [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44246909363) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44246909339) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44249465667).
+
+[NexoFlow-1.5.43.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.43/NexoFlow-1.5.43.zip) · [NexoFlow-Setup-1.5.43.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.43/NexoFlow-Setup-1.5.43.zip) · [SHA256SUMS-1.5.43.txt](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.43/SHA256SUMS-1.5.43.txt)
+
+Atualize pelo Setup em Preserve, inclusive se instalou a prévia de homologação 1.5.43.
+
 # NexoFlow 1.5.42 — Downloads
 
 Publicada em **17/11/2026, 20:52:15 (America/Fortaleza)**, no [commit `f4a9ecf78bdff2158a7f2e9451248bc784c54879`](https://github.com/felipetelesbarbosa/NexoFlow/commit/f4a9ecf78bdff2158a7f2e9451248bc784c54879). [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.42) · [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44199455757) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44199455758) · [Meta nativo](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44199455745) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44203002028).

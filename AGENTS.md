@@ -1,3 +1,9 @@
+# NexoFlow 1.5.43 publicada
+
+Publicada em **18/11/2026, 03:11:43 (America/Fortaleza)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.43) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/35764b7e1333bc6dc1fc2f45e5a54302c92c20b7) · [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44246909363) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44246909339) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44249465667).
+
+Os downloads públicos passaram na comparação com os artefatos aprovados, nos CRCs, nos hashes do manifesto do Setup e na verificação dos módulos e dos executáveis Windows x64. O token do perfil consulta o Flows v2. No recorte real FARMA de 01 a 06/11/2026, as quatro contagens diárias conciliaram com o Insights. A troca da ds136 no Looker depende da homologação na cópia do relatório.
+
 # NexoFlow 1.5.42 publicada
 
 Publicada em **17/11/2026, 20:52:15 (America/Fortaleza)**, no [commit `f4a9ecf78bdff2158a7f2e9451248bc784c54879`](https://github.com/felipetelesbarbosa/NexoFlow/commit/f4a9ecf78bdff2158a7f2e9451248bc784c54879). [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.42) · [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44199455757) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44199455758) · [Meta nativo](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44199455745) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44203002028).

@@ -1,6 +1,6 @@
 # NexoFlow — Changelog
 
-## 1.5.43 — em validação
+## 1.5.43 — publicada em 18/11/2026, 03:11:43 (America/Fortaleza)
 
 - O token do perfil FARMA usa Flows v2 para contar conversas distintas com classificação confirmada por dia de Belém. Paginação por offset, repetição de GET transitório e guarda contra conflito preservam o último dia válido. O cache e a visão registram a origem de cada dia. Analytics entrega os dias confirmados ao publicador PostgreSQL. A fonte tem tabela e permissões próprias, independente do fechamento financeiro. [Guia](docs/CONVERSAS%20DIARIAS%20WENI.md).
 
