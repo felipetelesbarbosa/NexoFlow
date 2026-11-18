@@ -83,3 +83,25 @@ Testar também `abc` (produto_codigo, unidades, receita_produtos, pedidos, class
 ## Complemento: vendas sem itens e Top de pares
 
 Ver [diagnóstico privado, escopo explícito de volume e roteiro do Work](DIAGNOSTICO%20VENDAS%20SEM%20ITENS%20E%20TOP%20PARES.md). Preservados publicador, READY, contratos, aliases e ds136. A investigação dos 204 casos exige comparar o corte original confirmado com os fatos; o diagnóstico não aplica recuperação. O modo COMPLETO de compras juntas continua padrão, e Top exige escolha explícita na cópia.
+
+## Sete componentes do resumo FARMA
+
+Os seis cartões de classes e a tabela da página Curva ABC pedem projeções
+diferentes do mesmo resumo. O leitor FARMA calcula a linha completa em
+PostgreSQL e confere as vendas, os itens e os centavos antes de devolver os
+campos pedidos por cada componente. A tabela pode solicitar também a métrica de
+ordenação `produtos_classe_a`.
+
+Cada chamada conserva a consulta de destino, conta, contrato, versão e UUID da
+publicação no seu próprio snapshot de leitura. O leitor pode reaproveitar um
+resumo completo apenas para o mesmo intervalo e o mesmo estado visível do
+PostgreSQL. Um processo retém até 32 resultados completos. Pedidos simultâneos
+do mesmo resumo compartilham o cálculo. A espera libera a conexão PostgreSQL e
+tem prazo de 45 segundos. Uma falha do cálculo libera os participantes e
+permite uma nova tentativa.
+
+Na homologação isolada, confira primeiro a resposta de `/v1/abc` para
+`mode=resumo` com todos os campos da página. Em seguida confira os seis
+cartões e a tabela para o mesmo dia e revisão na cópia. Registre as durações
+e o código sanitizado de qualquer erro. A alteração se limita ao processo
+leitor FARMA e o hash do contrato da API permanece o mesmo.
