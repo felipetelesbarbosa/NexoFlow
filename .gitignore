@@ -9,6 +9,7 @@ secrets_config.py
 .env.*
 credentials/google_credentials.json
 credentials/*.json
+credentials/weni/
 
 # Logs
 logs/privado/

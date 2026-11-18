@@ -1479,6 +1479,32 @@ var NexoDSSchemas={
     "full_history": false,
     "dimensions": []
   },
+  "BI_Weni_Conversas_Diarias": {
+    "public": true,
+    "columns": [
+      "data",
+      "segmento",
+      "conversas_weni",
+      "resolvidas",
+      "nao_resolvidas",
+      "transferidas",
+      "origem",
+      "fuso"
+    ],
+    "period": "data",
+    "segment": "FARMA",
+    "types": {
+      "data": "date",
+      "segmento": "text",
+      "conversas_weni": "number",
+      "resolvidas": "number",
+      "nao_resolvidas": "number",
+      "transferidas": "number",
+      "origem": "text",
+      "fuso": "text"
+    },
+    "dimensions": []
+  },
   "Compradores_Operacionais": {
     "columns": [
       "contact_uuid",
@@ -1495,6 +1521,7 @@ var NexoDSSchemas={
     "period": null
   },
   "Pedidos_Atribuiveis_Meta": {
+    "segment": "FARMA",
     "columns": [
       "pedido_id",
       "cliente",
@@ -1515,6 +1542,31 @@ var NexoDSSchemas={
     },
     "dimensions": [],
     "period": null
+  },
+  "Contatos_Atribuicao_Meta": {
+    "segment": "FARMA",
+    "columns": [
+      "contact_uuid",
+      "primeiro_anuncio_id",
+      "primeiro_anuncio_origem",
+      "primeiro_anuncio_data",
+      "pedido_id",
+      "pedido_data",
+      "coorte_primeiro_anuncio",
+      "pedido_apos_anuncio"
+    ],
+    "types": {
+      "contact_uuid": "text",
+      "primeiro_anuncio_id": "text",
+      "primeiro_anuncio_origem": "text",
+      "primeiro_anuncio_data": "text",
+      "pedido_id": "text",
+      "pedido_data": "text",
+      "coorte_primeiro_anuncio": "date",
+      "pedido_apos_anuncio": "text"
+    },
+    "dimensions": [],
+    "period": "coorte_primeiro_anuncio"
   },
   "ABC_abc": {
     "columns": [

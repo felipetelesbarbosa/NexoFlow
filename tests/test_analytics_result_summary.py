@@ -83,6 +83,22 @@ class AnalyticsResultSummaryTests(unittest.TestCase):
                 code = main.main()
         return code, "\n".join(captured.output), controls, sheets
 
+    def test_analytics_envia_dias_guardados_no_backend_postgres(self):
+        with (
+            patch("ds_backend.client.enabled", return_value=True),
+            patch("weni_insights.enabled", return_value=True),
+            patch("weni_insights.publish_configured", return_value=2) as publish,
+            patch("ds_backend.runtime.open_store") as open_store,
+        ):
+            # Interrompe o restante da rotina sintética após observar o envio.
+            open_store.return_value.get_control.side_effect = RuntimeError(
+                "fim do teste"
+            )
+            self.run_pipeline()
+            publish.assert_called_once_with(
+                main.secrets, open_store.return_value.client
+            )
+
     def test_meta_schema_pending_keeps_successful_primary_counts_and_cursor(self):
         code, output, controls, _ = self.run_pipeline(
             meta={

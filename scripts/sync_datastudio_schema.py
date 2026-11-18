@@ -69,10 +69,30 @@ def run():
         "venda_valida",
     ]
     public["Pedidos_Atribuiveis_Meta"] = dict(
+        segment="FARMA",
         columns=ad_order_fields,
         types={f: public["BI_Pedidos"]["types"][f] for f in ad_order_fields},
         dimensions=[],
         period=None,
+    )
+    ad_contact_fields = [
+        "contact_uuid",
+        "primeiro_anuncio_id",
+        "primeiro_anuncio_origem",
+        "primeiro_anuncio_data",
+        "pedido_id",
+        "pedido_data",
+    ]
+    public["Contatos_Atribuicao_Meta"] = dict(
+        segment="FARMA",
+        columns=[*ad_contact_fields, "coorte_primeiro_anuncio", "pedido_apos_anuncio"],
+        types={
+            **{f: public["Base_Contatos"]["types"][f] for f in ad_contact_fields},
+            "coorte_primeiro_anuncio": "date",
+            "pedido_apos_anuncio": "text",
+        },
+        dimensions=[],
+        period="coorte_primeiro_anuncio",
     )
     abc = json.loads(
         subprocess.check_output(

@@ -257,3 +257,92 @@ test('Mesclagem sintética preserva as quatro janelas de novembro e o intervalo 
     assert.equal(amounts.reduce((total, value) => total + Math.round(value * 100), 0), cents);
   }
 });
+
+const leftSource = 'Contatos_Atribuicao_Meta';
+
+function visitor(uuid, pedido, when, firstAd, origin = 'Meta Ads') {
+  return {
+    ...contact(pedido, when, firstAd, origin),
+    contact_uuid: uuid,
+    primeiro_anuncio_id: 'anuncio-' + uuid
+  };
+}
+
+function leftRequest(day, names = ['contact_uuid', 'coorte_primeiro_anuncio', 'pedido_apos_anuncio']) {
+  const req = request(names);
+  req.configParams.tabela = leftSource;
+  req.dateRange = {startDate: day, endDate: day};
+  return req;
+}
+
+test('Fontes Meta comparam instantes por contato e filtram pelo dia do anúncio em Belém', () => {
+  const people = [
+    visitor('a', '0017', '07/11/26 00:00:01', '2026-11-07T02:59:59Z'),
+    // O mesmo ID já é elegível em a. Para b a compra ocorreu 90 minutos antes do anúncio.
+    visitor('b', '0017', '2026-11-07T01:00:00Z', '2026-11-06T23:30:00-03:00'),
+    visitor('c', null, null, '2026-11-06T18:00:00+02:00'),
+    visitor('d', '0018', '2026-11-06T15:00:00', '06-11-2026 14:59'),
+    // O cabeçalho deve ser acessível à direita. A coorte pertence a 05/11.
+    visitor('e', '0019', '2026-11-06T03:00:01Z', '2026-11-06T02:59:59Z'),
+    visitor('f', '0020', '2026-11-06T16:13:01.123445Z', '2026-11-06T13:13:01.123446-03:00'),
+    visitor('g', '0021', '2026-11-06T14:00:00Z', '2026-11-06T13:00:00Z', 'Orgânico')
+  ];
+  const headers = [
+    order('0017', '130.90'), order('0018', '15.05'), order('0019', '9.10'),
+    order('0020', '950.00'), order('0021', '900.00')
+  ];
+  const f = fixture(people, headers);
+  const req = leftRequest('2026-11-06', [
+    'contact_uuid', 'primeiro_anuncio_id', 'primeiro_anuncio_origem',
+    'primeiro_anuncio_data', 'pedido_id', 'pedido_data', 'coorte_primeiro_anuncio', 'pedido_apos_anuncio'
+  ]);
+  const result = f.run(req);
+  assert.equal(result.schema.find(field => field.name === 'coorte_primeiro_anuncio').type, 'date');
+  assert.equal(result.schema.find(field => field.name === 'pedido_apos_anuncio').type, 'text');
+  const left = records(result).sort((a, b) => a.contact_uuid.localeCompare(b.contact_uuid));
+  assert.deepEqual(left.map(row => [row.contact_uuid, row.coorte_primeiro_anuncio, row.pedido_apos_anuncio]), [
+    ['a', '20261106', '0017'], ['b', '20261106', null], ['c', '20261106', null],
+    ['d', '20261106', '0018'], ['f', '20261106', null]
+  ]);
+  for (const row of left) {
+    const raw = people.find(person => person.contact_uuid === row.contact_uuid);
+    for (const field of ['primeiro_anuncio_id', 'primeiro_anuncio_origem', 'primeiro_anuncio_data', 'pedido_id', 'pedido_data']) {
+      assert.equal(row[field], raw[field]);
+    }
+  }
+  const right = new Map(records(f.run(request(['pedido_id', 'pedido_faturamento_total'])))
+    .map(row => [row.pedido_id, row.pedido_faturamento_total]));
+  assert.deepEqual([...right.keys()].sort(), ['0017', '0018', '0019']);
+  const amounts = left.map(row => right.get(row.pedido_apos_anuncio)).filter(value => value !== undefined);
+  assert.equal(amounts.length, 2);
+  assert.equal(amounts.reduce((sum, value) => sum + Math.round(value * 100), 0), 14595);
+});
+
+test('Fontes Meta respeitam o século de anos Weni e a hora repetida histórica de Belém', () => {
+  const examples = [
+    {uuid: 'y68', firstAd: '01/01/68 00:00', purchase: '2068-01-01T03:00:01Z', day: '2068-01-01'},
+    {uuid: 'y69', firstAd: '01-01-69 00:00:00', purchase: '1969-01-01T03:00:01Z', day: '1969-01-01'},
+    // As 23h50 locais ainda eram UTC-02 na primeira ocorrência. Às 23h10 UTC-03 já se passaram 20 min.
+    {uuid: 'hora-repetida', firstAd: '14/03/86 23:50', purchase: '1986-03-14T23:10:00-03:00', day: '1986-03-14'}
+  ];
+  for (const {uuid, firstAd, purchase, day} of examples) {
+    const f = fixture([visitor(uuid, uuid, purchase, firstAd)], [order(uuid)]);
+    const left = records(f.run(leftRequest(day)));
+    assert.deepEqual(left, [{
+      contact_uuid: uuid, coorte_primeiro_anuncio: day.replaceAll('-', ''), pedido_apos_anuncio: uuid
+    }], uuid);
+    assert.deepEqual(records(f.run(request(['pedido_id']))), [{pedido_id: uuid}], uuid);
+  }
+});
+
+test('Fontes Meta rejeitam data Weni não vazia impossível mesmo ao lado de um pedido válido', () => {
+  const people = [
+    visitor('valido', '01', '01/05/26 12:01', '01/05/26 12:00'),
+    visitor('invalido', '02', '31/04/26 12:01', '01/05/26 12:00')
+  ];
+  const headers = [order('01'), order('02')];
+  for (const req of [leftRequest('2026-05-01'), request(['pedido_id'])]) {
+    const f = fixture(people, headers);
+    assert.throws(() => f.run(req), /DS_DATA_INVALIDA/);
+  }
+});

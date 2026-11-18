@@ -100,6 +100,8 @@ class Reader(Store):
 
     def query(self, table, fields, start, end, filters, aggregation):
         spec = read_contract(table)
+        if spec.get("segment", self.segment) != self.segment:
+            raise StorageError("DS_INSIGHTS_SEGMENTO")
         allowed = spec.get("read_columns", spec["columns"])
         if (
             not spec["public"]
@@ -147,6 +149,8 @@ class Reader(Store):
             clauses.append(sql.SQL("vigente='Sim'"))
         if bool(start) != bool(end):
             raise StorageError("DS_PERIODO_INVALIDO")
+        if table == "BI_Weni_Conversas_Diarias" and not start:
+            raise StorageError("DS_INSIGHTS_PERIODO_OBRIGATORIO")
         if start:
             try:
                 first, last = date.fromisoformat(start), date.fromisoformat(end)
@@ -224,6 +228,16 @@ class Reader(Store):
             version = self.active(conn)
             if not version:
                 raise StorageError("DS_SEM_PUBLICACAO_CONFIRMADA")
+            if table == "BI_Weni_Conversas_Diarias":
+                coverage = conn.execute(
+                    "SELECT count(*) AS dias FROM farma.ds_bi_weni_conversas_diarias WHERE data BETWEEN %s AND %s",
+                    (start, end),
+                ).fetchone()
+                if (
+                    coverage["dias"]
+                    != (date.fromisoformat(end) - date.fromisoformat(start)).days + 1
+                ):
+                    raise StorageError("DS_INSIGHTS_COBERTURA_INCOMPLETA")
             if summary:
                 with conn.cursor(row_factory=dict_row) as cursor:
                     bounds = cursor.execute(
@@ -303,6 +317,8 @@ def create_views(conn):
     for segment in ("FARMA", "PET"):
         schema = segment.lower()
         for name, spec in READ_REGISTRY.items():
+            if name == "BI_Weni_Conversas_Diarias":
+                continue  # Visão opcional instalada junto com o vínculo do projeto.
             if not spec["public"] and name != "Exclusoes_Publicacao":
                 continue
             columns = []

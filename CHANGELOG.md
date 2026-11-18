@@ -1,5 +1,9 @@
 # NexoFlow — Changelog
 
+## 1.5.43 — homologação da ds136
+
+- Weni FARMA guarda os quatro agregados de Insights por projeto e dia. Analytics entrega os dias confirmados ao publicador PostgreSQL. A fonte tem tabela e permissões próprias, independente do fechamento financeiro. [Guia](docs/CONVERSAS%20DIARIAS%20WENI.md).
+
 ## 1.5.42 — publicada em 17/11/2026, 20:52:15 (America/Fortaleza)
 
 - O Setup e o pacote completo passam a distribuir somente o cliente nativo de leitura de Meta Ads. Removidos o servidor MCP, as dependências exclusivas dele e os instaladores de Codex CLI e MCP. Analytics e Noturno usam a credencial Meta já configurada.

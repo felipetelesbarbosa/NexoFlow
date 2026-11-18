@@ -50,10 +50,13 @@ Os limites de leitura continuam incidindo sobre os grupos retornados.
 ### Homologação dos pedidos atribuídos a anúncios
 
 Na cópia FARMA, duplique a combinação `ds123 LEFT ds121`. À esquerda,
-use `Base_Contatos`, selecione exatamente a origem `Meta Ads` e filtre a
-coorte pela data do primeiro anúncio em Belém. A chave calculada devolve o
-`pedido_id` quando o último pedido ocorreu no mesmo instante do primeiro
-anúncio ou depois dele. Um contato sem compra continua na entrada esquerda.
+use a fonte de ensaio `Contatos_Atribuicao_Meta`. Ela consulta a
+`Base_Contatos` com a origem exata `Meta Ads`. Escolha a dimensão de data
+`coorte_primeiro_anuncio` no controle da página. O campo `pedido_apos_anuncio`
+devolve o ID textual quando o último pedido daquele contato ocorreu no mesmo
+instante do primeiro anúncio ou depois dele. A coorte usa o calendário de
+Belém. Os campos brutos permanecem disponíveis para conferência. Um contato
+da coorte sem compra continua na entrada esquerda com chave de junção nula.
 
 À direita, adicione a fonte lógica `Pedidos_Atribuiveis_Meta` da implantação
 privada de ensaio com os arquivos `Code.js` e `Schemas.js` deste commit.
@@ -194,3 +197,7 @@ CI/CodeQL devem ser conferidos no SHA informado na entrega. Nenhum pacote Window
 ## Complemento: vendas sem itens e Top de pares
 
 Ver [diagnóstico privado, escopo explícito de volume e roteiro do Work](DIAGNOSTICO%20VENDAS%20SEM%20ITENS%20E%20TOP%20PARES.md). Preservados publicador, READY, contratos, aliases e ds136. A investigação dos 204 casos exige comparar o corte original confirmado com os fatos; o diagnóstico não aplica recuperação. O modo COMPLETO de compras juntas continua padrão, e Top exige escolha explícita na cópia.
+
+## Complemento da ds136 · coleta automática para homologação
+
+O contrato candidato da nova fonte usa Insights por projeto e dia. A origem manual permanece disponível na cópia e no relatório oficial. O teste estático de inventário identifica a nova tabela e conserva o cabeçalho observado e as pendências históricas da aba antiga. [Coleta, credencial e teste da nova fonte](CONVERSAS%20DIARIAS%20WENI.md).

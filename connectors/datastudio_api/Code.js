@@ -17,12 +17,8 @@ function getConfig(request){
   var env=config.newSelectSingle().setId('ambiente').setName('Ambiente').setIsDynamic(true);
   ['homologacao','producao'].forEach(function(v){env.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
   var table=config.newSelectSingle().setId('tabela').setName('Tabela lógica').setIsDynamic(true);
-  Object.keys(NexoDSSchemas).forEach(function(v){
-    if (v !== 'Pedidos_Atribuiveis_Meta' || p.segmento === 'FARMA') {
-      table.addOption(config.newOptionBuilder().setValue(v).setLabel(v));
-    }
-  });
-  if (!['Compradores_Operacionais', 'Pedidos_Atribuiveis_Meta'].includes(p.tabela)) {
+  Object.keys(NexoDSSchemas).filter(function(v){return !NexoDSSchemas[v].segment || NexoDSSchemas[v].segment===p.segmento;}).forEach(function(v){table.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
+  if (!['Compradores_Operacionais', 'Pedidos_Atribuiveis_Meta', 'Contatos_Atribuicao_Meta'].includes(p.tabela)) {
     var query=config.newSelectSingle().setId('modo_consulta').setName('Leitura: detalhe ou somas homologadas');
     ['detalhe','somas'].forEach(function(v){query.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
   }
@@ -39,8 +35,9 @@ function getConfig(request){
   return config.build();
 }
 function dsConfig_(p){
-  if (p.tabela === 'Pedidos_Atribuiveis_Meta' && p.segmento !== 'FARMA') throw new Error('DS_CONFIGURACAO_INVALIDA');
+  if (['Pedidos_Atribuiveis_Meta', 'Contatos_Atribuicao_Meta'].includes(p.tabela) && p.segmento !== 'FARMA') throw new Error('DS_CONFIGURACAO_INVALIDA');
   if(!['FARMA','PET'].includes(p.segmento)||!['producao','homologacao'].includes(p.ambiente)||!NexoDSSchemas[p.tabela])throw new Error('DS_CONFIGURACAO_INVALIDA');
+  if(NexoDSSchemas[p.tabela].segment && NexoDSSchemas[p.tabela].segment!==p.segmento)throw new Error('DS_INSIGHTS_SEGMENTO');
   var raw=PropertiesService.getScriptProperties().getProperty('NFDS_'+p.segmento+'_'+p.ambiente.toUpperCase());
   if(!raw)throw new Error('DS_CREDENCIAL_AUSENTE');
   var c=JSON.parse(raw);
@@ -59,7 +56,7 @@ function dsCall_(c,path,payload){
     if(status===409){
       var rejection={};try{rejection=JSON.parse(response.getContentText());}catch(ignored){}
       // Só códigos conhecidos, nunca texto livre/payload de erro do servidor.
-      if(['DS_FILTRO_CORTA_RECORTE_USE_DETALHE','DS_COMPRADORES_EXIGEM_COMPETENCIA_OU_RECORTE_UNICO','DS_COMPRADORES_NAO_SOMAVEIS_ENTRE_MESES','DS_RESUMO_EXIGE_GRAO','DS_RESUMO_TOTAL_NAO_APLICA_DATA','DS_CONSULTA_EXCEDE_LIMITE_USE_RESUMO_OU_PERIODO','DS_RESPOSTA_EXCEDE_LIMITE_USE_RESUMO','DS_SEM_PUBLICACAO_CONFIRMADA','DS_ABC_BASE_INCOMPLETA','DS_ABC_PEDIDO_EXCEDE_LIMITE_PARES','DS_ABC_PRECISAO_EXCEDIDA','DS_BI_PEDIDO_OPERACIONAL_AMBIGUO','DS_CONSULTA_TEMPO_LIMITE'].includes(rejection.error))throw new Error(rejection.error);
+      if(['DS_FILTRO_CORTA_RECORTE_USE_DETALHE','DS_COMPRADORES_EXIGEM_COMPETENCIA_OU_RECORTE_UNICO','DS_COMPRADORES_NAO_SOMAVEIS_ENTRE_MESES','DS_RESUMO_EXIGE_GRAO','DS_RESUMO_TOTAL_NAO_APLICA_DATA','DS_CONSULTA_EXCEDE_LIMITE_USE_RESUMO_OU_PERIODO','DS_RESPOSTA_EXCEDE_LIMITE_USE_RESUMO','DS_SEM_PUBLICACAO_CONFIRMADA','DS_ABC_BASE_INCOMPLETA','DS_INSIGHTS_COBERTURA_INCOMPLETA','DS_INSIGHTS_PERIODO_OBRIGATORIO','DS_ABC_PEDIDO_EXCEDE_LIMITE_PARES','DS_ABC_PRECISAO_EXCEDIDA','DS_BI_PEDIDO_OPERACIONAL_AMBIGUO','DS_CONSULTA_TEMPO_LIMITE'].includes(rejection.error))throw new Error(rejection.error);
     }
     if(![429,502,503,504].includes(status)||attempt===2||Date.now()-started>45000)throw new Error('DS_HTTP_'+status);
     Utilities.sleep(Math.min(4000,1000*Math.pow(2,attempt)));
@@ -95,7 +92,7 @@ function dsError_(error){
 function getData(request){try{
   var p=request.configParams,c=dsConfig_(p),spec=NexoDSSchemas[p.tabela];
   if(spec.abc_mode)return dsAbcData_(request,c,spec);
-  if(p.tabela==='Pedidos_Atribuiveis_Meta')return dsAdOrders_(request,c,spec);
+  if(p.tabela==='Pedidos_Atribuiveis_Meta'||p.tabela==='Contatos_Atribuicao_Meta')return dsAdData_(request,c,spec);
   var names=request.fields.map(function(f){return f.name;}),distinct=names.includes('produtos_distintos_periodo');
 
   if(names.some(function(n){return n!=='produtos_distintos_periodo'&&!spec.columns.includes(n);}))throw new Error('DS_CAMPOS_NAO_AUTORIZADOS');
@@ -125,6 +122,11 @@ function getData(request){try{
     payload.aggregation = {pedido_chave: 'count'};
   }
   if(spec.period&&!(p.tabela==='BI_Historico_Resumo'&&['TOTAL','SEM_EMISSAO'].includes(p.recorte_historico))&&(!payload.start||!payload.end)&&!(request.scriptParams&&request.scriptParams.sampleExtraction))throw new Error('DS_PERIODO_OBRIGATORIO');
+  // Uma amostra de schema sem período não escolhe nem inventa um dia da Weni.
+  if(p.tabela==='BI_Weni_Conversas_Diarias'&&request.scriptParams&&request.scriptParams.sampleExtraction&&!payload.start){
+    dsVerify_(c);
+    return {schema:dsFields_(p.tabela).forIds(names).build(),rows:[],filtersApplied:false};
+  }
   if(request.scriptParams&&request.scriptParams.sampleExtraction&&spec.period&&!payload.start){payload.start='2000-01-01';payload.end='2000-01-01';}
   var result=dsCheckedQuery_(c,payload);
   var fields=dsFields_(p.tabela).forIds(names);
@@ -146,22 +148,98 @@ function dsFormatRows_(data,names,spec,distinct){
   return data.map(function(r){if(r.length!==names.length)throw new Error('DS_SCHEMA_DIVERGENTE');return {values:r.map(function(v,i){if(v===null||v==='')return null;var kind=distinct?'number':spec.types[names[i]];if(kind==='number'){var n=Number(v);if(!Number.isFinite(n))throw new Error('DS_NUMERO_INVALIDO');return n;}if(kind==='date'){if(!/^\d{4}-\d{2}-\d{2}$/.test(v))throw new Error('DS_DATA_INVALIDA');return v.replace(/-/g,'');}return String(v);})};});
 }
 
-// A origem publica timestamps ISO com fuso. Compare o instante UTC e preserve
-// as frações: duas compras no mesmo segundo podem cair em lados opostos do anúncio.
-function dsAdInstant_(value) {
-  var timestamp = typeof value === 'string' &&
-    /^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d{1,9}))?(Z|[+-]\d\d:\d\d)$/.exec(value);
-  if (!timestamp) throw new Error('DS_DATA_INVALIDA');
-  var local = Date.parse(timestamp[1] + 'Z');
-  var utc = Date.parse(timestamp[1] + timestamp[3]);
-  if (!Number.isFinite(utc) || !Number.isFinite(local) ||
-      new Date(local).toISOString().slice(0, 19) !== timestamp[1]) {
-    throw new Error('DS_DATA_INVALIDA');
+// America/Belem inclui horário de verão histórico e o antigo horário médio local.
+// Só reutilize um deslocamento quando os dois extremos do dia UTC coincidirem.
+var dsAdZoneFormatter_;
+var dsAdZoneDays_ = new Map();
+
+function dsAdOffset_(second) {
+  function fromZone(at) {
+    if (!dsAdZoneFormatter_) dsAdZoneFormatter_ = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Belem', timeZoneName: 'longOffset'
+    });
+    var zone = dsAdZoneFormatter_.formatToParts(new Date(at * 1000)).find(function(p) {
+      return p.type === 'timeZoneName';
+    }).value;
+    var parts = /^GMT([+-])(\d\d):(\d\d)(?::(\d\d))?$/.exec(zone);
+    if (!parts) throw new Error('DS_DATA_INVALIDA');
+    var seconds = Number(parts[2]) * 3600 + Number(parts[3]) * 60 + Number(parts[4] || 0);
+    return parts[1] === '+' ? seconds : -seconds;
   }
-  return new Date(utc).toISOString().slice(0, 19) + '.' + (timestamp[2] || '').padEnd(9, '0');
+  var day = Math.floor(second / 86400);
+  if (!dsAdZoneDays_.has(day)) {
+    var first = fromZone(day * 86400), last = fromZone(day * 86400 + 86399);
+    if (dsAdZoneDays_.size >= 4096) dsAdZoneDays_.clear();
+    dsAdZoneDays_.set(day, first === last ? first : null);
+  }
+  var cached = dsAdZoneDays_.get(day);
+  return cached === null ? fromZone(second) : cached;
 }
 
-function dsAdOrders_(request, c, spec) {
+function dsAdDate_(value) {
+  if (value === null || (typeof value === 'string' && !value.trim())) return null;
+  if (typeof value !== 'string') throw new Error('DS_DATA_INVALIDA');
+  var raw = value.trim();
+  var br = /^(\d{1,2})([/-])(\d{1,2})\2(\d{2}|\d{4})\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/.exec(raw);
+  var year, month, day, hour = 0, minute = 0, second = 0, micro = 0, zone = null;
+  function clock(text) {
+    var match = /^(\d{2})(?:(:?)(\d{2})(?:\2(\d{2}))?)?(?:[.,](\d+))?$/.exec(text);
+    if (!match) throw new Error('DS_DATA_INVALIDA');
+    return [Number(match[1]), Number(match[3] || 0), Number(match[4] || 0),
+      Number((match[5] || '').slice(0, 6).padEnd(6, '0'))];
+  }
+  if (br) {
+    year = Number(br[4]);
+    if (br[4].length === 2) year += year <= 68 ? 2000 : 1900;
+    month = Number(br[3]); day = Number(br[1]); hour = Number(br[5]);
+    minute = Number(br[6]); second = Number(br[7] || 0);
+  } else {
+    var iso = /^(\d{4})(-?)(\d{2})\2(\d{2})(?:[T ]([^Z+-]+)(Z|[+-].+)?)?$/.exec(raw);
+    if (!iso) throw new Error('DS_DATA_INVALIDA');
+    year = Number(iso[1]); month = Number(iso[3]); day = Number(iso[4]);
+    if (iso[5]) {
+      var time = clock(iso[5]);
+      hour = time[0]; minute = time[1]; second = time[2]; micro = time[3]; zone = iso[6] || null;
+    }
+  }
+  var date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
+  date.setUTCHours(hour, minute, second, 0);
+  if (year < 1 || date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 ||
+      date.getUTCDate() !== day || date.getUTCHours() !== hour || date.getUTCMinutes() !== minute ||
+      date.getUTCSeconds() !== second) throw new Error('DS_DATA_INVALIDA');
+  var wall = date.getTime() / 1000, utc = wall;
+  var localDay = date.toISOString().slice(0, 10);
+  if (zone === null) {
+    // fold=0 do ZoneInfo escolhe o deslocamento anterior tanto na lacuna
+    // quanto na hora repetida. Fora da transição, a primeira tentativa basta.
+    var before = dsAdOffset_(wall - 86400);
+    utc -= before;
+    if (dsAdOffset_(utc) !== before) {
+      var after = dsAdOffset_(wall + 86400);
+      if (dsAdOffset_(wall - after) === after) utc = wall - after;
+    }
+  } else {
+    if (zone !== 'Z') {
+      var offset = clock(zone.slice(1)), sign = zone[0] === '+' ? 1 : -1;
+      var adjustment = offset[0] * 3600 + offset[1] * 60 + offset[2];
+      if (adjustment >= 86400) throw new Error('DS_DATA_INVALIDA');
+      // O fromisoformat considera UTC um offset com parte inteira toda zero.
+      utc -= sign * adjustment;
+      if (adjustment) micro -= sign * offset[3];
+      var carry = Math.floor(micro / 1000000);
+      utc += carry; micro -= carry * 1000000;
+    }
+    var localized = new Date((utc + dsAdOffset_(utc)) * 1000);
+    if (localized.getUTCFullYear() < 1 || localized.getUTCFullYear() > 9999) throw new Error('DS_DATA_INVALIDA');
+    localDay = localized.toISOString().slice(0, 10);
+  }
+  var instant = new Date(utc * 1000);
+  if (instant.getUTCFullYear() < 1 || instant.getUTCFullYear() > 9999) throw new Error('DS_DATA_INVALIDA');
+  return {instant: instant.toISOString().slice(0, 19) + '.' + String(micro).padStart(6, '0') + 'Z', day: localDay};
+}
+
+function dsAdData_(request, c, spec) {
   var started = Date.now();
   function read(table, fields, filters) {
     if (Date.now() - started > 45000) throw new Error('DS_PRAZO_CONSULTA');
@@ -179,27 +257,65 @@ function dsAdOrders_(request, c, spec) {
   if (!requested.length || requested.some(function(f) { return !spec.columns.includes(f.name); })) {
     throw new Error('DS_CAMPOS_NAO_AUTORIZADOS');
   }
+  var left = request.configParams.tabela === 'Contatos_Atribuicao_Meta';
   var groups = request.dimensionsFilters || [];
   var idFilters = groups.filter(function(g) {
     return Array.isArray(g) && g.length === 1 && g[0].type === 'INCLUDE' &&
       g[0].fieldName === 'pedido_id' && ['EQUALS', 'IN_LIST'].includes(g[0].operator) &&
       Array.isArray(g[0].values) && g[0].values.length && g[0].values.every(function(v) { return typeof v === 'string'; });
   }).map(function(g) { return new Set(g[0].values); });
-  var applied = groups.length > 0 && idFilters.length === groups.length;
+  var applied = !left && groups.length > 0 && idFilters.length === groups.length;
   if (!applied) idFilters = [];
   var selected = requested.filter(function(f) { return !applied || !f.forFilterOnly; });
   var schema = dsFields_(request.configParams.tabela).forIds(selected.map(function(f) { return f.name; })).build();
   var names = schema.map(function(f) { return f.name; });
-  var base = read('Base_Contatos', ['pedido_id', 'pedido_data', 'primeiro_anuncio_data'],
-    [{field: 'primeiro_anuncio_origem', values: ['Meta Ads']}]);
-  var candidates = new Set();
+  var baseFields = ['pedido_id', 'pedido_data', 'primeiro_anuncio_data'];
+  var cohort = 'coorte_primeiro_anuncio', attributed = 'pedido_apos_anuncio';
+  var range = request.dateRange || {};
+  if (left) {
+    if (!range.startDate && !range.endDate && request.scriptParams && request.scriptParams.sampleExtraction) {
+      dsVerify_(c);
+      return {schema: schema, rows: [], filtersApplied: false};
+    }
+    if (!range.startDate || !range.endDate) throw new Error('DS_PERIODO_OBRIGATORIO');
+    if (![range.startDate, range.endDate].every(function(day) {
+      return typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(day) && dsAdDate_(day).day === day;
+    }) || range.startDate > range.endDate) throw new Error('DS_PERIODO_INVALIDO');
+    names.forEach(function(name) {
+      if (![cohort, attributed].includes(name) && !baseFields.includes(name)) baseFields.push(name);
+    });
+  }
+  var base = read('Base_Contatos', baseFields, [{field: 'primeiro_anuncio_origem', values: ['Meta Ads']}]);
+  var candidates = new Set(), contacts = [];
   base.rows.forEach(function(row) {
     var id = row[0];
-    if (id === null || id === '' || row[1] === null || row[1] === '' || row[2] === null || row[2] === '') return;
-    if (typeof id !== 'string') throw new Error('DS_SCHEMA_DIVERGENTE');
-    if (id.trim() && idFilters.every(function(allowed) { return allowed.has(id); }) &&
-        dsAdInstant_(row[1]) >= dsAdInstant_(row[2])) candidates.add(id);
+    if (!left && (id === null || id === '' || !idFilters.every(function(allowed) { return allowed.has(id); }))) return;
+    var ad = dsAdDate_(row[2]);
+    if (left && (!ad || ad.day < range.startDate || ad.day > range.endDate)) return;
+    var key = null;
+    if (ad && id !== null && id !== '') {
+      if (typeof id !== 'string') throw new Error('DS_SCHEMA_DIVERGENTE');
+      if (id.trim()) {
+        var purchase = dsAdDate_(row[1]);
+        if (purchase && purchase.instant >= ad.instant) key = id;
+      }
+    }
+    if (left) {
+      contacts.push(names.map(function(name) {
+        if (name === cohort) return ad.day;
+        if (name === attributed) return key;
+        return row[baseFields.indexOf(name)];
+      }));
+    } else if (key !== null) candidates.add(key);
   });
+  if (left) {
+    var result = {schema: schema, filtersApplied: false, rows: dsFormatRows_(contacts, names, spec, false)};
+    if (Utilities.newBlob(JSON.stringify(result)).getBytes().length > 7000000) {
+      throw new Error('DS_RESPOSTA_EXCEDE_LIMITE_USE_RESUMO');
+    }
+    if (Date.now() - started > 45000) throw new Error('DS_PRAZO_CONSULTA');
+    return result;
+  }
   // Sem período de venda aqui: inclusive o cabeçalho posterior ao fim da coorte.
   // O limite de valores por filtro da API é 100. Nunca expor um lote parcial.
   var ids = Array.from(candidates);

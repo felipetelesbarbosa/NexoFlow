@@ -227,4 +227,20 @@ test('Top pares é explícito, tem universo verificado e não permite filtro sil
  assert.throws(()=>f.ctx.getData(req),/DS_TOP_PARES_FILTRO_NAO_SUPORTADO/);
 });
 
+test('ds136 preserva tipos e zero confirmado, bloqueia lacunas e separa PET',()=>{
+ const table='BI_Weni_Conversas_Diarias',r=request(['data','conversas_weni']);
+ r.configParams.tabela=table;r.dimensionsFilters=[];
+ const f=fixture(p=>result(p,[['2026-11-01',0]]));
+ assert.deepEqual(Array.from(f.ctx.getData(r).rows[0].values),['20261101',0]);
+ const blocked=fixture(()=>({status:409,body:{error:'DS_INSIGHTS_COBERTURA_INCOMPLETA'}}));
+ assert.throws(()=>blocked.ctx.getData(r),/DS_INSIGHTS_COBERTURA_INCOMPLETA/);
+ delete r.dateRange;
+ assert.throws(()=>f.ctx.getData(r),/DS_PERIODO_OBRIGATORIO/);
+ r.scriptParams={sampleExtraction:true};
+ assert.equal(f.ctx.getData(r).rows.length,0);
+ assert.ok(f.calls.at(-1).url.endsWith('/v1/destino'));
+ r.configParams.segmento='PET';
+ assert.throws(()=>f.ctx.getData(r),/DS_INSIGHTS_SEGMENTO/);
+});
+
 require('./datastudio/meta_orders.cjs');

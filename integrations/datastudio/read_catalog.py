@@ -4,8 +4,19 @@ from copy import deepcopy
 from typing import LiteralString
 
 from ds_backend.contract import REGISTRY, StorageError
+from integrations.datastudio.weni_daily import COLUMNS, FIELDS, TABLE
 
 READ_REGISTRY = deepcopy(REGISTRY)
+READ_REGISTRY[TABLE] = dict(
+    public=True,
+    columns=COLUMNS,
+    period="data",
+    segment="FARMA",
+    types={
+        f: ("date" if f == "data" else "number" if f in FIELDS else "text")
+        for f in COLUMNS
+    },
+)
 PROJECTIONS = {
     "Metricas_Diarias": (
         "data tipo_atribuicao anuncio_id anuncio_titulo contatos",

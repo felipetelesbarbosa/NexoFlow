@@ -174,6 +174,17 @@ def main() -> int:
         if args.apply and args.full and require_review is None:
             require_review = default_review
 
+        if args.apply:
+            from project_paths import load_private_settings
+            from weni_insights import collect_configured
+            from weni_insights import enabled as insights_enabled
+
+            settings = load_private_settings()
+            if insights_enabled(settings):
+                logging.info(
+                    "Insights FARMA: %d dias coletados.", collect_configured(settings)
+                )
+
         dedup_review = require_review or review_out or default_review
         stats, dedup = run_with_dedup(
             apply=args.apply,

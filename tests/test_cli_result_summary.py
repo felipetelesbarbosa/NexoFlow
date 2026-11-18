@@ -165,6 +165,23 @@ class CliResultSummaryTests(unittest.TestCase):
         self.assertIn("não representam POSTs nem mensagens enviadas", text)
         self.assertNotIn("68 contatos incluídos", text)
 
+    def test_insights_noturno_coleta_somente_na_aplicacao(self):
+        dedup = dict(proposed=0, deleted=0, pending=0, skipped=0)
+        with (
+            patch.object(run_update_weni, "configure_proxy", return_value=MagicMock()),
+            patch("logging_config.configure_logging"),
+            patch("weni_dedup.run_with_dedup", return_value=(UpdateStats(), dedup)),
+            patch("weni_insights.enabled", return_value=True),
+            patch("weni_insights.collect_configured", return_value=1) as collect,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            with patch("sys.argv", ["weni", "--dry-run"]):
+                self.assertEqual(run_update_weni.main(), 0)
+            collect.assert_not_called()
+            with patch("sys.argv", ["weni", "--apply"]):
+                self.assertEqual(run_update_weni.main(), 0)
+            collect.assert_called_once()
+
     def test_weni_actual_cli_distinguishes_new_from_total_confirmed_contacts(self):
         stats = UpdateStats(contacts_updated=7, contacts_created=2, orders_api_failed=1)
         dedup = {"proposed": 0, "deleted": 0, "pending": 0, "skipped": 0}
