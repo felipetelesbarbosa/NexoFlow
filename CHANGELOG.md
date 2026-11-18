@@ -1,6 +1,6 @@
 # NexoFlow — Changelog
 
-## 1.5.45 em homologação
+## 1.5.45 — publicada em 18/11/2026, 17:44:58 (America/Fortaleza)
 
 - O Analytics e a etapa Analytics do Noturno auditam destinos de anúncios no PostgreSQL FARMA de homologação. O leitor oferece detalhes e totais por período, com cobertura e pendências de recepção. [Roteiro](docs/DESTINOS%20META%20WENI.md).
 

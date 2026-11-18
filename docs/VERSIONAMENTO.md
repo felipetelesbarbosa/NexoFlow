@@ -1,8 +1,12 @@
 # Versionamento do NexoFlow
 
-## Preparação 1.5.45
+## Publicação 1.5.45
 
-Prévia para homologar destinos Meta no PostgreSQL FARMA. [Procedimento](DESTINOS%20META%20WENI.md).
+Publicada em **18/11/2026, 17:44:58 (America/Fortaleza)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.45) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/4de6b20276fb8b590e4a34ebb984786e73de2a65) · [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44390565728) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44390565773) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44390565719) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44394165244).
+
+Os ZIPs públicos coincidiram com os pacotes da preparação aprovada no mesmo SHA. Foram conferidos SHA-256, CRC, manifesto, módulos e versão dos executáveis x64. A homologação local cobriu o reenvio após perda de resposta, a separação dos destinos, o bloqueio por anúncio e a leitura com papel restrito. A validação comercial continua na cópia e na VPS de homologação.
+
+Destinos Meta no PostgreSQL FARMA. [Procedimento](DESTINOS%20META%20WENI.md).
 
 ## Publicação 1.5.44
 

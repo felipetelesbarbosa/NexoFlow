@@ -6,6 +6,19 @@ Em 18/11/2026 o conector Weni confirmou o projeto CX Delivery FarmaLíder, a org
 
 O controle de 01 a 18/11 do Work tem 5, 13 e 24 eventos por anúncio, 42 no total e 70 conversas iniciadas da Meta. A nova leitura direta de eventos por instante em Belém encontrou 4, 13 e 25 nos mesmos anúncios. Um UUID apareceu nos eventos e na pesquisa de canais por UUID. A origem da diferença por anúncio permanece em conferência. Preserve a READY que forneceu o controle. Compare a data no fuso da conta, o horário de corte do dia aberto, a correspondência com fatos diários e a cobertura das duas consultas. Mantenha as diferenças por anúncio no recibo. A soma geral isolada não aprova a aplicação.
 
+### Conferência independente da coleta em 18/11/2026
+
+A leitura de eventos usou o parser CTWA nativo e a identidade deduplicada do projeto. A Graph informou BRL e America/Noronha. A tabela compara 01 a 18/11 inclusive nos recortes indicados, com o dia 18 ainda aberto.
+
+| Sufixo do anúncio | Referência Work CTWA | Flows bruto em Belém | Flows bruto no fuso da conta | Coincide com dia com fato na Graph no fuso da conta | Fora dos dias com fato | Conversas Meta Work / nova consulta |
+|---|---:|---:|---:|---:|---:|---:|
+| 6270073 | 5 | 4 | 5 | 5 | 0 | 8 / 8 |
+| 6070073 | 13 | 13 | 14 | 13 | 1 | 16 / 16 |
+| 4080073 | 24 | 25 | 25 | 23 | 2 | 46 / 45 |
+| **Total** | **42** | **42** | **44** | **41** | **3** | **70 / 69** |
+
+A nova leitura da Graph somou R$ 251,02 de investimento nos três anúncios. O fuso e a presença de fato por dia explicam diferenças entre as novas consultas. A versão do fato e o instante exato da comparação com o corte do Work ainda precisam ser conferidos. O extrato deste teste consultou os provedores em leitura. A simulação no Terminal precisa combinar também a base já persistida no backend de homologação. No corte do Work os 42 eventos permanecem pendentes de receptor. Mantenha os valores de referência no arquivo privado. Libere a aplicação apenas após reproduzir a mesma definição e o mesmo corte por anúncio.
+
 | Campo ou fonte | Uso |
 |---|---|
 | Projeto CX / organização Flows | Dois UUIDs independentes. Obter o vínculo por get_user_projects. O nome e o UUID do org.json e o fuso devem coincidir. |
