@@ -1,8 +1,8 @@
 # NexoFlow — Changelog
 
-## 1.5.43 — homologação da ds136
+## 1.5.43 — em validação
 
-- Weni FARMA guarda os quatro agregados de Insights por projeto e dia. Analytics entrega os dias confirmados ao publicador PostgreSQL. A fonte tem tabela e permissões próprias, independente do fechamento financeiro. [Guia](docs/CONVERSAS%20DIARIAS%20WENI.md).
+- O token do perfil FARMA usa Flows v2 para contar conversas distintas com classificação confirmada por dia de Belém. Paginação por offset, repetição de GET transitório e guarda contra conflito preservam o último dia válido. O cache e a visão registram a origem de cada dia. Analytics entrega os dias confirmados ao publicador PostgreSQL. A fonte tem tabela e permissões próprias, independente do fechamento financeiro. [Guia](docs/CONVERSAS%20DIARIAS%20WENI.md).
 
 ## 1.5.42 — publicada em 17/11/2026, 20:52:15 (America/Fortaleza)
 

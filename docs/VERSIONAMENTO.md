@@ -1,8 +1,8 @@
 # Versionamento do NexoFlow
 
-## Homologação 1.5.43
+## Preparação 1.5.43
 
-O Setup de homologação da coleta Weni Insights é distribuído pelo artefato do Actions do commit preparado. Instalar em Preserve. A ativação depende de acesso de serviço ao Insights e da conferência das seis datas na cópia do Looker. [Procedimento](CONVERSAS%20DIARIAS%20WENI.md).
+A prévia de homologação 7b3d4bc não gerou tag pública. A primeira release estável 1.5.43 distribui o coletor corrigido do Flows v2. Quem instalou a prévia deve instalar o Setup público em Preserve. [Procedimento e controle do recorte](CONVERSAS%20DIARIAS%20WENI.md).
 
 ## Publicação 1.5.42
 

@@ -1,10 +1,10 @@
-# NexoFlow 1.5.43 em homologação
+# NexoFlow 1.5.43
 
 Aplicativos operacionais e autônomos para Windows que integram **Weni e a API FarmaLíder nos segmentos FarmaLíder e Pets Líder**, atualizam contatos e pedidos e organizam os dados no **Google Sheets** para análise no **Data Studio**.
 
 O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
 
-[Baixar instalador estável 1.5.42](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.42/NexoFlow-Setup-1.5.42.zip) · [Setup de homologação e operação da ds136](docs/CONVERSAS%20DIARIAS%20WENI.md) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
+[Baixar instalador 1.5.43](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.43/NexoFlow-Setup-1.5.43.zip) · [Homologação da ds136](docs/CONVERSAS%20DIARIAS%20WENI.md) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
 
 [Base Mestre permanente de conhecimento e diretrizes](docs/planejamento/DIRETRIZES_E_CONHECIMENTO_NEXOFLOW.md) — ponto de consulta compartilhado entre Codex e Work antes de novas tarefas.
 
@@ -94,7 +94,7 @@ As continuações automáticas no Meu Drive exigem autorização Google local. O
 
 ## Versões e atualizações
 
-Para a homologação da 1.5.43 use o artefato do Actions indicado no guia. O endereço de distribuição `/releases/download/v1.5.43/NexoFlow-Setup-1.5.43.zip` é reservado à futura publicação estável.
+A 1.5.43 usa o Flows v2 para as conversas diárias FARMA com a credencial do perfil. Quem instalou o artefato de homologação anterior deve atualizar pelo Setup da release em Preserve.
 
 O NexoFlow **1.5.42** foi publicado em 17/11/2026, 20:52:15 (America/Fortaleza). [Release Windows](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.42) · [Evidências e hashes](docs/VERSIONAMENTO.md).
 

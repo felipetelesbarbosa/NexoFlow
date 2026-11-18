@@ -36,22 +36,24 @@ def install(store, project):
           conversas_weni integer NOT NULL CHECK(conversas_weni>=0), resolvidas integer NOT NULL CHECK(resolvidas>=0),
           nao_resolvidas integer NOT NULL CHECK(nao_resolvidas>=0), transferidas integer NOT NULL CHECK(transferidas>=0),
           hash text NOT NULL, PRIMARY KEY(projeto,data))""")
+        conn.execute("""ALTER TABLE farma.nf_weni_dias ADD COLUMN IF NOT EXISTS origem text NOT NULL
+            DEFAULT 'WENI_INSIGHTS' CHECK(origem IN ('WENI_INSIGHTS','WENI_FLOWS_V2'))""")
         conn.execute("""CREATE OR REPLACE VIEW farma.ds_bi_weni_conversas_diarias WITH(security_barrier=true) AS
             SELECT data,'FARMA'::text AS segmento,conversas_weni,resolvidas,nao_resolvidas,transferidas,
-            'WENI_INSIGHTS'::text AS origem,'America/Belem'::text AS fuso FROM farma.nf_weni_dias""")
+            origem,'America/Belem'::text AS fuso FROM farma.nf_weni_dias""")
         conn.execute("GRANT SELECT ON farma.nf_weni_projeto TO nf_ds_farma_publish")
         conn.execute(
             "GRANT SELECT, INSERT ON farma.nf_weni_dias TO nf_ds_farma_publish"
         )
         conn.execute(
-            "GRANT UPDATE(observado,conversas_weni,resolvidas,nao_resolvidas,transferidas,hash) ON farma.nf_weni_dias TO nf_ds_farma_publish"
+            "GRANT UPDATE(observado,conversas_weni,resolvidas,nao_resolvidas,transferidas,hash,origem) ON farma.nf_weni_dias TO nf_ds_farma_publish"
         )
         conn.execute(
             "GRANT SELECT ON farma.ds_bi_weni_conversas_diarias TO nf_ds_farma_read"
         )
 
 
-def put(store, project, day, observed, metrics):
+def put(store, project, day, observed, metrics, origin="WENI_INSIGHTS"):
     if store.segment != "FARMA":
         raise StorageError("DS_INSIGHTS_SEGMENTO")
     try:
@@ -71,9 +73,12 @@ def put(store, project, day, observed, metrics):
             raise ValueError
     except (TypeError, ValueError, AttributeError):
         raise StorageError("DS_INSIGHTS_DIA_INVALIDO") from None
-    fingerprint = digest(
-        dict(project=project, day=day, observed=observed, metrics=metrics)
-    )
+    payload = dict(project=project, day=day, observed=observed, metrics=metrics)
+    if origin == "WENI_FLOWS_V2":
+        payload["origin"] = origin
+    elif origin != "WENI_INSIGHTS":
+        raise StorageError("DS_INSIGHTS_ORIGEM_DIVERGENTE")
+    fingerprint = digest(payload)
     with store.connect() as conn:
         if not conn.execute(
             "SELECT 1 FROM farma.nf_weni_projeto WHERE projeto=%s", (project,)
@@ -81,12 +86,19 @@ def put(store, project, day, observed, metrics):
             raise StorageError("DS_INSIGHTS_PROJETO_DIVERGENTE")
         conn.execute(
             """INSERT INTO farma.nf_weni_dias AS d
-            (projeto,data,observado,conversas_weni,resolvidas,nao_resolvidas,transferidas,hash)
-            VALUES(%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT(projeto,data) DO UPDATE SET
-            (observado,conversas_weni,resolvidas,nao_resolvidas,transferidas,hash)=
-            (excluded.observado,excluded.conversas_weni,excluded.resolvidas,excluded.nao_resolvidas,excluded.transferidas,excluded.hash)
+            (projeto,data,observado,conversas_weni,resolvidas,nao_resolvidas,transferidas,hash,origem)
+            VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT(projeto,data) DO UPDATE SET
+            (observado,conversas_weni,resolvidas,nao_resolvidas,transferidas,hash,origem)=
+            (excluded.observado,excluded.conversas_weni,excluded.resolvidas,excluded.nao_resolvidas,excluded.transferidas,excluded.hash,excluded.origem)
             WHERE d.observado < excluded.observado""",
-            (project, day, observed, *(metrics[k] for k in FIELDS), fingerprint),
+            (
+                project,
+                day,
+                observed,
+                *(metrics[k] for k in FIELDS),
+                fingerprint,
+                origin,
+            ),
         )
         current = conn.execute(
             "SELECT hash FROM farma.nf_weni_dias WHERE projeto=%s AND data=%s",

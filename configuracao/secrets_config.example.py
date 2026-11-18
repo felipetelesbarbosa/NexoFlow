@@ -76,6 +76,7 @@ PERFIS = {
         "WENI_INSIGHTS_ENABLED": False,
         "WENI_INSIGHTS_CREDENTIAL_SOURCE": "perfil",
         "WENI_INSIGHTS_PROJECT_UUID": "",
+        "WENI_FLOWS_ORG_UUID": "",  # Opcional, UUID de org.json do workspace FARMA.
         "WENI_INSIGHTS_START_DATE": "",
         "WENI_API_TOKEN": WENI_API_TOKEN,
         "GOOGLE_SPREADSHEET_ID": GOOGLE_SPREADSHEET_ID,

@@ -150,4 +150,16 @@ def test_collect_publish_replay_correct_and_read(store, tmp_path, monkeypatch):
             put(Store(DSN, "homologacao", "PET"), *args)
         with pytest.raises(StorageError, match="PROJETO_DIVERGENTE"):
             put(store, str(uuid4()), *args[1:])
+        from tests.test_weni_insights import event, ok
+
+        flows = Mock()
+        flows.get.side_effect = [ok([event(20, "Has Chat Room")]), ok([])]
+        assert (
+            weni.collect(db, flows, project, b, b, origin=weni.FLOWS, refresh=True) == 1
+        )
+        assert weni.publish(db, client, project) == 1
+        assert weni.publish(db, client, project) == 0
+        observed_rows = sorted(query(b.isoformat()).json()["rows"])
+        assert observed_rows[0][-2] == "WENI_INSIGHTS"
+        assert observed_rows[1][2:] == [1, 0, 0, 1, "WENI_FLOWS_V2", "America/Belem"]
         assert store.inspect(base)["state"] == "READY"

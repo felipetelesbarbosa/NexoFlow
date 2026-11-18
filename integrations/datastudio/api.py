@@ -92,9 +92,11 @@ def create_app(store, token, *, reader=False):
 
         from integrations.datastudio.weni_daily import put
 
-        return await invoke(
-            request, partial(put, store), ("project", "day", "observed", "metrics")
-        )
+        data = await body(request)
+        required = {"project", "day", "observed", "metrics"}
+        if set(data) not in (required, required | {"origin"}):
+            raise StorageError("DS_PARAMETROS_INVALIDOS")
+        return await run_in_threadpool(partial(put, store), **data)
 
     @api.get("/v1/conferencia")
     def audit():

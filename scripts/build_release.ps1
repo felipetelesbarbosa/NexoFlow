@@ -422,7 +422,7 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-A 1.5.43 adiciona a coleta diária opcional do Weni Insights e a publicação da ds136 pelo Analytics no PostgreSQL FARMA. O roteiro de homologação descreve o acesso de serviço necessário, o vínculo por projeto, a retomada e a fonte separada de conversas. [Roteiro](docs/CONVERSAS%20DIARIAS%20WENI.md).
+O token do perfil FARMA agora consulta a classificação de conversas no Flows v2. O coletor confirma o workspace, lê todas as páginas do dia e conserva os dias já conferidos em caso de falha. O Analytics publica a origem de cada dia. Quem já instalou a prévia 1.5.43 deve instalar este Setup público em Preserve. [Guia para homologação na cópia](https://github.com/felipetelesbarbosa/NexoFlow/blob/v1.5.43/docs/CONVERSAS%20DIARIAS%20WENI.md).
 
 Instale em Preserve e confira nexo versao. O Setup conserva configurações, credenciais, SQLite, logs, checkpoints e journals. Os ZIPs não incluem instalador Python nem dados comerciais. Não substitua módulos avulsos. A publicação do software não comprova recuperação ou homologação comercial e não executa cargas.
 
