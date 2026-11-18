@@ -222,8 +222,17 @@ def test_inconsistent_base_fails_instead_of_empty_or_partial(store, problem):
             reader.abc(mode, ["periodo_inicio"], "2026-11-01", "2026-11-02")
 
 
-@pytest.mark.parametrize("top", [False, True])
-def test_abc_version_change_reads_one_complete_ready_snapshot(store, monkeypatch, top):
+@pytest.mark.parametrize(
+    "mode,before,after",
+    [
+        ("juntos", [[2]], [[2], [1], [1]]),
+        ("resumo", [[2]], [[3]]),
+        ("abc", [["001"], ["002"]], [["001"], ["002"], ["003"]]),
+    ],
+)
+def test_abc_version_change_reads_one_complete_ready_snapshot(
+    store, monkeypatch, mode, before, after
+):
     from tests.datastudio.test_ds_database import batch
 
     items, _ = seed(store, 6)
@@ -237,20 +246,19 @@ def test_abc_version_change_reads_one_complete_ready_snapshot(store, monkeypatch
         finish(store, rev)
         return version
 
+    def read():
+        start, end = "2026-11-01", "2026-11-02"
+        if mode == "juntos":
+            return reader.pairs(["pedidos_juntos"], start, end, 25)
+        fields = ["skus_distintos"] if mode == "resumo" else ["produto_codigo"]
+        return reader.abc(mode, fields, start, end)
+
     monkeypatch.setattr(reader, "active", active)
-    old = (
-        reader.pairs(["pedidos_juntos"], "2026-11-01", "2026-11-02", 25)
-        if top
-        else reader.abc("resumo", ["skus_distintos"], "2026-11-01", "2026-11-02")
-    )
-    assert old["version"] == 1 and old["rows"] == [[2]]
+    old = read()
+    assert old["version"] == 1 and old["rows"] == before
     monkeypatch.setattr(reader, "active", original)
-    new = (
-        reader.pairs(["pedidos_juntos"], "2026-11-01", "2026-11-02", 25)
-        if top
-        else reader.abc("resumo", ["skus_distintos"], "2026-11-01", "2026-11-02")
-    )
-    assert new["version"] == 2 and new["rows"] == ([[2], [1], [1]] if top else [[3]])
+    new = read()
+    assert new["version"] == 2 and new["rows"] == after
     pet = Reader(DSN, "homologacao", "PET")
     with pytest.raises(StorageError, match="SEM_PUBLICACAO"):
         pet.abc("abc", ["produto_codigo"], "2026-11-01", "2026-11-02")
@@ -388,7 +396,8 @@ def test_abc_cancellations_exclusions_and_freight_stay_in_financial_views(store)
             (rev,),
         )
         conn.execute(
-            "UPDATE controle.nf_publicacoes SET versao=1 WHERE segmento='FARMA'"
+            "UPDATE controle.nf_publicacoes SET versao=1, execucao=%s WHERE segmento='FARMA'",
+            (rev,),
         )
     reader = Reader(DSN, "homologacao", "FARMA")
     result = reader.abc(
