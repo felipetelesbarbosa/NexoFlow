@@ -6,9 +6,10 @@ import json
 import sys
 from collections import OrderedDict
 from concurrent.futures import Future
+from contextlib import contextmanager
 from datetime import date
 from decimal import Decimal
-from threading import Lock
+from threading import BoundedSemaphore, Lock
 from typing import Any
 
 from psycopg import sql
@@ -30,6 +31,9 @@ from integrations.datastudio.store import Store
 
 MAX_RESULT_ROWS = 50_000
 MAX_RESULT_BYTES = 7_000_000
+# O papel de leitura na VPS aceita seis conexões. Dois lugares ficam livres
+# para o healthcheck e para a conferência com outro processo.
+MAX_READER_CONNECTIONS = 4
 
 
 def view_name(name):
@@ -58,6 +62,17 @@ class Reader(Store):
             "abc": OrderedDict(),
         }
         self.product_periods = ProductPeriods()
+        self._db_slots = BoundedSemaphore(MAX_READER_CONNECTIONS)
+
+    @contextmanager
+    def connect(self, *, readonly=False):
+        if not self._db_slots.acquire(timeout=45):
+            raise StorageError("DS_CONSULTA_TEMPO_LIMITE")
+        try:
+            with super().connect(readonly=readonly) as conn:
+                yield conn
+        finally:
+            self._db_slots.release()
 
     def products(self, mode, fields, start, end, names=None):
         return projected(

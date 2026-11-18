@@ -143,3 +143,50 @@ def test_failed_abc_releases_waiters_without_caching_a_partial_row(
     assert calls == 1
     assert reader.abc(*args)["rows"] == expected
     assert calls == (1 if failure == "wait_timeout" else 2)
+
+
+def test_chart_requests_wait_for_reader_connections_instead_of_exhausting_role(
+    store, monkeypatch
+):
+    from contextlib import contextmanager
+    from time import sleep
+
+    from psycopg.errors import TooManyConnections
+
+    from integrations.datastudio.store import Store
+
+    seed(store, 6)
+    original = Store.connect
+    lock = Lock()
+    barrier = Barrier(7)
+    in_use = 0
+
+    @contextmanager
+    def constrained(self, **options):
+        nonlocal in_use
+        with lock:
+            if in_use == 4:
+                raise TooManyConnections()
+            in_use += 1
+        try:
+            # Emula as duas conexões usadas por outros processos no mesmo papel.
+            sleep(0.10)
+            with original(self, **options) as conn:
+                yield conn
+        finally:
+            with lock:
+                in_use -= 1
+
+    monkeypatch.setattr(Store, "connect", constrained)
+    reader = Reader(DSN, "homologacao", "FARMA")
+
+    def card(fields):
+        barrier.wait(timeout=10)
+        return reader.abc("resumo", fields, "2026-11-09", "2026-11-09")
+
+    with ThreadPoolExecutor(max_workers=7) as pool:
+        results = list(pool.map(card, CARDS))
+
+    assert all(r["complete"] for r in results)
+    assert [r["fields"] for r in results] == CARDS
+    assert in_use == 0
