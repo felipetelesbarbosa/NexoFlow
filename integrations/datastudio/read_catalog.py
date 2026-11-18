@@ -4,6 +4,7 @@ from copy import deepcopy
 from typing import LiteralString
 
 from ds_backend.contract import REGISTRY, StorageError
+from integrations.datastudio import meta_destinations
 from integrations.datastudio.weni_daily import COLUMNS, FIELDS, TABLE
 
 READ_REGISTRY = deepcopy(REGISTRY)
@@ -16,6 +17,50 @@ READ_REGISTRY[TABLE] = dict(
         f: ("date" if f == "data" else "number" if f in FIELDS else "text")
         for f in COLUMNS
     },
+)
+for name, fields, period in meta_destinations.specs():
+    READ_REGISTRY[name] = dict(
+        public=True,
+        optional=True,
+        segment="FARMA",
+        columns=fields,
+        period=period,
+        metric_kinds={
+            f: "max" for f in ("cpa", "roas", "conversas_weni") if f in fields
+        },
+        types={
+            f: (
+                "date"
+                if f == "data"
+                else "number"
+                if f in meta_destinations.METRICS
+                else "text"
+            )
+            for f in fields
+        },
+    )
+PUBLIC_SUMMARY = "BI_Publico_Resumo"
+PUBLIC_DIMENSIONS = ("cidade", "canal", "idade", "idade_informada")
+PUBLIC_METRICS = {
+    "contatos": "Contatos",
+    "compra_identificada": "Com compra identificada",
+    "sem_compra_identificada": "Sem compra identificada",
+    "contatos_idade_informada": "Contatos com idade informada",
+    "contatos_sem_cidade": "Contatos sem cidade",
+}
+READ_REGISTRY[PUBLIC_SUMMARY] = dict(
+    public=True,
+    segment="FARMA",
+    optional=True,
+    columns=[*PUBLIC_DIMENSIONS, *PUBLIC_METRICS],
+    period=None,
+    types={
+        field: "text" if field in ("cidade", "canal") else "number"
+        for field in (*PUBLIC_DIMENSIONS, *PUBLIC_METRICS)
+    },
+    dimensions=["idade", "idade_informada"],
+    labels=PUBLIC_METRICS,
+    metric_kinds=dict.fromkeys(PUBLIC_METRICS, "sum"),
 )
 PROJECTIONS = {
     "Metricas_Diarias": (
@@ -56,6 +101,23 @@ DERIVED_SQL: dict[tuple[str, str], LiteralString] = {
         AND registro ->> 'farmalider_status_pedido' IN ('4', '1', '2')
         AND registro ->> 'farmalider_forma_pagamento' != '0'
         THEN 'Sim' ELSE 'Não' END""",
+}
+
+
+_PRODUCT = {
+    "produto_codigo",
+    "produto_nome",
+    "quantidade",
+    "receita_item",
+    "participacao_acumulada",
+    "registros",
+}
+PRODUCT_FIELDS = {
+    "ranking": _PRODUCT,
+    "receita": _PRODUCT | {"posicao_receita_top5"},
+    "unidades": _PRODUCT | {"posicao_unidades_top5"},
+    "resumo": {"produtos_distintos_periodo", "quantidade", "receita_item", "registros"},
+    "nomes": {"produto_nome", "registros"},
 }
 
 

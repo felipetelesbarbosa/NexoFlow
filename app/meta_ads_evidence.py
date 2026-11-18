@@ -42,6 +42,7 @@ def collect_weni_evidence(
     end: datetime,
     segments=("FARMA", "PET"),
     client_factory=None,
+    destination=None,
     contacts_by_segment: dict[str, list[dict[str, Any]]] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Consulta janelas de até sete dias; cobertura incompleta impede rateio exclusivo.
@@ -96,6 +97,24 @@ def collect_weni_evidence(
             # A prova acima pertence a ESTA instância, inclusive quando o processo
             # opera PET e consulta somente leitura no projeto FARMA (ou vice-versa).
             client._profile_verified = True
+            if destination is not None and segment == "FARMA":
+                if (
+                    org.get("uuid") != destination["flows_org"]
+                    or org.get("timezone") != "America/Belem"
+                ):
+                    raise ValueError("Organização Flows divergente.")
+                channels = {}
+                for entry in client._iter_paginated(
+                    "https://flows.weni.ai/api/v2/channels.json",
+                    {},
+                    item_label="canais empresariais",
+                    strict_items=True,
+                ):
+                    if entry.get("uuid") and entry.get("address"):
+                        addresses = channels.setdefault(entry["uuid"], [])
+                        if entry["address"] not in addresses:
+                            addresses.append(entry["address"])
+                report["channel_addresses"] = channels
             contacts = (contacts_by_segment or {}).get(segment)
             if contacts is None:
                 contacts = client.list_contacts()

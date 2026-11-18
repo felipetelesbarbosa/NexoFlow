@@ -89,6 +89,7 @@ def _restore_facts(tables):
             fact = json.loads(payload)
             if not isinstance(fact, dict):
                 raise ValueError("Payload diário Meta inválido.")
+            fact.pop("nf_destino_v1", None)
             fact.update(
                 account_id=row.get("conta_id", ""),
                 ad_id=row.get("anuncio_id", ""),
@@ -242,6 +243,29 @@ def sync_native_meta(
     try:
         if segment not in {"FARMA", "PET"}:
             raise ValueError("Segmento Meta inválido.")
+        destination = None
+        evidence_path = _setting(settings, segment, "META_ADS_DESTINOS_FILE")
+        if evidence_path:
+            from meta_ads_destinations import reference
+
+            config = getattr(getattr(store, "client", None), "config", {})
+            if (
+                segment != "FARMA"
+                or config.get("environment") != "homologacao"
+                or config.get("segment") != segment
+            ):
+                raise ValueError(
+                    "Destinos Meta exigem o PostgreSQL FARMA de homologação."
+                )
+            destination = reference(
+                json.loads(
+                    (runtime_root / evidence_path).read_text(encoding="utf-8-sig")
+                )
+            )
+            if destination["cx_project"] != _setting(
+                settings, segment, "WENI_INSIGHTS_PROJECT_UUID"
+            ):
+                raise ValueError("Projeto CX divergente.")
         clock = now or datetime.now(TZ)
         if clock.tzinfo is None:
             raise ValueError("Relógio Meta exige fuso explícito.")
@@ -303,7 +327,12 @@ def sync_native_meta(
             stage = "coleta_meta"
             try:
                 path = root / f"{segment}-{account}.json"
-                state = _state(path, segment, account)
+                if destination is None:
+                    state = _state(path, segment, account)
+                else:
+                    state = json.loads(
+                        store.get_control("meta_destino_cursor_" + account) or "{}"
+                    )
                 since = start
                 if state and state.get("policy") == POLICY:
                     through = date.fromisoformat(state["through"])
@@ -319,7 +348,10 @@ def sync_native_meta(
                 local_catalogs = {}
                 for name, method in [
                     ("campaigns", client.campaigns),
-                    ("adsets", client.adsets),
+                    (
+                        "adsets",
+                        client.destination_adsets if destination else client.adsets,
+                    ),
                     ("ads", client.ads),
                 ]:
                     stage = "coleta_meta_" + name
@@ -475,6 +507,7 @@ def sync_native_meta(
             start=evidence_start,
             end=evidence_end,
             contacts_by_segment=supplied,
+            **({"destination": destination} if destination else {}),
         )
         if coverage.get("auth_failed"):
             report["errors"].append(
@@ -510,7 +543,34 @@ def sync_native_meta(
             account_meta=account_meta,
             updated_at=clock.isoformat(),
             coverage=coverage,
+            destination=destination,
         )
+        if destination is not None:
+            from meta_ads_destinations import period_control
+
+            control = period_control(tables, start.isoformat(), end.isoformat())
+            report["controle_destinos"] = control
+            baseline = destination.get("controle")
+            if baseline:
+                frozen = period_control(tables, baseline["inicio"], baseline["fim"])
+                report["controle_referencia"] = frozen
+                actual = {r["anuncio_id"]: r["eventos_ctwa"] for r in frozen}
+                if (
+                    len(actual) != len(frozen)
+                    or actual != baseline["eventos_por_anuncio"]
+                    or any(
+                        r["conversas_meta"] is None
+                        or r["conta_id"] != baseline["conta_id"]
+                        or r["moeda"] != baseline["moeda"]
+                        for r in frozen
+                    )
+                    or sum(r["conversas_meta"] for r in frozen)
+                    != baseline["conversas_meta"]
+                ):
+                    report.update(
+                        status="controle_por_anuncio_divergente", partial=True
+                    )
+                    return report
         # Conversões deixam rastro em vez de manter receita de compra cancelada.
         fresh = {row["chave"] for row in tables["BI_Meta_Conversoes"]}
         for row in previous.get("BI_Meta_Conversoes", []):
@@ -524,6 +584,25 @@ def sync_native_meta(
                         atualizado_em=clock.isoformat(),
                     )
                 )
+        if destination is not None:
+            # Um reenvio idêntico mantém a primeira observação do estado. Uma troca
+            # de configuração, vigência ou contagem produz uma nova observação.
+            old_raw = {r["chave"]: r for r in previous.get("Meta_Ads_Diario", [])}
+            for row in tables["Meta_Ads_Diario"]:
+                old_payload = old_raw.get(row["chave"], {}).get("payload_api_json")
+                if not old_payload:
+                    continue
+                prev = json.loads(old_payload).get("nf_destino_v1")
+                payload = json.loads(row["payload_api_json"])
+                current = payload["nf_destino_v1"]
+                if prev and dict(prev, observado=current["observado"]) == current:
+                    current["observado"] = prev["observado"]
+                    row["payload_api_json"] = json.dumps(
+                        payload,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    )
         for title in ("Meta_Ads_Diario", "BI_Meta_Resultados"):
             current_keys = {row["chave"] for row in tables.get(title, [])}
             for old in previous.get(title, []):
@@ -568,7 +647,9 @@ def sync_native_meta(
             raise ValueError("Fontes Meta mudaram durante a coleta; plano bloqueado.")
         report["plan"] = plan
         report["counts"] = {title: len(rows) for title, rows in tables.items()}
-        report["coverage"] = coverage
+        report["coverage"] = {
+            k: v for k, v in coverage.items() if k != "channel_addresses"
+        }
         if plan.get("pending_tabs"):
             report.update(status="parcial", partial=True)
             return report
@@ -590,7 +671,17 @@ def sync_native_meta(
         report["applied"] = True
         stage = "checkpoint"
         for account, (path, state) in ready.items():
-            _atomic(path, state)
+            if destination is None:
+                _atomic(path, state)
+            else:
+                # O cursor fica na mesma revisão transacional dos fatos e observações.
+                store.set_controls(
+                    {
+                        "meta_destino_cursor_" + account: json.dumps(
+                            state, sort_keys=True
+                        )
+                    }
+                )
             report["accounts"][account]["status"] = "confirmado"
         report.update(
             status="parcial" if report["errors"] else "concluido",

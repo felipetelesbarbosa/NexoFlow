@@ -1,5 +1,9 @@
 # Versionamento do NexoFlow
 
+## Preparação 1.5.45
+
+Prévia para homologar destinos Meta no PostgreSQL FARMA. [Procedimento](DESTINOS%20META%20WENI.md).
+
 ## Publicação 1.5.44
 
 Publicada em **18/11/2026, 08:46:25 (America/Fortaleza)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.44) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/69ac78e1b7d31a4d723ea79555f5cfb8fe805987) · [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44294204863) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44294204798) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44297634663).

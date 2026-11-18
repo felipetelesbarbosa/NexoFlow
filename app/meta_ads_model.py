@@ -349,6 +349,7 @@ def build_native_tables(
     account_meta: dict,
     updated_at: str,
     coverage: dict,
+    destination=None,
 ) -> dict[str, list[dict]]:
     """Não atribui custos compartilhados; último toque observado não é causalidade.
 
@@ -406,6 +407,7 @@ def build_native_tables(
             uid,
             dt.isoformat(),
             _text(raw.get("conversation_id")),
+            _text(raw.get("channel_uuid")),
         )
         if key in event_keys:
             if event_keys[key] != signature:
@@ -605,9 +607,39 @@ def build_native_tables(
             continue
         seen_facts[key] = normalized
         classification = class_map.get((account, aid), "NAO_CLASSIFICADO")
+        adset_id = _text(fact.get("adset_id"))
+        local_events = [
+            e
+            for e in events_by_ad[(account, aid)]
+            if e["segment"] == segment
+            and e["dt"].astimezone(zone).date().isoformat() == start
+        ]
+        audit = None
+        if destination is not None:
+            from meta_ads_destinations import day_evidence
+
+            audit = day_evidence(
+                destination,
+                coverage["channel_addresses"],
+                local_events,
+                account=account,
+                ad=aid,
+                adset=adset_id,
+                day=date.fromisoformat(start),
+                zone=tz,
+                observed=updated_at,
+                complete=complete,
+                delivered_segments={e["segment"] for e in events_by_ad[(account, aid)]},
+                current_destination=adset_index.get((account, adset_id), {}).get(
+                    "destination_type"
+                ),
+            )
+            if audit["configurado"] == "FARMA":
+                classification = segment
         if classification in {"FARMA", "PET"} and classification != segment:
             continue
         exclusive = classification == segment
+        cost_proven = exclusive and (audit is None or audit["configurado"] == "FARMA")
         spend, impressions, clicks = (
             _number(fact.get(k)) for k in ("spend", "impressions", "clicks")
         )
@@ -628,7 +660,7 @@ def build_native_tables(
             "conjunto_id": _text(fact.get("adset_id")),
             "classificacao": classification,
             "investimento_original": _money(spend),
-            "investimento_atribuivel": _money(spend) if exclusive else "",
+            "investimento_atribuivel": _money(spend) if cost_proven else "",
             "impressoes": _money(impressions),
             "cliques": _money(clicks),
             "alcance": _money(_number(fact.get("reach"))),
@@ -684,14 +716,10 @@ def build_native_tables(
                 "valor_compras_atribuido_meta": purchase_value,
             }
         )
+        if audit is not None:
+            # Extensão com namespace no documento privado do fato. O leitor expõe só o agregado.
+            raw["payload_api_json"] = _json({**_safe_fact_payload(fact), "nf_destino_v1": audit})
         tables["Meta_Ads_Diario"].append(raw)
-        local_events = [
-            e
-            for e in events_by_ad[(account, aid)]
-            if e["segment"] == segment
-            and e["ad_id"] == aid
-            and e["dt"].astimezone(zone).date().isoformat() == start
-        ]
         local_conversions = [
             r
             for r in conversions_by_ad[(account, aid)]
@@ -708,17 +736,19 @@ def build_native_tables(
         }
         conversations = (
             len(conversation_ids)
-            if local_events and all(e.get("conversation_id") for e in local_events)
+            if (audit is None or audit["cobertura"] == "COMPLETA")
+            and local_events
+            and all(e.get("conversation_id") for e in local_events)
             else ""
         )
-        availability = exclusive and policy != "DESCONHECIDA" and currency == "BRL"
+        availability = cost_proven and policy != "DESCONHECIDA" and currency == "BRL"
         tables["BI_Meta_Resultados"].append(
             {
                 **dims,
                 "segmento": segment,
                 "classificacao": classification,
                 "investimento_original": _money(spend),
-                "investimento_atribuivel": _money(spend) if exclusive else "",
+                "investimento_atribuivel": _money(spend) if cost_proven else "",
                 "impressoes": _money(impressions),
                 "cliques": _money(clicks),
                 "ctr_pct": _ratio(clicks, impressions, Decimal(100)),

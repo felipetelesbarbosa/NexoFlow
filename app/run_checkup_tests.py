@@ -27,6 +27,7 @@ REQUIRED_FILES = (
     "app/run_noturno.py",
     "app/auditar_consistencia.py",
     "app/meta_ads_native.py",
+    "app/meta_ads_destinations.py",
     "app/meta_ads_client.py",
     "app/meta_ads_settings.py",
 )

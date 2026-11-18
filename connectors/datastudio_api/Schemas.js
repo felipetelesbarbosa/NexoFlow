@@ -1505,6 +1505,278 @@ var NexoDSSchemas={
     },
     "dimensions": []
   },
+  "Anuncios_Veiculados_FARMA": {
+    "public": true,
+    "segment": "FARMA",
+    "columns": [
+      "data",
+      "conta_id",
+      "moeda",
+      "fuso",
+      "politica_atribuicao",
+      "anuncio_id",
+      "anuncios",
+      "investimento_original",
+      "investimento_comprovado",
+      "pedidos_confirmados",
+      "receita_confirmada",
+      "eventos_ctwa",
+      "wa_1",
+      "wa_2",
+      "pendentes",
+      "conversas_meta",
+      "conversas_weni",
+      "dias_parciais",
+      "cpa",
+      "roas"
+    ],
+    "period": "data",
+    "metric_kinds": {
+      "cpa": "max",
+      "roas": "max",
+      "conversas_weni": "max"
+    },
+    "types": {
+      "data": "date",
+      "conta_id": "text",
+      "moeda": "text",
+      "fuso": "text",
+      "politica_atribuicao": "text",
+      "anuncio_id": "text",
+      "anuncios": "number",
+      "investimento_original": "number",
+      "investimento_comprovado": "number",
+      "pedidos_confirmados": "number",
+      "receita_confirmada": "number",
+      "eventos_ctwa": "number",
+      "wa_1": "number",
+      "wa_2": "number",
+      "pendentes": "number",
+      "conversas_meta": "number",
+      "conversas_weni": "number",
+      "dias_parciais": "number",
+      "cpa": "number",
+      "roas": "number"
+    },
+    "dimensions": []
+  },
+  "Resumo_Anuncios_Veiculados_FARMA": {
+    "public": true,
+    "segment": "FARMA",
+    "columns": [
+      "data",
+      "conta_id",
+      "moeda",
+      "fuso",
+      "politica_atribuicao",
+      "anuncios",
+      "investimento_original",
+      "investimento_comprovado",
+      "pedidos_confirmados",
+      "receita_confirmada",
+      "eventos_ctwa",
+      "wa_1",
+      "wa_2",
+      "pendentes",
+      "conversas_meta",
+      "conversas_weni",
+      "dias_parciais",
+      "cpa",
+      "roas"
+    ],
+    "period": "data",
+    "metric_kinds": {
+      "cpa": "max",
+      "roas": "max",
+      "conversas_weni": "max"
+    },
+    "types": {
+      "data": "date",
+      "conta_id": "text",
+      "moeda": "text",
+      "fuso": "text",
+      "politica_atribuicao": "text",
+      "anuncios": "number",
+      "investimento_original": "number",
+      "investimento_comprovado": "number",
+      "pedidos_confirmados": "number",
+      "receita_confirmada": "number",
+      "eventos_ctwa": "number",
+      "wa_1": "number",
+      "wa_2": "number",
+      "pendentes": "number",
+      "conversas_meta": "number",
+      "conversas_weni": "number",
+      "dias_parciais": "number",
+      "cpa": "number",
+      "roas": "number"
+    },
+    "dimensions": []
+  },
+  "Destinos_CTWA_Diarios": {
+    "public": true,
+    "segment": "FARMA",
+    "columns": [
+      "data",
+      "conta_id",
+      "moeda",
+      "fuso",
+      "politica_atribuicao",
+      "anuncio_id",
+      "destino",
+      "situacao",
+      "configurado",
+      "cobertura",
+      "eventos_ctwa"
+    ],
+    "period": "data",
+    "metric_kinds": {},
+    "types": {
+      "data": "date",
+      "conta_id": "text",
+      "moeda": "text",
+      "fuso": "text",
+      "politica_atribuicao": "text",
+      "anuncio_id": "text",
+      "destino": "text",
+      "situacao": "text",
+      "configurado": "text",
+      "cobertura": "text",
+      "eventos_ctwa": "number"
+    },
+    "dimensions": []
+  },
+  "Catalogo_Destinos_Meta": {
+    "public": true,
+    "segment": "FARMA",
+    "columns": [
+      "campo",
+      "definicao",
+      "origem",
+      "grao",
+      "agregacao",
+      "nulos"
+    ],
+    "period": null,
+    "metric_kinds": {},
+    "types": {
+      "campo": "text",
+      "definicao": "text",
+      "origem": "text",
+      "grao": "text",
+      "agregacao": "text",
+      "nulos": "text"
+    },
+    "dimensions": []
+  },
+  "BI_Publico_Resumo": {
+    "public": true,
+    "segment": "FARMA",
+    "columns": [
+      "cidade",
+      "canal",
+      "idade",
+      "idade_informada",
+      "contatos",
+      "compra_identificada",
+      "sem_compra_identificada",
+      "contatos_idade_informada",
+      "contatos_sem_cidade"
+    ],
+    "period": null,
+    "types": {
+      "cidade": "text",
+      "canal": "text",
+      "idade": "number",
+      "idade_informada": "number",
+      "contatos": "number",
+      "compra_identificada": "number",
+      "sem_compra_identificada": "number",
+      "contatos_idade_informada": "number",
+      "contatos_sem_cidade": "number"
+    },
+    "dimensions": [
+      "idade",
+      "idade_informada"
+    ],
+    "labels": {
+      "contatos": "Contatos",
+      "compra_identificada": "Com compra identificada",
+      "sem_compra_identificada": "Sem compra identificada",
+      "contatos_idade_informada": "Contatos com idade informada",
+      "contatos_sem_cidade": "Contatos sem cidade"
+    },
+    "metric_kinds": {
+      "contatos": "sum",
+      "compra_identificada": "sum",
+      "sem_compra_identificada": "sum",
+      "contatos_idade_informada": "sum",
+      "contatos_sem_cidade": "sum"
+    }
+  },
+  "Compradores_Operacionais": {
+    "columns": [
+      "contact_uuid",
+      "calc_gf73fvq57d"
+    ],
+    "types": {
+      "contact_uuid": "text",
+      "calc_gf73fvq57d": "text"
+    },
+    "labels": {
+      "calc_gf73fvq57d": "Venda elegível"
+    },
+    "dimensions": [],
+    "period": null
+  },
+  "Pedidos_Atribuiveis_Meta": {
+    "segment": "FARMA",
+    "columns": [
+      "pedido_id",
+      "cliente",
+      "cliente_chave",
+      "data",
+      "pedido_produtos",
+      "pedido_faturamento_total",
+      "venda_valida"
+    ],
+    "types": {
+      "pedido_id": "text",
+      "cliente": "text",
+      "cliente_chave": "text",
+      "data": "date",
+      "pedido_produtos": "text",
+      "pedido_faturamento_total": "number",
+      "venda_valida": "number"
+    },
+    "dimensions": [],
+    "period": null
+  },
+  "Contatos_Atribuicao_Meta": {
+    "segment": "FARMA",
+    "columns": [
+      "contact_uuid",
+      "primeiro_anuncio_id",
+      "primeiro_anuncio_origem",
+      "primeiro_anuncio_data",
+      "pedido_id",
+      "pedido_data",
+      "coorte_primeiro_anuncio",
+      "pedido_apos_anuncio"
+    ],
+    "types": {
+      "contact_uuid": "text",
+      "primeiro_anuncio_id": "text",
+      "primeiro_anuncio_origem": "text",
+      "primeiro_anuncio_data": "text",
+      "pedido_id": "text",
+      "pedido_data": "text",
+      "coorte_primeiro_anuncio": "date",
+      "pedido_apos_anuncio": "text"
+    },
+    "dimensions": [],
+    "period": "coorte_primeiro_anuncio"
+  },
   "ABC_abc": {
     "columns": [
       "periodo_inicio",
@@ -1665,6 +1937,99 @@ var NexoDSSchemas={
       "produto_b_nome": "text",
       "pedidos_juntos": "sum",
       "atualizado_em": "text"
+    }
+  },
+  "Produtos_Mais_Vendidos": {
+    "columns": [
+      "periodo_inicio",
+      "produto_codigo",
+      "produto_nome",
+      "quantidade",
+      "receita_item",
+      "participacao_acumulada",
+      "registros",
+      "produtos_distintos_periodo",
+      "posicao_receita_top5",
+      "posicao_unidades_top5"
+    ],
+    "types": {
+      "periodo_inicio": "date",
+      "produto_codigo": "text",
+      "produto_nome": "text",
+      "quantidade": "number",
+      "receita_item": "number",
+      "participacao_acumulada": "number",
+      "registros": "number",
+      "produtos_distintos_periodo": "number",
+      "posicao_receita_top5": "number",
+      "posicao_unidades_top5": "number"
+    },
+    "dimensions": [],
+    "period": "periodo_inicio",
+    "segment": "FARMA",
+    "product_modes": {
+      "ranking": [
+        "participacao_acumulada",
+        "periodo_inicio",
+        "produto_codigo",
+        "produto_nome",
+        "quantidade",
+        "receita_item",
+        "registros"
+      ],
+      "receita": [
+        "participacao_acumulada",
+        "periodo_inicio",
+        "posicao_receita_top5",
+        "produto_codigo",
+        "produto_nome",
+        "quantidade",
+        "receita_item",
+        "registros"
+      ],
+      "unidades": [
+        "participacao_acumulada",
+        "periodo_inicio",
+        "posicao_unidades_top5",
+        "produto_codigo",
+        "produto_nome",
+        "quantidade",
+        "receita_item",
+        "registros"
+      ],
+      "resumo": [
+        "periodo_inicio",
+        "produtos_distintos_periodo",
+        "quantidade",
+        "receita_item",
+        "registros"
+      ],
+      "nomes": [
+        "periodo_inicio",
+        "produto_nome",
+        "registros"
+      ]
+    },
+    "metric_kinds": {
+      "quantidade": "sum",
+      "receita_item": "money",
+      "participacao_acumulada": "percent",
+      "registros": "sum",
+      "produtos_distintos_periodo": "max",
+      "posicao_receita_top5": "max",
+      "posicao_unidades_top5": "max"
+    },
+    "labels": {
+      "periodo_inicio": "Início do período",
+      "produto_codigo": "Código do produto",
+      "produto_nome": "Nome do produto",
+      "quantidade": "Unidades",
+      "receita_item": "Receita de produtos",
+      "participacao_acumulada": "Participação acumulada",
+      "registros": "Linhas de itens",
+      "produtos_distintos_periodo": "Produtos distintos no período (SKU informado)",
+      "posicao_receita_top5": "Posição no Top 5 por receita",
+      "posicao_unidades_top5": "Posição no Top 5 por unidades"
     }
   }
 };

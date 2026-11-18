@@ -405,19 +405,23 @@ class PostgresStore(GoogleSheetsStore):
         return self.native_meta_read(title, headers)
 
     def native_meta_confirm(self, title, headers, records, *, expected_snapshot):
-        current = self.native_meta_read(title, headers)
-        if current != expected_snapshot:
+        self._native_meta_headers(title, headers)
+        if expected_snapshot["worksheet_id"] != title:
             raise StorageError("DS_REVISAO_META_DIVERGENTE")
-        by_key = {r["chave"]: r for r in self.records(title)}
-        if any(
-            any(
-                str(by_key.get(r["chave"], {}).get(c, "")) != str(r.get(c, ""))
-                for c in headers
-            )
-            for r in records
-        ):
+        # O snapshot anterior já foi confrontado antes do envio. Reler a revisão
+        # do servidor e devolver ao adapter apenas os registros do lote solicitado.
+        expected = {
+            r["chave"]: r
+            for r in normalize(title, records, self.client.config["segment"])
+        }
+        confirmed = {
+            r["chave"]: r
+            for r in self.client.rows(title, self.revision)
+            if r["chave"] in expected
+        }
+        if confirmed != expected:
             raise StorageError("DS_CONFERENCIA_META_DIVERGENTE")
-        return current
+        return list(confirmed.values())
 
     def finish(self, *, complete):
         if not complete:

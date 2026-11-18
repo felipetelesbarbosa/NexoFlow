@@ -1,5 +1,9 @@
 # NexoFlow — Changelog
 
+## 1.5.45 em homologação
+
+- O Analytics e a etapa Analytics do Noturno auditam destinos de anúncios no PostgreSQL FARMA de homologação. O leitor oferece detalhes e totais por período, com cobertura e pendências de recepção. [Roteiro](docs/DESTINOS%20META%20WENI.md).
+
 ## 1.5.44 — publicada em 18/11/2026, 08:46:25 (America/Fortaleza)
 
 - O Setup instala as dependências e as ferramentas do check-up em uma única etapa. Falhas transitórias na verificação HTTPS têm até três tentativas na rota escolhida. O pip tem duas retentativas por requisição.

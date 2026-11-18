@@ -31,5 +31,5 @@ jobs:
       - name: Validar cliente, isolamento e transporte Meta sem APIs reais
         run: python -m unittest tests.test_meta_ads_client tests.test_meta_ads_client_security tests.test_meta_ads_client_transport -v
       - name: Validar integração e pacote nativos sem APIs ou planilhas reais
-        run: python -m unittest tests.test_meta_native_install tests.test_meta_ads_model tests.test_meta_ads_evidence tests.test_meta_ads_sheets tests.test_meta_ads_native tests.test_meta_native_pipeline tests.test_meta_analytics_hook tests.test_run_meta_ads -v
+        run: python -m unittest tests.test_meta_native_install tests.test_meta_ads_model tests.test_meta_ads_destinations tests.test_meta_ads_evidence tests.test_meta_ads_sheets tests.test_meta_ads_native tests.test_meta_native_pipeline tests.test_meta_analytics_hook tests.test_run_meta_ads -v
       - run: python -m pip check

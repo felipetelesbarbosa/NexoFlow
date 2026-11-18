@@ -338,6 +338,14 @@ class MetaAdsClient:
             pages,
         )
 
+    def destination_adsets(self, account_id, limit=100, pages=None):
+        account_id = self._account(account_id)
+        return self._pages(
+            f"act_{account_id}/adsets",
+            {"fields": "id,name,campaign_id,status,effective_status,destination_type"},
+            limit, pages,
+        )
+
     def ads(
         self, account_id: str, limit: int = 50, pages: int | None = 2
     ) -> dict[str, Any]:

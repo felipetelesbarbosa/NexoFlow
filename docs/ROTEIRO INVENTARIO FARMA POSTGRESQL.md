@@ -16,6 +16,71 @@ A auditoria estática encontra destino para 36 dos 37 aliases. O recibo comprova
 
 O relatório oficial permanece na etapa anterior até a decisão de corte. Esta conferência dispensa recoleta, reenvio e novo fechamento.
 
+### Homologação do público com compras identificadas
+
+Para a combinação histórica `ds74 LEFT ds72`, a fonte lógica
+`Compradores_Operacionais` pede à API de leitura já existente os campos
+`contact_uuid`, `calc_gf73fvq57d` e a contagem de `pedido_chave`. O PostgreSQL
+filtra `Venda elegível = Sim` antes de agrupar por contato. A consulta abrange
+todas as datas da READY ativa, inclusive novas datas em revisões posteriores.
+Os limites de leitura continuam incidindo sobre os grupos retornados.
+
+1. Na implantação privada de homologação do conector, use o `Code.js` e o
+   `Schemas.js` correspondentes a esta versão. O Windows, as visões e as permissões
+   da VPS podem permanecer nas versões que já oferecem a projeção de pedidos.
+2. Na **cópia** do relatório, adicione uma fonte FARMA com a tabela lógica
+   `Compradores_Operacionais`. Duplique a mesclagem de público. Mantenha
+   `Base_Contatos` à esquerda com seus campos e filtros de canal e faixa etária.
+   Substitua somente a entrada direita, reassocie `contact_uuid` dos dois lados,
+   mantenha a junção externa à esquerda e a métrica **Contar diferentes** do
+   `contact_uuid` **da direita** para “Clientes que já compraram”.
+   Se o filtro de elegibilidade da fonte antiga perdeu a referência, associe-o
+   novamente à dimensão `Venda elegível`. Os dois lados da combinação histórica
+   ficam sem dimensão de período. A mesclagem de produtos continua utilizando
+   `Pedidos_FarmaLider` no grão de pedido.
+3. Confira a versão ativa antes e depois da atualização do gráfico. Se mudou,
+   repita os controles na mesma revisão. Na READY v2 conferida em 17/11/2026,
+   o controle da VPS foi de 48.843 contatos, 28.868 compradores e 19.975 sem
+   compra, correspondentes a 157.711 pedidos elegíveis vinculados à base.
+   Compare também um segmento de canal ou faixa na cópia e na VPS. Uma revisão
+   posterior requer controles próprios. Registre apenas agregados. Para reverter
+   o ensaio, reassocie o gráfico da cópia à combinação anterior.
+
+
+### Homologação dos pedidos atribuídos a anúncios
+
+Na cópia FARMA, duplique a combinação `ds123 LEFT ds121`. À esquerda,
+use a fonte de ensaio `Contatos_Atribuicao_Meta`. Ela consulta a
+`Base_Contatos` com a origem exata `Meta Ads`. Escolha a dimensão de data
+`coorte_primeiro_anuncio` no controle da página. O campo `pedido_apos_anuncio`
+devolve o ID textual quando o último pedido daquele contato ocorreu no mesmo
+instante do primeiro anúncio ou depois dele. A coorte usa o calendário de
+Belém. Os campos brutos permanecem disponíveis para conferência. Um contato
+da coorte sem compra continua na entrada esquerda com chave de junção nula.
+
+À direita, adicione a fonte lógica `Pedidos_Atribuiveis_Meta` da implantação
+privada de ensaio com os arquivos `Code.js` e `Schemas.js` deste commit.
+Associe a chave calculada ao `pedido_id` textual. Esta fonte busca os
+cabeçalhos na `BI_Pedidos` pelos IDs únicos dos contatos Meta elegíveis.
+O período é aplicado no lado dos contatos. Uma compra posterior ao fim da
+coorte pode ser atribuída a um anúncio dentro dela. A data de venda, os
+campos de cliente e produto e o faturamento com frete são os do cabeçalho.
+A fonte exige `venda_valida > 0` e uma linha elegível por ID. Cada consulta
+usa a versão ativa. Se ela mudar entre os lotes, atualize os dados do
+gráfico e repita na nova versão.
+
+1. Na tabela, exclua cabeçalhos com data nula e confira o máximo do
+   faturamento por pedido e anúncio. No seletor, exclua faturamento e chave
+   temporal nulos e confira a soma. Exiba os valores monetários em BRL com
+   duas casas. Confira separadamente os IDs atribuídos a múltiplos contatos
+   ou anúncios, que podem multiplicar o valor no seletor.
+2. Compare as duas visualizações com a VPS na mesma revisão. Para FARMA READY
+   v2, 01 a 17/11 e 01 a 15/11/2026 têm 39 contatos na coorte, três pedidos
+   e R$ 322,69. Em 06/11 são três contatos e uma compra de 09/11 por
+   R$ 130,90. Em 16 a 17/11 são zero contatos e zero pedidos. Confira também
+   o período anual contra os controles da revisão testada.
+3. Registre apenas agregados, revisão e período. Para reverter o ensaio,
+   reassocie a tabela e o seletor à combinação anterior na cópia.
 
 **Correção posterior de volume do leitor (15/11/2026):** [ABC, resumo e pares no servidor](ABC%20POSTGRESQL%20EM%20VOLUME.md). Preserva fechamento READY existente; implantação somente do leitor FARMA e dos quatro arquivos do conector. ds136 permanece na fonte atual.
 

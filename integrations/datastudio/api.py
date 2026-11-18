@@ -38,6 +38,17 @@ def create_app(store, token, *, reader=False):
 
     @api.exception_handler(psycopg.Error)
     async def database_error(_request, error):
+        if (
+            reader
+            and isinstance(error, psycopg.errors.RaiseException)
+            and error.diag.message_primary
+            in (
+                "DS_ANUNCIOS_GRAO_AMBIGUO",
+                "DS_DESTINOS_CONTAGEM_DIVERGENTE",
+                "DS_PERIODO_INVALIDO",
+            )
+        ):
+            return JSONResponse({"error": error.diag.message_primary}, status_code=409)
         if reader and isinstance(error, psycopg.errors.QueryCanceled):
             return JSONResponse({"error": "DS_CONSULTA_TEMPO_LIMITE"}, status_code=409)
         code = (
@@ -67,6 +78,12 @@ def create_app(store, token, *, reader=False):
         return await run_in_threadpool(func, **data)
 
     if reader:
+
+        @api.post("/v1/produtos")
+        async def products(request: Request):
+            return await invoke(
+                request, store.products, ("mode", "fields", "start", "end", "names")
+            )
 
         @api.post("/v1/abc/pares")
         async def pairs(request: Request):

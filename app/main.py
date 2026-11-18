@@ -1618,6 +1618,10 @@ def main() -> int:
             all_weni_contacts,
         )
 
+        if getattr(secrets, "META_ADS_DESTINOS_FILE", "") and native_meta_result.get("status") != "concluido":
+            from ds_backend.contract import StorageError
+            raise StorageError("DS_DESTINOS_PUBLICACAO_INCOMPLETA")
+
         from analytics_history_sync import run as publish_history
 
         historical_publication = (

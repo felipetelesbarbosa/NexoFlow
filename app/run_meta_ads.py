@@ -189,6 +189,7 @@ def _real(args):
         if (
             not args.apply
             and args.review
+            and not result.get("partial")
             and isinstance(result.get("schema_manifest"), dict)
         ):
             save_private(
