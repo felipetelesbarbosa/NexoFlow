@@ -140,6 +140,46 @@ test('ds72 mantém ID e Texto sem agregação, aplicando elegibilidade antes da 
  assert.equal(new Set(resultData.rows.map(r=>r.values[0])).size,1);
 });
 
+test('Compradores_Operacionais usa o histórico inteiro e agrupa no leitor antes da LEFT', () => {
+  const f = fixture(p => {
+    assert.equal(p.table, 'Pedidos_FarmaLider');
+    assert.deepEqual(p.fields, ['contact_uuid', 'calc_gf73fvq57d', 'pedido_chave']);
+    assert.deepEqual(p.filters, [{field: 'calc_gf73fvq57d', values: ['Sim']}]);
+    assert.deepEqual(p.aggregation, {pedido_chave: 'count'});
+    assert.deepEqual([p.start, p.end], ['', '']);
+    return result(p, [['001', 'Sim', 50001], [null, 'Sim', 1], [' ', 'Sim', 2]]);
+  });
+  const r = request(['contact_uuid']);
+  r.configParams.tabela = 'Compradores_Operacionais';
+  r.dimensionsFilters = [];
+  const response = f.ctx.getData(r);
+  assert.deepEqual(Array.from(response.schema, f => f.name), ['contact_uuid']);
+  assert.deepEqual(Array.from(response.rows, r => Array.from(r.values)), [['001']]);
+  assert.equal(f.ctx.NexoDSSchemas.Compradores_Operacionais.period, null);
+  assert.equal(f.ctx.NexoDSSchemas.Pedidos_FarmaLider.period, 'data');
+});
+
+test('Compradores_Operacionais mantém filtros da fonte e as guardas do leitor', () => {
+  const r = request(['calc_gf73fvq57d']);
+  r.configParams.tabela = 'Compradores_Operacionais';
+  r.fields.push({name:'contact_uuid', forFilterOnly:true});
+  r.dimensionsFilters = [[{type:'INCLUDE', operator:'EQUALS', fieldName:'contact_uuid', values:['001']}]];
+  const f = fixture(p => {
+    assert.deepEqual(p.filters, [
+      {field:'contact_uuid', values:['001']},
+      {field:'calc_gf73fvq57d', values:['Sim']}
+    ]);
+    return result(p, [['001', 'Sim', 2]]);
+  });
+  const response = f.ctx.getData(r);
+  assert.equal(response.filtersApplied, true);
+  assert.deepEqual(Array.from(response.rows[0].values), ['Sim']);
+  const wrong = fixture(p => result(p, [['001', 'Não', 2]]));
+  assert.throws(() => wrong.ctx.getData(r), /DS_RESPOSTA_INCOMPLETA/);
+  const limited = fixture(() => ({status:409, body:{error:'DS_CONSULTA_EXCEDE_LIMITE_USE_RESUMO_OU_PERIODO'}}));
+  assert.throws(() => limited.ctx.getData(r), /DS_CONSULTA_EXCEDE_LIMITE/);
+});
+
 
 test('somas SQL explícitas reduzem volume sem inferir médias/distintos ou alterar fontes antigas',()=>{
  const r=request(['receita_item','produto_codigo','quantidade']);
@@ -202,3 +242,5 @@ test('ds136 preserva tipos e zero confirmado, bloqueia lacunas e separa PET',()=
  r.configParams.segmento='PET';
  assert.throws(()=>f.ctx.getData(r),/DS_INSIGHTS_SEGMENTO/);
 });
+
+require('./datastudio/meta_orders.cjs');

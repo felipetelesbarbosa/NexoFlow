@@ -1505,6 +1505,69 @@ var NexoDSSchemas={
     },
     "dimensions": []
   },
+  "Compradores_Operacionais": {
+    "columns": [
+      "contact_uuid",
+      "calc_gf73fvq57d"
+    ],
+    "types": {
+      "contact_uuid": "text",
+      "calc_gf73fvq57d": "text"
+    },
+    "labels": {
+      "calc_gf73fvq57d": "Venda elegível"
+    },
+    "dimensions": [],
+    "period": null
+  },
+  "Pedidos_Atribuiveis_Meta": {
+    "segment": "FARMA",
+    "columns": [
+      "pedido_id",
+      "cliente",
+      "cliente_chave",
+      "data",
+      "pedido_produtos",
+      "pedido_faturamento_total",
+      "venda_valida"
+    ],
+    "types": {
+      "pedido_id": "text",
+      "cliente": "text",
+      "cliente_chave": "text",
+      "data": "date",
+      "pedido_produtos": "text",
+      "pedido_faturamento_total": "number",
+      "venda_valida": "number"
+    },
+    "dimensions": [],
+    "period": null
+  },
+  "Contatos_Atribuicao_Meta": {
+    "segment": "FARMA",
+    "columns": [
+      "contact_uuid",
+      "primeiro_anuncio_id",
+      "primeiro_anuncio_origem",
+      "primeiro_anuncio_data",
+      "pedido_id",
+      "pedido_data",
+      "coorte_primeiro_anuncio",
+      "pedido_apos_anuncio"
+    ],
+    "types": {
+      "contact_uuid": "text",
+      "primeiro_anuncio_id": "text",
+      "primeiro_anuncio_origem": "text",
+      "primeiro_anuncio_data": "text",
+      "pedido_id": "text",
+      "pedido_data": "text",
+      "coorte_primeiro_anuncio": "date",
+      "pedido_apos_anuncio": "text"
+    },
+    "dimensions": [],
+    "period": "coorte_primeiro_anuncio"
+  },
   "ABC_abc": {
     "columns": [
       "periodo_inicio",

@@ -12,7 +12,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "app"))
 sys.path.insert(0, str(ROOT))
 from ds_backend.contract import SCHEMA_HASH  # noqa: E402
-from integrations.datastudio.read_catalog import READ_REGISTRY as REGISTRY  # noqa: E402
+from integrations.datastudio.read_catalog import (  # noqa: E402
+    ELIGIBLE_FIELD,
+    READ_REGISTRY,
+)
 
 
 def run():
@@ -31,7 +34,7 @@ def run():
         )
     )
     public = {}
-    for name, spec in REGISTRY.items():
+    for name, spec in READ_REGISTRY.items():
         if not spec["public"]:
             continue
         dims = [
@@ -46,6 +49,51 @@ def run():
             dimensions=dims,
             types={f: spec["types"][f] for f in columns},
         )
+    # Lado direito do LEFT ds74/ds72. O agrupamento usa a API de leitura
+    # existente e a regra oficial da visão de pedidos, no histórico inteiro.
+    public["Compradores_Operacionais"] = dict(
+        columns=["contact_uuid", ELIGIBLE_FIELD],
+        types={"contact_uuid": "text", ELIGIBLE_FIELD: "text"},
+        labels=public["Pedidos_FarmaLider"]["labels"],
+        dimensions=[],
+        period=None,
+    )
+    # A coorte é filtrada pelo primeiro anúncio no lado esquerdo da mesclagem.
+    ad_order_fields = [
+        "pedido_id",
+        "cliente",
+        "cliente_chave",
+        "data",
+        "pedido_produtos",
+        "pedido_faturamento_total",
+        "venda_valida",
+    ]
+    public["Pedidos_Atribuiveis_Meta"] = dict(
+        segment="FARMA",
+        columns=ad_order_fields,
+        types={f: public["BI_Pedidos"]["types"][f] for f in ad_order_fields},
+        dimensions=[],
+        period=None,
+    )
+    ad_contact_fields = [
+        "contact_uuid",
+        "primeiro_anuncio_id",
+        "primeiro_anuncio_origem",
+        "primeiro_anuncio_data",
+        "pedido_id",
+        "pedido_data",
+    ]
+    public["Contatos_Atribuicao_Meta"] = dict(
+        segment="FARMA",
+        columns=[*ad_contact_fields, "coorte_primeiro_anuncio", "pedido_apos_anuncio"],
+        types={
+            **{f: public["Base_Contatos"]["types"][f] for f in ad_contact_fields},
+            "coorte_primeiro_anuncio": "date",
+            "pedido_apos_anuncio": "text",
+        },
+        dimensions=[],
+        period="coorte_primeiro_anuncio",
+    )
     abc = json.loads(
         subprocess.check_output(
             [
