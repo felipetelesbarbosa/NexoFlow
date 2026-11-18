@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT))
 from ds_backend.contract import SCHEMA_HASH  # noqa: E402
 from integrations.datastudio.read_catalog import (  # noqa: E402
     ELIGIBLE_FIELD,
+    PRODUCT_FIELDS,
     READ_REGISTRY,
 )
 
@@ -117,6 +118,39 @@ def run():
             abc_mode=mode,
             abc_kinds=dict(fields),
         )
+    products = {
+        "periodo_inicio": ("date", "Início do período"),
+        "produto_codigo": ("text", "Código do produto"),
+        "produto_nome": ("text", "Nome do produto"),
+        "quantidade": ("sum", "Unidades"),
+        "receita_item": ("money", "Receita de produtos"),
+        "participacao_acumulada": ("percent", "Participação acumulada"),
+        "registros": ("sum", "Linhas de itens"),
+        "produtos_distintos_periodo": (
+            "max",
+            "Produtos distintos no período (SKU informado)",
+        ),
+        "posicao_receita_top5": ("max", "Posição no Top 5 por receita"),
+        "posicao_unidades_top5": ("max", "Posição no Top 5 por unidades"),
+    }
+    public["Produtos_Mais_Vendidos"] = dict(
+        columns=list(products),
+        types={
+            f: k if k in {"text", "date"} else "number"
+            for f, (k, _) in products.items()
+        },
+        dimensions=[],
+        period="periodo_inicio",
+        segment="FARMA",
+        product_modes={
+            mode: sorted(fields | {"periodo_inicio"})
+            for mode, fields in PRODUCT_FIELDS.items()
+        },
+        metric_kinds={
+            f: k for f, (k, _) in products.items() if k not in {"text", "date"}
+        },
+        labels={f: label for f, (_, label) in products.items()},
+    )
     core = ROOT / "connectors/datastudio_api/AbcCore.js"
     original = (ROOT / "connectors/looker_abc/AbcCore.js").read_text(encoding="utf-8")
     if args.check:

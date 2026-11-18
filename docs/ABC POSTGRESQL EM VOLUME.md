@@ -83,3 +83,46 @@ Testar também `abc` (produto_codigo, unidades, receita_produtos, pedidos, class
 ## Complemento: vendas sem itens e Top de pares
 
 Ver [diagnóstico privado, escopo explícito de volume e roteiro do Work](DIAGNOSTICO%20VENDAS%20SEM%20ITENS%20E%20TOP%20PARES.md). Preservados publicador, READY, contratos, aliases e ds136. A investigação dos 204 casos exige comparar o corte original confirmado com os fatos; o diagnóstico não aplica recuperação. O modo COMPLETO de compras juntas continua padrão, e Top exige escolha explícita na cópia.
+
+## Sete componentes do resumo FARMA
+
+Os seis cartões de classes e a tabela da página Curva ABC pedem projeções
+diferentes do mesmo resumo. O leitor FARMA calcula a linha completa em
+PostgreSQL e confere as vendas, os itens e os centavos antes de devolver os
+campos pedidos por cada componente. A tabela pode solicitar também a métrica de
+ordenação `produtos_classe_a`.
+
+Cada chamada conserva a consulta de destino, conta, contrato, versão e UUID da
+publicação no seu próprio snapshot de leitura. O leitor pode reaproveitar um
+resumo completo apenas para o mesmo intervalo e o mesmo estado visível do
+PostgreSQL. Um processo retém até 32 resultados completos. Pedidos simultâneos
+do mesmo resumo compartilham o cálculo. A espera libera a conexão PostgreSQL e
+tem prazo de 45 segundos. Uma falha do cálculo libera os participantes e
+permite uma nova tentativa.
+
+Na homologação isolada, confira primeiro a resposta de `/v1/abc` para
+`mode=resumo` com todos os campos da página. Em seguida confira os seis
+cartões e a tabela para o mesmo dia e revisão na cópia. Registre as durações
+e o código sanitizado de qualquer erro. A alteração se limita ao processo
+leitor FARMA e o hash do contrato da API permanece o mesmo.
+
+## Ranking e seletor de classe FARMA
+
+A tabela de produtos e o seletor de classe pedem métricas diferentes do mesmo
+ranking. O leitor pode compartilhar o cálculo entre os dois componentes dentro
+do mesmo modo, recorte, destino e snapshot confirmado. Cada resposta verifica
+os limites de linhas e de bytes com sua própria lista de campos. Assim, o
+seletor pode receber todas as classes e unidades mesmo quando uma tabela que
+inclui nomes de produtos ultrapassa o limite de resposta.
+
+Para as chamadas em sequência, cada processo retém no máximo um ranking cujo
+conjunto de linhas calculadas caiba no orçamento de memória de 7.000.000
+bytes estimados. Rankings maiores podem ser compartilhados durante a consulta
+e são liberados ao fim das leituras. Os 32 resultados possíveis do resumo
+continuam em armazenamento separado e o Top de pares mantém sua validação
+específica.
+
+Na cópia de ensaio, confira em 09/11 a tabela isolada e depois a tabela com
+o seletor de classes na mesma página. Compare a lista, a ordem, as unidades,
+a receita em centavos e as participações na mesma READY, aguardando o fim das
+duas leituras. Repita com classe selecionada e com o período vazio.

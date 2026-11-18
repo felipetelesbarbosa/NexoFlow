@@ -278,3 +278,4 @@ test('ds136 preserva tipos e zero confirmado, bloqueia lacunas e separa PET',()=
 });
 
 require('./datastudio/meta_orders.cjs');
+require('./datastudio/produtos_periodo.cjs')({fixture, result});

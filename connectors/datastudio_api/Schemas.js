@@ -1729,6 +1729,99 @@ var NexoDSSchemas={
       "pedidos_juntos": "sum",
       "atualizado_em": "text"
     }
+  },
+  "Produtos_Mais_Vendidos": {
+    "columns": [
+      "periodo_inicio",
+      "produto_codigo",
+      "produto_nome",
+      "quantidade",
+      "receita_item",
+      "participacao_acumulada",
+      "registros",
+      "produtos_distintos_periodo",
+      "posicao_receita_top5",
+      "posicao_unidades_top5"
+    ],
+    "types": {
+      "periodo_inicio": "date",
+      "produto_codigo": "text",
+      "produto_nome": "text",
+      "quantidade": "number",
+      "receita_item": "number",
+      "participacao_acumulada": "number",
+      "registros": "number",
+      "produtos_distintos_periodo": "number",
+      "posicao_receita_top5": "number",
+      "posicao_unidades_top5": "number"
+    },
+    "dimensions": [],
+    "period": "periodo_inicio",
+    "segment": "FARMA",
+    "product_modes": {
+      "ranking": [
+        "participacao_acumulada",
+        "periodo_inicio",
+        "produto_codigo",
+        "produto_nome",
+        "quantidade",
+        "receita_item",
+        "registros"
+      ],
+      "receita": [
+        "participacao_acumulada",
+        "periodo_inicio",
+        "posicao_receita_top5",
+        "produto_codigo",
+        "produto_nome",
+        "quantidade",
+        "receita_item",
+        "registros"
+      ],
+      "unidades": [
+        "participacao_acumulada",
+        "periodo_inicio",
+        "posicao_unidades_top5",
+        "produto_codigo",
+        "produto_nome",
+        "quantidade",
+        "receita_item",
+        "registros"
+      ],
+      "resumo": [
+        "periodo_inicio",
+        "produtos_distintos_periodo",
+        "quantidade",
+        "receita_item",
+        "registros"
+      ],
+      "nomes": [
+        "periodo_inicio",
+        "produto_nome",
+        "registros"
+      ]
+    },
+    "metric_kinds": {
+      "quantidade": "sum",
+      "receita_item": "money",
+      "participacao_acumulada": "percent",
+      "registros": "sum",
+      "produtos_distintos_periodo": "max",
+      "posicao_receita_top5": "max",
+      "posicao_unidades_top5": "max"
+    },
+    "labels": {
+      "periodo_inicio": "Início do período",
+      "produto_codigo": "Código do produto",
+      "produto_nome": "Nome do produto",
+      "quantidade": "Unidades",
+      "receita_item": "Receita de produtos",
+      "participacao_acumulada": "Participação acumulada",
+      "registros": "Linhas de itens",
+      "produtos_distintos_periodo": "Produtos distintos no período (SKU informado)",
+      "posicao_receita_top5": "Posição no Top 5 por receita",
+      "posicao_unidades_top5": "Posição no Top 5 por unidades"
+    }
   }
 };
 if(typeof module!=="undefined")module.exports={hash:NexoDSSchemaHash,tables:NexoDSSchemas};

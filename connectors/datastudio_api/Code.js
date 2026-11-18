@@ -18,7 +18,7 @@ function getConfig(request){
   ['homologacao','producao'].forEach(function(v){env.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
   var table=config.newSelectSingle().setId('tabela').setName('Tabela lógica').setIsDynamic(true);
   Object.keys(NexoDSSchemas).filter(function(v){return !NexoDSSchemas[v].segment || NexoDSSchemas[v].segment===p.segmento;}).forEach(function(v){table.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
-  if (!['Compradores_Operacionais', 'Pedidos_Atribuiveis_Meta', 'Contatos_Atribuicao_Meta'].includes(p.tabela)) {
+  if (!['Compradores_Operacionais', 'Pedidos_Atribuiveis_Meta', 'Contatos_Atribuicao_Meta', 'Produtos_Mais_Vendidos'].includes(p.tabela)) {
     var query=config.newSelectSingle().setId('modo_consulta').setName('Leitura: detalhe ou somas homologadas');
     ['detalhe','somas'].forEach(function(v){query.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
   }
@@ -28,8 +28,10 @@ function getConfig(request){
     var top=config.newSelectSingle().setId('pares_limite').setName('Top de pares (exibir o escopo no título do gráfico)');
     ['10','25','50','100','250','500','1000'].forEach(function(v){top.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
   }
-  var grain=config.newSelectSingle().setId('recorte_historico').setName('Resumo histórico: grão');
-  ['MES','ANO','TOTAL','SEM_EMISSAO'].forEach(function(v){grain.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
+  if(p.tabela!=='Produtos_Mais_Vendidos'){
+    var grain=config.newSelectSingle().setId('recorte_historico').setName('Resumo histórico: grão');
+    ['MES','ANO','TOTAL','SEM_EMISSAO'].forEach(function(v){grain.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
+  }
   config.setIsSteppedConfig(!NexoDSSchemas[p.tabela]);
   config.setDateRangeRequired(!!(NexoDSSchemas[p.tabela]&&NexoDSSchemas[p.tabela].period)&&!(p.tabela==='BI_Historico_Resumo'&&['TOTAL','SEM_EMISSAO'].includes(p.recorte_historico)));
   return config.build();
@@ -37,6 +39,7 @@ function getConfig(request){
 function dsConfig_(p){
   if (['Pedidos_Atribuiveis_Meta', 'Contatos_Atribuicao_Meta'].includes(p.tabela) && p.segmento !== 'FARMA') throw new Error('DS_CONFIGURACAO_INVALIDA');
   if(!['FARMA','PET'].includes(p.segmento)||!['producao','homologacao'].includes(p.ambiente)||!NexoDSSchemas[p.tabela])throw new Error('DS_CONFIGURACAO_INVALIDA');
+  if(p.tabela==='Produtos_Mais_Vendidos' && p.segmento!=='FARMA')throw new Error('DS_TABELA_NAO_AUTORIZADA');
   if(NexoDSSchemas[p.tabela].segment && NexoDSSchemas[p.tabela].segment!==p.segmento)throw new Error('DS_INSIGHTS_SEGMENTO');
   var raw=PropertiesService.getScriptProperties().getProperty('NFDS_'+p.segmento+'_'+p.ambiente.toUpperCase());
   if(!raw)throw new Error('DS_CREDENCIAL_AUSENTE');
@@ -59,6 +62,7 @@ function dsCall_(c,path,payload){
       if(status===503 && rejection.error==='DS_PERMISSAO')throw new Error('DS_PERMISSAO');
       if(status===503 && rejection.error==='DS_BANCO_INDISPONIVEL')failure='DS_BANCO_INDISPONIVEL';
       // Só códigos conhecidos, nunca texto livre/payload de erro do servidor.
+      if(status===409 && path==='/v1/produtos' && ['DS_PRODUTOS_BASE_INVALIDA','DS_FILTRO_INVALIDO','DS_REVISAO_ALTERADA','DS_CAMPOS_NAO_AUTORIZADOS','DS_PERIODO_INVALIDO'].includes(rejection.error))throw new Error(rejection.error);
       if(status===409 && ['DS_FILTRO_CORTA_RECORTE_USE_DETALHE','DS_COMPRADORES_EXIGEM_COMPETENCIA_OU_RECORTE_UNICO','DS_COMPRADORES_NAO_SOMAVEIS_ENTRE_MESES','DS_RESUMO_EXIGE_GRAO','DS_RESUMO_TOTAL_NAO_APLICA_DATA','DS_CONSULTA_EXCEDE_LIMITE_USE_RESUMO_OU_PERIODO','DS_RESPOSTA_EXCEDE_LIMITE_USE_RESUMO','DS_SEM_PUBLICACAO_CONFIRMADA','DS_ABC_BASE_INCOMPLETA','DS_INSIGHTS_COBERTURA_INCOMPLETA','DS_INSIGHTS_PERIODO_OBRIGATORIO','DS_ABC_PEDIDO_EXCEDE_LIMITE_PARES','DS_ABC_PRECISAO_EXCEDIDA','DS_BI_PEDIDO_OPERACIONAL_AMBIGUO','DS_CONSULTA_TEMPO_LIMITE'].includes(rejection.error))throw new Error(rejection.error);
     }
     if(![429,502,503,504].includes(status)||attempt===2||Date.now()-started>45000)throw new Error(failure);
@@ -67,9 +71,11 @@ function dsCall_(c,path,payload){
   throw new Error('DS_RESPOSTA_NAO_CONFIRMADA');
 }
 function dsVerify_(c){
-  var info=dsCall_(c,'/v1/destino');
+  dsCheckDestination_(c,dsCall_(c,'/v1/destino'));
+}
+function dsCheckDestination_(c,info){
   var db=c.environment==='producao'?'nexoflow_datastudio':'nexoflow_datastudio_homologacao';
-  if(info.protocol!=='nexoflow_datastudio_1'||info.target!==db+'.'+c.segment.toLowerCase()||info.segment!==c.segment||info.environment!==c.environment||info.schema_hash!==NexoDSSchemaHash)throw new Error('DS_CONTRATO_DESTINO_DIVERGENTE');
+  if(!info||info.protocol!=='nexoflow_datastudio_1'||info.target!==db+'.'+c.segment.toLowerCase()||info.segment!==c.segment||info.environment!==c.environment||info.schema_hash!==NexoDSSchemaHash)throw new Error('DS_CONTRATO_DESTINO_DIVERGENTE');
 }
 var NexoDSAbcLabels={periodo_rotulo:'Período',produto_nome:'Produto',classe_abc:'Classe',unidades:'Unidades',receita_produtos:'Receita de produtos',participacao_receita:'Participação (%)',participacao_acumulada:'Acumulada (%)',skus_distintos:'Produtos diferentes',faturamento_produtos:'Receita de produtos',participacao_top5_receita:'Top 5 na receita (%)',produtos_classe_a:'Produtos na classe A',produtos_classe_b:'Produtos na classe B',produtos_classe_c:'Produtos na classe C',receita_classe_a:'Receita classe A (%)',receita_classe_b:'Receita classe B (%)',receita_classe_c:'Receita classe C (%)',produto_a_nome:'Produto A',produto_b_nome:'Produto B',pedidos_juntos:'Pedidos juntos'};
 function dsFields_(table){
@@ -77,11 +83,11 @@ function dsFields_(table){
   if(!spec)throw new Error('DS_TABELA_NAO_AUTORIZADA');
   spec.columns.forEach(function(name){
     var kind=spec.types[name],metric=kind==='number'&&!spec.dimensions.includes(name),field=metric?fields.newMetric():fields.newDimension();
-    var abcKind=spec.abc_kinds&&spec.abc_kinds[name];
-    var brl=(NexoDSCurrencyBRL[table]||[]).includes(name)||abcKind==='money';
+    var metricKind=(spec.abc_kinds||spec.metric_kinds||{})[name];
+    var brl=(NexoDSCurrencyBRL[table]||[]).includes(name)||metricKind==='money';
     field.setId(name).setName(spec.abc_mode?(NexoDSAbcLabels[name]||name):((spec.labels||{})[name]||name)).setType(kind==='date'?cc.FieldType.YEAR_MONTH_DAY:kind==='number'?(brl?cc.FieldType.CURRENCY_BRL:cc.FieldType.NUMBER):cc.FieldType.TEXT);
-    if(abcKind==='percent')field.setType(cc.FieldType.PERCENT);
-    if(metric)field.setAggregation(abcKind?(['sum','money'].includes(abcKind)?cc.AggregationType.SUM:cc.AggregationType.MAX):(/taxa|pct|idade|ranking|ticket_medio|^clientes$/.test(name)?cc.AggregationType.MAX:cc.AggregationType.SUM));
+    if(metricKind==='percent')field.setType(cc.FieldType.PERCENT);
+    if(metric)field.setAggregation(metricKind?(['sum','money'].includes(metricKind)?cc.AggregationType.SUM:cc.AggregationType.MAX):(/taxa|pct|idade|ranking|ticket_medio|^clientes$/.test(name)?cc.AggregationType.MAX:cc.AggregationType.SUM));
   });
   if(table==='BI_Itens')fields.newMetric().setId('produtos_distintos_periodo').setName('Produtos distintos no período (SKU informado)').setType(cc.FieldType.NUMBER).setIsReaggregatable(false);
   return fields;
@@ -94,6 +100,7 @@ function dsError_(error){
 }
 function getData(request){try{
   var p=request.configParams,c=dsConfig_(p),spec=NexoDSSchemas[p.tabela];
+  if(spec.product_modes)return dsProductsData_(request,c,spec);
   if(spec.abc_mode)return dsAbcData_(request,c,spec);
   if(p.tabela==='Pedidos_Atribuiveis_Meta'||p.tabela==='Contatos_Atribuicao_Meta')return dsAdData_(request,c,spec);
   var names=request.fields.map(function(f){return f.name;}),distinct=names.includes('produtos_distintos_periodo');
@@ -370,6 +377,125 @@ function dsBuyerRows_(rows, fields, names) {
     if (row[0].trim()) projected.push(indices.map(function(i) { return row[i]; }));
   });
   return projected;
+}
+
+function dsProductNames_(groups) {
+  // No Looker as condições de um grupo são OR; os grupos combinam-se por AND.
+  if (!Array.isArray(groups) || groups.length > 16) throw new Error('DS_FILTRO_AGREGACAO_NAO_SUPORTADO');
+  var selected = null;
+  var conditions = 0;
+  groups.forEach(function(group) {
+    if (!Array.isArray(group) || !group.length) throw new Error('DS_FILTRO_AGREGACAO_NAO_SUPORTADO');
+    conditions += group.length;
+    if (conditions > 16) throw new Error('DS_FILTRO_AGREGACAO_NAO_SUPORTADO');
+    var values = new Set();
+    group.forEach(function(filter) {
+      if (!filter || filter.fieldName !== 'produto_nome' || filter.type !== 'INCLUDE' ||
+          !['EQUALS','IN_LIST'].includes(filter.operator) || !Array.isArray(filter.values) ||
+          filter.values.length > 100 || (filter.operator === 'EQUALS' && filter.values.length !== 1)) {
+        throw new Error('DS_FILTRO_AGREGACAO_NAO_SUPORTADO');
+      }
+      filter.values.forEach(function(name) {
+        if (typeof name !== 'string' || name.indexOf('\0') !== -1) throw new Error('DS_FILTRO_INVALIDO');
+        values.add(name);
+      });
+      if (values.size > 100) throw new Error('DS_FILTRO_INVALIDO');
+    });
+    selected = selected === null ? Array.from(values) : selected.filter(function(name) { return values.has(name); });
+  });
+  return selected;
+}
+
+function dsProductMode_(fields, spec) {
+  var mode = 'resumo';
+  if (fields.includes('posicao_unidades_top5')) mode = 'unidades';
+  else if (fields.includes('posicao_receita_top5') || fields.includes('participacao_acumulada')) mode = 'receita';
+  else if (fields.includes('produto_codigo')) mode = 'ranking';
+  else if (fields.includes('produto_nome')) mode = 'nomes';
+  if (!fields.every(function(field) { return spec.product_modes[mode].includes(field); })) {
+    throw new Error('DS_CAMPOS_NAO_AUTORIZADOS');
+  }
+  return mode;
+}
+
+function dsProductDate_(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  var t = Date.parse(value + 'T00:00:00Z');
+  return Number.isFinite(t) && value.slice(0,4) !== '0000' && new Date(t).toISOString().slice(0,10) === value;
+}
+
+function dsProductValue_(name, kind, value, start) {
+  if (kind === 'date') {
+    if (value !== start) throw new Error('DS_DATA_INVALIDA');
+    return value.replace(/-/g, '');
+  }
+  if (kind === 'text') {
+    if (value !== null && typeof value !== 'string') throw new Error('DS_SCHEMA_DIVERGENTE');
+    return value;
+  }
+  if (value === null && name === 'participacao_acumulada') return null;
+  if (typeof value !== 'number' &&
+      (typeof value !== 'string' || !/^-?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i.test(value))) {
+    throw new Error('DS_NUMERO_INVALIDO');
+  }
+  var numeric = Number(value);
+  if (!Number.isFinite(numeric)) throw new Error('DS_NUMERO_INVALIDO');
+  if (['produtos_distintos_periodo','registros'].includes(name) &&
+      (!Number.isSafeInteger(numeric) || numeric < 0)) throw new Error('DS_NUMERO_INVALIDO');
+  return numeric;
+}
+
+function dsProductsData_(request, config, spec) {
+  var started = Date.now();
+  var requested = request.fields;
+  if (!Array.isArray(requested) || !requested.length ||
+      requested.some(function(f) { return !f || !spec.columns.includes(f.name); }) ||
+      new Set(requested.map(function(f) { return f.name; })).size !== requested.length) {
+    throw new Error('DS_CAMPOS_NAO_AUTORIZADOS');
+  }
+  var names = dsProductNames_(request.dimensionsFilters || []);
+  var fields = requested.filter(function(f) {
+    if (!f.forFilterOnly) return true;
+    if (names === null || f.name !== 'produto_nome') throw new Error('DS_FILTRO_AGREGACAO_NAO_SUPORTADO');
+    return false;
+  }).map(function(f) { return f.name; });
+  if (!fields.length) throw new Error('DS_CAMPOS_NAO_AUTORIZADOS');
+  var schema = dsFields_(request.configParams.tabela).forIds(fields).build();
+  fields = schema.map(function(f) { return f.name; });
+  var range = request.dateRange || {};
+  var sample = request.scriptParams && request.scriptParams.sampleExtraction;
+  if (sample && ((!range.startDate && !range.endDate) || fields.length === spec.columns.length)) {
+    // O extrator de esquema pode pedir campos de vários grãos na mesma amostra.
+    dsVerify_(config);
+    return {schema:schema, rows:[], filtersApplied:names !== null};
+  }
+  if (!range.startDate || !range.endDate) throw new Error('DS_PERIODO_OBRIGATORIO');
+  if (!dsProductDate_(range.startDate) || !dsProductDate_(range.endDate) || range.startDate > range.endDate) {
+    throw new Error('DS_PERIODO_INVALIDO');
+  }
+  var mode = dsProductMode_(fields, spec);
+  var result = dsCall_(config, '/v1/produtos', {
+    mode:mode, fields:fields, start:range.startDate, end:range.endDate, names:names
+  });
+  if (Date.now() - started > 45000) throw new Error('DS_PRAZO_CONSULTA');
+  dsCheckDestination_(config, result);
+  if (!Number.isSafeInteger(result.version) || result.version < 1 || result.complete !== true ||
+      JSON.stringify(result.fields) !== JSON.stringify(fields) || !Array.isArray(result.rows) ||
+      result.rows.length > 50000 || (mode === 'resumo' && result.rows.length !== 1) ||
+      (['receita','unidades'].includes(mode) && result.rows.length > 5)) {
+    throw new Error('DS_RESPOSTA_INCOMPLETA');
+  }
+  var rows = result.rows.map(function(row, position) {
+    if (!Array.isArray(row) || row.length !== fields.length) throw new Error('DS_SCHEMA_DIVERGENTE');
+    return {values:row.map(function(value, i) {
+      var name = fields[i], converted = dsProductValue_(name, spec.types[name], value, range.startDate);
+      if (['posicao_receita_top5','posicao_unidades_top5'].includes(name) && converted !== position + 1) {
+        throw new Error('DS_RESPOSTA_INCOMPLETA');
+      }
+      return converted;
+    })};
+  });
+  return {schema:schema, rows:rows, filtersApplied:names !== null};
 }
 
 // Modo explícito: não inferir SUM para taxas, compradores, LTV ou métricas Meta.
