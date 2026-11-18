@@ -1,6 +1,6 @@
 # NexoFlow — Changelog
 
-## 1.5.44 — em validação
+## 1.5.44 — publicada em 18/11/2026, 08:46:25 (America/Fortaleza)
 
 - O Setup instala as dependências e as ferramentas do check-up em uma única etapa. Falhas transitórias na verificação HTTPS têm até três tentativas na rota escolhida. O pip tem duas retentativas por requisição.
 - O log distingue timeout, DNS, recusa HTTP, túnel do proxy e falha de CA/TLS. Preservados a validação TLS, o proxy corporativo e a restauração da instalação anterior caso a preparação falhe.

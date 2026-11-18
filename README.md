@@ -94,6 +94,8 @@ As continuações automáticas no Meu Drive exigem autorização Google local. O
 
 ## Versões e atualizações
 
+O NexoFlow **1.5.44** foi publicado em 18/11/2026, 08:46:25 (America/Fortaleza) com a correção do Setup para falhas transitórias de proxy. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.44) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/69ac78e1b7d31a4d723ea79555f5cfb8fe805987) · [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44294204863) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44294204798) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44297634663).
+
 A 1.5.43 usa o Flows v2 para as conversas diárias FARMA com a credencial do perfil. Quem instalou o artefato de homologação anterior deve atualizar pelo Setup da release em Preserve.
 
 O NexoFlow **1.5.43** foi publicado em 18/11/2026, 03:11:43 (America/Fortaleza). [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.43) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/35764b7e1333bc6dc1fc2f45e5a54302c92c20b7) · [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44246909363) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44246909339) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44249465667).

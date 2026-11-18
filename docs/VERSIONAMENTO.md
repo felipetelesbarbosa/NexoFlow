@@ -1,5 +1,14 @@
 # Versionamento do NexoFlow
 
+## Publicação 1.5.44
+
+Publicada em **18/11/2026, 08:46:25 (America/Fortaleza)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.44) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/69ac78e1b7d31a4d723ea79555f5cfb8fe805987) · [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44294204863) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44294204798) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44297634663).
+
+A distribuição corrigiu a sondagem HTTPS das dependências do Setup. Os testes cobriram recuperação de timeout, recusa de proxy e restauração do Setup no Windows. Os downloads públicos reproduziram os hashes dos ZIPs aprovados e passaram nas conferências de CRC, manifesto, módulos e executáveis. A instalação com o proxy corporativo real continua pendente de conferência no PC do operador.
+
+- NexoFlow-Setup-1.5.44.zip · SHA-256 `4003a2b02997f1fbbb6fc558a5a0044c5797c6cc40814222a911f71a55dd8d67`
+- NexoFlow-1.5.44.zip · SHA-256 `950cec1c59934d5cba0e2bcbf9319277081ae75961280f1b892dc3761def9222`
+
 ## Preparação 1.5.44
 
 O Setup 1.5.43 podia validar o acesso HTTPS e abortar na sondagem seguinte, antes de instalar as dependências da aplicação. A correção usa uma etapa de instalação e repete falhas transitórias na mesma rota. A causa específica da falha no proxy do operador depende da conferência no PC do trabalho.
@@ -47,7 +56,7 @@ A **1.5.32 foi publicada em 10/11/2026, 19:16:49 (America/Fortaleza)**, no SHA `
 
 A **1.5.33 foi publicada em 10/11/2026, 23:28:34 (America/Fortaleza)**, no SHA `7884d7007fd0c65cbf90bfc30c5c35dc6c9056fb`, com recuperação da leitura da trava Sheets. [Release e pacotes conferidos](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.33).
 
-As próximas publicações de atualização, hotfix ou patch seguem **1.5.44 → ... → 1.5.99 → 1.6 → 1.6.1**. Cada publicação incrementa uma única vez; commits e novas tentativas de CI da mesma entrega não mudam a numeração. Não há salto automático de versão principal.
+As próximas publicações de atualização, hotfix ou patch seguem **1.5.45 → ... → 1.5.99 → 1.6 → 1.6.1**. Cada publicação incrementa uma única vez; commits e novas tentativas de CI da mesma entrega não mudam a numeração. Não há salto automático de versão principal.
 
 A versão da distribuição fica em `VERSION`. A tag é `v{versao}`, o título é `NexoFlow {versao}` e os pacotes são `NexoFlow-{versao}.zip` e `NexoFlow-Setup-{versao}.zip`. Nunca sobrescreva os arquivos de uma versão pública para entregar código novo. O workflow permite retomar somente um rascunho da mesma entrega.
 
