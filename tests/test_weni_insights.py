@@ -1,12 +1,16 @@
 """Transporte de leitura do Insights, sem acesso de rede ou credenciais reais."""
 
+import json
+import tempfile
 import unittest
-from unittest.mock import Mock
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 import requests
 
 from ds_backend.contract import StorageError
-from weni_insights import URL, fetch_day
+from weni_insights import URL, fetch_day, session_for
 
 
 class InsightsTransportTests(unittest.TestCase):
@@ -32,3 +36,42 @@ class InsightsTransportTests(unittest.TestCase):
             StorageError, "^DS_INSIGHTS_CONSULTA_INDISPONIVEL$"
         ):
             fetch_day(session, "project", "2026-01-02")
+
+    def test_usa_token_do_perfil_sem_arquivo_e_separa_a_credencial_dedicada(self):
+        settings = SimpleNamespace(
+            WENI_INSIGHTS_ENABLED=True, WENI_API_TOKEN="synthetic-flow"
+        )
+        project = "synthetic-project"
+        with (
+            tempfile.TemporaryDirectory() as folder,
+            patch("weni_insights.ROOT", Path(folder)),
+            patch.dict("os.environ", {"NEXOFLOW_PERFIL": "FARMA"}),
+        ):
+            with session_for(settings, project) as session:
+                self.assertEqual(
+                    session.headers["Authorization"], "Bearer synthetic-flow"
+                )
+            settings.WENI_INSIGHTS_CREDENTIAL_SOURCE = "arquivo"
+            with self.assertRaisesRegex(StorageError, "CREDENCIAL_PRIVADA"):
+                session_for(settings, project)
+            path = Path(folder) / "credentials/weni/FARMA/insights.json"
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                json.dumps(
+                    dict(
+                        project_uuid=project,
+                        timezone="America/Belem",
+                        segment="FARMA",
+                        access_token="synthetic-insights",
+                    )
+                )
+            )
+            with session_for(settings, project) as session:
+                self.assertEqual(
+                    session.headers["Authorization"], "Bearer synthetic-insights"
+                )
+            with self.assertRaisesRegex(StorageError, "CREDENCIAL_PRIVADA"):
+                session_for(settings, "other-project")
+            with patch.dict("os.environ", {"NEXOFLOW_PERFIL": "PET"}):
+                with self.assertRaisesRegex(StorageError, "DESABILITADO"):
+                    session_for(settings, project)

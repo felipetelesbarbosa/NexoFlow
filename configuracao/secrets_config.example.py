@@ -74,6 +74,7 @@ PERFIS = {
     "FARMA": {
         "SEGMENTO": "FARMA",
         "WENI_INSIGHTS_ENABLED": False,
+        "WENI_INSIGHTS_CREDENTIAL_SOURCE": "perfil",
         "WENI_INSIGHTS_PROJECT_UUID": "",
         "WENI_INSIGHTS_START_DATE": "",
         "WENI_API_TOKEN": WENI_API_TOKEN,

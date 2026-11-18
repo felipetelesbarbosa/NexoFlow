@@ -65,23 +65,34 @@ def fetch_day(session, project, day):
         raise StorageError("DS_INSIGHTS_RESPOSTA_INCOMPLETA") from None
 
 
-def session_for(project):
-    path = ROOT / "credentials/weni/FARMA/insights.json"
+def session_for(settings, project):
+    if not enabled(settings):
+        raise StorageError("DS_INSIGHTS_DESABILITADO")
+    source = getattr(settings, "WENI_INSIGHTS_CREDENTIAL_SOURCE", "perfil")
     try:
-        data = json.loads(path.read_text(encoding="utf-8-sig"))
-        token = data["access_token"]
+        if source == "perfil":
+            token = settings.WENI_API_TOKEN
+        elif source == "arquivo":
+            path = ROOT / "credentials/weni/FARMA/insights.json"
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
+            if (
+                data["project_uuid"] != project
+                or data["timezone"] != ZONE
+                or data["segment"] != "FARMA"
+            ):
+                raise ValueError
+            token = data["access_token"]
+        else:
+            raise ValueError
         if (
-            data["project_uuid"] != project
-            or data["timezone"] != ZONE
-            or data["segment"] != "FARMA"
-            or not isinstance(token, str)
+            not isinstance(token, str)
             or not token
             or not token.isascii()
             or not token.isprintable()
             or any(c.isspace() for c in token)
         ):
             raise ValueError
-    except (OSError, TypeError, ValueError, KeyError):
+    except (OSError, TypeError, ValueError, KeyError, AttributeError):
         raise StorageError("DS_INSIGHTS_CREDENCIAL_PRIVADA") from None
     session = requests.Session()
     session.headers["Authorization"] = "Bearer " + token
@@ -138,7 +149,7 @@ def collect_configured(settings, start=None, end=None):
     )
     if lo < first or hi > yesterday or (start and lo > hi):
         raise StorageError("DS_INSIGHTS_PERIODO_INVALIDO")
-    with session_for(project) as session, closing(cache()) as conn:
+    with session_for(settings, project) as session, closing(cache()) as conn:
         return collect(conn, session, project, lo, hi, refresh=bool(start))
 
 
@@ -197,7 +208,7 @@ def main(argv=None):
             or date.fromisoformat(args.inicio) >= datetime.now(ZoneInfo(ZONE)).date()
         ):
             parser.error("Informe um dia encerrado em --inicio.")
-        with session_for(project) as session:
+        with session_for(settings, project) as session:
             print(json.dumps(fetch_day(session, project, args.inicio)))
     elif args.acao == "coletar":
         print("Dias consultados:", collect_configured(settings, args.inicio, args.fim))
