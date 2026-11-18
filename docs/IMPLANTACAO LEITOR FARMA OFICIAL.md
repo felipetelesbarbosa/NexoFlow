@@ -49,6 +49,7 @@ O limite HTTP e o limite de conexões SQL controlam recursos diferentes. O Compo
 | ABC em 16 e 17/11/2026 | O primeiro ensaio exibiu `DS_PRAZO_CONSULTA` em parte dos gráficos. No reteste de 18/11, o resumo abriu com zero SKUs e R$ 0,00. O ranking e pares ficaram vazios e as classes exibiram “Não há dados”. Repetir a abertura conjunta pela rota oficial. |
 | Produtos mais vendidos | Os sete componentes foram vinculados à fonte privada integrada. Os dois Top 5 coincidiram posição a posição em receita e unidades no dia e no anual. O filtro de um único produto preservou os totais filtrados e exibiu 100% de participação. No vazio, os cartões zeraram e os rankings ficaram vazios, sem erro. |
 | Meus clientes | O ranking e os cartões de compradores, receita média e pedidos por comprador coincidiram com o controle privado de 09 a 12/11. Selecionar um comprador pelo nome reduziu o ranking a uma linha e conciliou os três cartões com os valores desse comprador. |
+| Pedidos por cliente | O detalhe exibiu a mesclagem PostgreSQL com as dimensões originais e valores em BRL. O seletor de detalhe precisou usar a mesma mesclagem da tabela. Após o remapeamento, a busca por nome restringiu os produtos ao comprador selecionado de 09 a 12/11. |
 | Resumo e Vendas | Entre 09 e 12/11, comparar pedidos, unidades e faturamento com frete com o recibo privado. Conferir moeda em BRL e preservar filtros. |
 | Mesclagens, público e anúncios | Conferir chaves, cardinalidade, filtros, custos, atribuição FARMA e LTV por cliente. Comparar agregados no mesmo período e mesma revisão. |
 
