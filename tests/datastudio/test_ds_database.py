@@ -1013,6 +1013,61 @@ def test_ds72_report_eligibility_filters_blends_without_changing_facts(store):
     assert field not in records[0]  # campo derivado nunca entra no contrato Windows
 
 
+def test_operational_buyer_projection_groups_before_limit_and_preserves_left(store):
+    from integrations.datastudio.read_catalog import ELIGIBLE_FIELD
+
+    revision = begin(store)
+    contacts = ["001", "002", "only_cancelled", "no_orders"]
+    batch(
+        store,
+        revision,
+        "Base_Contatos",
+        [row("Base_Contatos", contact_uuid=c) for c in contacts],
+    )
+    finish(store, revision)
+    with store.connect() as conn:
+        conn.execute("""
+            INSERT INTO farma.nf_atuais(tabela,chave,registro)
+            SELECT 'Pedidos_FarmaLider', n::text, jsonb_build_object(
+                'pedido_chave',n::text,
+                'contact_uuid',CASE WHEN n<=50001 THEN '001' WHEN n=50002 THEN '002'
+                    WHEN n=50003 THEN 'only_cancelled' ELSE 'outside_base' END,
+                'data',CASE WHEN n<=50001 THEN '2020-04-20' ELSE '2026-11-12' END,
+                'status_confirmacao','CONFIRMADO_API','status_validacao','OK',
+                'farmalider_status_pedido',CASE WHEN n=50003 THEN '3' ELSE '2' END,
+                'farmalider_forma_pagamento','1')
+            FROM generate_series(1,50004) n
+        """)
+
+    reader = Reader(DSN, "homologacao", "FARMA")
+    eligible = [{"field": ELIGIBLE_FIELD, "values": ["Sim"]}]
+    with pytest.raises(StorageError, match="DS_CONSULTA_EXCEDE_LIMITE"):
+        reader.query("Pedidos_FarmaLider", ["contact_uuid"], "", "", eligible, {})
+    buyers = reader.query(
+        "Pedidos_FarmaLider",
+        ["contact_uuid", ELIGIBLE_FIELD, "pedido_chave"],
+        "",
+        "",
+        eligible,
+        {"pedido_chave": "count"},
+    )
+    assert buyers["complete"] and buyers["version"] == 1
+    assert sorted(buyers["rows"]) == [
+        ["001", "Sim", 50001],
+        ["002", "Sim", 1],
+        ["outside_base", "Sim", 1],
+    ]
+    left = reader.query("Base_Contatos", ["contact_uuid"], "", "", [], {})
+    assert left["version"] == buyers["version"]
+    counts = {contact: count for contact, _, count in buyers["rows"]}
+    assert {contact: counts.get(contact, 0) for [contact] in left["rows"]} == {
+        "001": 50001,
+        "002": 1,
+        "only_cancelled": 0,
+        "no_orders": 0,
+    }
+
+
 def test_metric_contract_upgrade_preserves_unrelated_data_and_rejects_old_clients(
     store,
 ):

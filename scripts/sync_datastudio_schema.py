@@ -12,7 +12,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "app"))
 sys.path.insert(0, str(ROOT))
 from ds_backend.contract import SCHEMA_HASH  # noqa: E402
-from integrations.datastudio.read_catalog import READ_REGISTRY as REGISTRY  # noqa: E402
+from integrations.datastudio.read_catalog import (  # noqa: E402
+    ELIGIBLE_FIELD,
+    READ_REGISTRY,
+)
 
 
 def run():
@@ -31,7 +34,7 @@ def run():
         )
     )
     public = {}
-    for name, spec in REGISTRY.items():
+    for name, spec in READ_REGISTRY.items():
         if not spec["public"]:
             continue
         dims = [
@@ -46,6 +49,15 @@ def run():
             dimensions=dims,
             types={f: spec["types"][f] for f in columns},
         )
+    # Lado direito do LEFT ds74/ds72. O agrupamento usa a API de leitura
+    # existente e a regra oficial da visão de pedidos, no histórico inteiro.
+    public["Compradores_Operacionais"] = dict(
+        columns=["contact_uuid", ELIGIBLE_FIELD],
+        types={"contact_uuid": "text", ELIGIBLE_FIELD: "text"},
+        labels=public["Pedidos_FarmaLider"]["labels"],
+        dimensions=[],
+        period=None,
+    )
     abc = json.loads(
         subprocess.check_output(
             [
