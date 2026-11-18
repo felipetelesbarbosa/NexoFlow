@@ -139,7 +139,7 @@ def grants(conn, segment):
             )
     # O leitor só enxerga visões públicas; Store.info usa esta função restrita na implantação.
     for name, spec in READ_REGISTRY.items():
-        if spec["public"]:
+        if spec["public"] and name != "BI_Weni_Conversas_Diarias":
             conn.execute(
                 sql.SQL("GRANT SELECT ON {}.{} TO {}").format(
                     sql.Identifier(schema),
@@ -148,7 +148,7 @@ def grants(conn, segment):
                 )
             )
     for name, spec in READ_REGISTRY.items():
-        if spec["public"]:
+        if spec["public"] and name != "BI_Weni_Conversas_Diarias":
             conn.execute(
                 sql.SQL("GRANT SELECT ON {}.{} TO {}").format(
                     sql.Identifier(schema),
@@ -207,11 +207,37 @@ def run(argv=None):
     p.add_argument("--segmento", choices=("FARMA", "PET"), required=True)
     p.add_argument("--aprovar-origem", type=Path)
     p.add_argument("--atualizar-visoes-farma", metavar="UUID_READY")
+    p.add_argument("--instalar-conversas-projeto", metavar="UUID_PROJETO_WENI")
     p.add_argument("--finalizar-selada")
     p.add_argument("--saida", type=Path)
     p.add_argument("--recibos-esperados", type=int)
     p.add_argument("--registros-esperados", type=int)
     args = p.parse_args(argv)
+    if args.instalar_conversas_projeto is not None:
+        if any(
+            x is not None
+            for x in (
+                args.aprovar_origem,
+                args.atualizar_visoes_farma,
+                args.finalizar_selada,
+                args.saida,
+                args.recibos_esperados,
+                args.registros_esperados,
+            )
+        ):
+            p.error("Instale a fonte de conversas isoladamente.")
+        from integrations.datastudio.weni_daily import install
+
+        install(
+            Store(
+                args.dsn_file.read_text(encoding="utf-8-sig").strip(),
+                args.ambiente,
+                args.segmento,
+            ),
+            args.instalar_conversas_projeto,
+        )
+        print("[OK] Projeto vinculado e visão FARMA de conversas instalada.")
+        return
     if args.atualizar_visoes_farma is not None:
         if any(
             value is not None

@@ -86,6 +86,16 @@ def create_app(store, token, *, reader=False):
 
         return api
 
+    @api.post("/v1/weni/conversas-diarias")
+    async def weni_day(request: Request):
+        from functools import partial
+
+        from integrations.datastudio.weni_daily import put
+
+        return await invoke(
+            request, partial(put, store), ("project", "day", "observed", "metrics")
+        )
+
     @api.get("/v1/conferencia")
     def audit():
         return store.audit()

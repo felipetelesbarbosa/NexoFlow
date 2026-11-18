@@ -42,7 +42,7 @@ def test_observed_label_is_not_invented_formula_or_permission_to_expose():
     assert "Receita gerada" in aliases["ds80"]["labels_or_fields_to_check"]
     assert "faturamento" in aliases["ds80"]["exact_fields_in_contract"]
     assert (
-        aliases["ds136"]["target_table"] is None
+        aliases["ds136"]["target_table"] == "BI_Weni_Conversas_Diarias"
     )  # Não aliasar Conversas_Diarias à força.
     assert aliases["ds72"]["target_table"] == "Pedidos_FarmaLider"
     assert aliases["ds109"]["target_table"] == "ABC_resumo"  # Dinâmico ≠ snapshot.
@@ -94,7 +94,7 @@ def test_new_alias_contract_does_not_mutate_windows_storage_or_guess_conversatio
         sources["ds136"]["confirmed_header"]
         == "data segmento conversas_weni resolvidas nao_resolvidas transferidas origem fuso".split()
     )
-    assert sources["ds136"]["target_table"] is None
+    assert sources["ds136"]["target_table"] == "BI_Weni_Conversas_Diarias"
 
 
 def test_work_supplement_confirms_modes_and_keeps_unknown_metadata_explicit():

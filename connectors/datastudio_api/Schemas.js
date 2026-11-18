@@ -1479,6 +1479,32 @@ var NexoDSSchemas={
     "full_history": false,
     "dimensions": []
   },
+  "BI_Weni_Conversas_Diarias": {
+    "public": true,
+    "columns": [
+      "data",
+      "segmento",
+      "conversas_weni",
+      "resolvidas",
+      "nao_resolvidas",
+      "transferidas",
+      "origem",
+      "fuso"
+    ],
+    "period": "data",
+    "segment": "FARMA",
+    "types": {
+      "data": "date",
+      "segmento": "text",
+      "conversas_weni": "number",
+      "resolvidas": "number",
+      "nao_resolvidas": "number",
+      "transferidas": "number",
+      "origem": "text",
+      "fuso": "text"
+    },
+    "dimensions": []
+  },
   "ABC_abc": {
     "columns": [
       "periodo_inicio",

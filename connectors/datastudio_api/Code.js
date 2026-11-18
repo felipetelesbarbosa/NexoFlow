@@ -16,7 +16,7 @@ function getConfig(request){
   var env=config.newSelectSingle().setId('ambiente').setName('Ambiente').setIsDynamic(true);
   ['homologacao','producao'].forEach(function(v){env.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
   var table=config.newSelectSingle().setId('tabela').setName('Tabela lógica').setIsDynamic(true);
-  Object.keys(NexoDSSchemas).forEach(function(v){table.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
+  Object.keys(NexoDSSchemas).filter(function(v){return !NexoDSSchemas[v].segment || NexoDSSchemas[v].segment===p.segmento;}).forEach(function(v){table.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
   var query=config.newSelectSingle().setId('modo_consulta').setName('Leitura: detalhe ou somas homologadas');
   ['detalhe','somas'].forEach(function(v){query.addOption(config.newOptionBuilder().setValue(v).setLabel(v));});
   if(p.tabela==='ABC_juntos'){
@@ -33,6 +33,7 @@ function getConfig(request){
 }
 function dsConfig_(p){
   if(!['FARMA','PET'].includes(p.segmento)||!['producao','homologacao'].includes(p.ambiente)||!NexoDSSchemas[p.tabela])throw new Error('DS_CONFIGURACAO_INVALIDA');
+  if(NexoDSSchemas[p.tabela].segment && NexoDSSchemas[p.tabela].segment!==p.segmento)throw new Error('DS_INSIGHTS_SEGMENTO');
   var raw=PropertiesService.getScriptProperties().getProperty('NFDS_'+p.segmento+'_'+p.ambiente.toUpperCase());
   if(!raw)throw new Error('DS_CREDENCIAL_AUSENTE');
   var c=JSON.parse(raw);
@@ -51,7 +52,7 @@ function dsCall_(c,path,payload){
     if(status===409){
       var rejection={};try{rejection=JSON.parse(response.getContentText());}catch(ignored){}
       // Só códigos conhecidos, nunca texto livre/payload de erro do servidor.
-      if(['DS_FILTRO_CORTA_RECORTE_USE_DETALHE','DS_COMPRADORES_EXIGEM_COMPETENCIA_OU_RECORTE_UNICO','DS_COMPRADORES_NAO_SOMAVEIS_ENTRE_MESES','DS_RESUMO_EXIGE_GRAO','DS_RESUMO_TOTAL_NAO_APLICA_DATA','DS_CONSULTA_EXCEDE_LIMITE_USE_RESUMO_OU_PERIODO','DS_RESPOSTA_EXCEDE_LIMITE_USE_RESUMO','DS_SEM_PUBLICACAO_CONFIRMADA','DS_ABC_BASE_INCOMPLETA','DS_ABC_PEDIDO_EXCEDE_LIMITE_PARES','DS_ABC_PRECISAO_EXCEDIDA','DS_CONSULTA_TEMPO_LIMITE'].includes(rejection.error))throw new Error(rejection.error);
+      if(['DS_FILTRO_CORTA_RECORTE_USE_DETALHE','DS_COMPRADORES_EXIGEM_COMPETENCIA_OU_RECORTE_UNICO','DS_COMPRADORES_NAO_SOMAVEIS_ENTRE_MESES','DS_RESUMO_EXIGE_GRAO','DS_RESUMO_TOTAL_NAO_APLICA_DATA','DS_CONSULTA_EXCEDE_LIMITE_USE_RESUMO_OU_PERIODO','DS_RESPOSTA_EXCEDE_LIMITE_USE_RESUMO','DS_SEM_PUBLICACAO_CONFIRMADA','DS_ABC_BASE_INCOMPLETA','DS_INSIGHTS_COBERTURA_INCOMPLETA','DS_INSIGHTS_PERIODO_OBRIGATORIO','DS_ABC_PEDIDO_EXCEDE_LIMITE_PARES','DS_ABC_PRECISAO_EXCEDIDA','DS_CONSULTA_TEMPO_LIMITE'].includes(rejection.error))throw new Error(rejection.error);
     }
     if(![429,502,503,504].includes(status)||attempt===2||Date.now()-started>45000)throw new Error('DS_HTTP_'+status);
     Utilities.sleep(Math.min(4000,1000*Math.pow(2,attempt)));
@@ -107,6 +108,11 @@ function getData(request){try{
   var sumAggregation=dsSums_(p,spec,names,groups,supported,distinct);
   var payload={table:p.tabela,fields:distinct?['produto_codigo']:names,start:spec.period?(range.startDate||''):'',end:spec.period?(range.endDate||''):'',filters:filters,aggregation:distinct?{produto_codigo:'count_distinct'}:sumAggregation};
   if(spec.period&&!(p.tabela==='BI_Historico_Resumo'&&['TOTAL','SEM_EMISSAO'].includes(p.recorte_historico))&&(!payload.start||!payload.end)&&!(request.scriptParams&&request.scriptParams.sampleExtraction))throw new Error('DS_PERIODO_OBRIGATORIO');
+  // Uma amostra de schema sem período não escolhe nem inventa um dia da Weni.
+  if(p.tabela==='BI_Weni_Conversas_Diarias'&&request.scriptParams&&request.scriptParams.sampleExtraction&&!payload.start){
+    dsVerify_(c);
+    return {schema:dsFields_(p.tabela).forIds(names).build(),rows:[],filtersApplied:false};
+  }
   if(request.scriptParams&&request.scriptParams.sampleExtraction&&spec.period&&!payload.start){payload.start='2000-01-01';payload.end='2000-01-01';}
   var result=dsCall_(c,'/v1/consulta',payload);
   var expectedDB=c.environment==='producao'?'nexoflow_datastudio':'nexoflow_datastudio_homologacao';

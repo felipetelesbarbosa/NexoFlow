@@ -1148,6 +1148,14 @@ def main() -> int:
         from ds_backend.runtime import open_store
 
         sheets = open_store(secrets, GoogleSheetsStore)
+        from weni_insights import enabled as insights_enabled
+        from weni_insights import publish_configured
+
+        if postgres_enabled(secrets) and insights_enabled(secrets):
+            logging.info(
+                "Insights FARMA: %d recibos confirmados.",
+                publish_configured(secrets, sheets.client),
+            )
         logging.info(
             "Google Sheets inicializado em %.2fs.",
             time.monotonic() - sheets_started,
