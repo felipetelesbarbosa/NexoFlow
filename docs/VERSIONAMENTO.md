@@ -1,5 +1,9 @@
 # Versionamento do NexoFlow
 
+## Homologação 1.5.43
+
+O Setup de homologação da coleta Weni Insights é distribuído pelo artefato do Actions do commit preparado. Instalar em Preserve. A ativação depende de acesso de serviço ao Insights e da conferência das seis datas na cópia do Looker. [Procedimento](CONVERSAS%20DIARIAS%20WENI.md).
+
 ## Publicação 1.5.42
 
 Publicada em **17/11/2026, 20:52:15 (America/Fortaleza)**, no [commit `f4a9ecf78bdff2158a7f2e9451248bc784c54879`](https://github.com/felipetelesbarbosa/NexoFlow/commit/f4a9ecf78bdff2158a7f2e9451248bc784c54879). [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.42) · [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44199455757) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44199455758) · [Meta nativo](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44199455745) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44203002028).

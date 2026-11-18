@@ -163,6 +163,7 @@ def audit(path=INVENTORY):
             source["confirmed_report_metadata"] = details
             source["legacy_config"] = supplement["abc_legacy_config"]
         if source["alias"] == "ds136":
+            source["contract_status"] = "INSIGHTS_AUTOMACAO_HOMOLOGACAO_PENDENTE"
             source["confirmed_header"] = supplement["ds136"]["confirmed_header"]
             source["confirmed_report_metadata"] = supplement["ds136"]
             source["missing_evidence"] = [

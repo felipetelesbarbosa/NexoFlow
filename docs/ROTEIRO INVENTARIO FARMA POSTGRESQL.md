@@ -162,3 +162,7 @@ CI/CodeQL devem ser conferidos no SHA informado na entrega. Nenhum pacote Window
 ## Complemento: vendas sem itens e Top de pares
 
 Ver [diagnóstico privado, escopo explícito de volume e roteiro do Work](DIAGNOSTICO%20VENDAS%20SEM%20ITENS%20E%20TOP%20PARES.md). Preservados publicador, READY, contratos, aliases e ds136. A investigação dos 204 casos exige comparar o corte original confirmado com os fatos; o diagnóstico não aplica recuperação. O modo COMPLETO de compras juntas continua padrão, e Top exige escolha explícita na cópia.
+
+## Complemento da ds136 · coleta automática para homologação
+
+O contrato candidato da nova fonte usa Insights por projeto e dia. A origem manual permanece disponível na cópia e no relatório oficial. O teste estático de inventário identifica a nova tabela e conserva o cabeçalho observado e as pendências históricas da aba antiga. [Coleta, credencial e teste da nova fonte](CONVERSAS%20DIARIAS%20WENI.md).

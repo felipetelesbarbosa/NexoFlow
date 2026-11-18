@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.42",
+    [string]$Version = "1.5.43",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -363,7 +363,7 @@ foreach ($relative in @('app/run_noturno_console.py','comandos/executar_noturno.
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/NexoFlow Recompra.exe"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/NexoFlow Recompra.exe"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/weni_update.py"
-foreach ($module in @("history_capacity", "history_conference", "history_exclusions", "history_publication", "history_reconciliation", "history_publish_cli", "history_sheets_transport", "history_snapshot", "order_history_sheets", "run_order_history", "meta_ads_native", "meta_ads_model", "meta_ads_sheets", "meta_ads_evidence", "run_meta_ads", "meta_events", "ad_attribution", "weni_dedup", "contact_dedup_guard", "dedup_io", "dedup_sheets", "dedup_bi", "recompra_lock", "recompra_review_audit", "farmalider_customers", "recompra_profiles", "recompra_cleanup", "runtime_profile", "recompra_group_audit")) {
+foreach ($module in @("weni_insights", "history_capacity", "history_conference", "history_exclusions", "history_publication", "history_reconciliation", "history_publish_cli", "history_sheets_transport", "history_snapshot", "order_history_sheets", "run_order_history", "meta_ads_native", "meta_ads_model", "meta_ads_sheets", "meta_ads_evidence", "run_meta_ads", "meta_events", "ad_attribution", "weni_dedup", "contact_dedup_guard", "dedup_io", "dedup_sheets", "dedup_bi", "recompra_lock", "recompra_review_audit", "farmalider_customers", "recompra_profiles", "recompra_cleanup", "runtime_profile", "recompra_group_audit")) {
     Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/$module.py"
     Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/app/$module.py"
 }
@@ -371,7 +371,7 @@ foreach ($command in @("limpar_cancelados_recompra.bat", "atualizar_recompra_pet
     Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/comandos/$command"
     Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/comandos/$command"
 }
-foreach ($relative in @("app/ds_backend/registry.json", "app/ds_backend/cache_schema.json", "app/ds_backend/adapter.py", "app/run_datastudio.py", "integrations/datastudio/002_backend.sql", "connectors/datastudio_api/Code.js", "configuracao/datastudio/publicacao.example.json")) {
+foreach ($relative in @("integrations/datastudio/weni_daily.py", "docs/CONVERSAS DIARIAS WENI.md", "app/ds_backend/registry.json", "app/ds_backend/cache_schema.json", "app/ds_backend/adapter.py", "app/run_datastudio.py", "integrations/datastudio/002_backend.sql", "connectors/datastudio_api/Code.js", "configuracao/datastudio/publicacao.example.json")) {
     Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/$relative"
     Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/$relative"
 }
@@ -422,9 +422,7 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-O Setup e o pacote completo passam a distribuir o cliente nativo de leitura da Meta. Removidos o servidor Meta Ads MCP local, seu ambiente dedicado e os instaladores opcionais do Codex CLI e do MCP. O Analytics e o Noturno continuam lendo a credencial já configurada. O Setup cuida dos componentes da pasta do NexoFlow; a instalação independente de Codex no perfil Windows é administrada pelo usuário.
-
-No PostgreSQL FARMA, BI_Vendas passa a calcular o resumo diário com vendas válidas e itens conciliados, com frete separado. BI_Pedidos protege a contagem e o faturamento contra cabeçalhos repetidos. A conferência compara os dias e o período total na revisão READY escolhida. O Work instala o leitor e confere as cinco fontes na cópia do Looker. [Roteiro](https://github.com/felipetelesbarbosa/NexoFlow/blob/v$Version/docs/CONFERENCIA%20BI%20VENDAS%20E%20PEDIDOS%20FARMA.md).
+A 1.5.43 adiciona a coleta diária opcional do Weni Insights e a publicação da ds136 pelo Analytics no PostgreSQL FARMA. O roteiro de homologação descreve o acesso de serviço necessário, o vínculo por projeto, a retomada e a fonte separada de conversas. [Roteiro](docs/CONVERSAS%20DIARIAS%20WENI.md).
 
 Instale em Preserve e confira nexo versao. O Setup conserva configurações, credenciais, SQLite, logs, checkpoints e journals. Os ZIPs não incluem instalador Python nem dados comerciais. Não substitua módulos avulsos. A publicação do software não comprova recuperação ou homologação comercial e não executa cargas.
 
@@ -440,7 +438,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.42
+# NexoFlow 1.5.43
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"
