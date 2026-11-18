@@ -90,14 +90,35 @@ docker run --rm --network "$REDE_PG" -v "$DSN_ADMIN:/run/secrets/admin-dsn:ro" \
   --instalar-publico-farma "$READY_TESTE"
 ```
 
-Na cópia, duplique a página e configure a tabela lógica `BI_Publico_Resumo`. Use **Soma** para os cinco campos de contagem. Copie do editor a expressão e os rótulos de **Faixa etária** usando a dimensão `idade`. Confirme o tratamento de idade e cidade ausentes, inclusive os filtros **Idades informadas**. Recrie participação na seleção como percentual do total filtrado e compra identificada como `SUM(compra_identificada) / SUM(contatos)`, com o denominador vazio sem dados. Valide essas fórmulas contra as configurações reais de cada componente. Comprove os 12 usos por ID, incluindo o cartão de cidade ausente, as tabelas de cidade, canal e faixa etária e os três controles. Compare sem filtro, cada controle isolado e os três combinados, inclusive faixa sem resultado. Use os IDs dos componentes do [inventário da página Público](inventarios/FARMA_DATA_STUDIO_2026-11-12.md#9-base-de-clientes). A visão é um resumo atual da READY, sem dimensão de período.
+Na cópia, duplique a página e configure a tabela lógica `BI_Publico_Resumo`. Cada contato da publicação corresponde a uma chave única na origem. Os campos de contagem da visão são somáveis. Preserve o rótulo `Não informado` no controle de cidade e conte esse rótulo no cartão de cidade ausente, junto com valores nulos ou vazios após `TRIM`. A coluna de contatos sem compra é o total menos a soma das marcações, como no relatório anterior, inclusive para uma marcação vazia.
 
-- **BI_Publico.** No corte de referência, confira **48.843 contatos**, **30.939 marcações de compra** e **17.904 sem a marcação**. Compare em PostgreSQL `sum(contatos)`, `sum(compra_identificada)` e `sum(sem_compra_identificada)` da visão nova com a fonte anterior e com cada projeção filtrada. Registre número de grupos e latência.
+| Componente | ID na cópia | Campo ou expressão na fonte resumida |
+| --- | --- | --- |
+| Contatos na base | `cd-q2trpqu27d` | `SUM(contatos)` |
+| Contatos com compra identificada | `cd-tefmjqea8d` | `SUM(compra_identificada)` |
+| Sem compra identificada | `cd-jw98usea8d` | `SUM(sem_compra_identificada)` |
+| Contatos que já compraram (%) | `cd-4nddr8ea8d` | `SUM(compra_identificada) / SUM(contatos)`, com denominador zero retornando nulo |
+| Contatos com idade informada | `cd-8qltwe6d8d` | `SUM(contatos_idade_informada)`, com `idade_informada = 1` |
+| Contatos sem cidade | `cd-2g1cap6d8d` | `SUM(contatos_sem_cidade)` |
+| Tabela por canal | `cd-0vau7zw67d` | `canal`, contatos, compra identificada, razão entre somas por canal e percentual de contatos no total filtrado |
+| Tabela por faixa etária | `cd-57m5b7w67d` | Faixa etária, `SUM(contatos_idade_informada)`, com `idade_informada = 1` |
+| Tabela por cidade | `cd-cj7ofn6d8d` | `cidade`, `SUM(contatos)` e **Porcentagem do total** sobre essa soma |
+| Controle Cidade | `cd-golewrna8d` | `cidade` com `SUM(contatos)` |
+| Controle Canal de contato | `cd-1108funa8d` | `canal` com `SUM(contatos)` |
+| Controle Faixa etária | `cd-61m1qioa8d` | Faixa etária com `SUM(contatos)` |
+
+Copie do editor a expressão e os rótulos de **Faixa etária** usando a dimensão `idade`. Confirme a ordenação anterior dos controles. Compare sem filtro, cada controle isolado e os três combinados, inclusive faixa sem resultado. A visão é um resumo atual da READY, sem dimensão de período. [Inventário da página Público](inventarios/FARMA_DATA_STUDIO_2026-11-12.md#9-base-de-clientes)
+
+- **BI_Publico.** No corte conferido na cópia, os seis cartões mostraram **48.843 contatos**, **30.939 com compra identificada**, **17.904 sem a marcação**, **63,34% com compra**, **2.184 com idade informada** e **6.174 sem cidade**. Compare esses controles com a visão PostgreSQL e a fonte anterior. Registre número de grupos e latência.
 - **Compras elegíveis.** Em inspeção SQL privada, conte `DISTINCT p.contact_uuid` de `farma.ds_pedidos_farmalider p` com `p.calc_gf73fvq57d='Sim'` e com correspondência em `farma.nf_atuais` na tabela `Base_Contatos` por `registro->>'contact_uuid'`. Compare **28.868 contatos** no corte da READY v2, deduplicando vários pedidos do mesmo contato. Preserve a mesclagem `ds74 LEFT ds72`, seus filtros e a presença dos contatos sem pedido. Compare o seu valor separadamente da soma de marcações de `BI_Publico`.
 
 ### Painel principal de Anúncios · ds133
 
-Os cartões de investimento e a tabela herdam o filtro de página. O cartão de conversas usa o filtro `classificacao = FARMA` e `conversas_iniciadas_meta`. Confirme qual filtro é aplicado a cada componente antes de usar os valores como uma única população. A coluna `conversas` do catálogo mede conversas Weni com evidência própria. A coluna `conversas_iniciadas_meta` vem da Meta. Registre separadamente a classificação vigente, a evidência CTWA do projeto Delivery FarmaLíder, a conta, a moeda, o fuso e a política. Campanha ou rótulo FARMA, por si só, são insuficientes para afirmar o vínculo ao projeto.
+No recorte inclusivo **01 a 18/11/2026**, o Work isolou toda a diferença em um único ID. Os outros dois coincidiram por anúncio, em investimento e conversas. O ID que falta na tabela da cópia está em ambas as bases, Google Planilhas e PostgreSQL, classificado como FARMA e vinculado ao Delivery FarmaLíder. O controle PostgreSQL delimita `segmento='FARMA'`, `classificacao='FARMA'` e `moeda='BRL'`. O detalhe por ID foi conferido pelo Work e fica na evidência privada.
+
+O relatório está sem filtro global. O filtro de página **Delivery FarmaLíder | Campanhas verificadas** pertence à fonte de validação PostgreSQL. No editor, as duas condições INCLUDE unidas por AND aparecem com campos ausentes e valores em branco. Investimento, Pedidos, Receita, CPA e a tabela ainda usam Google Planilhas, com **Herdar filtros** desligado e sem filtros locais. A tabela indica **Filtro inválido**. Conversas e ROAS herdam filtros e também têm o filtro local `classificacao = FARMA`. O aviso de filtro inválido precisa ser resolvido, mas ainda falta evidência de que ele exclui esse ID.
+
+A coluna `conversas_iniciadas_meta` vem da Meta. A coluna `conversas` mede conversas Weni com evidência própria. O controle por ID soma `conversas_iniciadas_meta`. Compare o grão e os filtros efetivos de cada cartão antes de interpretar a diferença.
 
 Exporte da cópia as duas linhas agregadas, com ID textual e centavos inteiros, num JSON privado com uma linha por anúncio. Use `null` para valor indisponível. Confirme se custo e conversas usam filtros equivalentes. Se os filtros diferirem, faça os controles em duas tabelas de ensaio, uma com o filtro efetivo de cada cartão. Estrutura da entrada `copia.json` com valores fictícios:
 
@@ -121,11 +142,18 @@ docker run --rm --network "$REDE_PG" \
   --inicio 2026-11-01 --fim 2026-11-18 --copia /run/evidence/copia.json
 ```
 
-Leve ao aceite os totais observados de **2 anúncios, R$ 228,67 e 62 conversas** na cópia e **3 anúncios, R$ 251,02 e 70 conversas** no PostgreSQL. Confira se o delta de **R$ 22,35 e 8 conversas** vem de uma linha ausente, de mais de um ID ou de uma combinação de filtros. Para o ID apontado, registre o filtro que muda sua inclusão, o registro diário na Meta e a origem da classificação/vínculo ao projeto. Compare também o instante do corte das duas fontes. Adie a troca de ds133 até essa conciliação.
+Na cópia, isole a exclusão com uma variável por vez.
+
+1. Em uma página só de teste, coloque uma tabela com a **mesma fonte Google Planilhas**, período fixo inclusivo de **01 a 18/11/2026**, dimensão de período `data`, ID textual e data como dimensões. Use as somas de `investimento_atribuivel` e `conversas_iniciadas_meta`. Comece sem filtros herdados e separe o anúncio com um filtro local pelo ID exato. Abra a tabela antes e depois de atualizar os dados. Compare o resultado com as linhas da aba para as mesmas datas.
+2. Se o ID continuar ausente, confira o arquivo, a aba, o intervalo efetivo de células, a atualização dos dados, o tipo do ID e as datas dessas linhas. Teste uma nova conexão de validação com toda a aba, preservando a conexão anterior. Registre qual ajuste faz aparecer **R$ 22,35 e 8 conversas**.
+3. Se o ID aparecer na tabela neutra, reintroduza separadamente a dimensão **Campanha**, a ordenação, a paginação e os filtros efetivos. Antes de reconstruir o filtro de página, obtenha os IDs dos campos e valores das duas cláusulas de uma fonte funcional. Aplique as condições comprovadas em uma tabela de teste e valide o efeito também nos cartões que herdam filtros.
+4. Refaça a comparação por ID e por componente. O universo FARMA/BRL do PostgreSQL tem **3 anúncios, R$ 251,02 e 70 conversas**. A cópia apresentou **2 anúncios, R$ 228,67 e 62 conversas**. A fonte candidata deve reproduzir o universo pretendido com filtros válidos e a exclusão explicada antes da troca de `ds133`.
 
 ### Weni · instalação idempotente e cobertura
 
-A origem prevista para novos dias é **Flows v2 do Delivery FarmaLíder**, com configuração do UUID do projeto Insights e identificação separada do workspace Flows. O operador validou a leitura de 01/11 no Windows. A aba atual continua como evidência para o período anterior. Antes da troca, registre produtor, data inicial e data final utilizadas no relatório, cortes por dia em Belém e eventuais edições manuais. A confirmação de seis dias em homologação não determina a cobertura da fonte em produção.
+Na inspeção do relatório oficial, a `ds136` tinha **zero gráficos e zero variáveis vinculados**. Nenhum componente vinculado exige uma data mínima. A primeira data disponível na aba é **01/11/2026**. Os seis dias usados como referência vieram de uma extração do **Weni Insights**. O produtor histórico da aba segue sem confirmação.
+
+A origem para novos dias é **Flows v2 do Delivery FarmaLíder**, com o UUID do projeto Insights e a identificação separada do workspace Flows. O operador validou a leitura de 01/11 no Windows. Homologue a fonte num componente temporário da cópia a partir de 01/11. Se houver um novo uso no relatório, confira a cobertura do recorte desse componente antes de vinculá-lo. Preserve a aba original como evidência.
 
 Execute o mesmo instalador de visão **duas vezes** com o UUID privado já conferido. Primeiro, faça isso no banco de homologação. Para produção, use exclusivamente o DSN e o argumento `--ambiente producao` correspondentes ao banco comercial e registre a autorização da janela. O comando vincula o projeto e instala a visão com oito campos. As métricas são publicadas separadamente pelo Windows com credencial do destino correspondente.
 

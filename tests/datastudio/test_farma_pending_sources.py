@@ -107,6 +107,55 @@ def test_public_summary_collapses_volume_and_preserves_joint_filters(store, tmp_
     assert store.inspect(rev)["state"] == "READY"
 
 
+def test_public_summary_matches_looker_formula_for_missing_fields(store, tmp_path):
+    with store.connect() as conn:
+        grants(conn, "FARMA")
+    rev = begin(store)
+    batch(
+        store,
+        rev,
+        "BI_Publico",
+        [
+            row("BI_Publico", contato_chave="a", cidade="", compra_identificada=""),
+            row("BI_Publico", contato_chave="b", cidade="   ", compra_identificada=0),
+            row(
+                "BI_Publico",
+                contato_chave="c",
+                cidade="Não informado",
+                compra_identificada=1,
+            ),
+            row("BI_Publico", contato_chave="d", cidade="Belém", compra_identificada=0),
+        ],
+    )
+    finish(store, rev)
+
+    # Simula uma cópia que já instalou a visão do commit anterior. Os tipos
+    # permanecem os mesmos para CREATE OR REPLACE VIEW atualizar a definição.
+    with store.connect() as conn:
+        conn.execute("""
+            CREATE VIEW farma.ds_bi_publico_resumo AS
+            SELECT cidade,canal,idade,idade_informada,0::bigint AS contatos,
+              0::bigint AS compra_identificada,0::bigint AS sem_compra_identificada,
+              0::bigint AS contatos_idade_informada,0::bigint AS contatos_sem_cidade
+            FROM farma.ds_bi_publico WHERE false
+            """)
+    cli(store, tmp_path, "--instalar-publico-farma", rev)
+    reader = Reader(DSN, "homologacao", "FARMA")
+    fields = [
+        "cidade",
+        "contatos",
+        "compra_identificada",
+        "sem_compra_identificada",
+        "contatos_sem_cidade",
+    ]
+    result = reader.query("BI_Publico_Resumo", fields, "", "", [], {})
+    assert {city: counts for city, *counts in result["rows"]} == {
+        None: [2, 0, 2, 2],
+        "Não informado": [1, 1, 0, 1],
+        "Belém": [1, 0, 1, 0],
+    }
+
+
 def test_ads_panel_delta_by_id_distinguishes_origin_scope_and_money(store):
     rev = begin(store)
 

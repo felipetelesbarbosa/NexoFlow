@@ -537,9 +537,10 @@ def create_farma_public_summary(conn):
         WITH (security_barrier=true) AS
         SELECT nullif(btrim(cidade),'') AS cidade,canal,idade,idade_informada,
           count(*) AS contatos,
-          count(*) FILTER (WHERE compra_identificada=1) AS compra_identificada,
-          count(*) FILTER (WHERE compra_identificada=0) AS sem_compra_identificada,
+          coalesce(sum(compra_identificada),0)::bigint AS compra_identificada,
+          count(*) - coalesce(sum(compra_identificada),0)::bigint AS sem_compra_identificada,
           count(*) FILTER (WHERE idade_informada=1) AS contatos_idade_informada,
-          count(*) FILTER (WHERE nullif(btrim(cidade),'') IS NULL) AS contatos_sem_cidade
+          count(*) FILTER (WHERE nullif(btrim(cidade),'') IS NULL
+            OR btrim(cidade)='Não informado') AS contatos_sem_cidade
         FROM farma.ds_bi_publico GROUP BY 1,2,3,4""")
     conn.execute("GRANT SELECT ON farma.ds_bi_publico_resumo TO nf_ds_farma_read")
