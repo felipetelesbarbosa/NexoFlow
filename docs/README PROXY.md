@@ -83,6 +83,12 @@ indisponível, o diagnóstico informa a falha em vez de presumir acesso direto.
 
 ## Diagnóstico
 
+### Setup e dependências do Python
+
+A partir da 1.5.44, o Setup usa uma única execução do pip para as dependências e as ferramentas do check-up. O teste HTTPS faz até três tentativas na rota selecionada em caso de timeout ou falha transitória. Erros de certificado e recusa de autenticação no proxy encerram o teste imediatamente. Se a instalação falhar em Preserve, o Setup tenta restaurar a versão anterior.
+
+Se precisar investigar a falha, abra `%TEMP%\NexoFlow-Setup.log` e procure o primeiro código `REDE_PIP_`, `PROXY_CONNECT_` ou `TLS_CERTIFICADO`. O log registra a tentativa e a categoria da falha e omite a saída bruta do pip. `PROXY_CONNECT_407` indica autenticação recusada pelo proxy. `TLS_CERTIFICADO` indica erro de CA ou TLS. `REDE_PIP_TIMEOUT` indica que a sondagem expirou. Encaminhe à TI somente as linhas do código da falha e da restauração.
+
 `comandos/testar_conexoes.bat` exibe uma linha parecida com:
 
 ```text

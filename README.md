@@ -1,10 +1,10 @@
-# NexoFlow 1.5.43
+# NexoFlow 1.5.44
 
 Aplicativos operacionais e autônomos para Windows que integram **Weni e a API FarmaLíder nos segmentos FarmaLíder e Pets Líder**, atualizam contatos e pedidos e organizam os dados no **Google Sheets** para análise no **Data Studio**.
 
 O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
 
-[Baixar instalador 1.5.43](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.43/NexoFlow-Setup-1.5.43.zip) · [Homologação da ds136](docs/CONVERSAS%20DIARIAS%20WENI.md) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
+[Baixar instalador 1.5.44](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.44/NexoFlow-Setup-1.5.44.zip) · [Homologação da ds136](docs/CONVERSAS%20DIARIAS%20WENI.md) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
 
 [Base Mestre permanente de conhecimento e diretrizes](docs/planejamento/DIRETRIZES_E_CONHECIMENTO_NEXOFLOW.md) — ponto de consulta compartilhado entre Codex e Work antes de novas tarefas.
 

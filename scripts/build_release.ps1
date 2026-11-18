@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.43",
+    [string]$Version = "1.5.44",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -422,7 +422,7 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-O token do perfil FARMA agora consulta a classificação de conversas no Flows v2. O coletor confirma o workspace, lê todas as páginas do dia e conserva os dias já conferidos em caso de falha. O Analytics publica a origem de cada dia. Quem já instalou a prévia 1.5.43 deve instalar este Setup público em Preserve. [Guia para homologação na cópia](https://github.com/felipetelesbarbosa/NexoFlow/blob/v1.5.43/docs/CONVERSAS%20DIARIAS%20WENI.md).
+O Setup corrige a preparação das dependências em rede corporativa. A instalação usa uma só etapa pip, com retentativas limitadas na rota escolhida e diagnóstico de timeout, DNS, túnel e CA/TLS. A coleta de conversas FARMA pelo Flows v2 continua disponível.
 
 Instale em Preserve e confira nexo versao. O Setup conserva configurações, credenciais, SQLite, logs, checkpoints e journals. Os ZIPs não incluem instalador Python nem dados comerciais. Não substitua módulos avulsos. A publicação do software não comprova recuperação ou homologação comercial e não executa cargas.
 
@@ -438,7 +438,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.43
+# NexoFlow 1.5.44
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"

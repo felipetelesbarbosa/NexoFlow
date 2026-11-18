@@ -101,22 +101,16 @@ if exist "secrets_config.py" (
     echo Usando a configuração de rede temporária do Setup.
 ) else (
     echo [AVISO] secrets_config.py não foi encontrado.
-    echo O pip tentará usar conexão direta.
-    echo Se estiver na rede da empresa e o proxy exigir autenticação,
-    echo configure secrets_config.py e execute novamente.
+    echo A conexão direta exige que a opção de rede pessoal esteja selecionada.
+    echo Na rede da empresa, forneça a configuração do proxy no Setup.
     echo.
 )
 
 echo Mantendo o pip fornecido pelo ambiente Python; sem atualização automática.
 
 echo.
-echo Preparando ferramentas do check-up e empacotamento...
-".venv\Scripts\python.exe" app\run_pip.py install "setuptools>=77" wheel
-if errorlevel 1 goto :erro_proxy
-
-echo.
-echo Instalando dependências...
-".venv\Scripts\python.exe" app\run_pip.py install -r requirements.txt
+echo Instalando dependências do NexoFlow e ferramentas do check-up...
+".venv\Scripts\python.exe" app\run_pip.py install "setuptools>=77" wheel -r requirements.txt
 if errorlevel 1 goto :erro_proxy
 
 echo.
@@ -141,8 +135,8 @@ echo ==============================================
 echo [ERRO] Falha ao instalar dependências.
 echo ==============================================
 echo.
-echo Se apareceu "407 Proxy Authentication Required", verifique
-echo secrets_config.py e as configurações PROXY_MODE/PROXY_USER/PROXY_PASSWORD.
+echo Se o código indicar 407, confira as credenciais do proxy com a TI.
+echo Se indicar TLS_CERTIFICADO, confira a CA corporativa aprovada.
 echo.
 if not defined NEXOFLOW_INSTALLER pause
 exit /b 1

@@ -1,5 +1,10 @@
 # NexoFlow — Changelog
 
+## 1.5.44 — em validação
+
+- O Setup instala as dependências e as ferramentas do check-up em uma única etapa. Falhas transitórias na verificação HTTPS têm até três tentativas na rota escolhida. O pip tem duas retentativas por requisição.
+- O log distingue timeout, DNS, recusa HTTP, túnel do proxy e falha de CA/TLS. Preservados a validação TLS, o proxy corporativo e a restauração da instalação anterior caso a preparação falhe.
+
 ## 1.5.43 — publicada em 18/11/2026, 03:11:43 (America/Fortaleza)
 
 - O token do perfil FARMA usa Flows v2 para contar conversas distintas com classificação confirmada por dia de Belém. Paginação por offset, repetição de GET transitório e guarda contra conflito preservam o último dia válido. O cache e a visão registram a origem de cada dia. Analytics entrega os dias confirmados ao publicador PostgreSQL. A fonte tem tabela e permissões próprias, independente do fechamento financeiro. [Guia](docs/CONVERSAS%20DIARIAS%20WENI.md).

@@ -196,12 +196,8 @@ class MetaNativePackagingTests(unittest.TestCase):
         # Python 3.14 não traz setuptools; versões antigas não atendem ao
         # backend declarado. O check-up instalado executa o mesmo wheeltest.
         bootstrap = (ROOT / "instalar.bat").read_text(encoding="utf-8")
-        command = 'app\\run_pip.py install "setuptools>=77" wheel'
+        command = 'app\\run_pip.py install "setuptools>=77" wheel -r requirements.txt'
         self.assertIn(command, bootstrap)
-        self.assertLess(
-            bootstrap.index(command),
-            bootstrap.index("app\\run_pip.py install -r requirements.txt"),
-        )
         workflow = ROOT / ".github/workflows/release-v1.yml"
         if workflow.is_file():
             text = workflow.read_text(encoding="utf-8")

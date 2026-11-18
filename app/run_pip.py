@@ -73,7 +73,7 @@ def main() -> int:
         *sys.argv[1:],
     ]
     if sys.argv[1] == "install":
-        command += ["--retries", "0", "--timeout", "15"]
+        command += ["--retries", "2", "--timeout", "15"]
 
     # Não exibimos o comando completo porque argumentos futuros podem
     # eventualmente conter informações sensíveis.
@@ -93,7 +93,9 @@ def main() -> int:
                 "[ERRO] pip não concluiu a etapa. Saída bruta omitida para proteger URLs e credenciais; nenhuma etapa seguinte será iniciada."
             )
         else:
-            print("[OK] Dependências solicitadas nesta etapa instaladas ou já compatíveis.")
+            print(
+                "[OK] Dependências solicitadas nesta etapa instaladas ou já compatíveis."
+            )
         return completed.returncode
     except (OSError, subprocess.TimeoutExpired):
         print(

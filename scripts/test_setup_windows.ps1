@@ -168,9 +168,9 @@ function Assert-Installed {
 
     Assert-True (Test-Path -LiteralPath $UninstallKey) "Registro de desinstalação não foi criado."
     $installedVersion = (Get-Content -Raw -LiteralPath (Join-Path $InstallDir "VERSION")).Trim()
-    Assert-True ($installedVersion -eq "1.5.43") "Versão instalada inesperada: $installedVersion"
+    Assert-True ($installedVersion -eq "1.5.44") "Versão instalada inesperada: $installedVersion"
     $displayVersion = (Get-ItemProperty -LiteralPath $UninstallKey -Name DisplayVersion -ErrorAction Stop).DisplayVersion
-    Assert-True ($displayVersion -eq "1.5.43") "DisplayVersion inesperada: $displayVersion"
+    Assert-True ($displayVersion -eq "1.5.44") "DisplayVersion inesperada: $displayVersion"
 }
 
 Remove-TestArtifacts
@@ -185,7 +185,7 @@ try {
     $importsPayload = Join-Path $SetupDir 'payload\importacoes'
     Assert-True (Test-Path -LiteralPath $importsPayload -PathType Container) 'Pasta importacoes ausente no ZIP do Setup.'
     Assert-True (@(Get-ChildItem -LiteralPath $importsPayload -Force -Recurse).Count -eq 0) 'O pacote deve conter importacoes vazia, sem exports.'
-    $projectZip = Join-Path (Split-Path -Parent $resolvedZip) 'NexoFlow-1.5.43.zip'
+    $projectZip = Join-Path (Split-Path -Parent $resolvedZip) 'NexoFlow-1.5.44.zip'
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $projectArchive = [IO.Compression.ZipFile]::OpenRead($projectZip)
     try {
@@ -221,6 +221,7 @@ public static class NexoFlowPayloadTestLock {
     $firstOutput = [IO.File]::ReadAllText((Join-Path $TempRoot 'setup-stdout.txt'), [Text.Encoding]::UTF8)
     Assert-True ($firstOutput -match 'aguardando .* para validar a integridade') 'O teste nao exercitou a espera pelo arquivo do payload.'
     Assert-True ($firstOutput -notmatch '\[1\] Farma') 'O Setup exibiu indevidamente a selecao de segmento.'
+    Assert-True ([regex]::Matches($firstOutput, 'Dependências solicitadas nesta etapa').Count -eq 1) 'O Setup precisa concluir uma única etapa de instalação de dependências.'
     $env:NEXOFLOW_PERFIL = 'FARMA'
     Assert-Installed
 
@@ -420,7 +421,7 @@ public static class NexoFlowSetupRootLock {
         else { $env:PYTHONPATH = $previousPythonPath }
     }
 
-    Write-Host "[OK] Smoke test do NexoFlow Setup 1.5.43 concluído."
+    Write-Host "[OK] Smoke test do NexoFlow Setup 1.5.44 concluído."
 }
 finally {
     if ($null -eq $previousTestNetworkMode) { Remove-Item Env:NEXOFLOW_NETWORK_MODE -ErrorAction SilentlyContinue }
@@ -431,4 +432,4 @@ finally {
     Remove-TestArtifacts
     Remove-Item -LiteralPath $TempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
-# NexoFlow 1.5.43
+# NexoFlow 1.5.44

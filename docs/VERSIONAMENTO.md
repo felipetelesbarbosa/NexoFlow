@@ -1,5 +1,9 @@
 # Versionamento do NexoFlow
 
+## Preparação 1.5.44
+
+O Setup 1.5.43 podia validar o acesso HTTPS e abortar na sondagem seguinte, antes de instalar as dependências da aplicação. A correção usa uma etapa de instalação e repete falhas transitórias na mesma rota. A causa específica da falha no proxy do operador depende da conferência no PC do trabalho.
+
 ## Publicação 1.5.43
 
 Publicada em **18/11/2026, 03:11:43 (America/Fortaleza)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.43) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/35764b7e1333bc6dc1fc2f45e5a54302c92c20b7) · [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44246909363) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44246909339) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44249465667).

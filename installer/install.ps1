@@ -9,7 +9,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
 $AppName = 'NexoFlow'
-$AppVersion = '1.5.43'
+$AppVersion = '1.5.44'
 $Publisher = 'Grupo Lider'
 $InstallDir = 'C:\NexoFlow'
 $DataDir = 'C:\NexoFlow Data'
@@ -1785,4 +1785,4 @@ finally {
     if ($null -eq $previousNetworkMode) { Remove-Item Env:NEXOFLOW_NETWORK_MODE -ErrorAction SilentlyContinue }
     else { $env:NEXOFLOW_NETWORK_MODE = $previousNetworkMode }
 }
-# NexoFlow 1.5.43
+# NexoFlow 1.5.44

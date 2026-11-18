@@ -129,6 +129,26 @@ class NetworkChoiceTests(unittest.TestCase):
 
 
 class PipPreflightTests(unittest.TestCase):
+    def test_recovers_timeout_and_proxy_gateway_on_the_same_route(self):
+        proxy = "http://synthetic:secret@proxy.invalid:8020"
+        with (
+            patch("pip_network.urllib.request.build_opener") as build,
+            patch("time.sleep") as sleep,
+            patch("builtins.print") as output,
+        ):
+            opener = build.return_value
+            opener.open.side_effect = [
+                TimeoutError("SECRET"),
+                urllib.error.URLError(OSError("Tunnel connection failed: 503 SECRET")),
+                MagicMock(),
+            ]
+            pip_network.preflight({"PIP_PROXY": proxy})
+            build.assert_called_once()
+            self.assertEqual(build.call_args.args[1].proxies, {"https": proxy})
+            self.assertEqual(opener.open.call_count, 3)
+            self.assertEqual([call.args[0] for call in sleep.call_args_list], [2, 4])
+            self.assertNotIn("SECRET", str(output.call_args_list))
+
     def test_direct_and_proxy_use_explicit_handler_tls_and_timeout(self):
         for proxy in ("", "http://synthetic:secret@proxy.invalid:8020"):
             opener = MagicMock()
@@ -144,21 +164,20 @@ class PipPreflightTests(unittest.TestCase):
                     build.call_args.args[2]._context.verify_mode, ssl.CERT_REQUIRED
                 )
 
-    def test_connect_tls_and_timeout_fail_before_packages_without_secrets(self):
+    def test_permanent_errors_fail_without_retries_or_secrets(self):
         for failure, category in (
             (
                 urllib.error.URLError(OSError("Tunnel connection failed: 407 SECRET")),
                 "CONNECT_407",
             ),
             (
-                urllib.error.URLError(OSError("Tunnel connection failed: 503 SECRET")),
-                "CONNECT_503",
+                urllib.error.URLError(OSError("Tunnel connection failed: 403 SECRET")),
+                "CONNECT_403",
             ),
             (
                 urllib.error.URLError(ssl.SSLError("certificate verify failed SECRET")),
                 "TLS_CERTIFICADO",
             ),
-            (TimeoutError("SECRET"), "REDE_PIP_INDISPONIVEL"),
         ):
             with patch("pip_network.urllib.request.build_opener") as build:
                 build.return_value.open.side_effect = failure
@@ -166,6 +185,19 @@ class PipPreflightTests(unittest.TestCase):
                     pip_network.preflight({})
                 self.assertNotIn("SECRET", str(caught.exception))
                 self.assertEqual(build.return_value.open.call_count, 1)
+
+    def test_timeout_stops_after_three_attempts(self):
+        with (
+            patch("pip_network.urllib.request.build_opener") as build,
+            patch("time.sleep"),
+        ):
+            build.return_value.open.side_effect = urllib.error.URLError(
+                TimeoutError("SECRET")
+            )
+            with self.assertRaisesRegex(ValueError, "REDE_PIP_TIMEOUT") as caught:
+                pip_network.preflight({})
+            self.assertNotIn("SECRET", str(caught.exception))
+            self.assertEqual(build.return_value.open.call_count, 3)
 
 
 class PipPolicyTests(unittest.TestCase):
@@ -175,4 +207,8 @@ class PipPolicyTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         text = (root / "instalar.bat").read_text(encoding="utf-8")
         self.assertNotIn("install --upgrade pip", text)
-        self.assertIn("setuptools>=77", text)
+        self.assertEqual(text.count("app\\run_pip.py install"), 1)
+        self.assertIn(
+            'app\\run_pip.py install "setuptools>=77" wheel -r requirements.txt',
+            text,
+        )

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import os
 import re
+import socket
 import ssl
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -40,37 +42,55 @@ def preflight(env: dict[str, str]) -> None:
     if urlsplit(url).scheme != "https":
         raise ValueError("TLS_INDICE: o índice pip precisa usar HTTPS.")
     proxy = env.get("PIP_PROXY") or ""
+    try:
+        context = ssl.create_default_context(cafile=env.get("PIP_CERT") or None)
+    except OSError:
+        raise ValueError(
+            "TLS_CERTIFICADO: não foi possível carregar a CA aprovada."
+        ) from None
     opener = urllib.request.build_opener(
         _NoRedirect(),
         urllib.request.ProxyHandler({"https": proxy} if proxy else {}),
-        urllib.request.HTTPSHandler(
-            context=ssl.create_default_context(cafile=env.get("PIP_CERT") or None)
-        ),
+        urllib.request.HTTPSHandler(context=context),
     )
-    try:
-        with opener.open(urllib.request.Request(url, method="HEAD"), timeout=10):
-            return
-    except urllib.error.HTTPError as exc:
-        # O índice pode recusar HEAD, mas ainda comprova o transporte HTTPS.
-        if exc.code == 405:
-            return
-        code = exc.code
-        raise ValueError(
-            f"REDE_PIP_HTTP_{code}: índice/proxy recusou a verificação; nenhuma dependência foi solicitada."
-        ) from None
-    except (OSError, urllib.error.URLError) as exc:
-        raw = str(exc).lower()  # apenas para classificar; nunca imprimir
-        match = re.search(r"tunnel connection failed:\s*(\d{3})", raw)
-        if match:
-            code = match[1]
+    waits = (2, 4, None)
+    for attempt, wait in enumerate(waits, start=1):
+        try:
+            with opener.open(urllib.request.Request(url, method="HEAD"), timeout=10):
+                return
+        except urllib.error.HTTPError as exc:
+            exc.close()
+            # O índice pode recusar HEAD após estabelecer o transporte HTTPS.
+            if exc.code == 405:
+                return
+            category = f"REDE_PIP_HTTP_{exc.code}"
+            retry = exc.code in (408, 500, 502, 503, 504)
+        except OSError as exc:
+            category, retry = _transport_failure(exc)
+        if wait is None or not retry:
             raise ValueError(
-                f"PROXY_CONNECT_{code}: túnel HTTPS não estabelecido; confira autenticação e política com a TI."
+                f"{category}: a verificação HTTPS falhou na tentativa {attempt}/{len(waits)}. "
+                "Nenhuma dependência foi solicitada."
             ) from None
-        category = (
-            "TLS_CERTIFICADO"
-            if "certificate" in raw or isinstance(exc, ssl.SSLError)
-            else "REDE_PIP_INDISPONIVEL"
+        print(
+            f"[AVISO] {category}: tentativa {attempt}/{len(waits)}. "
+            f"Nova tentativa na mesma rota em {wait}s.",
+            flush=True,
         )
-        raise ValueError(
-            f"{category}: preflight HTTPS falhou; nenhuma dependência foi solicitada."
-        ) from None
+        time.sleep(wait)
+
+
+def _transport_failure(exc: OSError) -> tuple[str, bool]:
+    reason = exc.reason if isinstance(exc, urllib.error.URLError) else exc
+    raw = str(reason).lower()  # apenas para classificar; nunca imprimir
+    match = re.search(r"tunnel connection failed:\s*(\d{3})", raw)
+    if match:
+        code = match[1]
+        return f"PROXY_CONNECT_{code}", code in ("500", "502", "503", "504")
+    if isinstance(reason, TimeoutError) or "timed out" in raw:
+        return "REDE_PIP_TIMEOUT", True
+    if isinstance(reason, ssl.SSLError) or "certificate" in raw:
+        return "TLS_CERTIFICADO", False
+    if isinstance(reason, socket.gaierror):
+        return "REDE_PIP_DNS", reason.errno == socket.EAI_AGAIN
+    return "REDE_PIP_INDISPONIVEL", True
