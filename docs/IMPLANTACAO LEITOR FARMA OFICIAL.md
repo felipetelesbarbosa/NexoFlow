@@ -51,9 +51,15 @@ O limite HTTP e o limite de conexões SQL controlam recursos diferentes. O Compo
 | Meus clientes | O ranking e os cartões de compradores, receita média e pedidos por comprador coincidiram com o controle privado de 09 a 12/11. Selecionar um comprador pelo nome reduziu o ranking a uma linha e conciliou os três cartões com os valores desse comprador. |
 | Pedidos por cliente | O detalhe exibiu a mesclagem PostgreSQL com as dimensões originais e valores em BRL. O seletor de detalhe precisou usar a mesma mesclagem da tabela. Após o remapeamento, a busca por nome restringiu os produtos ao comprador selecionado de 09 a 12/11. |
 | Resumo e Vendas | Entre 09 e 12/11, comparar pedidos, unidades e faturamento com frete com o recibo privado. Conferir moeda em BRL e preservar filtros. |
+| Pedidos dos anúncios | Tabela e seletor na cópia usam a mesclagem QA14 por `pedido_apos_anuncio = pedido_id`, com coorte automática do primeiro anúncio à esquerda e o cabeçalho elegível à direita. Preserve `pedido_id` no resultado e exclua cabeçalhos nulos nos dois componentes. Os três pedidos da referência privada, o filtro de um pedido, a compra posterior ao primeiro anúncio e o intervalo vazio passaram. O período deve continuar selecionando a coorte. |
 | Mesclagens, público e anúncios | Conferir chaves, cardinalidade, filtros, custos, atribuição FARMA e LTV por cliente. Comparar agregados no mesmo período e mesma revisão. |
 
 Para um 503, registre a janela, o gráfico e o erro sanitizado. Compare os logs do leitor, do proxy e do PostgreSQL no mesmo horário. Conte recusas de conexão do papel, `Exceeded concurrency limit` e `53100` separadamente. Ao ver `DS_PRAZO_CONSULTA`, compare o tempo na API com o tempo do conector e refaça o cenário com a página inteira. O teste de 18/11 mediu o `jit` no resumo vazio em sessões de diagnóstico. O resultado com `jit=off` foi de 6,4–7,1 s e com `jit=on` de 8,5–8,7 s. O overlay leva apenas a configuração homologada de paralelismo e limites. Preserve o prazo e as guardas do conector.
+
+## Pendências de Público e do painel Anúncios
+
+- **Público.** Na cópia, o Looker exibiu erro de sistema nos gráficos após a troca, inclusive no ensaio do leitor ajustado. Os 12 componentes de `BI_Publico` voltaram às ligações anteriores. A consulta direta à API retornou HTTP 200 para as duas projeções integrais da READY v2. A métrica de compra identificada de `BI_Publico` soma marcações dos contatos. A mesclagem de compradores operacionais conta contatos com pedido elegível. Reconcilie os dois critérios separadamente antes de validar uma nova projeção dos cartões e filtros.
+- **Painel principal de Anúncios.** No período de 01 a 18/11, a cópia e a consulta de `BI_Meta_Resultados` classificada como FARMA em BRL divergiram em anúncios, investimento e conversas. O painel segue na fonte anterior. Confira a população e os filtros herdados antes de promover as métricas do painel. A página Pedidos dos anúncios tem validação própria por coorte.
 
 ## Fonte Weni ds136
 
