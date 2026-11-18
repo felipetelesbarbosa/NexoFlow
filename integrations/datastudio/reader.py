@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import json
+import sys
+from collections import OrderedDict
+from concurrent.futures import Future
+from contextlib import contextmanager
 from datetime import date
 from decimal import Decimal
+from threading import BoundedSemaphore, Lock
 from typing import Any
 
 from psycopg import sql
@@ -16,6 +21,7 @@ from ds_backend.contract import (
     SCHEMA_HASH,
     StorageError,
 )
+from integrations.datastudio.products_reader import ProductPeriods, projected
 from integrations.datastudio.read_catalog import (
     DERIVED_SQL,
     READ_REGISTRY,
@@ -25,13 +31,54 @@ from integrations.datastudio.store import Store
 
 MAX_RESULT_ROWS = 50_000
 MAX_RESULT_BYTES = 7_000_000
+# O papel de leitura na VPS aceita seis conexões. Dois lugares ficam livres
+# para o healthcheck e para a conferência com outro processo.
+MAX_READER_CONNECTIONS = 4
 
 
 def view_name(name):
     return "ds_" + name.lower()
 
 
+def ranking_fits_cache(rows):
+    """Limita retenção entre chamadas. Campos pedidos têm seu próprio limite HTTP."""
+    size = sys.getsizeof(rows)
+    for row in rows:
+        size += sys.getsizeof(row) + sum(sys.getsizeof(value) for value in row.values())
+        if size > MAX_RESULT_BYTES:
+            return False
+    return True
+
+
 class Reader(Store):
+    def __init__(self, dsn, environment, segment, *, require_dedicated_role=False):
+        super().__init__(
+            dsn, environment, segment, require_dedicated_role=require_dedicated_role
+        )
+        self._abc_lock = Lock()
+        self._abc_pending: dict[tuple, Future] = {}
+        self._abc_ready: dict[str, OrderedDict[tuple, list]] = {
+            "resumo": OrderedDict(),
+            "abc": OrderedDict(),
+        }
+        self.product_periods = ProductPeriods()
+        self._db_slots = BoundedSemaphore(MAX_READER_CONNECTIONS)
+
+    @contextmanager
+    def connect(self, *, readonly=False):
+        if not self._db_slots.acquire(timeout=45):
+            raise StorageError("DS_CONSULTA_TEMPO_LIMITE")
+        try:
+            with super().connect(readonly=readonly) as conn:
+                yield conn
+        finally:
+            self._db_slots.release()
+
+    def products(self, mode, fields, start, end, names=None):
+        return projected(
+            self, mode, fields, start, end, names, MAX_RESULT_ROWS, MAX_RESULT_BYTES
+        )
+
     def pairs(self, fields, start, end, top):
         if type(top) is not int or not 1 <= top <= 1000:
             raise StorageError("DS_TOP_PARES_INVALIDO")
@@ -58,6 +105,8 @@ class Reader(Store):
                 raise ValueError
         except (TypeError, ValueError):
             raise StorageError("DS_PERIODO_INVALIDO") from None
+        if mode in ("abc", "resumo") and self.segment == "FARMA":
+            return self._shared_abc(mode, fields, start, end)
         with self.connect(readonly=True) as conn:
             version = self.active(conn)
             if not version:
@@ -85,6 +134,80 @@ class Reader(Store):
                 all_pairs_returned=universe == len(rows),
             )
         return result
+
+    def _shared_abc(self, mode, fields, start, end):
+        from integrations.datastudio.abc_reader import FIELDS, aggregates, calculate
+
+        # Cada requisição confirma contrato, usuário, READY e visibilidade MVCC.
+        # Uma escrita ou troca de visão invalida o reuso mesmo sob o mesmo UUID.
+        leader = False
+        try:
+            with self.connect(readonly=True) as conn:
+                version = self.active(conn)
+                if not version:
+                    raise StorageError("DS_SEM_PUBLICACAO_CONFIRMADA")
+                identity = conn.execute(
+                    "SELECT execucao, current_user AS role, pg_postmaster_start_time() AS boot, "
+                    "pg_current_snapshot()::text AS snapshot FROM controle.nf_publicacoes "
+                    "WHERE segmento=%s AND versao=%s AND execucao IS NOT NULL",
+                    (self.segment, version),
+                ).fetchone()
+                if not identity:
+                    raise StorageError("DS_SEM_PUBLICACAO_CONFIRMADA")
+                key = (
+                    self.target,
+                    mode,
+                    version,
+                    identity["execucao"],
+                    identity["role"],
+                    identity["boot"],
+                    identity["snapshot"],
+                    start,
+                    end,
+                )
+                ready = self._abc_ready[mode]
+                with self._abc_lock:
+                    complete = ready.get(key)
+                    if complete is not None:
+                        ready.move_to_end(key)
+                    else:
+                        pending = self._abc_pending.get(key)
+                        if pending is None:
+                            pending = Future()
+                            self._abc_pending[key] = pending
+                            leader = True
+                if leader:
+                    conn.execute("SET LOCAL enable_nestloop=off")
+                    records = aggregates(
+                        conn, self.schema, start, end, mode, MAX_RESULT_ROWS
+                    )
+                    complete = calculate(records, start, end, mode)
+                    if mode == "resumo":
+                        self.result(version, FIELDS[mode], complete)
+                    retain = mode == "resumo" or ranking_fits_cache(complete)
+            # Uma consulta participante libera a conexão antes de esperar.
+            # O responsável disponibiliza a linha só após o êxito da transação.
+        except BaseException as error:
+            if leader:
+                with self._abc_lock:
+                    self._abc_pending.pop(key).set_exception(error)
+            raise
+
+        if leader:
+            with self._abc_lock:
+                if retain:
+                    ready[key] = complete
+                    if len(ready) > (32 if mode == "resumo" else 1):
+                        ready.popitem(last=False)
+                self._abc_pending.pop(key).set_result(complete)
+        elif complete is None:
+            try:
+                complete = pending.result(timeout=45)
+            except TimeoutError:
+                raise StorageError("DS_CONSULTA_TEMPO_LIMITE") from None
+        # Validar cada projeção por si: a tabela pode exceder o limite de bytes
+        # enquanto o seletor de classes do mesmo ranking continua válido.
+        return self.result(version, fields, complete)
 
     def info(self):
         with self.connect() as conn:
