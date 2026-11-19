@@ -85,7 +85,16 @@ Conte a tag `Pedido Finalizado` uma vez por atendimento comprovadamente ligado a
 
 Para conferir no Analytics da Weni, abra **Live Desk → Dados históricos**, selecione o período e aplique **Pedido Finalizado** no setor **Delivery FarmaLíder**. Busque o nome em **Contato**. Identifique o ticket pelo encerramento e pela duração. O mesmo contato pode ter vários atendimentos ou pedidos no período. Compare a emissão de cada pedido com o ticket correspondente e use o ID oficial do pedido na deduplicação. A confirmação manual pelo Analytics pode ser feita enquanto a coleta automática das tags por ticket aguarda acesso à API do Weni Chats.
 
-Uma compra válida do mesmo contato em até sete dias após o evento CTWA pode ser apresentada como compra posterior quando falta a prova de fechamento no atendimento do anúncio. Conte cada pedido uma vez e mantenha a receita dessa métrica separada da receita de venda no atendimento. O tempo até a compra é o intervalo observado entre o evento e a emissão do pedido. As janelas de 24, 48 e 72 horas foram comparadas em simulação. Os indicadores comerciais dependem da homologação do vínculo por atendimento. [Detalhe e validação dos tickets](README%20DELIVERY.md) · [Fonte diária da Weni](CONVERSAS%20DIARIAS%20WENI.md)
+#### Métricas da página Anúncios em produção
+
+| Nome no Data Studio | Regra |
+| --- | --- |
+| **Pedidos na conversa do anúncio** | Pedidos válidos fechados no atendimento humano iniciado pela conversa do anúncio, com a tag `Pedido Finalizado` vinculada ao ticket. A receita dessa categoria entra no ROAS principal. O CPA principal divide o investimento da Meta da FarmaLíder pela quantidade desses pedidos. |
+| **Pedidos após a conversa do anúncio (até 7 dias)** | Pedidos válidos do mesmo contato em outro atendimento, emitidos em até 168 horas após a abertura da conversa do anúncio. Exibir quantidade e receita próprias. |
+
+Classifique cada ID oficial de pedido uma única vez no segmento FARMA antes de agregar por anúncio e período. Um vínculo comprovado com a conversa original tem prioridade. Se houver vários eventos de anúncio para uma compra posterior, use o último evento elegível anterior ao pedido no mesmo contato; trate toques conflitantes como pendência. Conte pedidos diferentes do mesmo cliente pelos respectivos IDs. Preserve as datas da conversa e da compra. Filtre a veiculação e a coorte de pedidos pela data da conversa do anúncio no fuso da conta Meta e informe cobertura parcial enquanto o ciclo ainda estiver aberto ou o vínculo estiver pendente.
+
+A publicação tem como destino o Data Studio oficial, pelo PostgreSQL na VPS e pelo conector comercial. As fontes comerciais atuais agregam pedidos atribuídos pela regra nativa e não expõem as duas categorias. Para publicar os campos, a rotina do Windows precisa conciliar todos os pedidos do recorte, ler as tags por ticket e confirmar o vínculo do atendimento com a conversa do anúncio. A auditoria de último pedido por contato valida casos, mas não comprova a cobertura de todos os pedidos. [Detalhe e validação dos tickets](README%20DELIVERY.md) · [Operação Windows e VPS](OPERACAO_WINDOWS_VPS.md)
 
 Para conferir um período na revisão READY do ambiente configurado no perfil FARMA, execute no Terminal NexoFlow com o pacote que contém a rotina e `ARMAZENAMENTO_BACKEND = "postgres"`:
 
