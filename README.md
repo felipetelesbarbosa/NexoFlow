@@ -1,6 +1,6 @@
 # NexoFlow 1.5.46 em homologação
 
-Aplicativos operacionais e autônomos para Windows que integram **Weni e a API FarmaLíder nos segmentos FarmaLíder e Pets Líder**, atualizam contatos e pedidos e organizam os dados no **Google Sheets** para análise no **Data Studio**.
+O **NexoFlow Windows** integra Weni e a API FarmaLíder nos segmentos FarmaLíder e Pets Líder. O Analytics prepara os dados para o Data Studio e publica no **PostgreSQL privado da VPS** quando esse destino está ativado no perfil. O Looker Studio lê as revisões confirmadas pela API leitora via conector Apps Script.
 
 O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
 
@@ -12,15 +12,15 @@ A validação dos destinos Meta/Weni está disponível para o PostgreSQL FARMA d
 
 [Base Mestre permanente de conhecimento e diretrizes](docs/planejamento/DIRETRIZES_E_CONHECIMENTO_NEXOFLOW.md) — ponto de consulta compartilhado entre Codex e Work antes de novas tarefas.
 
-## Armazenamento PostgreSQL completo — implementação opt-in
+## Operação com PostgreSQL na VPS
 
-O novo contrato privado separa publicação e leitura, com catálogo por segmento, revisões atômicas e retomada. A migração comercial depende do corte READY completo e da conferência das fontes pelo Work. Sheets continua padrão; nenhum destino é ativado automaticamente. Ver [guia](docs/MIGRACAO%20WINDOWS%20POSTGRESQL%20DATA%20STUDIO.md), [mapa](docs/ESTRUTURA%20POSTGRESQL%20DATA%20STUDIO.md) e [relatório](docs/RELATORIO%20BACKEND%20DATA%20STUDIO.md).
+Consulte o [estado operacional e roteiro Windows → VPS → Looker](docs/OPERACAO_WINDOWS_VPS.md) antes de alterar perfil, instalar uma versão ou trocar uma fonte. A publicação Windows e a leitura do Looker têm credenciais e destinos próprios. A carga no PostgreSQL, a ativação por perfil e a troca das fontes do relatório são etapas independentes. O modo Sheets permanece disponível para instalações legadas e reversão explícita. Veja o [contrato de armazenamento](docs/MIGRACAO%20WINDOWS%20POSTGRESQL%20DATA%20STUDIO.md) e o [mapa PostgreSQL](docs/ESTRUTURA%20POSTGRESQL%20DATA%20STUDIO.md).
 
 O [inventário real e roteiro do relatório FARMA](docs/ROTEIRO%20INVENTARIO%20FARMA%20POSTGRESQL.md) preservam as 37 fontes e cinco mesclagens; registram os aliases ainda sem substituição direta e a conferência de TOTAL/MES/ANO, anúncios e moeda. Não confundir disponibilidade do armazenamento com migração das fontes do painel.
 
-## Integração BI_Itens FARMA 1.5.36 — código publicado; ativação pendente
+## Referência do piloto BI_Itens FARMA
 
-Destino opcional PostgreSQL por API privada com staging, reconciliação por venda, planos/recibos, outbox e retomada sem nova coleta. Leitura do Data Studio por outro serviço/usuário, consultando a visão do piloto; PostgreSQL não é exposto publicamente. O padrão continua Sheets e PET mantém o fluxo anterior. [Contrato, homologação, ativação, rollback e roteiro do Work](docs/BI%20ITENS%20POSTGRESQL%20FARMA.md). Setup não implanta VPS, Access ou Apps Script.
+O piloto de itens usa um contrato e uma visão próprios. Consulte o [guia do piloto](docs/BI%20ITENS%20POSTGRESQL%20FARMA.md) para manutenção desse ambiente.
 
 ## Componentes
 
@@ -28,16 +28,10 @@ Destino opcional PostgreSQL por API privada com staging, reconciliação por ven
 | --- | --- |
 | **NexoFlow Noturno** | Executa Weni, Analytics e Recompra sem confirmação humana, com auditoria automática e relatório final. |
 | **NexoFlow Weni** | Retroalimenta contatos e pedidos da API na Weni, incluindo compras externas; atualiza grupos e trata duplicados após revisão. |
-| **NexoFlow Analytics** | Sincroniza a base, acumula o histórico de pedidos e atualiza as tabelas do Google Sheets. |
+| **NexoFlow Analytics** | Sincroniza a base, acumula o histórico de pedidos e publica no destino configurado para o perfil. |
 | **NexoFlow Planilha** | Revalida exports de contatos e conversas para atualizar Weni ou Analytics. |
 | **NexoFlow Recompra** | Mantém a elegibilidade da Recompra FarmaLíder D+25 e Pets Líder D+30; os envios ficam na campanha Weni. |
 | **NexoFlow Terminal** | Oferece comandos, consultas e diagnóstico pelo comando `nexo`. |
-
-## Atualização 1.5.35
-
-Antecipação da pendência de fontes não confirmadas: Analytics e nexo looker verificam a expansão por arquivo e parte antes das substituições grandes do BI. O bloqueio conhecido aparece como pendência (código 3), preservando gravações anteriores e o checkpoint de sucesso. As guardas de capacidade, segmento, manifesto e publicação continuam ativas. [Diagnóstico e roteiro](docs/INICIALIZACAO%20BI%20ITENS.md).
-
-Publicada em 11/11/2026, 21:23:49 (America/Fortaleza), no SHA `c6204f0535914c48fec71ce5c009f0e8f9a1884a`. Checks, pacotes e downloads públicos conferidos. A 1.5.34 e anteriores permanecem intactas. A validação comercial da BI_Itens no Data Studio continua pendente. Atualize pelo Setup em **Preserve**, com cargas encerradas. O Setup não valida nem liga fontes no Data Studio. Enquanto BI_Itens depender dessa migração, não repetir Analytics/Noturno nem confirmar a fonte sem a conferência real pelo Work. A 1.5.34 e os releases anteriores permanecem intactos.
 
 ## NexoFlow Hub em homologação
 
@@ -46,8 +40,8 @@ O [núcleo Linux do Hub](hub/README.md) possui API interna, worker e PostgreSQL 
 ## Instalar e configurar
 
 1. Baixe e extraia todo o ZIP do instalador. Execute **NexoFlow Setup.exe**.
-2. Configure suas credenciais em `C:\NexoFlow\secrets_config.py`, usando [o modelo](configuracao/secrets_config.example.py). Salve a credencial Google em `C:\NexoFlow\credentials\google_credentials.json`.
-3. Compartilhe as planilhas como **Editor** com a conta de serviço Google e configure seus destinos.
+2. Configure suas credenciais em `C:\NexoFlow\secrets_config.py` usando [o modelo](configuracao/secrets_config.example.py).
+3. Para a VPS, configure a credencial privada da API publicadora do perfil e do ambiente conforme o [guia operacional](docs/OPERACAO_WINDOWS_VPS.md). Para instalações que mantêm o modo Sheets, siga a [configuração Google](docs/GOOGLE%20SETUP.md).
 4. Abra **NexoFlow Terminal** e execute `nexo diagnostico` antes das cargas.
 
 Requer Windows x64 e Python 3.11 ou superior, 64 bits. O Setup reutiliza o Python compatível existente e oferece download oficial com SHA-256 quando necessário. Veja [instalação e primeira configuração](docs/README%20INSTALACAO.md).
@@ -56,7 +50,7 @@ Requer Windows x64 e Python 3.11 ou superior, 64 bits. O Setup reutiliza o Pytho
 
 Abra o mesmo executável Weni, Analytics, Recompra, Planilha ou Noturno e escolha **[1] FarmaLíder** ou **[2] Pets Líder**. No Noturno, depois escolha incremental ou completa. O Terminal também permite selecionar a marca. Ambos executam a mesma sequência de conexão, auditoria e aplicação; credenciais, planilhas, revisões e estado permanecem separados. Para agendamentos, use `--perfil FARMA` ou `--perfil PET`; o Noturno também aceita `--incremental` ou `--full`.
 
-Preencha `PERFIS["FARMA"]` e `PERFIS["PET"]` no arquivo local, incluindo os três IDs de Sheets (Dashboard, Operação e Histórico). A credencial Google pode ser compartilhada; os arquivos de planilhas precisam ser distintos. Confira o [guia dos segmentos e fluxos](docs/SEGMENTOS%20E%20FLUXOS.md) e o mapa `NexoFlow_Arquivos` em cada Dashboard. O NexoFlow recusa destinos Pets divergentes e token de outra organização.
+Preencha `PERFIS["FARMA"]` e `PERFIS["PET"]` no arquivo local. Cada perfil tem seu próprio destino de publicação. No modo Sheets, configure os três IDs (Dashboard, Operação e Histórico) e confira o mapa `NexoFlow_Arquivos` de cada Dashboard. O NexoFlow recusa destinos Pets divergentes e token de outra organização. [Guia dos segmentos e fluxos](docs/SEGMENTOS%20E%20FLUXOS.md)
 
 Pets usa `logs/PET/`, `importacoes/PET/`, `compra_recente` e `opt_in_marketing` com Sim/Não. Não exige maioridade. A Recompra usa **pedido_data D+30**; FarmaLíder usa **pedido_data D+25**. O filtro humano permanece exclusivo da FarmaLíder; pedidos Pets exigem segmento PET comprovado pela listagem ou pela consulta individual por CPF.
 
@@ -71,7 +65,7 @@ O NexoFlow já tem arquitetura organizada por perfis para inclusão de novos dep
 Execute nesta ordem, revisando e confirmando os relatórios solicitados:
 
 1. **Weni:** carga completa em `comandos/atualizar_weni_carga_completa.bat`.
-2. **Planilha, quando houver exports:** opção **[1] Atualizar Weni**, depois **[2] Atualizar Analytics e Google Sheets**.
+2. **Planilha, quando houver exports:** siga o menu do importador e confira o perfil e o destino do Analytics antes de aplicar.
 3. **Analytics:** carga completa em `comandos/executar_carga_completa.bat`.
 4. **Recompra:** gere a revisão, confira as pendências e confirme a aplicação.
 5. **Analytics:** sincronização incremental; depois atualize os dados no Data Studio.
@@ -86,9 +80,9 @@ Na rotina diária, use os atalhos Weni, Recompra e Analytics conforme necessári
 
 - Pedidos e valores dependem da confirmação na API FarmaLíder. Cancelados, inclusive pedidos oficialmente sem itens, ficam fora das vendas e da Recompra.
 - No perfil FARMA, o recorte é da farmácia: pedidos mistos mantêm somente produtos humanos; pedidos apenas pet ou veterinários são excluídos.
-- O histórico é acumulado nas coletas dos dois segmentos, inclusive pedidos de clientes ainda ausentes na Weni. Pedidos observados ficam guardados localmente até a entrega idempotente ao Analytics/Sheets. O último pedido da API não comprova todas as compras anteriores nem compras intermediárias não observadas.
+- O histórico é acumulado nas coletas dos dois segmentos, inclusive pedidos de clientes ainda ausentes na Weni. Pedidos observados ficam guardados localmente até a entrega idempotente ao destino configurado. O último pedido da API não comprova todas as compras anteriores nem compras intermediárias não observadas.
 - A rotina Weni propõe criar clientes da API com pedido validado e identidade única, preenchendo nome, telefone e campos disponíveis. Sem telefone, o cadastro pode ficar sem canal de contato. CPF inválido sem vínculo independente, conflito cadastral e resposta incerta ficam pendentes; não são criados consentimentos nem inclusões em grupos.
-- A Weni mantém o pedido mais recente; o histórico de pedidos distintos fica nas planilhas e no dashboard. Um pedido vindo da API não comprova que foi feito pelo WhatsApp ou pela Weni.
+- A Weni mantém o pedido mais recente. O histórico de pedidos distintos alimenta o dashboard pelo destino do perfil. Um pedido vindo da API não comprova que foi feito pelo WhatsApp ou pela Weni.
 - Operação, histórico e dashboard podem usar [três arquivos do Sheets](docs/planilhas_separadas.md). O Data Studio lê as fontes `BI_*`; confira seus destinos e atualize os campos quando houver novas colunas.
 - Nos atalhos individuais, revise as propostas de Weni, Planilha e Recompra antes de aplicar. Carga parcial exige conferir o log e as pendências antes de prosseguir.
 

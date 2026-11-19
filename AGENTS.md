@@ -1,3 +1,7 @@
+# Operação atual do NexoFlow
+
+Antes de orientar uma carga Windows ou trocar fontes do Looker Studio, consulte [Operação Windows, VPS e Looker](docs/OPERACAO_WINDOWS_VPS.md) e confirme o ambiente real. `VERSION` informa a versão do código. O status de release, de publicação de dados e de troca das fontes do relatório devem ser conferidos separadamente. O perfil FARMA pode publicar por API privada no PostgreSQL. O Looker lê READY pela API leitora quando o componente está vinculado ao conector apropriado. Preserve a separação entre FARMA/PET e homologação/produção.
+
 # NexoFlow 1.5.45 publicada
 
 Publicada em **18/11/2026, 17:44:58 (America/Fortaleza)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.45) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/4de6b20276fb8b590e4a34ebb984786e73de2a65) · [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44390565728) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44390565773) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44390565719) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44394165244).

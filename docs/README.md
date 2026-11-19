@@ -1,8 +1,10 @@
-# Documentação do NexoFlow 1.5.35
+# Documentação do NexoFlow
 
 O **NexoFlow Windows** atende **FarmaLíder e Pets Líder**, com aplicativos operacionais autônomos e dados separados. Confira [segmentos, campos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
 
 Comece pela [instalação](README%20INSTALACAO.md) e pelo [guia de operação](Documentacao%20NexoFlow.md).
+
+Para a operação atual da FARMA, consulte [Windows, PostgreSQL na VPS e Looker Studio](OPERACAO_WINDOWS_VPS.md). O guia registra o destino de cada rotina, as versões conferidas e o estado da troca das fontes.
 
 [Base Mestre de conhecimento e diretrizes](planejamento/DIRETRIZES_E_CONHECIMENTO_NEXOFLOW.md): arquitetura, contratos, estados, pendências e passagem Codex/Work.
 
