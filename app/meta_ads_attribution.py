@@ -481,12 +481,20 @@ def apply_attribution(
         )
         history_complete = _covered(windows, HISTORY_START, last_day)
         audit = dict(
-            pedidos_conversa_anuncio=counts["direto"],
-            receita_conversa_anuncio=str(revenues[grain]["direto"]),
-            pedidos_apos_conversa_7d=counts["posterior"],
-            receita_apos_conversa_7d=str(revenues[grain]["posterior"]),
+            pedidos_conversa_anuncio=counts["direto"]
+            if complete or counts["direto"]
+            else None,
+            receita_conversa_anuncio=str(revenues[grain]["direto"])
+            if complete or counts["direto"]
+            else None,
+            pedidos_apos_conversa_7d=counts["posterior"]
+            if complete or counts["posterior"]
+            else None,
+            receita_apos_conversa_7d=str(revenues[grain]["posterior"])
+            if complete or counts["posterior"]
+            else None,
             novos_clientes_anuncio=counts["novos"]
-            if history_complete and grain not in unknown_first
+            if complete and history_complete and grain not in unknown_first
             else None,
             cobertura_comercial=complete,
         )

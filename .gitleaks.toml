@@ -3,12 +3,13 @@
 useDefault = true
 
 # A regra generic-api-key interpreta a porta/caminho desta URL pública como chave.
-# A exceção não ignora arquivos, regras nem outras URLs.
+# As exceções se limitam a literais públicos.
 [allowlist]
-description = "URL pública da API FarmaLíder (porta e caminho), sem credencial"
+description = "URLs sem credenciais e identificadores de esquema sem segredo"
 regexTarget = "secret"
 # A URL interna do workflow sintético também não contém senha/token.
 # No commit 619fc57, generic-api-key classificou o identificador literal
 # faturamento_produtos= (teste sintético) como segredo. Exceção somente deste
 # texto exato; não ignora arquivo, commit, valores nem regra de segurança.
-regexes = ['''^3200/farmalider$''', '''^8000/tarefas/historico$''', '''^faturamento_produtos=$''']
+# PAYLOAD_KEY, em app/meta_ads_attribution.py, nomeia um campo JSON público do código.
+regexes = ['''^3200/farmalider$''', '''^8000/tarefas/historico$''', '''^faturamento_produtos=$''', '''^nf_atribuicao_comercial_v1$''']

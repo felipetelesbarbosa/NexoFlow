@@ -199,7 +199,9 @@ class CommercialMetaTests(unittest.TestCase):
             rooms,
             conversations,
         )
-        self.assertEqual(audit(tables, 0)["pedidos_conversa_anuncio"], 0)
+        self.assertIsNone(audit(tables, 0)["pedidos_conversa_anuncio"])
+        self.assertIsNone(audit(tables, 0)["pedidos_apos_conversa_7d"])
+        self.assertIsNone(audit(tables, 0)["receita_conversa_anuncio"])
         self.assertFalse(audit(tables, 0)["cobertura_comercial"])
 
     def test_post_window_uses_conversation_opening_and_is_inclusive(self):
