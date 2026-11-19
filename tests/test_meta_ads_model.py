@@ -118,6 +118,55 @@ class NativeMetaModelTests(unittest.TestCase):
         order = {**self.order, "contact_uuid": "another"}
         self.assertEqual(self.build(orders=[order])["BI_Meta_Conversoes"], [])
 
+    def test_weni_cohort_explains_valid_orders_missing_from_ad_summary(self):
+        orders = []
+        contacts = []
+        for index in range(1, 4):
+            uid, order_id = f"c{index}", f"p{index}"
+            orders.append(
+                {
+                    **self.order,
+                    "contact_uuid": uid,
+                    "pedido_id": order_id,
+                    "pedido_chave": order_id,
+                }
+            )
+            contacts.append(
+                {
+                    "contact_uuid": uid,
+                    "pedido_id": order_id,
+                    "pedido_data": self.order["data_hora"],
+                    "primeiro_anuncio_origem": "Meta Ads",
+                    "primeiro_anuncio_id": "20",
+                    "primeiro_anuncio_data": "2026-11-02T10:00:00-03:00",
+                }
+            )
+        other_day = {
+            **self.event,
+            "event_id": "dia-sem-fato",
+            "contact_uuid": "c3",
+            "date": "2026-11-02T10:00:00-03:00",
+        }
+        args = dict(contacts=contacts, orders=orders, evidence=[self.event, other_day])
+        audit = {"inicio": "2026-11-01", "fim": "2026-11-18"}
+        tables = self.build(**args, order_reconciliation=audit)
+        self.assertEqual(tables, self.build(**args))
+        self.assertEqual(audit["contatos_coorte"], 3)
+        self.assertEqual(audit["pedidos_validos"], 3)
+        self.assertEqual(audit["pedidos_no_resumo"], 1)
+        self.assertEqual(audit["receita_valida"], "30.00")
+        self.assertEqual(audit["receita_no_resumo"], "10.00")
+        self.assertEqual(tables["BI_Meta_Resultados"][0]["receita_confirmada"], "10.00")
+        self.assertEqual(
+            [(row["pedido_id"], row["situacao"]) for row in audit["pedidos"]],
+            [
+                ("p1", "VINCULADO_NO_RESUMO"),
+                ("p2", "SEM_CTWA_COM_UUID"),
+                ("p3", "SEM_FATO_FARMA_NO_RECORTE"),
+            ],
+        )
+        self.assertEqual(audit["pedidos"][0]["data_meta"], "2026-11-03")
+
     def test_cancelled_unvalidated_and_payment_zero_orders_never_count(self):
         for change in [
             {"farmalider_status_pedido": "3"},

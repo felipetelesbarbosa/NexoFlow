@@ -65,6 +65,21 @@ O comando dedicado mantém a simulação por padrão e exige revisão e `--confi
 
 Revise o resultado da simulação antes do segundo comando. Confirmação de schema não autoriza apagar dados, migrar uma aba divergente nem trocar o destino de outra marca. Arquivos fornecidos por `--input` são fixtures de simulação offline e nunca autorizam aplicação em produção. Confira as tabelas e os destinos do perfil antes de habilitar a carga. O bootstrap aditivo do Analytics não autoriza migração destrutiva nem correção automática de schemas divergentes.
 
+## Conciliação de pedidos da Weni no Windows
+
+Com Meta Ads ativo no perfil FARMA, o Analytics e a etapa Analytics do Noturno cruzam os contatos e eventos oficiais CTWA da Weni com os pedidos da FarmaLíder. O resumo fica no log da execução. A seção `reconciliacao_pedidos_weni` do arquivo `logs/privado/meta_ads_ultima_execucao.json` registra os totais e o motivo por pedido, com os IDs de anúncio e evento disponíveis. Guarde esse arquivo no ambiente privado.
+
+A revisão por pedido parte dos contatos com origem Meta cuja chegada caiu no período de Belém. Ela verifica o último pedido informado pela Weni e aplica os mesmos critérios usados na publicação. A venda exige pedido elegível, evento oficial vinculado ao mesmo contato por UUID, último toque anterior ou simultâneo ao pedido e uma linha diária do anúncio na janela e no fuso da conta Meta. O diagnóstico distingue falta de evento, último toque ambíguo, pedido sem vínculo elegível e ausência da linha de veiculação. A data da chegada do contato e a data do anúncio atribuído podem cair em dias diferentes. Os 20 dias se referem à revisão dos dados históricos da Meta.
+
+Para conferir um período na revisão READY do ambiente configurado no perfil FARMA, execute no Terminal NexoFlow com o pacote que contém a rotina e `ARMAZENAMENTO_BACKEND = "postgres"`:
+
+```powershell
+Set-Location C:\NexoFlow
+.\.venv\Scripts\python.exe -B app\run_meta_ads.py --perfil FARMA --start 2026-11-01 --end 2026-11-18 --dry-run --auditoria-pedidos logs\privado\meta_ads_conciliacao_2026-11.json
+```
+
+A simulação consulta Weni, Meta e as tabelas do PostgreSQL e grava a auditoria somente no arquivo local. Registra o ambiente e a versão READY usados e interrompe se a revisão mudar durante a leitura. Confira `pedidos_validos`, `pedidos_no_resumo`, `receita_no_resumo` e a `situacao` de cada pedido. Esses resultados descrevem o cálculo da simulação sobre a revisão lida. Para confirmar a publicação comercial, confira a revisão resultante e compare os totais da fonte de veiculação no Looker para o mesmo período.
+
 ## Separação de FarmaLíder e Pets Líder
 
 A credencial limita as contas acessíveis. **O nome de campanha, conjunto ou anúncio não determina o segmento.** A classificação utiliza evidência oficial Weni associada ao projeto correto, com os tokens próprios de FarmaLíder e Pets Líder.

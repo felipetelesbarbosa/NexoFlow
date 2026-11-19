@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -347,6 +347,135 @@ def _canonical_purchase(actions):
     return ""
 
 
+def _last_order_touch(order, paid_events, order_time):
+    candidates = [event for event in paid_events if event["dt"] <= order_time]
+    if not candidates:
+        return None, "EVENTO_CTWA_POSTERIOR" if paid_events else "SEM_CTWA_COM_UUID"
+    latest = max(event["dt"] for event in candidates)
+    finalists = [event for event in candidates if event["dt"] == latest]
+    if len({(event["account_id"], event["ad_id"]) for event in finalists}) != 1:
+        return None, "ULTIMO_TOQUE_AMBIGUO"
+    event = min(finalists, key=lambda event: event["event_id"])
+    if ad_is_after_order(
+        {**order, "ultimo_anuncio_data": event["dt"].isoformat()}, "ultimo_anuncio_"
+    ):
+        return None, "EVENTO_CTWA_POSTERIOR"
+    return event, "ULTIMO_TOQUE_CONFIRMADO"
+
+
+def _cohort_orders(contacts, start, end):
+    """Reproduz o recorte do detalhe: último pedido após o primeiro anúncio."""
+    candidates = defaultdict(set)
+    contacted = set()
+    for row in contacts:
+        uid = _text(row.get("contact_uuid"))
+        if row.get("primeiro_anuncio_origem") != "Meta Ads" or not uid:
+            continue
+        first = business_order_datetime(row.get("primeiro_anuncio_data"))
+        if first is None or not start <= first.date() <= end:
+            continue
+        contacted.add(uid)
+        order_id = _text(row.get("pedido_id"))
+        purchase = business_order_datetime(row.get("pedido_data"))
+        if order_id and purchase is not None and purchase >= first:
+            candidates[order_id].add(
+                (uid, _text(row.get("primeiro_anuncio_id")), first)
+            )
+    return candidates, len(contacted)
+
+
+def _finish_order_reconciliation(report, cohort, decisions, facts, converted):
+    from meta_ads_destinations import _farma_delivery
+
+    period_rows = [
+        row
+        for row in facts
+        if row["segmento"] == row["classificacao"] == "FARMA"
+        and report["inicio"] <= row["data"] <= report["fim"]
+    ]
+    delivered = _farma_delivery(period_rows)
+    daily_facts = defaultdict(list)
+    for row in period_rows:
+        key = row["conta_id"], row["anuncio_id"]
+        if key in delivered:
+            daily_facts[key].append(row)
+    conversions = {row["pedido_id"]: row for row in converted if row["pedido_id"]}
+    details = []
+    for order_id, references in sorted(cohort.items()):
+        detail = {"pedido_id": order_id}
+        if len(references) != 1:
+            details.append({**detail, "situacao": "REFERENCIA_WENI_AMBIGUA"})
+            continue
+        uid, first_ad, first_at = next(iter(references))
+        detail.update(
+            primeiro_anuncio_id=first_ad, primeiro_anuncio_data=first_at.isoformat()
+        )
+        status, order_uid, order_time, revenue = decisions.get(
+            order_id, ("PEDIDO_AUSENTE_NA_FONTE", "", None, "")
+        )
+        if order_uid and order_uid != uid:
+            details.append({**detail, "situacao": "CONTATO_PEDIDO_DIVERGENTE"})
+            continue
+        if order_time is not None:
+            detail["data_pedido"] = order_time.isoformat()
+            if order_time < first_at:
+                details.append({**detail, "situacao": "PEDIDO_ANTERIOR_A_COORTE"})
+                continue
+        if revenue:
+            detail["receita_valida"] = revenue
+        conversion = conversions.get(order_id)
+        if conversion:
+            key = conversion["conta_id"], conversion["anuncio_id"]
+            exposed = business_order_datetime(conversion["data_exposicao"])
+            matching = [
+                row
+                for row in daily_facts[key]
+                if exposed is not None
+                and exposed.astimezone(ZoneInfo(row["fuso"])).date().isoformat()
+                == row["data"]
+            ]
+            detail.update(
+                conta_id=key[0],
+                anuncio_id=key[1],
+                evento_id=conversion["evento_id"],
+                data_evento=conversion["data_exposicao"],
+            )
+            if len(matching) == 1:
+                status = "VINCULADO_NO_RESUMO"
+                detail["data_meta"] = matching[0]["data"]
+            else:
+                status = (
+                    "FATO_DIARIO_AMBIGUO" if matching else "SEM_FATO_FARMA_NO_RECORTE"
+                )
+        if revenue and not order_uid:
+            status = "PEDIDO_VALIDO_SEM_UUID_WENI"
+        details.append({**detail, "situacao": status})
+    counts = Counter(detail["situacao"] for detail in details)
+    report.update(
+        pedidos_candidatos=len(details),
+        pedidos_validos=sum("receita_valida" in detail for detail in details),
+        pedidos_no_resumo=counts.get("VINCULADO_NO_RESUMO", 0),
+        receita_valida=_money(
+            sum(
+                (Decimal(detail.get("receita_valida", "0")) for detail in details),
+                Decimal(0),
+            )
+        ),
+        receita_no_resumo=_money(
+            sum(
+                (
+                    Decimal(detail["receita_valida"])
+                    for detail in details
+                    if detail["situacao"] == "VINCULADO_NO_RESUMO"
+                ),
+                Decimal(0),
+            )
+        ),
+        motivos=dict(sorted(counts.items())),
+        pedidos=details,
+    )
+
+
 def build_native_tables(
     *,
     segment: str,
@@ -360,6 +489,7 @@ def build_native_tables(
     updated_at: str,
     coverage: dict,
     destination=None,
+    order_reconciliation: dict | None = None,
 ) -> dict[str, list[dict]]:
     """Não atribui custos compartilhados; último toque observado não é causalidade.
 
@@ -369,6 +499,15 @@ def build_native_tables(
     """
     if segment not in {"FARMA", "PET"}:
         raise ValueError("Segmento Meta inválido.")
+    cohort = {}
+    decisions = {}
+    if segment == "FARMA" and order_reconciliation is not None:
+        cohort, contacted = _cohort_orders(
+            contacts,
+            date.fromisoformat(order_reconciliation["inicio"]),
+            date.fromisoformat(order_reconciliation["fim"]),
+        )
+        order_reconciliation["contatos_coorte"] = contacted
     tables: dict[str, list[dict]] = {name: [] for name in SCHEMAS}
     campaigns = _rows(catalogs, "campaigns", "campanhas")
     ads = _rows(catalogs, "ads", "anuncios")
@@ -479,34 +618,38 @@ def build_native_tables(
         oid = _text(order.get("pedido_id"))
         okey = _text(order.get("pedido_chave"))
         unique = oid or okey
-        if (
-            not unique
-            or unique in conflicting_orders
-            or unique in seen_orders
-            or not _sales_order_is_valid(order)
-            or order.get("origem_pedido") == "FARMALIDER_PEDIDOS_PAGINADOS"
-        ):
+        if not unique or unique in seen_orders:
             continue
-        seen_orders.add(unique)
+        uid = _text(order.get("contact_uuid"))
+        if unique in conflicting_orders or not _sales_order_is_valid(order):
+            if oid in cohort:
+                reason = (
+                    "PEDIDO_CONFLITANTE"
+                    if unique in conflicting_orders
+                    else "PEDIDO_SEM_VENDA_VALIDA"
+                )
+                decisions[oid] = reason, "", None, ""
+            continue
         dt = business_order_datetime(
             order.get("data_hora") or order.get("farmalider_emissao")
         )
-        if dt is None:
-            continue
-        candidates = [
-            e for e in by_contact.get(order.get("contact_uuid"), []) if e["dt"] <= dt
-        ]
-        if not candidates:
-            continue
-        latest = max(e["dt"] for e in candidates)
-        finalists = [e for e in candidates if e["dt"] == latest]
-        if len({(e["account_id"], e["ad_id"]) for e in finalists}) != 1:
-            continue
-        event = sorted(finalists, key=lambda e: e["event_id"])[0]
-        # Reutilizar a guarda temporal existente com a prova escolhida.
-        if ad_is_after_order(
-            {**order, "ultimo_anuncio_data": event["dt"].isoformat()}, "ultimo_anuncio_"
-        ):
+        event = None
+        if order.get("origem_pedido") == "FARMALIDER_PEDIDOS_PAGINADOS":
+            reason = "ORIGEM_PAGINADA_FORA_ATRIBUICAO_NATIVA"
+        else:
+            seen_orders.add(unique)
+            if dt is None:
+                reason = "DATA_PEDIDO_INVALIDA"
+            else:
+                event, reason = _last_order_touch(order, by_contact.get(uid, []), dt)
+        if oid in cohort:
+            decisions[oid] = (
+                reason,
+                uid,
+                dt,
+                _money(_order_revenue_parts(order)[2]),
+            )
+        if event is None or dt is None:
             continue
         products = []
         item_seen = set()
@@ -556,7 +699,7 @@ def build_native_tables(
                 "venda_valida": "Sim",
                 "status_vinculo": "ATIVO",
                 "pedido_id": oid,
-                "contact_uuid": _text(order.get("contact_uuid")),
+                "contact_uuid": uid,
                 "produtos_json": _json(products),
                 "quantidade_itens": _money(quantity) if products else "",
                 "politica_atribuicao": "ULTIMO_TOQUE_OBSERVADO_SEM_JANELA_CAUSAL",
@@ -908,4 +1051,12 @@ def build_native_tables(
                 raise ValueError("Catálogo Meta divergente para a mesma identidade.")
             collected[key] = row
         tables[name] = sorted(collected.values(), key=lambda r: r["chave"])
+    if segment == "FARMA" and order_reconciliation is not None:
+        _finish_order_reconciliation(
+            order_reconciliation,
+            cohort,
+            decisions,
+            tables["BI_Meta_Resultados"],
+            converted,
+        )
     return tables

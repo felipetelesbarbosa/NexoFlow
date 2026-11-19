@@ -58,6 +58,39 @@ class NativeMetaCliTests(unittest.TestCase):
             ):
                 run_meta_ads.run(args)
 
+    def test_audit_keeps_order_identifiers_out_of_terminal_output(self):
+        audit = {"pedidos_validos": 1, "pedidos": [{"pedido_id": "pedido-privado"}]}
+        output = io.StringIO()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "auditoria.json"
+            with (
+                patch.dict(os.environ),
+                patch(
+                    "run_meta_ads._real",
+                    return_value={"reconciliacao_pedidos_weni": audit},
+                ),
+                contextlib.redirect_stdout(output),
+            ):
+                code = run_meta_ads.run(
+                    [
+                        "--perfil",
+                        "FARMA",
+                        "--start",
+                        "2026-11-01",
+                        "--end",
+                        "2026-11-18",
+                        "--auditoria-pedidos",
+                        str(path),
+                    ]
+                )
+            self.assertEqual(code, 0)
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8")), audit)
+        self.assertNotIn("pedido-privado", output.getvalue())
+        self.assertEqual(
+            json.loads(output.getvalue())["reconciliacao_pedidos_weni"],
+            {"pedidos_validos": 1},
+        )
+
     def test_real_defaults_to_no_apply_and_selects_profile_first(self):
         def fake(args):
             self.assertEqual(os.environ["NEXOFLOW_PERFIL"], "PET")
@@ -101,6 +134,7 @@ class NativeMetaCliTests(unittest.TestCase):
             review=None,
             perfil="PET",
             confirm_schema=False,
+            auditoria_pedidos=None,
         )
         with patch.dict(sys.modules, modules):
             result = run_meta_ads._real(args)
@@ -128,6 +162,49 @@ class NativeMetaCliTests(unittest.TestCase):
             self.assertEqual(run_meta_ads.run([]), 1)
         self.assertNotIn("secret", output.getvalue())
         self.assertNotIn("customer=", output.getvalue())
+
+    def test_farma_postgres_audit_requires_the_same_ready_version_throughout(self):
+        from ds_backend.adapter import PostgresStore
+        from ds_backend.contract import StorageError
+
+        store = Mock(spec=PostgresStore, client=Mock())
+        store.native_meta_inputs.return_value = dict(contacts=[], orders=[], items=[])
+        sync = Mock()
+        complete = Mock()
+        modules = {
+            "ds_backend.runtime": SimpleNamespace(
+                open_store=Mock(return_value=store), complete=complete
+            ),
+            "meta_ads_native": SimpleNamespace(sync_native_meta=sync),
+            "project_paths": SimpleNamespace(
+                load_private_settings=lambda: SimpleNamespace(
+                    ARMAZENAMENTO_BACKEND="postgres"
+                )
+            ),
+            "proxy_config": SimpleNamespace(configure_proxy=Mock()),
+        }
+        args = SimpleNamespace(
+            start="2026-11-01",
+            end="2026-11-18",
+            apply=False,
+            review=None,
+            perfil="FARMA",
+            confirm_schema=False,
+            auditoria_pedidos=Path("audit.json"),
+        )
+        ready = {"version": 2, "environment": "producao"}
+        audit = {"pedidos_validos": 1}
+        sync.return_value = {"reconciliacao_pedidos_weni": audit}
+        with patch.dict(sys.modules, modules):
+            store.client.verify.side_effect = [ready, ready]
+            run_meta_ads._real(args)
+            self.assertEqual(audit["versao_ready"], 2)
+            self.assertEqual(audit["ambiente"], "producao")
+            store.client.verify.side_effect = [ready, {**ready, "version": 3}]
+            with self.assertRaisesRegex(StorageError, "DS_VERSAO_ALTERADA"):
+                run_meta_ads._real(args)
+        complete.assert_not_called()
+        self.assertEqual(store.close.call_count, 2)
 
     def test_meta_divergence_aborts_its_own_empty_postgres_revision(self):
         from ds_backend.adapter import PostgresStore
@@ -169,6 +246,7 @@ class NativeMetaCliTests(unittest.TestCase):
                         review=review,
                         perfil="FARMA",
                         confirm_schema=True,
+                        auditoria_pedidos=None,
                     )
                 )
         self.assertEqual(result, report)

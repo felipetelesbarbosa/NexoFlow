@@ -537,6 +537,11 @@ def sync_native_meta(
             report.update(status="parcial", partial=True)
             return report
         stage = "transformacao"
+        order_reconciliation = (
+            {"inicio": start.isoformat(), "fim": end.isoformat()}
+            if segment == "FARMA"
+            else None
+        )
         tables = build_native_tables(
             segment=segment,
             facts=facts,
@@ -549,7 +554,10 @@ def sync_native_meta(
             updated_at=clock.isoformat(),
             coverage=coverage,
             destination=destination,
+            order_reconciliation=order_reconciliation,
         )
+        if order_reconciliation is not None:
+            report["reconciliacao_pedidos_weni"] = order_reconciliation
         differences = []
         if segment == "FARMA":
             from meta_ads_destinations import reconcile_conversation_days

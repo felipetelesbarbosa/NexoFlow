@@ -7,7 +7,7 @@ Estado registrado em 19/11/2026. Use este guia para distinguir a versão do Wind
 | Etapa | Execução e destino |
 | --- | --- |
 | Weni | Windows consulta os contatos e a API FarmaLíder, reconcilia os pedidos e aplica as atualizações autorizadas na Weni. |
-| Analytics | Windows consolida pedidos, itens e histórico. Com PostgreSQL ativo no perfil, publica pela API HTTPS privada. A VPS recebe os lotes e confirma a revisão READY após a conciliação. |
+| Analytics | Windows consolida pedidos, itens e histórico. No perfil FARMA com Meta Ads ativo, cruza eventos CTWA da Weni com os pedidos e gera o diagnóstico por pedido. Com PostgreSQL ativo no perfil, publica pela API HTTPS privada. A VPS recebe os lotes e confirma a revisão READY após a conciliação. |
 | Recompra | Windows calcula e aplica a elegibilidade aos grupos Weni (FARMA D+25, PET D+30). O armazenamento configurado no perfil controla o estado e a retomada. O envio da campanha é da Weni. |
 | Noturno | Windows automatiza Weni → Analytics → Recompra no perfil selecionado. |
 | Looker Studio | O conector privado Apps Script consulta a API leitora da VPS quando o gráfico está ligado à fonte PostgreSQL. Usa o segmento, o ambiente e a janela selecionados. |
@@ -37,7 +37,7 @@ No cartão e na tabela de Anúncios, o campo calculado `nxf_roas_meta` divide a 
 
 De 01 a 18/11/2026, o painel oficial apresentou três anúncios, R$ 251,02 de gasto Meta, 70 conversas informadas, zero pedidos e R$ 0,00 de receita na fonte de veiculação. `fatos_sem_metrica_meta` sinaliza três fatos sem contagem. Os 42 eventos CTWA têm origem e métrica próprias.
 
-A revalidação no mesmo recorte encontrou dois registros na página oficial de Pedidos dos anúncios por meio da mesclagem legada. Na cópia PostgreSQL de homologação, a mesclagem `FARMA QA14 | Pedidos dos anúncios` devolveu três pedidos válidos de contatos com origem Meta Ads na Weni, posteriores ao primeiro anúncio. A soma foi R$ 322,69, incluindo frete. O período da mesclagem seleciona a chegada dos contatos. A conciliação dos eventos CTWA individuais e da receita com a fonte comercial de veiculação permanece pendente. Registre o ambiente e a revisão READY antes de usar o resultado de homologação no painel comercial.
+A revalidação no mesmo recorte encontrou dois registros na página oficial de Pedidos dos anúncios por meio da mesclagem legada. Na cópia PostgreSQL de homologação, a mesclagem `FARMA QA14 | Pedidos dos anúncios` devolveu três pedidos válidos de contatos com origem Meta Ads na Weni, posteriores ao primeiro anúncio. A soma foi R$ 322,69, incluindo frete. O período da mesclagem seleciona a chegada dos contatos. A conciliação dos eventos CTWA individuais e da receita com a fonte comercial de veiculação permanece pendente. A rotina no código Windows pode conferir cada pedido em modo somente leitura no perfil comercial. Use um pacote que inclua a alteração e registre o ambiente e a versão READY da execução. [Como executar a conferência](META%20ADS%20NATIVO.md#concilia%C3%A7%C3%A3o-de-pedidos-da-weni-no-windows)
 
 Público reproduziu os seis cartões da cópia na READY v2. As dimensões de cidade, canal e faixa etária são compartilhadas pela fonte comercial. A participação por linha usa o total da seleção, e o percentual de compra usa a razão entre as somas de compra identificada e de contatos. O filtro Instagram retornou 147 contatos. Belém retornou 33.451 e o cruzamento Belém com 35–44 anos retornou 322 nos cartões e nas tabelas. A página Base de clientes usa a revisão ativa e seus controles de público.
 

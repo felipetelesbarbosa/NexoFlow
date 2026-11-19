@@ -412,6 +412,14 @@ def _log_final_summary(
         )
     else:
         logging.info("Meta Ads: etapa concluída.")
+    if reconciliation := native_meta_result.get("reconciliacao_pedidos_weni"):
+        logging.info(
+            "Meta Ads e Weni: pedidos válidos no recorte de contatos=%s; "
+            "no resumo calculado=%s. "
+            "Motivos e pedidos no diagnóstico privado da etapa.",
+            reconciliation["pedidos_validos"],
+            reconciliation["pedidos_no_resumo"],
+        )
     meta_writes = native_meta_result.get("summary") or {}
     if meta_writes:
         logging.info(

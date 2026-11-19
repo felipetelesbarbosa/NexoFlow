@@ -2,6 +2,7 @@
 
 ## 1.5.46 em homologação
 
+- Analytics e Noturno FARMA registram o cruzamento entre contatos da Weni, pedidos elegíveis e atribuição a anúncios. O diagnóstico por pedido fica no log privado e também pode rodar em modo somente leitura. [Guia](docs/META%20ADS%20NATIVO.md#concilia%C3%A7%C3%A3o-de-pedidos-da-weni-no-windows).
 - O Analytics FARMA compara a resposta diária da Meta com a revisão anterior por conta, anúncio e dia. Se um valor informado ficar indisponível, registra a divergência e preserva a revisão confirmada. Uma resposta explícita permite retomar pela conciliação existente. [Roteiro](docs/DESTINOS%20META%20WENI.md).
 
 ## 1.5.45 — publicada em 18/11/2026, 17:44:58 (America/Fortaleza)

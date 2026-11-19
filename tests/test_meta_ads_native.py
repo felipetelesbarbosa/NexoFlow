@@ -169,6 +169,53 @@ class NativeSyncTests(unittest.TestCase):
             self.assertEqual(len(store.planned["Meta_Ads_Diario"]), 4)
             self.assertTrue(client.closed)
 
+    def test_farma_audits_the_weni_cohort_during_normal_publication(self):
+        from tests.test_recompra import fixture
+
+        _, order, _ = fixture(5)
+        order.update(
+            contact_uuid="contato",
+            pedido_id="pedido",
+            pedido_chave="pedido",
+            data_hora="2026-11-03T11:00:00-03:00",
+        )
+        contact = {
+            "contact_uuid": "contato",
+            "pedido_id": "pedido",
+            "pedido_data": order["data_hora"],
+            "primeiro_anuncio_origem": "Meta Ads",
+            "primeiro_anuncio_id": "123",
+            "primeiro_anuncio_data": "2026-11-03T09:00:00-03:00",
+        }
+        event = {
+            "segment": "FARMA",
+            "event_id": "ctwa-elegivel",
+            "ad_id": "123",
+            "contact_uuid": "contato",
+            "date": "2026-11-03T10:00:00-03:00",
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Store()
+            client = Client()
+            result = sync_native_meta(
+                store,
+                {"META_ADS_ENABLED": True, "META_ADS_SCHEMA_APPROVED": True},
+                "FARMA",
+                [contact],
+                [order],
+                [],
+                now=NOW,
+                state_dir=Path(tmp),
+                client_factory=lambda: client,
+                evidence_collector=lambda *a, **k: ([event], evidence()[1]),
+            )
+            self.assertTrue(result["applied"], result)
+            audit = result["reconciliacao_pedidos_weni"]
+            self.assertEqual(audit["pedidos_validos"], 1)
+            self.assertEqual(audit["pedidos_no_resumo"], 1)
+            self.assertEqual(audit["pedidos"][0]["evento_id"], "ctwa-elegivel")
+            self.assertEqual(len(store.tables["BI_Meta_Conversoes"]), 1)
+
     def test_farma_conversation_omission_preserves_publication_and_rechecks(self):
         action = "messaging_conversation_started_7d"
 

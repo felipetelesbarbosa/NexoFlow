@@ -87,6 +87,11 @@ def run(argv: list[str] | None = None) -> int:
         type=Path,
         help="Arquivo local de revisão: salvar na simulação e conferir na aplicação",
     )
+    parser.add_argument(
+        "--auditoria-pedidos",
+        type=Path,
+        help="Salvar o cruzamento privado por pedido em uma simulação real FARMA.",
+    )
     args = parser.parse_args(argv)
     if bool(args.start) != bool(args.end):
         parser.error("Informe --start e --end juntos.")
@@ -102,6 +107,16 @@ def run(argv: list[str] | None = None) -> int:
         )
     if args.input and args.apply:
         parser.error("Arquivos de simulação nunca autorizam escrita em produção.")
+    if args.auditoria_pedidos and (
+        args.perfil != "FARMA" or args.apply or args.input or not args.start
+    ):
+        parser.error("--auditoria-pedidos exige simulação FARMA com --start e --end.")
+    if (
+        args.auditoria_pedidos
+        and args.review
+        and args.auditoria_pedidos.resolve() == args.review.resolve()
+    ):
+        parser.error("Use arquivos distintos para a auditoria e a revisão.")
     # Nenhum módulo operacional é importado antes da escolha de perfil.
     os.environ["NEXOFLOW_PERFIL"] = args.perfil
     try:
@@ -109,6 +124,19 @@ def run(argv: list[str] | None = None) -> int:
             summary = _fixture(args.input, args.perfil)
         else:
             summary = _real(args)
+        audit = summary.get("reconciliacao_pedidos_weni")
+        if args.auditoria_pedidos:
+            if audit is None:
+                summary.update(auditoria_pedidos="indisponivel", partial=True)
+            else:
+                from dedup_io import save_private
+
+                save_private(args.auditoria_pedidos, audit)
+                summary["auditoria_pedidos"] = "gravada"
+        if audit is not None:
+            summary["reconciliacao_pedidos_weni"] = {
+                key: value for key, value in audit.items() if key != "pedidos"
+            }
         print(json.dumps(summary, ensure_ascii=False, sort_keys=True))
         return 3 if summary.get("partial") else 0
     except Exception as exc:
@@ -123,6 +151,7 @@ def run(argv: list[str] | None = None) -> int:
 
 def _real(args):
     from types import SimpleNamespace
+    from typing import cast
 
     from dedup_io import save_private
     from google_sheets import GoogleSheetsStore
@@ -162,18 +191,33 @@ def _real(args):
             )
         expected = review["schema_manifest"]
     dashboard = str(getattr(settings, "GOOGLE_SPREADSHEET_ID", "") or "").strip()
+    from ds_backend.client import Client as PostgresClient
     from ds_backend.client import enabled as postgres_enabled
 
-    if not postgres_enabled(settings) and not dashboard:
+    uses_postgres = postgres_enabled(settings)
+    if args.auditoria_pedidos and not uses_postgres:
+        raise ValueError("A auditoria por pedido requer PostgreSQL no perfil FARMA.")
+    if not uses_postgres and not dashboard:
         raise ValueError("Dashboard do perfil não configurado.")
     # Ao contrário do construtor operacional, esta abertura não cria ou migra
     # nenhuma aba, mesmo durante simulações com fontes reais.
+    from ds_backend.adapter import PostgresStore
+    from ds_backend.contract import StorageError
     from ds_backend.runtime import complete, open_store
 
     store = open_store(
         settings, GoogleSheetsStore, purpose="meta", readonly=not args.apply
     )
     try:
+        source_version = None
+        audit_client = None
+        if args.auditoria_pedidos:
+            if not isinstance(store, PostgresStore):
+                raise StorageError("DS_DESTINO_AUDITORIA_DIVERGENTE")
+            audit_client = cast(PostgresClient, store.client)
+            source_version = audit_client.verify().get("version")
+            if type(source_version) is not int or source_version < 1:
+                raise StorageError("DS_SEM_PUBLICACAO_CONFIRMADA")
         inputs = store.native_meta_inputs()
         result = sync_native_meta(
             store,
@@ -186,6 +230,14 @@ def _real(args):
             expected_manifest=expected,
             schema_approved=args.confirm_schema,
         )
+        if audit_client is not None:
+            source = audit_client.verify()
+            if source["version"] != source_version:
+                raise StorageError("DS_VERSAO_ALTERADA_DURANTE_LEITURA")
+            if audit := result.get("reconciliacao_pedidos_weni"):
+                audit.update(
+                    ambiente=source["environment"], versao_ready=source_version
+                )
         if (
             not args.apply
             and args.review
@@ -203,8 +255,6 @@ def _real(args):
             )
         if not args.apply:
             return result
-
-        from ds_backend.adapter import PostgresStore
 
         if isinstance(store, PostgresStore) and result["status"] in (
             "controle_por_anuncio_divergente",
