@@ -25,8 +25,22 @@ for name, fields, period in meta_destinations.specs():
         segment="FARMA",
         columns=fields,
         period=period,
+        labels={
+            f: v for f, v in meta_destinations.COMMERCIAL_METRICS.items() if f in fields
+        },
         metric_kinds={
-            f: "max" for f in ("cpa", "roas", "conversas_weni") if f in fields
+            f: kind
+            for f, kind in {
+                "cpa": "max",
+                "roas": "max",
+                "conversas_weni": "max",
+                "cpa_conversa_anuncio": "money_max",
+                "cac_novos_clientes": "money_max",
+                "roas_conversa_anuncio": "percent",
+                "receita_conversa_anuncio": "money",
+                "receita_apos_conversa_7d": "money",
+            }.items()
+            if f in fields
         },
         types={
             f: (

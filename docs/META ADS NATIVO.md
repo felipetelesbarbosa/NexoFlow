@@ -96,7 +96,21 @@ O **CAC de novos clientes** divide o investimento da FarmaLíder no Meta pelos c
 
 Classifique cada ID oficial de pedido uma única vez no segmento FARMA antes de agregar por anúncio e período. Um vínculo comprovado com a conversa original tem prioridade. Se houver vários eventos de anúncio para uma compra posterior, use o último evento elegível anterior ao pedido no mesmo contato; trate toques conflitantes como pendência. Conte pedidos diferentes do mesmo cliente pelos respectivos IDs. Preserve as datas da conversa e da compra. Filtre a veiculação e a coorte de pedidos pela data da conversa do anúncio no fuso da conta Meta e informe cobertura parcial enquanto o ciclo ainda estiver aberto ou o vínculo estiver pendente.
 
-A publicação tem como destino o Data Studio oficial, pelo PostgreSQL na VPS e pelo conector comercial. A exportação XLSX de **Salas** no Analytics da Weni, para chats encerrados do setor Delivery FarmaLíder e com a tag **Pedido Finalizado**, é a alternativa ao acesso à API do Weni Chats. O leitor de exportações do Windows preserva o vínculo por UUID ou URN, as tags e as datas do ticket. A configuração PostgreSQL do perfil direciona o importador para o publicador da VPS, onde a tabela interna `Tickets_Delivery_Weni` registra os tickets. O histórico completo de pedidos vem da FarmaLíder. O cruzamento por conversa e pedido e os campos de Anúncios e CAC precisam de integração ao Analytics e ao leitor comercial. A auditoria de último pedido por contato valida casos, mas não comprova a cobertura de todos os pedidos. [Detalhe e validação dos tickets](README%20DELIVERY.md) · [Operação Windows e VPS](OPERACAO_WINDOWS_VPS.md)
+O Analytics e o Noturno FARMA usam a mesma coleta Meta para calcular os campos. Exporte **Salas** no Analytics da Weni, selecione chats encerrados, o setor **Delivery FarmaLíder** e a tag **Pedido Finalizado**. Preserve o XLSX original. O arquivo pode conter salas do Instagram, que ficam fora da leitura CTWA de WhatsApp. Nenhum conteúdo do XLSX é enviado ao GitHub.
+
+No perfil FARMA, em PostgreSQL, inclua no arquivo privado:
+
+```python
+"META_ADS_WENI_SALAS": {
+    "arquivo": "importacoes/Conversas_Delivery.xlsx",
+    "inicio": "2026-10-01",
+    "fim": "2026-11-18",
+},
+```
+
+As datas correspondem ao filtro de encerramento usado na geração do XLSX. O Windows cruza a URN do WhatsApp, os horários no export e o vínculo de contato único na Weni. Se o CTWA não informar o ID da conversa, a identificação exige uma única abertura no mesmo contato nos cinco segundos após o evento. A venda exige um ticket humano com **Pedido Finalizado**, um pedido oficial vigente e emissão compatível com os horários do ticket. Mais de um pedido candidato ao mesmo ticket sem identificador explícito deixa a atribuição em pendência. O CAC deixa de ser exibido quando as janelas extraídas desde 01/01/2020 não formam cobertura contínua ou quando o primeiro pedido é ambíguo.
+
+O publicador grava somente contagens, receitas e cobertura no fato diário da Meta, com o contrato de armazenamento existente. A função de leitura `farma.ds_veiculacao_meta_v4` acrescenta os campos comerciais às fontes **Anúncios veiculados** e **Resumo de anúncios**. A v3 continua atendendo os campos anteriores. Na VPS, instale o leitor do mesmo commit e reaplique a instalação de destinos FARMA à revisão READY ativa antes de atualizar o conector Apps Script. No Data Studio, use os campos novos para pedidos, receita, CPA, ROAS e CAC. Os campos de valor mostram os subtotais comprovados com o indicador de dias parciais. As razões ficam indisponíveis enquanto o recorte tiver fatos parciais. [Operação Windows e VPS](OPERACAO_WINDOWS_VPS.md)
 
 Para conferir um período na revisão READY do ambiente configurado no perfil FARMA, execute no Terminal NexoFlow com o pacote que contém a rotina e `ARMAZENAMENTO_BACKEND = "postgres"`:
 

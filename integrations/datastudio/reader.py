@@ -353,12 +353,19 @@ class Reader(Store):
             sql.Identifier(view_name(table)),
         )
         period_ads = table in meta_destinations.PERIOD
+        commercial_ads = period_ads and bool(
+            meta_destinations.COMMERCIAL_METRICS.keys()
+            & (set(fields) | {f["field"] for f in filters})
+        )
+        ads_function = (
+            "ds_veiculacao_meta_v4" if commercial_ads else "ds_veiculacao_meta_v3"
+        )
         if period_ads:
             if not start or aggregation:
                 raise StorageError("DS_ANUNCIOS_PERIODO_OU_AGREGACAO")
-            statement = sql.SQL(
-                "SELECT {} FROM farma.ds_veiculacao_meta_v3(%s,%s,%s)"
-            ).format(sql.SQL(",").join(expressions))
+            statement = sql.SQL("SELECT {} FROM farma.{}(%s,%s,%s)").format(
+                sql.SQL(",").join(expressions), sql.Identifier(ads_function)
+            )
             params = [start, end, table == meta_destinations.PERIOD[1], *params]
         if clauses:
             statement += sql.SQL(" WHERE ") + sql.SQL(" AND ").join(clauses)
@@ -390,7 +397,8 @@ class Reader(Store):
             if (
                 period_ads
                 and not conn.execute(
-                    "SELECT to_regprocedure('farma.ds_veiculacao_meta_v3(date,date,boolean)') AS f"
+                    "SELECT to_regprocedure(%s) AS f",
+                    (f"farma.{ads_function}(date,date,boolean)",),
                 ).fetchone()["f"]
             ):
                 raise StorageError("DS_DESTINOS_VISAO_AUSENTE")

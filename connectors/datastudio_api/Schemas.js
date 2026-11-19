@@ -1531,13 +1531,38 @@ var NexoDSSchemas={
       "conversas_weni",
       "dias_parciais",
       "cpa",
-      "roas"
+      "roas",
+      "pedidos_conversa_anuncio",
+      "receita_conversa_anuncio",
+      "pedidos_apos_conversa_7d",
+      "receita_apos_conversa_7d",
+      "novos_clientes_anuncio",
+      "cac_novos_clientes",
+      "cpa_conversa_anuncio",
+      "roas_conversa_anuncio",
+      "dias_comerciais_parciais"
     ],
     "period": "data",
+    "labels": {
+      "pedidos_conversa_anuncio": "Pedidos na conversa do anúncio",
+      "receita_conversa_anuncio": "Receita na conversa do anúncio",
+      "pedidos_apos_conversa_7d": "Pedidos após a conversa do anúncio (até 7 dias)",
+      "receita_apos_conversa_7d": "Receita após a conversa do anúncio (até 7 dias)",
+      "novos_clientes_anuncio": "Novos clientes na conversa do anúncio",
+      "cac_novos_clientes": "CAC de novos clientes",
+      "cpa_conversa_anuncio": "CPA na conversa do anúncio",
+      "roas_conversa_anuncio": "ROAS na conversa do anúncio",
+      "dias_comerciais_parciais": "Fatos diários com atribuição comercial parcial"
+    },
     "metric_kinds": {
       "cpa": "max",
       "roas": "max",
-      "conversas_weni": "max"
+      "conversas_weni": "max",
+      "cpa_conversa_anuncio": "money_max",
+      "cac_novos_clientes": "money_max",
+      "roas_conversa_anuncio": "percent",
+      "receita_conversa_anuncio": "money",
+      "receita_apos_conversa_7d": "money"
     },
     "types": {
       "data": "date",
@@ -1562,7 +1587,16 @@ var NexoDSSchemas={
       "conversas_weni": "number",
       "dias_parciais": "number",
       "cpa": "number",
-      "roas": "number"
+      "roas": "number",
+      "pedidos_conversa_anuncio": "number",
+      "receita_conversa_anuncio": "number",
+      "pedidos_apos_conversa_7d": "number",
+      "receita_apos_conversa_7d": "number",
+      "novos_clientes_anuncio": "number",
+      "cac_novos_clientes": "number",
+      "cpa_conversa_anuncio": "number",
+      "roas_conversa_anuncio": "number",
+      "dias_comerciais_parciais": "number"
     },
     "dimensions": []
   },
@@ -1590,13 +1624,38 @@ var NexoDSSchemas={
       "conversas_weni",
       "dias_parciais",
       "cpa",
-      "roas"
+      "roas",
+      "pedidos_conversa_anuncio",
+      "receita_conversa_anuncio",
+      "pedidos_apos_conversa_7d",
+      "receita_apos_conversa_7d",
+      "novos_clientes_anuncio",
+      "cac_novos_clientes",
+      "cpa_conversa_anuncio",
+      "roas_conversa_anuncio",
+      "dias_comerciais_parciais"
     ],
     "period": "data",
+    "labels": {
+      "pedidos_conversa_anuncio": "Pedidos na conversa do anúncio",
+      "receita_conversa_anuncio": "Receita na conversa do anúncio",
+      "pedidos_apos_conversa_7d": "Pedidos após a conversa do anúncio (até 7 dias)",
+      "receita_apos_conversa_7d": "Receita após a conversa do anúncio (até 7 dias)",
+      "novos_clientes_anuncio": "Novos clientes na conversa do anúncio",
+      "cac_novos_clientes": "CAC de novos clientes",
+      "cpa_conversa_anuncio": "CPA na conversa do anúncio",
+      "roas_conversa_anuncio": "ROAS na conversa do anúncio",
+      "dias_comerciais_parciais": "Fatos diários com atribuição comercial parcial"
+    },
     "metric_kinds": {
       "cpa": "max",
       "roas": "max",
-      "conversas_weni": "max"
+      "conversas_weni": "max",
+      "cpa_conversa_anuncio": "money_max",
+      "cac_novos_clientes": "money_max",
+      "roas_conversa_anuncio": "percent",
+      "receita_conversa_anuncio": "money",
+      "receita_apos_conversa_7d": "money"
     },
     "types": {
       "data": "date",
@@ -1619,7 +1678,16 @@ var NexoDSSchemas={
       "conversas_weni": "number",
       "dias_parciais": "number",
       "cpa": "number",
-      "roas": "number"
+      "roas": "number",
+      "pedidos_conversa_anuncio": "number",
+      "receita_conversa_anuncio": "number",
+      "pedidos_apos_conversa_7d": "number",
+      "receita_apos_conversa_7d": "number",
+      "novos_clientes_anuncio": "number",
+      "cac_novos_clientes": "number",
+      "cpa_conversa_anuncio": "number",
+      "roas_conversa_anuncio": "number",
+      "dias_comerciais_parciais": "number"
     },
     "dimensions": []
   },
@@ -1640,6 +1708,7 @@ var NexoDSSchemas={
       "eventos_ctwa"
     ],
     "period": "data",
+    "labels": {},
     "metric_kinds": {},
     "types": {
       "data": "date",
@@ -1668,6 +1737,7 @@ var NexoDSSchemas={
       "nulos"
     ],
     "period": null,
+    "labels": {},
     "metric_kinds": {},
     "types": {
       "campo": "text",

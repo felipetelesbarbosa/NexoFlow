@@ -1617,6 +1617,12 @@ def main() -> int:
         # The ordinary Analytics load does not create these tabs or infer new ticket tags.
         sheets.refresh_delivery_bi(all_order_records, create=False)
 
+        from analytics_history_sync import run as publish_history
+
+        historical_publication = None
+        if getattr(secrets, "META_ADS_WENI_SALAS", None) and postgres_enabled(secrets):
+            historical_publication = publish_history(secrets, storage=sheets)
+
         native_meta_result = _sync_optional_native_meta(
             sheets,
             secrets,
@@ -1630,13 +1636,12 @@ def main() -> int:
             from ds_backend.contract import StorageError
             raise StorageError("DS_DESTINOS_PUBLICACAO_INCOMPLETA")
 
-        from analytics_history_sync import run as publish_history
-
-        historical_publication = (
-            publish_history(secrets, storage=sheets)
-            if postgres_enabled(secrets)
-            else publish_history(secrets)
-        )
+        if historical_publication is None:
+            historical_publication = (
+                publish_history(secrets, storage=sheets)
+                if postgres_enabled(secrets)
+                else publish_history(secrets)
+            )
 
         # O status é gravado por último para refletir a própria execução do BI.
         completion_status, completion_controls = _completion_controls(

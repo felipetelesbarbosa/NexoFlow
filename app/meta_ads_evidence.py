@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from config import WENI_EVENTS_API_URL
 from meta_events import event_datetime, event_message
 from urn_utils import native_contact_urns
 from weni_client import WeniClient
@@ -23,6 +24,29 @@ class ReadOnlyEvidenceClient(WeniClient):
         if method.upper() != "GET":
             raise ValueError("A coleta de evidências Weni permite somente GET.")
         return super()._request_json(method, url, **kwargs)
+
+    def list_conversation_classifications(self, urn, *, after, before):
+        limit = 100
+        params = {
+            "date_start": self.format_datetime(after),
+            "date_end": self.format_datetime(before),
+            "key": "conversation_classification",
+            "contact_urn": urn,
+            "limit": limit,
+        }
+        previous = None
+        offset = 0
+        while True:
+            page = self._request_json(
+                "GET", WENI_EVENTS_API_URL, params=dict(params, offset=offset)
+            )
+            if not isinstance(page, list) or len(page) > limit or page == previous:
+                raise ValueError("Paginação de conversas da Weni incompleta.")
+            if not page:
+                return
+            yield from page
+            previous = page
+            offset += len(page)
 
 
 def _profile(settings: Any, segment: str) -> dict[str, Any]:

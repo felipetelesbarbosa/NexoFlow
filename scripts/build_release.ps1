@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.46",
+    [string]$Version = "1.5.47",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -363,7 +363,7 @@ foreach ($relative in @('app/run_noturno_console.py','comandos/executar_noturno.
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/NexoFlow Recompra.exe"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/NexoFlow Recompra.exe"
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/weni_update.py"
-foreach ($module in @("weni_insights", "history_capacity", "history_conference", "history_exclusions", "history_publication", "history_reconciliation", "history_publish_cli", "history_sheets_transport", "history_snapshot", "order_history_sheets", "run_order_history", "meta_ads_native", "meta_ads_model", "meta_ads_destinations", "meta_ads_sheets", "meta_ads_evidence", "run_meta_ads", "meta_events", "ad_attribution", "weni_dedup", "contact_dedup_guard", "dedup_io", "dedup_sheets", "dedup_bi", "recompra_lock", "recompra_review_audit", "farmalider_customers", "recompra_profiles", "recompra_cleanup", "runtime_profile", "recompra_group_audit")) {
+foreach ($module in @("weni_insights", "history_capacity", "history_conference", "history_exclusions", "history_publication", "history_reconciliation", "history_publish_cli", "history_sheets_transport", "history_snapshot", "order_history_sheets", "run_order_history", "meta_ads_native", "meta_ads_attribution", "meta_ads_model", "meta_ads_destinations", "meta_ads_sheets", "meta_ads_evidence", "run_meta_ads", "meta_events", "ad_attribution", "weni_dedup", "contact_dedup_guard", "dedup_io", "dedup_sheets", "dedup_bi", "recompra_lock", "recompra_review_audit", "farmalider_customers", "recompra_profiles", "recompra_cleanup", "runtime_profile", "recompra_group_audit")) {
     Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/app/$module.py"
     Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/app/$module.py"
 }
@@ -422,7 +422,7 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-Conciliação diária de conversas Meta FARMA no Analytics e no Noturno. A rotina registra omissões por anúncio e dia, preserva a revisão confirmada e aceita atualizações explícitas após as verificações do fluxo.
+Atribuição comercial FARMA no Analytics e no Noturno. O perfil PostgreSQL pode ler o XLSX de salas finalizadas da Weni para calcular pedidos na conversa do anúncio, pedidos em outro atendimento em até sete dias e CAC de novos clientes. Consulte o guia Meta para configurar o XLSX e atualizar o leitor e o conector do Data Studio.
 
 Instale em Preserve e confira nexo versao. O Setup conserva configurações, credenciais, SQLite, logs, checkpoints e journals. Os ZIPs não incluem instalador Python nem dados comerciais. Não substitua módulos avulsos. A publicação do software não comprova recuperação ou homologação comercial e não executa cargas.
 
@@ -438,7 +438,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.46
+# NexoFlow 1.5.47
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"

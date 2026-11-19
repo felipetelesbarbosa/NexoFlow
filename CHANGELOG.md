@@ -1,5 +1,9 @@
 # NexoFlow — Changelog
 
+## 1.5.47 — em preparação
+
+- O Analytics e o Noturno FARMA calculam pedidos na conversa do anúncio, pedidos em outro atendimento em até sete dias e CAC de novos clientes. A rotina usa o XLSX de salas finalizadas, o vínculo com a Weni Flows e o histórico oficial de pedidos. [Configuração e leitura no Data Studio](docs/META%20ADS%20NATIVO.md#m%C3%A9tricas-da-p%C3%A1gina-an%C3%BAncios-em-produ%C3%A7%C3%A3o).
+
 ## 1.5.46 — publicada em 19/11/2026, 11:11:43 (America/Sao_Paulo)
 
 - Analytics e Noturno FARMA registram o cruzamento entre contatos da Weni, pedidos elegíveis e atribuição a anúncios. O diagnóstico por pedido fica no log privado e também pode rodar em modo somente leitura. [Guia](docs/META%20ADS%20NATIVO.md#concilia%C3%A7%C3%A3o-de-pedidos-da-weni-no-windows).

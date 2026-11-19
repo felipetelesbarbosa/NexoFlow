@@ -60,13 +60,23 @@ def test_two_stage_population_shared_grain_and_lost_ack(store):  # noqa: F811
             eventos={"WA_1": ctwa},
             conversas_distintas_privadas=["same"] if ctwa else [],
         )
+        payload = {"nf_destino_v1": audit}
+        if ad == "001" and day in (1, 2):
+            payload["nf_atribuicao_comercial_v1"] = dict(
+                pedidos_conversa_anuncio=day - 1,
+                receita_conversa_anuncio=48 * (day - 1),
+                pedidos_apos_conversa_7d=day,
+                receita_apos_conversa_7d=10 * day,
+                novos_clientes_anuncio=day - 1,
+                cobertura_comercial=True,
+            )
         d.append(
             row(
                 "Meta_Ads_Diario",
                 chave=key,
                 segmento="FARMA",
                 campanha_nome={1: "Campanha anterior", 2: "Campanha atual"}.get(day),
-                payload_api_json=json.dumps({"nf_destino_v1": audit}),
+                payload_api_json=json.dumps(payload),
             )
         )
     receipt = batch(store, rev, "BI_Meta_Resultados", b)
@@ -105,6 +115,23 @@ def test_two_stage_population_shared_grain_and_lost_ack(store):  # noqa: F811
         ).fetchone()["raw"]
         conn.rollback()
     reader = Reader(DSN, "homologacao", "FARMA")
+    commercial_fields = [
+        "pedidos_conversa_anuncio",
+        "pedidos_apos_conversa_7d",
+        "cac_novos_clientes",
+        "cpa_conversa_anuncio",
+        "roas_conversa_anuncio",
+        "dias_comerciais_parciais",
+    ]
+    for period_table in PERIOD:
+        for end, expected in (
+            ("2026-11-02", [1, 3, 12, 12, 4, 0]),
+            ("2026-11-03", [1, 3, None, None, None, 1]),
+        ):
+            actual = reader.query(
+                period_table, commercial_fields, "2026-11-01", end, [], {}
+            )["rows"][0]
+            assert [None if x is None else Decimal(str(x)) for x in actual] == expected
     assert reader.query(
         PERIOD[0], ["anuncio_id", "campanha_nome"], "2026-11-01", "2026-11-03", [], {}
     )["rows"] == [["001", "Campanha atual"]]

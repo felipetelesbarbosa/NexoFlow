@@ -599,6 +599,43 @@ def sync_native_meta(
         if any(row["acao"] == "PENDENTE_HISTORICO" for row in differences):
             report.update(status="conversas_meta_pendentes", partial=True)
             return report
+        commercial = _setting(settings, segment, "META_ADS_WENI_SALAS")
+        if commercial:
+            stage = "atribuicao_comercial_weni"
+            from meta_ads_attribution import (
+                apply_attribution,
+                load_conversations,
+                read_finalized_rooms,
+            )
+
+            config = getattr(getattr(store, "client", None), "config", {})
+            if segment != "FARMA" or config.get("segment") != "FARMA":
+                raise ValueError("A atribuição comercial Weni requer PostgreSQL FARMA.")
+            begin = date.fromisoformat(commercial["inicio"])
+            through = date.fromisoformat(commercial["fim"])
+            if begin > through or through >= clock.astimezone(TZ).date():
+                raise ValueError("Use um período de encerramento Weni já concluído.")
+            rooms = read_finalized_rooms(
+                runtime_root / commercial["arquivo"], begin, through, clock
+            )
+            report["atribuicao_comercial_weni"] = apply_attribution(
+                tables,
+                evidence,
+                orders,
+                store.records("Historico_Pedidos"),
+                store.records("BI_Cobertura_Historica"),
+                rooms,
+                begin,
+                through,
+                clock,
+                lambda urns: load_conversations(
+                    _setting(settings, segment, "WENI_API_TOKEN"),
+                    urns,
+                    min(evidence_start, datetime.combine(begin, time.min, TZ)),
+                    clock,
+                    org_uuid=_setting(settings, segment, "WENI_FLOWS_ORG_UUID", ""),
+                ),
+            )
         # Conversões deixam rastro em vez de manter receita de compra cancelada.
         fresh = {row["chave"] for row in tables["BI_Meta_Conversoes"]}
         for row in previous.get("BI_Meta_Conversoes", []):

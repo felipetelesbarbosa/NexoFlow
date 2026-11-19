@@ -19,6 +19,18 @@ METRICS = {
     "cpa": "Custo exclusivo dividido pelos pedidos do intervalo",
     "roas": "Receita em BRL dividida pelo investimento exclusivo em BRL",
 }
+COMMERCIAL_METRICS = {
+    "pedidos_conversa_anuncio": "Pedidos na conversa do anúncio",
+    "receita_conversa_anuncio": "Receita na conversa do anúncio",
+    "pedidos_apos_conversa_7d": "Pedidos após a conversa do anúncio (até 7 dias)",
+    "receita_apos_conversa_7d": "Receita após a conversa do anúncio (até 7 dias)",
+    "novos_clientes_anuncio": "Novos clientes na conversa do anúncio",
+    "cac_novos_clientes": "CAC de novos clientes",
+    "cpa_conversa_anuncio": "CPA na conversa do anúncio",
+    "roas_conversa_anuncio": "ROAS na conversa do anúncio",
+    "dias_comerciais_parciais": "Fatos diários com atribuição comercial parcial",
+}
+METRICS.update(COMMERCIAL_METRICS)
 PERIOD = ("Anuncios_Veiculados_FARMA", "Resumo_Anuncios_Veiculados_FARMA")
 DETAIL = "Destinos_CTWA_Diarios"
 CATALOG = "Catalogo_Destinos_Meta"
@@ -51,7 +63,8 @@ def specs():
 def install(conn):
     conn.execute("""CREATE OR REPLACE VIEW farma.ds_destino_meta_base_v1 WITH(security_barrier=true) AS
       SELECT b.*, (nullif(d.registro->>'payload_api_json','')::jsonb)->'nf_destino_v1' AS audit,
-        nullif(btrim(d.registro->>'campanha_nome'),'') AS campanha_nome
+        nullif(btrim(d.registro->>'campanha_nome'),'') AS campanha_nome,
+        (nullif(d.registro->>'payload_api_json','')::jsonb)->'nf_atribuicao_comercial_v1' AS atrib_comercial
       FROM farma.ds_bi_meta_resultados b LEFT JOIN farma.nf_atuais d ON
       d.tabela='Meta_Ads_Diario' AND d.registro->>'chave'=b.chave
       WHERE b.segmento='FARMA' AND b.classificacao='FARMA'""")
@@ -137,6 +150,7 @@ def install(conn):
         "farma.ds_veiculacao_meta_v3(date,date,boolean) TO nf_ds_farma_read"
     )
     conn.execute("GRANT SELECT ON farma.ds_destinos_ctwa_diarios TO nf_ds_farma_read")
+    install_commercial(conn)
     from psycopg import sql
 
     rows = []
@@ -241,3 +255,57 @@ def install(conn):
         ).format(values)
     )
     conn.execute("GRANT SELECT ON farma.ds_catalogo_destinos_meta TO nf_ds_farma_read")
+
+
+def install_commercial(conn):
+    conn.execute("""CREATE OR REPLACE FUNCTION farma.ds_veiculacao_meta_v4(inicio date,fim date,resumo boolean)
+    RETURNS TABLE(data date,conta_id text,moeda text,fuso text,politica_atribuicao text,anuncio_id text,
+      anuncios bigint,investimento_original numeric,investimento_comprovado numeric,pedidos_confirmados numeric,
+      receita_confirmada numeric,eventos_ctwa numeric,wa_1 numeric,wa_2 numeric,pendentes numeric,
+      conversas_meta numeric,conversas_weni bigint,dias_parciais bigint,cpa numeric,roas numeric,
+      conversas_meta_informadas numeric,fatos_sem_metrica_meta bigint,campanha_nome text,
+      pedidos_conversa_anuncio numeric,receita_conversa_anuncio numeric,pedidos_apos_conversa_7d numeric,
+      receita_apos_conversa_7d numeric,novos_clientes_anuncio numeric,cac_novos_clientes numeric,
+      cpa_conversa_anuncio numeric,roas_conversa_anuncio numeric,dias_comerciais_parciais bigint)
+    LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $fn$
+      WITH legacy AS MATERIALIZED (
+        SELECT * FROM farma.ds_veiculacao_meta_v3(inicio,fim,resumo)
+      ), base AS MATERIALIZED (
+        SELECT b.conta_id,b.moeda,b.fuso,b.politica_atribuicao,b.anuncio_id,
+          bool_or(b.impressoes>0 OR b.investimento_original>0)
+            OVER(PARTITION BY b.conta_id,b.anuncio_id) AS veiculado,
+          b.atrib_comercial AS audit
+        FROM farma.ds_destino_meta_base_v1 b
+        WHERE b.data BETWEEN inicio AND fim
+      ), comercial AS (
+        SELECT b.conta_id,b.moeda,b.fuso,b.politica_atribuicao,
+          CASE WHEN resumo THEN NULL ELSE b.anuncio_id END ad,
+          sum((b.audit->>'pedidos_conversa_anuncio')::numeric) AS pedidos_diretos,
+          sum((b.audit->>'receita_conversa_anuncio')::numeric) AS receita_direta,
+          sum((b.audit->>'pedidos_apos_conversa_7d')::numeric) AS pedidos_posteriores,
+          sum((b.audit->>'receita_apos_conversa_7d')::numeric) AS receita_posterior,
+          CASE WHEN count(b.audit->>'novos_clientes_anuncio')=count(*)
+            THEN sum((b.audit->>'novos_clientes_anuncio')::numeric) END AS novos,
+          count(*) FILTER(WHERE b.audit->>'cobertura_comercial' IS DISTINCT FROM 'true') AS parciais
+        FROM base b WHERE b.veiculado GROUP BY 1,2,3,4,5
+      )
+      SELECT l.*, c.pedidos_diretos, c.receita_direta, c.pedidos_posteriores, c.receita_posterior,
+        c.novos,
+        CASE WHEN c.parciais=0 AND l.moeda='BRL'
+          THEN l.investimento_original/nullif(c.novos,0) END,
+        CASE WHEN c.parciais=0 AND l.moeda='BRL'
+          THEN l.investimento_original/nullif(c.pedidos_diretos,0) END,
+        CASE WHEN c.parciais=0 AND l.moeda='BRL'
+          THEN c.receita_direta/nullif(l.investimento_original,0) END,
+        c.parciais
+      FROM legacy l LEFT JOIN comercial c
+        ON (l.conta_id,l.moeda,l.fuso,l.politica_atribuicao)=(c.conta_id,c.moeda,c.fuso,c.politica_atribuicao)
+        AND l.anuncio_id IS NOT DISTINCT FROM c.ad
+      ORDER BY l.conta_id,l.moeda,l.fuso,l.politica_atribuicao,l.anuncio_id
+    $fn$""")
+    conn.execute(
+        "REVOKE ALL ON FUNCTION farma.ds_veiculacao_meta_v4(date,date,boolean) FROM PUBLIC"
+    )
+    conn.execute(
+        "GRANT EXECUTE ON FUNCTION farma.ds_veiculacao_meta_v4(date,date,boolean) TO nf_ds_farma_read"
+    )

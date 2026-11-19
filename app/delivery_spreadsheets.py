@@ -25,6 +25,18 @@ class DeliverySpreadsheetError(ValueError):
     """Erro seguro: não inclui nomes, CPFs nem conteúdo das células."""
 
 
+ROOM_COLUMNS = {
+    "contact__uuid",
+    "contact__name",
+    "urn",
+    "created_on",
+    "ended_at",
+    "is_active",
+    "tags_list",
+    "user__email",
+}
+
+
 def _rows(path, sheet, required):
     import openpyxl
 
@@ -185,17 +197,7 @@ def read_delivery_spreadsheets(directory, *, cutoff):
         for urn in urns:
             urn_index[urn].add(uid)
     tickets, seen = [], set()
-    required = {
-        "contact__uuid",
-        "contact__name",
-        "urn",
-        "created_on",
-        "ended_at",
-        "is_active",
-        "tags_list",
-        "user__email",
-    }
-    for number, headers, values in _rows(room_path, "rooms", required):
+    for number, headers, values in _rows(room_path, "rooms", ROOM_COLUMNS):
         row = dict(zip(headers, values, strict=False))
         tags = _tags(row.get("tags_list"))
         if not any(is_order_tag(tag) for tag in tags):
