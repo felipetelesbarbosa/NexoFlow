@@ -95,7 +95,7 @@ COMMIT;
 
 ## Terminal FARMA
 
-Instale o Setup 1.5.45 em Preserve na instalação de homologação. Confira o backend PostgreSQL FARMA, as credenciais do destino de **homologação**, a READY e ambas as credenciais Weni. Em secrets_config.py do perfil FARMA, configure META_ADS_ENABLED=True e META_ADS_DESTINOS_FILE com o caminho privado credentials/datastudio/FARMA/destinos.json. WENI_INSIGHTS_PROJECT_UUID deve conter o UUID CX do projeto conferido. Mantenha em branco o novo caminho nos outros ambientes. O JSON de destinos contém metadados de autoridade e nenhuma credencial. Exemplo estrutural com identificadores fictícios:
+Para a conciliação diária, instale o Setup 1.5.46 em Preserve na instalação de homologação. Confira o backend PostgreSQL FARMA, as credenciais do destino de **homologação**, a READY e ambas as credenciais Weni. Em secrets_config.py do perfil FARMA, configure META_ADS_ENABLED=True e META_ADS_DESTINOS_FILE com o caminho privado credentials/datastudio/FARMA/destinos.json. WENI_INSIGHTS_PROJECT_UUID deve conter o UUID CX do projeto conferido. Mantenha em branco o novo caminho nos outros ambientes. O JSON de destinos contém metadados de autoridade e nenhuma credencial. Exemplo estrutural com identificadores fictícios:
 
 ```json
 {"segment":"FARMA","source":"WENI_CX_PROJECT_WABAS","observed":"2026-11-18T12:00:00-03:00","cx_project":"00000000-0000-4000-8000-000000000001","flows_org":"00000000-0000-4000-8000-000000000002","waba":"001","phones":{"+550000000001":"WA_1","+550000000002":"WA_2"},"bindings":[],"controle":{"inicio":"2026-11-01","fim":"2026-11-18","conta_id":"001","moeda":"BRL","eventos_por_anuncio":{"001":2},"conversas_meta":3}}

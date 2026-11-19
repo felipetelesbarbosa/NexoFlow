@@ -1,5 +1,9 @@
 # Versionamento do NexoFlow
 
+## Preparação 1.5.46
+
+Prévia Windows para homologar a conciliação diária de conversas Meta FARMA. O Setup de homologação está sujeito aos checks do mesmo commit. A publicação comercial depende da validação da divergência e da cópia do Looker.
+
 ## Publicação 1.5.45
 
 Publicada em **18/11/2026, 17:44:58 (America/Fortaleza)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.45) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/4de6b20276fb8b590e4a34ebb984786e73de2a65) · [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44390565728) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44390565773) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44390565719) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44394165244).
@@ -64,7 +68,7 @@ A **1.5.32 foi publicada em 10/11/2026, 19:16:49 (America/Fortaleza)**, no SHA `
 
 A **1.5.33 foi publicada em 10/11/2026, 23:28:34 (America/Fortaleza)**, no SHA `7884d7007fd0c65cbf90bfc30c5c35dc6c9056fb`, com recuperação da leitura da trava Sheets. [Release e pacotes conferidos](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.33).
 
-As próximas publicações de atualização, hotfix ou patch seguem **1.5.45 → ... → 1.5.99 → 1.6 → 1.6.1**. Cada publicação incrementa uma única vez; commits e novas tentativas de CI da mesma entrega não mudam a numeração. Não há salto automático de versão principal.
+As próximas publicações de atualização, hotfix ou patch seguem **1.5.46 → ... → 1.5.99 → 1.6 → 1.6.1**. Cada publicação incrementa uma única vez; commits e novas tentativas de CI da mesma entrega não mudam a numeração. Não há salto automático de versão principal.
 
 A versão da distribuição fica em `VERSION`. A tag é `v{versao}`, o título é `NexoFlow {versao}` e os pacotes são `NexoFlow-{versao}.zip` e `NexoFlow-Setup-{versao}.zip`. Nunca sobrescreva os arquivos de uma versão pública para entregar código novo. O workflow permite retomar somente um rascunho da mesma entrega.
 

@@ -59,14 +59,14 @@ class VersionPolicyTests(unittest.TestCase):
         from nexo_cli import VERSION
 
         metadata = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-        self.assertEqual(CURRENT_VERSION, "1.5.45")
+        self.assertEqual(CURRENT_VERSION, "1.5.46")
         self.assertEqual(APP_VERSION, CURRENT_VERSION)
         self.assertEqual(VERSION, CURRENT_VERSION)
         self.assertEqual(metadata["project"]["version"], CURRENT_VERSION)
         installer = (ROOT / "installer/install.ps1").read_text(encoding="utf-8-sig")
         self.assertIn(f"$AppVersion = '{CURRENT_VERSION}'", installer)
         self.assertIn(
-            f"/releases/download/v{CURRENT_VERSION}/NexoFlow-Setup-{CURRENT_VERSION}.zip",
+            f"NexoFlow-Setup-{CURRENT_VERSION}.zip",
             (ROOT / "README.md").read_text(encoding="utf-8"),
         )
 

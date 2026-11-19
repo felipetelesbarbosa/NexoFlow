@@ -1,5 +1,9 @@
 # NexoFlow — Changelog
 
+## 1.5.46 em homologação
+
+- O Analytics FARMA compara a resposta diária da Meta com a revisão anterior por conta, anúncio e dia. Se um valor informado ficar indisponível, registra a divergência e preserva a revisão confirmada. Uma resposta explícita permite retomar pela conciliação existente. [Roteiro](docs/DESTINOS%20META%20WENI.md).
+
 ## 1.5.45 — publicada em 18/11/2026, 17:44:58 (America/Fortaleza)
 
 - O Analytics e a etapa Analytics do Noturno auditam destinos de anúncios no PostgreSQL FARMA de homologação. O leitor oferece detalhes e totais por período, com cobertura e pendências de recepção. [Roteiro](docs/DESTINOS%20META%20WENI.md).

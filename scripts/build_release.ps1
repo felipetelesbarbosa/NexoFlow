@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.45",
+    [string]$Version = "1.5.46",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -422,7 +422,7 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-Homologação do destino Meta/Weni no Analytics e no Noturno FARMA, com fonte PostgreSQL por período e separação entre eventos recebidos e conversas da Meta.
+Conciliação diária de conversas Meta FARMA no Analytics e no Noturno. A rotina registra omissões por anúncio e dia, preserva a revisão confirmada e aceita atualizações explícitas após as verificações do fluxo.
 
 Instale em Preserve e confira nexo versao. O Setup conserva configurações, credenciais, SQLite, logs, checkpoints e journals. Os ZIPs não incluem instalador Python nem dados comerciais. Não substitua módulos avulsos. A publicação do software não comprova recuperação ou homologação comercial e não executa cargas.
 
@@ -438,7 +438,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.45
+# NexoFlow 1.5.46
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"

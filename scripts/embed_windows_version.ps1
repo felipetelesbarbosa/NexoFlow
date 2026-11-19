@@ -1,7 +1,7 @@
 ﻿param(
     [Parameter(Mandatory = $true)][string]$ExecutablePath,
     [Parameter(Mandatory = $true)][string]$Description,
-    [string]$Version = "1.5.45"
+    [string]$Version = "1.5.46"
 )
 
 $ErrorActionPreference = "Stop"
