@@ -127,6 +127,35 @@ Confirme pela API e pela cópia a nova versão READY. Reenvio verifica o recibo 
 
 ## Looker e reversão
 
+### Conciliação de conversas iniciadas na Meta
+
+Em cada coleta FARMA, o diagnóstico `conciliacao_conversas_meta` compara a resposta
+diária da Meta com a publicação anterior. O campo `janelas_conversas_meta` informa
+o intervalo efetivamente consultado por conta. A comparação usa a mesma conta,
+anúncio e dia e exige a política de atribuição, moeda e fuso da revisão.
+
+| Resposta da Meta | Tratamento |
+| --- | --- |
+| Sem linha | Registra `SEM_LINHA` dentro do intervalo consultado. |
+| Linha sem valor utilizável da métrica | Registra `SEM_METRICA`. |
+| Valor zero explícito | Registra `ZERO_EXPLICITO` quando houver diferença. |
+| Valor informado | Aceita a nova observação depois das verificações existentes. |
+
+Se uma conversa antes informada perder a linha ou o valor, a rotina preserva o
+histórico e bloqueia a etapa Meta antes de gravar. O cursor fica no último corte
+confirmado para a próxima execução reconsultar a janela. Uma nova resposta com
+valor explícito permite retomar o fluxo normal. O controle congelado por anúncio,
+quando configurado em homologação, ainda precisa bater antes de gravar.
+
+Para o painel de Anúncios, valide na cópia do Looker a coluna `conversas_meta`
+da tabela `Anuncios_Veiculados_FARMA` e do cartão
+`Resumo_Anuncios_Veiculados_FARMA`. As fontes leem a revisão ativa. Use o período
+e os filtros iguais no cartão e no detalhamento. A função de período retorna
+indisponível quando faltar valor em algum fato incluído. Compare os números e a
+revisão com a VPS antes de trocar o relatório oficial. Uma consulta inconclusiva
+fica no diagnóstico de execução, com o resultado anterior preservado na
+publicação. As conversas iniciadas na Meta e os eventos CTWA têm fontes próprias.
+
 No projeto Apps Script de teste, implante Code.js, Schemas.js, AbcCore.js e appsscript.json de connectors/datastudio_api. Selecione FARMA e homologacao. Para a tabela use Anuncios_Veiculados_FARMA. Para os cartões use Resumo_Anuncios_Veiculados_FARMA com a mesma janela, conta, moeda, fuso e política. Mantenha um único grupo dessas dimensões nos cartões de razão. Destinos_CTWA_Diarios e Catalogo_Destinos_Meta são fontes separadas de inspeção. Confira os cinco períodos do ensaio, o dia sem entrega com conversão posterior, período vazio e falha de acesso. Registre os totais por ID para 01 a 18/11, distinguindo o corte READY de um novo pull. Solicite apenas as colunas autorizadas. Uma única imagem da peça não identifica anúncio nem receptor.
 
 Para reverter o leitor na sessão Bash acima, execute:

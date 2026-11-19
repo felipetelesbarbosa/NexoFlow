@@ -258,6 +258,16 @@ def _action_value(actions, names):
     return ""
 
 
+def started_conversations(actions):
+    return _action_value(
+        actions,
+        (
+            "onsite_conversion.messaging_conversation_started_7d",
+            "messaging_conversation_started_7d",
+        ),
+    )
+
+
 def _catalog_index(rows):
     return {
         (
@@ -684,13 +694,7 @@ def build_native_tables(
         link_clicks = _number(fact.get("inline_link_clicks"))
         if link_clicks is None:
             link_clicks = _number(_action_value(fact.get("actions"), ("link_click",)))
-        started = _action_value(
-            fact.get("actions"),
-            (
-                "onsite_conversion.messaging_conversation_started_7d",
-                "messaging_conversation_started_7d",
-            ),
-        )
+        started = started_conversations(fact.get("actions"))
         purchase_value = _canonical_purchase(fact.get("action_values"))
         raw.update(
             {

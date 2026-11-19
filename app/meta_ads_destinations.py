@@ -3,6 +3,7 @@
 import hashlib
 from collections import Counter
 from datetime import datetime, time, timedelta
+from decimal import Decimal
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -216,22 +217,97 @@ def day_evidence(
     )
 
 
+def _farma_delivery(rows):
+    return {
+        (r["conta_id"], r["anuncio_id"])
+        for r in rows
+        if r["segmento"] == r["classificacao"] == "FARMA"
+        and any(
+            Decimal(str(r[k] or 0)) > 0 for k in ("impressoes", "investimento_original")
+        )
+    }
+
+
+def _conversation_observation(value):
+    if value in ("", None):
+        return {"estado": "SEM_METRICA", "valor": None}
+    number = Decimal(value)
+    return {
+        "estado": "ZERO_EXPLICITO" if number == 0 else "VALOR_INFORMADO",
+        "valor": int(number) if number == number.to_integral_value() else float(number),
+    }
+
+
+def reconcile_conversation_days(published, candidate, refreshed, windows):
+    """Compara a resposta bruta com a revisão anterior antes de aceitar a mescla."""
+    from meta_ads_model import started_conversations
+
+    eligible = _farma_delivery(published) | _farma_delivery(candidate)
+
+    def index(rows):
+        result = {}
+        for account, ad, day, value in rows:
+            interval = windows.get(account)
+            if (account, ad) not in eligible or not interval:
+                continue
+            if interval[0] <= day <= interval[1]:
+                key = account, ad, day
+                observation = _conversation_observation(value)
+                if key in result and result[key] != observation:
+                    raise ValueError(
+                        "Observações de conversas Meta divergentes no mesmo dia."
+                    )
+                result[key] = observation
+        return result
+
+    before = index(
+        (r["conta_id"], r["anuncio_id"], r["data"], r.get("conversas_iniciadas_meta"))
+        for r in published
+        if r["segmento"] == r["classificacao"] == "FARMA"
+    )
+    current = index(
+        (
+            r["account_id"],
+            r["ad_id"],
+            r["date_start"],
+            started_conversations(r.get("actions")),
+        )
+        for r in refreshed
+    )
+    absent = {"estado": "SEM_LINHA", "valor": None}
+    differences = []
+    for account, ad, day in sorted(before.keys() | current.keys()):
+        key = account, ad, day
+        old, new = before.get(key, absent), current.get(key, absent)
+        if old == new and new["valor"] is not None:
+            continue
+        if new["valor"] is None:
+            action = (
+                "PENDENTE_HISTORICO" if old["valor"] is not None else "INDISPONIVEL"
+            )
+        else:
+            action = "VALOR_CONFIRMADO_NA_CONSULTA"
+        differences.append(
+            dict(
+                conta_id=account,
+                anuncio_id=ad,
+                data=day,
+                historico=old,
+                consulta=new,
+                acao=action,
+            )
+        )
+    return differences
+
+
 def period_control(tables, start, end):
     """Mesmo universo da função SQL. Exibe IDs de anúncio e contagens sem identidades Weni."""
-    from decimal import Decimal
-
     rows = [
         r
         for r in tables["BI_Meta_Resultados"]
         if r["segmento"] == r["classificacao"] == "FARMA" and start <= r["data"] <= end
     ]
-    eligible = {
-        (r["conta_id"], r["anuncio_id"])
-        for r in rows
-        if any(
-            Decimal(str(r[k] or 0)) > 0 for k in ("impressoes", "investimento_original")
-        )
-    }
+    eligible = _farma_delivery(rows)
     sums = {}
     grains = set()
     for r in rows:

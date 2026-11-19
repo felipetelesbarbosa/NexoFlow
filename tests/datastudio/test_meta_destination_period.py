@@ -1,5 +1,6 @@
 import json
 import os
+from decimal import Decimal
 
 import pytest
 
@@ -113,8 +114,6 @@ def test_two_stage_population_shared_grain_and_lost_ack(store):  # noqa: F811
     ]
     for name in PERIOD:
         r = reader.query(name, fields, "2026-11-01", "2026-11-02", [], {})
-        from decimal import Decimal
-
         assert [Decimal(str(x)) for x in r["rows"][0]] == [1, 2, 2, 0, 6, 1, 6, 4]
         assert (
             reader.query(name, fields, "2026-11-02", "2026-11-02", [], {})["rows"] == []
@@ -166,6 +165,27 @@ def test_native_postgres_with_lost_batch_response(store, tmp_path, monkeypatch):
     client = Client(cfg, session=session)
     graph = Graph()
     graph.destination_adsets = graph.adsets
+    original_insights = graph.daily_insights
+    values = {f"2026-11-0{day}": str(day) for day in range(1, 5)}
+
+    def insights(*args, **kwargs):
+        response = original_insights(*args, **kwargs)
+        response["dados"] = [
+            dict(
+                row,
+                actions=[
+                    {
+                        "action_type": "messaging_conversation_started_7d",
+                        "value": values[row["date_start"]],
+                    }
+                ],
+            )
+            for row in response["dados"]
+            if row["date_start"] in values
+        ]
+        return response
+
+    graph.daily_insights = insights
     event = dict(
         date=NOW.isoformat(),
         segment="FARMA",
@@ -177,10 +197,8 @@ def test_native_postgres_with_lost_batch_response(store, tmp_path, monkeypatch):
     def collect(*args, **kwargs):
         return [event], dict(segments=dict(FARMA=True, PET=True), channel_addresses={})
 
-    finish(store, begin(store))
-    for apply in [False, True, True]:
-        target = PostgresStore(client, readonly=not apply)
-        report = sync_native_meta(
+    def collect_metrics(target, apply):
+        return sync_native_meta(
             target,
             dict(
                 META_ADS_ENABLED=True,
@@ -197,6 +215,11 @@ def test_native_postgres_with_lost_batch_response(store, tmp_path, monkeypatch):
             client_factory=lambda: graph,
             evidence_collector=collect,
         )
+
+    finish(store, begin(store))
+    for apply in [False, True, True]:
+        target = PostgresStore(client, readonly=not apply)
+        report = collect_metrics(target, apply)
         assert not report["partial"], report
         if apply:
             assert target.finish(complete=True)["state"] == "READY"
@@ -206,3 +229,37 @@ def test_native_postgres_with_lost_batch_response(store, tmp_path, monkeypatch):
     assert len(store.rows("BI_Meta_Resultados")["rows"]) == 4
     assert len(store.rows("Controle")["rows"]) == 1
     assert report["summary"]["updated"] == 0
+
+    ready = store.info()["version"]
+    with store.connect() as conn:
+        grants(conn, "FARMA")
+        revision = str(
+            conn.execute(
+                "SELECT execucao FROM controle.nf_publicacoes WHERE segmento='FARMA'"
+            ).fetchone()["execucao"]
+        )
+    update_farma_report(store, revision, destinations=True)
+    reader = Reader(DSN, "homologacao", "FARMA")
+
+    def published():
+        rows = reader.query(
+            PERIOD[1], ["conversas_meta"], "2026-11-01", "2026-11-04", [], {}
+        )["rows"]
+        return Decimal(rows[0][0])
+
+    assert published() == 10
+    del values["2026-11-02"]
+    pending = PostgresStore(client, purpose="meta")
+    rejected = collect_metrics(pending, True)
+    assert rejected["status"] == "conversas_meta_pendentes"
+    assert not rejected["applied"]
+    assert store.info()["version"] == ready
+    assert published() == 10
+    assert store.abort(pending.revision)["state"] == "ABORTADA"
+
+    values["2026-11-02"] = "0"
+    recovered = PostgresStore(client, purpose="meta")
+    corrected = collect_metrics(recovered, True)
+    assert corrected["applied"], corrected
+    assert recovered.finish(complete=True)["state"] == "READY"
+    assert published() == 8

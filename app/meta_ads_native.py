@@ -318,6 +318,8 @@ def sync_native_meta(
             {},
             {},
         )
+        refreshed_facts = []
+        refreshed_windows = {}
         root = (
             Path(state_dir)
             if state_dir is not None
@@ -467,6 +469,9 @@ def sync_native_meta(
                     "status": "coletado",
                     "facts": len(local_facts),
                 }
+                if segment == "FARMA":
+                    refreshed_facts.extend(local_facts)
+                    refreshed_windows[account] = (since.isoformat(), end.isoformat())
             except Exception as exc:
                 report["errors"].append(_failure(account, stage, exc))
                 report["accounts"][account] = {"status": "pendente"}
@@ -545,6 +550,18 @@ def sync_native_meta(
             coverage=coverage,
             destination=destination,
         )
+        differences = []
+        if segment == "FARMA":
+            from meta_ads_destinations import reconcile_conversation_days
+
+            differences = reconcile_conversation_days(
+                previous.get("BI_Meta_Resultados", []),
+                tables["BI_Meta_Resultados"],
+                refreshed_facts,
+                refreshed_windows,
+            )
+            report["conciliacao_conversas_meta"] = differences
+            report["janelas_conversas_meta"] = refreshed_windows
         if destination is not None:
             from meta_ads_destinations import period_control
 
@@ -571,6 +588,9 @@ def sync_native_meta(
                         status="controle_por_anuncio_divergente", partial=True
                     )
                     return report
+        if any(row["acao"] == "PENDENTE_HISTORICO" for row in differences):
+            report.update(status="conversas_meta_pendentes", partial=True)
+            return report
         # Conversões deixam rastro em vez de manter receita de compra cancelada.
         fresh = {row["chave"] for row in tables["BI_Meta_Conversoes"]}
         for row in previous.get("BI_Meta_Conversoes", []):

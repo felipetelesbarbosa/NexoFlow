@@ -169,6 +169,100 @@ class NativeSyncTests(unittest.TestCase):
             self.assertEqual(len(store.planned["Meta_Ads_Diario"]), 4)
             self.assertTrue(client.closed)
 
+    def test_farma_conversation_omission_preserves_publication_and_rechecks(self):
+        action = "messaging_conversation_started_7d"
+
+        class ConversationClient(Client):
+            def __init__(self, values):
+                super().__init__()
+                self.values = values
+
+            def daily_insights(self, *args, **kwargs):
+                result = super().daily_insights(*args, **kwargs)
+                result["dados"] = [
+                    dict(
+                        row,
+                        actions=(
+                            [
+                                {
+                                    "action_type": action,
+                                    "value": self.values[row["date_start"]],
+                                }
+                            ]
+                            if self.values[row["date_start"]] is not None
+                            else [{"action_type": "link_click", "value": "2"}]
+                        ),
+                    )
+                    for row in result["dados"]
+                    if row["date_start"] in self.values
+                ]
+                return result
+
+        def farma(*args, **kwargs):
+            events, coverage = evidence(*args, **kwargs)
+            return [
+                *events,
+                dict(segment="FARMA", event_id="1", ad_id="123", date=NOW.isoformat()),
+            ], coverage
+
+        first, second, third = "2026-11-01", "2026-11-02", "2026-11-03"
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)
+            store = Store()
+            initial = self.run_sync(
+                store,
+                ConversationClient({first: "8", second: "1", third: None}),
+                path,
+                collector=farma,
+            )
+            self.assertEqual(initial["status"], "concluido", initial)
+            state = path / f"FARMA-{ACCOUNT}.json"
+            checkpoint = state.read_bytes()
+            stored = deepcopy(store.tables)
+
+            for refreshed, expected in [
+                ({first: "8", third: None}, "SEM_LINHA"),
+                ({first: "8", second: None}, "SEM_METRICA"),
+            ]:
+                blocked = self.run_sync(
+                    store,
+                    ConversationClient(refreshed),
+                    path,
+                    collector=farma,
+                )
+                self.assertEqual(blocked["status"], "conversas_meta_pendentes", blocked)
+                self.assertFalse(blocked["applied"])
+                changes = {r["data"]: r for r in blocked["conciliacao_conversas_meta"]}
+                self.assertEqual(changes[second]["historico"]["valor"], 1)
+                self.assertEqual(
+                    changes[second]["consulta"], {"estado": expected, "valor": None}
+                )
+                self.assertEqual(changes[second]["acao"], "PENDENTE_HISTORICO")
+                self.assertEqual(store.writes, 1)
+                self.assertEqual(store.tables, stored)
+                self.assertEqual(state.read_bytes(), checkpoint)
+
+            recovered = self.run_sync(
+                store,
+                ConversationClient({first: "8", second: "0", third: None}),
+                path,
+                collector=farma,
+            )
+            self.assertEqual(recovered["status"], "concluido", recovered)
+            change = next(
+                r
+                for r in recovered["conciliacao_conversas_meta"]
+                if r["data"] == second
+            )
+            self.assertEqual(
+                change["consulta"], {"estado": "ZERO_EXPLICITO", "valor": 0}
+            )
+            self.assertEqual(store.writes, 2)
+            row = next(
+                r for r in store.tables["BI_Meta_Resultados"] if r["data"] == second
+            )
+            self.assertEqual(row["conversas_iniciadas_meta"], "0.00")
+
     def test_success_checkpoint_and_replay_are_segment_account_scoped(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp)

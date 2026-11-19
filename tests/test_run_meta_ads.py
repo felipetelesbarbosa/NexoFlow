@@ -129,6 +129,53 @@ class NativeMetaCliTests(unittest.TestCase):
         self.assertNotIn("secret", output.getvalue())
         self.assertNotIn("customer=", output.getvalue())
 
+    def test_meta_divergence_aborts_its_own_empty_postgres_revision(self):
+        store = Mock(revision="synthetic-revision")
+        store.native_meta_inputs.return_value = dict(contacts=[], orders=[], items=[])
+        store.client.call.return_value = {"state": "ABORTADA"}
+        report = dict(
+            status="conversas_meta_pendentes", applied=False, partial=True, errors=[]
+        )
+        modules = {
+            "ds_backend.runtime": SimpleNamespace(
+                open_store=Mock(return_value=store), complete=Mock()
+            ),
+            "meta_ads_native": SimpleNamespace(
+                sync_native_meta=Mock(return_value=report)
+            ),
+            "project_paths": SimpleNamespace(
+                load_private_settings=lambda: SimpleNamespace(
+                    ARMAZENAMENTO_BACKEND="postgres"
+                )
+            ),
+            "proxy_config": SimpleNamespace(configure_proxy=Mock()),
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            review = Path(tmp) / "revisao.json"
+            review.write_text(
+                json.dumps(
+                    dict(segment="FARMA", start=None, end=None, schema_manifest={})
+                ),
+                encoding="utf-8",
+            )
+            with patch.dict(sys.modules, modules):
+                result = run_meta_ads._real(
+                    SimpleNamespace(
+                        start=None,
+                        end=None,
+                        apply=True,
+                        review=review,
+                        perfil="FARMA",
+                        confirm_schema=True,
+                    )
+                )
+        self.assertEqual(result, report)
+        store.client.call.assert_called_once_with(
+            "/v1/abortar", {"revision": "synthetic-revision"}
+        )
+        modules["ds_backend.runtime"].complete.assert_not_called()
+        store.close.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()
