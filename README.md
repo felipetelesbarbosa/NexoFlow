@@ -1,12 +1,12 @@
-# NexoFlow 1.5.46 em homologação
+# NexoFlow 1.5.46
 
 O **NexoFlow Windows** integra Weni e a API FarmaLíder nos segmentos FarmaLíder e Pets Líder. O Analytics prepara os dados para o Data Studio e publica no **PostgreSQL privado da VPS** quando esse destino está ativado no perfil. O Looker Studio lê as revisões confirmadas pela API leitora via conector Apps Script.
 
 O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
 
-[Baixar instalador estável 1.5.45](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.45/NexoFlow-Setup-1.5.45.zip) · [Homologação da ds136](docs/CONVERSAS%20DIARIAS%20WENI.md) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
+[Baixar instalador estável 1.5.46](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.46/NexoFlow-Setup-1.5.46.zip) · [Homologação da ds136](docs/CONVERSAS%20DIARIAS%20WENI.md) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
 
-O pacote de homologação usa o arquivo `NexoFlow-Setup-1.5.46.zip` da execução de preparação no GitHub Actions.
+A release 1.5.46 inclui a auditoria de eventos CTWA dos pedidos paginados FARMA. Atualize o Windows escolhendo **Atualizar mantendo dados**. [Release oficial](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.46)
 
 O publicador e o leitor PostgreSQL do Data Studio FARMA estão implantados na VPS comercial. Consulte o guia operacional para conferir a versão do Windows, a revisão READY ativa e a fonte efetiva de cada página do Looker. [Contrato Meta e Weni](docs/DESTINOS%20META%20WENI.md)
 
