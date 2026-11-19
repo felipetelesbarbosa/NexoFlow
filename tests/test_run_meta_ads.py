@@ -130,7 +130,9 @@ class NativeMetaCliTests(unittest.TestCase):
         self.assertNotIn("customer=", output.getvalue())
 
     def test_meta_divergence_aborts_its_own_empty_postgres_revision(self):
-        store = Mock(revision="synthetic-revision")
+        from ds_backend.adapter import PostgresStore
+
+        store = Mock(spec=PostgresStore, revision="synthetic-revision", client=Mock())
         store.native_meta_inputs.return_value = dict(contacts=[], orders=[], items=[])
         store.client.call.return_value = {"state": "ABORTADA"}
         report = dict(

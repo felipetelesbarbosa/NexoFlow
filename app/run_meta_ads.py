@@ -164,8 +164,7 @@ def _real(args):
     dashboard = str(getattr(settings, "GOOGLE_SPREADSHEET_ID", "") or "").strip()
     from ds_backend.client import enabled as postgres_enabled
 
-    postgres = postgres_enabled(settings)
-    if not postgres and not dashboard:
+    if not postgres_enabled(settings) and not dashboard:
         raise ValueError("Dashboard do perfil não configurado.")
     # Ao contrário do construtor operacional, esta abertura não cria ou migra
     # nenhuma aba, mesmo durante simulações com fontes reais.
@@ -202,14 +201,14 @@ def _real(args):
                     "schema_manifest": result["schema_manifest"],
                 },
             )
-        if (
-            args.apply
-            and postgres
-            and result["status"]
-            in (
-                "controle_por_anuncio_divergente",
-                "conversas_meta_pendentes",
-            )
+        if not args.apply:
+            return result
+
+        from ds_backend.adapter import PostgresStore
+
+        if isinstance(store, PostgresStore) and result["status"] in (
+            "controle_por_anuncio_divergente",
+            "conversas_meta_pendentes",
         ):
             # A CLI abriu esta revisão exclusivamente para a Meta. Nesses dois
             # estados a validação retornou antes do primeiro lote ou cursor.
@@ -222,7 +221,7 @@ def _real(args):
                 result["errors"].append(
                     {"stage": "abortar_revisao_vazia", "error_type": type(exc).__name__}
                 )
-        elif args.apply:
+        else:
             complete(store, success=not result.get("partial", False))
         return result
     finally:
