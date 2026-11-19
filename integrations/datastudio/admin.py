@@ -184,7 +184,12 @@ def grants(conn, segment):
 
 
 def update_farma_report(
-    store, expected_revision, *, public_summary=False, destinations=False
+    store,
+    expected_revision,
+    *,
+    public_summary=False,
+    destinations=False,
+    promote_destinations=False,
 ):
     from integrations.datastudio.financial_views import (
         create_farma_orders_view,
@@ -193,6 +198,8 @@ def update_farma_report(
 
     if store.segment != "FARMA":
         raise StorageError("DS_SEGMENTO_DIVERGENTE")
+    if destinations and store.environment != "homologacao" and not promote_destinations:
+        raise StorageError("DS_DESTINOS_EXIGE_HOMOLOGACAO")
     with store.connect() as conn:
         # Mesma trava de begin/finish. As duas definições passam a valer juntas.
         active = store.active(conn, lock=True)
@@ -206,8 +213,6 @@ def update_farma_report(
         if destinations:
             from integrations.datastudio.meta_destinations import install
 
-            if store.environment != "homologacao":
-                raise StorageError("DS_DESTINOS_EXIGE_HOMOLOGACAO")
             install(conn)
         elif public_summary:
             from integrations.datastudio.reader import create_farma_public_summary
@@ -232,11 +237,18 @@ def run(argv=None):
     mode.add_argument("--instalar-destinos-farma", metavar="UUID_READY")
     mode.add_argument("--instalar-publico-farma", metavar="UUID_READY")
     mode.add_argument("--instalar-conversas-projeto", metavar="UUID_PROJETO_WENI")
+    p.add_argument("--promover-leitor-destinos-farma", action="store_true")
     p.add_argument("--finalizar-selada")
     p.add_argument("--saida", type=Path)
     p.add_argument("--recibos-esperados", type=int)
     p.add_argument("--registros-esperados", type=int)
     args = p.parse_args(argv)
+    if args.promover_leitor_destinos_farma and (
+        args.instalar_destinos_farma is None
+        or args.ambiente != "producao"
+        or args.segmento != "FARMA"
+    ):
+        p.error("A promoção exige --instalar-destinos-farma no ambiente FARMA de produção.")
     if args.instalar_conversas_projeto is not None:
         if any(
             x is not None
@@ -286,6 +298,7 @@ def run(argv=None):
             else args.instalar_destinos_farma or args.atualizar_visoes_farma,
             public_summary=public_summary,
             destinations=args.instalar_destinos_farma is not None,
+            promote_destinations=args.promover_leitor_destinos_farma,
         )
         views = "BI_Publico_Resumo" if public_summary else "BI_Pedidos e BI_Vendas"
         if args.instalar_destinos_farma:

@@ -26,7 +26,11 @@ CATALOG = "Catalogo_Destinos_Meta"
 
 def specs():
     for name in PERIOD:
-        fields = [*DIM, *([] if name == PERIOD[1] else ["anuncio_id"]), *METRICS]
+        fields = [
+            *DIM,
+            *([] if name == PERIOD[1] else ["anuncio_id", "campanha_nome"]),
+            *METRICS,
+        ]
         yield name, fields, "data"
     yield (
         DETAIL,
@@ -46,7 +50,8 @@ def specs():
 
 def install(conn):
     conn.execute("""CREATE OR REPLACE VIEW farma.ds_destino_meta_base_v1 WITH(security_barrier=true) AS
-      SELECT b.*, (nullif(d.registro->>'payload_api_json','')::jsonb)->'nf_destino_v1' AS audit
+      SELECT b.*, (nullif(d.registro->>'payload_api_json','')::jsonb)->'nf_destino_v1' AS audit,
+        nullif(btrim(d.registro->>'campanha_nome'),'') AS campanha_nome
       FROM farma.ds_bi_meta_resultados b LEFT JOIN farma.nf_atuais d ON
       d.tabela='Meta_Ads_Diario' AND d.registro->>'chave'=b.chave
       WHERE b.segmento='FARMA' AND b.classificacao='FARMA'""")
@@ -58,12 +63,12 @@ def install(conn):
       FROM farma.ds_destino_meta_base_v1 b CROSS JOIN LATERAL jsonb_each_text(
         coalesce(nullif(b.audit->'eventos','{}'::jsonb),
           jsonb_build_object(CASE WHEN b.audit IS NULL THEN 'SEM_AUDITORIA' ELSE 'SEM_EVENTOS' END,b.eventos_ctwa))) e""")
-    conn.execute("""CREATE OR REPLACE FUNCTION farma.ds_veiculacao_meta_v2(inicio date,fim date,resumo boolean)
+    conn.execute("""CREATE OR REPLACE FUNCTION farma.ds_veiculacao_meta_v3(inicio date,fim date,resumo boolean)
     RETURNS TABLE(data date,conta_id text,moeda text,fuso text,politica_atribuicao text,anuncio_id text,
       anuncios bigint,investimento_original numeric, investimento_comprovado numeric,pedidos_confirmados numeric,
       receita_confirmada numeric,eventos_ctwa numeric,wa_1 numeric,wa_2 numeric,pendentes numeric,
       conversas_meta numeric,conversas_weni bigint,dias_parciais bigint,cpa numeric,roas numeric,
-      conversas_meta_informadas numeric,fatos_sem_metrica_meta bigint)
+      conversas_meta_informadas numeric,fatos_sem_metrica_meta bigint,campanha_nome text)
     LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $fn$
     BEGIN
       IF inicio IS NULL OR fim IS NULL OR fim<inicio THEN RAISE EXCEPTION 'DS_PERIODO_INVALIDO'; END IF;
@@ -98,13 +103,15 @@ def install(conn):
         CASE WHEN count(b.conversas_iniciadas_meta)=count(*) THEN sum(b.conversas_iniciadas_meta) END conv,
         sum(b.conversas_iniciadas_meta) conv_informadas,
         count(*)-count(b.conversas_iniciadas_meta) sem_metrica,
+        CASE WHEN NOT resumo THEN (array_agg(b.campanha_nome ORDER BY b.data DESC)
+          FILTER(WHERE b.campanha_nome IS NOT NULL))[1] END campanha,
         bool_and(coalesce(jsonb_typeof(b.audit->'conversas_distintas_privadas')='array',false)) identidades_completas,
         count(*) FILTER(WHERE b.audit->>'cobertura' IS DISTINCT FROM 'COMPLETA') parciais
         FROM base b WHERE b.veiculado GROUP BY 1,2,3,4,5
       ) SELECT inicio,g.conta_id,g.moeda,g.fuso,g.politica_atribuicao,g.ad,g.n,g.custo,g.exclusivo,
         g.pedidos,g.receita,g.ctwa,g.wa1,g.wa2,g.ctwa-g.wa1-g.wa2,g.conv,CASE WHEN g.identidades_completas THEN coalesce(i.n,0) END,g.parciais,
         g.exclusivo/nullif(g.pedidos,0),CASE WHEN g.moeda='BRL' THEN g.receita/nullif(g.exclusivo,0) END,
-        g.conv_informadas,g.sem_metrica
+        g.conv_informadas,g.sem_metrica,g.campanha
         FROM grupos g LEFT JOIN identidades i ON (i.conta_id,i.moeda,i.fuso,i.politica_atribuicao)=(g.conta_id,g.moeda,g.fuso,g.politica_atribuicao) AND i.ad IS NOT DISTINCT FROM g.ad ORDER BY g.conta_id,g.moeda,g.fuso,g.politica_atribuicao,g.ad;
     END $fn$""")
     # Preserve a assinatura e a cobertura exigida pelos leitores anteriores.
@@ -118,16 +125,16 @@ def install(conn):
         v.anuncios,v.investimento_original,v.investimento_comprovado,v.pedidos_confirmados,
         v.receita_confirmada,v.eventos_ctwa,v.wa_1,v.wa_2,v.pendentes,
         v.conversas_meta,v.conversas_weni,v.dias_parciais,v.cpa,v.roas
-      FROM farma.ds_veiculacao_meta_v2(inicio,fim,resumo) v
+      FROM farma.ds_veiculacao_meta_v3(inicio,fim,resumo) v
       ORDER BY v.conta_id,v.moeda,v.fuso,v.politica_atribuicao,v.anuncio_id
     $fn$""")
     conn.execute(
         "REVOKE ALL ON FUNCTION farma.ds_veiculacao_meta_v1(date,date,boolean), "
-        "farma.ds_veiculacao_meta_v2(date,date,boolean) FROM PUBLIC"
+        "farma.ds_veiculacao_meta_v3(date,date,boolean) FROM PUBLIC"
     )
     conn.execute(
         "GRANT EXECUTE ON FUNCTION farma.ds_veiculacao_meta_v1(date,date,boolean), "
-        "farma.ds_veiculacao_meta_v2(date,date,boolean) TO nf_ds_farma_read"
+        "farma.ds_veiculacao_meta_v3(date,date,boolean) TO nf_ds_farma_read"
     )
     conn.execute("GRANT SELECT ON farma.ds_destinos_ctwa_diarios TO nf_ds_farma_read")
     from psycopg import sql
@@ -176,6 +183,11 @@ def install(conn):
             "anuncio_id",
             "Identificador textual do anúncio, independente do criativo.",
             "Meta Graph",
+        ),
+        (
+            "campanha_nome",
+            "Nome mais recente informado nos fatos do anúncio no período.",
+            "Meta Insights",
         ),
         ("moeda", "Moeda do investimento original.", "Meta Graph"),
         (

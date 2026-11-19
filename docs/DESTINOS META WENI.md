@@ -31,7 +31,7 @@ A nova leitura da Graph somou R$ 251,02 de investimento nos três anúncios. O f
 | Fuso e cobertura | Datas inclusivas no fuso IANA da conta. Eventos são instantes convertidos para esse fuso. A operação Weni usa America/Belem. Contagens de conversas Meta ficam no dia da Meta. O dia ainda aberto aparece como parcial. A API exige READY e devolve erro se a leitura falhar. |
 | Publicação / agentes | A rotina nativa roda no Analytics e na etapa Analytics do Noturno. O publicador privado existente confirma o hash/recibo por lote e recupera a resposta perdida. Dados e cursor tornam-se visíveis juntos na READY. O documento de auditoria fica no fato privado. O agente futuro deverá receber acesso apenas à função agregada e ao catálogo abaixo, por um canal dedicado. |
 
-O catálogo aditivo chama-se `farma.ds_catalogo_destinos_meta`. O leitor atual consulta `farma.ds_veiculacao_meta_v2(date,date,boolean)`. A função `v1` conserva a assinatura anterior. O comando de instalação confere o banco, o perfil, a revisão e a ausência de WRITING sob a trava do publicador.
+O catálogo aditivo chama-se `farma.ds_catalogo_destinos_meta`. O leitor atual consulta `farma.ds_veiculacao_meta_v3(date,date,boolean)`. A função `v1` conserva a assinatura anterior. O comando de instalação confere o banco, o perfil, a revisão e a ausência de WRITING sob a trava do publicador.
 
 ## Work na VPS de homologação
 
@@ -70,8 +70,8 @@ O publicador existente aceita o contrato de lotes original. Mantenha a credencia
 ```sql
 BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY;
 SELECT current_database(), current_user;
-SELECT * FROM farma.ds_veiculacao_meta_v2('2026-11-01','2026-11-18',false);
-SELECT * FROM farma.ds_veiculacao_meta_v2('2026-11-01','2026-11-18',true);
+SELECT * FROM farma.ds_veiculacao_meta_v3('2026-11-01','2026-11-18',false);
+SELECT * FROM farma.ds_veiculacao_meta_v3('2026-11-01','2026-11-18',true);
 SELECT anuncio_id,destino,situacao,sum(eventos_ctwa)
 FROM farma.ds_destinos_ctwa_diarios WHERE data BETWEEN '2026-11-01' AND '2026-11-18'
 GROUP BY 1,2,3 ORDER BY 1,2,3;
@@ -89,7 +89,7 @@ CREATE ROLE nf_ds_hml_farma_anuncios_agregados NOLOGIN;
 GRANT CONNECT ON DATABASE nexoflow_datastudio_homologacao TO nf_ds_hml_farma_anuncios_agregados;
 GRANT USAGE ON SCHEMA farma TO nf_ds_hml_farma_anuncios_agregados;
 GRANT SELECT ON farma.ds_catalogo_destinos_meta TO nf_ds_hml_farma_anuncios_agregados;
-GRANT EXECUTE ON FUNCTION farma.ds_veiculacao_meta_v2(date,date,boolean) TO nf_ds_hml_farma_anuncios_agregados;
+GRANT EXECUTE ON FUNCTION farma.ds_veiculacao_meta_v3(date,date,boolean) TO nf_ds_hml_farma_anuncios_agregados;
 COMMIT;
 ```
 
@@ -127,6 +127,8 @@ Confirme pela API e pela cópia a nova versão READY. Reenvio verifica o recibo 
 
 ## Looker e reversão
 
+A promoção da projeção leitora usa `--instalar-destinos-farma UUID_READY --promover-leitor-destinos-farma` com `--ambiente producao --segmento FARMA` e o DSN administrativo desse ambiente. Execute após conferir as duas fontes na cópia. A revisão ativa e a ausência de WRITING são verificadas na transação. A coleta com arquivo `META_ADS_DESTINOS_FILE` continua exclusiva da homologação. A promoção do leitor só habilita a consulta dos fatos confirmados de produção.
+
 ### Conciliação de conversas iniciadas na Meta
 
 Em cada coleta FARMA, o diagnóstico `conciliacao_conversas_meta` compara a resposta
@@ -151,6 +153,7 @@ Para o painel de Anúncios, valide na cópia as fontes `Anuncios_Veiculados_FARM
 e `Resumo_Anuncios_Veiculados_FARMA` com o mesmo período e filtros. Configure
 `conversas_meta_informadas` com o rótulo **Conversas informadas pela Meta** e
 mostre `fatos_sem_metrica_meta` como **Registros diários sem métrica de conversas**.
+A tabela usa `campanha_nome` dos fatos diários. Se o nome mudou, exibe o mais recente no recorte e conserva uma linha por anúncio, conta, moeda, fuso e política.
 O subtotal fica indisponível quando nenhum fato tiver valor e conserva um zero
 explícito. O campo `conversas_meta` continua exigindo cobertura de todos os fatos.
 Na READY v2 de homologação, o controle de 01 a 18/11/2026 tem 70 conversas

@@ -65,6 +65,7 @@ def test_two_stage_population_shared_grain_and_lost_ack(store):  # noqa: F811
                 "Meta_Ads_Diario",
                 chave=key,
                 segmento="FARMA",
+                campanha_nome={1: "Campanha anterior", 2: "Campanha atual"}.get(day),
                 payload_api_json=json.dumps({"nf_destino_v1": audit}),
             )
         )
@@ -104,6 +105,9 @@ def test_two_stage_population_shared_grain_and_lost_ack(store):  # noqa: F811
         ).fetchone()["raw"]
         conn.rollback()
     reader = Reader(DSN, "homologacao", "FARMA")
+    assert reader.query(
+        PERIOD[0], ["anuncio_id", "campanha_nome"], "2026-11-01", "2026-11-03", [], {}
+    )["rows"] == [["001", "Campanha atual"]]
     fields = [
         "anuncios",
         "eventos_ctwa",
