@@ -30,10 +30,12 @@ O Apps Script comercial está na versão 7. A versão 6 e as definições Compos
 | Uso comercial | Estado verificado |
 | --- | --- |
 | Anúncios | A página principal usa `Anuncios_Veiculados_FARMA` para a tabela e `Resumo_Anuncios_Veiculados_FARMA` para os cartões de veiculação e resultados. A fonte dos detalhes de pedidos por anúncio tem aceite próprio. |
-| Público | `BI_Publico_Resumo` está disponível no leitor e como fonte comercial no Looker. Confira os vínculos e os filtros por componente em cada corte. |
+| Público | Os 12 componentes antes vinculados à `ds82` na Base de clientes usam `BI_Publico_Resumo` no Looker oficial. São seis cartões, três tabelas e três controles. Os componentes de bairro e LTV têm fontes e aceite próprios. |
 | Weni | A visão comercial está instalada. O leitor retornou `DS_INSIGHTS_COBERTURA_INCOMPLETA` ao consultar 01–06/11 pelo papel de leitura. O vínculo comercial da `ds136` depende dos recibos da publicação Windows e da validação do período efetivo. |
 
-Em Anúncios, `investimento_original` representa a veiculação informada pela Meta, em BRL no corte conferido. `investimento_comprovado` é a base de CPA e ROAS e ficou nulo nesse corte. A tabela e os cartões indicam indisponibilidade onde a razão não pôde ser confirmada. `conversas_meta_informadas` preserva o subtotal e `fatos_sem_metrica_meta` sinaliza lacunas. Os 42 eventos CTWA têm origem e métrica próprias. Valide novamente após uma nova READY ou mudança de período.
+Em Anúncios, `investimento_original` representa a veiculação informada pela Meta, em BRL no corte conferido. `investimento_comprovado` é a base de CPA e ROAS e ficou nulo nesse corte. A tabela e os cartões indicam indisponibilidade onde a razão não pôde ser confirmada. `conversas_meta_informadas` preserva o subtotal e `fatos_sem_metrica_meta` sinaliza lacunas. Os 42 eventos CTWA têm origem e métrica próprias. O relatório oficial reproduziu três anúncios, R$ 251,02 e 70 conversas em 01–18/11/2026. Valide novamente após uma nova READY ou mudança de período.
+
+Público reproduziu os seis cartões da cópia na READY v2. As dimensões de cidade, canal e faixa etária são compartilhadas pela fonte comercial. A participação por linha usa o total da seleção, e o percentual de compra usa a razão entre as somas de compra identificada e de contatos. O filtro Instagram retornou 147 contatos. Belém retornou 33.451 e o cruzamento Belém com 35–44 anos retornou 322 nos cartões e nas tabelas. A página Base de clientes usa a revisão ativa e seus controles de público.
 
 ## Conferir o Windows antes de uma carga
 
