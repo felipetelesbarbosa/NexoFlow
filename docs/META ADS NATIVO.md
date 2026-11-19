@@ -28,11 +28,11 @@ A configuração fica no `secrets_config.py` local e usa:
 
 | Chave | Regra |
 | --- | --- |
-| `META_ADS_ENABLED` | Padrão `False`; habilitar com `True` após conferir credencial, contas e os arquivos de destino. Autoriza preparar as cinco abas Meta ausentes ou vazias com o schema canônico. |
+| `META_ADS_ENABLED` | Padrão `False`; habilitar com `True` após conferir credencial, contas e destino. No PostgreSQL, usa as tabelas Meta do contrato. Em perfis legados Sheets, prepara as cinco abas Meta ausentes ou vazias. |
 | `META_ADS_START_DATE` | Data inicial histórica desejada, no formato ISO `AAAA-MM-DD`. |
 | `META_ADS_OVERLAP_DAYS` | Sobreposição da incremental; padrão **7 dias**, para reconciliar indicadores que a Meta pode atualizar após a primeira coleta. |
 
-Os tokens Weni e as três planilhas de cada segmento continuam configurados nos perfis existentes. Nenhuma credencial é criada automaticamente a partir de outra. Habilitar a integração não substitui permissões Meta/Google/Weni ausentes.
+Configure a credencial Meta, os tokens Weni e a credencial do destino escolhido no perfil. Para o modo PostgreSQL FARMA, siga o [guia de operação Windows e VPS](OPERACAO_WINDOWS_VPS.md). Sheets usa os arquivos e as permissões Google dos perfis legados.
 
 Execute o **NexoFlow Analytics** pelo aplicativo normal, selecionando o segmento. O **Noturno** utiliza a mesma integração ao executar Analytics. Para consultar as opções do comando dedicado instalado:
 
@@ -69,7 +69,9 @@ Revise o resultado da simulação antes do segundo comando. Confirmação de sch
 
 Com Meta Ads ativo no perfil FARMA, o Analytics e a etapa Analytics do Noturno cruzam os contatos e eventos oficiais CTWA da Weni com os pedidos da FarmaLíder. O resumo fica no log da execução. A seção `reconciliacao_pedidos_weni` do arquivo `logs/privado/meta_ads_ultima_execucao.json` registra os totais e o motivo por pedido, com os IDs de anúncio e evento disponíveis. Guarde esse arquivo no ambiente privado.
 
-A revisão por pedido parte dos contatos com origem Meta cuja chegada caiu no período de Belém. Ela verifica o último pedido informado pela Weni e aplica os mesmos critérios usados na publicação. A venda exige pedido elegível, evento oficial vinculado ao mesmo contato por UUID, último toque anterior ou simultâneo ao pedido e uma linha diária do anúncio na janela e no fuso da conta Meta. O diagnóstico distingue falta de evento, último toque ambíguo, pedido sem vínculo elegível e ausência da linha de veiculação. A data da chegada do contato e a data do anúncio atribuído podem cair em dias diferentes. Os 20 dias se referem à revisão dos dados históricos da Meta.
+A revisão por pedido parte dos contatos com origem Meta cuja chegada caiu no período de Belém. Ela verifica o último pedido informado pela Weni e aplica os mesmos critérios usados na publicação. A venda exige pedido elegível, evento oficial vinculado ao mesmo contato por UUID, último toque anterior ou simultâneo ao pedido e uma linha diária do anúncio na janela e no fuso da conta Meta. O diagnóstico distingue falta de evento, último toque ambíguo, pedido sem vínculo elegível e ausência da linha de veiculação. A data da chegada do contato e a data do anúncio atribuído podem cair em dias diferentes.
+
+O recorte de hoje até D−20 vale para a reconsulta de pedidos da FarmaLíder, inclusive o histórico incremental quando habilitado. A atualização incremental da Meta tem uma sobreposição própria de sete dias por padrão, configurável em `META_ADS_OVERLAP_DAYS`. O vínculo com a venda segue a política de último toque observado descrita acima. [Guia do histórico automático](ANALYTICS%20HISTORICO%20AUTOMATICO.md)
 
 Para conferir um período na revisão READY do ambiente configurado no perfil FARMA, execute no Terminal NexoFlow com o pacote que contém a rotina e `ARMAZENAMENTO_BACKEND = "postgres"`:
 
