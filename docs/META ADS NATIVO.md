@@ -73,7 +73,17 @@ A revisão por pedido parte dos contatos com origem Meta cuja chegada caiu no pe
 
 O recorte de hoje até D−20 vale para a reconsulta de pedidos da FarmaLíder, inclusive o histórico incremental quando habilitado. A atualização incremental da Meta tem uma sobreposição própria de sete dias por padrão, configurável em `META_ADS_OVERLAP_DAYS`. O vínculo com a venda segue a política de último toque observado descrita acima. [Guia do histórico automático](ANALYTICS%20HISTORICO%20AUTOMATICO.md)
 
-Para pedidos do histórico paginado, a auditoria mostra em `evidencias_ctwa_paginados` quantos têm evento CTWA anterior do mesmo contato, quantos têm eventos ambíguos ou posteriores e quantos carecem de vínculo. Se houver evento anterior inequívoco, o arquivo privado registra o anúncio, o evento e o intervalo em segundos até o pedido. A inclusão desses pedidos no CPA e no ROAS requer uma janela de atribuição comercial homologada. [Regra do histórico de pedidos](HISTORICO%20PEDIDOS.md)
+Para pedidos do histórico paginado, a auditoria mostra em `evidencias_ctwa_paginados` quantos têm evento CTWA anterior do mesmo contato, quantos têm eventos ambíguos ou posteriores e quantos carecem de vínculo. Se houver evento anterior inequívoco, o arquivo privado registra o anúncio, o evento e o intervalo em segundos até o pedido. Essa versão registra os resultados em auditoria. [Regra do histórico de pedidos](HISTORICO%20PEDIDOS.md)
+
+#### Homologação do atendimento humano FARMA
+
+Na FarmaLíder, a Lili fornece orçamentos e encaminha o cliente. A venda é realizada pelo agente humano. A tag `Pedido Finalizado` registra que houve um pedido no atendimento em que foi aplicada. `Orçamento` indica orçamento registrado. O evento de transferência indica encaminhamento e pode ser usado para medir oportunidades.
+
+Verifique a sequência no mesmo projeto FARMA: metadados CTWA do anúncio na Weni, identidade da conversa, atendimento humano e tag do próprio ticket. O evento CTWA fornece o ID do anúncio, do clique e da mensagem externa. Use o ID da conversa quando disponível e confirme a identidade do atendimento na origem. A `ds136` publica totais por dia. A validação individual usa o detalhe da Weni Flows e do Weni Chats.
+
+Conte a tag `Pedido Finalizado` uma vez por atendimento comprovadamente ligado ao anúncio. Para o CPA e o ROAS, concilie o atendimento com um pedido oficial único e válido da FarmaLíder, com valor, status e pagamento conferidos na API. Um identificador do pedido gravado no próprio ticket resolve o vínculo. Vários pedidos candidatos para o mesmo atendimento deixam a receita pendente de conciliação. Os rótulos de orçamento ou transferência medem etapas distintas da venda.
+
+Uma compra válida do mesmo contato em até sete dias após o evento CTWA pode ser apresentada como compra posterior quando falta a prova de fechamento no atendimento do anúncio. Conte cada pedido uma vez e mantenha a receita dessa métrica separada da receita de venda no atendimento. O tempo até a compra é o intervalo observado entre o evento e a emissão do pedido. As janelas de 24, 48 e 72 horas foram comparadas em simulação. Os indicadores comerciais dependem da homologação do vínculo por atendimento. [Detalhe e validação dos tickets](README%20DELIVERY.md) · [Fonte diária da Weni](CONVERSAS%20DIARIAS%20WENI.md)
 
 Para conferir um período na revisão READY do ambiente configurado no perfil FARMA, execute no Terminal NexoFlow com o pacote que contém a rotina e `ARMAZENAMENTO_BACKEND = "postgres"`:
 
