@@ -4,11 +4,9 @@ O **NexoFlow Windows** integra Weni e a API FarmaLíder nos segmentos FarmaLíde
 
 O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
 
-[Baixar instalador estável 1.5.46](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.46/NexoFlow-Setup-1.5.46.zip) · [Homologação da ds136](docs/CONVERSAS%20DIARIAS%20WENI.md) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
+[Baixar instalador 1.5.47](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.47/NexoFlow-Setup-1.5.47.zip) · [Homologação da ds136](docs/CONVERSAS%20DIARIAS%20WENI.md) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
 
-A release 1.5.46 inclui a auditoria de eventos CTWA dos pedidos paginados FARMA. Atualize o Windows escolhendo **Atualizar mantendo dados**. [Release oficial](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.46)
-
-A preparação da 1.5.47 acrescenta pedidos na conversa do anúncio, pedidos em até sete dias e CAC de novos clientes ao Analytics FARMA. O pacote desta versão é `NexoFlow-Setup-1.5.47.zip`. [Configuração da atribuição comercial](docs/META%20ADS%20NATIVO.md#m%C3%A9tricas-da-p%C3%A1gina-an%C3%BAncios-em-produ%C3%A7%C3%A3o)
+A 1.5.47 acrescenta pedidos no atendimento original, pedidos em até sete dias e CAC ao Analytics FARMA. Atualize o Windows escolhendo **Atualizar mantendo dados** e configure o XLSX de Salas da Weni no perfil FARMA. [Release oficial](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.47) · [Configuração da atribuição comercial](docs/META%20ADS%20NATIVO.md#m%C3%A9tricas-da-p%C3%A1gina-an%C3%BAncios-em-produ%C3%A7%C3%A3o)
 
 O publicador e o leitor PostgreSQL do Data Studio FARMA estão implantados na VPS comercial. Consulte o guia operacional para conferir a versão do Windows, a revisão READY ativa e a fonte efetiva de cada página do Looker. [Contrato Meta e Weni](docs/DESTINOS%20META%20WENI.md)
 

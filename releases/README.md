@@ -1,3 +1,11 @@
+# NexoFlow 1.5.47 — Downloads
+
+Publicada em **19/11/2026, 16:14:22 (America/Sao_Paulo)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.47) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/2d9332010e26839774da33fe91ccf33dd2c95594) · [CI, pacotes e publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44591238396).
+
+[NexoFlow-1.5.47.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.47/NexoFlow-1.5.47.zip) · [NexoFlow-Setup-1.5.47.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.47/NexoFlow-Setup-1.5.47.zip) · [SHA256SUMS-1.5.47.txt](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.47/SHA256SUMS-1.5.47.txt)
+
+Atualize pelo Setup em **Atualizar mantendo dados**. [Configuração FARMA e estado da VPS](../docs/OPERACAO_WINDOWS_VPS.md)
+
 # NexoFlow 1.5.46 — Downloads
 
 Publicada em **19/11/2026, 11:11:43 (America/Sao_Paulo)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.46) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/53db8ec6e89f27883bc12e535a5da56b3f3bd2b1) · [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44537082625) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44541000441).

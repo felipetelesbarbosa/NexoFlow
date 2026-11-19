@@ -1,5 +1,11 @@
 # Versionamento do NexoFlow
 
+## Publicação 1.5.47
+
+Publicada em **19/11/2026, 16:14:22 (America/Sao_Paulo)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.47) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/2d9332010e26839774da33fe91ccf33dd2c95594) · [CI, pacotes e publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44591238396) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44591238437).
+
+O Setup foi testado no Windows. Os dois arquivos públicos passaram na verificação SHA-256 e CRC. A atualização acrescenta a atribuição comercial FARMA ao Analytics e ao Noturno. [Operação na VPS de produção](OPERACAO_WINDOWS_VPS.md)
+
 ## Preparação 1.5.46
 
 Prévia Windows para homologar a conciliação diária de conversas Meta FARMA. O Setup de homologação está sujeito aos checks do mesmo commit. A publicação comercial depende da validação da divergência e da cópia do Looker.
@@ -68,7 +74,7 @@ A **1.5.32 foi publicada em 10/11/2026, 19:16:49 (America/Fortaleza)**, no SHA `
 
 A **1.5.33 foi publicada em 10/11/2026, 23:28:34 (America/Fortaleza)**, no SHA `7884d7007fd0c65cbf90bfc30c5c35dc6c9056fb`, com recuperação da leitura da trava Sheets. [Release e pacotes conferidos](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.33).
 
-As próximas publicações de atualização, hotfix ou patch seguem **1.5.46 → ... → 1.5.99 → 1.6 → 1.6.1**. Cada publicação incrementa uma única vez; commits e novas tentativas de CI da mesma entrega não mudam a numeração. Não há salto automático de versão principal.
+As próximas publicações de atualização, hotfix ou patch seguem **1.5.48 → ... → 1.5.99 → 1.6 → 1.6.1**. Incremente a numeração uma vez por publicação e preserve os números em novas tentativas de CI da mesma entrega.
 
 A versão da distribuição fica em `VERSION`. A tag é `v{versao}`, o título é `NexoFlow {versao}` e os pacotes são `NexoFlow-{versao}.zip` e `NexoFlow-Setup-{versao}.zip`. Nunca sobrescreva os arquivos de uma versão pública para entregar código novo. O workflow permite retomar somente um rascunho da mesma entrega.
 
