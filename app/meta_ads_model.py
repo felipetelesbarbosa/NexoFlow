@@ -384,7 +384,9 @@ def _cohort_orders(contacts, start, end):
     return candidates, len(contacted)
 
 
-def _finish_order_reconciliation(report, cohort, decisions, facts, converted):
+def _finish_order_reconciliation(
+    report, cohort, decisions, facts, converted, paginated_touches
+):
     from meta_ads_destinations import _farma_delivery
 
     period_rows = [
@@ -423,6 +425,25 @@ def _finish_order_reconciliation(report, cohort, decisions, facts, converted):
                 continue
         if revenue:
             detail["receita_valida"] = revenue
+        if (
+            status == "ORIGEM_PAGINADA_FORA_ATRIBUICAO_NATIVA"
+            and order_id in paginated_touches
+        ):
+            paginated_event, evidence_status = paginated_touches[order_id]
+            detail["evidencia_ctwa_paginado"] = (
+                "EVENTO_CTWA_ANTERIOR" if paginated_event else evidence_status
+            )
+            if paginated_event and order_time is not None:
+                exposed_at = paginated_event["dt"]
+                detail.update(
+                    conta_id=paginated_event["account_id"],
+                    anuncio_id=paginated_event["ad_id"],
+                    evento_id=paginated_event["event_id"],
+                    data_evento=exposed_at.isoformat(),
+                    intervalo_evento_pedido_segundos=int(
+                        (order_time - exposed_at).total_seconds()
+                    ),
+                )
         conversion = conversions.get(order_id)
         if conversion:
             key = conversion["conta_id"], conversion["anuncio_id"]
@@ -474,6 +495,13 @@ def _finish_order_reconciliation(report, cohort, decisions, facts, converted):
         motivos=dict(sorted(counts.items())),
         pedidos=details,
     )
+    paginated_evidence = Counter(
+        detail["evidencia_ctwa_paginado"]
+        for detail in details
+        if "evidencia_ctwa_paginado" in detail
+    )
+    if paginated_evidence:
+        report["evidencias_ctwa_paginados"] = dict(sorted(paginated_evidence.items()))
 
 
 def build_native_tables(
@@ -501,6 +529,7 @@ def build_native_tables(
         raise ValueError("Segmento Meta inválido.")
     cohort = {}
     decisions = {}
+    paginated_touches = {}
     if segment == "FARMA" and order_reconciliation is not None:
         cohort, contacted = _cohort_orders(
             contacts,
@@ -636,6 +665,12 @@ def build_native_tables(
         event = None
         if order.get("origem_pedido") == "FARMALIDER_PEDIDOS_PAGINADOS":
             reason = "ORIGEM_PAGINADA_FORA_ATRIBUICAO_NATIVA"
+            if oid in cohort:
+                paginated_touches[oid] = (
+                    _last_order_touch(order, by_contact.get(uid, []), dt)
+                    if dt is not None
+                    else (None, "DATA_PEDIDO_INVALIDA")
+                )
         else:
             seen_orders.add(unique)
             if dt is None:
@@ -1058,5 +1093,6 @@ def build_native_tables(
             decisions,
             tables["BI_Meta_Resultados"],
             converted,
+            paginated_touches,
         )
     return tables

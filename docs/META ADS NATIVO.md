@@ -73,6 +73,8 @@ A revisão por pedido parte dos contatos com origem Meta cuja chegada caiu no pe
 
 O recorte de hoje até D−20 vale para a reconsulta de pedidos da FarmaLíder, inclusive o histórico incremental quando habilitado. A atualização incremental da Meta tem uma sobreposição própria de sete dias por padrão, configurável em `META_ADS_OVERLAP_DAYS`. O vínculo com a venda segue a política de último toque observado descrita acima. [Guia do histórico automático](ANALYTICS%20HISTORICO%20AUTOMATICO.md)
 
+Para pedidos do histórico paginado, a auditoria mostra em `evidencias_ctwa_paginados` quantos têm evento CTWA anterior do mesmo contato, quantos têm eventos ambíguos ou posteriores e quantos carecem de vínculo. Se houver evento anterior inequívoco, o arquivo privado registra o anúncio, o evento e o intervalo em segundos até o pedido. A inclusão desses pedidos no CPA e no ROAS requer uma janela de atribuição comercial homologada. [Regra do histórico de pedidos](HISTORICO%20PEDIDOS.md)
+
 Para conferir um período na revisão READY do ambiente configurado no perfil FARMA, execute no Terminal NexoFlow com o pacote que contém a rotina e `ARMAZENAMENTO_BACKEND = "postgres"`:
 
 ```powershell

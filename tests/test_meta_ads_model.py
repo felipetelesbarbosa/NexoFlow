@@ -167,6 +167,52 @@ class NativeMetaModelTests(unittest.TestCase):
         )
         self.assertEqual(audit["pedidos"][0]["data_meta"], "2026-11-03")
 
+    def test_paged_orders_show_weni_evidence_in_audit_without_attribution(self):
+        order = {**self.order, "origem_pedido": "FARMALIDER_PEDIDOS_PAGINADOS"}
+        contact = {
+            "contact_uuid": "c1",
+            "pedido_id": order["pedido_id"],
+            "pedido_data": order["data_hora"],
+            "primeiro_anuncio_origem": "Meta Ads",
+            "primeiro_anuncio_id": "20",
+            "primeiro_anuncio_data": self.event["date"],
+        }
+        wrong_contact = {**self.event, "contact_uuid": "c2"}
+        future_touch = {**self.event, "date": "2026-11-03T12:00:00-03:00"}
+        conflicting_touch = {
+            **self.event,
+            "event_id": "outro",
+            "ad_id": "21",
+            "account_id": "10",
+        }
+        for events, evidence_status in (
+            ([self.event], "EVENTO_CTWA_ANTERIOR"),
+            ([wrong_contact], "SEM_CTWA_COM_UUID"),
+            ([future_touch], "EVENTO_CTWA_POSTERIOR"),
+            ([self.event, conflicting_touch], "ULTIMO_TOQUE_AMBIGUO"),
+        ):
+            with self.subTest(evidence_status=evidence_status):
+                audit = {"inicio": "2026-11-01", "fim": "2026-11-18"}
+                args = dict(orders=[order], contacts=[contact], evidence=events)
+                tables = self.build(**args, order_reconciliation=audit)
+                self.assertEqual(tables, self.build(**args))
+                self.assertEqual(tables["BI_Meta_Conversoes"], [])
+                self.assertEqual(audit["pedidos_validos"], 1)
+                self.assertEqual(audit["pedidos_no_resumo"], 0)
+                self.assertEqual(audit["receita_no_resumo"], "0.00")
+                self.assertEqual(
+                    audit["evidencias_ctwa_paginados"], {evidence_status: 1}
+                )
+                detail = audit["pedidos"][0]
+                self.assertEqual(
+                    detail["situacao"], "ORIGEM_PAGINADA_FORA_ATRIBUICAO_NATIVA"
+                )
+                if evidence_status == "EVENTO_CTWA_ANTERIOR":
+                    self.assertEqual(detail["evento_id"], "e1")
+                    self.assertEqual(detail["intervalo_evento_pedido_segundos"], 3600)
+                else:
+                    self.assertNotIn("evento_id", detail)
+
     def test_cancelled_unvalidated_and_payment_zero_orders_never_count(self):
         for change in [
             {"farmalider_status_pedido": "3"},
