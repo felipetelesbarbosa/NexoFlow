@@ -357,7 +357,7 @@ class Reader(Store):
             if not start or aggregation:
                 raise StorageError("DS_ANUNCIOS_PERIODO_OU_AGREGACAO")
             statement = sql.SQL(
-                "SELECT {} FROM farma.ds_veiculacao_meta_v1(%s,%s,%s)"
+                "SELECT {} FROM farma.ds_veiculacao_meta_v3(%s,%s,%s)"
             ).format(sql.SQL(",").join(expressions))
             params = [start, end, table == meta_destinations.PERIOD[1], *params]
         if clauses:
@@ -390,7 +390,7 @@ class Reader(Store):
             if (
                 period_ads
                 and not conn.execute(
-                    "SELECT to_regprocedure('farma.ds_veiculacao_meta_v1(date,date,boolean)') AS f"
+                    "SELECT to_regprocedure('farma.ds_veiculacao_meta_v3(date,date,boolean)') AS f"
                 ).fetchone()["f"]
             ):
                 raise StorageError("DS_DESTINOS_VISAO_AUSENTE")
