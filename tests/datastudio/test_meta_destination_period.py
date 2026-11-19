@@ -27,6 +27,8 @@ def test_two_stage_population_shared_grain_and_lost_ack(store):  # noqa: F811
             ("001", 1, 5, 12, 0, 0, 1),
             ("001", 2, 0, 0, 2, 48, 1),
             ("002", 1, 0, 0, 10, 300, 0),
+            ("001", 3, 5, 2, 0, 0, 0),
+            ("002", 4, 5, 2, 0, 0, 0),
         ]
     ):
         key = str(idx)
@@ -49,7 +51,7 @@ def test_two_stage_population_shared_grain_and_lost_ack(store):  # noqa: F811
                 pedidos_confirmados=orders,
                 receita_confirmada=revenue,
                 eventos_ctwa=ctwa,
-                conversas_iniciadas_meta=3,
+                conversas_iniciadas_meta={3: None, 4: 0}.get(day, 3),
             )
         )
         audit = dict(
@@ -118,6 +120,18 @@ def test_two_stage_population_shared_grain_and_lost_ack(store):  # noqa: F811
         assert (
             reader.query(name, fields, "2026-11-02", "2026-11-02", [], {})["rows"] == []
         )
+        coverage_fields = [
+            "conversas_meta",
+            "conversas_meta_informadas",
+            "fatos_sem_metrica_meta",
+        ]
+        for start, end, expected in [
+            ("2026-11-01", "2026-11-03", [None, Decimal(6), 1]),
+            ("2026-11-03", "2026-11-03", [None, None, 1]),
+            ("2026-11-04", "2026-11-04", [Decimal(0), Decimal(0), 0]),
+        ]:
+            actual = reader.query(name, coverage_fields, start, end, [], {})["rows"][0]
+            assert [None if v is None else Decimal(str(v)) for v in actual] == expected
     with pytest.raises(StorageError):
         reader.query(PERIOD[0], ["contact_uuid"], "2026-11-01", "2026-11-02", [], {})
 
