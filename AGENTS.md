@@ -1,6 +1,8 @@
 # Operação atual do NexoFlow
 
-Antes de orientar uma carga Windows ou trocar fontes do Looker Studio, consulte [Operação Windows, VPS e Looker](docs/OPERACAO_WINDOWS_VPS.md) e confirme o ambiente real. `VERSION` informa a versão do código. O status de release, de publicação de dados e de troca das fontes do relatório devem ser conferidos separadamente. O perfil FARMA pode publicar por API privada no PostgreSQL. O Looker lê READY pela API leitora quando o componente está vinculado ao conector apropriado. Preserve a separação entre FARMA/PET e homologação/produção.
+Comece em [Operação Windows, VPS e Looker](docs/OPERACAO_WINDOWS_VPS.md) e no [guia de instalação](docs/README%20INSTALACAO.md). O fluxo comercial FARMA usa Windows → API publicadora privada → PostgreSQL na VPS → API leitora → Apps Script → Looker Studio. O Windows continua executando Weni, Analytics, Recompra e Noturno. No modo PostgreSQL do perfil, use a credencial privada do destino. Google Sheets é opção legada e ainda atende componentes do relatório pendentes de troca.
+
+Confirme separadamente `VERSION`, release, versão instalada no PC, perfil, ambiente, estado da publicação READY e fonte dos componentes no Looker oficial. Preserve a separação FARMA/PET e homologação/produção. As entradas de release abaixo registram estados históricos.
 
 # NexoFlow 1.5.45 publicada
 

@@ -1,6 +1,6 @@
 # Implantação do leitor FARMA no Data Studio oficial
 
-Registro de 18/11/2026. O relatório oficial e o seu leitor em produção continuam em uso. O corte comercial depende da conferência da cópia e da imagem e implantação privada que serão promovidas.
+O [guia de operação Windows, VPS e Looker](OPERACAO_WINDOWS_VPS.md) registra o estado comercial a partir de 19/11/2026. As configurações da tabela inicial, as pendências descritas no ensaio e os comandos abaixo documentam a preparação de 18/11. Confira o guia vigente e os vínculos atuais antes de reaplicar qualquer etapa.
 
 ## Configuração conferida na VPS
 

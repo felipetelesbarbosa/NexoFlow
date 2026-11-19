@@ -1,30 +1,30 @@
-# NexoFlow 1.5.30 — Instalação
+# Instalação do NexoFlow Windows
 
 ## Requisitos
 
 - Windows x64.
 - Python 3.11 ou superior, 64 bits. O Setup oferece baixar o Python 3.14.8 x64 do site oficial, com SHA-256 conferido, se não encontrar um compatível. O instalador Python não acompanha os ZIPs.
-- Acesso à Weni, à API FarmaLíder e ao Google Sheets, com suas próprias credenciais para FarmaLíder e/ou Pets Líder.
+- Credenciais da Weni e da API FarmaLíder para o segmento usado.
+- Credencial do destino de publicação do perfil. Na operação FARMA com a VPS, use a credencial da API publicadora PostgreSQL. Perfis legados em modo Sheets usam a conta de serviço Google.
 
 ## Instalar
 
-1. Baixe [NexoFlow-Setup-1.5.30.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.30/NexoFlow-Setup-1.5.30.zip).
+1. Abra as [releases do NexoFlow](https://github.com/felipetelesbarbosa/NexoFlow/releases/latest) e baixe o arquivo `NexoFlow-Setup-<versão>.zip` da versão estável. O [guia operacional](OPERACAO_WINDOWS_VPS.md) identifica os pacotes de homologação e os destinos correspondentes.
 2. Extraia todo o pacote e execute **NexoFlow Setup.exe**. Autorize a instalação quando o Windows solicitar.
 3. Conclua o assistente. O destino padrão é `C:\NexoFlow`, com atalhos dos aplicativos na Área de Trabalho e no Menu Iniciar.
 
-O [release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.30) também oferece o projeto completo e o arquivo de hashes dos pacotes.
+A página da release também oferece o projeto completo e os hashes dos pacotes.
 
 ## Configurar os acessos
 
 | Integração | Configuração |
 | --- | --- |
-| Weni e FarmaLíder | Use `configuracao/secrets_config.example.py` como modelo para criar `C:\NexoFlow\secrets_config.py`. Preencha os tokens e os três IDs de Sheets em `PERFIS["FARMA"]` e `PERFIS["PET"]`, nas organizações corretas. |
-| Google Sheets | Salve a sua credencial em `C:\NexoFlow\credentials\google_credentials.json`, configure Dashboard, Operação e Histórico de cada segmento e compartilhe cada arquivo como **Editor** com a conta de serviço. |
+| Weni e FarmaLíder | Use o [modelo de configuração](../configuracao/secrets_config.example.py) para criar `C:\NexoFlow\secrets_config.py`. Preencha as credenciais em `PERFIS["FARMA"]` ou `PERFIS["PET"]` conforme a organização usada. |
+| PostgreSQL na VPS | No perfil ativo, confira `ARMAZENAMENTO_BACKEND = "postgres"`, `DATASTUDIO_AMBIENTE` e `DATASTUDIO_CREDENTIALS_FILE`. Use a credencial privada da API publicadora para o mesmo perfil e ambiente. [Guia operacional](OPERACAO_WINDOWS_VPS.md) |
+| Google Sheets legado | No perfil em modo Sheets, configure `credentials/google_credentials.json`, os três IDs de Dashboard, Operação e Histórico e a permissão de edição da conta de serviço. [Configuração Google](GOOGLE%20SETUP.md) |
 | Proxy | Se necessário, siga o [guia de rede e proxy](README%20PROXY.md). |
 
-A mesma credencial Google pode atender aos dois perfis; as planilhas e os tokens Weni são próprios de cada marca. O ambiente da API é produção nos dois perfis. Veja [segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md).
-
-Para configurar a conta Google, consulte [Google Sheets](GOOGLE%20SETUP.md). Se houver destinos separados de operação e histórico, confira a [divisão em três arquivos](planilhas_separadas.md).
+Cada marca tem sua própria organização Weni e seu próprio perfil. O exemplo do repositório conserva os valores legados e de homologação. Confira explicitamente o destino antes de usar a instalação comercial. [Segmentos e fluxos](SEGMENTOS%20E%20FLUXOS.md)
 
 O NexoFlow não inclui chaves, tokens nem credenciais. Mantenha seus acessos privados.
 
@@ -53,6 +53,8 @@ Abra **NexoFlow Terminal**, escolha FarmaLíder ou Pets Líder e execute:
 nexo diagnostico
 ```
 
+Para um perfil PostgreSQL, rode também `nexo armazenamento postgres diagnosticar` e confira segmento, ambiente e revisão ativa, conforme o [guia operacional](OPERACAO_WINDOWS_VPS.md#conferir-o-windows-antes-de-uma-carga).
+
 Depois, siga o [guia de operação](Documentacao%20NexoFlow.md): **Weni completa → Planilha, quando houver exports → Analytics completo → Recompra → Analytics incremental**. Revise os relatórios solicitados. Finalize atualizando os dados e os campos necessários no Data Studio.
 
 As cargas completas oferecem **100%** ou quatro partes de **25%**. Execute as partes em ordem, separadamente para Weni e Analytics. Não avance para a parte seguinte do Analytics se a anterior terminou parcial ou com erro.
@@ -65,9 +67,9 @@ Encerre as rotinas dos dois segmentos e execute o novo **NexoFlow Setup.exe**. Q
 - **Instalação limpa:** reinicia esses dados locais nos dois segmentos. Configure os acessos novamente e gere novas cargas e revisões.
 - **Cancelar:** encerra sem alterar a instalação.
 
-Os arquivos de `importacoes/` são preservados nas duas opções. O Setup não exclui dados na Weni ou no Google Sheets. Se a instalação falhar, tenta restaurar a versão anterior com seus dados.
+Os arquivos de `importacoes/` são preservados nas duas opções. Se a instalação falhar, o Setup tenta restaurar a versão anterior com seus dados.
 
-A série atual é 1.5; patches posteriores seguem 1.5.30 até 1.5.99, antes de 1.6. A versão instalada aparece no Terminal e nos metadados dos aplicativos.
+Confira a versão instalada no Terminal com `nexo versao` e nos metadados dos aplicativos.
 
 Após atualizar, rode o diagnóstico e gere novas revisões antes de aplicar mudanças. Faça carga completa quando precisar revalidar a base ou preencher novos campos. O [histórico de mudanças](../CHANGELOG.md) informa os ajustes de cada publicação.
 
@@ -85,7 +87,9 @@ Se o Windows impedir a leitura ou a cópia do launcher `NexoFlow Noturno.exe`, o
 
 ## Capacidade e confiança na distribuição
 
-Para criar continuações no Meu Drive, configure a autorização Google local e depois as fontes do Data Studio; confira [CONTINUACOES.md](CONTINUACOES.md). O Setup preserva credenciais e não configura fontes do relatório sozinho.
+Continuações no Meu Drive fazem parte do modo Sheets legado. [Guia de continuações](CONTINUACOES.md)
+
+A publicação PostgreSQL e o vínculo das fontes do Looker têm configuração própria. [Guia operacional](OPERACAO_WINDOWS_VPS.md)
 
 O ZIP contém `RELATORIO DE SEGURANCA.json` com o estado das assinaturas. Certificados autoassinados locais não conferem confiança pública. Veja [assinatura Windows](ASSINATURA%20WINDOWS.md) e [antivírus](ANTIVIRUS%20E%20CONFIANCA.md).
 

@@ -2,6 +2,10 @@
 
 Consolidação documental em **10/11/2026**. Referência compartilhada para Codex, Work e futuros responsáveis. Este documento organiza decisões e liga os contratos especializados; não autoriza implementar o roadmap, iniciar cargas, alterar fontes comerciais, publicar agentes, implantar serviços ou gerar releases.
 
+## Operação vigente desde 19/11/2026
+
+O [guia Windows, VPS e Looker](../OPERACAO_WINDOWS_VPS.md) registra o caminho comercial FARMA e o estado das fontes. O NexoFlow roda as rotinas no Windows, publica pela API privada no PostgreSQL da VPS e entrega a revisão READY ao conector do Looker pela API leitora. Os registros de 10 a 12/11 neste documento descrevem seus respectivos cortes. Para instalação, consulte o [guia atual](../README%20INSTALACAO.md).
+
 ## Navegação e ordem de consulta
 
 1. [AGENTS.md](../../AGENTS.md): regras operacionais vigentes e limites da tarefa autorizada.
@@ -27,7 +31,7 @@ Registrar separadamente: **código desenvolvido → teste aprovado → release p
 
 ## 2. Arquitetura e fronteiras
 
-Windows permanece operacional e autônomo em `C:\NexoFlow`, sem dependência de Codex CLI, servidor MCP, clone de desenvolvimento ou VPS. Ver [aplicativos](../../README.md), [Noturno](../NOTURNO.md) e [núcleo Hub](../../hub/README.md).
+O Windows executa as rotinas em `C:\NexoFlow` com Weni, API FarmaLíder e estado local. A publicação do perfil PostgreSQL depende da API privada da VPS. O Windows funciona independentemente do worker do Hub, do Codex CLI, de servidor MCP e de clone de desenvolvimento. Ver [aplicativos](../../README.md), [Noturno](../NOTURNO.md) e [núcleo Hub](../../hub/README.md).
 
 No Hub, Python mantém identidade, pedidos, finanças, segmentação, elegibilidade, reconciliação e atribuição. Worker controla tarefas, tentativas, checkpoints, leases e retomada; PostgreSQL persiste estados e coordenação; FastAPI fornece API interna autenticada. n8n agenda/orquestra e não duplica regras de negócio. Os conectores comerciais e a escrita real permanecem bloqueados no contrato de homologação descrito no repositório.
 

@@ -25,7 +25,15 @@ O contrato `nexoflow_datastudio_1` usa os bancos `nexoflow_datastudio` (produç�
 
 As visões de Público, Anúncios e Weni foram instaladas na VPS. Leitor e publicador rodaram saudáveis com a imagem do commit `574e70254fb18c63791d679f06a2944845cd9584` e a READY v2 permaneceu ativa. O leitor usa um processo Uvicorn, limite HTTP 48 e `max_parallel_workers_per_gather=0` na sessão. A rota comercial de Weni aceitou a autenticação e rejeitou a solicitação de teste vazia com `DS_PARAMETROS_INVALIDOS`, sem gravar dias. A visão comercial de Weni retornou `DS_INSIGHTS_COBERTURA_INCOMPLETA` para a amostra, ainda aguardando publicação Windows nesse destino.
 
-O Apps Script comercial está na versão 7. As conexões PostgreSQL de Anúncios, Resumo de Anúncios e Público foram criadas. Vincule e confira os componentes no relatório oficial antes de registrar o corte do Looker. A versão 6 do Apps Script e os arquivos Compose anteriores ficaram disponíveis para reversão. Para reoperar o novo serviço, preserve a ordem de arquivos `compose.yaml`, `compose.tunnel.yaml`, `compose.farma-v146-validado.yaml`. O backup operacional guarda as definições anteriores da FARMA, as imagens e os hashes. PET segue o próprio roteiro.
+O Apps Script comercial está na versão 7. A versão 6 e as definições Compose anteriores ficaram disponíveis para reversão. Para reoperar os serviços, use nesta ordem `compose.yaml`, `compose.tunnel.yaml` e `compose.farma-v146-validado.yaml`. O backup operacional guarda as definições anteriores da FARMA, as imagens e os hashes. PET segue o próprio roteiro.
+
+| Uso comercial | Estado verificado |
+| --- | --- |
+| Anúncios | A página principal usa `Anuncios_Veiculados_FARMA` para a tabela e `Resumo_Anuncios_Veiculados_FARMA` para os cartões de veiculação e resultados. A fonte dos detalhes de pedidos por anúncio tem aceite próprio. |
+| Público | `BI_Publico_Resumo` está disponível no leitor e como fonte comercial no Looker. Confira os vínculos e os filtros por componente em cada corte. |
+| Weni | A visão comercial está instalada. O leitor retornou `DS_INSIGHTS_COBERTURA_INCOMPLETA` ao consultar 01–06/11 pelo papel de leitura. O vínculo comercial da `ds136` depende dos recibos da publicação Windows e da validação do período efetivo. |
+
+Em Anúncios, `investimento_original` representa a veiculação informada pela Meta, em BRL no corte conferido. `investimento_comprovado` é a base de CPA e ROAS e ficou nulo nesse corte. A tabela e os cartões indicam indisponibilidade onde a razão não pôde ser confirmada. `conversas_meta_informadas` preserva o subtotal e `fatos_sem_metrica_meta` sinaliza lacunas. Os 42 eventos CTWA têm origem e métrica próprias. Valide novamente após uma nova READY ou mudança de período.
 
 ## Conferir o Windows antes de uma carga
 
@@ -37,6 +45,6 @@ nexo versao
 nexo armazenamento postgres diagnosticar
 ```
 
-Confira segmento, ambiente, revisão ativa e pendências. A credencial privada é indicada por `DATASTUDIO_CREDENTIALS_FILE` no perfil local. O caminho pode incluir uma subpasta específica do ambiente ou do ensaio. Guarde o arquivo fora do Git. Consulte os requisitos de ativação, importação de estado, preparo e retomada no [guia de migração](MIGRACAO%20WINDOWS%20POSTGRESQL%20DATA%20STUDIO.md).
+Para a carga comercial FARMA, confira `ARMAZENAMENTO_BACKEND = "postgres"`, `DATASTUDIO_AMBIENTE = "producao"`, segmento `FARMA`, revisão ativa e pendências. A credencial privada da API publicadora é indicada por `DATASTUDIO_CREDENTIALS_FILE` no perfil local. O caminho pode incluir uma subpasta específica do ambiente ou do ensaio. Guarde o arquivo fora do Git. Consulte os requisitos de ativação, importação de estado, preparo e retomada no [guia de migração](MIGRACAO%20WINDOWS%20POSTGRESQL%20DATA%20STUDIO.md).
 
 Uma falha durante o envio pode acontecer depois de a VPS ter gravado o lote. Retome o plano e confirme seus recibos antes de iniciar outra revisão. Uma carga completa de Weni, Recompra e Analytics usa os atalhos normais com o perfil e o destino já conferidos. Registre no relatório de execução o ambiente, a versão Windows e a READY publicada. Só marque a troca do Looker como concluída após conferir a fonte efetiva, os totais e os filtros no endereço oficial.

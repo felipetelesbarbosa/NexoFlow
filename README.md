@@ -8,7 +8,7 @@ O NexoFlow identifica pedidos registrados na API **independentemente de terem si
 
 O pacote de homologação usa o arquivo `NexoFlow-Setup-1.5.46.zip` da execução de preparação no GitHub Actions.
 
-A validação dos destinos Meta/Weni está disponível para o PostgreSQL FARMA de homologação. [Guia do Work](docs/DESTINOS%20META%20WENI.md).
+O publicador e o leitor PostgreSQL do Data Studio FARMA estão implantados na VPS comercial. Consulte o guia operacional para conferir a versão do Windows, a revisão READY ativa e a fonte efetiva de cada página do Looker. [Contrato Meta e Weni](docs/DESTINOS%20META%20WENI.md)
 
 [Base Mestre permanente de conhecimento e diretrizes](docs/planejamento/DIRETRIZES_E_CONHECIMENTO_NEXOFLOW.md) — ponto de consulta compartilhado entre Codex e Work antes de novas tarefas.
 
@@ -50,7 +50,7 @@ Requer Windows x64 e Python 3.11 ou superior, 64 bits. O Setup reutiliza o Pytho
 
 Abra o mesmo executável Weni, Analytics, Recompra, Planilha ou Noturno e escolha **[1] FarmaLíder** ou **[2] Pets Líder**. No Noturno, depois escolha incremental ou completa. O Terminal também permite selecionar a marca. Ambos executam a mesma sequência de conexão, auditoria e aplicação; credenciais, planilhas, revisões e estado permanecem separados. Para agendamentos, use `--perfil FARMA` ou `--perfil PET`; o Noturno também aceita `--incremental` ou `--full`.
 
-Preencha `PERFIS["FARMA"]` e `PERFIS["PET"]` no arquivo local. Cada perfil tem seu próprio destino de publicação. No modo Sheets, configure os três IDs (Dashboard, Operação e Histórico) e confira o mapa `NexoFlow_Arquivos` de cada Dashboard. O NexoFlow recusa destinos Pets divergentes e token de outra organização. [Guia dos segmentos e fluxos](docs/SEGMENTOS%20E%20FLUXOS.md)
+Preencha `PERFIS["FARMA"]` e `PERFIS["PET"]` no arquivo local. Cada perfil tem seu próprio destino de publicação. Para a operação FARMA na VPS, siga o [checklist PostgreSQL](docs/OPERACAO_WINDOWS_VPS.md#conferir-o-windows-antes-de-uma-carga). No modo Sheets legado, configure os três IDs (Dashboard, Operação e Histórico) e confira o mapa `NexoFlow_Arquivos` de cada Dashboard. O NexoFlow recusa destinos Pets divergentes e token de outra organização. [Guia dos segmentos e fluxos](docs/SEGMENTOS%20E%20FLUXOS.md)
 
 Pets usa `logs/PET/`, `importacoes/PET/`, `compra_recente` e `opt_in_marketing` com Sim/Não. Não exige maioridade. A Recompra usa **pedido_data D+30**; FarmaLíder usa **pedido_data D+25**. O filtro humano permanece exclusivo da FarmaLíder; pedidos Pets exigem segmento PET comprovado pela listagem ou pela consulta individual por CPF.
 
@@ -58,7 +58,7 @@ Para conferir apenas o grupo atual, execute `comandos/auditar_grupo_recompra.bat
 
 ## Novos departamentos e segmentos
 
-O NexoFlow já tem arquitetura organizada por perfis para inclusão de novos departamentos e segmentos. A habilitação inclui registrar o novo perfil nos seletores e configurar organização Weni, credenciais, API autorizada, destinos Sheets, campos, fluxos e regras próprias, com validação antes de ativar. Os perfis operacionais disponíveis nesta versão são **FARMA** e **PET**.
+O NexoFlow já tem arquitetura organizada por perfis para inclusão de novos departamentos e segmentos. A habilitação inclui registrar o novo perfil nos seletores e configurar organização Weni, credenciais, API autorizada, destino de armazenamento por perfil, campos, fluxos e regras próprias, com validação antes de ativar. Os perfis operacionais disponíveis nesta versão são **FARMA** e **PET**.
 
 ## Primeira carga e atualização completa
 
@@ -83,10 +83,10 @@ Na rotina diária, use os atalhos Weni, Recompra e Analytics conforme necessári
 - O histórico é acumulado nas coletas dos dois segmentos, inclusive pedidos de clientes ainda ausentes na Weni. Pedidos observados ficam guardados localmente até a entrega idempotente ao destino configurado. O último pedido da API não comprova todas as compras anteriores nem compras intermediárias não observadas.
 - A rotina Weni propõe criar clientes da API com pedido validado e identidade única, preenchendo nome, telefone e campos disponíveis. Sem telefone, o cadastro pode ficar sem canal de contato. CPF inválido sem vínculo independente, conflito cadastral e resposta incerta ficam pendentes; não são criados consentimentos nem inclusões em grupos.
 - A Weni mantém o pedido mais recente. O histórico de pedidos distintos alimenta o dashboard pelo destino do perfil. Um pedido vindo da API não comprova que foi feito pelo WhatsApp ou pela Weni.
-- Operação, histórico e dashboard podem usar [três arquivos do Sheets](docs/planilhas_separadas.md). O Data Studio lê as fontes `BI_*`; confira seus destinos e atualize os campos quando houver novas colunas.
+- Na operação FARMA com a VPS, o Windows publica os dados de operação, histórico e dashboard pela API privada. O Looker Studio lê as fontes migradas pelo conector Apps Script. Os perfis em modo legado podem usar [três arquivos do Sheets](docs/planilhas_separadas.md).
 - Nos atalhos individuais, revise as propostas de Weni, Planilha e Recompra antes de aplicar. Carga parcial exige conferir o log e as pendências antes de prosseguir.
 
-## Capacidade das planilhas
+## Capacidade das planilhas no modo legado
 
 As continuações automáticas no Meu Drive exigem autorização Google local. O Data Studio precisa do conector privado e de uma troca inicial de fontes para somar as partes. Veja [configuração e limites](docs/CONTINUACOES.md); a instalação não muda o dashboard automaticamente.
 
