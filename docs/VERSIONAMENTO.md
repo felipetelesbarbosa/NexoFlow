@@ -1,5 +1,11 @@
 # Versionamento do NexoFlow
 
+## Publicação 1.5.48
+
+Publicada em **20/11/2026, 00:18:11 (America/Fortaleza)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.48) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/ed067d76c29fcb94e33ef94bd3b0600f840e8029) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44664424134) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44664424120) · [Meta Ads](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44664424115) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44666740087).
+
+O Setup passou pelos testes Preserve, Clean e rollback. Os downloads públicos coincidiram com os ZIPs aprovados em SHA-256 e passaram nos testes de CRC, versão e contrato histórico. Analytics e Noturno FARMA detectam o XLSX de Salas e leem as datas dos atendimentos. [Guia da atribuição comercial](META%20ADS%20NATIVO.md).
+
 ## Publicação 1.5.47
 
 Publicada em **19/11/2026, 16:14:22 (America/Sao_Paulo)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.47) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/2d9332010e26839774da33fe91ccf33dd2c95594) · [CI, pacotes e publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44591238396) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44591238437).

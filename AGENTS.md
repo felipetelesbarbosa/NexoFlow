@@ -4,6 +4,12 @@ Comece em [Operação Windows, VPS e Looker](docs/OPERACAO_WINDOWS_VPS.md) e no 
 
 Confirme separadamente `VERSION`, release, versão instalada no PC, perfil, ambiente, estado da publicação READY e fonte dos componentes no Looker oficial. Preserve a separação FARMA/PET e homologação/produção. As entradas de release abaixo registram estados históricos.
 
+# NexoFlow 1.5.48 publicada
+
+Publicada em **20/11/2026, 00:18:11 (America/Fortaleza)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.48) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/ed067d76c29fcb94e33ef94bd3b0600f840e8029) · [Validação Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44664424134) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44666740087).
+
+Os dois ZIPs públicos passaram nas verificações de SHA-256, CRC, versão e contrato histórico. Analytics e Noturno FARMA localizam o XLSX de Salas e leem as datas dos atendimentos. O Flows v2 sustenta o cálculo na ausência do XLSX quando há evidência suficiente.
+
 # NexoFlow 1.5.47 publicada
 
 Publicada em **19/11/2026, 16:14:22 (America/Sao_Paulo)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.47) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/2d9332010e26839774da33fe91ccf33dd2c95594) · [CI, pacotes e publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44591238396) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44591238437) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44591238607).
@@ -104,7 +110,7 @@ Reutilizar os planos, journals, capacidade e guardas existentes. Preservar byte 
 
 - Use mensagens de commit curtas em português que descrevam a área ou a alteração, como `Automação`, `Documentação`, `Instalador` ou `Corrigir revisão da Recompra`. `NexoFlow 1.5.28` identifica a versão, não é uma mensagem obrigatória de commit. Separe alterações por área quando isso tornar a navegação do GitHub mais clara; não reescreva o histórico apenas para mudar os textos exibidos.
 - A `main` é a única branch de trabalho do repositório. Atualize diretamente a `main`; não crie nem mantenha branches adicionais.
-- A distribuição publicada usa NexoFlow 1.5.47, tag v1.5.47 e pacotes com sufixo 1.5.47. Novas publicações exigem autorização e validação. Para cada próxima publicação de atualização/hotfix/patch, incremente uma única vez, de 1.5.48 até 1.5.99 e depois de 1.6 até 1.6.99. Não incremente por commit ou tentativa de CI da mesma entrega. Preserve tags e releases anteriores. Nunca sobrescreva uma versão anterior com um novo patch. Confira `VERSION` e `docs/VERSIONAMENTO.md`.
+- A distribuição publicada usa NexoFlow 1.5.48, tag v1.5.48 e pacotes com sufixo 1.5.48. Novas publicações exigem autorização e validação. Para cada próxima publicação de atualização/hotfix/patch, incremente uma única vez, de 1.5.49 até 1.5.99 e depois de 1.6 até 1.6.99. Não incremente por commit ou tentativa de CI da mesma entrega. Preserve tags e releases anteriores. Nunca sobrescreva uma versão anterior com um novo patch. Confira `VERSION` e `docs/VERSIONAMENTO.md`.
 - Cada release deve mostrar a data da sua publicação. Não reutilize uma versão já publicada para código novo.
 - O NexoFlow Windows é operacional e autônomo; Analytics e Noturno usam a integração Meta nativa, sem exigir Codex ou MCP. A distribuição Windows usa o cliente Meta nativo diretamente. O **NexoFlow Hub** tem desenvolvimento e homologação Linux expressamente autorizados na Etapa 2, isolados em `hub/`, com dados sintéticos, PostgreSQL temporário e escrita real bloqueada. Consulte [o núcleo](hub/README.md) e o [planejamento](docs/planejamento/README.md). Não transformar o Windows em cliente dependente do Hub, não alterar serviços/volumes da VPS nem abrir portas públicas nesta fase. Commits Hub usam `[skip release]`, sem incrementar a versão ou publicar releases Windows. Alterações compartilhadas exigem regressão Windows.
 - Preserve as credenciais e os diagnósticos privados fora do Git e dos pacotes públicos.

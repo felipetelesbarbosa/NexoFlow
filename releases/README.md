@@ -1,3 +1,11 @@
+# NexoFlow 1.5.48 — Downloads
+
+Publicada em **20/11/2026, 00:18:11 (America/Fortaleza)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.48) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/ed067d76c29fcb94e33ef94bd3b0600f840e8029) · [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44664424134) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44666740087).
+
+[NexoFlow-Setup-1.5.48.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.48/NexoFlow-Setup-1.5.48.zip) · [NexoFlow-1.5.48.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.48/NexoFlow-1.5.48.zip) · [SHA256SUMS-1.5.48.txt](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.48/SHA256SUMS-1.5.48.txt)
+
+Atualize pelo Setup em **Atualizar mantendo dados**. O Analytics e o Noturno FARMA detectam o XLSX de Salas e leem suas datas. [Guia da atribuição comercial](../docs/META%20ADS%20NATIVO.md).
+
 # NexoFlow 1.5.47 — Downloads
 
 Publicada em **19/11/2026, 16:14:22 (America/Sao_Paulo)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.47) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/2d9332010e26839774da33fe91ccf33dd2c95594) · [CI, pacotes e publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44591238396).

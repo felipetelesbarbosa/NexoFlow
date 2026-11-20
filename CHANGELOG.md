@@ -1,6 +1,6 @@
 # NexoFlow — Changelog
 
-## 1.5.48
+## 1.5.48 — publicada em 20/11/2026, 00:18:11 (America/Fortaleza)
 
 - Analytics e Noturno FARMA detectam o XLSX de Salas em Downloads ou em `importacoes` e leem os horários do próprio arquivo. As datas do `secrets_config.py` deixam de ser necessárias.
 - Quando o XLSX está indisponível, o cálculo usa a Weni Flows v2. Casos sem horário de encerramento confiável ficam pendentes e aparecem como cobertura parcial. [Guia](docs/META%20ADS%20NATIVO.md#m%C3%A9tricas-da-p%C3%A1gina-an%C3%BAncios-em-produ%C3%A7%C3%A3o).
