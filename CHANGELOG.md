@@ -2,6 +2,8 @@
 
 ## 1.5.50 — preparação
 
+- Se o envio perder a resposta, o Windows consulta o recibo. Se ainda estiver ausente, repete uma vez o mesmo lote na mesma revisão e exige o hash e a confirmação do servidor. O log identifica tabela, revisão e lote para conferência.
+
 - Os relatórios do Analytics identificam o armazenamento usado para contatos, pedidos, métricas e BI. No PostgreSQL da VPS, o log registra a revisão após o servidor confirmar READY. O resumo da incremental sem mudanças inclui o total de requisições.
 - Terminal, Weni, Recompra, Planilha e Noturno identificam o armazenamento do perfil e distinguem o XLSX de entrada, as ações Weni e o checkpoint.
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -14,6 +15,7 @@ from ds_backend.contract import (
     SCHEMA_HASH,
     StorageError,
     digest,
+    identifier,
     normalize,
     target,
 )
@@ -175,7 +177,8 @@ class Client:
         )
 
     def send(self, revision, name, rows, *, remove=None, batch_id=None, simulate=False):
-        batch_id = batch_id or str(uuid4())
+        revision = identifier(revision)
+        batch_id = identifier(batch_id) if batch_id is not None else str(uuid4())
         data = dict(
             revision=revision,
             batch_id=batch_id,
@@ -184,15 +187,6 @@ class Client:
             remove=remove or [],
             simulate=simulate,
         )
-        try:
-            receipt = self.call("/v1/lotes", data)
-        except StorageError as error:
-            if str(error) != "DS_RESPOSTA_NAO_CONFIRMADA_RETOMAR":
-                raise
-            # Não repetir um POST incerto: consultar o MESMO recibo primeiro.
-            receipt = self.call("/v1/lotes/" + batch_id)
-            if receipt.get("revision") != revision:
-                raise StorageError("DS_RECIBO_DIVERGENTE") from None
         expected = digest(
             dict(
                 revision=revision,
@@ -201,6 +195,31 @@ class Client:
                 remove=remove or [],
             )
         )
+        for attempt in range(2):
+            try:
+                receipt = self.call("/v1/lotes", data)
+                break
+            except StorageError as error:
+                if str(error) != "DS_RESPOSTA_NAO_CONFIRMADA_RETOMAR":
+                    raise
+            # O GET pode ocorrer antes do COMMIT. A API serializa pelo UUID
+            # da revisão e reconfere o hash do mesmo lote sob a trava.
+            logging.warning(
+                "%s: resposta incerta; consultando recibo. Revisão=%s; tabela=%s; lote=%s.",
+                POSTGRES_LABEL, revision, name, batch_id,
+            )
+            try:
+                receipt = self.call("/v1/lotes/" + batch_id)
+                break
+            except StorageError as error:
+                if str(error) != "DS_LOTE_AUSENTE" or attempt:
+                    raise
+                logging.warning(
+                    "%s: recibo ausente; repetindo uma vez o mesmo lote %s.",
+                    POSTGRES_LABEL, batch_id,
+                )
+        else:
+            raise StorageError("DS_RESPOSTA_NAO_CONFIRMADA_RETOMAR")
         if (
             receipt.get("id") != batch_id
             or receipt.get("revision") != revision

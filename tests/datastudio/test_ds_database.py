@@ -434,7 +434,8 @@ def test_manifest_missing_replacement_batch_and_state_cas(store):
     assert store.state_get("weni_update")["document"] == {"cursor": "synthetic"}
 
 
-def test_real_client_lost_response_receipt_and_wrong_target(store):
+@pytest.mark.parametrize("before_commit", [True, False])
+def test_real_client_lost_response_receipt_and_wrong_target(store, before_commit):
     import requests
 
     from ds_backend.client import Client
@@ -447,6 +448,9 @@ def test_real_client_lost_response_receipt_and_wrong_target(store):
         headers = {}
 
         def request(self, method, url, **kwargs):
+            if before_commit and lost["enabled"] and url.endswith("/v1/lotes"):
+                lost["enabled"] = False
+                raise requests.ConnectionError("synthetic failure before processing")
             response = web.request(
                 method,
                 url.removeprefix("https://publish.example.invalid"),
@@ -480,6 +484,11 @@ def test_real_client_lost_response_receipt_and_wrong_target(store):
         receipt["inserted"] == 1
         and len(store.rows("BI_Itens", revision=revision)["rows"]) == 1
     )
+    with store.connect(readonly=True) as conn:
+        lots = conn.execute(
+            "SELECT count(*) AS n FROM controle.nf_lotes WHERE execucao=%s", (revision,)
+        ).fetchone()
+        assert lots["n"] == 1
     with pytest.raises(StorageError, match="CONTRATO_DESTINO_DIVERGENTE"):
         Client(dict(config, segment="PET"), session=Session())
 

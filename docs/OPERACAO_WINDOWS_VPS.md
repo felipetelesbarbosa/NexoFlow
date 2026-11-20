@@ -131,3 +131,9 @@ A partir da 1.5.50, confira o perfil e o armazenamento em `nexo status --local`.
 O Noturno identifica em seu resultado o armazenamento configurado para as etapas. As alterações de contatos e grupos continuam sendo operações da Weni. A rotina Planilha usa o XLSX como entrada e informa o destino autorizado para a aplicação. A verificação de código no check-up inclui o conector Google Sheets nos dois modos. Exportações explícitas de uma planilha ainda identificam o Google como origem.
 
 Conclua a execução em andamento antes de atualizar com **Atualizar mantendo dados**. No Terminal do mesmo perfil, confira `nexo versao` e o destino. Consulte o log da próxima execução regular para conferir as mensagens e a revisão confirmada.
+
+### Resposta incerta durante o envio do Analytics
+
+Na 1.5.50, se o Windows perder a resposta de um lote, ele consulta o recibo pelo UUID. Se a API devolver `DS_LOTE_AUSENTE`, repete o POST uma única vez com os mesmos dados, revisão e UUID. Se a segunda resposta também se perder, consulta o recibo mais uma vez. Só prossegue com ID, hash, revisão e estado comprovados. Permissão negada, divergência ou ausência persistente interrompem a etapa. A simulação exige um resultado SIMULADO.
+
+Se uma execução anterior já encerrou com código 3, consulte `nexo armazenamento postgres diagnosticar` e `nexo armazenamento postgres status --id-revisao <UUID>`. Uma atualização do Setup não reconstrói o lote em memória da execução anterior. Para uma revisão Analytics WRITING sem selo, o Work deve conferir heartbeat, gravador, quantidade e horário dos recibos, linhas de staging por tabela e publicações posteriores com o administrador, em leitura. Preserve evidências. O comando de retomada de uma exportação exige seu plano de migração e o fechamento de revisão selada exige o manifesto previamente selado. Antes de decidir o destino de uma revisão operacional interrompida, registre os resultados e confirme o procedimento com o operador.

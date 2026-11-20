@@ -88,3 +88,75 @@ def test_pinned_preview_refuses_a_different_version_on_first_page():
 def test_period_fields_are_civil_dates_not_arbitrary_timestamp_text():
     for spec in REGISTRY.values():
         assert spec["period"] is None or spec["types"][spec["period"]] == "date"
+
+
+@pytest.mark.parametrize(
+    "case,expected_calls",
+    [
+        ("antes_do_commit", ["POST", "GET", "POST"]),
+        ("recibo_atrasado", ["POST", "GET", "POST", "GET"]),
+        ("sem_recibo", ["POST", "GET", "POST", "GET"]),
+        ("permissao", ["POST", "GET"]),
+    ],
+)
+def test_resposta_incerta_confere_mesmo_lote_antes_de_reenviar(case, expected_calls):
+    from uuid import uuid4
+
+    from ds_backend.client import Client
+    from ds_backend.contract import digest, normalize
+
+    revision, batch = str(uuid4()), str(uuid4())
+    rows = [row("BI_Itens", item_chave="teste")]
+    payload = dict(
+        revision=revision,
+        table="BI_Itens",
+        rows=normalize("BI_Itens", rows, "FARMA"),
+        remove=[],
+    )
+    receipt = dict(
+        id=batch,
+        revision=revision,
+        hash=digest(payload),
+        state="CONFIRMADO",
+        inserted=1,
+        updated=0,
+        unchanged=0,
+        removed=0,
+    )
+    client = Client.__new__(Client)
+    client.config = {"segment": "FARMA"}
+    calls = []
+
+    def call(path, data=None):
+        if data is not None:
+            assert path == "/v1/lotes"
+            assert data == dict(
+                revision=revision,
+                batch_id=batch,
+                name="BI_Itens",
+                rows=rows,
+                remove=[],
+                simulate=False,
+            )
+            calls.append("POST")
+            if case == "antes_do_commit" and calls.count("POST") == 2:
+                return receipt
+            raise StorageError("DS_RESPOSTA_NAO_CONFIRMADA_RETOMAR")
+        assert path == "/v1/lotes/" + batch
+        calls.append("GET")
+        if case == "permissao":
+            raise StorageError("DS_PERMISSAO")
+        if case == "recibo_atrasado" and calls.count("GET") == 2:
+            return receipt
+        raise StorageError("DS_LOTE_AUSENTE")
+
+    client.call = call
+    if case in ("sem_recibo", "permissao"):
+        with pytest.raises(
+            StorageError,
+            match="DS_LOTE_AUSENTE" if case == "sem_recibo" else "DS_PERMISSAO",
+        ):
+            client.send(revision, "BI_Itens", rows, batch_id=batch)
+    else:
+        assert client.send(revision, "BI_Itens", rows, batch_id=batch) == receipt
+    assert calls == expected_calls
