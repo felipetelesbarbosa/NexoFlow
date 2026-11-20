@@ -1,25 +1,40 @@
-"""Atribuição comercial FARMA com pedido oficial, CTWA, Flows e export de Salas."""
+"""Atribuição comercial FARMA com pedido oficial e evidência Weni Flows."""
 
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from zipfile import BadZipFile
 from zoneinfo import ZoneInfo
 
 from analytics import _sales_order_is_valid
-from delivery_spreadsheets import ROOM_COLUMNS, _date, _rows, _tags, _uuid
+from delivery_spreadsheets import (
+    CONVERSATIONS_FILENAME,
+    ROOM_COLUMNS,
+    _date,
+    _rows,
+    _tags,
+    _uuid,
+)
 from meta_ads_evidence import PROJECT_NAMES, ReadOnlyEvidenceClient
 from pedido_utils import business_order_datetime
 
 PAYLOAD_KEY = "nf_atribuicao_comercial_v1"
+FLOWS_SOURCE = "WENI_FLOWS_V2"
+XLSX_SOURCE = "WENI_XLSX_SALAS"
 WINDOW = timedelta(days=7)
 START_TOLERANCE = timedelta(seconds=5)
 BELEM = ZoneInfo("America/Belem")
 HISTORY_START = date(2020, 1, 1)
+ROOM_EXPORT_NAME = re.compile(
+    rf"{re.escape(Path(CONVERSATIONS_FILENAME).stem)}(?: ?\(\d+\))?\.xlsx",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -54,19 +69,17 @@ class Purchase:
 
 
 def read_finalized_rooms(path, start, end, clock):
-    """Lê a aba original; a faixa declarada é por encerramento em Belém."""
+    """Retorna as salas elegíveis e as datas observadas em Belém."""
     required = ROOM_COLUMNS | {"queue__sector__name"}
     rooms = defaultdict(set)
+    observed = set()
     for _, header, values in _rows(Path(path), "rooms", required):
         row = dict(zip(header, values, strict=False))
-        # Exportações do Excel podem trazer linhas finais completamente vazias.
-        if not any(value not in (None, "") for value in values):
+        if row.get("queue__sector__name") != PROJECT_NAMES["FARMA"]:
             continue
-        if row["queue__sector__name"] != PROJECT_NAMES["FARMA"]:
-            raise ValueError("Export de salas de outro projeto/setor.")
-        tags = {" ".join(tag.casefold().split()) for tag in _tags(row["tags_list"])}
+        tags = {" ".join(tag.casefold().split()) for tag in _tags(row.get("tags_list"))}
         if "pedido finalizado" not in tags:
-            raise ValueError("Selecione Pedido Finalizado na geração do XLSX.")
+            continue
         opened, closed = _date(row["created_on"]), _date(row["ended_at"])
         urn = str(row["urn"] or "").strip()
         if ":" in urn and not urn.startswith("whatsapp:"):
@@ -77,7 +90,6 @@ def read_finalized_rooms(path, start, end, clock):
             or not closed
             or opened > closed
             or closed > clock
-            or not start <= closed.astimezone(BELEM).date() <= end
             or not _uuid(row["contact__uuid"])
             or not urn.startswith("whatsapp:")
             or not urn.removeprefix("whatsapp:").isdigit()
@@ -85,8 +97,67 @@ def read_finalized_rooms(path, start, end, clock):
             or not row["user__email"]
         ):
             raise ValueError("Sala marcada como finalizada com evidência inválida.")
-        rooms[urn].add(Room(opened, closed))
-    return rooms
+        closed_day = closed.astimezone(BELEM).date()
+        observed.add(closed_day)
+        if start <= closed_day <= end:
+            rooms[urn].add(Room(opened, closed))
+    return (min(observed), max(observed), rooms) if rooms else None
+
+
+def optional_room_export(root, config, start, end, clock):
+    """Procura o XLSX mais recente com salas válidas no período da análise."""
+    candidates = set()
+    if isinstance(config, dict) and isinstance(config.get("arquivo"), str):
+        if config["arquivo"]:
+            candidates.add(root / config["arquivo"])
+    folders = [root / "importacoes"]
+    try:
+        folders.append(Path.home() / "Downloads")
+    except RuntimeError:
+        pass
+    for folder in folders:
+        try:
+            candidates.update(
+                path for path in folder.iterdir() if ROOM_EXPORT_NAME.fullmatch(path.name)
+            )
+        except OSError:
+            continue
+    modified = {}
+    for path in candidates:
+        try:
+            if path.is_file():
+                modified[path] = path.stat().st_mtime_ns
+        except OSError:
+            continue
+    status = "ausente"
+    for path in sorted(modified, key=lambda p: (modified[p], str(p)), reverse=True):
+        try:
+            export = read_finalized_rooms(path, start, end, clock)
+        except (BadZipFile, KeyError, OSError, SyntaxError, ValueError):
+            status = "invalido"
+            continue
+        if export is not None:
+            return export, "utilizado"
+        if status == "ausente":
+            status = "sem_salas_no_periodo"
+    return None, status
+
+
+def retain_commercial_audits(tables, previous):
+    """O rebuild de fatos Meta preserva atribuição fora do corte recalculado."""
+    saved = {
+        row["chave"]: json.loads(row.get("payload_api_json") or "{}").get(PAYLOAD_KEY)
+        for row in previous.get("Meta_Ads_Diario", [])
+        if row["segmento"] == row["classificacao"] == "FARMA"
+    }
+    for row in tables["Meta_Ads_Diario"]:
+        audit = saved.get(row["chave"])
+        if isinstance(audit, dict) and row["segmento"] == row["classificacao"] == "FARMA":
+            payload = json.loads(row["payload_api_json"])
+            payload[PAYLOAD_KEY] = audit
+            row["payload_api_json"] = json.dumps(
+                payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            )
 
 
 def load_conversations(token, urns, begin, end, *, org_uuid=""):
@@ -274,7 +345,7 @@ def _first_purchase(owner, first_day, first_day_orders, operational):
     return dated[0][1] if dated[0][0] != dated[1][0] else None
 
 
-def prepare_attribution(tables, evidence, orders, history, rooms):
+def prepare_attribution(tables, evidence, orders, history, rooms, *, through):
     """Indexa revisões por pedido, contato e grão diário; a chave do cliente é oficial."""
     raw = [
         r
@@ -337,25 +408,25 @@ def prepare_attribution(tables, evidence, orders, history, rooms):
         if not record["data"]:
             if owner:
                 unknown_emission.add(owner)
-            pending.update(t.grain for t in own_touches if t.urn in rooms)
+            pending.update(t.grain for t in own_touches)
             continue
         day = date.fromisoformat(record["data"])
         if owner and (owner not in first or day < first[owner][0]):
             first[owner] = (day, [oid])
         elif owner and day == first[owner][0]:
             first[owner][1].append(oid)
+        if day > through:
+            continue
         possible = [
             t
             for t in own_touches
-            if t.urn in rooms
-            and t.at.astimezone(BELEM).date() <= day
+            if t.at.astimezone(BELEM).date() <= day
             and (
-                day <= (t.at + WINDOW).astimezone(BELEM).date()
+                rooms is None
+                or day <= (t.at + WINDOW + START_TOLERANCE).astimezone(BELEM).date()
                 or any(
-                    r.opened.astimezone(BELEM).date()
-                    <= day
-                    <= r.closed.astimezone(BELEM).date()
-                    for r in rooms[t.urn]
+                    r.opened.astimezone(BELEM).date() <= day <= r.closed.astimezone(BELEM).date()
+                    for r in rooms.get(t.urn, ())
                 )
             )
         ]
@@ -406,13 +477,33 @@ def apply_attribution(
     clock,
     conversations_loader,
 ):
+    flows_only = rooms is None
     days, touches, purchases, pending, first = prepare_attribution(
-        tables, evidence, orders, history, rooms
+        tables, evidence, orders, history, rooms, through=end
     )
     # O identificador de atendimento da exportação pode ser interno ao Chats.
     # O vínculo usa somente a URN oficial de um evento CTWA de contato único.
-    urns = {t.urn for uid in purchases for t in touches[uid] if t.urn in rooms}
+    urns = {
+        t.urn
+        for uid in purchases
+        for t in touches[uid]
+        if rooms is None or t.urn in rooms
+    }
     conversations = conversations_loader(urns)
+    if flows_only:
+        # Flows pode fechar a classificação no último microssegundo do dia,
+        # mesmo quando a sala do Live Desk encerrou antes.
+        rooms = {
+            urn: tuple(
+                Room(conversation.opened, conversation.closed)
+                for conversation in entries
+                if start <= conversation.closed.astimezone(BELEM).date() <= end
+                and conversation.closed <= clock
+                and conversation.closed.astimezone(BELEM).time() != time.max
+            )
+            for urn, entries in conversations.items()
+        }
+    assert rooms is not None
     windows = _coverage(coverage)
     values = defaultdict(Counter)
     revenues = defaultdict(Counter)
@@ -430,6 +521,11 @@ def apply_attribution(
                 count_by_room.update((urn, r) for r in matching)
         for purchase, matches in linked_rooms.items():
             if not matches:
+                pending.update(
+                    t.grain
+                    for t in own_touches
+                    if t.at <= purchase.at <= t.at + WINDOW + START_TOLERANCE
+                )
                 continue
             if len(matches) != 1 or count_by_room[matches[0]] != 1:
                 pending.update(
@@ -470,7 +566,7 @@ def apply_attribution(
         )
         last_day = (last_instant - timedelta(microseconds=1)).astimezone(BELEM).date()
         counts = values[grain]
-        if not start <= first_day <= end and not counts and grain not in pending:
+        if not start <= first_day <= end and not counts:
             continue
         complete = (
             first_day >= start
@@ -497,6 +593,7 @@ def apply_attribution(
             if complete and history_complete and grain not in unknown_first
             else None,
             cobertura_comercial=complete,
+            origem_evidencia=FLOWS_SOURCE if flows_only else XLSX_SOURCE,
         )
         payload = json.loads(row["payload_api_json"])
         payload[PAYLOAD_KEY] = audit

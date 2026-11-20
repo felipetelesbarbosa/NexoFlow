@@ -30,6 +30,7 @@ class ReadOnlyEvidenceClient(WeniClient):
         params = {
             "date_start": self.format_datetime(after),
             "date_end": self.format_datetime(before),
+            "event_name": "weni_nexus_data",
             "key": "conversation_classification",
             "contact_urn": urn,
             "limit": limit,

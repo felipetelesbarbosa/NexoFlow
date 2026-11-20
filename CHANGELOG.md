@@ -1,5 +1,10 @@
 # NexoFlow — Changelog
 
+## 1.5.48
+
+- Analytics e Noturno FARMA detectam o XLSX de Salas em Downloads ou em `importacoes` e leem os horários do próprio arquivo. As datas do `secrets_config.py` deixam de ser necessárias.
+- Quando o XLSX está indisponível, o cálculo usa a Weni Flows v2. Casos sem horário de encerramento confiável ficam pendentes e aparecem como cobertura parcial. [Guia](docs/META%20ADS%20NATIVO.md#m%C3%A9tricas-da-p%C3%A1gina-an%C3%BAncios-em-produ%C3%A7%C3%A3o).
+
 ## 1.5.47 — publicada em 19/11/2026, 16:14:22 (America/Sao_Paulo)
 
 - O Analytics e o Noturno FARMA calculam pedidos na conversa do anúncio, pedidos em outro atendimento em até sete dias e CAC de novos clientes. A rotina usa o XLSX de salas finalizadas, o vínculo com a Weni Flows e o histórico oficial de pedidos. [Configuração e leitura no Data Studio](docs/META%20ADS%20NATIVO.md#m%C3%A9tricas-da-p%C3%A1gina-an%C3%BAncios-em-produ%C3%A7%C3%A3o).

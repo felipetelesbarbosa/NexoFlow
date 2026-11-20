@@ -201,6 +201,15 @@ def _failure(account, stage, exc):
     }
 
 
+def commercial_attribution_enabled(store, segment):
+    config = getattr(getattr(store, "client", None), "config", None)
+    return (
+        segment == "FARMA"
+        and isinstance(config, dict)
+        and config.get("segment") == "FARMA"
+    )
+
+
 def sync_native_meta(
     store,
     settings,
@@ -599,43 +608,67 @@ def sync_native_meta(
         if any(row["acao"] == "PENDENTE_HISTORICO" for row in differences):
             report.update(status="conversas_meta_pendentes", partial=True)
             return report
-        commercial = _setting(settings, segment, "META_ADS_WENI_SALAS")
-        if commercial:
+        if commercial_attribution_enabled(store, segment):
             stage = "atribuicao_comercial_weni"
             from meta_ads_attribution import (
+                FLOWS_SOURCE,
+                WINDOW,
+                XLSX_SOURCE,
                 apply_attribution,
                 load_conversations,
-                read_finalized_rooms,
+                optional_room_export,
+                retain_commercial_audits,
             )
 
-            config = getattr(getattr(store, "client", None), "config", {})
-            if segment != "FARMA" or config.get("segment") != "FARMA":
-                raise ValueError("A atribuição comercial Weni requer PostgreSQL FARMA.")
-            begin = date.fromisoformat(commercial["inicio"])
-            through = date.fromisoformat(commercial["fim"])
-            if begin > through or through >= clock.astimezone(TZ).date():
-                raise ValueError("Use um período de encerramento Weni já concluído.")
-            rooms = read_finalized_rooms(
-                runtime_root / commercial["arquivo"], begin, through, clock
+            retain_commercial_audits(tables, previous)
+            begin = evidence_start.astimezone(TZ).date()
+            through = min(
+                today - timedelta(days=1),
+                evidence_end.astimezone(TZ).date() + WINDOW,
             )
-            report["atribuicao_comercial_weni"] = apply_attribution(
-                tables,
-                evidence,
-                orders,
-                store.records("Historico_Pedidos"),
-                store.records("BI_Cobertura_Historica"),
-                rooms,
+            export, export_status = optional_room_export(
+                runtime_root,
+                _setting(settings, segment, "META_ADS_WENI_SALAS"),
                 begin,
                 through,
                 clock,
-                lambda urns: load_conversations(
-                    _setting(settings, segment, "WENI_API_TOKEN"),
-                    urns,
-                    min(evidence_start, datetime.combine(begin, time.min, TZ)),
-                    clock,
-                    org_uuid=_setting(settings, segment, "WENI_FLOWS_ORG_UUID", ""),
-                ),
             )
+            rooms = None
+            if export is not None:
+                observed_start, observed_end, rooms = export
+                begin = max(begin, observed_start - WINDOW)
+            commercial_result = report["atribuicao_comercial_weni"] = dict(
+                origem_evidencia=XLSX_SOURCE if export is not None else FLOWS_SOURCE,
+                xlsx_opcional=export_status,
+                inicio=begin.isoformat(),
+                fim=through.isoformat(),
+            )
+            if export is not None:
+                commercial_result.update(
+                    xlsx_inicio_observado=observed_start.isoformat(),
+                    xlsx_fim_observado=observed_end.isoformat(),
+                )
+            if begin <= through:
+                commercial_result.update(
+                    apply_attribution(
+                        tables,
+                        evidence,
+                        orders,
+                        store.records("Historico_Pedidos"),
+                        store.records("BI_Cobertura_Historica"),
+                        rooms,
+                        begin,
+                        through,
+                        clock,
+                        lambda urns: load_conversations(
+                            _setting(settings, segment, "WENI_API_TOKEN"),
+                            urns,
+                            evidence_start,
+                            datetime.combine(through, time.max, TZ),
+                            org_uuid=_setting(settings, segment, "WENI_FLOWS_ORG_UUID", ""),
+                        ),
+                    )
+                )
         # Conversões deixam rastro em vez de manter receita de compra cancelada.
         fresh = {row["chave"] for row in tables["BI_Meta_Conversoes"]}
         for row in previous.get("BI_Meta_Conversoes", []):

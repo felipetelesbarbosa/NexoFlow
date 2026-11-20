@@ -60,6 +60,25 @@ class Client:
 
 
 class EvidenceTests(unittest.TestCase):
+    def test_conversation_classifications_query_only_flows_events(self):
+        client = object.__new__(ReadOnlyEvidenceClient)
+        response = {"event_name": "weni_nexus_data", "metadata": {"human_support": True}}
+        with patch.object(client, "_request_json", side_effect=[[response], []]) as request:
+            self.assertEqual(
+                list(
+                    client.list_conversation_classifications(
+                        URN, after=START, before=START + timedelta(days=1)
+                    )
+                ),
+                [response],
+            )
+        for offset, call in enumerate(request.call_args_list):
+            self.assertEqual(call.args, ("GET", "https://flows.weni.ai/api/v2/events.json"))
+            self.assertEqual(call.kwargs["params"]["event_name"], "weni_nexus_data")
+            self.assertEqual(call.kwargs["params"]["key"], "conversation_classification")
+            self.assertEqual(call.kwargs["params"]["contact_urn"], URN)
+            self.assertEqual(call.kwargs["params"]["offset"], offset)
+
     def collect(self, clients=None, **kwargs):
         clients = clients or {s: Client(s) for s in PROJECT_NAMES}
         settings = SimpleNamespace(

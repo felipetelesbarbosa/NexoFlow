@@ -1618,9 +1618,12 @@ def main() -> int:
         sheets.refresh_delivery_bi(all_order_records, create=False)
 
         from analytics_history_sync import run as publish_history
+        from meta_ads_native import commercial_attribution_enabled
 
         historical_publication = None
-        if getattr(secrets, "META_ADS_WENI_SALAS", None) and postgres_enabled(secrets):
+        if getattr(secrets, "META_ADS_ENABLED", False) and commercial_attribution_enabled(
+            sheets, segment()
+        ):
             historical_publication = publish_history(secrets, storage=sheets)
 
         native_meta_result = _sync_optional_native_meta(

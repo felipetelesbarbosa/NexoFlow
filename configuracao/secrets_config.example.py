@@ -77,7 +77,7 @@ PERFIS = {
         "WENI_INSIGHTS_CREDENTIAL_SOURCE": "perfil",
         "WENI_INSIGHTS_PROJECT_UUID": "",
         "META_ADS_DESTINOS_FILE": "",  # PostgreSQL de homologação, metadados privados.
-        "META_ADS_WENI_SALAS": None,  # {"arquivo": "importacoes/Conversas_Delivery.xlsx", "inicio": "AAAA-MM-DD", "fim": "AAAA-MM-DD"}
+        "META_ADS_WENI_SALAS": None,  # FARMA: busca automática em importacoes e Downloads.
         "WENI_FLOWS_ORG_UUID": "",  # Opcional, UUID de org.json do workspace FARMA.
         "WENI_INSIGHTS_START_DATE": "",
         "WENI_API_TOKEN": WENI_API_TOKEN,

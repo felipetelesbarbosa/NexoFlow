@@ -1,15 +1,24 @@
 """Regressões comerciais FARMA sem clientes ou credenciais reais."""
 
 import json
+import os
+import tempfile
 import unittest
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
+from unittest.mock import patch
+
+from openpyxl import Workbook
 
 from meta_ads_attribution import (
+    FLOWS_SOURCE,
     PAYLOAD_KEY,
     Conversation,
     Room,
     apply_attribution,
+    optional_room_export,
 )
+from tests.test_delivery_spreadsheets import ROOM_HEADERS
 
 
 def moment(day, hour=10, minute=0, second=0):
@@ -106,6 +115,149 @@ def audit(tables, position):
 
 
 class CommercialMetaTests(unittest.TestCase):
+    def test_auto_discovers_download_and_reads_dates_from_finalized_rooms(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            downloads = root / "Downloads"
+            downloads.mkdir()
+            imports = root / "importacoes"
+            imports.mkdir()
+            book = Workbook()
+            self.addCleanup(book.close)
+            sheet = book.active
+            sheet.title = "rooms"
+            sheet.append(ROOM_HEADERS)
+            sheet.append([
+                "10000000-0000-4000-8000-000000000001", "Teste", "whatsapp:1",
+                "2026-11-01 10:00:00", "2026-11-01 11:00:00", False,
+                "['Pedido Finalizado']", "agent@example.test", "Delivery FarmaLíder", "",
+            ])
+            previous = imports / "Conversas_Delivery.xlsx"
+            book.save(previous)
+            sheet.append([
+                "10000000-0000-4000-8000-000000000002", "Teste", "whatsapp:2",
+                "2026-11-03 10:00:00", "2026-11-03 11:00:00", False,
+                "['Pedido Finalizado']", "agent@example.test", "Delivery FarmaLíder", "",
+            ])
+            latest_valid = downloads / "Conversas_Delivery (1).xlsx"
+            book.save(latest_valid)
+            malformed = downloads / "Conversas_Delivery(2).xlsx"
+            malformed.write_bytes(b"not an xlsx")
+            for timestamp, path in enumerate((previous, latest_valid, malformed), 1_700_000_000):
+                os.utime(path, (timestamp, timestamp))
+
+            with patch.object(Path, "home", return_value=root):
+                export, status = optional_room_export(
+                    root,
+                    {"inicio": "2026-10-01", "fim": "2026-10-31"},
+                    date(2026, 11, 1),
+                    date(2026, 11, 4),
+                    moment(5),
+                )
+
+        self.assertEqual(status, "utilizado")
+        start, end, rooms = export
+        self.assertEqual((start, end), (date(2026, 11, 1), date(2026, 11, 3)))
+        self.assertEqual(set(rooms), {"whatsapp:1", "whatsapp:2"})
+
+    def test_flows_and_official_orders_attribute_without_an_export(self):
+        tables = facts()
+        direct = moment(1, 12)
+        later = moment(4, 12)
+        apply(
+            tables,
+            [event("a", "1", moment(1), conversation_id="11111111-1111-4111-8111-111111111111")],
+            [order("10", "77", "1", direct), order("11", "77", "1", later)],
+            [
+                historical("10", "77", "1", direct.date(), "19.50"),
+                historical("11", "77", "1", later.date(), "45.00"),
+            ],
+            None,
+            {"whatsapp:1": (
+                Conversation("11111111-1111-4111-8111-111111111111", moment(1), moment(1, 14), True),
+                Conversation("later", moment(4, 11), moment(4, 13), True),
+            )},
+        )
+        result = audit(tables, 0)
+        self.assertEqual(result["origem_evidencia"], FLOWS_SOURCE)
+        self.assertEqual(result["pedidos_conversa_anuncio"], 1)
+        self.assertEqual(result["receita_conversa_anuncio"], "19.50")
+        self.assertEqual(result["pedidos_apos_conversa_7d"], 1)
+        self.assertEqual(result["receita_apos_conversa_7d"], "45.00")
+        self.assertEqual(result["novos_clientes_anuncio"], 1)
+        self.assertTrue(result["cobertura_comercial"])
+
+    def test_flows_end_of_day_requires_actual_room_for_attribution(self):
+        opened = moment(1, 21, 17)
+        room = Room(moment(1, 21, 20), moment(1, 21, 47))
+        day_end = moment(2, 2, 59, 59).replace(microsecond=999999)
+        conversations = {"whatsapp:1": (Conversation("room", opened, day_end, True),)}
+        for export, purchase, expected in (
+            (None, moment(1, 22), None),
+            ({"whatsapp:1": [room]}, moment(1, 21, 30), 1),
+        ):
+            with self.subTest(export=export is not None):
+                tables = facts()
+                apply(
+                    tables,
+                    [event("a", "1", opened)],
+                    [order("10", "77", "1", purchase)],
+                    [historical("10", "77", "1", purchase.date())],
+                    export,
+                    conversations,
+                )
+                result = audit(tables, 0)
+                self.assertEqual(result["pedidos_conversa_anuncio"], expected)
+                self.assertEqual(result["cobertura_comercial"], expected is not None)
+                if export is None:
+                    self.assertIsNone(result["receita_conversa_anuncio"])
+
+    def test_partial_xlsx_counts_confirmed_sales_without_assuming_coverage(self):
+        tables = facts()
+        purchase = moment(1, 12)
+        rooms = {"whatsapp:1": [Room(moment(1, 11), moment(1, 13))]}
+        apply(
+            tables,
+            [event("a", "1", moment(1)), event("a", "2", moment(1))],
+            [order("10", "77", "1", purchase), order("11", "88", "2", purchase)],
+            [
+                historical("10", "77", "1", purchase.date()),
+                historical("11", "88", "2", purchase.date()),
+            ],
+            rooms,
+            {"whatsapp:1": (Conversation("a", moment(1), moment(1, 14), True),)},
+        )
+        result = audit(tables, 0)
+        self.assertEqual(result["pedidos_conversa_anuncio"], 1)
+        self.assertEqual(result["receita_conversa_anuncio"], "19.50")
+        self.assertIsNone(result["pedidos_apos_conversa_7d"])
+        self.assertFalse(result["cobertura_comercial"])
+
+    def test_flows_missing_human_or_unique_conversation_leaves_pending(self):
+        purchase = moment(1, 12)
+        for conversations in (
+            (),
+            (Conversation("bot", moment(1), moment(1, 14), False),),
+            (
+                Conversation("first", moment(1), moment(1, 14), True),
+                Conversation("second", moment(1, 11), moment(1, 14), True),
+            ),
+        ):
+            with self.subTest(conversations=len(conversations)):
+                tables = facts()
+                apply(
+                    tables,
+                    [event("a", "1", moment(1))],
+                    [order("10", "77", "1", purchase)],
+                    [historical("10", "77", "1", purchase.date())],
+                    None,
+                    {"whatsapp:1": conversations},
+                )
+                result = audit(tables, 0)
+                self.assertIsNone(result["pedidos_conversa_anuncio"])
+                self.assertIsNone(result["receita_conversa_anuncio"])
+                self.assertFalse(result["cobertura_comercial"])
+
     def test_direct_beats_later_touch_and_duplicate_order_does_not_count_twice(self):
         tables = facts()
         original = "1f95f280-5b4c-42dd-9761-c6800ae8eabe"

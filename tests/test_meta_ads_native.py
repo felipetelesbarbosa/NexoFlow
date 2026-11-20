@@ -7,7 +7,7 @@ from copy import deepcopy
 from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from zoneinfo import ZoneInfo
 
 from meta_ads_client import MetaReadError
@@ -112,6 +112,52 @@ def evidence(*args, **kwargs):
 
 
 class NativeSyncTests(unittest.TestCase):
+    def test_farma_postgres_uses_flows_when_configured_xlsx_is_missing(self):
+        from tests.test_meta_ads_attribution import Conversation, historical, order
+
+        def at(hour):
+            return NOW.replace(day=2, hour=hour)
+
+        event = dict(
+            segment="FARMA", event_id="ctwa-1", ad_id="123", contact_uuid="1",
+            contact_urn="whatsapp:1", link_status="unique", date=at(10).isoformat(),
+        )
+        settings = {
+            "META_ADS_ENABLED": True,
+            "WENI_API_TOKEN": "token-ficticio",
+            "META_ADS_WENI_SALAS": {
+                "arquivo": "importacoes/export-inexistente.xlsx",
+                "inicio": "2026-11-01", "fim": "2026-11-03",
+            },
+        }
+        store = Store()
+        store.client = SimpleNamespace(config={"segment": "FARMA"})
+        sources = {
+            "Historico_Pedidos": [historical("10", "77", "1", at(11).date())],
+            "BI_Cobertura_Historica": [dict(
+                segmento="FARMA", vigente="Sim", inicio="2020-01-01",
+                fim="2026-11-03", extracao="extraida", pendencias="0",
+            )],
+        }
+        store.records = sources.__getitem__
+        with tempfile.TemporaryDirectory() as tmp, patch(
+            "meta_ads_attribution.load_conversations",
+            return_value={"whatsapp:1": (Conversation("chat", at(10), at(13), True),)},
+        ) as get_conversations:
+            result = sync_native_meta(
+                store, settings, "FARMA", [], [order("10", "77", "1", at(11))], [],
+                now=NOW, apply=False, state_dir=Path(tmp), client_factory=Client,
+                evidence_collector=lambda *a, **k: ([event], evidence()[1]),
+            )
+        self.assertEqual(result["status"], "simulacao", result)
+        diagnostic = result["atribuicao_comercial_weni"]
+        self.assertEqual(diagnostic["xlsx_opcional"], "ausente")
+        self.assertEqual(diagnostic["origem_evidencia"], "WENI_FLOWS_V2")
+        self.assertEqual(diagnostic["direto"], 1)
+        self.assertEqual(store.writes, 0)
+        get_conversations.assert_called_once()
+        self.assertEqual(get_conversations.call_args.args[1], {"whatsapp:1"})
+
     def run_sync(
         self,
         store,
