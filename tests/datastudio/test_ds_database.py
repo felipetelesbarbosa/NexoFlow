@@ -1553,3 +1553,51 @@ def test_farma_publisher_can_validate_without_exposing_exclusions_to_reader(stor
         ).fetchone()["exposed"]
         conn.execute("SET LOCAL ROLE nf_ds_farma_publish")
         assert_financial(conn, "farma")
+
+
+def test_large_recompra_checkpoint_lost_response_replay_and_atomic_read(store):
+    import base64
+    import random
+
+    from ds_backend.state_transfer import put
+    from ds_backend.states import unpack
+    from integrations.datastudio.admin import grants
+
+    with store.connect() as conn:
+        grants(conn, "FARMA")
+    api = TestClient(create_app(store, "x" * 40))
+    headers = {"Authorization": "Bearer " + "x" * 40}
+    # Dados sintéticos incompressíveis; o estado compactado excede os 7 MB de HTTP.
+    payload = {"synthetic": base64.b64encode(random.Random(1234).randbytes(5_400_000)).decode()}
+    parts = []
+
+    class Client:
+        expected_target = store.target
+        config = {"segment": "FARMA"}
+        interrupt = True
+
+        def call(self, path, body):
+            assert path == "/v1/estados/parte"
+            assert len(body["data"]) <= 4_000_000
+            parts.append(body)
+            if body["index"] == body["count"] - 1 and self.interrupt:
+                assert store.state_get("recompra")["version"] == 0
+                self.interrupt = False
+                raise ConnectionError("interrupção sintética")
+            response = api.post(path, json=body, headers=headers)
+            assert response.status_code == 200, response.text[:80]
+            return response.json()
+
+    client = Client()
+    with pytest.raises(ConnectionError):
+        put(client, "recompra", 0, payload)
+    tampered = dict(parts[-1], raw_hash="0" * 64)
+    response = api.post("/v1/estados/parte", json=tampered, headers=headers)
+    assert response.json() == {"error": "DS_ESTADO_HASH_DIVERGENTE"}
+    assert store.state_get("recompra")["document"] is None
+    receipt = put(client, "recompra", 0, payload)
+    assert put(client, "recompra", 0, payload) == receipt
+    assert store.state_get("recompra")["version"] == 1
+    assert unpack(store.state_get("recompra")["document"]) == payload
+    with store.connect() as conn:
+        assert conn.execute("SELECT count(*) AS n FROM farma.nf_estado_partes").fetchone()["n"] == 0

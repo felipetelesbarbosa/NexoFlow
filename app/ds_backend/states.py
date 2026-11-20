@@ -5,10 +5,10 @@ from __future__ import annotations
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
 
 from ds_backend.client import Client, configured
-from ds_backend.contract import StorageError, digest
+from ds_backend.contract import StorageError
+from ds_backend.state_transfer import put
 
 NAMES = {
     "weni_update_state.json": "weni_update",
@@ -78,20 +78,7 @@ def save(path, document, *, name=None):
         key = (client.expected_target, name)
         if key not in _VERSIONS:
             raise StorageError("DS_ESTADO_EXIGE_LEITURA_PREVIA")
-        encoded = pack(document)
-        receipt = client.call(
-            "/v1/estados/gravar",
-            dict(
-                name=name,
-                expected_version=_VERSIONS[key],
-                document=encoded,
-                receipt_id=str(uuid4()),
-            ),
-        )
-        if receipt.get("state") != "CONFIRMADO" or receipt.get("hash") != digest(
-            encoded
-        ):
-            raise StorageError("DS_ESTADO_NAO_CONFIRMADO")
+        receipt = put(client, name, _VERSIONS[key], document)
         _VERSIONS[key] = receipt["version"]
         _DOCUMENTS[key] = deepcopy(document)
         return True

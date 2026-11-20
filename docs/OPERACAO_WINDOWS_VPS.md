@@ -65,7 +65,35 @@ Na 1.5.48, o perfil FARMA detecta o XLSX opcional em Downloads ou em `importacoe
 
 Em 20/11/2026, o servidor confirmou o aborto da v3 vazia. A v2 permaneceu READY com o mesmo recibo. O papel da API publicadora recebeu erro de permissão na leitura das exclusões durante a guarda financeira. A aplicação das permissões e a retomada comercial têm conferências independentes.
 
-1. Na VPS, usar a sessão administrativa privada do banco dedicado. No checkout revisado, executar `psql -X -v ON_ERROR_STOP=1 --single-transaction -d nexoflow_datastudio -f integrations/datastudio/grants_conferencia_farma.sql`. O arquivo se limita a SELECT das colunas usadas diretamente pelo publicador nas três visões privadas. Os papéis do painel e PET conservam seus privilégios. Para verificar, usar o mesmo DSN do publicador, no contêiner do serviço, e executar a função `assert_financial(conn, "farma")` numa transação somente leitura sobre a READY vigente. Guardar o código de saída. A ausência de registros no resultado de uma consulta que falhou não comprova conciliação.
+1. Na VPS, usar a sessão administrativa privada do banco dedicado. No checkout revisado, executar `psql -X -v ON_ERROR_STOP=1 --single-transaction -d nexoflow_datastudio -f integrations/datastudio/grants_conferencia_farma.sql`. O SQL concede ao publicador SELECT nas colunas usadas nas três visões e prepara a tabela privada de partes descrita abaixo. Os papéis do painel e PET conservam seus privilégios. Para verificar, usar o mesmo DSN do publicador, no contêiner do serviço, e executar a função `assert_financial(conn, "farma")` numa transação somente leitura sobre a READY vigente. Guardar o código de saída. A ausência de registros no resultado de uma consulta que falhou não comprova conciliação.
 2. Instalar o Setup 1.5.49 em **Atualizar mantendo dados**. Abrir o Terminal FARMA. Conferir `nexo versao` e `nexo armazenamento postgres diagnosticar`. Identificar a produção, a READY e a ausência de revisão concorrente.
 3. Recuperar os documentos privados da última instalação ou backup com procedência, inclusive pendências e admissões anteriores. Com rotinas paradas, usar o procedimento de [importação de estado](MIGRACAO%20WINDOWS%20POSTGRESQL%20DATA%20STUDIO.md). Uma campanha fracionada comprovadamente inexistente pode usar o procedimento documentado. Um checkpoint perdido de Weni/Recompra exige reconstrução e conferência operacional antes de aplicar. O histórico comercial e uma lista atual de contatos não reconstituem as ações anteriores.
 4. Após liberar os estados, executar a simulação Weni. Conferir que a revisão comercial permanece a mesma. Para verificar a publicação do Analytics, escolher incremental no Terminal FARMA; preservar o recibo, comparar o indicador afetado pelo mesmo período na VPS e na página oficial e verificar as chaves e totais após repetição. A existência da release não substitui essa conferência.
+
+### Importação seletiva do backup do Windows
+
+Recuperar exclusivamente o estado FARMA da raiz de logs, identificando a última aplicação Weni e Recompra por segmento e data. Conferir integridade do ZIP e dos membros selecionados. O histórico de relatórios, arquivos de atendimento e logs integrais pode permanecer arquivado. Validar a ausência de uma campanha fracionada ativa com o operador antes de importar seu estado inicial.
+
+Para estados grandes de Recompra, implantar primeiro o SQL acima e a imagem do **publicador** desta versão no serviço FARMA, conservando as configurações privadas, limites HTTP e o leitor. A migração cria uma tabela privada de partes apenas no schema FARMA. Conferir a integridade e a READY no serviço. O comando `importar-estado` e as gravações posteriores usam o formato compactado do checkpoint. O cliente divide o documento grande em partes e mantém uma chave de recibo determinística para o mesmo destino, nome, versão e conteúdo. Uma interrupção antes da última parte mantém o estado anterior; a última transação confere o hash, aplica o controle de concorrência e grava o recibo. Repetir o mesmo arquivo permite recuperar o recibo após perda da resposta. O leitor do painel não tem acesso às partes.
+
+Reversão do publicador: aguardar a conclusão de um envio em andamento, manter a API sem escritores e restabelecer a imagem anterior com o mesmo Compose. Preservar checkpoints, recibos e a tabela de partes. O formato armazenado é legível pela versão anterior; o envio de novos estados grandes requer a versão com transporte em partes.
+
+O operador da VPS deve registrar o SHA da imagem FARMA anterior e aplicar o SQL revisado em uma transação antes da troca do serviço. Usar um overlay com a imagem nova apenas para `datastudio-farma-publish`; manter leitor, túnel e demais serviços com suas imagens efetivas. Se os arquivos Compose comerciais estiverem em outro diretório, usar o projeto e os arquivos já auditados. No contêiner atualizado, este comando Python confere o papel dedicado, a transação de leitura e a guarda usada por `/v1/confirmar`. Não imprimir a configuração ou o DSN.
+
+```python
+import json, os
+from pathlib import Path
+from integrations.datastudio.store import Store
+from integrations.datastudio.financial_views import assert_financial
+
+cfg = json.loads(Path(os.environ["DATASTUDIO_CONFIG_FILE"]).read_text(encoding="utf-8-sig"))
+if (cfg["mode"], cfg["environment"], cfg["segment"]) != ("publish", "producao", "FARMA"):
+    raise SystemExit("Serviço ou destino divergente")
+store = Store(Path(cfg["dsn_file"]).read_text(encoding="utf-8-sig").strip(),
+              "producao", "FARMA", require_dedicated_role=True)
+with store.connect(readonly=True) as conn:
+    assert_financial(conn, store.schema)
+    print("Conferência financeira aprovada na READY", store.active(conn))
+```
+
+O checkpoint grande usa até oito partes de quatro milhões de caracteres base64. Acima desse volume a execução informa erro e conserva a versão anterior. Uma revisão do histórico ou um arquivo `.lock` não substituem o documento de estado da Weni, da Recompra ou de uma campanha.

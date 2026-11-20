@@ -621,41 +621,47 @@ class Store:
             or not isinstance(document, dict)
         ):
             raise StorageError("DS_ESTADO_INVALIDO")
-        checksum = digest(dict(name=name, base=expected_version, document=document))
         with self.connect() as conn:
-            conn.execute(
-                "SELECT pg_advisory_xact_lock(hashtextextended(%s,0))",
-                (self.segment + ":state:" + name,),
-            )
-            previous = conn.execute(
-                f"SELECT hash,recibo FROM {self.schema}.nf_estado_recibos WHERE id=%s",
-                (receipt_id,),
-            ).fetchone()
-            if previous:
-                if previous["hash"] != checksum:
-                    raise StorageError("DS_RECIBO_REUTILIZADO")
-                return previous["recibo"]
-            current = conn.execute(
-                f"SELECT versao FROM {self.schema}.nf_estados WHERE nome=%s FOR UPDATE",
-                (name,),
-            ).fetchone()
-            if (current["versao"] if current else 0) != expected_version:
-                raise StorageError("DS_ESTADO_EDICAO_CONCORRENTE")
-            receipt = dict(
-                id=receipt_id,
-                state="CONFIRMADO",
-                version=expected_version + 1,
-                hash=digest(document),
-            )
-            conn.execute(
-                f"INSERT INTO {self.schema}.nf_estados(nome,versao,hash,documento) VALUES(%s,%s,%s,%s) ON CONFLICT(nome) DO UPDATE SET versao=excluded.versao,hash=excluded.hash,documento=excluded.documento,atualizado=clock_timestamp()",
-                (name, receipt["version"], receipt["hash"], Jsonb(document)),
-            )
-            conn.execute(
-                f"INSERT INTO {self.schema}.nf_estado_recibos VALUES(%s,%s,%s)",
-                (receipt_id, checksum, Jsonb(receipt)),
-            )
-            return receipt
+            self.lock_state(conn, name)
+            return self.write_state(conn, name, expected_version, document, receipt_id)
+
+    def lock_state(self, conn, name):
+        conn.execute(
+            "SELECT pg_advisory_xact_lock(hashtextextended(%s,0))",
+            (self.segment + ":state:" + name,),
+        )
+
+    def write_state(self, conn, name, expected_version, document, receipt_id):
+        checksum = digest(dict(name=name, base=expected_version, document=document))
+        previous = conn.execute(
+            f"SELECT hash,recibo FROM {self.schema}.nf_estado_recibos WHERE id=%s",
+            (receipt_id,),
+        ).fetchone()
+        if previous:
+            if previous["hash"] != checksum:
+                raise StorageError("DS_RECIBO_REUTILIZADO")
+            return previous["recibo"]
+        current = conn.execute(
+            f"SELECT versao FROM {self.schema}.nf_estados WHERE nome=%s FOR UPDATE",
+            (name,),
+        ).fetchone()
+        if (current["versao"] if current else 0) != expected_version:
+            raise StorageError("DS_ESTADO_EDICAO_CONCORRENTE")
+        receipt = dict(
+            id=receipt_id,
+            state="CONFIRMADO",
+            version=expected_version + 1,
+            hash=digest(document),
+        )
+        conn.execute(
+            f"INSERT INTO {self.schema}.nf_estados(nome,versao,hash,documento) VALUES(%s,%s,%s,%s) ON CONFLICT(nome) DO UPDATE SET versao=excluded.versao,hash=excluded.hash,documento=excluded.documento,atualizado=clock_timestamp()",
+            (name, receipt["version"], receipt["hash"], Jsonb(document)),
+        )
+        conn.execute(
+            f"INSERT INTO {self.schema}.nf_estado_recibos VALUES(%s,%s,%s)",
+            (receipt_id, checksum, Jsonb(receipt)),
+        )
+        return receipt
 
     def seal(self, revision, manifest):
         if (

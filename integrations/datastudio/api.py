@@ -184,4 +184,14 @@ def create_app(store, token, *, reader=False):
             ("name", "expected_version", "document", "receipt_id"),
         )
 
+    if store.segment == "FARMA":
+        @api.post("/v1/estados/parte")
+        async def state_part(request: Request):
+            from integrations.datastudio.state_parts import receive
+
+            return await invoke(request, lambda **kwargs: receive(store, **kwargs), (
+                "name", "expected_version", "receipt_id", "checksum", "raw_hash",
+                "count", "index", "data",
+            ))
+
     return api

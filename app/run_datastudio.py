@@ -238,17 +238,20 @@ def run(argv=None):
         elif args.operacao == "importar-estado":
             if not args.estado or args.arquivo is None:
                 parser.error("Informe --estado e --arquivo privado.")
-            from uuid import uuid4
+            from ds_backend.state_transfer import put
 
-            result = client.call(
-                "/v1/estados/gravar",
-                dict(
-                    name=args.estado,
-                    expected_version=0,
-                    document=json.loads(args.arquivo.read_text(encoding="utf-8-sig")),
+            document = json.loads(args.arquivo.read_text(encoding="utf-8-sig"))
+            if not isinstance(document, dict):
+                raise StorageError("DS_ESTADO_INVALIDO")
+            if client.config["segment"] == "FARMA":
+                result = put(client, args.estado, 0, document)
+            else:
+                from uuid import uuid4
+
+                result = client.call("/v1/estados/gravar", dict(
+                    name=args.estado, expected_version=0, document=document,
                     receipt_id=str(uuid4()),
-                ),
-            )
+                ))
         else:
             if not args.id_revisao:
                 parser.error("Informe --id-revisao.")

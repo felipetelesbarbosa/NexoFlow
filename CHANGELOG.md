@@ -3,6 +3,7 @@
 ## 1.5.49 — preparação
 
 - No PostgreSQL FARMA, a simulação Weni lê a base sem abrir revisão de fatos. A aplicação confere a presença do estado Weni antes de abrir revisão e preserva o retorno de falha sem selar ou confirmar.
+- O checkpoint grande da Recompra FARMA passa pela API privada em partes verificadas. Importação inicial e atualizações usam a mesma regra de confirmação e retomada.
 - O administrador pode aplicar as permissões de coluna necessárias à conferência financeira do publicador. A liberação dos checkpoints continua sendo operacional.
 
 ## 1.5.48 — publicada em 20/11/2026, 00:18:11 (America/Fortaleza)
