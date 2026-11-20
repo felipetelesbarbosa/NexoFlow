@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.48",
+    [string]$Version = "1.5.49",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -422,7 +422,7 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-O Analytics e o Noturno FARMA localizam o XLSX de Salas da Weni em Downloads ou em importacoes e leem as datas do próprio arquivo. Quando o XLSX está indisponível, a rotina consulta a Weni Flows v2. Pedidos sem horário confiável de encerramento ficam pendentes na atribuição de anúncios.
+A simulação Weni FARMA em PostgreSQL utiliza a base sem abrir publicação comercial. A aplicação verifica o checkpoint antes de abrir uma revisão e só confirma o sucesso. Consulte docs/OPERACAO_WINDOWS_VPS.md para as permissões da VPS e a recuperação dos estados privados.
 
 Instale em Preserve e confira nexo versao. O Setup conserva configurações, credenciais, SQLite, logs, checkpoints e journals. Os ZIPs não incluem instalador Python nem dados comerciais. Não substitua módulos avulsos. A publicação do software não comprova recuperação ou homologação comercial e não executa cargas.
 
@@ -438,7 +438,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.48
+# NexoFlow 1.5.49
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"

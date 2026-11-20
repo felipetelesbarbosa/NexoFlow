@@ -61,6 +61,7 @@ def test_paged_read_refuses_mixed_publication_versions():
     from ds_backend.client import Client
 
     client = Client.__new__(Client)
+    client.expected_read_version = None
     pages = iter(
         [
             dict(version=1, rows=[{"key": "a"}], next="a"),
@@ -72,6 +73,16 @@ def test_paged_read_refuses_mixed_publication_versions():
     assert next(iterator) == {"key": "a"}
     with pytest.raises(StorageError, match="VERSAO_ALTERADA"):
         next(iterator)
+
+
+def test_pinned_preview_refuses_a_different_version_on_first_page():
+    from ds_backend.client import Client
+
+    client = Client.__new__(Client)
+    client.expected_read_version = 2
+    client.call = lambda *_: dict(version=3, rows=[{"key": "new"}], next=None)
+    with pytest.raises(StorageError, match="VERSAO_ALTERADA"):
+        list(client.rows("BI_Itens", None))
 
 
 def test_period_fields_are_civil_dates_not_arbitrary_timestamp_text():

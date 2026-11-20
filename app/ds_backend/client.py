@@ -65,6 +65,7 @@ class Client:
                 "CF-Access-Client-Secret": config["access_client_secret"],
             }
         )
+        self.expected_read_version: int | None = None
         self.reads = self.writes = 0
         self.verify()
 
@@ -141,7 +142,7 @@ class Client:
 
     def rows(self, name, revision):
         cursor = ""
-        version = None
+        version = self.expected_read_version
         while True:
             page = self.call(
                 "/v1/linhas",

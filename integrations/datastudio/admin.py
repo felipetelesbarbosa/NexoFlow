@@ -169,6 +169,12 @@ def grants(conn, segment):
             sql.Identifier(reader)
         )
     )
+    if segment == "FARMA":
+        conn.execute(
+            Path(__file__)
+            .with_name("grants_conferencia_farma.sql")
+            .read_text(encoding="utf-8")
+        )
     policy = "ds_" + schema + "_reader"
     if not conn.execute(
         "SELECT 1 FROM pg_policies WHERE schemaname='controle' AND tablename='nf_publicacoes' AND policyname=%s",

@@ -50,6 +50,9 @@ def connect(store):
         path.chmod(0o600)
     if _TEMP is None:
         raise StorageError("DS_CACHE_INDISPONIVEL")
+    if store.readonly:
+        # As observações da prévia vivem apenas no SQLite temporário desta sessão.
+        return sqlite3.connect(Path(_TEMP.name) / "observacoes.sqlite", timeout=30)
     db = sqlite3.connect(
         Path(_TEMP.name) / "observacoes.sqlite", factory=RemoteConnection, timeout=30
     )

@@ -24,6 +24,12 @@ def open_store(settings, google_factory, *, purpose="analytics", readonly=False)
 
         _VERSIONS.clear()
         _DOCUMENTS.clear()
+        if purpose == "weni" and client.config["segment"] == "FARMA" and not readonly:
+            state = client.call("/v1/estados/ler", {"name": "weni_update"})
+            if state.get("document") is None:
+                from ds_backend.contract import StorageError
+
+                raise StorageError("DS_ESTADO_EXIGE_MIGRACAO_INICIAL")
         CURRENT_STORE = PostgresStore(client, purpose=purpose, readonly=readonly)
         return CURRENT_STORE
     except Exception:
@@ -109,6 +115,9 @@ def backend_session(purpose):
                     and parsed.max_paginas < 1
                 ):
                     raise ValueError("--max-paginas exige valor positivo.")
+            from runtime_profile import segment
+
+            weni_farma = purpose == "weni" and segment() == "FARMA"
             settings = load_private_settings()
             if purpose == "historico" and any(
                 x in argv for x in ("--auditar-banco", "--excluir-pedidos")
@@ -117,14 +126,23 @@ def backend_session(purpose):
             from google_sheets import GoogleSheetsStore
 
             readonly = (
-                purpose == "historico" and "--somente-resumo" in argv
-            ) or "--check-only" in argv
+                (purpose == "historico" and "--somente-resumo" in argv)
+                or "--check-only" in argv
+                or (weni_farma and "--dry-run" in argv)
+            )
             store = open_store(
                 settings, GoogleSheetsStore, purpose=purpose, readonly=readonly
             )
             try:
+                if weni_farma and "--dry-run" in argv:
+                    from ds_backend.contract import StorageError
+
+                    info = store.client.info
+                    if not info["version"] or info.get("pending"):
+                        raise StorageError("DS_SIMULACAO_EXIGE_READY_SEM_PENDENCIA")
+                    store.client.expected_read_version = info["version"]
                 result = function(*args, **kwargs)
-                if not readonly:
+                if not readonly and (not weni_farma or result == 0):
                     complete(store)
                 return result
             finally:

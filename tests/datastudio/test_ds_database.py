@@ -1539,3 +1539,17 @@ def test_item_fallback_respects_exclusion_and_header_state(store):
                 ]
                 == 0
             )
+
+
+def test_farma_publisher_can_validate_without_exposing_exclusions_to_reader(store):
+    from integrations.datastudio.admin import grants
+    from integrations.datastudio.financial_views import assert_financial
+
+    with store.connect() as conn:
+        grants(conn, "FARMA")
+        grants(conn, "FARMA")
+        assert not conn.execute(
+            "SELECT has_column_privilege('nf_ds_farma_read','farma.ds_exclusoes_publicacao','pedido_id','SELECT') AS exposed"
+        ).fetchone()["exposed"]
+        conn.execute("SET LOCAL ROLE nf_ds_farma_publish")
+        assert_financial(conn, "farma")

@@ -266,3 +266,66 @@ def test_detail_delta_preserves_old_sale_and_skips_timestamp_only_run():
     store._cancelled_sales = {"old-sale"}
     assert store._replace_table(ws, headers, [[changed[c] for c in headers]])
     assert {r["item_chave"] for r in store.records("BI_Itens")} == {"new-item"}
+
+
+def test_farma_weni_simulation_and_failure_do_not_seal(monkeypatch):
+    from types import SimpleNamespace
+
+    import project_paths
+    from ds_backend import runtime
+    from ds_backend.cache import connect
+
+    calls = []
+
+    class TrackedClient(MemoryClient):
+        info = {"version": 2, "pending": []}
+
+        def begin(self, *args):
+            calls.append("begin")
+            return super().begin(*args)
+
+        def call(self, path, data):
+            calls.append(path)
+            if path == "/v1/estados/ler":
+                return {"document": state}
+            return super().call(path, data)
+
+    client = TrackedClient()
+    monkeypatch.setenv("NEXOFLOW_PERFIL", "FARMA")
+    monkeypatch.setattr(runtime, "configured", lambda: True)
+    monkeypatch.setattr(runtime.Client, "from_settings", lambda _: client)
+    monkeypatch.setattr(
+        project_paths,
+        "load_private_settings",
+        lambda: SimpleNamespace(ARMAZENAMENTO_BACKEND="postgres"),
+    )
+
+    @runtime.backend_session("weni")
+    def operation(argv):
+        if "--dry-run" in argv:
+            store = runtime.CURRENT_STORE
+            assert store.readonly
+            assert client.expected_read_version == 2
+            with connect(store) as db:
+                db.execute("INSERT INTO profile VALUES(?)", ("FARMA",))
+            assert not client.tables
+            assert store.revision is None
+        return result
+
+    state = None
+    result = 1
+    assert operation(["--dry-run"]) == 1
+    assert not calls
+    with pytest.raises(StorageError, match="DS_ESTADO_EXIGE_MIGRACAO_INICIAL"):
+        operation(["--apply"])
+    assert calls == ["/v1/estados/ler"]
+    state = {"cursor": "synthetic"}
+    calls.clear()
+    assert operation(["--apply"]) == 1
+    assert calls == ["/v1/estados/ler", "begin"]
+    calls.clear()
+    result = 0
+    assert operation(["--dry-run"]) == 0
+    assert not calls
+    assert operation(["--apply"]) == 0
+    assert calls == ["/v1/estados/ler", "begin", "/v1/selar", "/v1/confirmar"]

@@ -1,5 +1,10 @@
 # NexoFlow — Changelog
 
+## 1.5.49 — preparação
+
+- No PostgreSQL FARMA, a simulação Weni lê a base sem abrir revisão de fatos. A aplicação confere a presença do estado Weni antes de abrir revisão e preserva o retorno de falha sem selar ou confirmar.
+- O administrador pode aplicar as permissões de coluna necessárias à conferência financeira do publicador. A liberação dos checkpoints continua sendo operacional.
+
 ## 1.5.48 — publicada em 20/11/2026, 00:18:11 (America/Fortaleza)
 
 - Analytics e Noturno FARMA detectam o XLSX de Salas em Downloads ou em `importacoes` e leem os horários do próprio arquivo. As datas do `secrets_config.py` deixam de ser necessárias.

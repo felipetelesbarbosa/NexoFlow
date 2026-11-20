@@ -1,3 +1,7 @@
+# NexoFlow 1.5.49 — preparação Windows
+
+Atualização em modo Preserve para a simulação Weni FARMA com PostgreSQL. Conferir os pacotes na [página de releases](https://github.com/felipetelesbarbosa/NexoFlow/releases).
+
 # NexoFlow 1.5.48 — Downloads
 
 Publicada em **20/11/2026, 00:18:11 (America/Fortaleza)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.48) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/ed067d76c29fcb94e33ef94bd3b0600f840e8029) · [CI e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44664424134) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44666740087).
