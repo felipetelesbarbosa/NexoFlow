@@ -1,6 +1,10 @@
-# NexoFlow 1.5.50 — preparação
+# NexoFlow 1.5.50 — Downloads
 
-Atualização dos relatórios operacionais no Windows. [Conferir o destino das rotinas](../docs/OPERACAO_WINDOWS_VPS.md#destino-nos-relatórios-do-windows).
+Publicada em **20/11/2026, 19:45:04 (America/Fortaleza)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.50) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/0c6587586bcc7c9e665223b077caf2077304e389) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44829026869) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44829026846) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44829026868) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44831416055).
+
+[NexoFlow-Setup-1.5.50.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.50/NexoFlow-Setup-1.5.50.zip) · [NexoFlow-1.5.50.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.50/NexoFlow-1.5.50.zip) · [SHA256SUMS-1.5.50.txt](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.50/SHA256SUMS-1.5.50.txt)
+
+Use o Setup em **Atualizar mantendo dados**. [Destino nos relatórios do Windows](../docs/OPERACAO_WINDOWS_VPS.md#destino-nos-relatórios-do-windows).
 
 # NexoFlow 1.5.49 — Downloads
 
