@@ -22,7 +22,11 @@ from ds_backend.contract import (
     StorageError,
 )
 from integrations.datastudio import meta_destinations
-from integrations.datastudio.products_reader import ProductPeriods, projected
+from integrations.datastudio.products_reader import (
+    ProductPeriods,
+    SnapshotPeriod,
+    projected,
+)
 from integrations.datastudio.read_catalog import (
     DERIVED_SQL,
     PUBLIC_SUMMARY,
@@ -52,6 +56,22 @@ def ranking_fits_cache(rows):
     return True
 
 
+class SalesPeriods(SnapshotPeriod[list[dict]]):
+    @staticmethod
+    def load(conn, params):
+        conn.execute("SET LOCAL enable_nestloop=off")
+        columns = sql.SQL(",").join(
+            sql.Identifier(field) for field in READ_REGISTRY["BI_Vendas"]["columns"]
+        )
+        return conn.execute(
+            sql.SQL(
+                "SELECT {} FROM farma.ds_bi_vendas WHERE data BETWEEN %(inicio)s "
+                "AND %(fim)s LIMIT %(limite)s"
+            ).format(columns),
+            params,
+        ).fetchall()
+
+
 class Reader(Store):
     def __init__(self, dsn, environment, segment, *, require_dedicated_role=False):
         super().__init__(
@@ -64,6 +84,7 @@ class Reader(Store):
             "abc": OrderedDict(),
         }
         self.product_periods = ProductPeriods()
+        self.sales_periods = SalesPeriods()
         self._db_slots = BoundedSemaphore(MAX_READER_CONNECTIONS)
 
     @contextmanager
@@ -338,6 +359,21 @@ class Reader(Store):
             if table == "BI_Vendas" and self.segment == "FARMA"
             else []
         )
+        if (
+            table == "BI_Vendas"
+            and self.segment == "FARMA"
+            and start
+            and not filters
+            and not aggregation
+        ):
+            key, rows = self.sales_periods.get(
+                self, {"inicio": first, "fim": last, "limite": MAX_RESULT_ROWS + 1}
+            )
+            # Um gráfico pode pedir somente medidas com cobertura. Cada projeção
+            # conserva o mesmo bloqueio por nulo da consulta SQL individual.
+            if any(row[field] is None for row in rows for field in daily_metrics):
+                raise StorageError("DS_BI_VENDAS_INCOMPLETA")
+            return self.result(key[0], fields, rows)
         if daily_metrics:
             # SUM no SQL e a reagregação do Looker ignoram NULL. Conferir a
             # cobertura dos campos pedidos no mesmo snapshot e na mesma leitura.

@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+from abc import ABC, abstractmethod
 from concurrent.futures import Future
 from datetime import date
 from decimal import Decimal
 from threading import Lock
+from typing import Generic, TypeVar
 
 from psycopg import sql
 
@@ -105,14 +107,22 @@ def request(mode, fields, start, end, names):
     }
 
 
-class ProductPeriods:
-    """Compartilha a varredura dos sete gráficos somente sob a mesma visibilidade."""
+PeriodData = TypeVar("PeriodData")
+
+
+class SnapshotPeriod(ABC, Generic[PeriodData]):
+    """Compartilha uma leitura entre gráficos no mesmo snapshot PostgreSQL."""
 
     def __init__(self):
         self.lock = Lock()
-        self.pending: dict[tuple, Future] = {}
+        self.pending: dict[tuple, Future[PeriodData]] = {}
         self.last_key: tuple | None = None
-        self.last: dict | None = None
+        self.last: PeriodData | None = None
+
+    @staticmethod
+    @abstractmethod
+    def load(conn, params) -> PeriodData:
+        raise NotImplementedError
 
     @staticmethod
     def identity(reader, conn, params):
@@ -126,6 +136,7 @@ class ProductPeriods:
         ).fetchone()
         if not state:
             raise StorageError("DS_SEM_PUBLICACAO_CONFIRMADA")
+        names = params.get("nomes")
         return (
             state["versao"],
             state["execucao"],
@@ -134,29 +145,8 @@ class ProductPeriods:
             state["snapshot"],
             params["inicio"],
             params["fim"],
-            None if params["nomes"] is None else tuple(params["nomes"]),
+            None if names is None else tuple(names),
         )
-
-    @staticmethod
-    def load(conn, params):
-        conn.execute("SET LOCAL enable_nestloop=off")
-        data: dict = {"produto": [], "nome": []}
-        for part in conn.execute(BUNDLE, params):
-            section = part["parte"]
-            row = json.loads(part["dados"], parse_float=Decimal)
-            if section in ("produto", "nome"):
-                data[section].append(row)
-            else:
-                data[section] = row
-        if not data["resumo"].pop("completo"):
-            raise StorageError("DS_PRODUTOS_BASE_INVALIDA")
-        if abs(data["resumo"]["receita_item"]) * 100 > 2**53 - 1:
-            raise StorageError("DS_ABC_PRECISAO_EXCEDIDA")
-        data["produto"].sort(key=lambda row: row["posicao_receita_top5"])
-        data["nome"].sort(
-            key=lambda row: (row["produto_nome"] is None, row["produto_nome"] or "")
-        )
-        return data
 
     def get(self, reader, params):
         leader = False
@@ -164,7 +154,7 @@ class ProductPeriods:
             with reader.connect(readonly=True) as conn:
                 key = self.identity(reader, conn, params)
                 with self.lock:
-                    if key == self.last_key:
+                    if key == self.last_key and self.last is not None:
                         return key, self.last
                     future = self.pending.get(key)
                     if future is None:
@@ -187,6 +177,29 @@ class ProductPeriods:
             return key, future.result(timeout=45)
         except TimeoutError:
             raise StorageError("DS_CONSULTA_TEMPO_LIMITE") from None
+
+
+class ProductPeriods(SnapshotPeriod[dict]):
+    @staticmethod
+    def load(conn, params):
+        conn.execute("SET LOCAL enable_nestloop=off")
+        data: dict = {"produto": [], "nome": []}
+        for part in conn.execute(BUNDLE, params):
+            section = part["parte"]
+            row = json.loads(part["dados"], parse_float=Decimal)
+            if section in ("produto", "nome"):
+                data[section].append(row)
+            else:
+                data[section] = row
+        if not data["resumo"].pop("completo"):
+            raise StorageError("DS_PRODUTOS_BASE_INVALIDA")
+        if abs(data["resumo"]["receita_item"]) * 100 > 2**53 - 1:
+            raise StorageError("DS_ABC_PRECISAO_EXCEDIDA")
+        data["produto"].sort(key=lambda row: row["posicao_receita_top5"])
+        data["nome"].sort(
+            key=lambda row: (row["produto_nome"] is None, row["produto_nome"] or "")
+        )
+        return data
 
 
 def read_columns(reader, key, params, mode, fields, byte_limit):
