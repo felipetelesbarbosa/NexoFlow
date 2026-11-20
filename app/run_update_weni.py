@@ -96,7 +96,9 @@ def main() -> int:
     from weni_update import _invalid_cpf_summary, check_update_connections, run_update
 
     configure_logging(WENI_UPDATE_LOG_FILE)
-    logging.info("NexoFlow Weni iniciado.")
+    from ds_backend.client import backend_label, configured
+
+    logging.info("NexoFlow Weni iniciado. Armazenamento do perfil: %s.", backend_label(configured()))
     logging.info("Proxy: %s", status.safe_summary)
 
     try:

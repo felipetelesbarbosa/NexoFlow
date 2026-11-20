@@ -310,7 +310,8 @@ def sync_native_meta(
         )
         overlap = _bounded(settings, segment, "META_ADS_OVERLAP_DAYS", 7, 31)
         batch = _bounded(settings, segment, "META_ADS_BATCH_DAYS", 7, 7)
-        stage = "ler_planilhas"
+        storage_stage = "tabelas" if _setting(settings, segment, "ARMAZENAMENTO_BACKEND") == "postgres" else "planilhas"
+        stage = f"ler_{storage_stage}"
         manifest = adapter.schema_manifest()
         previous = adapter.load_tables()
         read_errors = getattr(adapter, "read_errors", {})
@@ -739,7 +740,7 @@ def sync_native_meta(
                 for row in previous.get(title, [])
                 if row.get("conta_id") not in ready
             ]
-        stage = "plano_planilhas"
+        stage = f"plano_{storage_stage}"
         plan = adapter.plan_tables(tables)
         if plan.get("schema_manifest") != manifest:
             raise ValueError("Fontes Meta mudaram durante a coleta; plano bloqueado.")
@@ -758,7 +759,7 @@ def sync_native_meta(
         # O adapter reconfere destinos, conteúdo e manifesto antes de escrever;
         # abas vazias podem receber cabeçalho, schemas divergentes não são migrados.
         # schema_approved permanece compatível com a CLI e revisões já existentes.
-        stage = "aplicar_planilhas"
+        stage = f"aplicar_{storage_stage}"
         applied = adapter.apply_tables(
             tables, expected_manifest=expected_manifest or manifest
         )

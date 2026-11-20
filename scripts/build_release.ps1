@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.49",
+    [string]$Version = "1.5.50",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -402,7 +402,7 @@ $shaLines = @(
 $releaseNotes = @"
 # NexoFlow $Version
 
-Aplicativos Windows para FarmaLíder e Pets Líder: integração Weni/API, clientes, pedidos, Recompra, Google Sheets e Data Studio.
+Aplicativos Windows para FarmaLíder e Pets Líder: integração Weni/API, clientes, pedidos, Recompra e Data Studio, com armazenamento em PostgreSQL da VPS ou Google Sheets conforme o perfil.
 
 O NexoFlow identifica pedidos registrados na API independentemente do canal de origem e retroalimenta a base de contatos Weni, inclusive para compras feitas por telefone ou fora da plataforma. O canal específico só é afirmado com evidência.
 
@@ -438,7 +438,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.49
+# NexoFlow 1.5.50
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"

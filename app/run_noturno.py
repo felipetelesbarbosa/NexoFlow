@@ -199,6 +199,10 @@ def execute(root: Path = ROOT, *, runner=run_step, full: bool = False) -> int:
                 from proxy_config import configure_proxy
 
                 configure_proxy()
+            from ds_backend.client import backend_label, configured
+
+            summary["armazenamento_configurado"] = backend_label(configured())
+            print(f"Armazenamento do perfil: {summary['armazenamento_configurado']}", flush=True)
             code = run_flow()
     except KeyboardInterrupt:
         code = 130

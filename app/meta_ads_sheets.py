@@ -120,7 +120,7 @@ class NativeMetaSheets:
             raise NativeMetaSchemaError("A fonte Meta pertence a outro perfil.")
         ids = [context.get(key) for key in ("dashboard", "operations", "history")]
         if not all(isinstance(x, str) and x for x in ids) or len(set(ids)) != 3:
-            raise NativeMetaSchemaError("Meta exige os três destinos Google distintos.")
+            raise NativeMetaSchemaError("Meta exige três destinos lógicos distintos para dashboard, operação e histórico.")
         return context
 
     def _record(self, title, value):
@@ -175,7 +175,7 @@ class NativeMetaSheets:
         snapshot = self.store.native_meta_read(title, headers)
         expected = context["dashboard" if title.startswith("BI_") else "operations"]
         if snapshot.get("book_id") != expected:
-            raise NativeMetaSchemaError("Aba Meta no arquivo Google errado.")
+            raise NativeMetaSchemaError("Tabela Meta em destino diferente do autorizado.")
         values = snapshot.get("values", [])
         records = {}
         if snapshot.get("exists") and not native_values_empty(values):
@@ -247,7 +247,7 @@ class NativeMetaSheets:
     def _prepared(self, tables, context):
         if not isinstance(tables, dict) or set(tables) - set(_schemas()):
             raise NativeMetaSchemaError(
-                "A integração Meta não pode alterar abas legadas."
+                "A integração Meta não pode alterar tabelas legadas."
             )
         prepared, failures = {}, {}
         for title, rows in tables.items():

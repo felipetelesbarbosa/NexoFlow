@@ -18,6 +18,12 @@ from ds_backend.contract import (
     target,
 )
 
+POSTGRES_LABEL = "PostgreSQL da VPS"
+
+
+def backend_label(postgres: bool) -> str:
+    return POSTGRES_LABEL if postgres else "Google Sheets"
+
 
 def enabled(settings):
     mode = getattr(settings, "ARMAZENAMENTO_BACKEND", "sheets")

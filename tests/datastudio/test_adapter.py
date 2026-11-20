@@ -329,3 +329,41 @@ def test_farma_weni_simulation_and_failure_do_not_seal(monkeypatch):
     assert not calls
     assert operation(["--apply"]) == 0
     assert calls == ["/v1/estados/ler", "begin", "/v1/selar", "/v1/confirmar"]
+
+
+def test_postgres_contact_and_bi_logs_identify_vps_and_ready(caplog):
+    from looker_bi import SCHEMAS
+
+    client = MemoryClient()
+    store = PostgresStore(client)
+    contact = row("Base_Contatos", contact_uuid="synthetic-contact")
+    store.upsert_contacts_detailed([contact])
+    with caplog.at_level("INFO"):
+        _, records, ids = store.load_base_snapshot()
+        store.reconcile_pharmacy_scope(include_history=False)
+        store.replace_looker_tables({name: [] for name in SCHEMAS})
+        assert "READY" not in caplog.text
+        store.finish(complete=True)
+    assert len(records) == 1 and ids == {"synthetic-contact"}
+    assert "Google Sheets" not in caplog.text
+    assert "PostgreSQL da VPS" in caplog.text
+    assert "READY" in caplog.text
+    assert store.request_stats()["total"] == client.reads + client.writes
+
+def test_falha_de_confirmacao_preserva_a_pendencia_e_o_rotulo_do_sheets(caplog, monkeypatch):
+    from unittest.mock import Mock
+
+    from google_sheets import GoogleSheetsStore
+
+    client = MemoryClient()
+    store = PostgresStore(client)
+    monkeypatch.setattr(client, "call", lambda *_: {"state": "SELADA"})
+    with caplog.at_level("INFO"):
+        with pytest.raises(StorageError, match="DS_REVISAO_NAO_CONFIRMADA"):
+            store.finish(complete=True)
+        assert "READY" not in caplog.text
+        google = Mock()
+        google._read_with_retry.return_value = []
+        google._values_to_records.return_value = []
+        GoogleSheetsStore.load_base_snapshot(google)
+        assert "Google Sheets: Base_Contatos pré-carregada" in caplog.text

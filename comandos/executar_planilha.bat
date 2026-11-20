@@ -15,14 +15,14 @@ title NexoFlow Planilha
 :menu
 cls
 echo ==========================================================
-echo NexoFlow Planilha - NexoFlow 1.5.49
+echo NexoFlow Planilha - NexoFlow 1.5.50
 echo ==========================================================
 echo Coloque os arquivos na pasta %IMPORT_DIR%:
 echo   Conversas_Delivery.xlsx
 echo   Contatos_Delivery.xlsx
 echo.
 echo [1] Atualizar contatos e pedidos na Weni
-echo [2] Atualizar Analytics e Google Sheets
+echo [2] Atualizar Analytics com os XLSX no armazenamento do perfil
 echo [3] Abrir pasta de importações
 echo [4] Sair
 echo.

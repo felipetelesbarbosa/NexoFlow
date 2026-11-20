@@ -19,6 +19,7 @@ class AnalyticsResultSummaryTests(unittest.TestCase):
         meta=None,
         historical=None,
         bi_pending=False,
+        postgres=False,
     ):
         sheets, farm, weni = Mock(), Mock(), Mock()
         sheets._continuity = None
@@ -45,6 +46,11 @@ class AnalyticsResultSummaryTests(unittest.TestCase):
             stack.enter_context(
                 patch.dict(os.environ, {"FORCE_FULL_SYNC": "", "FULL_SYNC_QUARTER": ""})
             )
+            if postgres:
+                stack.enter_context(patch("ds_backend.client.enabled", return_value=True))
+                stack.enter_context(patch("ds_backend.runtime.open_store", return_value=sheets))
+                stack.enter_context(patch("weni_insights.enabled", return_value=False))
+                stack.enter_context(patch("order_history_store.analytics_history", return_value=([], [], None)))
             for target, value in (
                 ("configure_logging", None),
                 ("validate_configuration", None),
@@ -83,6 +89,18 @@ class AnalyticsResultSummaryTests(unittest.TestCase):
                 code = main.main()
         return code, "\n".join(captured.output), controls, sheets
 
+    def test_etapas_e_resumo_identificam_o_destino_do_perfil(self):
+        for postgres, label in ((False, "Google Sheets"), (True, "PostgreSQL da VPS")):
+            with self.subTest(label=label):
+                code, output, _, _ = self.run_pipeline(postgres=postgres)
+                self.assertEqual(code, 0, output)
+                for stage in range(1, 5):
+                    self.assertIn(f"{label}: etapa {stage}/4", output)
+                for table in range(1, 8):
+                    self.assertIn(f"{label}: BI {table}/7", output)
+                self.assertIn(f"{label} | contatos inseridos=", output)
+                self.assertNotIn("Google Sheets" if postgres else "PostgreSQL da VPS", output)
+
     def test_analytics_envia_dias_guardados_no_backend_postgres(self):
         with (
             patch("ds_backend.client.enabled", return_value=True),
@@ -119,7 +137,7 @@ class AnalyticsResultSummaryTests(unittest.TestCase):
         self.assertIn("Pedidos gravados: novos=3; atualizados=1", output)
         self.assertIn("Itens gravados: novos=5; atualizados=2", output)
         self.assertIn("Checkpoint principal: avançado", output)
-        self.assertIn("Meta Ads: estrutura da planilha pendente", output)
+        self.assertIn("Meta Ads: estrutura pendente em Google Sheets", output)
         self.assertIn("cursor próprio", output)
         self.assertNotIn("0 erro(s) em consulta", output)
         self.assertNotIn("marco incremental anterior foi mantido", output)
@@ -159,9 +177,9 @@ class AnalyticsResultSummaryTests(unittest.TestCase):
         )
         self.assertEqual(code, 3)
         self.assertIn(
-            "Meta Ads gravado em abas concluídas: novas linhas=2; atualizadas=3", output
+            "Meta Ads gravado em tabelas concluídas: novas linhas=2; atualizadas=3", output
         )
-        self.assertIn("linhas confirmadas em abas ainda pendentes=5", output)
+        self.assertIn("linhas confirmadas em tabelas ainda pendentes=5", output)
         self.assertNotIn("1000", output)
 
     def test_history_pending_preserves_checkpoint_and_other_tables(self):

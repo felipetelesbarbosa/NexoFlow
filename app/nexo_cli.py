@@ -308,7 +308,7 @@ def _print_commands() -> None:
         "  nexo looker --inicio AAAA-MM-DD --fim AAAA-MM-DD  Recalcula KPIs para o Data Studio"
     )
     print(
-        "  nexo analytics planilhas     Consulta os exports e atualiza o Google Sheets"
+        "  nexo analytics planilhas     Lê os XLSX e atualiza o armazenamento do perfil"
     )
     print()
     print("CONSULTAS WENI - SOMENTE LEITURA")
@@ -351,8 +351,14 @@ def _status(local_only: bool) -> int:
         proxy = f"ERRO: {exc}"
     print(f"Proxy.................... {proxy}")
 
+    from ds_backend.client import backend_label, configured
+
+    postgres = configured()
+    print(f"Armazenamento do perfil.. {backend_label(postgres)}")
     state_path = LOG_DIR / "weni_update_state.json"
-    if state_path.exists():
+    if postgres:
+        print("Checkpoint Weni........... PostgreSQL da VPS (estado remoto não consultado)")
+    elif state_path.exists():
         try:
             state = json.loads(state_path.read_text(encoding="utf-8"))
             last = (
@@ -636,7 +642,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     looker = sub.add_parser(
         "looker",
-        help="recalcula os KPIs do Data Studio usando o histórico do Google Sheets",
+        help="recalcula os KPIs do Data Studio usando o histórico do armazenamento do perfil",
     )
     looker.add_argument("--inicio", help="Início do período, AAAA-MM-DD")
     looker.add_argument("--fim", help="Fim do período, AAAA-MM-DD")

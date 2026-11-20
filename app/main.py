@@ -323,6 +323,7 @@ def _log_final_summary(
     completion_controls,
     full_quarter,
     native_meta_result,
+    destination,
     historical_publication=None,
     pg_publication=None,
 ):
@@ -397,7 +398,8 @@ def _log_final_summary(
     elif native_partial:
         if native_meta_result.get("status") == "schema_pendente":
             logging.warning(
-                "Meta Ads: estrutura da planilha pendente; confira o diagnóstico privado da etapa."
+                "Meta Ads: estrutura pendente em %s; confira o diagnóstico privado da etapa.",
+                destination,
             )
         elif native_meta_result.get("critical"):
             logging.error(
@@ -423,7 +425,7 @@ def _log_final_summary(
     meta_writes = native_meta_result.get("summary") or {}
     if meta_writes:
         logging.info(
-            "Meta Ads gravado em abas concluídas: novas linhas=%s; atualizadas=%s; sem mudança=%s.",
+            "Meta Ads gravado em tabelas concluídas: novas linhas=%s; atualizadas=%s; sem mudança=%s.",
             meta_writes.get("inserted", 0),
             meta_writes.get("updated", 0),
             meta_writes.get("unchanged", 0),
@@ -435,7 +437,7 @@ def _log_final_summary(
         )
         if pending_confirmed:
             logging.info(
-                "Meta Ads: linhas confirmadas em abas ainda pendentes=%s; a próxima carga revalida o restante.",
+                "Meta Ads: linhas confirmadas em tabelas ainda pendentes=%s; a próxima carga revalida o restante.",
                 pending_confirmed,
             )
     if not primary_partial and not native_partial:
@@ -1128,9 +1130,12 @@ def main() -> int:
         if full_quarter is not None:
             validate_full_load_quarter(part=full_quarter, component="analytics")
 
+        from ds_backend.client import backend_label
         from ds_backend.client import enabled as postgres_enabled
 
-        pg_publisher = None if postgres_enabled(secrets) else open_publisher(secrets)
+        postgres = postgres_enabled(secrets)
+        destination = backend_label(postgres)
+        pg_publisher = None if postgres else open_publisher(secrets)
         if pg_publisher is not None:
             pg_publisher.start()
 
@@ -1146,7 +1151,7 @@ def main() -> int:
         )
         logging.info(
             "Iniciando sincronização Weni → FarmaLíder → %s.",
-            "PostgreSQL" if postgres_enabled(secrets) else "Google Sheets",
+            destination,
         )
 
         weni_token = str(getattr(secrets, "WENI_API_TOKEN", "")).strip()
@@ -1159,13 +1164,13 @@ def main() -> int:
         from weni_insights import enabled as insights_enabled
         from weni_insights import publish_configured
 
-        if postgres_enabled(secrets) and insights_enabled(secrets):
+        if postgres and insights_enabled(secrets):
             logging.info(
                 "Insights FARMA: %d recibos confirmados.",
                 publish_configured(secrets, sheets.client),
             )
         logging.info(
-            "Google Sheets inicializado em %.2fs.",
+            f"{destination} inicializado em %.2fs.",
             time.monotonic() - sheets_started,
         )
 
@@ -1203,7 +1208,7 @@ def main() -> int:
         # São APIs independentes, então a latência de uma fica escondida pela outra.
         with ThreadPoolExecutor(
             max_workers=1,
-            thread_name_prefix="sheets-preload",
+            thread_name_prefix="storage-preload",
         ) as preload_executor:
             preload_base = force_full or after is None
             base_snapshot_future = (
@@ -1305,7 +1310,7 @@ def main() -> int:
                     "consultar FarmaLíder ou recalcular métricas."
                 )
                 logging.info(
-                    "Google Sheets: requisições HTTP da execução: leituras=%s | escritas=%s | total=%s.",
+                    f"{destination}: requisições HTTP da execução: leituras=%s | escritas=%s | total=%s.",
                     request_stats["reads"],
                     request_stats["writes"],
                     request_stats["total"],
@@ -1358,7 +1363,7 @@ def main() -> int:
 
         contacts_sheets_started = time.monotonic()
         logging.info(
-            "Google Sheets: etapa 1/4 - Base_Contatos + Historico_Alteracoes (%s contatos).",
+            f"{destination}: etapa 1/4 - Base_Contatos + Historico_Alteracoes (%s contatos).",
             len(normalized),
         )
         contact_result = sheets.upsert_contacts_detailed(
@@ -1367,12 +1372,12 @@ def main() -> int:
         )
         inserted, updated = contact_result.inserted, contact_result.updated
         logging.info(
-            "Google Sheets: etapa 1/4 - Base_Contatos finalizada; histórico receberá somente %s contato(s) com mudança real.",
+            f"{destination}: etapa 1/4 - Base_Contatos finalizada; histórico receberá somente %s contato(s) com mudança real.",
             len(contact_result.changed_records),
         )
         sheets.append_history(contact_result.changed_records, existing_uuids)
         logging.info(
-            "Google Sheets: contatos + histórico em %.2fs.",
+            f"{destination}: contatos + histórico em %.2fs.",
             time.monotonic() - contacts_sheets_started,
         )
 
@@ -1476,7 +1481,7 @@ def main() -> int:
             _apply_request_metrics(cliente_stats, farm_client.metrics_snapshot())
 
         postprocess_started = time.monotonic()
-        logging.info("Google Sheets: etapa 2/4 - Pedidos e itens.")
+        logging.info(f"{destination}: etapa 2/4 - Pedidos e itens.")
         order_result, item_result = sheets.upsert_pharmacy_orders(order_rows, item_rows)
         scope_pending = (
             sheets.get_control("escopo_farmacia_versao") != PHARMACY_SCOPE_VERSION
@@ -1493,11 +1498,11 @@ def main() -> int:
         items_inserted = item_result.inserted
         items_updated = item_result.updated
 
-        logging.info("Google Sheets: etapa 3/4 - Métricas de contatos e anúncios.")
+        logging.info(f"{destination}: etapa 3/4 - Métricas de contatos e anúncios.")
         ad_metrics = build_daily_metrics(contact_result.final_records)
         sheets.replace_metrics(ad_metrics)
 
-        logging.info("Google Sheets: etapa 4/4 - Métricas de vendas e fechamento.")
+        logging.info(f"{destination}: etapa 4/4 - Métricas de vendas e fechamento.")
         all_order_records = pharmacy_scope.orders
         all_item_records = pharmacy_scope.items
         if scope_pending:
@@ -1508,14 +1513,14 @@ def main() -> int:
         sheets.replace_sales_metrics(sales_metrics)
         sales_metrics_count = len(sales_metrics)
         logging.info(
-            "Google Sheets: pedidos + métricas em %.2fs.",
+            f"{destination}: pedidos + métricas em %.2fs.",
             time.monotonic() - postprocess_started,
         )
 
         # Camada BI pronta para o Data Studio. As abas são mantidas pelo próprio
         # Analytics para que o relatório não precise recalcular regras de negócio.
         bi_started = time.monotonic()
-        logging.info("Google Sheets: camada BI/Data Studio - iniciando 7 tabelas.")
+        logging.info(f"{destination}: camada BI/Data Studio - iniciando 7 tabelas.")
         bi_summary = build_bi_summary_record(
             contact_result.final_records,
             all_order_records,
@@ -1524,7 +1529,7 @@ def main() -> int:
             updated_at=sync_time,
         )
         sheets.upsert_bi_summary(bi_summary)
-        logging.info("Google Sheets: BI 1/7 - BI_Resumo_Diario atualizado.")
+        logging.info(f"{destination}: BI 1/7 - BI_Resumo_Diario atualizado.")
 
         bi_channels = build_bi_channel_records(
             contact_result.final_records,
@@ -1532,7 +1537,7 @@ def main() -> int:
             updated_at=sync_time,
         )
         sheets.upsert_bi_channels(bi_channels)
-        logging.info("Google Sheets: BI 2/7 - BI_Canais atualizado.")
+        logging.info(f"{destination}: BI 2/7 - BI_Canais atualizado.")
 
         bi_conversion = build_bi_conversion_records(
             contact_result.final_records,
@@ -1541,7 +1546,7 @@ def main() -> int:
             updated_at=sync_time,
         )
         sheets.upsert_bi_conversion(bi_conversion)
-        logging.info("Google Sheets: BI 3/7 - BI_Conversao atualizado.")
+        logging.info(f"{destination}: BI 3/7 - BI_Conversao atualizado.")
 
         bi_sales = build_bi_sales_rows(
             all_order_records,
@@ -1598,11 +1603,11 @@ def main() -> int:
             ],
         )
         sheets.replace_bi_sales(bi_sales)
-        logging.info("Google Sheets: BI 4/7 - BI_Vendas atualizado.")
+        logging.info(f"{destination}: BI 4/7 - BI_Vendas atualizado.")
         sheets.replace_bi_ads(bi_ads)
-        logging.info("Google Sheets: BI 5/7 - BI_Ads atualizado.")
+        logging.info(f"{destination}: BI 5/7 - BI_Ads atualizado.")
         sheets.replace_bi_orders(bi_orders)
-        logging.info("Google Sheets: BI 6/7 - BI_Pedidos atualizado.")
+        logging.info(f"{destination}: BI 6/7 - BI_Pedidos atualizado.")
         if skipped_bi:
             publish_other_looker_tables(sheets, looker_tables)
         else:
@@ -1642,7 +1647,7 @@ def main() -> int:
         if historical_publication is None:
             historical_publication = (
                 publish_history(secrets, storage=sheets)
-                if postgres_enabled(secrets)
+                if postgres
                 else publish_history(secrets)
             )
 
@@ -1700,7 +1705,7 @@ def main() -> int:
             ]
         )
         logging.info(
-            "Google Sheets: BI 7/7 - BI_Status atualizado; camada BI concluída em %.2fs.",
+            f"{destination}: BI 7/7 - BI_Status atualizado; camada BI concluída em %.2fs.",
             time.monotonic() - bi_started,
         )
 
@@ -1817,7 +1822,7 @@ def main() -> int:
 
         from ds_backend.runtime import complete as complete_storage
 
-        if postgres_enabled(secrets):
+        if postgres:
             acknowledge(history_receipts)
         complete_storage(sheets, success=completion_status == "sucesso")
 
@@ -1870,7 +1875,7 @@ def main() -> int:
         )
         request_stats = sheets.request_stats()
         logging.info(
-            "  Google Sheets | contatos inseridos=%s | atualizados=%s | sem mudança=%s | "
+            f"  {destination} | contatos inseridos=%s | atualizados=%s | sem mudança=%s | "
             "pedidos inseridos=%s | pedidos atualizados=%s | HTTP leituras/escritas=%s/%s.",
             inserted,
             updated,
@@ -1892,7 +1897,7 @@ def main() -> int:
                 "20 dias da data do pedido. A pendência não bloqueia esta parte.",
                 order_stats.pending_without_items,
             )
-        if not postgres_enabled(secrets):
+        if not postgres:
             acknowledge(history_receipts)
         partial = _log_final_summary(
             total_elapsed=total_elapsed,
@@ -1904,6 +1909,7 @@ def main() -> int:
             completion_controls=completion_controls,
             full_quarter=full_quarter,
             native_meta_result=native_meta_result,
+            destination=destination,
             historical_publication=historical_publication,
             pg_publication=pg_publication,
         )
@@ -1919,7 +1925,7 @@ def main() -> int:
             logging.warning("[PENDÊNCIA] %s", exc)
             if isinstance(exc, StorageError):
                 logging.warning(
-                    "PostgreSQL: confirmação pendente. Consulte a revisão %s antes de retomar; o servidor preserva recibos e a última versão confirmada.",
+                    "PostgreSQL da VPS: confirmação pendente. Consulte a revisão %s antes de retomar; o servidor preserva recibos e a última versão confirmada.",
                     getattr(sheets, "revision", "não iniciada"),
                 )
             elif isinstance(exc, PublicationError):
@@ -1949,7 +1955,8 @@ def main() -> int:
                 )
             except Exception:
                 logging.warning(
-                    "Não foi possível registrar o status de erro na aba Controle.",
+                    "Não foi possível registrar o status de erro em Controle (%s).",
+                    destination,
                     exc_info=True,
                 )
         return PARTIAL_SYNC_EXIT_CODE if source_pending else 1

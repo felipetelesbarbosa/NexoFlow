@@ -1,5 +1,10 @@
 # NexoFlow — Changelog
 
+## 1.5.50 — preparação
+
+- Os relatórios do Analytics identificam o armazenamento usado para contatos, pedidos, métricas e BI. No PostgreSQL da VPS, o log registra a revisão após o servidor confirmar READY. O resumo da incremental sem mudanças inclui o total de requisições.
+- Terminal, Weni, Recompra, Planilha e Noturno identificam o armazenamento do perfil e distinguem o XLSX de entrada, as ações Weni e o checkpoint.
+
 ## 1.5.49 — publicada em 20/11/2026, 17:58:58 (America/Fortaleza)
 
 [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.49) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/3e72ea40887142e4ac22e08449b65c60424888f0) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44813287021) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44813287015) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44813287012) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44816131177).

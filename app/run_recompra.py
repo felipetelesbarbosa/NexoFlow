@@ -13,7 +13,7 @@ from runtime_profile import segment as active_segment
 from versioning import CURRENT_VERSION
 
 
-def print_application_summary(result, report):
+def print_application_summary(result, report, *, state_label="estado local"):
     """Exibe confirmações separadas de escrita remota e revalidação."""
     print("\n=== Resultado da aplicação Recompra ===")
     print("\n--- CONFIRMADO NESTA CARGA ---")
@@ -35,7 +35,7 @@ def print_application_summary(result, report):
         )
     else:
         print("Escritas na Weni: confira as confirmações na auditoria desta aplicação.")
-    print(f"Atualizações somente no estado local: {result.get('estado_local', 0)}")
+    print(f"Atualizações somente no {state_label}: {result.get('estado_local', 0)}")
     print(f"Contatos sem mudança: {result.get('sem_mudanca', 0)}")
     print(
         f"Planos concluídos: {result.get('aplicados', 0)}; "
@@ -198,6 +198,9 @@ def main(argv=None):
     from project_paths import load_private_settings
 
     secrets = load_private_settings()
+    from ds_backend.client import POSTGRES_LABEL, enabled
+
+    logging.info("Recompra: estado operacional em %s.", POSTGRES_LABEL if enabled(secrets) else "arquivo local")
     from recompra import (
         STATE,
         apply_review,
@@ -351,7 +354,7 @@ def main(argv=None):
                 )
             if not isinstance(application_report, dict):
                 application_report = {}
-            print_application_summary(result, application_report)
+            print_application_summary(result, application_report, state_label=POSTGRES_LABEL if enabled(secrets) else "estado local")
             if partial:
                 print(
                     "[INFO] Alterações confirmadas preservadas. Gere uma nova revisão para "

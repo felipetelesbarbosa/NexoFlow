@@ -554,7 +554,7 @@ def apply_batch(payload, weni, farm, store, contacts, names, directory):
     layout = store.layout.values()
     if "storage" in state and state["storage"] != layout:
         raise ValueError(
-            "Os arquivos Google mudaram desde a exclusão; preserve os comprovantes para revisão."
+            "O destino de armazenamento mudou desde a exclusão; preserve os comprovantes para revisão."
         )
     state["storage"] = layout
     save_private(state_path, state)
@@ -935,7 +935,7 @@ def run_with_dedup(*, apply, full, quarter, review_path, update):
                         ):
                             progress.set_activity(
                                 f"lote em execução={index}/{len(jobs)}; "
-                                "conferindo Weni, fontes do Sheets e BI"
+                                "conferindo Weni, fontes operacionais e BI"
                             )
                             try:
                                 deleted, conflicts = apply_batch(

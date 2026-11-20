@@ -14,10 +14,10 @@ set "NEXOFLOW_FULL_WORKFLOW=1"
 set "FORCE_FULL_SYNC="
 set "FULL_SYNC_QUARTER="
 cd /d "%NEXOFLOW_HOME%\"
-title NexoFlow 1.5.49 - Atualização completa
+title NexoFlow 1.5.50 - Atualização completa
 
 echo ==========================================================
-echo NexoFlow 1.5.49 - Atualização completa em ordem
+echo NexoFlow 1.5.50 - Atualização completa em ordem
 echo ==========================================================
 echo As cargas integrais serão executadas com 100%% da base.
 echo Cada aplicação Weni, Planilhas e Recompra exige sua revisão.
@@ -41,7 +41,7 @@ echo [ETAPA %ETAPA%]
 call "%NEXOFLOW_HOME%\comandos\atualizar_weni_planilhas.bat"
 set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto :interrompido
-set "ETAPA=2/5 - Planilhas: Analytics e Google Sheets"
+set "ETAPA=2/5 - XLSX: Analytics no armazenamento do perfil"
 echo [ETAPA %ETAPA%]
 call "%NEXOFLOW_HOME%\comandos\executar_analytics_planilhas.bat"
 set "RC=%ERRORLEVEL%"

@@ -64,7 +64,7 @@ def main():
     mode.add_argument(
         "--apply",
         action="store_true",
-        help="aplica o snapshot revisado na Weni e no Google Sheets",
+        help="aplica o snapshot revisado no destino autorizado pela revisão",
     )
     parser.add_argument(
         "--review-out", type=Path, default=scoped_path("logs/delivery_review.json")
@@ -115,6 +115,8 @@ def main():
         select_tickets,
         write_delivery_review,
     )
+    from ds_backend.client import backend_label
+    from ds_backend.client import enabled as postgres_enabled
     from google_sheets import GoogleSheetsStore
     from logging_config import configure_logging
     from weni_chats_client import WeniChatsClient
@@ -149,12 +151,13 @@ def main():
             spreadsheet_id = str(getattr(secrets, "GOOGLE_SPREADSHEET_ID", ""))
 
             def store_factory():
-                from ds_backend.client import enabled as postgres_enabled
                 from ds_backend.runtime import open_store
 
                 if not postgres_enabled(secrets) and not spreadsheet_id:
                     raise RuntimeError("ID da planilha Google não configurado.")
-                return open_store(secrets, GoogleSheetsStore, purpose="delivery")
+                store = open_store(secrets, GoogleSheetsStore, purpose="delivery")
+                logging.info("Delivery: armazenamento aberto: %s.", backend_label(postgres_enabled(secrets)))
+                return store
 
             result = apply_delivery_review(
                 args.require_review,
@@ -244,9 +247,10 @@ def main():
         print(
             f"Tickets: {len(tickets)} | clientes: {len(plans)} | pedidos únicos: {len(delivery['orders'])}."
         )
-        print(
-            "[INFO] Nenhuma gravação na Weni ou no Google Sheets. Revise o relatório antes de aplicar."
-        )
+        destination = "Weni" if args.target == "weni" else backend_label(postgres_enabled(secrets))
+        if args.target in (None, "both"):
+            destination = "Weni e " + destination
+        print(f"[INFO] Simulação para {destination}. Revise o relatório antes de aplicar.")
         print(
             "[INFO] Sem ID de pedido no ticket, a existência de pedido do cliente não comprova atribuição ao atendimento."
         )

@@ -6,9 +6,13 @@ Nenhum método pode abrir Google ou confirmar uma revisão implicitamente em clo
 from __future__ import annotations
 
 import json
+import logging
 from copy import deepcopy
+from functools import wraps
+from threading import get_ident
 from types import SimpleNamespace
 
+from ds_backend.client import POSTGRES_LABEL
 from ds_backend.contract import (
     REGISTRY,
     SCHEMA_HASH,
@@ -19,6 +23,33 @@ from ds_backend.contract import (
     table_contract,
 )
 from google_sheets import GoogleSheetsStore, UpsertResult
+
+
+def _postgres_log_context(method):
+    """Identifica o transporte ao reutilizar as operações do módulo Sheets assinado."""
+    @wraps(method)
+    def operation(self, *args, **kwargs):
+        thread = get_ident()
+
+        def label(record):
+            if (
+                record.thread == thread
+                and record.module == "google_sheets"
+                and record.funcName == method.__name__
+                and isinstance(record.msg, str)
+                and record.msg.startswith("Google Sheets:")
+            ):
+                record.msg = POSTGRES_LABEL + record.msg[len("Google Sheets"):]
+            return True
+
+        logger = logging.getLogger()
+        logger.addFilter(label)
+        try:
+            return method(self, *args, **kwargs)
+        finally:
+            logger.removeFilter(label)
+
+    return operation
 
 
 class Table:
@@ -79,6 +110,11 @@ class PostgresStore(GoogleSheetsStore):
             *[[row[c] for c in spec["columns"]] for row in self.records(name)],
         ]
 
+    load_base_snapshot = _postgres_log_context(GoogleSheetsStore.load_base_snapshot)
+    replace_looker_tables = _postgres_log_context(GoogleSheetsStore.replace_looker_tables)
+    reconcile_pharmacy_scope = _postgres_log_context(GoogleSheetsStore.reconcile_pharmacy_scope)
+    upsert_order_items_detailed = _postgres_log_context(GoogleSheetsStore.upsert_order_items_detailed)
+
     def _get_or_create_sheet(self, title, headers, rows=1000, **_kwargs):
         if table_contract(title)["columns"] != headers:
             raise StorageError("DS_SCHEMA_DIVERGENTE")
@@ -104,7 +140,8 @@ class PostgresStore(GoogleSheetsStore):
         return rows
 
     def request_stats(self):
-        return dict(reads=self.client.reads, writes=self.client.writes)
+        reads, writes = self.client.reads, self.client.writes
+        return dict(reads=reads, writes=writes, total=reads + writes)
 
     def close(self):
         from ds_backend import runtime
@@ -436,5 +473,6 @@ class PostgresStore(GoogleSheetsStore):
         )
         if result.get("state") != "READY":
             raise StorageError("DS_REVISAO_NAO_CONFIRMADA")
+        logging.info("%s: revisão %s confirmada (READY).", POSTGRES_LABEL, self.revision)
         self._finished = True
         return result

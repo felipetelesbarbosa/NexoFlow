@@ -1,4 +1,4 @@
-"""Recalcula as tabelas comerciais usando o histórico já gravado no Sheets."""
+"""Recalcula as tabelas comerciais usando o histórico do armazenamento do perfil."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 
 def run(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Atualiza as tabelas do Data Studio a partir do Google Sheets."
+        description="Atualiza as tabelas do Data Studio a partir do armazenamento do perfil."
     )
     parser.add_argument("--inicio", help="Início do período ABC, AAAA-MM-DD")
     parser.add_argument("--fim", help="Fim do período ABC, AAAA-MM-DD")
@@ -36,6 +36,7 @@ def run(argv: list[str] | None = None) -> int:
 
     configure_logging()
     spreadsheet_id = str(getattr(secrets, "GOOGLE_SPREADSHEET_ID", "") or "").strip()
+    from ds_backend.client import backend_label
     from ds_backend.client import enabled as postgres_enabled
 
     if not postgres_enabled(secrets) and (
@@ -48,6 +49,7 @@ def run(argv: list[str] | None = None) -> int:
 
     store = open_store(secrets, GoogleSheetsStore, purpose="bi")
     try:
+        logging.info("Data Studio: origem e destino das tabelas: %s.", backend_label(postgres_enabled(secrets)))
         _, base, _ = store.load_base_snapshot()
         orders, items = store.load_order_records(), store.load_order_item_records()
         tables = build_looker_tables(

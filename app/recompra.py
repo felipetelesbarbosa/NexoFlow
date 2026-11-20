@@ -2360,7 +2360,7 @@ def apply_review(
             dict(Counter(event["status"] for event in pending_events)),
         )
     logging.info(
-        "Recompra escritas confirmadas: %s; estado local=%s.",
+        "Recompra escritas confirmadas na Weni: %s; atualizações somente no checkpoint=%s.",
         write_metrics.snapshot(),
         summary.get("estado_local", 0),
     )

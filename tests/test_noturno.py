@@ -27,6 +27,14 @@ class NoturnoTests(unittest.TestCase):
         report = next((root / "logs/noturno").glob("*/resultado.json"))
         return code, calls, json.loads(report.read_text(encoding="utf-8"))
 
+    def test_relatorio_identifica_o_armazenamento_selecionado(self):
+        for postgres, name in ((True, "PostgreSQL da VPS"), (False, "Google Sheets")):
+            with self.subTest(postgres=postgres), tempfile.TemporaryDirectory() as temp:
+                with patch("ds_backend.client.configured", return_value=postgres):
+                    code, _, report = self.run_flow(Path(temp))
+                self.assertEqual(code, 0)
+                self.assertEqual(report["armazenamento_configurado"], name)
+
     def test_sequence_uses_its_own_reviews_and_never_forces_full_load(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

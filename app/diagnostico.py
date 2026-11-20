@@ -69,7 +69,7 @@ def main() -> int:
 
     postgres = postgres_enabled(secrets)
     if postgres:
-        ok("Backend PostgreSQL: credencial Sheets dispensada; sem fallback automático.")
+        ok("Armazenamento configurado: PostgreSQL da VPS.")
     elif GOOGLE_CREDENTIALS_FILE.exists():
         ok(f"Credencial Google encontrada: {GOOGLE_CREDENTIALS_FILE}")
     else:
@@ -164,7 +164,7 @@ def main() -> int:
             try:
                 info = client.info
                 ok(
-                    "Contrato PostgreSQL confirmado; segmento="
+                    "Contrato PostgreSQL da VPS confirmado; segmento="
                     + info["segment"]
                     + "; versão="
                     + str(info["version"])

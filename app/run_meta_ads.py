@@ -80,7 +80,7 @@ def run(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--confirm-schema",
         action="store_true",
-        help="Confirmar o modelo aditivo das abas Meta",
+        help="Confirmar o modelo aditivo das tabelas Meta",
     )
     parser.add_argument(
         "--review",
@@ -192,6 +192,7 @@ def _real(args):
         expected = review["schema_manifest"]
     dashboard = str(getattr(settings, "GOOGLE_SPREADSHEET_ID", "") or "").strip()
     from ds_backend.client import Client as PostgresClient
+    from ds_backend.client import backend_label
     from ds_backend.client import enabled as postgres_enabled
 
     uses_postgres = postgres_enabled(settings)
@@ -230,6 +231,7 @@ def _real(args):
             expected_manifest=expected,
             schema_approved=args.confirm_schema,
         )
+        result["armazenamento"] = backend_label(uses_postgres)
         if audit_client is not None:
             source = audit_client.verify()
             if source["version"] != source_version:

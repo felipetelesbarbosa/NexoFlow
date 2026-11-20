@@ -705,7 +705,7 @@ def apply_delivery_review(path, weni, *, store_factory=None, target=None):
         )
     if target in {"analytics", "both"} and store_factory is None:
         raise ValueError(
-            "Google Sheets deve estar configurado para o destino revisado."
+            "Configure o armazenamento do perfil para o destino revisado."
         )
     audit_plans(plans, opt_out_group_available=True, opt_in_group_available=True)
     available = _available_weni_fields(weni)
@@ -887,7 +887,7 @@ def apply_delivery_review(path, weni, *, store_factory=None, target=None):
         }
     if store_factory is None:
         raise ValueError(
-            "Google Sheets deve estar configurado para o destino revisado."
+            "Configure o armazenamento do perfil para o destino revisado."
         )
     store = store_factory()
     try:

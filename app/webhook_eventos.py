@@ -76,7 +76,7 @@ def receive_event(
     if len(row) != len(EVENT_COLUMNS):
         raise HTTPException(
             status_code=500,
-            detail="Estrutura do evento incompatível com a planilha.",
+            detail="Estrutura do evento incompatível com a tabela de eventos.",
         )
     with WEBHOOK_WRITE_LOCK:
         from ds_backend.runtime import complete, open_store

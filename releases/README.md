@@ -1,3 +1,7 @@
+# NexoFlow 1.5.50 — preparação
+
+Atualização dos relatórios operacionais no Windows. [Conferir o destino das rotinas](../docs/OPERACAO_WINDOWS_VPS.md#destino-nos-relatórios-do-windows).
+
 # NexoFlow 1.5.49 — Downloads
 
 Publicada em **20/11/2026, 17:58:58 (America/Fortaleza)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.49) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/3e72ea40887142e4ac22e08449b65c60424888f0) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44813287021) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44813287015) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44813287012) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44816131177).

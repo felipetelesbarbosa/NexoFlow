@@ -246,7 +246,7 @@ def check_farmalider_runtime() -> None:
         )
     else:
         ok(
-            "Carga reconhece troca direta/proxy em Weni, FarmaLíder e "
+            "Verificação do código: a carga reconhece troca direta/proxy em Weni, FarmaLíder e "
             "Google Sheets e repete a operação em andamento."
         )
 
@@ -487,7 +487,7 @@ def check_google_sheets_retry_if_configured() -> None:
         fail("Proteção de escrita do Google Sheets incompleta: " + ", ".join(missing))
     else:
         ok(
-            "Google Sheets protegido com timeout/retry de leitura, "
+            "Verificação do código do conector Google Sheets: timeout/retry de leitura, "
             "retry de escrita e otimizações de carga."
         )
 
@@ -515,7 +515,7 @@ def check_google_sheets_retry_if_configured() -> None:
         )
     else:
         ok(
-            "Google Sheets informa progresso de carga e retries recuperados "
+            "O código do conector Google Sheets informa progresso de carga e retries recuperados "
             "sem períodos silenciosos longos."
         )
 

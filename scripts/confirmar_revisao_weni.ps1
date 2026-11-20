@@ -23,7 +23,7 @@ function Confirm-WeniReview {
 O dry-run incremental foi concluído e auditado.
 
 A aplicação inclui as exclusões de duplicados propostas no relatório
-e a limpeza das fontes do Google Sheets e do Data Studio.
+e a limpeza das fontes operacionais e das tabelas do Data Studio.
 
 Para autorizar as alterações revisadas, digite exatamente:
 
