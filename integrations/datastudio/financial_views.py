@@ -249,6 +249,13 @@ def create_farma_orders_view(conn):
 def assert_financial(conn, schema):
     from ds_backend.contract import StorageError
 
+    if schema == "farma":
+        # A conciliação varre a base acumulada. Usar o plano validado na VPS
+        # também na confirmação, apenas até o fim da transação financeira.
+        conn.execute("SET LOCAL enable_nestloop = off")
+        conn.execute("SET LOCAL jit = off")
+        conn.execute("SET LOCAL work_mem = '64MB'")
+
     assert_operational_items(conn, schema)
 
     # Agregar cada grão antes do relacionamento: não multiplicar o cabeçalho

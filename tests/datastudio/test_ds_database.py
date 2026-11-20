@@ -1601,3 +1601,60 @@ def test_large_recompra_checkpoint_lost_response_replay_and_atomic_read(store):
     assert unpack(store.state_get("recompra")["document"]) == payload
     with store.connect() as conn:
         assert conn.execute("SELECT count(*) AS n FROM farma.nf_estado_partes").fetchone()["n"] == 0
+
+
+def test_confirm_farma_uses_validated_plan_in_publisher_transaction(store, monkeypatch):
+    from psycopg.conninfo import make_conninfo
+
+    from integrations.datastudio import financial_views
+    from integrations.datastudio.admin import grants
+
+    with store.connect() as conn:
+        grants(conn, "FARMA")
+
+    publisher = Store(
+        make_conninfo(
+            store.dsn,
+            options="-c role=nf_ds_farma_publish -c enable_nestloop=on -c jit=on -c work_mem=4MB",
+        ),
+        "homologacao",
+        "FARMA",
+        require_dedicated_role=True,
+    )
+    guard = financial_views.assert_operational_items
+    settings_sql = """SELECT current_user AS role, current_setting('enable_nestloop') AS nested,
+                      current_setting('jit') AS jit, current_setting('work_mem') AS memory,
+                      current_setting('statement_timeout') AS timeout"""
+    observed = []
+
+    def observe(conn, schema):
+        observed.append(conn.execute(settings_sql).fetchone())
+        guard(conn, schema)
+
+    monkeypatch.setattr(financial_views, "assert_operational_items", observe)
+    token = "isolated-farma-publisher-test-token"
+    payload = dict(
+        revision=begin(publisher),
+        manifest=dict(schema_hash=SCHEMA_HASH, batches={}, complete_sources=True),
+        complete=True,
+    )
+    with TestClient(create_app(publisher, token)) as api:
+        api.headers["Authorization"] = "Bearer " + token
+        reply = api.post("/v1/confirmar", json=payload)
+        assert reply.status_code == 200, reply.text
+        assert reply.json()["state"] == "READY"
+        assert api.post("/v1/confirmar", json=payload).json() == reply.json()
+    expected = dict(
+        role="nf_ds_farma_publish",
+        nested="off",
+        jit="off",
+        memory="64MB",
+        timeout="50s",
+    )
+    assert observed == [expected]
+    with publisher.connect(readonly=True) as conn:
+        financial_views.assert_financial(conn, "farma")
+        assert observed[-1] == expected
+        conn.commit()
+        reset = conn.execute(settings_sql).fetchone()
+        assert (reset["nested"], reset["jit"], reset["memory"]) == ("on", "on", "4MB")

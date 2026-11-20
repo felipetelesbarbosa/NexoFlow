@@ -205,12 +205,12 @@ def test_cut_partial_stale_values_are_rejected(tmp_path, change):
 @pytest.mark.skipif(not DSN, reason="PostgreSQL descartável")
 def test_guard_volume_sqlite_and_postgres_60003_items(store, tmp_path):
     from ds_backend.item_consistency import assert_export_items
-    from integrations.datastudio.financial_views import assert_operational_items
+    from integrations.datastudio.financial_views import assert_financial
     from tests.datastudio.test_abc_reader import seed
 
     items, sales = seed(store)
     with store.connect(readonly=True) as conn:
-        assert_operational_items(conn, "farma")
+        assert_financial(conn, "farma")
     path = tmp_path / "volume.sqlite"
     with closing(Export(path, create=True)) as cut:
         for name, rows in (("BI_Clientes_Vendas", sales), ("BI_Itens", items)):
@@ -236,4 +236,4 @@ def test_guard_volume_sqlite_and_postgres_60003_items(store, tmp_path):
         )
     with store.connect(readonly=True) as conn:
         with pytest.raises(StorageError, match="DS_BI_ITENS_DEFASADOS"):
-            assert_operational_items(conn, "farma")
+            assert_financial(conn, "farma")

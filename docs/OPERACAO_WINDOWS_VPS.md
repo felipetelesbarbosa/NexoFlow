@@ -98,6 +98,14 @@ with store.connect(readonly=True) as conn:
 
 O checkpoint grande usa até oito partes de quatro milhões de caracteres base64. Acima desse volume a execução informa erro e conserva a versão anterior. Uma revisão do histórico ou um arquivo `.lock` não substituem o documento de estado da Weni, da Recompra ou de uma campanha.
 
+### Conferência financeira do publicador FARMA em volume
+
+Em 20/11/2026, na READY v2, o Work confirmou as permissões da 1.5.49. Com o planejador padrão, a consulta de itens operacionais expirou aos 50 e aos 180 segundos. Na mesma base e com o mesmo papel, a conferência completa passou com `enable_nestloop=off`, `jit=off` e `work_mem=64MB` locais à transação, conservando o limite original de 50 segundos por instrução. O publicador corrigido aplica esses valores ao entrar em `assert_financial` da FARMA, depois de preparar a revisão candidata e antes de verificar itens, pedidos e LTV. Uma divergência financeira ou um timeout ainda reverte a transação de confirmação.
+
+Para implantar a correção, use a imagem do commit corrigido somente em `datastudio-farma-publish`, com os mesmos arquivos Compose e a mesma configuração privada em uso. Confira o SHA em `/v1/destino`, a READY esperada e `pending` vazio. No contêiner atualizado execute o teste de leitura da seção anterior, como `nf_ds_farma_publish`, sem passar opções de planejador na conexão, no ambiente ou no comando. Registre duração, revisão e código de saída. O aceite exige a conclusão de todas as verificações nesse caminho padrão. A homologação sintética cobre a rota de confirmação, a releitura do recibo e o retorno dos parâmetros de sessão após o fim da transação.
+
+Se o teste padrão falhar, conserve a READY e a saída de erro e mantenha a carga pausada. Para reverter o serviço, retorne o publicador à imagem anterior à correção de desempenho (1.5.49, `3e72ea40887142e4ac22e08449b65c60424888f0`). O próximo passo após o aceite é o incremental isolado abaixo.
+
 ### Conferir o Analytics enquanto se recuperam os estados de ações Weni
 
 Em uma instalação FARMA já configurada para PostgreSQL de produção, o comando `nexo analytics` abre o executável Analytics. O fluxo incremental faz o check-up, testa as conexões e executa a sincronização. Ele abre o armazenamento com a finalidade `analytics`. A aplicação de mudanças de campos ou grupos por Update Weni e Recompra tem executáveis e checkpoints próprios. Uma ativação nova do backend continua exigindo o procedimento de migração dos estados.
