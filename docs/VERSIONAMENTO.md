@@ -1,5 +1,11 @@
 # Versionamento do NexoFlow
 
+## Publicação 1.5.49
+
+Publicada em **20/11/2026, 17:58:58 (America/Fortaleza)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.49) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/3e72ea40887142e4ac22e08449b65c60424888f0) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44813287021) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44813287015) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44813287012) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44816131177).
+
+Os dois ZIPs públicos coincidiram byte a byte com os pacotes aprovados. Foram conferidos os hashes, o CRC e os módulos de estado do publicador usados no Windows.
+
 ## Publicação 1.5.48
 
 Publicada em **20/11/2026, 00:18:11 (America/Fortaleza)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.48) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/ed067d76c29fcb94e33ef94bd3b0600f840e8029) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44664424134) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44664424120) · [Meta Ads](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44664424115) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44666740087).

@@ -1,6 +1,10 @@
-# NexoFlow 1.5.49 — preparação Windows
+# NexoFlow 1.5.49 — Downloads
 
-Atualização em modo Preserve para a simulação Weni FARMA com PostgreSQL. Conferir os pacotes na [página de releases](https://github.com/felipetelesbarbosa/NexoFlow/releases).
+Publicada em **20/11/2026, 17:58:58 (America/Fortaleza)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.49) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/3e72ea40887142e4ac22e08449b65c60424888f0) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44813287021) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44813287015) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44813287012) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44816131177).
+
+[NexoFlow-Setup-1.5.49.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.49/NexoFlow-Setup-1.5.49.zip) · [NexoFlow-1.5.49.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.49/NexoFlow-1.5.49.zip) · [SHA256SUMS-1.5.49.txt](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.49/SHA256SUMS-1.5.49.txt)
+
+Use o Setup em **Atualizar mantendo dados**. [Recuperação FARMA](../docs/OPERACAO_WINDOWS_VPS.md#recuperação-farma-após-simulação-weni-interrompida).
 
 # NexoFlow 1.5.48 — Downloads
 

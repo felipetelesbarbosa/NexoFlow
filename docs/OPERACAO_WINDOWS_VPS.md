@@ -97,3 +97,21 @@ with store.connect(readonly=True) as conn:
 ```
 
 O checkpoint grande usa até oito partes de quatro milhões de caracteres base64. Acima desse volume a execução informa erro e conserva a versão anterior. Uma revisão do histórico ou um arquivo `.lock` não substituem o documento de estado da Weni, da Recompra ou de uma campanha.
+
+### Conferir o Analytics enquanto se recuperam os estados de ações Weni
+
+Em uma instalação FARMA já configurada para PostgreSQL de produção, o comando `nexo analytics` abre o executável Analytics. O fluxo incremental faz o check-up, testa as conexões e executa a sincronização. Ele abre o armazenamento com a finalidade `analytics`. A aplicação de mudanças de campos ou grupos por Update Weni e Recompra tem executáveis e checkpoints próprios. Uma ativação nova do backend continua exigindo o procedimento de migração dos estados.
+
+Após o Work confirmar a versão do publicador FARMA, a guarda financeira com seu papel de produção e a ausência de gravação pendente, o operador pode conferir uma atualização pelo Analytics no PC. Se aparecer uma revisão pendente, investigue o recibo antes de iniciar outra execução. No Terminal FARMA, execute um comando de cada vez.
+
+```powershell
+Set-Location C:\NexoFlow
+nexo versao
+nexo armazenamento postgres diagnosticar
+nexo analytics
+nexo armazenamento postgres diagnosticar
+```
+
+Guarde o horário de Belém, o resultado da sincronização, a READY e o recibo confirmado. Escolha um indicador cujo período coincida com a carga. Compare o valor do Windows com a API da VPS e com o componente atualizado do relatório oficial, usando a mesma fonte, filtro e granularidade. Para faturamento histórico mensal, use a linha do mês em `nexo armazenamento postgres conferir --saida "$env:TEMP\nexoflow-farma-conferencia-$([guid]::NewGuid()).json"` e a página de histórico com o mesmo recorte. Verifique as chaves e os totais em uma repetição sem mudança de origem. Registre separadamente dados novos coletados entre as duas execuções.
+
+Um ZIP de logs com Weni e Recompra de datas diferentes pode servir de referência privada. Quando houver dúvida sobre aplicações posteriores, compare cada documento com a última aplicação confirmada, o respectivo `weni_update_audit.jsonl` ou `recompra_audit.jsonl` e os resultados do Noturno na máquina que executou a rotina. Conserve pendências e admissões. A ausência de linhas de estado em backups do servidor não comprova ausência de ações Weni iniciadas em outro PC. Retome o Noturno após validar e importar os estados operacionais correspondentes.

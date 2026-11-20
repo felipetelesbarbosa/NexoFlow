@@ -1,6 +1,8 @@
 # NexoFlow — Changelog
 
-## 1.5.49 — preparação
+## 1.5.49 — publicada em 20/11/2026, 17:58:58 (America/Fortaleza)
+
+[Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.49) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/3e72ea40887142e4ac22e08449b65c60424888f0) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44813287021) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44813287015) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44813287012) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44816131177).
 
 - No PostgreSQL FARMA, a simulação Weni lê a base sem abrir revisão de fatos. A aplicação confere a presença do estado Weni antes de abrir revisão e preserva o retorno de falha sem selar ou confirmar.
 - O checkpoint grande da Recompra FARMA passa pela API privada em partes verificadas. Importação inicial e atualizações usam a mesma regra de confirmação e retomada.
