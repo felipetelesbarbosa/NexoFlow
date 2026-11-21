@@ -1,5 +1,9 @@
 # NexoFlow — Changelog
 
+## 1.5.51 — preparação
+
+- O cache temporário do backend PostgreSQL consolida alterações repetidas pela chave durante uma mesma transação SQLite. Uma página incremental com correção de pedido existente pode concluir e atualizar o cursor. Páginas inválidas ou interrompidas conservam o ponto de retomada.
+
 ## 1.5.50 — publicada em 20/11/2026, 19:45:04 (America/Fortaleza)
 
 [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.50) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/0c6587586bcc7c9e665223b077caf2077304e389) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44829026869) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44829026846) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44829026868) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44831416055).

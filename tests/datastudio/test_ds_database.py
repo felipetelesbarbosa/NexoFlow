@@ -1667,3 +1667,40 @@ def test_confirm_farma_uses_validated_plan_in_publisher_transaction(store, monke
         conn.commit()
         reset = conn.execute(settings_sql).fetchone()
         assert (reset["nested"], reset["jit"], reset["memory"]) == ("on", "on", "4MB")
+
+
+def test_cache_historico_corrigido_chega_uma_vez_a_ready(store):
+    import json
+    from contextlib import closing
+    from unittest.mock import Mock
+
+    from ds_backend.adapter import PostgresStore
+    from ds_backend.cache import connect
+    from order_history import HistoryQuery
+    from order_history_store import HistoryStore
+    from tests.test_order_history import NOW, Source, order
+
+    revision = begin(store)
+    client = Mock(config={"segment": "FARMA"}, expected_target=store.target)
+    client.rows.side_effect = lambda name, rev: store.rows(name, revision=rev)["rows"]
+    client.send.side_effect = lambda rev, name, rows, remove=None: batch(
+        store, rev, name, rows, remove=remove
+    )
+    adapter = PostgresStore(client, revision=revision)
+    with closing(connect(adapter)) as db:
+        history = HistoryStore(db, "FARMA")
+        query = HistoryQuery("FARMA", "2026-11-01", "2026-11-06", 100)
+        for amount in (80, 85, 85):
+            history.begin(query, restart=True)
+            source = Source([order(segment="FARMA", amount=amount)])
+            history.commit_page(
+                query, 1, source.get_pedidos_history(query, 1), now=NOW, mode="incremental"
+            )
+        [(expected,)] = db.execute("SELECT record FROM history_orders").fetchall()
+        assert history.totals()["faturamento_centavos"] == 8500
+    assert not store.rows("Cache_history_orders")["rows"]
+    assert finish(store, revision)["state"] == "READY"
+    [published] = store.rows("Cache_history_orders")["rows"]
+    assert json.loads(published["record"]) == json.loads(expected)
+    [window] = store.rows("Cache_history_windows")["rows"]
+    assert window["status"] == "extraida" and window["next_page"] == "2"

@@ -72,19 +72,18 @@ def connect(store):
         new = encoded("NEW", columns)
         newkey = encoded("NEW", keys)
         oldkey = encoded("OLD", keys)
+        # A política de conflito da operação externa pode substituir OR REPLACE
+        # no trigger. O UPSERT explícito consolida a última operação da chave.
+        change = (
+            f"INSERT INTO nf_changes(t,k,v) VALUES('{name}',{{key}},{{value}}) "
+            "ON CONFLICT(t,k) DO UPDATE SET v=excluded.v;"
+        )
+        write = change.format(key=newkey, value=new)
+        remove = change.format(key=oldkey, value="NULL")
         for event, code in [
-            (
-                "INSERT",
-                f"INSERT OR REPLACE INTO nf_changes VALUES('{name}',{newkey},{new});",
-            ),
-            (
-                "DELETE",
-                f"INSERT OR REPLACE INTO nf_changes VALUES('{name}',{oldkey},NULL);",
-            ),
-            (
-                "UPDATE",
-                f"INSERT OR REPLACE INTO nf_changes VALUES('{name}',{oldkey},NULL);INSERT OR REPLACE INTO nf_changes VALUES('{name}',{newkey},{new});",
-            ),
+            ("INSERT", write),
+            ("DELETE", remove),
+            ("UPDATE", remove + write),
         ]:
             db.execute(
                 f'CREATE TEMP TRIGGER nf_{name}_{event} AFTER {event} ON main."{name}" BEGIN {code} END'
