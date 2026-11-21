@@ -63,6 +63,18 @@ class PostgresCacheChangesTests(unittest.TestCase):
             self.assertEqual(history.state(query)["next_page"], 1)
             self.assertEqual(history.totals()["faturamento_centavos"], 8500)
 
+    def test_falha_ao_carregar_cache_permite_repetir_com_o_mesmo_destino(self):
+        self.store.records.side_effect = TimeoutError("falha de leitura simulada")
+        with self.assertRaises(TimeoutError):
+            connect(self.store)
+        self.store.records.side_effect = None
+        self.store.records.return_value = []
+        with closing(connect(self.store)) as db:
+            self.assertEqual(
+                db.execute("SELECT COUNT(*) FROM history_orders").fetchone(), (0,)
+            )
+        self.store._send.assert_not_called()
+
     def test_troca_de_chave_e_ultima_operacao_por_linha(self):
         with closing(connect(self.store)) as db:
             with db:

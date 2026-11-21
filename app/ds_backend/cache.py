@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import tempfile
+from contextlib import closing
 from pathlib import Path
 
 from ds_backend.contract import StorageError, record_key
@@ -20,34 +21,36 @@ _TEMP = None
 _STORE = None
 
 
+def _populate(store, path):
+    with closing(sqlite3.connect(path)) as db, db:
+        for name, spec in SCHEMAS.items():
+            db.execute(spec["sql"])
+            columns = ",".join('"' + c + '"' for c in spec["columns"])
+            marks = ",".join("?" for _ in spec["columns"])
+            for row in store.records("Cache_" + name):
+                db.execute(
+                    'INSERT INTO "' + name + '"(' + columns + ") VALUES(" + marks + ")",
+                    [
+                        None if c in ("total", "pages") and row[c] == "" else row[c]
+                        for c in spec["columns"]
+                    ],
+                )
+
+
 def connect(store):
     global _TEMP, _STORE
     if _STORE is not store:
-        if _TEMP is not None:
-            _TEMP.cleanup()
-        _TEMP = tempfile.TemporaryDirectory(prefix="nexoflow-pg-cache-")
-        _STORE = store
-        path = Path(_TEMP.name) / "observacoes.sqlite"
-        with sqlite3.connect(path) as db:
-            for name, spec in SCHEMAS.items():
-                db.execute(spec["sql"])
-                columns = ",".join('"' + c + '"' for c in spec["columns"])
-                marks = ",".join("?" for _ in spec["columns"])
-                for row in store.records("Cache_" + name):
-                    db.execute(
-                        'INSERT INTO "'
-                        + name
-                        + '"('
-                        + columns
-                        + ") VALUES("
-                        + marks
-                        + ")",
-                        [
-                            None if c in ("total", "pages") and row[c] == "" else row[c]
-                            for c in spec["columns"]
-                        ],
-                    )
-        path.chmod(0o600)
+        temp = tempfile.TemporaryDirectory(prefix="nexoflow-pg-cache-")
+        try:
+            path = Path(temp.name) / "observacoes.sqlite"
+            _populate(store, path)
+            path.chmod(0o600)
+            if _TEMP is not None:
+                _TEMP.cleanup()
+        except BaseException:
+            temp.cleanup()
+            raise
+        _TEMP, _STORE = temp, store
     if _TEMP is None:
         raise StorageError("DS_CACHE_INDISPONIVEL")
     if store.readonly:

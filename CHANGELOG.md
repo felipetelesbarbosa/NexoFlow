@@ -2,6 +2,8 @@
 
 ## 1.5.51 — preparação
 
+- O Windows fecha a conexão que monta o SQLite temporário antes de abri-lo para uso. Uma leitura interrompida durante a montagem pode ser repetida com o mesmo destino.
+
 - O cache temporário do backend PostgreSQL consolida alterações repetidas pela chave durante uma mesma transação SQLite. Uma página incremental com correção de pedido existente pode concluir e atualizar o cursor. Páginas inválidas ou interrompidas conservam o ponto de retomada.
 
 ## 1.5.50 — publicada em 20/11/2026, 19:45:04 (America/Fortaleza)
