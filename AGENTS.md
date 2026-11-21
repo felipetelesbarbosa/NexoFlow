@@ -4,6 +4,13 @@ Comece em [Operação Windows, VPS e Looker](docs/OPERACAO_WINDOWS_VPS.md) e no 
 
 Confirme separadamente `VERSION`, release, versão instalada no PC, perfil, ambiente, estado da publicação READY e fonte dos componentes no Looker oficial. Preserve a separação FARMA/PET e homologação/produção. As entradas de release abaixo registram estados históricos.
 
+## Requisitos para a próxima release Windows após a 1.5.51
+
+Solicitação do operador em 20/11/2026, pendente de implementação e teste no Setup distribuído.
+
+- **Rede.** Em uma nova execução automática do Setup, Terminal, Weni, Analytics, Planilha, Recompra ou Noturno, testar primeiro uma conexão HTTPS direta, sem proxy nem credenciais. Se funcionar, prosseguir sem pedir uma opção de rede, inclusive quando houver um proxy cadastrado. Só oferecer a tentativa por proxy após falha da conexão direta. Reutilizar a decisão nas etapas filhas, inclusive pip e simulação/aplicação. Exercitar acesso direto, falha seguida de aceite ou recusa do proxy e execução agendada sem console. Conferir tanto o seletor PowerShell do Setup quanto o seletor Python dos aplicativos.
+- **Horários de execução.** Nos logs e textos para o operador, exibir a hora de Belém em `HH:mm`, por exemplo `19:08`, sem segundos, milissegundos ou sufixo `-03:00`. Manter a data onde identifica o dia da execução. Aplicar a formatação na apresentação e preservar a precisão e o fuso nos recibos, checkpoints e dados de integração. Conferir o mesmo instante no console e no arquivo de log.
+
 # NexoFlow 1.5.51 publicada
 
 Publicada em **20/11/2026, 22:11:01 (America/Fortaleza)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.51) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/13b582bcde6985ae0a2f0b73bf771ac08e9fbe3a) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44846369197) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44846369191) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44846369284) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44848544427).
