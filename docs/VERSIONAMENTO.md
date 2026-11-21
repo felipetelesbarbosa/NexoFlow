@@ -1,5 +1,11 @@
 # Versionamento do NexoFlow
 
+## Publicação 1.5.52
+
+Publicada em **21/11/26 02:11:52 (Belém)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.52) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/70f77ab5ab1be2602b290f519408e9c4db2dddb8) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44867735796) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44867735795) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44867735815) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44869685131).
+
+Os dois ZIPs públicos coincidiram byte a byte com os pacotes aprovados. Foram conferidos os hashes, o CRC e o manifesto do Setup, os módulos de app/ e a versão dos oito executáveis Windows.
+
 ## Publicação 1.5.51
 
 Publicada em **20/11/2026, 22:11:01 (America/Fortaleza)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.51) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/13b582bcde6985ae0a2f0b73bf771ac08e9fbe3a) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44846369197) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44846369191) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44846369284) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44848544427).
