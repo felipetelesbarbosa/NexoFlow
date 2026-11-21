@@ -429,3 +429,82 @@ def test_progresso_historico_sucesso_e_sem_mudancas(caplog, monkeypatch):
         monkeypatch.setattr(client, "rows", lambda *_: pytest.fail("Leitura desnecessária"))
         store._cache.clear()
         store.append_history([], set())
+
+
+def test_analytics_reconciles_shorter_snapshot_through_postgres_and_replays():
+    from ds_backend.contract import record_key
+    from tests.test_pharmacy_scope import fixture
+
+    client = MemoryClient()
+    store = PostgresStore(client)
+    order, items, _ = fixture()
+    other, other_items, _ = fixture(order_id="701")
+    store.upsert_pharmacy_orders([order, other], items + other_items)
+    name = "Itens_Pedidos_FarmaLider"
+    kept, untouched = store.records(name)
+    stale = dict(kept, item_chave="synthetic-obsolete")
+    client.tables[name].append(stale)
+    # Outra instância lê a base acumulada pela mesma entrada usada no Analytics.
+    store = PostgresStore(client)
+    _, result = store.upsert_pharmacy_orders([order], items)
+    assert result.removed == 1
+    expected = {record_key(name, r) for r in [kept, untouched]}
+    assert {record_key(name, r) for r in client.tables[name]} == expected
+    assert {record_key(name, r) for r in result.final_records} == expected
+    receipts = len(client.receipts)
+    _, repeated = store.upsert_pharmacy_orders([order], items)
+    assert repeated.removed == 0 and len(client.receipts) == receipts
+
+
+def test_scope_sanitation_keeps_separate_changes_for_one_contact():
+    client = MemoryClient()
+    name = "Historico_Alteracoes"
+    records = [
+        row(
+            name,
+            contact_uuid="shared",
+            sincronizado_em=t,
+            acao="Atualizado",
+            nome="synthetic",
+        )
+        for t in ("2026-11-01", "2026-11-02")
+    ]
+    client.tables[name] = deepcopy(records)
+    store = PostgresStore(client)
+
+    def sanitize(record):
+        if record["sincronizado_em"] == "2026-11-02":
+            record["nome"] = "corrected"
+        return record
+
+    assert store._sanitize_scope_rows(store.history, sanitize) == 1
+    assert [r["nome"] for r in store.records(name)] == ["synthetic", "corrected"]
+    assert store.records(name) == client.tables[name]
+    assert store._sanitize_scope_rows(store.history, sanitize) == 0
+
+
+def test_unconfirmed_item_removal_keeps_cache_and_can_be_retried(monkeypatch):
+    from tests.test_pharmacy_scope import fixture
+
+    order, items, _ = fixture()
+    store = PostgresStore(MemoryClient())
+    _, original = store.upsert_pharmacy_orders([order], items)
+    name = "Itens_Pedidos_FarmaLider"
+    keep = original.final_records[0]
+    stale = dict(keep, item_chave="obsolete")
+    store.records(name).append(stale)
+    store.client.tables[name].append(deepcopy(stale))
+    confirmed_send = store.client.send
+
+    def no_receipt(revision, table, rows, remove=None):
+        if remove:
+            raise StorageError("DS_RESPOSTA_NAO_CONFIRMADA_RETOMAR")
+        return confirmed_send(revision, table, rows, remove)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(store.client, "send", no_receipt)
+        with pytest.raises(StorageError, match="DS_RESPOSTA_NAO_CONFIRMADA_RETOMAR"):
+            store.upsert_pharmacy_orders([order], items)
+    assert stale in store.records(name)
+    _, retried = store.upsert_pharmacy_orders([order], items)
+    assert retried.removed == 1 and retried.final_records == [keep]

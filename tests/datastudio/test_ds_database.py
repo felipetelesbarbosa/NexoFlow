@@ -1704,3 +1704,39 @@ def test_cache_historico_corrigido_chega_uma_vez_a_ready(store):
     assert json.loads(published["record"]) == json.loads(expected)
     [window] = store.rows("Cache_history_windows")["rows"]
     assert window["status"] == "extraida" and window["next_page"] == "2"
+
+
+def test_analytics_shortened_order_stages_item_removal_until_ready(store):
+    from unittest.mock import Mock
+
+    from ds_backend.adapter import PostgresStore
+    from tests.test_pharmacy_scope import fixture
+
+    name = "Itens_Pedidos_FarmaLider"
+    order, items, _ = fixture()
+    seed = begin(store)
+    stale = row(name, pedido_chave=order["pedido_chave"], item_chave="obsolete")
+    other = row(name, pedido_chave="FARMALIDER:999", item_chave="untouched")
+    batch(store, seed, name, [stale, other])
+    finish(store, seed)
+    rev = begin(store)
+    client = Mock(config={"segment": "FARMA"}, expected_target=store.target)
+    client.rows.side_effect = lambda name, rev: store.rows(name, revision=rev)["rows"]
+    client.send.side_effect = lambda rev, name, rows, remove=None: batch(
+        store, rev, name, rows, remove=remove
+    )
+    adapter = PostgresStore(client, revision=rev)
+    _, updated = adapter.upsert_pharmacy_orders([order], items)
+    assert updated.removed == 1
+    assert {r["item_chave"] for r in store.rows(name)["rows"]} == {
+        "obsolete",
+        "untouched",
+    }
+    calls = client.send.call_count
+    _, repeated = adapter.upsert_pharmacy_orders([order], items)
+    assert repeated.removed == 0 and client.send.call_count == calls
+    assert finish(store, rev)["state"] == "READY"
+    assert {r["item_chave"] for r in store.rows(name)["rows"]} == {
+        items[0]["item_chave"],
+        "untouched",
+    }

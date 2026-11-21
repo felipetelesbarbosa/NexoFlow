@@ -138,7 +138,6 @@ class PostgresStore(GoogleSheetsStore):
     load_base_snapshot = _postgres_log_context(GoogleSheetsStore.load_base_snapshot)
     replace_looker_tables = _postgres_log_context(GoogleSheetsStore.replace_looker_tables)
     reconcile_pharmacy_scope = _postgres_log_context(GoogleSheetsStore.reconcile_pharmacy_scope)
-    upsert_order_items_detailed = _postgres_log_context(GoogleSheetsStore.upsert_order_items_detailed)
 
     def _get_or_create_sheet(self, title, headers, rows=1000, **_kwargs):
         if table_contract(title)["columns"] != headers:
@@ -374,7 +373,50 @@ class PostgresStore(GoogleSheetsStore):
         self._cancelled_sales = set(sales_scope(orders, []))
         return super().upsert_pharmacy_orders(orders, items)
 
+    def upsert_order_items_detailed(self, items):
+        from product_scope import pharmacy_items
+
+        # Apenas pedidos representados por um snapshot de itens entram no escopo.
+        # Uma lista vazia não autoriza remoções de outros pedidos da base.
+        active: dict[str, set[str]] = {}
+        for item in items:
+            order = str(item.get("pedido_chave") or "").strip()
+            if not order or not str(item.get("item_chave") or "").strip():
+                raise ValueError("Snapshot de itens sem identidade do pedido ou item.")
+            active.setdefault(order, set())
+        retained = pharmacy_items(items)
+        for item in retained:
+            active[str(item["pedido_chave"]).strip()].add(
+                str(item["item_chave"]).strip()
+            )
+        result = self._upsert_records_detailed(
+            self.order_items,
+            retained,
+            "item_chave",
+            ignore_compare_fields={"capturado_em"},
+        )
+        stale = {
+            row["item_chave"]
+            for row in result.final_records
+            if row["pedido_chave"] in active
+            and row["item_chave"] not in active[row["pedido_chave"]]
+        }
+        if stale:
+            self._clear_scope_records(
+                self.order_items, result.final_records, "item_chave", stale
+            )
+            result.final_records = self.records(self.order_items.title)
+            result.removed = len(stale)
+            logging.info(
+                "%s: %s itens antigos removidos dos pedidos atualizados.",
+                POSTGRES_LABEL,
+                len(stale),
+            )
+        return result
+
     def _clear_scope_records(self, ws, records, key_name, keys, **_kwargs):
+        if not keys:
+            return
         removed = [
             record_key(ws.title, r)
             for r in self.records(ws.title)
@@ -386,11 +428,23 @@ class PostgresStore(GoogleSheetsStore):
         ]
 
     def _sanitize_scope_rows(self, ws, sanitizer, *, values=None, **_kwargs):
-        rows = [sanitizer(deepcopy(r)) for r in self.records(ws.title)]
-        result = self._upsert_records_detailed(
-            ws, rows, table_contract(ws.title)["keys"][0]
-        )
-        return result.updated
+        name = ws.title
+        current = self.records(name)
+        changes = []
+        positions = []
+        for index, old in enumerate(current):
+            sanitized = sanitizer(deepcopy(old))
+            row = {field: sanitized.get(field, old[field]) for field in old}
+            if row == old:
+                continue
+            if record_key(name, row) != record_key(name, old):
+                raise StorageError("DS_CHAVE_DIVERGENTE")
+            changes.append(row)
+            positions.append(index)
+        confirmed = self._send(name, changes)
+        for index, row in zip(positions, confirmed, strict=True):
+            current[index] = row
+        return len(confirmed)
 
     def set_controls(self, values):
         from datetime import UTC, datetime
