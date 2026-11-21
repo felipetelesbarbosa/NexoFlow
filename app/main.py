@@ -1915,8 +1915,13 @@ def main() -> int:
         return PARTIAL_SYNC_EXIT_CODE if partial else 0
 
     except Exception as exc:
+        from ds_backend.adapter import PostgresStore
         from ds_backend.contract import StorageError
 
+        if isinstance(sheets, PostgresStore) and sheets.abort_after_fatal_error(exc):
+            logging.error("Analytics interrompido por %s. A revisão desta execução foi abortada.",
+                          str(exc) if isinstance(exc, StorageError) else type(exc).__name__)
+            return 1
         source_pending = isinstance(
             exc, (BIContinuationPending, PublicationError, StorageError)
         )

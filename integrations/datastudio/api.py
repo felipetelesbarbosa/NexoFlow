@@ -168,6 +168,10 @@ def create_app(store, token, *, reader=False):
     async def rollback(request: Request):
         return await invoke(request, store.rollback, ("revision", "expected_version"))
 
+    @api.post("/v1/analytics/abortar-incompleta")
+    async def abort_failed_analytics(request: Request):
+        return await invoke(request, store.abort_failed_analytics, ("revision",))
+
     @api.post("/v1/abortar")
     async def abort(request: Request):
         return await invoke(request, store.abort, ("revision",))

@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import main
+from ds_backend import runtime
 
 
 class AnalyticsResultSummaryTests(unittest.TestCase):
@@ -20,6 +21,7 @@ class AnalyticsResultSummaryTests(unittest.TestCase):
         historical=None,
         bi_pending=False,
         postgres=False,
+        stage_error=None,
     ):
         sheets, farm, weni = Mock(), Mock(), Mock()
         sheets._continuity = None
@@ -42,13 +44,22 @@ class AnalyticsResultSummaryTests(unittest.TestCase):
         sheets.reconcile_pharmacy_scope.return_value = SimpleNamespace(
             contacts=[], orders=[], items=[]
         )
+        if stage_error is not None:
+            from ds_backend.adapter import PostgresStore
+            sheets.__class__ = PostgresStore
+            sheets._owns_analytics_revision = True
+            sheets._finalization_started = False
+            sheets.revision = "synthetic"
+            sheets.client.call.return_value = {"state": "ABORTADA", "facts_preserved": True}
+            sheets.abort_after_fatal_error.side_effect = lambda exc: PostgresStore.abort_after_fatal_error(sheets, exc)
+            sheets.upsert_pharmacy_orders.side_effect = stage_error
         with ExitStack() as stack:
             stack.enter_context(
                 patch.dict(os.environ, {"FORCE_FULL_SYNC": "", "FULL_SYNC_QUARTER": ""})
             )
             if postgres:
                 stack.enter_context(patch("ds_backend.client.enabled", return_value=True))
-                stack.enter_context(patch("ds_backend.runtime.open_store", return_value=sheets))
+                stack.enter_context(patch.object(runtime, "open_store", return_value=sheets))
                 stack.enter_context(patch("weni_insights.enabled", return_value=False))
                 stack.enter_context(patch("order_history_store.analytics_history", return_value=([], [], None)))
             for target, value in (
@@ -204,6 +215,23 @@ class AnalyticsResultSummaryTests(unittest.TestCase):
         self.assertIn(
             "Cinco fontes históricas: publicação e conferência concluídas", output
         )
+
+    def test_etapa_2_aborta_erro_impeditivo_e_preserva_revisao_incerta(self):
+        from ds_backend.contract import StorageError
+        for error, expected in (("DS_OPERACAO_SHEETS_NAO_PERMITIDA", 1),
+                                ("DS_RESPOSTA_NAO_CONFIRMADA_RETOMAR", 3)):
+            code, output, controls, sheets = self.run_pipeline(
+                postgres=True, stage_error=StorageError(error)
+            )
+            self.assertEqual(code, expected)
+            if expected == 1:
+                sheets.client.call.assert_called_once_with(
+                    "/v1/analytics/abortar-incompleta", {"revision": "synthetic"})
+                self.assertIn("ABORTADA", output)
+            else:
+                sheets.client.call.assert_not_called()
+                self.assertIn("confirmação pendente", output)
+            self.assertEqual(controls["ultima_sincronizacao_sucesso_utc"], "2026-10-01T12:00:00+00:00")
 
     def test_storage_failure_stays_critical_without_success_summary(self):
         with patch("main.build_looker_tables", side_effect=RuntimeError("synthetic")):

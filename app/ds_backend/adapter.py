@@ -92,6 +92,8 @@ class PostgresStore(GoogleSheetsStore):
     ):
         # Não chamar GoogleSheetsStore.__init__: credenciais Google são dispensáveis.
         self.client = client
+        self._owns_analytics_revision = purpose == "analytics" and revision is None and not readonly
+        self._finalization_started = False
         self.readonly = readonly
         self.revision = (
             None
@@ -576,12 +578,38 @@ class PostgresStore(GoogleSheetsStore):
             raise StorageError("DS_CONFERENCIA_META_DIVERGENTE")
         return list(confirmed.values())
 
+    def abort_after_fatal_error(self, error):
+        # Somente falhas locais determinísticas que encerraram a rotina. Um código
+        # de saída parcial, por si só, não determina o destino da revisão.
+        definite = (
+            str(error) in {
+                "DS_OPERACAO_SHEETS_NAO_PERMITIDA", "DS_CHAVE_DIVERGENTE",
+                "DS_SCHEMA_DIVERGENTE", "DS_CHAVE_DUPLICADA", "DS_CHAVE_AUSENTE",
+                "DS_TIPO_INVALIDO", "DS_NUMERO_INVALIDO", "DS_DATA_INVALIDA",
+                "DS_CELULA_INVALIDA", "DS_CHAVE_OFICIAL_DIVERGENTE",
+                "DS_COMPRA_VALIDA_SEM_IDENTIDADE_OU_DATA", "DS_FRETE_ITEM_INVALIDO",
+                "DS_BASE_FINANCEIRA_DIVERGENTE",
+            } if isinstance(error, StorageError) else type(error) is ValueError
+        )
+        if not (definite and self._owns_analytics_revision) or self._finalization_started:
+            return False
+        try:
+            result = self.client.call("/v1/analytics/abortar-incompleta", {"revision": self.revision})
+            if result.get("state") != "ABORTADA" or result.get("facts_preserved") is not True:
+                raise StorageError("DS_ABORTO_NAO_CONFIRMADO")
+        except Exception:
+            logging.warning("%s: aborto automático sem confirmação. Consulte a revisão %s.", POSTGRES_LABEL, self.revision)
+            return False
+        logging.warning("%s: revisão Analytics %s ABORTADA após erro impeditivo. Última READY preservada.", POSTGRES_LABEL, self.revision)
+        return True
+
     def finish(self, *, complete):
         if not complete:
             raise StorageError("DS_FONTES_INCOMPLETAS_RETOMAR")
         manifest = dict(
             schema_hash=SCHEMA_HASH, batches=self._receipts, complete_sources=True
         )
+        self._finalization_started = True
         self.client.call("/v1/selar", dict(revision=self.revision, manifest=manifest))
         result = self.client.call(
             "/v1/confirmar",

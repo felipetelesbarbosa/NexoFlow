@@ -1740,3 +1740,27 @@ def test_analytics_shortened_order_stages_item_removal_until_ready(store):
         items[0]["item_chave"],
         "untouched",
     }
+
+
+def test_analytics_autoabort_checks_state_under_lock_and_preserves_receipts(store):
+    api = TestClient(create_app(store, "x" * 40))
+    def attempt(rev):
+        return api.post("/v1/analytics/abortar-incompleta", json={"revision": rev},
+                        headers={"Authorization": "Bearer " + "x" * 40})
+    original = begin(store)
+    assert attempt(original).status_code == 409
+    finish(store, original)
+    active = store.info()["version"]
+    rev = store.begin(str(uuid4()), "analytics", {})["revision"]
+    receipt = batch(store, rev, "Controle", [row("Controle", chave="synthetic", valor="1")])
+    for _ in range(2):
+        assert attempt(rev).json() == {"state": "ABORTADA", "facts_preserved": True}
+    assert store.info()["version"] == active and store.info()["pending"] == []
+    assert store.receipt(receipt["id"]) == receipt
+    assert store.rows("Controle")["rows"] == []
+    rev = store.begin(str(uuid4()), "analytics", {})["revision"]
+    manifest = {"schema_hash": SCHEMA_HASH, "batches": {}, "complete_sources": True}
+    store.seal(rev, manifest)
+    assert attempt(rev).status_code == 409
+    assert store.finish(rev, manifest, complete=True)["state"] == "READY"
+    assert attempt(rev).status_code == 409

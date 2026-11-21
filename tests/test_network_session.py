@@ -37,6 +37,7 @@ settings.PROXY_HOST = 'proxy.example.invalid'
 settings.PROXY_PORT = 8020
 sys.modules['secrets_config'] = settings
 import proxy_config
+proxy_config._direct_internet_available = lambda *args: False
 proxy_config._is_reachable = lambda *args: False
 proxy_config.time.sleep = lambda *args: None
 if sys.argv[1] == 'first':
@@ -79,6 +80,7 @@ settings.PROXY_HOST = 'proxy.example.invalid'
 settings.PROXY_PORT = 8020
 sys.modules['secrets_config'] = settings
 import proxy_config
+proxy_config._direct_internet_available = lambda *args: False
 proxy_config._is_reachable = lambda *args: False
 proxy_config.time.sleep = lambda *args: None
 sys.stdin.isatty = lambda: True
@@ -116,6 +118,7 @@ raise SystemExit('Rota escolhida sem entrada')
                 network_session.tempfile, "gettempdir", return_value=directory
             ),
             patch.object(module.sys.stdin, "isatty", return_value=True),
+            patch.object(module, "_direct_internet_available", return_value=False),
             patch.object(module, "_is_reachable", return_value=False),
             patch.object(module.time, "sleep"),
             patch("builtins.input", return_value="1") as ask,

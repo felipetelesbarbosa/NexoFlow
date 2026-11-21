@@ -9,7 +9,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
 $AppName = 'NexoFlow'
-$AppVersion = '1.5.51'
+$AppVersion = '1.5.52'
 $Publisher = 'Grupo Lider'
 $InstallDir = 'C:\NexoFlow'
 $DataDir = 'C:\NexoFlow Data'
@@ -63,20 +63,40 @@ function Exit-NexoMaintenance {
     }
 }
 
+function Test-SetupDirectHttps {
+    $response = $null
+    try {
+        $request = [Net.HttpWebRequest]::Create('https://pypi.org/simple/pip/')
+        $request.Proxy = $null
+        $request.UseDefaultCredentials = $false
+        $request.AllowAutoRedirect = $false
+        $request.Method = 'HEAD'
+        $request.Timeout = 5000
+        $response = $request.GetResponse()
+        return ([int]$response.StatusCode -ge 200 -and [int]$response.StatusCode -lt 300)
+    } catch [Net.WebException] {
+        if ($_.Exception.Response) { $_.Exception.Response.Close() }
+        return $false
+    } finally { if ($response) { $response.Close() } }
+}
+
 function Select-SetupNetwork {
     if ($NetworkMode -ne 'Auto') { $env:NEXOFLOW_NETWORK_MODE = $NetworkMode.ToLowerInvariant(); return }
     if ($env:NEXOFLOW_NETWORK_MODE -in @('personal','corporate')) { return }
+    if (Test-SetupDirectHttps) {
+        $env:NEXOFLOW_NETWORK_MODE = 'personal'
+        Write-Host '[OK] Conexão HTTPS direta confirmada.'
+        return
+    }
     $recognizer = Join-Path $PayloadDir 'scripts/reconhecer_rede.ps1'
-    if (Test-Path -LiteralPath $recognizer) {
-        $known = & $recognizer
-        if ($known -in @('personal','corporate')) {
-            $env:NEXOFLOW_NETWORK_MODE = $known
-            Write-Host "[INFO] Rede reconhecida pelo Windows: rota=$known."
+    if ($NonInteractive) {
+        if ((Test-Path -LiteralPath $recognizer) -and ((& $recognizer) -eq 'corporate')) {
+            $env:NEXOFLOW_NETWORK_MODE = 'corporate'
             return
         }
+        throw 'HTTPS direto indisponível. Configure -NetworkMode Corporate para usar o proxy sem console.'
     }
-    if ($NonInteractive) { return }
-    Write-Host 'Confirme a rede desconhecida. A escolha será lembrada para esta rede neste usuário Windows.'
+    Write-Host 'A conexão HTTPS direta falhou. Deseja tentar pelo proxy?'
     Write-Host '[1] PC pessoal / conexão direta autorizada'
     Write-Host '[2] Rede corporativa / proxy obrigatório'
     do {
@@ -1785,4 +1805,4 @@ finally {
     if ($null -eq $previousNetworkMode) { Remove-Item Env:NEXOFLOW_NETWORK_MODE -ErrorAction SilentlyContinue }
     else { $env:NEXOFLOW_NETWORK_MODE = $previousNetworkMode }
 }
-# NexoFlow 1.5.51
+# NexoFlow 1.5.52

@@ -133,14 +133,14 @@ def _direct_internet_available(timeout: float) -> bool:
     no Windows mesmo quando o nosso código decidiu não ativá-lo.
     """
     try:
-        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoProbeRedirect())
         request = urllib.request.Request(
             DIRECT_TEST_URL,
             method="HEAD",
             headers={"User-Agent": f"NexoFlow/{CURRENT_VERSION}"},
         )
         with opener.open(request, timeout=max(timeout, 3.0)) as response:
-            return 200 <= getattr(response, "status", 200) < 500
+            return 200 <= getattr(response, "status", 200) < 300
     except (OSError, HTTPException):
         # URLError, erros TLS e timeouts são subclasses de OSError.
         # Erros de programação não devem ser confundidos com falta de rede.
@@ -259,13 +259,19 @@ def configure_proxy(
     choice = read_choice()
     if choice:
         os.environ["NEXOFLOW_NETWORK_MODE"] = choice
-    elif os.environ.get("NEXOFLOW_NETWORK_MODE", "auto") == "auto":
-        # Somente no modo automático: configuração explícita on/off é soberana.
-        if _read_settings()[0] == "auto":
-            remembered = windows_network_choice()
-            if remembered:
-                os.environ["NEXOFLOW_NETWORK_MODE"] = remembered
-                logging.info("Rede reconhecida pelo Windows: rota=%s", remembered)
+    elif os.environ.get("NEXOFLOW_NETWORK_MODE", "auto").lower() == "auto":
+        mode, _host, _port, _user, _password, _bypass, timeout = _read_settings()
+        if mode == "auto":
+            if _direct_internet_available(timeout):
+                choice = "personal"
+            elif sys.stdin.isatty():
+                choice = _ask_route(initial_ambiguity=True)
+                windows_network_choice(choice)
+            elif windows_network_choice() == "corporate":
+                choice = "corporate"
+            else:
+                raise ValueError("REDE_AMBIGUA: HTTPS direto indisponível. Configure a rota corporativa para execução sem console.")
+            os.environ["NEXOFLOW_NETWORK_MODE"] = choice
     if sys.stdin.isatty():
         detection_attempts = max(3, detection_attempts or PROXY_DETECTION_ATTEMPTS)
     while True:
@@ -290,7 +296,7 @@ def configure_proxy(
 
 def _ask_route(*, initial_ambiguity: bool = False) -> str:
     reason = (
-        "Rede não confirmada: proxy sem resposta TCP. "
+        "Rede não confirmada: a conexão HTTPS direta falhou. "
         if initial_ambiguity
         else "A conexão falhou em três tentativas na rota atual. "
     )
@@ -590,7 +596,11 @@ def refresh_network_route(
             save_choice(choice)
             windows_network_choice(choice)
             os.environ["NEXOFLOW_NETWORK_MODE"] = choice
-        status = configure_proxy(preserve_active_proxy=previous_active is True)
+        if choice == "auto" and previous_active is not None:
+            # Compatibilidade com processos que iniciaram sem preferência de sessão.
+            status = _configure_proxy(preserve_active_proxy=previous_active is True)
+        else:
+            status = configure_proxy(preserve_active_proxy=previous_active is True)
         current_active = bool(status.active)
         changed = previous_active is not None and previous_active != current_active
 

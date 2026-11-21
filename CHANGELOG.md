@@ -1,5 +1,11 @@
 # NexoFlow — Changelog
 
+## 1.5.52
+
+- O Analytics reconcilia itens corrigidos pela chave no PostgreSQL e exibe o progresso das leituras e dos recibos. Os logs de execução mostram data e hora de Belém em DD/MM/AA HH:MM:SS.
+- O Setup e os aplicativos testam HTTPS direto antes de oferecer o proxy na seleção automática de uma nova sessão.
+- O Analytics pode abortar a própria revisão aberta após uma falha definitiva. A operação exige o publicador atualizado, mantém recibos e staging e preserva a revisão READY. Pendências comerciais e respostas incertas seguem o fluxo de conferência.
+
 ## 1.5.51 — publicada em 20/11/2026, 22:11:01 (America/Fortaleza)
 
 [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.51) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/13b582bcde6985ae0a2f0b73bf771ac08e9fbe3a) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44846369197) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44846369191) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44846369284) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44848544427).

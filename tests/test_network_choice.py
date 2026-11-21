@@ -41,6 +41,7 @@ class NetworkChoiceTests(unittest.TestCase):
     def test_interactive_ambiguity_requires_choice_and_remembers_session(self):
         module = self.load_module(PROXY_ALLOW_DIRECT_FALLBACK=False)
         with (
+            patch.object(module, "_direct_internet_available", return_value=False),
             patch.object(module, "_is_reachable", return_value=False),
             patch.object(module.sys.stdin, "isatty", return_value=True),
             patch("builtins.input", return_value="1"),
@@ -56,9 +57,9 @@ class NetworkChoiceTests(unittest.TestCase):
                 with (
                     patch.dict(module.os.environ, {"NEXOFLOW_NETWORK_MODE": "auto"}),
                     patch.object(
-                        module, "_is_reachable", side_effect=[False, False, False, True]
+                        module, "_is_reachable", return_value=True
                     ) as tcp,
-                    patch.object(module, "_direct_internet_available") as direct,
+                    patch.object(module, "_direct_internet_available", return_value=False) as direct,
                     patch.object(module.sys.stdin, "isatty", return_value=True),
                     patch(
                         "builtins.input", side_effect=["3", "", "texto", "12", answer]
@@ -84,15 +85,15 @@ class NetworkChoiceTests(unittest.TestCase):
                     for warning in output.call_args_list:
                         self.assertIn("Opção inválida", warning.args[0])
                     self.assertEqual(
-                        tcp.call_count, 4 if expected == "corporate" else 3
+                        tcp.call_count, 1 if expected == "corporate" else 0
                     )
-                    direct.assert_not_called()
+                    direct.assert_called_once()
 
     def test_eof_ends_ambiguity_without_authorizing_a_route(self):
         module = self.load_module(PROXY_ALLOW_DIRECT_FALLBACK=False)
         with (
             patch.object(module, "_is_reachable", return_value=False) as tcp,
-            patch.object(module, "_direct_internet_available") as direct,
+            patch.object(module, "_direct_internet_available", return_value=False) as direct,
             patch.object(module.sys.stdin, "isatty", return_value=True),
             patch("builtins.input", side_effect=["", EOFError]) as ask,
             patch("builtins.print") as output,
@@ -103,8 +104,8 @@ class NetworkChoiceTests(unittest.TestCase):
             self.assertEqual(module.os.environ["NEXOFLOW_NETWORK_MODE"], "auto")
             self.assertEqual(ask.call_count, 2)
             self.assertEqual(output.call_count, 1)
-            self.assertEqual(tcp.call_count, 3)
-            direct.assert_not_called()
+            self.assertEqual(tcp.call_count, 0)
+            direct.assert_called_once()
 
     def test_headless_ambiguity_and_corporate_failure_do_not_read_input(self):
         for mode, category in (
@@ -116,16 +117,16 @@ class NetworkChoiceTests(unittest.TestCase):
                 with (
                     patch.dict(module.os.environ, {"NEXOFLOW_NETWORK_MODE": mode}),
                     patch.object(module, "_is_reachable", return_value=False) as tcp,
-                    patch.object(module, "_direct_internet_available") as direct,
+                    patch.object(module, "_direct_internet_available", return_value=False) as direct,
                     patch.object(module.sys.stdin, "isatty", return_value=False),
                     patch("builtins.input") as ask,
                     patch.object(module.time, "sleep"),
                 ):
                     with self.assertRaisesRegex(ValueError, category):
                         module.configure_proxy()
-                    self.assertEqual(tcp.call_count, 3)
+                    self.assertEqual(tcp.call_count, 3 if mode == "corporate" else 0)
                     ask.assert_not_called()
-                    direct.assert_not_called()
+                    self.assertEqual(direct.call_count, int(mode == "auto"))
 
 
 class PipPreflightTests(unittest.TestCase):

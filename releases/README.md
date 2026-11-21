@@ -1,8 +1,8 @@
-# NexoFlow 1.5.51 — Downloads
+# NexoFlow 1.5.52 — Downloads
 
-Publicada em **20/11/2026, 22:11:01 (America/Fortaleza)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.51) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/13b582bcde6985ae0a2f0b73bf771ac08e9fbe3a) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44846369197) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44846369191) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44846369284) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44848544427).
+Publicada em **20/11/2026, 22:11:01 (America/Fortaleza)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.52) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/13b582bcde6985ae0a2f0b73bf771ac08e9fbe3a) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44846369197) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44846369191) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44846369284) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44848544427).
 
-[NexoFlow-Setup-1.5.51.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.51/NexoFlow-Setup-1.5.51.zip) · [NexoFlow-1.5.51.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.51/NexoFlow-1.5.51.zip) · [SHA256SUMS-1.5.51.txt](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.51/SHA256SUMS-1.5.51.txt)
+[NexoFlow-Setup-1.5.52.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.52/NexoFlow-Setup-1.5.52.zip) · [NexoFlow-1.5.52.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.52/NexoFlow-1.5.52.zip) · [SHA256SUMS-1.5.52.txt](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.52/SHA256SUMS-1.5.52.txt)
 
 Use o Setup em **Atualizar mantendo dados**. [Destino nos relatórios do Windows](../docs/OPERACAO_WINDOWS_VPS.md#destino-nos-relatórios-do-windows).
 

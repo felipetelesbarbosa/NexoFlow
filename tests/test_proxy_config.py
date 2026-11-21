@@ -59,24 +59,19 @@ class ProxyConfigTests(unittest.TestCase):
         ):
             os.environ.pop(name, None)
 
-    def test_unreachable_corporate_proxy_never_probes_direct_without_authorization(
-        self,
-    ):
-        for credentials in (True, False):
-            module = self.load_module(
-                PROXY_ALLOW_DIRECT_FALLBACK=False,
-                PROXY_USER="user" if credentials else "",
-                PROXY_PASSWORD="password" if credentials else "",
-            )
-            with (
-                patch.object(module, "_is_reachable", return_value=False),
-                patch.object(module, "_direct_internet_available") as direct,
-                patch.object(module.time, "sleep"),
-            ):
-                with patch.object(module.sys.stdin, "isatty", return_value=False):
-                    with self.assertRaisesRegex(ValueError, "REDE_AMBIGUA"):
-                        module.configure_proxy()
-                direct.assert_not_called()
+    def test_new_session_prefers_direct_even_with_a_known_proxy(self):
+        module = self.load_module(PROXY_ALLOW_DIRECT_FALLBACK=False)
+        with (
+            patch.object(module, "_direct_internet_available", return_value=True) as direct,
+            patch.object(module, "_is_reachable") as tcp,
+            patch("network_session.windows_network_choice", return_value="corporate") as memory,
+            patch("builtins.input") as ask,
+        ):
+            self.assertFalse(module.configure_proxy().active)
+            direct.assert_called_once()
+            tcp.assert_not_called()
+            memory.assert_not_called()
+            ask.assert_not_called()
 
     def test_auto_uses_direct_when_proxy_unreachable(self) -> None:
         module = self.load_module()
@@ -89,8 +84,9 @@ class ProxyConfigTests(unittest.TestCase):
         self.assertFalse(status.active)
         self.assertEqual(os.environ.get("WENI_PROXY_ACTIVE"), "0")
 
-    def test_auto_activates_when_proxy_reachable(self) -> None:
+    def test_explicit_corporate_activates_when_proxy_reachable(self) -> None:
         module = self.load_module()
+        os.environ["NEXOFLOW_NETWORK_MODE"] = "corporate"
         with patch.object(module, "_is_reachable", return_value=True):
             status = module.configure_proxy()
         self.assertTrue(status.active)
@@ -108,7 +104,7 @@ class ProxyConfigTests(unittest.TestCase):
             patch.object(module, "_direct_internet_available", return_value=True),
             patch.object(module.time, "sleep", return_value=None),
         ):
-            initial = module.configure_proxy()
+            initial = module._configure_proxy()
         self.assertFalse(initial.active)
 
         with patch.object(module, "_is_reachable", return_value=True):
@@ -123,7 +119,7 @@ class ProxyConfigTests(unittest.TestCase):
     def test_refresh_switches_proxy_to_direct(self) -> None:
         module = self.load_module()
         with patch.object(module, "_is_reachable", return_value=True):
-            initial = module.configure_proxy()
+            initial = module._configure_proxy()
         self.assertTrue(initial.active)
 
         with (
@@ -143,7 +139,7 @@ class ProxyConfigTests(unittest.TestCase):
     def test_refresh_keeps_active_proxy_when_only_public_internet_is_reachable(self):
         module = self.load_module()
         with patch.object(module, "_is_reachable", return_value=True):
-            module.configure_proxy()
+            module._configure_proxy()
         previous = os.environ["HTTPS_PROXY"]
         with (
             patch.object(module, "_is_reachable", return_value=False) as probe,
@@ -162,7 +158,7 @@ class ProxyConfigTests(unittest.TestCase):
     def test_refresh_recovers_transient_tcp_probe_without_switching_routes(self):
         module = self.load_module()
         with patch.object(module, "_is_reachable", return_value=True):
-            module.configure_proxy()
+            module._configure_proxy()
         with (
             patch.object(module, "_is_reachable", side_effect=[False, True]) as probe,
             patch.object(module, "_direct_internet_available") as direct,
@@ -177,7 +173,7 @@ class ProxyConfigTests(unittest.TestCase):
     def test_active_anonymous_proxy_is_preserved_if_direct_network_is_unavailable(self):
         module = self.load_module(PROXY_USER="", PROXY_PASSWORD="")
         with patch.object(module, "_is_reachable", return_value=True):
-            module.configure_proxy()
+            module._configure_proxy()
         with (
             patch.object(module, "_is_reachable", return_value=False),
             patch.object(module, "_direct_internet_available", return_value=False),
@@ -250,7 +246,7 @@ class ProxyConfigTests(unittest.TestCase):
             with self.subTest(direct_service_available=direct_service_available):
                 module = self.load_module()
                 with patch.object(module, "_is_reachable", return_value=True):
-                    module.configure_proxy()
+                    module._configure_proxy()
                 client = FarmaliderClient("TOKEN_SINTETICO")
                 try:
                     with (

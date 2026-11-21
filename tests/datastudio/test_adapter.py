@@ -508,3 +508,24 @@ def test_unconfirmed_item_removal_keeps_cache_and_can_be_retried(monkeypatch):
     assert stale in store.records(name)
     _, retried = store.upsert_pharmacy_orders([order], items)
     assert retried.removed == 1 and retried.final_records == [keep]
+
+
+def test_analytics_aborts_only_its_own_definitive_preseal_failure():
+    from unittest.mock import Mock
+
+    client = MemoryClient()
+    client.call = Mock(return_value={"state": "ABORTADA", "facts_preserved": True})
+    error = StorageError("DS_OPERACAO_SHEETS_NAO_PERMITIDA")
+    for store in (PostgresStore(client, purpose="weni"), PostgresStore(client, readonly=True),
+                  PostgresStore(client, revision=str(uuid4()))):
+        assert not store.abort_after_fatal_error(error)
+    store = PostgresStore(client)
+    for pending in ("DS_FONTES_INCOMPLETAS_RETOMAR", "DS_RESPOSTA_NAO_CONFIRMADA_RETOMAR", "DS_RECIBO_DIVERGENTE"):
+        assert not store.abort_after_fatal_error(StorageError(pending))
+    client.call.assert_not_called()
+    assert store.abort_after_fatal_error(error)
+    client.call.assert_called_once_with("/v1/analytics/abortar-incompleta", {"revision": store.revision})
+    client.call.reset_mock()
+    store._finalization_started = True
+    assert not store.abort_after_fatal_error(error)
+    client.call.assert_not_called()

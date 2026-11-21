@@ -89,6 +89,12 @@ $f=$ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitio
 . ([scriptblock]::Create($f.Extent.Text))
 $PayloadDir=Join-Path ([IO.Path]::GetTempPath()) ([Guid]::NewGuid().ToString('N'))
 $NetworkMode='Auto';$NonInteractive=$false
+$script:works=$true
+function Test-SetupDirectHttps {return $script:works}
+Remove-Item Env:NEXOFLOW_NETWORK_MODE -ErrorAction SilentlyContinue
+Select-SetupNetwork
+if($env:NEXOFLOW_NETWORK_MODE -ne 'personal'){throw 'HTTPS direto ignorado'}
+$script:works=$false
 Remove-Item Env:NEXOFLOW_NETWORK_MODE -ErrorAction SilentlyContinue
 $script:answers=[Collections.Generic.Queue[string]]::new()
 @('','x','1')|ForEach-Object {$script:answers.Enqueue($_)}
@@ -108,6 +114,7 @@ class RememberedRouteTests(unittest.TestCase):
         module = self.load_module(PROXY_ALLOW_DIRECT_FALLBACK=False)
         with (
             patch('network_session.windows_network_choice', return_value='personal'),
+            patch.object(module, '_direct_internet_available', return_value=True),
             patch.object(module, '_is_reachable') as tcp,
             patch('builtins.input') as ask,
         ):
@@ -124,11 +131,11 @@ class RememberedRouteTests(unittest.TestCase):
             patch.object(module, '_is_reachable', return_value=False),
             patch.object(module.sys.stdin, 'isatty', return_value=False),
             patch.object(module.time, 'sleep'),
-            patch.object(module, '_direct_internet_available') as direct,
+            patch.object(module, '_direct_internet_available', return_value=False) as direct,
         ):
             with self.assertRaisesRegex(ValueError, 'PROXY_INDISPONIVEL'):
                 module.configure_proxy()
-            direct.assert_not_called()
+            direct.assert_called_once()
 
 
 if __name__ == '__main__':

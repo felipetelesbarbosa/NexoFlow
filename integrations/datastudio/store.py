@@ -553,6 +553,19 @@ class Store:
             )
             return receipt
 
+    def abort_failed_analytics(self, revision):
+        with self.connect() as conn:
+            base = self.active(conn, lock=True)
+            row = self.revision(conn, revision, lock=True)
+            if row["finalidade"] != "analytics" or row["intencao"] is not None or row["recibo"] is not None:
+                raise StorageError("DS_ABORTO_AUTOMATICO_INAPLICAVEL")
+            if row["estado"] == "ABORTADA":
+                return dict(state="ABORTADA", facts_preserved=True)
+            if row["estado"] != "WRITING" or row["base"] != base:
+                raise StorageError("DS_ABORTO_AUTOMATICO_INAPLICAVEL")
+            conn.execute("UPDATE controle.nf_execucoes SET estado='ABORTADA' WHERE id=%s", (identifier(revision),))
+            return dict(state="ABORTADA", facts_preserved=True)
+
     def abort(self, revision):
         with self.connect() as conn:
             if self.revision(conn, revision)["estado"] == "ABORTADA":
