@@ -132,6 +132,12 @@ O Noturno identifica em seu resultado o armazenamento configurado para as etapas
 
 Conclua a execução em andamento antes de atualizar com **Atualizar mantendo dados**. No Terminal do mesmo perfil, confira `nexo versao` e o destino. Consulte o log da próxima execução regular para conferir as mensagens e a revisão confirmada.
 
+### Progresso dos contatos e do histórico no Analytics (próximo Setup)
+
+O tempo de “contatos + histórico” abrange toda a primeira das quatro etapas. Na leitura paginada da VPS, o Windows mostra a tabela, as linhas recebidas e o tempo decorrido. O total de páginas não é fornecido pela API. Na conferência local do histórico, o contador soma registros existentes indexados e alterações examinadas. No envio, o progresso avança por lote com recibo da VPS. Durante uma espera, o log volta a informar a operação em andamento a cada 15 segundos.
+
+O tempo restante estimado vale para a operação identificada na linha. A leitura de tamanho desconhecido indica “indisponível”. O recibo de um lote atesta a gravação na revisão em preparo. A atualização do painel depende da confirmação final READY.
+
 ### Resposta incerta durante o envio do Analytics
 
 Na 1.5.50, se o Windows perder a resposta de um lote, ele consulta o recibo pelo UUID. Se a API devolver `DS_LOTE_AUSENTE`, repete o POST uma única vez com os mesmos dados, revisão e UUID. Se a segunda resposta também se perder, consulta o recibo mais uma vez. Só prossegue com ID, hash, revisão e estado comprovados. Permissão negada, divergência ou ausência persistente interrompem a etapa. A simulação exige um resultado SIMULADO.

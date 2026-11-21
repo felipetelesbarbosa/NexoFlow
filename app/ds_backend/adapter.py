@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+from contextlib import nullcontext
 from copy import deepcopy
 from functools import wraps
 from threading import get_ident
@@ -23,6 +24,17 @@ from ds_backend.contract import (
     table_contract,
 )
 from google_sheets import GoogleSheetsStore, UpsertResult
+from task_progress import TaskProgress
+
+# Estas leituras acumuladas podem ocupar vários minutos no Analytics.
+_PROGRESS_TABLES = {
+    "Base_Contatos",
+    "Historico_Alteracoes",
+    "Pedidos_FarmaLider",
+    "Itens_Pedidos_FarmaLider",
+    "Cache_history_orders",
+    "Cache_orders",
+}
 
 
 def _postgres_log_context(method):
@@ -100,7 +112,20 @@ class PostgresStore(GoogleSheetsStore):
     def records(self, name):
         table_contract(name)
         if name not in self._cache:
-            self._cache[name] = list(self.client.rows(name, self.revision))
+            source = self.client.rows(name, self.revision)
+            if name in _PROGRESS_TABLES:
+                with TaskProgress(
+                    f"{POSTGRES_LABEL}: leitura de {name}",
+                    None,
+                    unit="linhas lidas",
+                    interval=15,
+                    show_nested=True,
+                ) as progress:
+                    progress.set_activity("recebendo a tabela em páginas da VPS")
+                    self._cache[name] = list(progress.track(source))
+                    progress.set_activity("")
+            else:
+                self._cache[name] = list(source)
         return self._cache[name]
 
     def values(self, name):
@@ -154,23 +179,44 @@ class PostgresStore(GoogleSheetsStore):
         if self.readonly:
             raise StorageError("DS_OPERACAO_SOMENTE_LEITURA")
         normalized = []
-        for offset in range(0, len(rows), 1000):
-            chunk = normalize(
-                name, rows[offset : offset + 1000], self.client.config["segment"]
-            )
-            receipt = self.client.send(self.revision, name, chunk)
-            if receipt.get("state") != "CONFIRMADO":
-                raise StorageError("DS_LOTE_NAO_CONFIRMADO")
-            self._receipts[receipt["id"]] = receipt["hash"]
-            normalized.extend(chunk)
-        if remove:
-            for offset in range(0, len(remove), 1000):
-                receipt = self.client.send(
-                    self.revision, name, [], remove=remove[offset : offset + 1000]
+        for changes, removing in ((rows, False), (remove or [], True)):
+            if not changes:
+                continue
+            action = "remoções" if removing else "gravações"
+            monitor = (
+                TaskProgress(
+                    f"{POSTGRES_LABEL}: {name} — {action} na revisão",
+                    len(changes),
+                    unit="linhas com recibo",
+                    batch_size=1000,
+                    interval=15,
+                    show_nested=True,
                 )
-                if receipt.get("state") != "CONFIRMADO":
-                    raise StorageError("DS_LOTE_NAO_CONFIRMADO")
-                self._receipts[receipt["id"]] = receipt["hash"]
+                if name in {"Base_Contatos", "Historico_Alteracoes"} or len(changes) > 1000
+                else nullcontext()
+            )
+            with monitor as progress:
+                for offset in range(0, len(changes), 1000):
+                    batch = changes[offset : offset + 1000]
+                    if progress is not None:
+                        progress.set_activity(f"preparando lote {offset // 1000 + 1}")
+                    chunk = (
+                        [] if removing
+                        else normalize(name, batch, self.client.config["segment"])
+                    )
+                    if progress is not None:
+                        progress.set_activity(f"aguardando recibo do lote {offset // 1000 + 1}")
+                    if removing:
+                        receipt = self.client.send(self.revision, name, [], remove=batch)
+                    else:
+                        receipt = self.client.send(self.revision, name, chunk)
+                    if receipt.get("state") != "CONFIRMADO":
+                        raise StorageError("DS_LOTE_NAO_CONFIRMADO")
+                    self._receipts[receipt["id"]] = receipt["hash"]
+                    normalized.extend(chunk)
+                    if progress is not None:
+                        progress.set_activity("")
+                        progress.advance(len(batch))
         return normalized
 
     def _upsert_records_detailed(
@@ -367,6 +413,12 @@ class PostgresStore(GoogleSheetsStore):
         from geography import normalize_geography
         from pharmacy_scope import sanitize_contact_order
 
+        if not records:
+            return
+        logging.info(
+            "%s: Historico_Alteracoes — preparando %s alterações.",
+            POSTGRES_LABEL, len(records),
+        )
         records = [
             dict(
                 sanitize_contact_order(normalize_geography(r)),
@@ -379,18 +431,28 @@ class PostgresStore(GoogleSheetsStore):
         ]
         name = "Historico_Alteracoes"
         spec = table_contract(name)
-        current = {record_key(name, r): r for r in self.records(name)}
+        existing = self.records(name)
         new = []
-        for row in records:
-            row = {c: row.get(c, "") for c in spec["columns"]}
-            row = normalize(name, [row], self.client.config["segment"])[0]
-            key = record_key(name, row)
-            if key in current:
-                if current[key] != row:
-                    raise StorageError("DS_EVENTO_REUTILIZADO")
-            else:
-                new.append(row)
-                current[key] = row
+        with TaskProgress(
+            f"{POSTGRES_LABEL}: Historico_Alteracoes — conferência local",
+            len(existing) + len(records),
+            unit="registros",
+            interval=15,
+        ) as progress:
+            progress.set_activity("indexando registros existentes")
+            current = {record_key(name, r): r for r in progress.track(existing)}
+            progress.set_activity("comparando alterações pela chave")
+            for row in progress.track(records):
+                row = {c: row.get(c, "") for c in spec["columns"]}
+                row = normalize(name, [row], self.client.config["segment"])[0]
+                key = record_key(name, row)
+                if key in current:
+                    if current[key] != row:
+                        raise StorageError("DS_EVENTO_REUTILIZADO")
+                else:
+                    new.append(row)
+                    current[key] = row
+            progress.set_activity("")
         self._send(name, new)
         self._cache[name] = list(current.values())
 

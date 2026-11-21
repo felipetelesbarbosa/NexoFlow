@@ -367,3 +367,65 @@ def test_falha_de_confirmacao_preserva_a_pendencia_e_o_rotulo_do_sheets(caplog, 
         google._values_to_records.return_value = []
         GoogleSheetsStore.load_base_snapshot(google)
         assert "Google Sheets: Base_Contatos pré-carregada" in caplog.text
+
+
+def test_progresso_historico_so_conta_lotes_com_recibo(caplog, monkeypatch):
+    client = MemoryClient()
+    store = PostgresStore(client)
+    send = client.send
+    sizes = []
+
+    def interromper_segundo_lote(revision, name, rows, remove=None):
+        sizes.append(len(rows))
+        if len(sizes) == 2:
+            raise StorageError("DS_RESPOSTA_NAO_CONFIRMADA_RETOMAR")
+        return send(revision, name, rows, remove=remove)
+
+    monkeypatch.setattr(client, "send", interromper_segundo_lote)
+    contacts = [row("Base_Contatos", contact_uuid=f"synthetic-{i}") for i in range(1001)]
+    with caplog.at_level("INFO"), pytest.raises(StorageError, match="NAO_CONFIRMADA"):
+        store.append_history(contacts, set())
+
+    assert sizes == [1000, 1]
+    assert len(store._receipts) == 1
+    assert "leitura de Historico_Alteracoes" in caplog.text
+    assert "total ainda desconhecido" in caplog.text
+    assert "1000/1001" in caplog.text and "lotes=1/2" in caplog.text
+    assert "interrompido" in caplog.messages[-1]
+    assert "1001/1001 linhas com recibo" not in caplog.text and "synthetic-0" not in caplog.text
+    assert "READY" not in caplog.text
+
+
+def test_progresso_leitura_incompleta_nao_persiste_parcial(caplog, monkeypatch):
+    store = PostgresStore(MemoryClient())
+
+    def partial(name, revision):
+        yield row(name, contact_uuid="privado")
+        raise StorageError("DS_CURSOR_INVALIDO")
+
+    monkeypatch.setattr(store.client, "rows", partial)
+    with caplog.at_level("INFO"), pytest.raises(StorageError, match="DS_CURSOR_INVALIDO"):
+        store.records("Historico_Alteracoes")
+    assert "1 linhas lidas" in caplog.messages[-1]
+    assert "interrompido" in caplog.messages[-1]
+    assert "privado" not in caplog.text
+    assert "Historico_Alteracoes" not in store._cache
+
+
+def test_progresso_historico_sucesso_e_sem_mudancas(caplog, monkeypatch):
+    client = MemoryClient()
+    store = PostgresStore(client)
+    monkeypatch.setattr(store, "now_iso", lambda: "2026-11-20T20:00:00Z")
+    contacts = [row("Base_Contatos", contact_uuid="synthetic-1")]
+    with caplog.at_level("INFO"):
+        store.append_history(contacts, set())
+        assert "1/1 linhas com recibo | lotes=1/1" in caplog.messages[-1]
+        assert "concluído" in caplog.messages[-1]
+        caplog.clear()
+        store.append_history(contacts, set())
+        assert "gravações na revisão" not in caplog.text
+        assert "leitura de Historico_Alteracoes" not in caplog.text
+        assert len(store._receipts) == 1
+        monkeypatch.setattr(client, "rows", lambda *_: pytest.fail("Leitura desnecessária"))
+        store._cache.clear()
+        store.append_history([], set())
