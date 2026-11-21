@@ -1,6 +1,8 @@
 # NexoFlow — Changelog
 
-## 1.5.51 — preparação
+## 1.5.51 — publicada em 20/11/2026, 22:11:01 (America/Fortaleza)
+
+[Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.51) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/13b582bcde6985ae0a2f0b73bf771ac08e9fbe3a) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44846369197) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44846369191) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44846369284) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44848544427).
 
 - O Windows fecha a conexão que monta o SQLite temporário antes de abri-lo para uso. Uma leitura interrompida durante a montagem pode ser repetida com o mesmo destino.
 
