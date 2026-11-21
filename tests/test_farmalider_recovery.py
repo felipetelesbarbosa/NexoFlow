@@ -337,10 +337,10 @@ class FarmaliderRecoveryTests(unittest.TestCase):
 
     def test_logs_always_use_belem_utc_minus_three(self):
         record = logging.LogRecord("fixture", logging.INFO, "", 0, "message", (), None)
-        record.created = datetime(2026, 10, 7, 4, 0, tzinfo=UTC).timestamp()
+        record.created = datetime(2026, 11, 21, 2, 3, 31, tzinfo=UTC).timestamp()
         record.msecs = 123
         formatted = BelemFormatter("%(asctime)s | %(message)s").format(record)
-        self.assertEqual(formatted, "2026-10-07 01:00:00,123 -03:00 | message")
+        self.assertEqual(formatted, "20/11/26 23:03:31 | message")
 
 
 if __name__ == "__main__":

@@ -63,6 +63,7 @@ from farmalider_integration import resolve_contact_order, weni_identity_guard
 from geography import GEOGRAPHY_FIELDS, geography_changes
 from meta_events import meta_event_state, read_meta_events
 from pedido_utils import (
+    business_datetime_text,
     business_order_datetime,
     effective_order_status_code,
     farmalider_order_status_name,
@@ -2292,8 +2293,8 @@ def write_review_snapshot(
         " NexoFlow - Revisão Humana do NexoFlow Weni",
         "==========================================================",
         "",
-        f"Gerado em UTC: {payload['created_at_utc']}",
-        f"Corte do snapshot em UTC: {payload['captured_at_utc']}",
+        f"Gerado em: {business_datetime_text(payload['created_at_utc'])}",
+        f"Corte do snapshot em: {business_datetime_text(payload['captured_at_utc'])}",
         f"Modo: {'CARGA COMPLETA' if full else 'INCREMENTAL'}",
         *(
             [

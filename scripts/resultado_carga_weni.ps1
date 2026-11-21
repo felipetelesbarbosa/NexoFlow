@@ -21,7 +21,7 @@ function Complete-WeniResult {
     try {
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $log) | Out-Null
         $zone = [TimeZoneInfo]::FindSystemTimeZoneById('SA Eastern Standard Time')
-        $when = [TimeZoneInfo]::ConvertTime([DateTimeOffset]::UtcNow, $zone).ToString('yyyy-MM-ddTHH:mm:sszzz')
+        $when = [TimeZoneInfo]::ConvertTime([DateTimeOffset]::UtcNow, $zone).ToString('dd/MM/yy HH:mm:ss', [Globalization.CultureInfo]::InvariantCulture)
         Add-Content -LiteralPath $log -Encoding UTF8 -Value "$when | etapa=$Stage | código=$ResultCode | snapshot=$Snapshot"
         if ($RecordOnly) { return 0 }
         $status = if ($Stage -eq 'CANCELADO') { 'Operação cancelada.' }

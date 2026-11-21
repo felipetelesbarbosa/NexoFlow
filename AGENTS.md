@@ -6,10 +6,10 @@ Confirme separadamente `VERSION`, release, versão instalada no PC, perfil, ambi
 
 ## Requisitos para a próxima release Windows após a 1.5.51
 
-Solicitação do operador em 20/11/2026, pendente de implementação e teste no Setup distribuído.
+Solicitações do operador em 20/11/2026 para a próxima distribuição. A mudança de rede ainda precisa ser implementada.
 
 - **Rede.** Em uma nova execução automática do Setup, Terminal, Weni, Analytics, Planilha, Recompra ou Noturno, testar primeiro uma conexão HTTPS direta, sem proxy nem credenciais. Se funcionar, prosseguir sem pedir uma opção de rede, inclusive quando houver um proxy cadastrado. Só oferecer a tentativa por proxy após falha da conexão direta. Reutilizar a decisão nas etapas filhas, inclusive pip e simulação/aplicação. Exercitar acesso direto, falha seguida de aceite ou recusa do proxy e execução agendada sem console. Conferir tanto o seletor PowerShell do Setup quanto o seletor Python dos aplicativos.
-- **Horários de execução.** Nos logs e textos para o operador, exibir a hora de Belém em `HH:mm`, por exemplo `19:08`, sem segundos, milissegundos ou sufixo `-03:00`. Manter a data onde identifica o dia da execução. Aplicar a formatação na apresentação e preservar a precisão e o fuso nos recibos, checkpoints e dados de integração. Conferir o mesmo instante no console e no arquivo de log.
+- **Horários de execução.** Nos logs e textos para o operador, exibir a data e a hora de Belém em `DD/MM/AA HH:MM:SS`, por exemplo `20/11/26 23:03:31`, sem milissegundos ou sufixo de fuso. Aplicar a formatação na apresentação e preservar a precisão e o fuso nos recibos, checkpoints e dados de integração. Conferir o mesmo instante no console e no arquivo de log.
 
 # NexoFlow 1.5.51 publicada
 

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from config import LOG_DIR, LOG_FILE
 from duration_display import humanize
+from pedido_utils import BUSINESS_TIMEZONE, DISPLAY_DATETIME_FORMAT
 
 
 class BelemFormatter(logging.Formatter):
@@ -16,13 +17,8 @@ class BelemFormatter(logging.Formatter):
         return humanize(super().format(record))
 
     def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
-        local = datetime.fromtimestamp(
-            record.created,
-            timezone(timedelta(hours=-3), "America/Belem"),
-        )
-        if datefmt:
-            return local.strftime(datefmt)
-        return f"{local:%Y-%m-%d %H:%M:%S},{int(record.msecs):03d} -03:00"
+        local = datetime.fromtimestamp(record.created, BUSINESS_TIMEZONE)
+        return local.strftime(datefmt or DISPLAY_DATETIME_FORMAT)
 
 
 def configure_logging(log_file: Path | None = None) -> None:

@@ -12,7 +12,7 @@ import unicodedata
 from collections import Counter, OrderedDict
 from concurrent.futures import Future, ThreadPoolExecutor
 from copy import deepcopy
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from hashlib import sha256
 from itertools import groupby, islice
 from pathlib import Path
@@ -45,6 +45,7 @@ from farmalider_integration import (
     weni_customer_identity,
 )
 from pedido_utils import (
+    business_datetime_text,
     business_order_datetime,
     is_order_cancelled,
     normalize_farmalider_order_status_code,
@@ -1524,9 +1525,9 @@ def write_review(review, path=REVIEW):
     counts = Counter(plan["reason"] for plan in review["plans"])
     lines = [
         f"NexoFlow {CURRENT_VERSION} — Revisão {profile.brand} D+{profile.days}",
-        f"Dia local: {review['day']}",
-        f"Dados capturados em: {review['created_at']}",
-        f"Horários conferidos ao concluir: {review.get('generated_at', review['created_at'])}",
+        f"Dia local: {date.fromisoformat(review['day']).strftime('%d/%m/%y')}",
+        f"Dados capturados em: {business_datetime_text(review['created_at'])}",
+        f"Horários conferidos ao concluir: {business_datetime_text(review.get('generated_at', review['created_at']))}",
         f"Política: grupo entre 0 e {profile.days} dias; envio somente D+{profile.days}. Cancelamentos e recusas bloqueados. Perfil {profile.segment}; consentimento preservado.",
         "Sem disparos, sem alterações de campanha. Horário já passado não cria envio retroativo.",
         "Pendências: " + "; ".join(review["structure"]["errors"]),

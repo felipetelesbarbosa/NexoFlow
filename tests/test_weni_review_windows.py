@@ -521,7 +521,7 @@ raise SystemExit(90)
                     )
                     self.assertIn("etapa=ERRO", log)
                     self.assertIn("código=9", log)
-                    self.assertIn("-03:00", log)
+                    self.assertRegex(log, r"^\d{2}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} \| etapa=ERRO")
                     (root / "ack").touch()
                     self.assertEqual(process.wait(timeout=15), 0)
                 finally:

@@ -149,6 +149,7 @@ class RecompraDeadlineTests(unittest.TestCase):
             path = Path(directory) / "recompra_review.json"
             recompra.write_review(review, path)
             report = path.with_suffix(".txt").read_text(encoding="utf-8-sig")
+            self.assertIn("Dados capturados em: 09/10/26 13:57:00", report)
             self.assertIn("CPF_INVALIDO_CADASTRO", report)
             self.assertNotIn("Contato u1 |", report)
             self.assertEqual(recompra.read_review(path), review)

@@ -10,7 +10,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from analytics import (
     AD_FIELDS,
@@ -84,7 +83,11 @@ from observed_orders import (
     revalidate_observed_orders,
     verified_order_cancellation,
 )
-from pedido_utils import PENDING_ITEMS_STATUS, business_order_datetime
+from pedido_utils import (
+    PENDING_ITEMS_STATUS,
+    business_datetime_text,
+    business_order_datetime,
+)
 from product_scope import PHARMACY_SCOPE_VERSION
 from project_paths import load_private_settings
 from task_progress import TaskProgress, request_progress
@@ -1192,12 +1195,8 @@ def main() -> int:
         elif last_success is not None:
             after = last_success - timedelta(minutes=SYNC_OVERLAP_MINUTES)
             logging.info(
-                "Sincronização incremental desde %s UTC | horário local=%s "
-                "(%s min de sobreposição).",
-                utc_iso(after),
-                after.astimezone(ZoneInfo("America/Belem")).isoformat(
-                    timespec="seconds"
-                ),
+                "Sincronização incremental desde %s (%s min de sobreposição).",
+                business_datetime_text(after),
                 SYNC_OVERLAP_MINUTES,
             )
         else:

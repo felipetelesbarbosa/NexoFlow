@@ -12,6 +12,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 BUSINESS_TIMEZONE = ZoneInfo("America/Belem")
+DISPLAY_DATETIME_FORMAT = "%d/%m/%y %H:%M:%S"
 PENDING_ITEMS_STATUS = "PENDENTE_ITENS_API"
 FARMALIDER_ORDER_STATUS_NAMES = {
     -2: "Em aberto",
@@ -185,10 +186,15 @@ def business_order_datetime(value: Any) -> datetime | None:
     return parsed.astimezone(BUSINESS_TIMEZONE)
 
 
+def business_datetime_text(value: Any) -> str:
+    """Representa um instante em horário de Belém para leitura humana."""
+    parsed = business_order_datetime(value)
+    return parsed.strftime(DISPLAY_DATETIME_FORMAT) if parsed is not None else ""
+
+
 def weni_order_datetime_text(value: Any) -> str:
     """Format an order timestamp for the Weni pedido_data contract."""
-    parsed = business_order_datetime(value)
-    return parsed.strftime("%d/%m/%y %H:%M:%S") if parsed is not None else ""
+    return business_datetime_text(value)
 
 
 def is_order_cancelled(order: dict[str, Any]) -> bool:

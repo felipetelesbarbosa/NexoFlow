@@ -1441,6 +1441,7 @@ class WeniUpdateTests(unittest.TestCase):
                 captured_at_utc="2026-10-03T12:00:00Z",
             )
             text = txt_path.read_text(encoding="utf-8-sig")
+            self.assertIn("Corte do snapshot em: 03/10/26 09:00:00", text)
             self.assertIn("Maria", text)
             self.assertIn("ativo  ->  recusado", text)
             self.assertIn("cpf: <vazio>  ->  52998224725", text)
