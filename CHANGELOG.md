@@ -1,5 +1,9 @@
 # NexoFlow — Changelog
 
+## 1.5.53
+
+O Analytics aguarda até 120 segundos pela resposta do fechamento no PostgreSQL da VPS. Se a resposta se perder, o Windows consulta automaticamente a mesma revisão até três vezes. A confirmação exige READY, manifesto e recibo correspondentes. O código 0 exige sucesso das demais etapas. Uma confirmação incerta ou outra pendência mantém o código 3. A atualização do cliente funciona com o publicador 1.5.52.
+
 ## 1.5.52 — publicada em 21/11/26 02:11:52 (Belém)
 
 [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.52) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/70f77ab5ab1be2602b290f519408e9c4db2dddb8) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44867735796) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44867735795) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44867735815) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44869685131).
