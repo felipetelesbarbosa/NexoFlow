@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from contextlib import nullcontext
 from copy import deepcopy
 from functools import wraps
@@ -25,6 +26,14 @@ from ds_backend.contract import (
 )
 from google_sheets import GoogleSheetsStore, UpsertResult
 from task_progress import TaskProgress
+
+_UNCERTAIN_RESPONSE_ERRORS = {
+    "DS_RESPOSTA_NAO_CONFIRMADA_RETOMAR",
+    "DS_HTTP_502",
+    "DS_HTTP_503",
+    "DS_HTTP_504",
+    "DS_HTTP_524",
+}
 
 # Estas leituras acumuladas podem ocupar vários minutos no Analytics.
 _PROGRESS_TABLES = {
@@ -603,6 +612,34 @@ class PostgresStore(GoogleSheetsStore):
         logging.warning("%s: revisão Analytics %s ABORTADA após erro impeditivo. Última READY preservada.", POSTGRES_LABEL, self.revision)
         return True
 
+    def _read_final_receipt(self, manifest):
+        for attempt in range(3):
+            if attempt:
+                time.sleep(5)
+            logging.info("%s: consultando o recibo final da revisão %s (%d/3).",
+                         POSTGRES_LABEL, self.revision, attempt + 1)
+            try:
+                status = self.client.call(f"/v1/revisoes/{self.revision}")
+            except StorageError as exc:
+                if str(exc) in _UNCERTAIN_RESPONSE_ERRORS and attempt < 2:
+                    continue
+                raise
+            if status.get("revision") != self.revision or status.get("sealed_manifest") != manifest:
+                raise StorageError("DS_RECIBO_DIVERGENTE")
+            receipt = status.get("receipt")
+            if status.get("state") == "READY":
+                version = status.get("version")
+                if (type(version) is not int or version < 1 or not isinstance(receipt, dict)
+                        or receipt.get("state") != "READY" or receipt.get("revision") != self.revision
+                        or type(receipt.get("version")) is not int or receipt["version"] != version
+                        or receipt.get("manifest_hash") != digest(manifest)):
+                    raise StorageError("DS_RECIBO_DIVERGENTE")
+                logging.info("%s: publicação confirmada pelo recibo final da versão %d.", POSTGRES_LABEL, version)
+                return receipt
+            if status.get("state") != "WRITING" or receipt is not None:
+                break
+        raise StorageError("DS_REVISAO_NAO_CONFIRMADA")
+
     def finish(self, *, complete):
         if not complete:
             raise StorageError("DS_FONTES_INCOMPLETAS_RETOMAR")
@@ -611,10 +648,16 @@ class PostgresStore(GoogleSheetsStore):
         )
         self._finalization_started = True
         self.client.call("/v1/selar", dict(revision=self.revision, manifest=manifest))
-        result = self.client.call(
-            "/v1/confirmar",
-            dict(revision=self.revision, manifest=manifest, complete=True),
-        )
+        try:
+            result = self.client.call(
+                "/v1/confirmar",
+                dict(revision=self.revision, manifest=manifest, complete=True),
+            )
+        except StorageError as exc:
+            if str(exc) not in _UNCERTAIN_RESPONSE_ERRORS:
+                raise
+            logging.warning("%s: resposta final incerta para a revisão %s.", POSTGRES_LABEL, self.revision)
+            result = self._read_final_receipt(manifest)
         if result.get("state") != "READY":
             raise StorageError("DS_REVISAO_NAO_CONFIRMADA")
         logging.info("%s: revisão %s confirmada (READY).", POSTGRES_LABEL, self.revision)

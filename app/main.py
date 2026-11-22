@@ -1946,7 +1946,8 @@ def main() -> int:
         else:
             logging.exception("Falha na sincronização: %s", exc)
 
-        if sheets is not None:
+        # Depois do início do selo, Controle só pode mudar em outra revisão.
+        if sheets is not None and not (isinstance(sheets, PostgresStore) and sheets._finalization_started):
             try:
                 sheets.set_controls(
                     {

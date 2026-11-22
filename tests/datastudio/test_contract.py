@@ -160,3 +160,25 @@ def test_resposta_incerta_confere_mesmo_lote_antes_de_reenviar(case, expected_ca
     else:
         assert client.send(revision, "BI_Itens", rows, batch_id=batch) == receipt
     assert calls == expected_calls
+
+
+def test_read_timeout_only_extended_for_final_confirmation():
+    from unittest.mock import Mock
+
+    from ds_backend.client import Client
+
+    session = Mock()
+    session.request.return_value.status_code = 200
+    session.request.return_value.json.return_value = {}
+    client = Client.__new__(Client)
+    client.session = session
+    client.endpoint = "https://example.invalid"
+    client.reads = client.writes = 0
+    for path, data, timeout in [
+        ("/v1/confirmar", {"revision": "test"}, (10, 120)),
+        ("/v1/selar", {}, (10, 65)),
+        ("/v1/lotes", {}, (10, 65)),
+        ("/v1/revisoes/test", None, (10, 65)),
+    ]:
+        client.call(path, data)
+        assert session.request.call_args.kwargs["timeout"] == timeout

@@ -106,7 +106,7 @@ class Client:
                 method,
                 self.endpoint + path,
                 json=data,
-                timeout=(10, 65),
+                timeout=(10, 120 if method == "POST" and path == "/v1/confirmar" else 65),
                 allow_redirects=False,
             )
             if response.status_code not in (200, 201):

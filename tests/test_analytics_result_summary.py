@@ -22,6 +22,7 @@ class AnalyticsResultSummaryTests(unittest.TestCase):
         bi_pending=False,
         postgres=False,
         stage_error=None,
+        final_states=None,
     ):
         sheets, farm, weni = Mock(), Mock(), Mock()
         sheets._continuity = None
@@ -53,6 +54,44 @@ class AnalyticsResultSummaryTests(unittest.TestCase):
             sheets.client.call.return_value = {"state": "ABORTADA", "facts_preserved": True}
             sheets.abort_after_fatal_error.side_effect = lambda exc: PostgresStore.abort_after_fatal_error(sheets, exc)
             sheets.upsert_pharmacy_orders.side_effect = stage_error
+        if final_states is not None:
+            from types import MethodType
+
+            from ds_backend.adapter import PostgresStore
+            from ds_backend.contract import StorageError, digest
+
+            sheets.__class__ = PostgresStore
+            sheets.revision = "synthetic"
+            sheets._receipts = {}
+            sheets._finalization_started = False
+            sheets.finish = MethodType(PostgresStore.finish, sheets)
+            sheets._read_final_receipt = MethodType(PostgresStore._read_final_receipt, sheets)
+            sheets.abort_after_fatal_error = MethodType(PostgresStore.abort_after_fatal_error, sheets)
+            sheets._owns_analytics_revision = True
+            responses = iter(final_states)
+            manifest = {}
+
+            def call(path, data=None):
+                if path == "/v1/selar":
+                    manifest.update(data["manifest"])
+                    return {"state": "SELADA"}
+                if path == "/v1/confirmar":
+                    raise StorageError("DS_RESPOSTA_NAO_CONFIRMADA_RETOMAR")
+                self.assertEqual(path, "/v1/revisoes/synthetic")
+                state = next(responses)
+                if state == "OFFLINE":
+                    raise StorageError("DS_RESPOSTA_NAO_CONFIRMADA_RETOMAR")
+                receipt = dict(state="READY", revision="synthetic", version=8,
+                               manifest_hash=digest(manifest)) if state in ("READY", "DIVERGENTE") else None
+                if state == "DIVERGENTE":
+                    receipt["manifest_hash"] = "outro"
+                    state = "READY"
+                if state == "SEM_RECIBO":
+                    state = "READY"
+                revision = "outra" if state == "OUTRA_REVISAO" else "synthetic"
+                return dict(revision=revision, version=8, state=state,
+                            sealed_manifest=manifest, receipt=receipt)
+            sheets.client.call.side_effect = call
         with ExitStack() as stack:
             stack.enter_context(
                 patch.dict(os.environ, {"FORCE_FULL_SYNC": "", "FULL_SYNC_QUARTER": ""})
@@ -215,6 +254,27 @@ class AnalyticsResultSummaryTests(unittest.TestCase):
         self.assertIn(
             "Cinco fontes históricas: publicação e conferência concluídas", output
         )
+
+    @patch("ds_backend.adapter.time.sleep")
+    def test_codigo_apos_resposta_final_incerta(self, _sleep):
+        for states, meta, expected in (
+            (["WRITING", "READY"], None, 0),
+            (["READY"], {"status": "parcial", "partial": True}, 3),
+            (["WRITING"] * 3, None, 3),
+            (["OFFLINE", "READY"], None, 0),
+            (["OFFLINE"] * 3, None, 3),
+            (["SEM_RECIBO"], None, 3),
+            (["OUTRA_REVISAO"], None, 3),
+            (["DIVERGENTE"], None, 3),
+            (["ABORTADA"], None, 3),
+        ):
+            with self.subTest(states=states, meta=meta):
+                code, output, _, sheets = self.run_pipeline(postgres=True, final_states=states, meta=meta)
+                self.assertEqual(code, expected, output)
+                paths = [call.args[0] for call in sheets.client.call.call_args_list]
+                self.assertEqual(paths, ["/v1/selar", "/v1/confirmar"] + ["/v1/revisoes/synthetic"] * len(states))
+                self.assertFalse(any("ultima_execucao_erro_tipo" in call.args[0]
+                                     for call in sheets.set_controls.call_args_list))
 
     def test_etapa_2_aborta_erro_impeditivo_e_preserva_revisao_incerta(self):
         from ds_backend.contract import StorageError
