@@ -1,6 +1,8 @@
 # NexoFlow — Changelog
 
-## 1.5.54
+## 1.5.54 — publicada em 22/11/26 19:55:07 (Belém)
+
+[Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.54) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/671b32b9316d3c69b76e58609247f47bfbcee458) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45078727882) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45078727842) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45078727843) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45080319017).
 
 O Noturno FARMA aceita uma lista privada de reservas. Update Weni e Recompra conferem as reservas nas revisões e adiam as operações correspondentes.
 
