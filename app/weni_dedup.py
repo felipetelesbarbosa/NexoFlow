@@ -9,6 +9,7 @@ from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
 
+import reservas_farma
 from analytics import _full_load_25_load, get_fields, is_valid_cpf, normalize_cpf
 from config import LOG_DIR, WENI_PROGRESS_INTERVAL_SECONDS
 from contact_dedup_guard import (
@@ -374,6 +375,8 @@ def write_review(path, result, *, full, quarter, campaign_id):
         "created_at": now(),
         **result,
     }
+    reservas = reservas_farma.carregar(active_segment())
+    reservas.registrar(payload)
     payload["sha256"] = digest(payload)
     save_private(companion(path), payload)
     if Path(path).exists():
@@ -387,7 +390,7 @@ def write_review(path, result, *, full, quarter, campaign_id):
         f"Pendências preservadas: {len(result['pending'])}",
         f"Nomes a numerar por pedidos diferentes: {len(result.get('renames', []))}",
         "Os pedidos reais serão vinculados ao contato correto; os valores serão preservados.",
-        "A aplicação interromperá fluxos e excluirá da Weni os contatos listados abaixo.",
+        "Exclusões e retomadas de exclusão adiadas pelo operador." if reservas.sha256 else "A aplicação interromperá fluxos e excluirá da Weni os contatos listados abaixo.",
         f"Plano de duplicados SHA-256: {payload['sha256']}",
     ]
     for pair in result["pairs"]:
@@ -793,6 +796,7 @@ def run_with_dedup(*, apply, full, quarter, review_path, update):
     from weni_update import _open_farmalider
 
     settings = load_private_settings()
+    reservas = reservas_farma.carregar(active_segment())
     removed, skipped = set(), 0
     with execution_lock(DIRECTORY):
         payload = None
@@ -805,6 +809,8 @@ def run_with_dedup(*, apply, full, quarter, review_path, update):
             try:
                 payload = load_review(review_path, full=full, quarter=quarter)
             except (OSError, ValueError) as exc:
+                if reservas.sha256:
+                    raise RuntimeError("Revisão de duplicados inválida para as reservas FARMA.") from exc
                 logging.warning(
                     "Deduplicação sem revisão válida (%s); nenhuma nova exclusão será aplicada. Gere nova revisão na próxima incremental.",
                     type(exc).__name__,
@@ -814,6 +820,8 @@ def run_with_dedup(*, apply, full, quarter, review_path, update):
                     "pending": [{"reason": "REVISAO_DUPLICADOS_PENDENTE"}],
                     "sha256": "sem-novas-exclusoes",
                 }
+        if payload is not None:
+            reservas.conferir_revisao(payload)
         weni = WeniClient(str(settings.WENI_API_TOKEN), retry_mutations=False)
         farm, store = None, None
         try:
@@ -895,6 +903,11 @@ def run_with_dedup(*, apply, full, quarter, review_path, update):
                     if fresh_pairs:
                         jobs.append((folder, fresh_pairs))
                         covered.update(p["duplicate_uuid"] for p in fresh_pairs)
+            deferred = 0
+            if reservas.sha256:
+                deferred = len({p["duplicate_uuid"] for _, pairs in jobs for p in pairs})
+                jobs = []
+                logging.info("Weni: %d exclusões adiadas, incluindo retomadas.", deferred)
             failed_batches = 0
             # Registrar os lotes revisados antes de abrir conexões. Falhas de
             # serviço não perdem o trabalho pendente da próxima incremental.
@@ -968,21 +981,29 @@ def run_with_dedup(*, apply, full, quarter, review_path, update):
                         type(exc).__name__,
                     )
             renamed, name_pending = 0, 0
-            if payload.get("renames"):
+            renames = [change for change in payload.get("renames", []) if not reservas.protege(change["contact_uuid"])]
+            if renames:
                 try:
                     if farm is None:
                         farm = _open_farmalider()
                     if farm is None:
                         raise ValueError("API indisponível para conferir os nomes.")
                     renamed, name_pending = apply_renames(
-                        payload["renames"], weni, farm, root
+                        renames, weni, farm, root
                     )
                 except Exception as exc:
-                    name_pending = len(payload["renames"])
+                    name_pending = len(renames)
                     logging.warning(
                         "Deduplicação: nomes pendentes (%s); carga preservada.",
                         type(exc).__name__,
                     )
+            if reservas.sha256:
+                save_private(companion(review_path).with_suffix(".reservas.json"), {
+                    "reservas_farma_sha256": reservas.sha256,
+                    "revisao_duplicados_sha256": payload["sha256"],
+                    "exclusoes_adiadas": deferred,
+                    "nomes_adiados": len(payload.get("renames", [])) - len(renames),
+                })
             stats = update(removed, None)
             return stats, {
                 "proposed": len(payload["pairs"]),
@@ -990,6 +1011,7 @@ def run_with_dedup(*, apply, full, quarter, review_path, update):
                 "deleted": len(removed),
                 "skipped": skipped,
                 "failed_batches": failed_batches,
+                "deferred": deferred,
                 "renamed": renamed,
                 "name_pending": name_pending,
             }

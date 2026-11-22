@@ -23,6 +23,7 @@ from zoneinfo import ZoneInfo
 
 from requests import RequestException
 
+import reservas_farma
 from analytics import (
     _sales_order_is_valid,
     cpf_query_priority,
@@ -1507,7 +1508,7 @@ def make_review(plans, structure, *, now=None, state=None):
         if plan.get("segment", "FARMA") != structure.get("segment", "FARMA"):
             raise RuntimeError("Plano de outro perfil; aplicação bloqueada.")
         audit_plan(plan)
-    return {
+    review = {
         "schema": 1,
         "day": now.astimezone(TZ).date().isoformat(),
         "created_at": now.isoformat(),
@@ -1516,6 +1517,12 @@ def make_review(plans, structure, *, now=None, state=None):
         "state_sha256": digest(state or {"schema": 1, "contacts": {}}),
         "plans": plans,
     }
+
+    reservas = reservas_farma.carregar(structure.get("segment", "FARMA"))
+    reservas.registrar(review)
+    if reservas.sha256:
+        review["contatos_reservados"] = sorted(reservas.contatos)
+    return review
 
 
 def write_review(review, path=REVIEW):
@@ -1533,6 +1540,8 @@ def write_review(review, path=REVIEW):
         "Pendências: " + "; ".join(review["structure"]["errors"]),
         f"Resultados: {dict(counts)}",
     ]
+    if "contatos_reservados" in review:
+        lines.append(f"Reservas do operador: {len(review['contatos_reservados'])} contatos protegidos. As propostas desses contatos serão adiadas.")
     lines.extend(public_review_lines(review))
     if review.get("pagination"):
         lines.append(f"Paginação consolidada: {review['pagination']}")
@@ -1580,6 +1589,7 @@ def read_review(path):
         != profile_for(review.get("structure", {}).get("segment", "FARMA")).policy
     ):
         raise RuntimeError("Revisão inválida ou alterada. Nenhuma aplicação iniciada.")
+    reservas_farma.carregar(review["structure"].get("segment", "FARMA")).conferir_revisao(review)
     _validate_review_uuids(review["plans"])
     for plan in review["plans"]:
         if plan.get("segment", "FARMA") != review["structure"].get("segment", "FARMA"):
@@ -1715,6 +1725,8 @@ def apply_review(
         raise RuntimeError(
             "Revisão anterior à política atual. Gere um novo dry-run e revise antes de aplicar."
         )
+    reservas = reservas_farma.carregar(profile.segment)
+    reservas.conferir_revisao(review)
     _validate_review_uuids(review["plans"])
     now = now_fn()
     ensure_review_current(review, now)
@@ -1801,6 +1813,10 @@ def apply_review(
             state_dirty |= remember_plan(
                 state, reviewed, structure, now_fn(), confirmed=False, retry=True
             )
+            if reservas.protege(uid):
+                summary["reservados"] += 1
+                record_event({"contact_uuid": uid, "status": "RESERVADO", "acao_adiada": reviewed["action"]})
+                continue
             if has_incomplete_query(reviewed) and not pending_group_removal_due(
                 reviewed, now_fn()
             ):
@@ -2344,6 +2360,7 @@ def apply_review(
                 "started_at": now.isoformat(),
                 "finished_at": now_fn().isoformat(),
                 "aplicacao_concluida": True,
+                **({"reservas_farma_sha256": reservas.sha256} if reservas.sha256 else {}),
                 "resultado": dict(summary),
                 "escritas_confirmadas": write_metrics.snapshot(),
                 "pendencias_por_motivo": dict(

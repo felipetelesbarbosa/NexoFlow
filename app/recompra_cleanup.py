@@ -5,6 +5,7 @@ from pathlib import Path
 
 from requests import RequestException
 
+import reservas_farma
 from farmalider_client import (
     FarmaliderAuthError,
     FarmaliderError,
@@ -108,6 +109,7 @@ def make_cleanup_review(weni, farm, segment, *, now_fn=now_local):
         "structure": structure,
         "plans": plans,
     }
+    reservas_farma.carregar(segment).registrar(review)
     ensure_review_current(review, now_fn())
     return review
 
@@ -161,6 +163,8 @@ def apply_cleanup_review(
 ):
     profile = profile_for(review["structure"]["segment"])
     ensure_review_current(review, now_fn())
+    reservas = reservas_farma.carregar(profile.segment)
+    reservas.conferir_revisao(review)
     if inspect_cleanup_structure(weni, profile.segment) != review["structure"]:
         raise RuntimeError("Grupo ou organização mudou após a revisão.")
     summary = Counter()
@@ -191,6 +195,10 @@ def apply_cleanup_review(
             for plan in review["plans"]:
                 ensure_review_current(review, now_fn())
                 uid = plan["contact_uuid"]
+                if reservas.protege(uid):
+                    defer(uid, "reservados", "RESERVA_OPERADOR")
+                    progress.advance()
+                    continue
                 if plan["reason"] == "CONSULTA_PENDENTE":
                     defer(uid, "consultas_pendentes", "CONSULTA_DA_REVISAO")
                     progress.advance()

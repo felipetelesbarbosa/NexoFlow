@@ -6,15 +6,18 @@ import argparse
 import os
 import subprocess
 import sys
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
+import reservas_farma
 from network_session import session_scope
 from recompra import atomic_json, read_review
 from recompra_lock import execution_file_lock
 from recompra_review_audit import incomplete_query_summary
 from runtime_profile import scoped_path as profile_path
+from runtime_profile import segment
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -52,7 +55,23 @@ def run_step(
             return process.wait()
 
 
-def execute(root: Path = ROOT, *, runner=run_step, full: bool = False) -> int:
+@contextmanager
+def reservas_da_execucao(esperados):
+    reservas = (reservas_farma.conferir(esperados) if esperados is not None
+                else reservas_farma.carregar(segment()))
+    chave = reservas_farma.AMBIENTE_SHA
+    anterior = os.environ.get(chave)
+    os.environ[chave] = reservas.sha256
+    try:
+        yield reservas
+    finally:
+        if anterior is None:
+            os.environ.pop(chave, None)
+        else:
+            os.environ[chave] = anterior
+
+
+def execute(root: Path = ROOT, *, runner=run_step, full: bool = False, reservas_esperadas=None) -> int:
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ_") + uuid4().hex[:8]
     from runtime_profile import scoped_path
 
@@ -188,6 +207,7 @@ def execute(root: Path = ROOT, *, runner=run_step, full: bool = False) -> int:
     code = 1
     try:
         with (
+            reservas_da_execucao(reservas_esperadas) as reservas,
             session_scope(),
             execution_file_lock(
                 root / profile_path("logs") / "noturno.lock",
@@ -203,6 +223,10 @@ def execute(root: Path = ROOT, *, runner=run_step, full: bool = False) -> int:
 
             summary["armazenamento_configurado"] = backend_label(configured())
             print(f"Armazenamento do perfil: {summary['armazenamento_configurado']}", flush=True)
+            if reservas.sha256:
+                summary["reservas_farma_sha256"] = reservas.sha256
+                summary["contatos_reservados"] = len(reservas.contatos)
+                print(f"Reservas FARMA ativas: {len(reservas.contatos)} contatos; exclusões adiadas.", flush=True)
             code = run_flow()
     except KeyboardInterrupt:
         code = 130
@@ -252,8 +276,9 @@ def main() -> int:
     modes.add_argument(
         "--full", action="store_true", help="executa carga completa 100%"
     )
+    parser.add_argument("--reservas-farma", type=int, help="exige reservas FARMA com esta quantidade de contatos")
     args = parser.parse_args()
-    return execute(full=args.full)
+    return execute(full=args.full, reservas_esperadas=args.reservas_farma)
 
 
 if __name__ == "__main__":

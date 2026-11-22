@@ -36,6 +36,8 @@ def print_application_summary(result, report, *, state_label="estado local"):
     else:
         print("Escritas na Weni: confira as confirmações na auditoria desta aplicação.")
     print(f"Atualizações somente no {state_label}: {result.get('estado_local', 0)}")
+    if result.get("reservados"):
+        print(f"Contatos adiados por reserva: {result['reservados']}")
     print(f"Contatos sem mudança: {result.get('sem_mudanca', 0)}")
     print(
         f"Planos concluídos: {result.get('aplicados', 0)}; "
@@ -291,7 +293,7 @@ def main(argv=None):
                     review, weni, farm, state_path=state_path, audit_path=audit_path
                 )
                 partial = bool(
-                    result.get("conflitos") or result.get("consultas_pendentes")
+                    result.get("conflitos") or result.get("consultas_pendentes") or result.get("reservados")
                 )
                 print(
                     ("[AVISO] " if partial else "[OK] ")
@@ -331,7 +333,7 @@ def main(argv=None):
                     else {}
                 ),
             )
-            partial = bool(result.get("conflitos") or result.get("consultas_pendentes"))
+            partial = bool(result.get("conflitos") or result.get("consultas_pendentes") or result.get("reservados"))
             print(
                 (
                     "[AVISO] Recompra aplicada com pendências: "

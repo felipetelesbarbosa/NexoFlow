@@ -252,6 +252,8 @@ def main() -> int:
         print(
             f"Duplicados: propostas={dedup['proposed']}; excluídos={dedup['deleted']}; pendências={dedup['pending']}; conflitos={dedup['skipped']}; lotes pendentes={dedup.get('failed_batches', 0)}."
         )
+        if dedup.get("deferred") or stats.contatos_reservados:
+            print(f"Reservas FARMA: {dedup.get('deferred', 0)} exclusões e {stats.contatos_reservados} planos de contato adiados.")
         if args.dry_run:
             print("Modo: DRY-RUN. Nenhuma alteração foi gravada.")
             if review_out is not None:
@@ -302,6 +304,8 @@ def main() -> int:
             or stats.contacts_failed
             or stats.creation_pending
             or stats.meta_events_report.get("pending_from")
+            or stats.contatos_reservados
+            or dedup.get("deferred")
             or dedup["skipped"]
             or dedup["pending"]
             or dedup.get("failed_batches", 0)
@@ -311,6 +315,8 @@ def main() -> int:
                 + ("Simulação concluída" if args.dry_run else "Carga Weni concluída")
                 + " com pendências. Na próxima carga, revalide as consultas e os conflitos indicados acima."
             )
+        if args.apply and (dedup.get("deferred") or stats.contatos_reservados):
+            return 3
         return 0
     except Exception as exc:
         logging.exception("NexoFlow Weni falhou: %s", exc)

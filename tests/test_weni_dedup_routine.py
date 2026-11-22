@@ -491,6 +491,35 @@ class Fixtures(unittest.TestCase):
         )
         self.weni.update_contact_fields.assert_not_called()
 
+    def test_reserva_preserva_lote_antigo_e_exclusao_nova(self):
+        from reservas_farma import Reservas
+        from weni_update import UpdateStats, write_review_snapshot
+
+        with tempfile.TemporaryDirectory() as folder, patch(
+            "reservas_farma.carregar", return_value=Reservas("sintetico", frozenset())
+        ):
+            root = Path(folder)
+            review = root / "review.json"
+            write_review_snapshot([], UpdateStats(), full=True, json_path=review)
+            dedup.write_review(review, self.prepare(), full=True, quarter=None, campaign_id="")
+            journal = root / "journal" / "antigo" / "lote-0000" / "state.json"
+            journal.parent.mkdir(parents=True)
+            state = '{"done":false,"pairs":[{"duplicate_uuid":"outro"}]}'
+            journal.write_text(state, encoding="utf-8")
+            update = Mock()
+            with (
+                patch.object(dedup, "DIRECTORY", root / "journal"),
+                patch.object(dedup, "WeniClient", return_value=self.weni),
+                patch.object(dedup, "apply_batch") as batch,
+            ):
+                for _ in range(2):
+                    _, result = dedup.run_with_dedup(apply=True, full=True, quarter=None, review_path=review, update=update)
+                    self.assertEqual(result["deferred"], 2)
+                    self.assertEqual(result["deleted"], 0)
+            batch.assert_not_called()
+            update.assert_called_with(set(), None)
+            self.assertEqual(journal.read_text(encoding="utf-8"), state)
+
     def test_routine_cleans_before_advancing_normal_weni_checkpoint(self):
         from weni_update import UpdateStats, write_review_snapshot
 

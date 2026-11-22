@@ -11,6 +11,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
+import reservas_farma
 from ad_attribution import (
     AD_CLEARABLE_FIELDS,
     GOOGLE_ADS_ORIGIN,
@@ -232,6 +233,7 @@ class UpdateStats:
     creation_pending: dict[str, int] = field(default_factory=dict)
     contacts_failed: int = 0
     contacts_conflicted: int = 0
+    contatos_reservados: int = 0
     contacts_already_satisfied: int = 0
     purchase_confirmed: int = 0
     purchase_skipped: int = 0
@@ -2274,6 +2276,10 @@ def write_review_snapshot(
             for plan in sorted(plans, key=lambda item: item.contact_uuid)
         ],
     }
+    reservas = reservas_farma.carregar(segment())
+    reservas.registrar(payload)
+    if reservas.sha256:
+        summary["contatos_reservados"] = sum(reservas.protege(p.contact_uuid) for p in plans)
     if quarter is not None:
         payload["partition"] = {
             "kind": "full_25",
@@ -2296,6 +2302,7 @@ def write_review_snapshot(
         f"Gerado em: {business_datetime_text(payload['created_at_utc'])}",
         f"Corte do snapshot em: {business_datetime_text(payload['captured_at_utc'])}",
         f"Modo: {'CARGA COMPLETA' if full else 'INCREMENTAL'}",
+        *([f"Contatos com plano adiado por reserva: {summary['contatos_reservados']}"] if reservas.sha256 else []),
         *(
             [
                 f"Fragmento: PARTE {quarter}/4 (25%)",
@@ -2449,6 +2456,7 @@ def verify_review_snapshot(
 
     if payload.get("segment", "FARMA") != segment():
         raise PlanAuditError("Revisão de outro segmento; nenhuma gravação iniciada.")
+    reservas_farma.carregar(segment()).conferir_revisao(payload)
     if payload.get("schema_version") != REVIEW_SCHEMA_VERSION:
         raise PlanAuditError("Versão do snapshot de revisão incompatível.")
     expected_mode = "full" if full else "incremental"
@@ -2500,6 +2508,7 @@ def load_review_snapshot(
 
     if payload.get("segment", "FARMA") != segment():
         raise PlanAuditError("Revisão de outro segmento; nenhuma gravação iniciada.")
+    reservas_farma.carregar(segment()).conferir_revisao(payload)
     if payload.get("schema_version") != REVIEW_SCHEMA_VERSION:
         raise PlanAuditError(
             "Versão do snapshot de revisão incompatível. Execute novamente a carga completa para gerar um snapshot novo."
@@ -2993,7 +3002,10 @@ def run_update(
         if quarter not in {1, 2, 3, 4}:
             raise RuntimeError("A parte da carga 25% Weni deve ser 1, 2, 3 ou 4.")
 
+    reservas = reservas_farma.carregar(segment())
     frozen_apply = bool(apply and require_review is not None)
+    if reservas.sha256 and apply and not frozen_apply:
+        raise PlanAuditError("Com reservas FARMA a aplicação exige o snapshot da simulação.")
     window = None if frozen_apply else resolve_window(full=full)
     stats = UpdateStats()
     weni = WeniClient(token)
@@ -3134,6 +3146,14 @@ def run_update(
                 review_payload.get("pending_retry_uuids") or []
             )
             stats.contacts_failed = len(conflicted_uuids)
+            reservas.conferir_revisao(review_payload)
+            adiados = {p.contact_uuid for p in plans if reservas.protege(p.contact_uuid)}
+            stats.contatos_reservados = len(adiados)
+            conflicted_uuids.extend(sorted(adiados))
+            for plan in plans:
+                if plan.contact_uuid in adiados:
+                    _append_audit(_audit_plan_event(plan, mode="apply-frozen", status="RESERVADO"))
+            plans = [p for p in plans if p.contact_uuid not in adiados]
             from customer_discovery import CreationSession
 
             if any("__new_api_customer" in p.guards for p in plans):
@@ -3359,6 +3379,9 @@ def run_update(
                     quarter=quarter,
                 )
             )
+            if reservas.sha256:
+                state_payload["reservas_farma_sha256"] = reservas.sha256
+                state_payload["contatos_reservados"] = stats.contatos_reservados
             _save_state(state_payload)
             logging.info(
                 "Snapshot congelado concluído: aplicados=%s | conflitos ignorados=%s | já satisfeitos=%s. "

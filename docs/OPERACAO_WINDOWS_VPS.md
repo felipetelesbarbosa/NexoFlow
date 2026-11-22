@@ -157,3 +157,24 @@ Consulte o estado pelo UUID mostrado pelo próprio Analytics. Uma revisão em WR
 Instale o Setup em modo Preserve. Em Auto, uma nova sessão testa HTTPS direto, sem proxy, credenciais ou redirecionamento. Uma sessão filha reutiliza a rota escolhida. Se a direta falhar, o modo interativo oferece a escolha de proxy; sem console, a rede corporativa previamente reconhecida ou explicitamente configurada pode usar o proxy. Os modos explícitos continuam disponíveis.
 
 Para habilitar o aborto automático, o Work deve atualizar somente a imagem do publicador FARMA pelo procedimento de implantação deste guia, usando o commit da tag v1.5.52, preservar a imagem anterior para reversão e conferir o SHA em /v1/destino. A rota autenticada POST /v1/analytics/abortar-incompleta recebe o UUID da revisão. O cliente a usa ao tratar erros definitivos de validação local ou de chaves/schema que interrompem o Analytics, antes do selo e somente se o processo abriu a revisão. O servidor confere finalidade, base, estado, selo e recibo sob trava. As pendências informativas, erros de rede, respostas incertas e revisões anteriores continuam sujeitos aos mecanismos de conferência existentes. Um publicador anterior não oferece essa rota; o Windows informa a ausência de confirmação e preserva a revisão para conferência. Uma queda do processo ou do PC pode impedir a execução do tratador de erros.
+
+## Noturno FARMA com reservas do operador
+
+Na instalação Windows, guarde o manifesto privado em `credentials\farma-reservas.json`. Ele deve conter exatamente os campos `segmento` (texto `FARMA`), `adiar_exclusoes` (booleano `true`) e `contatos_recompra` (lista dos UUIDs Weni canônicos, minúsculos e distintos). O Work deve montar a lista a partir do cruzamento dos 21 contatos de inclusão e três de troca, conferir os UUIDs contra a revisão e fornecer o SHA-256 do arquivo final pelo canal privado. O manifesto vale nas próximas execuções desse PC enquanto estiver instalado. Use o mesmo arquivo nos demais PCs que possam executar essas rotinas.
+
+No Terminal FARMA da instalação atualizada, estes comandos conferem a identidade do arquivo e a quantidade de contatos antes da carga. Compare o hash exibido com o informado pelo Work.
+
+```powershell
+Set-Location C:\NexoFlow
+nexo versao
+Get-FileHash -Algorithm SHA256 -LiteralPath '.\credentials\farma-reservas.json'
+& '.\.venv\Scripts\python.exe' -B app/reservas_farma.py --esperados 24
+```
+
+Após a conferência, no mesmo Terminal FARMA, rode a carga usando a quantidade exigida. A rotina valida o manifesto antes de iniciar as etapas. Alterar ou retirar o arquivo invalida a revisão. Esta forma também bloqueia o início se o arquivo estiver ausente.
+
+```powershell
+& '.\.venv\Scripts\python.exe' -B app/run_noturno.py --full --reservas-farma 24
+```
+
+O Update Weni adia as exclusões novas e os lotes de exclusão interrompidos, mantém os planos de contatos reservados para reavaliar e grava a contagem no arquivo privado de reservas ao lado da revisão de duplicados. A Recompra preserva os grupos e os campos dos contatos reservados, inclusive nas trocas, e registra a decisão RESERVADO na auditoria. O relatório Noturno registra o hash e o total de reservas. A campanha que já estiver agendada na própria Weni continua com suas regras. Para liberar casos, atualize a lista fora de uma execução e gere nova simulação. Os recibos anteriores e a lista de reservas têm finalidades independentes. O perfil PET continua com sua configuração própria.

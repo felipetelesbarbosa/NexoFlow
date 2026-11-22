@@ -2271,6 +2271,53 @@ class WeniUpdateTests(unittest.TestCase):
         client.get_contact.assert_called_once_with(uuid="u2")
         client.update_contact_fields.assert_called_once_with("u2", {"idade": 37})
 
+    @patch("weni_update._save_state")
+    @patch("weni_update._append_audit")
+    @patch("weni_update.WeniClient")
+    def test_frozen_snapshot_holds_reserved_contact_and_applies_remainder(
+        self, client_cls, _audit, save_state
+    ):
+        client = client_cls.return_value
+        client.list_fields.return_value = self._required_weni_fields()
+        client.list_groups.return_value = [{"uuid": "g1", "name": "Opt-Out LGPD"}]
+        client.get_contact.return_value = {
+            "uuid": "u2",
+            "fields": {},
+            "urns": [],
+            "groups": [],
+        }
+        plans = [
+            ContactUpdatePlan(contact_uuid=uid, fields={"idade": 37})
+            for uid in ("u1", "u2")
+        ]
+        payload = {"summary": {}, "captured_at_utc": "2026-10-03T12:00:00Z"}
+        from reservas_farma import Reservas
+        payload["reservas_farma_sha256"] = "teste"
+        with (
+            patch("weni_update.reservas_farma.carregar", return_value=Reservas("teste", frozenset({"u1"}))),
+            patch(
+                "weni_update.load_review_snapshot",
+                return_value=(plans, payload, "hash"),
+            ),
+            patch("weni_update.audit_plans"),
+            patch(
+                "weni_update._prepare_frozen_plan_for_apply",
+                side_effect=lambda plan, *args, **kw: (plan, ""),
+            ),
+        ):
+            result = run_update(
+                apply=True,
+                full=True,
+                require_review=Path("sintetico.json"),
+            )
+        self.assertEqual(result.contatos_reservados, 1)
+        self.assertIn("u1", save_state.call_args.args[0]["pending_conflict_uuids"])
+        self.assertEqual(result.contacts_failed, 0)
+        self.assertEqual(result.contacts_conflicted, 0)
+        self.assertEqual(result.contacts_updated, 1)
+        client.get_contact.assert_called_once_with(uuid="u2")
+        client.update_contact_fields.assert_called_once_with("u2", {"idade": 37})
+
     @patch("weni_update._open_farmalider", return_value=None)
     @patch("weni_update.resolve_window")
     @patch("weni_update.WeniClient")
