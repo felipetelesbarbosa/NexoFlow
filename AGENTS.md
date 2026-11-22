@@ -4,6 +4,12 @@ Comece em [Operação Windows, VPS e Looker](docs/OPERACAO_WINDOWS_VPS.md) e no 
 
 Confirme separadamente `VERSION`, release, versão instalada no PC, perfil, ambiente, estado da publicação READY e fonte dos componentes no Looker oficial. Preserve a separação FARMA/PET e homologação/produção. As entradas de release abaixo registram estados históricos.
 
+# NexoFlow 1.5.53 publicada
+
+Publicada em **22/11/26 13:02:56 (Belém)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.53) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/c9352161510715f60c32c0c9ec75cdf60566b810) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45039946763) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45039946748) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45039946746) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45041587508).
+
+Os dois ZIPs públicos coincidiram com os da preparação aprovada. A conferência dos downloads verificou SHA-256, CRC, manifesto do Setup, módulos Python e versão dos executáveis. Para instalar no Windows, selecione **Atualizar mantendo dados**.
+
 # NexoFlow 1.5.52 publicada
 
 Publicada em **21/11/26 02:11:52 (Belém)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.52) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/70f77ab5ab1be2602b290f519408e9c4db2dddb8) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44867735796) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44867735795) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44867735815) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/44869685131).
@@ -134,7 +140,7 @@ Reutilizar os planos, journals, capacidade e guardas existentes. Preservar byte 
 
 - Use mensagens de commit curtas em português que descrevam a área ou a alteração, como `Automação`, `Documentação`, `Instalador` ou `Corrigir revisão da Recompra`. `NexoFlow 1.5.28` identifica a versão, não é uma mensagem obrigatória de commit. Separe alterações por área quando isso tornar a navegação do GitHub mais clara; não reescreva o histórico apenas para mudar os textos exibidos.
 - A `main` é a única branch de trabalho do repositório. Atualize diretamente a `main`; não crie nem mantenha branches adicionais.
-- A distribuição publicada usa NexoFlow 1.5.52, tag v1.5.52 e pacotes com sufixo 1.5.52. Novas publicações exigem autorização e validação. Para cada próxima publicação de atualização/hotfix/patch, incremente uma única vez, de 1.5.53 até 1.5.99 e depois de 1.6 até 1.6.99. Não incremente por commit ou tentativa de CI da mesma entrega. Preserve tags e releases anteriores. Nunca sobrescreva uma versão anterior com um novo patch. Confira `VERSION` e `docs/VERSIONAMENTO.md`.
+- A distribuição publicada usa NexoFlow 1.5.53, tag v1.5.53 e pacotes com sufixo 1.5.53. Novas publicações exigem autorização e validação. Para cada próxima publicação de atualização/hotfix/patch, incremente uma única vez, de 1.5.54 até 1.5.99 e depois de 1.6 até 1.6.99. Não incremente por commit ou tentativa de CI da mesma entrega. Preserve tags e releases anteriores. Nunca sobrescreva uma versão anterior com um novo patch. Confira `VERSION` e `docs/VERSIONAMENTO.md`.
 - Cada release deve mostrar a data da sua publicação. Não reutilize uma versão já publicada para código novo.
 - O NexoFlow Windows é operacional e autônomo; Analytics e Noturno usam a integração Meta nativa, sem exigir Codex ou MCP. A distribuição Windows usa o cliente Meta nativo diretamente. O **NexoFlow Hub** tem desenvolvimento e homologação Linux expressamente autorizados na Etapa 2, isolados em `hub/`, com dados sintéticos, PostgreSQL temporário e escrita real bloqueada. Consulte [o núcleo](hub/README.md) e o [planejamento](docs/planejamento/README.md). Não transformar o Windows em cliente dependente do Hub, não alterar serviços/volumes da VPS nem abrir portas públicas nesta fase. Commits Hub usam `[skip release]`, sem incrementar a versão ou publicar releases Windows. Alterações compartilhadas exigem regressão Windows.
 - Preserve as credenciais e os diagnósticos privados fora do Git e dos pacotes públicos.
