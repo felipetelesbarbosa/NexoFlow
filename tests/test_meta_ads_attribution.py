@@ -216,7 +216,7 @@ class CommercialMetaTests(unittest.TestCase):
         tables = facts()
         purchase = moment(1, 12)
         rooms = {"whatsapp:1": [Room(moment(1, 11), moment(1, 13))]}
-        apply(
+        summary = apply(
             tables,
             [event("a", "1", moment(1)), event("a", "2", moment(1))],
             [order("10", "77", "1", purchase), order("11", "88", "2", purchase)],
@@ -232,6 +232,8 @@ class CommercialMetaTests(unittest.TestCase):
         self.assertEqual(result["receita_conversa_anuncio"], "19.50")
         self.assertIsNone(result["pedidos_apos_conversa_7d"])
         self.assertFalse(result["cobertura_comercial"])
+        self.assertEqual(summary["direto"], 1)
+        self.assertEqual(summary["pedidos_pendentes_por_motivo"], {"SEM_ATENDIMENTO_COMPROVADO": 1})
 
     def test_flows_missing_human_or_unique_conversation_leaves_pending(self):
         purchase = moment(1, 12)

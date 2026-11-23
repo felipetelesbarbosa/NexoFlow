@@ -392,6 +392,7 @@ def prepare_attribution(tables, evidence, orders, history, rooms, *, through):
     first = {}
     unknown_emission = set()
     purchases = defaultdict(list)
+    unresolved = Counter()
     for oid, record in canonical.items():
         if record is None:
             raise ValueError("Histórico com duplicidade conflitante de pedido.")
@@ -409,6 +410,8 @@ def prepare_attribution(tables, evidence, orders, history, rooms, *, through):
             if owner:
                 unknown_emission.add(owner)
             pending.update(t.grain for t in own_touches)
+            if own_touches:
+                unresolved["EMISSAO_AUSENTE"] += 1
             continue
         day = date.fromisoformat(record["data"])
         if owner and (owner not in first or day < first[owner][0]):
@@ -442,6 +445,7 @@ def prepare_attribution(tables, evidence, orders, history, rooms, *, through):
             or not _sales_order_is_valid(row)
         ):
             pending.update(t.grain for t in possible)
+            unresolved["PEDIDO_OPERACIONAL_NAO_CONCILIADO"] += 1
             continue
         try:
             revenue = Decimal(str(record["faturamento"]))
@@ -449,6 +453,7 @@ def prepare_attribution(tables, evidence, orders, history, rooms, *, through):
                 raise ValueError
         except (ValueError, InvalidOperation):
             pending.update(t.grain for t in possible)
+            unresolved["RECEITA_INVALIDA"] += 1
             continue
         purchases[uid].append(Purchase(oid, owner, at, revenue))
     return (
@@ -456,6 +461,7 @@ def prepare_attribution(tables, evidence, orders, history, rooms, *, through):
         touches,
         purchases,
         pending,
+        unresolved,
         {
             owner: None
             if owner in unknown_emission
@@ -478,7 +484,7 @@ def apply_attribution(
     conversations_loader,
 ):
     flows_only = rooms is None
-    days, touches, purchases, pending, first = prepare_attribution(
+    days, touches, purchases, pending, unresolved, first = prepare_attribution(
         tables, evidence, orders, history, rooms, through=end
     )
     # O identificador de atendimento da exportação pode ser interno ao Chats.
@@ -521,22 +527,28 @@ def apply_attribution(
                 count_by_room.update((urn, r) for r in matching)
         for purchase, matches in linked_rooms.items():
             if not matches:
-                pending.update(
+                eligible = {
                     t.grain
                     for t in own_touches
                     if t.at <= purchase.at <= t.at + WINDOW + START_TOLERANCE
-                )
+                }
+                if eligible:
+                    pending.update(eligible)
+                    unresolved["SEM_ATENDIMENTO_COMPROVADO"] += 1
                 continue
             if len(matches) != 1 or count_by_room[matches[0]] != 1:
                 pending.update(
                     t.grain for t in own_touches if t.at <= purchase.at <= t.at + WINDOW
                 )
+                unresolved["ATENDIMENTO_OU_PEDIDO_AMBIGUO"] += 1
                 continue
             urn, room = matches[0]
             paid = [t for t in own_touches if t.urn == urn and t.at <= purchase.at]
             result = classify_purchase(purchase, paid, room, conversations)
             if result is None or result[0] == "pendente":
                 pending.update(t.grain for t in paid if purchase.at <= t.at + WINDOW)
+                if paid:
+                    unresolved["VINCULO_ANUNCIO_CONVERSA_INCONCLUSIVO"] += 1
                 continue
             kind, touch, opening = result
             day = (
@@ -547,6 +559,7 @@ def apply_attribution(
             grain = (*touch.grain[:2], day)
             if grain not in days:
                 pending.add(touch.grain)
+                unresolved["SEM_FATO_DIARIO_DO_ANUNCIO"] += 1
                 continue
             values[grain][kind] += 1
             revenues[grain][kind] += purchase.revenue
@@ -605,4 +618,4 @@ def apply_attribution(
             posterior=counts["posterior"],
             dias_parciais=int(not complete),
         )
-    return dict(report)
+    return dict(report, pedidos_pendentes_por_motivo=dict(sorted(unresolved.items())))

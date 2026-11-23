@@ -56,6 +56,14 @@ O limite HTTP e o limite de conexões SQL controlam recursos diferentes. O Compo
 
 Para um 503, registre a janela, o gráfico e o erro sanitizado. Compare os logs do leitor, do proxy e do PostgreSQL no mesmo horário. Conte recusas de conexão do papel, `Exceeded concurrency limit` e `53100` separadamente. Ao ver `DS_PRAZO_CONSULTA`, compare o tempo na API com o tempo do conector e refaça o cenário com a página inteira. O teste de 18/11 mediu o `jit` no resumo vazio em sessões de diagnóstico. O resultado com `jit=off` foi de 6,4–7,1 s e com `jit=on` de 8,5–8,7 s. O overlay leva apenas a configuração homologada de paralelismo e limites. Preserve o prazo e as guardas do conector.
 
+No Resumo oficial FARMA, a correção de **Clientes de destaque** é um campo calculado no gráfico `cd-qiedv2y67d`, que usa `BI_Clientes_Vendas`. Mantenha `cliente_chave` como dimensão de agrupamento, `SUM(faturamento)` e a ordenação atual. Troque apenas a expressão de **Nome** pela fórmula homologada na cópia:
+
+```text
+CASE WHEN IFNULL(TRIM(MAX(cliente)), "") = "" THEN "Nome não informado" ELSE MAX(cliente) END
+```
+
+No controle de 01 a 20/11/2026, confirme as mesmas cinco chaves distintas e a mesma receita na mesma ordem. Os dois clientes com nome vazio devem continuar em linhas separadas, com receitas de R$ 4.203,91 e R$ 3.861,68. Para reverter a apresentação, restaure `MAX(cliente)`.
+
 ## Pendências de Público e do painel Anúncios
 
 - **Público.** Na cópia, o Looker exibiu erro de sistema nos gráficos após a troca, inclusive no ensaio do leitor ajustado. Os 12 componentes de `BI_Publico` voltaram às ligações anteriores. A consulta direta à API retornou HTTP 200 para as duas projeções integrais da READY v2. A métrica de compra identificada de `BI_Publico` soma marcações dos contatos. A mesclagem de compradores operacionais conta contatos com pedido elegível. Reconcilie os dois critérios separadamente antes de validar uma nova projeção dos cartões e filtros.

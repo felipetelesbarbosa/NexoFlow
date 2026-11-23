@@ -106,6 +106,20 @@ Se o CTWA não informar o ID da conversa, a identificação exige uma única abe
 
 O publicador grava somente contagens, receitas e cobertura no fato diário da Meta, com o contrato de armazenamento existente. A função de leitura `farma.ds_veiculacao_meta_v4` acrescenta os campos comerciais às fontes **Anúncios veiculados** e **Resumo de anúncios**. A v3 continua atendendo os campos anteriores. Na VPS, instale o leitor do mesmo commit e reaplique a instalação de destinos FARMA à revisão READY ativa antes de atualizar o conector Apps Script. No Data Studio, use os campos novos para pedidos, receita, CPA, ROAS e CAC. Os campos de valor mostram os subtotais comprovados com o indicador de dias parciais. As razões ficam indisponíveis enquanto o recorte tiver fatos parciais. [Operação Windows e VPS](OPERACAO_WINDOWS_VPS.md)
 
+#### Mudança solicitada para o filtro de Anúncios
+
+O intervalo escolhido no Data Studio será aplicado antes de escolher o primeiro anúncio comprovado e a primeira compra válida de cada cliente naquele recorte. O mesmo intervalo selecionará os fatos de veiculação e investimento da Meta e as compras por data de emissão. As datas são inclusivas. Preserve o fuso da conta Meta nos fatos de mídia e use `America/Belem` nos eventos Weni e na emissão FarmaLíder. Confira a sequência pelo instante dos eventos quando as datas civis forem diferentes.
+
+| Indicador | Cálculo no recorte |
+| --- | --- |
+| Pedidos e receita | Contagem por ID de pedido válido e soma da receita oficialmente atribuída. Preserve a separação entre pedidos na conversa original e pedidos em outro atendimento no ciclo de 7 dias. |
+| ROAS | Receita atribuída dividida pelo investimento realizado na Meta em BRL. |
+| CPA | Investimento realizado dividido pelos pedidos atribuídos distintos. |
+| CAC no período | Investimento realizado dividido pelos clientes oficiais distintos cuja primeira compra válida **no intervalo** foi atribuída. A mesma pessoa pode ter uma compra anterior ao intervalo. |
+| Receita atribuída por cliente no período | Receita atribuída no intervalo dividida pelos compradores atribuídos distintos. A **Base de clientes** continua sendo a página do LTV histórico acumulado. |
+
+A v4 ainda soma valores pré-calculados por dia. Para recalcular a primeira compra e o primeiro anúncio a cada mudança de filtro, a publicação deve conservar internamente a evidência mínima por anúncio, cliente, pedido e instante. A interface de leitura entrega os agregados. Valide em homologação dois intervalos sobrepostos que escolham primeiros eventos diferentes para o mesmo cliente, compras e cliques nas bordas, um cliente com vários pedidos, conversas sem compra, período vazio e fonte incompleta. Tabela e cartões devem consultar a mesma revisão READY e usar a mesma população. A regra acima ainda não está disponível no leitor v4.
+
 Para conferir um período na revisão READY do ambiente configurado no perfil FARMA, execute no Terminal NexoFlow com o pacote que contém a rotina e `ARMAZENAMENTO_BACKEND = "postgres"`:
 
 ```powershell
@@ -114,6 +128,8 @@ Set-Location C:\NexoFlow
 ```
 
 A simulação consulta Weni, Meta e as tabelas do PostgreSQL e grava a auditoria somente no arquivo local. Registra o ambiente e a versão READY usados e interrompe se a revisão mudar durante a leitura. Confira `pedidos_validos`, `pedidos_no_resumo`, `receita_no_resumo` e a `situacao` de cada pedido. Esses resultados descrevem o cálculo da simulação sobre a revisão lida. Para confirmar a publicação comercial, confira a revisão resultante e compare os totais da fonte de veiculação no Looker para o mesmo período.
+
+`reconciliacao_pedidos_weni` reproduz a seleção legada do último pedido registrado por contato. `atribuicao_comercial_weni` considera os pedidos do histórico oficial com toque candidato. Confira `direto`, `posterior`, `dias_parciais` e `pedidos_pendentes_por_motivo`. O último campo mostra totais, sem expor os pedidos individuais, e ajuda a distinguir falta de evidência de atendimento, ambiguidades e falha de conciliação operacional. As contagens seguem a janela efetivamente lida em `inicio` e `fim` da auditoria comercial.
 
 ## Separação de FarmaLíder e Pets Líder
 
