@@ -1,6 +1,8 @@
 # NexoFlow — Changelog
 
-## 1.5.58
+## 1.5.58 — publicada em 23/11/26 19:31:19 (Belém)
+
+[Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.58) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/86180d2fa06b18d2bc1ac9f7d7faf1e99cfad7c6) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45277128402) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45277128575) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45277128475) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45280368979).
 
 No Analytics FARMA incremental com PostgreSQL, o horário máximo de emissão é o instante em que a página chega ao Windows. Isso permite validar pedidos emitidos durante a coleta que já constavam da página. Emissões ausentes, ilegíveis ou posteriores à resposta continuam pendentes. O corte do checkpoint segue o início da execução.
 

@@ -1,5 +1,11 @@
 # Versionamento do NexoFlow
 
+## Publicação 1.5.58
+
+Publicada em **23/11/26 19:31:19 (Belém)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.58) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/86180d2fa06b18d2bc1ac9f7d7faf1e99cfad7c6) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45277128402) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45277128575) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45277128475) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45280368979).
+
+Os dois ZIPs públicos coincidiram com os da preparação aprovada. A conferência dos downloads verificou SHA-256, CRC, manifesto do Setup, módulos Python e versão dos executáveis. Para instalar no Windows, selecione **Atualizar mantendo dados**.
+
 ## Publicação 1.5.57
 
 Publicada em **23/11/26 11:57:49 (Belém)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.57) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/61478b8246e4c4eeb6f3d4f13080528fd45d8804) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45193757790) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45193757662) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45193757880) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45199767186).
