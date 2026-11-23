@@ -148,6 +148,8 @@ A 1.5.56 confere os alertas de fechamento antigo que já existiam na base com um
 
 Na 1.5.58, no Analytics FARMA incremental em PostgreSQL, o limite máximo da emissão é o instante em que a página termina de chegar. Um pedido emitido durante a execução pode pertencer à faixa consultada e já estar na resposta. Emissão ausente, ilegível, posterior à resposta ou fora da faixa continua exigindo conferência. O corte do checkpoint segue o início da execução.
 
+A revisão da regra de preservação permite que o candidato herdado também tenha um `origem` diferente no cabeçalho. O cabeçalho e os itens da READY permanecem como publicados, inclusive a origem e a descrição. A exceção exige o mesmo pedido e o mesmo motivo de fechamento antigo. O Analytics registra o total de bloqueios por motivo, sem identificadores de clientes ou pedidos.
+
 Para uma revisão já em `WRITING`, consulte o estado antes de retomar. A correção se aplica a novas execuções e não produz o manifesto nem o recibo final de uma revisão anterior.
 
 ### Resposta incerta durante o envio do Analytics
@@ -155,6 +157,8 @@ Para uma revisão já em `WRITING`, consulte o estado antes de retomar. A corre�
 Na 1.5.50, se o Windows perder a resposta de um lote, ele consulta o recibo pelo UUID. Se a API devolver `DS_LOTE_AUSENTE`, repete o POST uma única vez com os mesmos dados, revisão e UUID. Se a segunda resposta também se perder, consulta o recibo mais uma vez. Só prossegue com ID, hash, revisão e estado comprovados. Permissão negada, divergência ou ausência persistente interrompem a etapa. A simulação exige um resultado SIMULADO.
 
 Na 1.5.53, o cliente Windows aguarda até 120 segundos pela leitura da resposta do fechamento. Se a resposta de `POST /v1/confirmar` se perder, o Analytics consulta automaticamente a própria revisão até três vezes, com cinco segundos entre consultas. Ele confere o manifesto selado, o estado READY e o recibo final com a mesma revisão, versão e hash do manifesto. Com a confirmação, o fluxo normal retorna 0 se as demais etapas também tiverem sucesso. Se a confirmação continuar incerta ou houver outra pendência, retorna 3. A consulta usa somente leitura, sem repetir a carga nem o POST de fechamento.
+
+A abertura e o selo podem repetir uma vez o mesmo UUID e conteúdo se houver falha ambígua. Na leitura paginada, indisponibilidade transitória do banco e HTTP 429 usam as tentativas da página corrente. Nos lotes, respostas ambíguas de gateway e banco passam pela conferência do recibo antes de qualquer reenvio. Permissões, contrato divergente e alterações de versão durante a leitura continuam exigindo diagnóstico.
 
 Se uma execução anterior já encerrou com código 3, consulte `nexo armazenamento postgres diagnosticar` e `nexo armazenamento postgres status --id-revisao <UUID>`. Uma atualização do Setup não reconstrói o lote em memória da execução anterior. Para uma revisão Analytics WRITING sem selo, o Work deve conferir heartbeat, gravador, quantidade e horário dos recibos, linhas de staging por tabela e publicações posteriores com o administrador, em leitura. Preserve evidências. O comando de retomada de uma exportação exige seu plano de migração e o fechamento de revisão selada exige o manifesto previamente selado. Antes de decidir o destino de uma revisão operacional interrompida, registre os resultados e confirme o procedimento com o operador.
 

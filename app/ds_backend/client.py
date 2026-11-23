@@ -22,6 +22,29 @@ from ds_backend.contract import (
 )
 
 POSTGRES_LABEL = "PostgreSQL da VPS"
+_TRANSIENT_SERVER_ERRORS = {
+    "DS_BANCO_INDISPONIVEL",
+    "DS_HTTP_502",
+    "DS_HTTP_503",
+    "DS_HTTP_504",
+    "DS_HTTP_524",
+}
+UNCERTAIN_RESPONSE_ERRORS = _TRANSIENT_SERVER_ERRORS | {"DS_RESPOSTA_NAO_CONFIRMADA_RETOMAR"}
+
+
+def replay_revision_request(call, path, data):
+    """Repete uma vez somente abertura ou selo, com o mesmo UUID e conteúdo."""
+    try:
+        return call(path, data)
+    except StorageError as error:
+        if str(error) not in UNCERTAIN_RESPONSE_ERRORS:
+            raise
+        logging.warning(
+            "%s: resposta incerta em %s (%s); repetindo uma vez com a mesma revisão %s.",
+            POSTGRES_LABEL, path, error, data["revision"],
+        )
+        time.sleep(1)
+        return call(path, data)
 
 
 def backend_label(postgres: bool) -> str:
@@ -182,12 +205,9 @@ class Client:
             except StorageError as error:
                 if isinstance(error, _PageResponseError):
                     reason = error.reason
-                elif str(error) in {
+                elif str(error) in _TRANSIENT_SERVER_ERRORS | {
                     "DS_HTTP_408",
-                    "DS_HTTP_502",
-                    "DS_HTTP_503",
-                    "DS_HTTP_504",
-                    "DS_HTTP_524",
+                    "DS_HTTP_429",
                 }:
                     reason = str(error)
                 else:
@@ -237,10 +257,14 @@ class Client:
 
     def begin(self, purpose, evidence=None):
         revision = str(uuid4())
-        return self.call(
+        result = replay_revision_request(
+            self.call,
             "/v1/revisoes",
             dict(revision=revision, purpose=purpose, evidence=evidence or {}),
         )
+        if result.get("revision") != revision or result.get("state") != "WRITING":
+            raise StorageError("DS_REVISAO_NAO_CONFIRMADA")
+        return result
 
     def send(self, revision, name, rows, *, remove=None, batch_id=None, simulate=False):
         revision = identifier(revision)
@@ -266,7 +290,7 @@ class Client:
                 receipt = self.call("/v1/lotes", data)
                 break
             except StorageError as error:
-                if str(error) != "DS_RESPOSTA_NAO_CONFIRMADA_RETOMAR":
+                if str(error) not in UNCERTAIN_RESPONSE_ERRORS:
                     raise
             # O GET pode ocorrer antes do COMMIT. A API serializa pelo UUID
             # da revisão e reconfere o hash do mesmo lote sob a trava.

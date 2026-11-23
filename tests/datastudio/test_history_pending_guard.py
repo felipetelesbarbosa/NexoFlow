@@ -53,8 +53,11 @@ def history_sale(segment="FARMA"):
     return PostgresStore(client), incoming
 
 
-def test_label_only_matches_by_item_identity_and_preserves_the_published_sale():
+@pytest.mark.parametrize("cached_origin", ["PUBLICADA", "CACHE_HERDADO"])
+def test_label_change_preserves_published_sale_and_provenance(cached_origin):
     store, incoming = history_sale()
+    store.client.tables["Historico_Pedidos"][0]["origem"] = "PUBLICADA"
+    incoming["Historico_Pedidos"][0]["origem"] = cached_origin
     published = deepcopy(store.client.tables)
     filtered, issues = protect_published(store, incoming, inherited_unobserved={"42"})
     assert [issue["id"] for issue in issues] == ["42"]
@@ -114,7 +117,7 @@ def test_unapproved_order_or_segment_remains_blocking(segment, eligible):
 
 @pytest.mark.parametrize(
     "case",
-    ["inherited", "financial", "new", "reobserved", "incomplete_page"],
+    ["inherited", "financial", "new", "reobserved", "incomplete_page", "other_reason"],
 )
 def test_history_collection_and_publication_against_ready_cache(
     case, monkeypatch, tmp_path
@@ -157,6 +160,7 @@ def test_history_collection_and_publication_against_ready_cache(
                 )
 
     header = client.tables["Historico_Pedidos"][0]
+    header["origem"] = "ORIGEM_DA_PUBLICACAO_ANTERIOR"
     item = client.tables["Historico_Itens"][0]
     item["produto"] = "Descrição da publicação anterior"
     if case == "financial":
@@ -183,6 +187,14 @@ def test_history_collection_and_publication_against_ready_cache(
         FARMALIDER_HISTORY_MAX_PAGES=1,
     )
     _, _, collected = analytics_history(source, [], [], [], now=NOW, settings=settings)
+    expected_reason = reason
+    if case == "other_reason":
+        expected_reason = "EMISSAO_INVALIDA"
+        with connect() as db:
+            db.execute(
+                "UPDATE history_issues SET reason=? WHERE segment='FARMA' AND id='42'",
+                (expected_reason,),
+            )
     publication = publish_history(settings, storage=store, collection=collected)
     if case == "incomplete_page":
         assert collected["status"] == "incompleta"
@@ -190,6 +202,9 @@ def test_history_collection_and_publication_against_ready_cache(
     else:
         assert collected["status"] == "extraida"
         assert publication["preserved_descriptions"] == int(case == "inherited")
+        assert publication["blocking_reasons"] == (
+            {} if case == "inherited" else {expected_reason: 1}
+        )
     assert publication["partial"] is (case != "inherited")
     complete = not publication["partial"]
     if case == "inherited":
@@ -203,4 +218,4 @@ def test_history_collection_and_publication_against_ready_cache(
     with connect() as db:
         assert db.execute(
             "SELECT reason FROM history_issues WHERE segment='FARMA' AND id='42'"
-        ).fetchone() == (reason,)
+        ).fetchone() == (expected_reason,)

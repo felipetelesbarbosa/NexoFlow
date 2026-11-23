@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 from contextlib import closing
 
 from ds_backend.contract import StorageError, normalize
@@ -42,14 +43,26 @@ def synchronize_postgres(settings, storage, *, collection=None):
             tables,
             inherited_unobserved=(collection or {}).get("inherited_unobserved", ()),
         )
-        preserved = sum(
-            bool(issue.get("preserved_description")) for issue in quality_issues
-        )
         check_current = collection is not None and history.segment == "FARMA"
+        pending = {}
+        if check_current:
+            pending = dict(db.execute(
+                "SELECT id,reason FROM history_issues WHERE segment=?", (history.segment,)
+            ))
+        preserved = 0
         for issue in quality_issues:
+            oid, reason = issue["id"], issue["reason"]
+            if issue.get("preserved_description"):
+                # A exceção vale só para o mesmo pedido e o mesmo alerta herdado.
+                if pending.get(oid) == reason:
+                    preserved += 1
+                    pending.pop(oid)
+                continue
+            if check_current:
+                pending[oid] = reason
             db.execute(
                 "INSERT OR REPLACE INTO history_issues VALUES(?,?,?)",
-                (history.segment, issue["id"], issue["reason"]),
+                (history.segment, oid, reason),
             )
         for name, records in tables.items():
             if not records:
@@ -77,14 +90,17 @@ def synchronize_postgres(settings, storage, *, collection=None):
         # Reutiliza a agregação oficial em TODA a base financeira remota,
         # inclusive os fatos do corte inicial sem payload bruto conservado.
         regenerate(storage)
-    return dict(
+    result: dict[str, str | bool | int | dict[str, int]] = dict(
         status="preparada",
-        partial=check_current and len(quality_issues) > preserved,
+        partial=bool(pending),
         preserved_descriptions=preserved,
         applied_rows=sum(map(len, tables.values())),
         remaining_batches=0,
         quality_issues=len(quality_issues),
     )
+    if check_current:
+        result["blocking_reasons"] = dict(sorted(Counter(pending.values()).items()))
+    return result
 
 
 def regenerate(storage):
@@ -286,7 +302,8 @@ def protect_published(storage, tables, *, inherited_unobserved=frozenset()):
                         and all(
                             old[field] == value
                             for field, value in normalized.items()
-                            if field not in {"produtos", "frete", "faturamento"}
+                            # O candidato será descartado, inclusive sua origem.
+                            if field not in {"produtos", "frete", "faturamento", "origem"}
                         )
                     ):
                         preserved_description = _only_item_descriptions_changed(

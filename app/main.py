@@ -1660,8 +1660,10 @@ def main() -> int:
                 total_issues,
                 preserved,
             )
-            if total_issues != preserved:
+            if "blocking_reasons" not in historical_publication and total_issues != preserved:
                 order_stats.api_errors += 1
+        if blocking_reasons := historical_publication.get("blocking_reasons"):
+            logging.warning("Histórico paginado: publicação bloqueada por motivo=%s.", blocking_reasons)
         # O status é gravado por último para refletir a própria execução do BI.
         completion_status, completion_controls = _completion_controls(
             sync_started,

@@ -14,7 +14,11 @@ from functools import wraps
 from threading import get_ident
 from types import SimpleNamespace
 
-from ds_backend.client import POSTGRES_LABEL
+from ds_backend.client import (
+    POSTGRES_LABEL,
+    UNCERTAIN_RESPONSE_ERRORS,
+    replay_revision_request,
+)
 from ds_backend.contract import (
     REGISTRY,
     SCHEMA_HASH,
@@ -26,14 +30,6 @@ from ds_backend.contract import (
 )
 from google_sheets import GoogleSheetsStore, UpsertResult
 from task_progress import TaskProgress
-
-_UNCERTAIN_RESPONSE_ERRORS = {
-    "DS_RESPOSTA_NAO_CONFIRMADA_RETOMAR",
-    "DS_HTTP_502",
-    "DS_HTTP_503",
-    "DS_HTTP_504",
-    "DS_HTTP_524",
-}
 
 # Estas leituras acumuladas podem ocupar vários minutos no Analytics.
 _PROGRESS_TABLES = {
@@ -621,7 +617,7 @@ class PostgresStore(GoogleSheetsStore):
             try:
                 status = self.client.call(f"/v1/revisoes/{self.revision}")
             except StorageError as exc:
-                if str(exc) in _UNCERTAIN_RESPONSE_ERRORS and attempt < 2:
+                if str(exc) in UNCERTAIN_RESPONSE_ERRORS and attempt < 2:
                     continue
                 raise
             if status.get("revision") != self.revision or status.get("sealed_manifest") != manifest:
@@ -647,14 +643,16 @@ class PostgresStore(GoogleSheetsStore):
             schema_hash=SCHEMA_HASH, batches=self._receipts, complete_sources=True
         )
         self._finalization_started = True
-        self.client.call("/v1/selar", dict(revision=self.revision, manifest=manifest))
+        replay_revision_request(
+            self.client.call, "/v1/selar", dict(revision=self.revision, manifest=manifest)
+        )
         try:
             result = self.client.call(
                 "/v1/confirmar",
                 dict(revision=self.revision, manifest=manifest, complete=True),
             )
         except StorageError as exc:
-            if str(exc) not in _UNCERTAIN_RESPONSE_ERRORS:
+            if str(exc) not in UNCERTAIN_RESPONSE_ERRORS:
                 raise
             logging.warning("%s: resposta final incerta para a revisão %s.", POSTGRES_LABEL, self.revision)
             result = self._read_final_receipt(manifest)

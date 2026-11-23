@@ -554,3 +554,23 @@ def test_analytics_aborts_only_its_own_definitive_preseal_failure():
     store._finalization_started = True
     assert not store.abort_after_fatal_error(error)
     client.call.assert_not_called()
+
+
+def test_lost_seal_response_replays_same_manifest_before_confirming(monkeypatch):
+    client = MemoryClient()
+    store = PostgresStore(client)
+    original_call = client.call
+    calls = []
+
+    def call(path, data):
+        calls.append((path, deepcopy(data)))
+        if len(calls) == 1:
+            raise StorageError("DS_HTTP_504")
+        return original_call(path, data)
+
+    client.call = call
+    monkeypatch.setattr("ds_backend.client.time.sleep", lambda _: None)
+    assert store.finish(complete=True)["state"] == "READY"
+    assert [path for path, _ in calls] == ["/v1/selar", "/v1/selar", "/v1/confirmar"]
+    assert calls[0] == calls[1]
+    assert calls[1][1]["manifest"] == calls[2][1]["manifest"]

@@ -258,7 +258,7 @@ def test_falha_na_pagina_201_em_leitura_do_analytics(result, monkeypatch, caplog
     assert "detalhe-privado" not in caplog.text
 
 
-@pytest.mark.parametrize("failure", ["gateway", "json", "tls", "cursor", "rows"])
+@pytest.mark.parametrize("failure", ["gateway", "database", "rate_limit", "json", "tls", "cursor", "rows"])
 def test_page_retry_handles_only_recoverable_responses(failure, monkeypatch):
     from unittest.mock import Mock
 
@@ -280,6 +280,12 @@ def test_page_retry_handles_only_recoverable_responses(failure, monkeypatch):
     elif failure == "gateway":
         bad.status_code = 504
         bad.json.side_effect = ValueError()
+    elif failure == "database":
+        bad.status_code = 503
+        bad.json.return_value = {"error": "DS_BANCO_INDISPONIVEL"}
+    elif failure == "rate_limit":
+        bad.status_code = 429
+        bad.json.return_value = {}
     elif failure == "json":
         bad.json.side_effect = ValueError()
     else:
@@ -290,10 +296,37 @@ def test_page_retry_handles_only_recoverable_responses(failure, monkeypatch):
         )
     client.session.request.side_effect = [bad, good]
     iterator = client.rows("BI_Itens", None)
-    if failure in {"gateway", "json"}:
+    if failure in {"gateway", "database", "rate_limit", "json"}:
         assert list(iterator) == [{"i": 1}]
         assert client.reads == 2
     else:
         with pytest.raises(StorageError):
             next(iterator)
         assert client.reads == 1
+
+
+@pytest.mark.parametrize("failure", ["DS_HTTP_504", "DS_PERMISSAO"])
+def test_begin_reuses_the_same_revision_after_a_lost_response(monkeypatch, failure):
+    from unittest.mock import Mock
+
+    from ds_backend.client import Client
+
+    client = Client.__new__(Client)
+    requests = []
+
+    def call(path, data):
+        assert path == "/v1/revisoes"
+        requests.append(dict(data))
+        if len(requests) == 1:
+            raise StorageError(failure)
+        return dict(revision=data["revision"], state="WRITING")
+
+    client.call = Mock(side_effect=call)
+    monkeypatch.setattr("ds_backend.client.time.sleep", lambda _: None)
+    if failure == "DS_PERMISSAO":
+        with pytest.raises(StorageError, match=failure):
+            client.begin("analytics")
+        assert len(requests) == 1
+    else:
+        result = client.begin("analytics")
+        assert requests == [dict(revision=result["revision"], purpose="analytics", evidence={})] * 2
