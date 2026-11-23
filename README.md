@@ -1,12 +1,12 @@
-# NexoFlow 1.5.56
+# NexoFlow 1.5.57
 
 O **NexoFlow Windows** integra Weni e a API FarmaLíder nos segmentos FarmaLíder e Pets Líder. O Analytics prepara os dados para o Data Studio e publica no **PostgreSQL privado da VPS** quando esse destino está ativado no perfil. O Looker Studio lê as revisões confirmadas pela API leitora via conector Apps Script.
 
 O NexoFlow identifica pedidos registrados na API **independentemente de terem sido feitos por conversa na Weni, ligação telefônica ou outro atendimento externo**. A rotina Weni faz a correspondência com os contatos e retroalimenta a base com os dados disponíveis, propondo criar os cadastros ausentes com identidade e pedido validados. Nos aplicativos individuais, a aplicação segue a revisão solicitada; no Noturno, ela é automática. O canal específico da compra só é informado quando há evidência: estar na API não prova que o pedido veio da Weni ou de uma ligação.
 
-[Baixar instalador 1.5.56](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.56/NexoFlow-Setup-1.5.56.zip) · [Homologação da ds136](docs/CONVERSAS%20DIARIAS%20WENI.md) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
+[Baixar instalador 1.5.57](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.57/NexoFlow-Setup-1.5.57.zip) · [Homologação da ds136](docs/CONVERSAS%20DIARIAS%20WENI.md) · [Documentação](docs/README.md) · [Histórico de mudanças](CHANGELOG.md)
 
-A partir da 1.5.48, o NexoFlow encontra o XLSX de Salas da Weni em Downloads ou em `importacoes` e lê as datas dos atendimentos. O Analytics e o Noturno FARMA também podem usar a API Weni Flows quando o arquivo está indisponível. Atualize o Windows escolhendo **Atualizar mantendo dados**. [Release oficial](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.56) · [Configuração da atribuição comercial](docs/META%20ADS%20NATIVO.md#m%C3%A9tricas-da-p%C3%A1gina-an%C3%BAncios-em-produ%C3%A7%C3%A3o)
+A partir da 1.5.48, o NexoFlow encontra o XLSX de Salas da Weni em Downloads ou em `importacoes` e lê as datas dos atendimentos. O Analytics e o Noturno FARMA também podem usar a API Weni Flows quando o arquivo está indisponível. Atualize o Windows escolhendo **Atualizar mantendo dados**. [Release oficial](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.57) · [Configuração da atribuição comercial](docs/META%20ADS%20NATIVO.md#m%C3%A9tricas-da-p%C3%A1gina-an%C3%BAncios-em-produ%C3%A7%C3%A3o)
 
 O publicador e o leitor PostgreSQL do Data Studio FARMA estão implantados na VPS comercial. Consulte o guia operacional para conferir a versão do Windows, a revisão READY ativa e a fonte efetiva de cada página do Looker. [Contrato Meta e Weni](docs/DESTINOS%20META%20WENI.md)
 

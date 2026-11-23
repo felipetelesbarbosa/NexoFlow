@@ -1,5 +1,9 @@
 # NexoFlow — Changelog
 
+## 1.5.57
+
+O cliente Windows repete a leitura da página do PostgreSQL da VPS após falhas transitórias. São até três tentativas para a mesma revisão e cursor. O log identifica a tabela, a página, a tentativa e o motivo. Se a versão mudar ou as tentativas se esgotarem, a leitura é interrompida e a tabela parcial é descartada.
+
 ## 1.5.56 — publicada em 23/11/26 08:47:51 (Belém)
 
 [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.56) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/373d67fe75cd0546c897c6677b6d01892f0a9094) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45165665905) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45165665910) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45165665918) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45168297830).
