@@ -2,7 +2,9 @@ import json
 import sqlite3
 import unittest
 from copy import deepcopy
-from unittest.mock import Mock
+from datetime import datetime
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from order_history import (
     HistoryError,
@@ -67,6 +69,64 @@ class HistoryTests(unittest.TestCase):
 
     def run_source(self, source, **kw):
         return collect(source, self.store, self.query, now=NOW, **kw)
+
+    def test_analytics_farma_valida_emissao_ate_receber_a_pagina(self):
+        from order_history_store import _analytics_history
+
+        rows = [order(i, segment="FARMA", day="2026-11-06") for i in range(1, 5)]
+        rows[0]["capa"]["emissao"] = "2026-11-06T20:01:00"
+        rows[1]["capa"]["emissao"] = "2026-11-06T20:04:00-03:00"
+        rows[2]["capa"]["emissao"] = "2026-11-06T20:02:01-03:00"
+        rows[3]["capa"]["emissao"] = None
+        clock = Mock(wraps=datetime)
+        clock.now.return_value = datetime.fromisoformat(NOW)
+
+        class TimedSource(Source):
+            def get_pedidos_history(self, query, page):
+                payload = super().get_pedidos_history(query, page)
+                clock.now.return_value = datetime.fromisoformat(
+                    f"2026-11-06T20:{page * 2:02d}:00-03:00"
+                )
+                return payload
+
+        source = TimedSource([rows[0], rows[2], rows[1], rows[3]])
+        settings = SimpleNamespace(
+            FARMALIDER_HISTORY_ENABLED=True,
+            FARMALIDER_HISTORY_PAGE_LIMIT=2,
+            ARMAZENAMENTO_BACKEND="postgres",
+        )
+        with (
+            patch.dict(
+                "os.environ",
+                {
+                    "NEXOFLOW_PERFIL": "FARMA",
+                    "NEXOFLOW_HISTORY_INICIO": "",
+                    "NEXOFLOW_HISTORY_FIM": "",
+                },
+            ),
+            patch("customer_observations.connect", return_value=self.db),
+            patch("order_history_store.datetime", clock),
+        ):
+            orders, items, result = _analytics_history(
+                source, [], [], [], now=NOW, settings=settings
+            )
+        assert result is not None
+        self.assertEqual(result["status"], "extraida")
+        self.assertEqual(result["pages_this_run"], 2)
+        self.assertEqual({row["pedido_id"] for row in orders}, {"1", "2"})
+        self.assertEqual({str(row["pedido_id"]) for row in items}, {"1", "2"})
+        self.assertEqual(
+            self.db.execute(
+                "SELECT id,reason FROM history_issues ORDER BY id"
+            ).fetchall(),
+            [("3", "EMISSAO_INVALIDA"), ("4", "EMISSAO_INVALIDA")],
+        )
+        self.assertEqual(
+            self.db.execute(
+                "SELECT DISTINCT first_seen FROM history_orders WHERE segment='FARMA'"
+            ).fetchall(),
+            [(NOW,)],
+        )
 
     def test_limits_1200_and_single_page(self):
         for limit, expected in ((400, [1, 2, 3]), (500, [1, 2, 3])):

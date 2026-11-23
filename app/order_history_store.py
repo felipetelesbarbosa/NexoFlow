@@ -96,9 +96,18 @@ class HistoryStore:
             )
 
     def commit_page(
-        self, query, page, payload, *, now, mode="historica", interrupt=None
+        self,
+        query,
+        page,
+        payload,
+        *,
+        now,
+        received_at=None,
+        mode="historica",
+        interrupt=None,
     ):
         rows, total, pages = page_envelope(payload, query, page)
+        emission_cutoff = now if received_at is None else received_at
         with self.db:
             self.db.execute("BEGIN IMMEDIATE")
             state = self.state(query)
@@ -110,7 +119,7 @@ class HistoryStore:
             ):
                 raise HistoryError("TOTAL_INSTAVEL_RECONCILIAR")
             for payload_row in rows:
-                record = normalize_order(payload_row, query.segment, now)
+                record = normalize_order(payload_row, query.segment, emission_cutoff)
                 oid = record["id"]
                 if self.db.execute(
                     "SELECT 1 FROM history_seen WHERE window_key=? AND id=?",
@@ -342,6 +351,7 @@ def collect(
     mode="historica",
     progress=None,
     include_totals=True,
+    use_page_receipt_time=False,
 ):
     if max_pages is not None and (type(max_pages) is not int or max_pages < 1):
         raise HistoryError("MAXIMO_PAGINAS_INVALIDO")
@@ -352,8 +362,14 @@ def collect(
     while state["status"] != "extraida" and processed < budget:
         try:
             payload = client.get_pedidos_history(query, state["next_page"])
+            received_at = datetime.now(UTC) if use_page_receipt_time else None
             state = store.commit_page(
-                query, state["next_page"], payload, now=now, mode=mode
+                query,
+                state["next_page"],
+                payload,
+                now=now,
+                received_at=received_at,
+                mode=mode,
             )
         except Exception as exc:
             store.mark_failure(
@@ -461,10 +477,11 @@ def _analytics_history(client, contacts, orders, items, *, now, settings):
         # Na revisão nova, o cache vem da READY. Capture as pendências antes
         # de incorporar observações locais ou receber páginas da API.
         inherited = set()
-        if (
+        farma_postgres = (
             store.segment == "FARMA"
             and getattr(settings, "ARMAZENAMENTO_BACKEND", "") == "postgres"
-        ):
+        )
+        if farma_postgres:
             inherited = {
                 oid
                 for (oid,) in db.execute(
@@ -482,6 +499,9 @@ def _analytics_history(client, contacts, orders, items, *, now, settings):
             now=now,
             mode="historica" if historical else "incremental",
             resume_pending=False,
+            # A página pode incluir pedidos emitidos após o início do Analytics.
+            # O corte do checkpoint e a faixa da consulta continuam os da execução.
+            use_page_receipt_time=farma_postgres and not historical,
             max_pages=None
             if historical
             else int(getattr(settings, "FARMALIDER_HISTORY_MAX_PAGES", 100)),
@@ -512,6 +532,7 @@ def collect_windows(
     mode="historica",
     progress=None,
     resume_pending=True,
+    use_page_receipt_time=False,
 ):
     """Faixas com fronteira compartilhada; cobertura civil continua não comprovada."""
     from datetime import timedelta
@@ -592,6 +613,7 @@ def collect_windows(
             if progress
             else None,
             include_totals=False,
+            use_page_receipt_time=use_page_receipt_time,
         )
         results.append(result)
         budget -= result["pages_this_run"]
