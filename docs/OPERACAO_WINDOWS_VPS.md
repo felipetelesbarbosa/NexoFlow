@@ -142,7 +142,7 @@ O tempo restante estimado vale para a operação identificada na linha. A leitur
 
 Na 1.5.55, `Histórico paginado: ... pendências=...` inclui todas as pendências do segmento no cache. Mesmo uma extração completa pode terminar com `DS_FONTES_INCOMPLETAS_RETOMAR` se a READY já continha alertas de fechamentos antigos.
 
-A correção posterior à 1.5.55 confere os alertas de fechamento antigo que já existiam na base com uma venda válida antes da coleta. Para tratá-los como preservados, exige pedido fora da coleta corrente, extração completa, cabeçalhos equivalentes, itens vigentes com chaves únicas correspondentes e diferença apenas na descrição. Mantém o alerta, a descrição publicada, os itens e os valores financeiros. O log informa quantas pendências acumuladas atenderam a esses critérios. Divergência nova, observação conflitante e evidência insuficiente continuam pendentes.
+A 1.5.56 confere os alertas de fechamento antigo que já existiam na base com uma venda válida antes da coleta. Para tratá-los como preservados, exige pedido fora da coleta corrente, extração completa, cabeçalhos equivalentes, itens vigentes com chaves únicas correspondentes e diferença apenas na descrição. Mantém o alerta, a descrição publicada, os itens e os valores financeiros. O log informa quantas pendências acumuladas atenderam a esses critérios. Divergência nova, observação conflitante e evidência insuficiente continuam pendentes.
 
 Para uma revisão já em `WRITING`, consulte o estado antes de retomar. A correção se aplica a novas execuções e não produz o manifesto nem o recibo final de uma revisão anterior.
 

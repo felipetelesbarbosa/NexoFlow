@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.55",
+    [string]$Version = "1.5.56",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -422,7 +422,7 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-O Analytics aguarda até 120 segundos pela resposta do fechamento no PostgreSQL da VPS. Se a resposta se perder, o Windows consulta automaticamente a mesma revisão até três vezes. A confirmação exige READY, manifesto e recibo correspondentes. O código 0 exige sucesso das demais etapas. Uma confirmação incerta ou outra pendência mantém o código 3. A atualização do cliente funciona com o publicador 1.5.52.
+O Analytics FARMA no PostgreSQL mantém o histórico publicado quando uma pendência herdada de fechamento antigo atende a todas as verificações da coleta. Confere cada pedido por chave, vigência, cabeçalho e itens. Uma diferença restrita à descrição preserva a venda e o alerta. Divergência financeira, itens ausentes, conflito de identidade ou observação nova continuam exigindo conferência. A correção vale para novas execuções.
 
 Instale em Preserve e confira nexo versao. O Setup conserva configurações, credenciais, SQLite, logs, checkpoints e journals. Os ZIPs não incluem instalador Python nem dados comerciais. Não substitua módulos avulsos. A publicação do software não comprova recuperação ou homologação comercial e não executa cargas.
 
@@ -438,7 +438,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.55
+# NexoFlow 1.5.56
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"

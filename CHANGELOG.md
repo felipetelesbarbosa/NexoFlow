@@ -1,5 +1,9 @@
 # NexoFlow — Changelog
 
+## 1.5.56
+
+O Analytics FARMA no PostgreSQL mantém o histórico publicado quando uma pendência herdada de fechamento antigo atende a todas as verificações da coleta. Confere cada pedido por chave, vigência, cabeçalho e itens. Uma diferença restrita à descrição preserva a venda e o alerta. Divergência financeira, itens ausentes, conflito de identidade ou observação nova continuam exigindo conferência. A correção vale para novas execuções.
+
 ## 1.5.55 — publicada em 22/11/26 22:40:54 (Belém)
 
 [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.55) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/29e81171073af86a6d8920a5ebc93fe51f86e5ef) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45094283163) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45094283236) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45094283210) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45095870575).
