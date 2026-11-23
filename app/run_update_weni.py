@@ -4,7 +4,7 @@ import argparse
 import logging
 import sys
 
-from ds_backend.runtime import backend_session
+from ds_backend.runtime import WeniCompletion, backend_session
 from proxy_config import configure_proxy
 from runtime_profile import scoped_path
 
@@ -316,7 +316,7 @@ def main() -> int:
                 + " com pendências. Na próxima carga, revalide as consultas e os conflitos indicados acima."
             )
         if args.apply and (dedup.get("deferred") or stats.contatos_reservados):
-            return 3
+            return WeniCompletion.WITH_RESERVATIONS
         return 0
     except Exception as exc:
         logging.exception("NexoFlow Weni falhou: %s", exc)

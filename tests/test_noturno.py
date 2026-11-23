@@ -7,7 +7,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import run_noturno as nightly
 from recompra_lock import execution_file_lock
@@ -26,6 +26,25 @@ class NoturnoTests(unittest.TestCase):
             code = nightly.execute(root, runner=runner, full=full)
         report = next((root / "logs/noturno").glob("*/resultado.json"))
         return code, calls, json.loads(report.read_text(encoding="utf-8"))
+
+    def test_parcial_farma_so_continua_com_destino_sem_revisao_pendente(self):
+        pending = [{"id": "revisao-sintetica", "purpose": "weni"}]
+        for info, expected in (({"pending": pending}, 1), ({"pending": []}, 3), ({}, 1)):
+            with (
+                self.subTest(info=info),
+                tempfile.TemporaryDirectory() as temp,
+                patch("ds_backend.client.configured", return_value=True),
+                patch("ds_backend.client.Client.from_settings", return_value=Mock(info=info)) as factory,
+            ):
+                code, calls, result = self.run_flow(Path(temp), {5: 3}, full=True)
+                self.assertEqual(code, expected)
+                self.assertEqual(result["etapas"][4]["codigo"], 3)
+                self.assertEqual(result["fluxo_completo"], expected == 3)
+                if expected == 1:
+                    self.assertEqual(len(calls), 5)
+                if info.get("pending"):
+                    self.assertEqual(result["etapas"][4]["revisoes_pendentes"], pending)
+                factory.return_value.close.assert_called_once()
 
     def test_relatorio_identifica_o_armazenamento_selecionado(self):
         for postgres, name in ((True, "PostgreSQL da VPS"), (False, "Google Sheets")):

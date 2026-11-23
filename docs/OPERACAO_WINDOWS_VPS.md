@@ -178,3 +178,9 @@ Após a conferência, no mesmo Terminal FARMA, rode a carga usando a quantidade 
 ```
 
 O Update Weni adia as exclusões novas e os lotes de exclusão interrompidos, mantém os planos de contatos reservados para reavaliar e grava a contagem no arquivo privado de reservas ao lado da revisão de duplicados. A Recompra preserva os grupos e os campos dos contatos reservados, inclusive nas trocas, e registra a decisão RESERVADO na auditoria. O relatório Noturno registra o hash e o total de reservas. A campanha que já estiver agendada na própria Weni continua com suas regras. Para liberar casos, atualize a lista fora de uma execução e gere nova simulação. Os recibos anteriores e a lista de reservas têm finalidades independentes. O perfil PET continua com sua configuração própria.
+
+### Aplicação Weni com reservas e revisão pendente
+
+No Windows 1.5.54, uma aplicação FARMA que gravou seu checkpoint e terminou com reservas pode retornar 3 e deixar a revisão Weni aberta no PostgreSQL. O checkpoint operacional e o recibo READY da revisão são comprovantes distintos. Para diagnosticar, use `nexo armazenamento postgres diagnosticar` e `nexo armazenamento postgres status --id-revisao UUID`. Compare o hash do plano no checkpoint com `plan_sha256` da revisão Weni e confira os recibos dos lotes antes de escolher uma recuperação. Uma revisão sem selo exige comprovar o manifesto completo antes da confirmação. A repetição da carga Weni pode atingir contatos já atualizados.
+
+A correção fecha a revisão quando a aplicação conclui a parte autorizada e retorna o resultado específico de reservas. A rotina continua informando código 3 ao operador. Em FARMA/PostgreSQL, após uma etapa com código 3, o Noturno consulta o destino e interrompe a sequência se houver publicação pendente ou se a consulta falhar. O relatório conserva o código original da etapa.

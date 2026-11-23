@@ -22,6 +22,26 @@ from runtime_profile import segment
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def pending_publications():
+    from ds_backend.client import Client
+    from ds_backend.contract import StorageError
+    from project_paths import load_private_settings
+
+    client = Client.from_settings(load_private_settings())
+    try:
+        pending = client.info.get("pending")
+        if not isinstance(pending, list) or not all(
+            isinstance(row, dict)
+            and isinstance(row.get("id"), str) and row["id"]
+            and isinstance(row.get("purpose"), str) and row["purpose"]
+            for row in pending
+        ):
+            raise StorageError("DS_RESPOSTA_NAO_CONFIRMADA_RETOMAR")
+        return [{"id": row["id"], "purpose": row["purpose"]} for row in pending]
+    finally:
+        client.close()
+
+
 def run_step(
     arguments: list[str], *, root: Path, log: Path, full_sync: bool = False
 ) -> int:
@@ -108,6 +128,23 @@ def execute(root: Path = ROOT, *, runner=run_step, full: bool = False, reservas_
                         "Não foi possível conferir o diagnóstico; a validação da revisão continua obrigatória antes da aplicação."
                     )
         summary["etapas"].append(record)
+        if result == 3 and segment() == "FARMA" and postgres:
+            from ds_backend.contract import StorageError
+
+            try:
+                pending = pending_publications()
+                if pending:
+                    record["revisoes_pendentes"] = pending
+                    for revision in pending:
+                        print(f"[PENDÊNCIA] Revisão {revision['id']} ({revision['purpose']}).")
+                    raise StorageError("DS_REVISAO_PENDENTE_RETOMAR")
+            except (OSError, ValueError) as exc:
+                record["verificacao_publicacao"] = (
+                    str(exc) if isinstance(exc, StorageError) else "DS_DESTINO_INDISPONIVEL"
+                )
+                atomic_json(summary_path, summary)
+                print(f"[ERRO] {record['verificacao_publicacao']}. Consulte o destino antes de retomar.", flush=True)
+                return 1
         atomic_json(summary_path, summary)
         return result
 
@@ -221,7 +258,8 @@ def execute(root: Path = ROOT, *, runner=run_step, full: bool = False, reservas_
                 configure_proxy()
             from ds_backend.client import backend_label, configured
 
-            summary["armazenamento_configurado"] = backend_label(configured())
+            postgres = configured()
+            summary["armazenamento_configurado"] = backend_label(postgres)
             print(f"Armazenamento do perfil: {summary['armazenamento_configurado']}", flush=True)
             if reservas.sha256:
                 summary["reservas_farma_sha256"] = reservas.sha256

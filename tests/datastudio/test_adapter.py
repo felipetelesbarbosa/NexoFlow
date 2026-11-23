@@ -324,6 +324,31 @@ def test_farma_weni_simulation_and_failure_do_not_seal(monkeypatch):
     assert operation(["--apply"]) == 1
     assert calls == ["/v1/estados/ler", "begin"]
     calls.clear()
+    result = 3
+    assert operation(["--apply"]) == 3
+    assert calls == ["/v1/estados/ler", "begin"]
+    calls.clear()
+    result = runtime.WeniCompletion.WITH_RESERVATIONS
+    assert operation(["--apply"]) == 3
+    assert calls == ["/v1/estados/ler", "begin", "/v1/selar", "/v1/confirmar"]
+    calls.clear()
+    # A CLI real termina com 3; o publicador recebe o manifesto da própria sessão.
+    from unittest.mock import Mock
+
+    import run_update_weni
+    from weni_update import UpdateStats
+
+    monkeypatch.setattr("sys.argv", ["weni", "--full", "--apply", "--require-review", "review.json"])
+    monkeypatch.setattr(run_update_weni, "configure_proxy", Mock())
+    monkeypatch.setattr("logging_config.configure_logging", Mock())
+    monkeypatch.setattr("weni_insights.enabled", lambda settings: False)
+    dedup = {"proposed": 11, "deferred": 11, "deleted": 0, "pending": 0, "skipped": 0}
+    applied = Mock(return_value=(UpdateStats(contatos_reservados=22), dedup))
+    monkeypatch.setattr("weni_dedup.run_with_dedup", applied)
+    assert run_update_weni.main() == 3
+    applied.assert_called_once()
+    assert calls == ["/v1/estados/ler", "begin", "/v1/selar", "/v1/confirmar"]
+    calls.clear()
     result = 0
     assert operation(["--dry-run"]) == 0
     assert not calls

@@ -2,9 +2,17 @@
 
 from __future__ import annotations
 
+from enum import IntEnum
+
 from ds_backend.client import Client, configured, enabled
 
 CURRENT_STORE = None
+
+
+class WeniCompletion(IntEnum):
+    """Checkpoint salvo após aplicar todos os planos permitidos pela revisão."""
+
+    WITH_RESERVATIONS = 3
 
 
 def open_store(settings, google_factory, *, purpose="analytics", readonly=False):
@@ -142,7 +150,10 @@ def backend_session(purpose):
                         raise StorageError("DS_SIMULACAO_EXIGE_READY_SEM_PENDENCIA")
                     store.client.expected_read_version = info["version"]
                 result = function(*args, **kwargs)
-                if not readonly and (not weni_farma or result == 0):
+                completed_with_holds = (
+                    result is WeniCompletion.WITH_RESERVATIONS and "--apply" in argv
+                )
+                if not readonly and (not weni_farma or result == 0 or completed_with_holds):
                     complete(store)
                 return result
             finally:
