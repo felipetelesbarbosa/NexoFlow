@@ -1455,9 +1455,8 @@ def main() -> int:
                 paginated_history["pendencias"],
                 paginated_history["status"],
             )
-            if (
-                paginated_history["status"] != "extraida"
-                or paginated_history["pendencias"]
+            if paginated_history["status"] != "extraida" or (
+                not postgres and paginated_history["pendencias"]
             ):
                 order_stats.api_errors += 1
         order_stats.api_errors += observed.api_errors
@@ -1628,7 +1627,9 @@ def main() -> int:
         if getattr(secrets, "META_ADS_ENABLED", False) and commercial_attribution_enabled(
             sheets, segment()
         ):
-            historical_publication = publish_history(secrets, storage=sheets)
+            historical_publication = publish_history(
+                secrets, storage=sheets, collection=paginated_history
+            )
 
         native_meta_result = _sync_optional_native_meta(
             sheets,
@@ -1645,11 +1646,22 @@ def main() -> int:
 
         if historical_publication is None:
             historical_publication = (
-                publish_history(secrets, storage=sheets)
+                publish_history(secrets, storage=sheets, collection=paginated_history)
                 if postgres
                 else publish_history(secrets)
             )
 
+        if postgres and paginated_history and paginated_history["pendencias"]:
+            total_issues = paginated_history["pendencias"]
+            preserved = historical_publication.get("preserved_descriptions", 0)
+            logging.info(
+                "Histórico paginado: pendências acumuladas=%s; fechamentos herdados "
+                "preservados com diferença de descrição=%s.",
+                total_issues,
+                preserved,
+            )
+            if total_issues != preserved:
+                order_stats.api_errors += 1
         # O status é gravado por último para refletir a própria execução do BI.
         completion_status, completion_controls = _completion_controls(
             sync_started,

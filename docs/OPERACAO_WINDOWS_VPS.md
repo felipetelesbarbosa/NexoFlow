@@ -138,6 +138,14 @@ O tempo de “contatos + histórico” abrange toda a primeira das quatro etapas
 
 O tempo restante estimado vale para a operação identificada na linha. A leitura de tamanho desconhecido indica “indisponível”. O recibo de um lote atesta a gravação na revisão em preparo. A atualização do painel depende da confirmação final READY.
 
+### Pendências históricas acumuladas no Analytics FARMA
+
+Na 1.5.55, `Histórico paginado: ... pendências=...` inclui todas as pendências do segmento no cache. Mesmo uma extração completa pode terminar com `DS_FONTES_INCOMPLETAS_RETOMAR` se a READY já continha alertas de fechamentos antigos.
+
+A correção posterior à 1.5.55 confere os alertas de fechamento antigo que já existiam na base com uma venda válida antes da coleta. Para tratá-los como preservados, exige pedido fora da coleta corrente, extração completa, cabeçalhos equivalentes, itens vigentes com chaves únicas correspondentes e diferença apenas na descrição. Mantém o alerta, a descrição publicada, os itens e os valores financeiros. O log informa quantas pendências acumuladas atenderam a esses critérios. Divergência nova, observação conflitante e evidência insuficiente continuam pendentes.
+
+Para uma revisão já em `WRITING`, consulte o estado antes de retomar. A correção se aplica a novas execuções e não produz o manifesto nem o recibo final de uma revisão anterior.
+
 ### Resposta incerta durante o envio do Analytics
 
 Na 1.5.50, se o Windows perder a resposta de um lote, ele consulta o recibo pelo UUID. Se a API devolver `DS_LOTE_AUSENTE`, repete o POST uma única vez com os mesmos dados, revisão e UUID. Se a segunda resposta também se perder, consulta o recibo mais uma vez. Só prossegue com ID, hash, revisão e estado comprovados. Permissão negada, divergência ou ausência persistente interrompem a etapa. A simulação exige um resultado SIMULADO.

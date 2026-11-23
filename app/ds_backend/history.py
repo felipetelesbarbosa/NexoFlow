@@ -8,7 +8,7 @@ from contextlib import closing
 from ds_backend.contract import StorageError, normalize
 
 
-def synchronize_postgres(settings, storage):
+def synchronize_postgres(settings, storage, *, collection=None):
     if storage is None:
         raise StorageError("DS_HISTORICO_EXIGE_MESMA_REVISAO")
     enabled = getattr(
@@ -37,7 +37,15 @@ def synchronize_postgres(settings, storage):
         for name, row in iter_tables(history):
             if name in tables:
                 tables[name].append(row)
-        tables, quality_issues = protect_published(storage, tables)
+        tables, quality_issues = protect_published(
+            storage,
+            tables,
+            inherited_unobserved=(collection or {}).get("inherited_unobserved", ()),
+        )
+        preserved = sum(
+            bool(issue.get("preserved_description")) for issue in quality_issues
+        )
+        check_current = collection is not None and history.segment == "FARMA"
         for issue in quality_issues:
             db.execute(
                 "INSERT OR REPLACE INTO history_issues VALUES(?,?,?)",
@@ -71,7 +79,8 @@ def synchronize_postgres(settings, storage):
         regenerate(storage)
     return dict(
         status="preparada",
-        partial=False,
+        partial=check_current and len(quality_issues) > preserved,
+        preserved_descriptions=preserved,
         applied_rows=sum(map(len, tables.values())),
         remaining_batches=0,
         quality_issues=len(quality_issues),
@@ -164,7 +173,41 @@ def regenerate(storage):
                 )
 
 
-def protect_published(storage, tables):
+def _only_item_descriptions_changed(before, after):
+    """Confere os itens por chave oficial, conservando SKUs textuais e valores exatos."""
+    from decimal import Decimal
+
+    def keyed(rows):
+        items = {}
+        for row in rows:
+            key = row["chave"]
+            if (
+                row["estado"] != "valido"
+                or row["vigente"] != "Sim"
+                or not row["item_id"]
+                or key in items
+                or key != ":".join((row["segmento"], row["pedido_id"], row["item_id"]))
+            ):
+                return {}
+            items[key] = dict(
+                row, quantidade=Decimal(row["quantidade"]), valor=Decimal(row["valor"])
+            )
+        return items
+
+    old, new = keyed(before), keyed(after)
+    if not old or old.keys() != new.keys():
+        return False
+    changed = False
+    for key, item in old.items():
+        incoming = new[key]
+        if item["produto"] != incoming["produto"]:
+            changed = True
+        if dict(item, produto=incoming["produto"]) != incoming:
+            return False
+    return changed
+
+
+def protect_published(storage, tables, *, inherited_unobserved=frozenset()):
     """A origem publicada prevalece sobre evidência incompleta do cache novo."""
     from datetime import datetime, timedelta
     from decimal import Decimal
@@ -207,6 +250,7 @@ def protect_published(storage, tables):
         if old is None:
             continue
         reason = None
+        preserved_description = False
         if old["vigente"] != "Sim":
             reason = "EXCLUSAO_PUBLICADA_PRESERVADA"
         elif row["cliente_id"] != old["cliente_id"]:
@@ -234,9 +278,27 @@ def protect_published(storage, tables):
                     old_items.get(row["pedido_id"], [])
                 ) != item_signature(new_items.get(row["pedido_id"], [])):
                     reason = "FECHAMENTO_ANTIGO_REQUER_RECONCILIACAO"
+                    if (
+                        storage.client.config["segment"] == "FARMA"
+                        and row["pedido_id"] in inherited_unobserved
+                        and old["estado"] == "valido"
+                        and not financial_changed
+                        and all(
+                            old[field] == value
+                            for field, value in normalized.items()
+                            if field not in {"produtos", "frete", "faturamento"}
+                        )
+                    ):
+                        preserved_description = _only_item_descriptions_changed(
+                            old_items.get(row["pedido_id"], []),
+                            new_items.get(row["pedido_id"], []),
+                        )
         if reason:
             blocked.add(row["pedido_id"])
-            issues.append(dict(id=row["pedido_id"], reason=reason))
+            issue: dict[str, str | bool] = dict(id=row["pedido_id"], reason=reason)
+            if preserved_description:
+                issue["preserved_description"] = True
+            issues.append(issue)
     result = {
         n: [
             r

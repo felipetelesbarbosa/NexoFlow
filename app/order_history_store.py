@@ -458,8 +458,24 @@ def _analytics_history(client, contacts, orders, items, *, now, settings):
             return merged, details, None
     with connect() as db:
         store = HistoryStore(db, segment())
+        # Na revisão nova, o cache vem da READY. Capture as pendências antes
+        # de incorporar observações locais ou receber páginas da API.
+        inherited = set()
+        if (
+            store.segment == "FARMA"
+            and getattr(settings, "ARMAZENAMENTO_BACKEND", "") == "postgres"
+        ):
+            inherited = {
+                oid
+                for (oid,) in db.execute(
+                    """SELECT i.id FROM history_issues i JOIN history_orders o USING(segment,id)
+                       WHERE i.segment=? AND i.reason='FECHAMENTO_ANTIGO_REQUER_RECONCILIACAO'
+                       AND json_extract(o.record,'$.state')='valido'""",
+                    (store.segment,),
+                )
+            }
         store.seed_observations(now)
-        result = collect_windows(
+        result: dict = collect_windows(
             client,
             store,
             query,
@@ -470,6 +486,13 @@ def _analytics_history(client, contacts, orders, items, *, now, settings):
             if historical
             else int(getattr(settings, "FARMALIDER_HISTORY_MAX_PAGES", 100)),
         )
+        if inherited:
+            observed = db.execute(
+                "SELECT id FROM history_run_receipts WHERE segment=? AND run=?",
+                (store.segment, result["execution"]["execucao_id"]),
+            )
+            inherited.difference_update(oid for (oid,) in observed)
+            result["inherited_unobserved"] = inherited
         directory = directory_for(client)
         if directory is not None:
             result.update(store.link(directory, contacts))
