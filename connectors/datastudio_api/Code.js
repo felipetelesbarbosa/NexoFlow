@@ -132,6 +132,15 @@ function dsError_(error,params){
   }
   DataStudioApp.createCommunityConnector().newUserError().setText(message).throwException();
 }
+function dsPeriodTrace_(context, started, result){
+  if(typeof console.info!=='function')return;
+  console.info(JSON.stringify(Object.assign({},context,{
+    duracao_ms:Date.now()-started,
+    concluida:!!result,
+    versao:result?result.version:null,
+    linhas:result?result.rows.length:null
+  })));
+}
 function getData(request){try{
   var p=request.configParams,c=dsConfig_(p),spec=NexoDSSchemas[p.tabela];
   var publicTable=['BI_Publico','BI_Publico_Resumo','Compradores_Operacionais'].includes(p.tabela);
@@ -174,7 +183,17 @@ function getData(request){try{
     return {schema:dsFields_(p.tabela,c.segment).forIds(names).build(),rows:[],filtersApplied:false};
   }
   if(request.scriptParams&&request.scriptParams.sampleExtraction&&spec.period&&!payload.start){payload.start='2000-01-01';payload.end='2000-01-01';}
-  var result=dsCheckedQuery_(c,payload);
+  var adsTable=['Anuncios_Veiculados_FARMA','Resumo_Anuncios_Veiculados_FARMA'].includes(p.tabela);
+  var started=adsTable?Date.now():0,result;
+  try{
+    result=dsCheckedQuery_(c,payload);
+  }finally{
+    if(adsTable)dsPeriodTrace_({
+      diagnostico:'anuncios_farma',tabela:p.tabela,ambiente:c.environment,
+      inicio:dsProductDate_(payload.start)?payload.start:null,fim:dsProductDate_(payload.end)?payload.end:null,
+      campos:names,filtros:groups.length,filtros_aplicados:!!applied
+    },started,result);
+  }
   var publicFetched=publicTable?Date.now():0;
   var fields=dsFields_(p.tabela,c.segment).forIds(names);
   var data = buyers ? dsBuyerRows_(result.rows, payload.fields, names) : result.rows;
@@ -519,28 +538,38 @@ function dsProductsData_(request, config, spec) {
     throw new Error('DS_PERIODO_INVALIDO');
   }
   var mode = dsProductMode_(fields, spec);
-  var result = dsCall_(config, '/v1/produtos', {
-    mode:mode, fields:fields, start:range.startDate, end:range.endDate, names:names
-  });
-  if (Date.now() - started > 45000) throw new Error('DS_PRAZO_CONSULTA');
-  dsCheckDestination_(config, result);
-  if (!Number.isSafeInteger(result.version) || result.version < 1 || result.complete !== true ||
-      JSON.stringify(result.fields) !== JSON.stringify(fields) || !Array.isArray(result.rows) ||
-      result.rows.length > 50000 || (mode === 'resumo' && result.rows.length !== 1) ||
-      (['receita','unidades'].includes(mode) && result.rows.length > 5)) {
-    throw new Error('DS_RESPOSTA_INCOMPLETA');
+  var result, confirmed;
+  try{
+    result = dsCall_(config, '/v1/produtos', {
+      mode:mode, fields:fields, start:range.startDate, end:range.endDate, names:names
+    });
+    if (Date.now() - started > 45000) throw new Error('DS_PRAZO_CONSULTA');
+    dsCheckDestination_(config, result);
+    if (!Number.isSafeInteger(result.version) || result.version < 1 || result.complete !== true ||
+        JSON.stringify(result.fields) !== JSON.stringify(fields) || !Array.isArray(result.rows) ||
+        result.rows.length > 50000 || (mode === 'resumo' && result.rows.length !== 1) ||
+        (['receita','unidades'].includes(mode) && result.rows.length > 5)) {
+      throw new Error('DS_RESPOSTA_INCOMPLETA');
+    }
+    var rows = result.rows.map(function(row, position) {
+      if (!Array.isArray(row) || row.length !== fields.length) throw new Error('DS_SCHEMA_DIVERGENTE');
+      return {values:row.map(function(value, i) {
+        var name = fields[i], converted = dsProductValue_(name, spec.types[name], value, range.startDate);
+        if (['posicao_receita_top5','posicao_unidades_top5'].includes(name) && converted !== position + 1) {
+          throw new Error('DS_RESPOSTA_INCOMPLETA');
+        }
+        return converted;
+      })};
+    });
+    confirmed = result;
+    return {schema:schema, rows:rows, filtersApplied:names !== null};
+  }finally{
+    dsPeriodTrace_({
+      diagnostico:'produtos_farma',modo:mode,ambiente:config.environment,
+      inicio:range.startDate,fim:range.endDate,campos:fields,
+      produtos_selecionados:names===null?null:names.length
+    },started,confirmed);
   }
-  var rows = result.rows.map(function(row, position) {
-    if (!Array.isArray(row) || row.length !== fields.length) throw new Error('DS_SCHEMA_DIVERGENTE');
-    return {values:row.map(function(value, i) {
-      var name = fields[i], converted = dsProductValue_(name, spec.types[name], value, range.startDate);
-      if (['posicao_receita_top5','posicao_unidades_top5'].includes(name) && converted !== position + 1) {
-        throw new Error('DS_RESPOSTA_INCOMPLETA');
-      }
-      return converted;
-    })};
-  });
-  return {schema:schema, rows:rows, filtersApplied:names !== null};
 }
 
 // Modo explícito: não inferir SUM para taxas, compradores, LTV ou métricas Meta.

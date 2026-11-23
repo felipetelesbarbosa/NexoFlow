@@ -184,5 +184,12 @@ module.exports = function registerProductTests({fixture, result, assertFarmaErro
     const late = fixture(p => { elapsed = 45001; return result(p,[[0]]); });
     late.ctx.Date = class extends Date { static now() { return elapsed; } };
     assertFarmaError(late, request(['receita_item']), /DS_PRAZO_CONSULTA/);
+    const trace = JSON.parse(late.infos.at(-1));
+    assert.deepEqual([trace.diagnostico, trace.modo, trace.inicio, trace.fim],
+      ['produtos_farma', 'resumo', dateRange.startDate, dateRange.endDate]);
+    assert.equal(trace.duracao_ms, 45001);
+    assert.equal(trace.concluida, false);
+    assert.equal(trace.versao, null);
+    assert.equal(trace.linhas, null);
   });
 };

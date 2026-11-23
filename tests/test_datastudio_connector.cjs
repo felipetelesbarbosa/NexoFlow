@@ -1,11 +1,11 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 function fixture(callback){
- const calls=[],logs=[],sleeps=[];
+ const calls=[],logs=[],infos=[],sleeps=[];
  const secret={protocol:'nexoflow_datastudio_1',segment:'FARMA',environment:'homologacao',endpoint:'https://reader.example.invalid',api_token:'synthetic-reader-only-token',access_client_id:'synthetic.access',access_client_secret:'synthetic-access-secret'};
  function fields(){const all=[];function field(role){const f={role,setId(v){this.id=v;return this;},setName(v){this.label=v;return this;},setType(v){this.type=v;return this;},setAggregation(v){this.aggregation=v;return this;},setIsReaggregatable(v){this.reaggregatable=v;return this;}};all.push(f);return f;}return {newMetric:()=>field('metric'),newDimension:()=>field('dimension'),build:()=>all,forIds:n=>({build:()=>all.filter(f=>n.includes(f.id)).map(f=>({name:f.id,type:f.type}))})};}
  const cc={getFields:fields,FieldType:{YEAR_MONTH_DAY:'date',NUMBER:'number',TEXT:'text',CURRENCY_BRL:'currency_brl',PERCENT:'percent'},AggregationType:{SUM:'sum',MAX:'max'},newUserError:()=>({setText(t){return {throwException(){throw Error(t)}}}})};
- const ctx={Date,DataStudioApp:{createCommunityConnector:()=>cc},console:{error:v=>logs.push(v)},Utilities:{sleep:v=>sleeps.push(v)},PropertiesService:{getScriptProperties:()=>({getProperty:()=>JSON.stringify(secret)})},UrlFetchApp:{fetch:(url,options)=>{calls.push({url,options});let reply;if(url.endsWith('/v1/destino'))reply={body:{protocol:secret.protocol,target:'nexoflow_datastudio_homologacao.farma',segment:'FARMA',environment:'homologacao',schema_hash:ctx.NexoDSSchemaHash}};else reply=callback(JSON.parse(options.payload),calls.length);return {getResponseCode:()=>reply.status||200,getContentText:()=>reply.raw ?? JSON.stringify(reply.body||{})};}}};
- vm.createContext(ctx);for(const f of ['Schemas.js','AbcCore.js','Code.js'])vm.runInContext(fs.readFileSync('connectors/datastudio_api/'+f,'utf8'),ctx);return {ctx,calls,logs,sleeps,secret};
+ const ctx={Date,DataStudioApp:{createCommunityConnector:()=>cc},console:{error:v=>logs.push(v),info:v=>infos.push(v)},Utilities:{sleep:v=>sleeps.push(v)},PropertiesService:{getScriptProperties:()=>({getProperty:()=>JSON.stringify(secret)})},UrlFetchApp:{fetch:(url,options)=>{calls.push({url,options});let reply;if(url.endsWith('/v1/destino'))reply={body:{protocol:secret.protocol,target:'nexoflow_datastudio_homologacao.farma',segment:'FARMA',environment:'homologacao',schema_hash:ctx.NexoDSSchemaHash}};else reply=callback(JSON.parse(options.payload),calls.length);return {getResponseCode:()=>reply.status||200,getContentText:()=>reply.raw ?? JSON.stringify(reply.body||{})};}}};
+ vm.createContext(ctx);for(const f of ['Schemas.js','AbcCore.js','Code.js'])vm.runInContext(fs.readFileSync('connectors/datastudio_api/'+f,'utf8'),ctx);return {ctx,calls,logs,infos,sleeps,secret};
 }
 function request(names=['produtos_distintos_periodo']){return {configParams:{segmento:'FARMA',ambiente:'homologacao',tabela:'BI_Itens'},fields:names.map(name=>({name})),dateRange:{startDate:'2026-11-01',endDate:'2026-11-03'},dimensionsFilters:[[{fieldName:'sku_informado',operator:'EQUALS',type:'INCLUDE',values:['1']}]]};}
 function assertFarmaError(f, req, code, message=/Falha ao carregar os dados|A consulta demorou|Selecione um período|O período selecionado tem dados demais|Sem dados suficientes/){
@@ -40,6 +40,24 @@ test('distintos em todo o período vêm do SQL; credenciais fora dos logs e payl
  const r=f.ctx.getData(request());assert.equal(r.rows[0].values[0],216);assert.equal(r.filtersApplied,true);
  for(const c of f.calls){assert.equal(c.options.followRedirects,false);assert.ok(!c.url.includes(f.secret.api_token));assert.ok(!(c.options.payload||'').includes(f.secret.api_token));}
  assert.ok(!f.logs.join().includes(f.secret.api_token));
+});
+test('tabela e cartão de anúncios enviam o próprio período e registram a revisão sem expor filtros',()=>{
+ const f=fixture(p=>result(p,p.table==='Anuncios_Veiculados_FARMA'?[[50.00],[75.00]]:[[125.00]]));
+ const data={startDate:'2026-11-01',endDate:'2026-11-18'};
+ for(const table of ['Anuncios_Veiculados_FARMA','Resumo_Anuncios_Veiculados_FARMA']){
+  const r=request(['investimento_original']);
+  Object.assign(r.configParams,{tabela:table});
+  r.dateRange=data;
+  r.dimensionsFilters=[[{fieldName:'moeda',operator:'EQUALS',type:'INCLUDE',values:['BRL']}]];
+  const actual=f.ctx.getData(r);
+  assert.equal(actual.rows.reduce((total,row)=>total+row.values[0],0),125);
+  const sent=JSON.parse(f.calls.at(-1).options.payload);
+  assert.deepEqual([sent.table,sent.start,sent.end],[table,data.startDate,data.endDate]);
+  const trace=JSON.parse(f.infos.at(-1));
+  assert.deepEqual([trace.tabela,trace.inicio,trace.fim,trace.versao,trace.concluida],[table,data.startDate,data.endDate,1,true]);
+  assert.equal(trace.filtros,1);
+  assert.doesNotMatch(f.infos.at(-1),/BRL|125\.00|synthetic-reader/);
+ }
 });
 test('detalhe, zeros à esquerda, moeda e período vazio',()=>{
  const f=fixture(p=>result(p,[['000123','134','4753.02']]));
