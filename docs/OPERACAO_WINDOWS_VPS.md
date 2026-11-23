@@ -146,7 +146,7 @@ Na 1.5.55, `Histórico paginado: ... pendências=...` inclui todas as pendência
 
 A 1.5.56 confere os alertas de fechamento antigo que já existiam na base com uma venda válida antes da coleta. Para tratá-los como preservados, exige pedido fora da coleta corrente, extração completa, cabeçalhos equivalentes, itens vigentes com chaves únicas correspondentes e diferença apenas na descrição. Mantém o alerta, a descrição publicada, os itens e os valores financeiros. O log informa quantas pendências acumuladas atenderam a esses critérios. Divergência nova, observação conflitante e evidência insuficiente continuam pendentes.
 
-Na correção em desenvolvimento para o Analytics FARMA incremental em PostgreSQL, o limite máximo da emissão é o instante em que a página termina de chegar. Um pedido emitido durante a execução pode pertencer à faixa consultada e já estar na resposta. Emissão ausente, ilegível, posterior à resposta ou fora da faixa continua exigindo conferência. O corte do checkpoint segue o início da execução.
+Na 1.5.58, no Analytics FARMA incremental em PostgreSQL, o limite máximo da emissão é o instante em que a página termina de chegar. Um pedido emitido durante a execução pode pertencer à faixa consultada e já estar na resposta. Emissão ausente, ilegível, posterior à resposta ou fora da faixa continua exigindo conferência. O corte do checkpoint segue o início da execução.
 
 Para uma revisão já em `WRITING`, consulte o estado antes de retomar. A correção se aplica a novas execuções e não produz o manifesto nem o recibo final de uma revisão anterior.
 

@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.57",
+    [string]$Version = "1.5.58",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -422,7 +422,7 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-O cliente Windows repete a leitura da página do PostgreSQL da VPS após falhas transitórias. São até três tentativas para a mesma revisão e cursor. O log identifica a tabela, a página, a tentativa e o motivo. Se a versão mudar ou as tentativas se esgotarem, a leitura é interrompida e a tabela parcial é descartada.
+No Analytics FARMA incremental com PostgreSQL, o horário máximo de emissão é o instante em que a página chega ao Windows. Isso permite validar pedidos emitidos durante a coleta que já constavam da página. Emissões ausentes, ilegíveis ou posteriores à resposta continuam pendentes. O corte do checkpoint segue o início da execução.
 
 Instale em Preserve e confira nexo versao. O Setup conserva configurações, credenciais, SQLite, logs, checkpoints e journals. Os ZIPs não incluem instalador Python nem dados comerciais. Não substitua módulos avulsos. A publicação do software não comprova recuperação ou homologação comercial e não executa cargas.
 
@@ -438,7 +438,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.57
+# NexoFlow 1.5.58
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"
