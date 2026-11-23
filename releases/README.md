@@ -1,3 +1,11 @@
+# NexoFlow 1.5.57 — Downloads
+
+Publicada em **23/11/26 11:57:49 (Belém)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.57) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/61478b8246e4c4eeb6f3d4f13080528fd45d8804) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45193757790) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45193757662) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45193757880) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45199767186).
+
+[NexoFlow-Setup-1.5.57.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.57/NexoFlow-Setup-1.5.57.zip) · [NexoFlow-1.5.57.zip](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.57/NexoFlow-1.5.57.zip) · [SHA256SUMS-1.5.57.txt](https://github.com/felipetelesbarbosa/NexoFlow/releases/download/v1.5.57/SHA256SUMS-1.5.57.txt)
+
+Os dois ZIPs públicos coincidiram com os da preparação aprovada. A conferência dos downloads verificou SHA-256, CRC, manifesto do Setup, módulos Python e versão dos executáveis. Para instalar no Windows, selecione **Atualizar mantendo dados**.
+
 # NexoFlow 1.5.56 — Downloads
 
 Publicada em **23/11/26 08:47:51 (Belém)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.56) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/373d67fe75cd0546c897c6677b6d01892f0a9094) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45165665905) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45165665910) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45165665918) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45168297830).
