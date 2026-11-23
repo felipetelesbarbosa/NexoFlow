@@ -5,16 +5,19 @@ from __future__ import annotations
 import json
 import os
 import re
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import BoundedSemaphore
+from typing import Annotated, Literal
 
 import jwt
 import psycopg
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from psycopg.conninfo import conninfo_to_dict
 from psycopg.rows import dict_row
 
+from .api_observability import read_consumption
 from .infrastructure import read_infrastructure
 
 SEGMENTS = {"FARMA", "PET"}
@@ -137,7 +140,8 @@ def operator_segments(assertion: str, settings: CentralSettings) -> list[str]:
     return segments
 
 
-def read_summary(dsn: str, segment: str):
+@contextmanager
+def read_cursor(dsn: str, segment: str):
     with (
         psycopg.connect(
             dsn,
@@ -150,6 +154,11 @@ def read_summary(dsn: str, segment: str):
     ):
         db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
         db.execute("SELECT set_config('nexoflow.segmento', %s, true)", (segment,))
+        yield db
+
+
+def read_summary(dsn: str, segment: str):
+    with read_cursor(dsn, segment) as db:
         tasks = db.execute(
             """SELECT id, estado, criado_em, atualizado_em FROM hub.central_tarefas
                WHERE segmento=%s ORDER BY criado_em DESC, id DESC LIMIT 50""",
@@ -194,6 +203,34 @@ def create_app(settings: CentralSettings | None = None):
         tokens = request.headers.getlist("cf-access-jwt-assertion")
         operator_segments(tokens[0] if len(tokens) == 1 else "", config)
         return read_infrastructure(config.infrastructure_file)
+
+    @app.get("/api/central/v1/consumo")
+    def consumption(
+        request: Request,
+        segmento: Literal["FARMA", "PET"] | None = None,
+        api: Literal["hub", "weni"] | None = None,
+        antes: Annotated[int | None, Query(ge=1, le=2**53 - 1)] = None,
+        so_erros: bool = False,
+    ):
+        tokens = request.headers.getlist("cf-access-jwt-assertion")
+        allowed = operator_segments(tokens[0] if len(tokens) == 1 else "", config)
+        segment = segmento or allowed[0]
+        if segment not in allowed:
+            raise HTTPException(403, "SEGMENTO_NAO_AUTORIZADO")
+        if not slots.acquire(blocking=False):
+            raise HTTPException(503, "CENTRAL_OCUPADA")
+        try:
+            with read_cursor(config.dsn, segment) as db:
+                return dict(
+                    read_consumption(
+                        db, segment, api=api, before=antes, only_errors=so_erros
+                    ),
+                    segmento=segment,
+                )
+        except psycopg.Error:
+            raise HTTPException(503, "LEITURA_CENTRAL_INDISPONIVEL") from None
+        finally:
+            slots.release()
 
     @app.get("/api/central/v1/resumo")
     def summary(request: Request):

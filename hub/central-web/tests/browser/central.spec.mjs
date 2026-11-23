@@ -282,3 +282,39 @@ test("infraestrutura em uma aba própria e uma coleta atrasada no celular", asyn
   await expect(page.locator("html")).toHaveAttribute("data-tema", "grafite");
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 });
+
+test("consumo de APIs abre histórico, detalhes e log textual no celular", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 760 });
+  await page.route("**/api/central/v1/resumo", (r) => r.fulfill({ json: summary }));
+  await page.route("**/api/central/v1/consumo*", (r) => {
+    const api = new URL(r.request().url()).searchParams.get("api");
+    return r.fulfill({
+      json: {
+        segmento: "FARMA",
+        resumo: [{ api: "hub", total: 4, sucesso: 3, erros: 1, p95_ms: 22 }],
+        serie: [{ api: "hub", hora: now, sucesso: 3, erros: 1 }],
+        requisicoes: api === "hub" ? [{
+          id: 100, ocorrido_em: now, metodo: "POST", endpoint: "/tarefas",
+          http: 409, duracao_ms: 22, corpo: { origem: "teste" },
+          erro: "IDEMPOTENCIA_CONFLITANTE",
+        }] : [],
+        proximo: null,
+      },
+    });
+  });
+  await page.goto("/#consumo");
+  await expect(page.getByText("75%", { exact: true })).toBeVisible();
+  await expect(page.getByText("25%", { exact: true })).toBeVisible();
+  await expect(page.getByText("Nenhuma requisição registrada no período.")).toBeVisible();
+  await page.getByRole("button", { name: "Detalhes de API do Hub" }).click();
+  await page.getByLabel("Somente erros").check();
+  await page.getByRole("button", { name: /POST \/tarefas/ }).click();
+  const detail = page.getByRole("dialog");
+  await expect(detail).toContainText("IDEMPOTENCIA_CONFLITANTE");
+  await expect(detail).toContainText("Campos técnicos do corpo");
+  await detail.getByText("Log textual").click();
+  await expect(detail.getByText(/"requisicao": 100/)).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  await page.keyboard.press("Escape");
+  await expect(detail).toHaveCount(0);
+});

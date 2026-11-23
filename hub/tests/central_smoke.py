@@ -16,6 +16,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 ISSUER = "https://homologacao-sintetica.cloudflareaccess.com"
 AUDIENCE = "central-de-operacoes-hml"
 SUMMARY = "/api/central/v1/resumo"
+CONSUMPTION = "/api/central/v1/consumo"
 INFRASTRUCTURE = "/api/central/v1/infraestrutura"
 EVENT = "/v1/webhooks/weni/farma"
 
@@ -77,6 +78,7 @@ def assert_reader_grants(reader_dsn):
             "hub.central_tarefas",
             "hub.central_eventos",
             "hub.central_operacao",
+            "hub.central_api_requisicoes",
         ):
             assert db.execute(
                 "SELECT has_table_privilege(%s, 'SELECT')", (view,)
@@ -89,6 +91,7 @@ def assert_reader_grants(reader_dsn):
             "hub.eventos_weni",
             "hub.checkpoints",
             "hub.sinal_worker",
+            "hub.api_requisicoes",
         ):
             assert db.execute(
                 "SELECT has_table_privilege(%s, 'SELECT,INSERT,UPDATE,DELETE')",
@@ -157,6 +160,34 @@ def verify(*, web_ip, api_ip, pg_ip, secret_dir, key, farma_id, pet_id, wait):
         assert accepted.status_code == 200 and accepted.json()["estado"] == "CONFIRMADO"
         again = client.post(api + EVENT, json=event, headers=hook)
         assert again.status_code == 200 and again.json() == accepted.json()
+        assert client.get(web + CONSUMPTION).status_code == 401
+        assert (
+            client.get(
+                web + CONSUMPTION, headers=farma, params={"segmento": "PET"}
+            ).status_code
+            == 403
+        )
+
+        def logged():
+            logged_response = client.get(
+                web + CONSUMPTION, headers=farma, params={"api": "weni"}
+            )
+            assert logged_response.status_code == 200
+            data = logged_response.json()
+            return len(data["requisicoes"]) == 2 and all(
+                item["endpoint"] == "/v1/webhooks/weni/farma"
+                and item["corpo"] == {"tipo": "atendimento_transferido"}
+                and item["http"] == 200
+                for item in data["requisicoes"]
+            )
+
+        wait(logged, "consumo_central_reenvio_weni_com_detalhe_sanitizado")
+        assert (
+            client.get(web + CONSUMPTION, headers=pet, params={"api": "weni"}).json()[
+                "requisicoes"
+            ]
+            == []
+        )
         changed = dict(event, ocorrido_em="2026-11-23T08:16:00-03:00")
         assert client.post(api + EVENT, json=changed, headers=hook).status_code == 409
         for segment, credentials, granted, params in (

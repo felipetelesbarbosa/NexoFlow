@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
-import secrets
+from time import monotonic
 from typing import Literal
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
+from starlette.background import BackgroundTask
 
 from order_history import MAX_HISTORY_PAGE_SIZE
 
+from .api_observability import authenticated_segment, observe
 from .config import Settings
 from .contracts import Scenario
 from .store import Conflict, Store
@@ -71,16 +74,16 @@ def create_app(settings: Settings | None = None):
     def scope(authorization: str = Header(default="")):
         if not authorization.startswith("Bearer "):
             raise HTTPException(401, "AUTENTICACAO_OBRIGATORIA")
-        supplied = authorization[7:]
-        for segment, token in settings.tokens.items():
-            if secrets.compare_digest(supplied.encode(), token.encode()):
-                return segment
+        segment = authenticated_segment(authorization, settings.tokens)
+        if segment is not None:
+            return segment
         raise HTTPException(401, "AUTENTICACAO_INVALIDA")
 
     dependency = Depends(scope)
 
     @app.middleware("http")
     async def bounded_body(request: Request, call_next):
+        started = monotonic()
         if request.method == "POST":
             body = bytearray()
             async for chunk in request.stream():
@@ -89,13 +92,29 @@ def create_app(settings: Settings | None = None):
                     return JSONResponse({"erro": "CORPO_EXCESSIVO"}, status_code=413)
             request._body = bytes(body)
         try:
-            return await call_next(request)
+            response = await call_next(request)
         except Exception:
-            return JSONResponse({"erro": "SERVICO_INDISPONIVEL"}, status_code=503)
+            request.state.api_error = "SERVICO_INDISPONIVEL"
+            response = JSONResponse({"erro": "SERVICO_INDISPONIVEL"}, status_code=503)
+        response.background = BackgroundTask(
+            observe,
+            request,
+            response.status_code,
+            store=store,
+            settings=settings,
+            duration=round((monotonic() - started) * 1000),
+        )
+        return response
 
     @app.exception_handler(RequestValidationError)
-    async def invalid(_request, _error):
+    async def invalid(request, _error):
+        request.state.api_error = "REQUISICAO_INVALIDA"
         return JSONResponse({"erro": "REQUISICAO_INVALIDA"}, status_code=422)
+
+    @app.exception_handler(HTTPException)
+    async def http_error(request, error):
+        request.state.api_error = error.detail
+        return await http_exception_handler(request, error)
 
     @app.get("/saude")
     def health():
@@ -108,7 +127,8 @@ def create_app(settings: Settings | None = None):
         return {"estado": "pronto"}
 
     @app.post("/tarefas", status_code=202)
-    def create(body: TaskRequest, segment=dependency):
+    def create(body: TaskRequest, request: Request, segment=dependency):
+        request.state.api_body = {"origem": body.origem, "cenario": body.cenario}
         if body.segmento != segment:
             raise HTTPException(403, "SEGMENTO_NAO_AUTORIZADO")
         try:
@@ -117,7 +137,12 @@ def create_app(settings: Settings | None = None):
             raise HTTPException(409, "IDEMPOTENCIA_CONFLITANTE") from None
 
     @app.post("/tarefas/historico", status_code=202)
-    def history(body: HistoryRequest, segment=dependency):
+    def history(body: HistoryRequest, request: Request, segment=dependency):
+        request.state.api_body = {
+            "origem": body.origem,
+            "modo": body.modo,
+            "limite": body.limite,
+        }
         if body.segmento != segment:
             raise HTTPException(403, "SEGMENTO_NAO_AUTORIZADO")
         from .history import validate_parameters

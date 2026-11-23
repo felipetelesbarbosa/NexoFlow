@@ -40,7 +40,7 @@ class Store:
         connection.row_factory = dict_row
         return connection
 
-    def migrate(self, *, down=False, target=4):
+    def migrate(self, *, down=False, target=5):
         root = Path(__file__).resolve().parents[1] / "migrations"
         with self.connect() as db:
             db.execute("SELECT pg_advisory_xact_lock(812631)")
@@ -59,8 +59,8 @@ class Store:
             )
             if (
                 versions != list(range(1, len(versions) + 1))
-                or len(versions) > 4
-                or target not in range(1, 5)
+                or len(versions) > 5
+                or target not in range(1, 6)
             ):
                 raise Conflict("SCHEMA_INCOMPATIVEL")
             if down:
@@ -72,6 +72,8 @@ class Store:
                 assert count is not None
                 if count["n"]:
                     raise Conflict("ROLLBACK_COM_DADOS_BLOQUEADO")
+                if 5 in versions:
+                    db.execute((root / "005_down.sql").read_bytes())
                 if 4 in versions:
                     db.execute((root / "004_down.sql").read_bytes())
                 if 3 in versions:
@@ -88,7 +90,7 @@ class Store:
         with self.connect() as db:
             return db.execute(
                 "SELECT versao FROM hub.migracoes ORDER BY versao"
-            ).fetchall() == [{"versao": version} for version in range(1, 5)]
+            ).fetchall() == [{"versao": version} for version in range(1, 6)]
 
     def signal_worker_cycle(self):
         with self.connect() as db:

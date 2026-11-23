@@ -39,7 +39,7 @@ def store(settings):
     # Banco temporário exclusivo desta suíte. Não executar em paralelo com VPS.
     with db.connect() as connection:
         connection.execute(
-            "TRUNCATE hub.sinal_worker,hub.historico_ltv,hub.historico_revisoes,hub.historico_pendencias,hub.historico_pedidos,hub.historico_recebidos,hub.historico_janelas,hub.auditoria,hub.checkpoints,hub.tentativas,hub.coordenacao,hub.tarefas,hub.cobertura"
+            "TRUNCATE hub.api_requisicoes,hub.sinal_worker,hub.historico_ltv,hub.historico_revisoes,hub.historico_pendencias,hub.historico_pedidos,hub.historico_recebidos,hub.historico_janelas,hub.auditoria,hub.checkpoints,hub.tentativas,hub.coordenacao,hub.tarefas,hub.cobertura"
         )
     return db
 
@@ -388,3 +388,78 @@ def test_n8n_exports_are_inactive_and_match_api_contract():
             == segment.upper()
         )
         assert not any("webhook" in n["type"].lower() for n in workflow["nodes"])
+
+
+def test_telemetria_registra_tentativas_e_nunca_guarda_urls_ou_corpos_privados(store):
+    from nexoflow_hub.api_observability import read_consumption
+
+    client = TestClient(create_app(store.settings))
+    farma = {"Authorization": "Bearer " + store.settings.tokens["FARMA"]}
+    pet = {"Authorization": "Bearer " + store.settings.tokens["PET"]}
+    body = {"segmento": "FARMA", "chave": "CHAVE_PRIVADA", "origem": "teste"}
+    first = client.post("/tarefas?token=NUNCA_GUARDAR", json=body, headers=farma)
+    assert first.status_code == 202
+    uid = first.json()["id"]
+    assert (
+        client.get(f"/tarefas/{uid}?cpf=NUNCA_GUARDAR", headers=farma).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            "/tarefas", json={**body, "cpf": "NUNCA_GUARDAR"}, headers=farma
+        ).status_code
+        == 422
+    )
+    assert client.get(f"/tarefas/{uid}", headers=pet).status_code == 404
+    assert client.get("/tarefas").status_code == 401
+    assert client.get("/saude").status_code == 200
+
+    def history(segment, **options):
+        with store.connect() as db:
+            db.execute("SELECT set_config('nexoflow.segmento', %s, true)", (segment,))
+            return read_consumption(db, segment, api="hub", **options)
+
+    farma_log = history("FARMA")
+    assert [(r["total"], r["sucesso"], r["erros"]) for r in farma_log["resumo"]] == [
+        (3, 2, 1)
+    ]
+    items = farma_log["requisicoes"]
+    assert items[0]["erro"] == "REQUISICAO_INVALIDA" and items[0]["corpo"] is None
+    assert items[1]["endpoint"] == "/tarefas/{uid}"
+    assert items[2]["corpo"] == {"origem": "teste", "cenario": "normal"}
+    assert items[2]["duracao_ms"] >= 0
+    errors = history("FARMA", only_errors=True)["requisicoes"]
+    assert errors == [items[0]]
+    assert history("PET")["requisicoes"][0]["erro"] == "TAREFA_NAO_ENCONTRADA"
+    public = str(farma_log)
+    assert all(
+        s not in public
+        for s in ("NUNCA_GUARDAR", "CHAVE_PRIVADA", uid, "Authorization")
+    )
+
+    with store.connect() as db:
+        for _ in range(50):
+            db.execute(
+                """INSERT INTO hub.api_requisicoes(segmento, api, metodo, endpoint, http, duracao_ms)
+                   VALUES('FARMA','hub','GET','/tarefas',200,1)"""
+            )
+    page = history("FARMA")
+    assert len(page["requisicoes"]) == 50 and page["proximo"] is not None
+    assert history("FARMA", before=page["proximo"])["requisicoes"] == items
+
+
+def test_falha_no_log_nao_muda_a_resposta_da_api(store, monkeypatch, caplog):
+    from nexoflow_hub import api_observability
+
+    def unavailable(*args, **kwargs):
+        raise RuntimeError("NAO_EXIBIR_ERRO_BRUTO")
+
+    monkeypatch.setattr(api_observability, "save", unavailable)
+    client = TestClient(create_app(store.settings))
+    response = client.get(
+        "/tarefas",
+        headers={"Authorization": "Bearer " + store.settings.tokens["FARMA"]},
+    )
+    assert response.status_code == 200
+    assert "TELEMETRIA_API_INDISPONIVEL" in caplog.text
+    assert "NAO_EXIBIR_ERRO_BRUTO" not in caplog.text

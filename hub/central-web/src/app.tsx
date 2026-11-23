@@ -5,6 +5,7 @@ import {
   Activity,
   ArrowDownWideNarrow,
   ArrowRight,
+  Braces,
   CalendarDays,
   ChartNoAxesColumn,
   Check,
@@ -43,6 +44,7 @@ import {
   isSegmento,
 } from "./resumo";
 import type { Estado, Evento, Resumo, Segmento, Tarefa } from "./resumo";
+import { ApiConsumption } from "./consumo";
 import { Infrastructure } from "./infraestrutura";
 import "./style.css";
 
@@ -50,6 +52,7 @@ const pages = {
   geral: { nome: "Visão geral", icone: LayoutDashboard },
   execucoes: { nome: "Execuções", icone: ListChecks },
   eventos: { nome: "Eventos Weni", icone: Webhook },
+  consumo: { nome: "Consumo de APIs", icone: Braces },
   infraestrutura: { nome: "Infraestrutura", icone: Server },
 } as const;
 type Page = keyof typeof pages;
@@ -353,7 +356,9 @@ function App() {
           </div>
         </header>
         <main id="conteudo" tabIndex={-1} ref={main}>
-          {page === "infraestrutura" ? <Infrastructure /> : <>
+          {page === "infraestrutura" ? <Infrastructure /> : page === "consumo" ? (
+            <ApiConsumption key={request.segmento ?? "inicial"} segment={request.segmento} />
+          ) : <>
           <div className="title-row">
             <div>
               <h1>{page === "geral" ? "Visão geral" : view.nome}</h1>

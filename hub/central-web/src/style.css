@@ -1080,3 +1080,66 @@ td {
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+.api-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+}
+.api-card {
+  min-width: 0;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+.api-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  margin: 0 0 12px;
+}
+.api-card dl, .api-pages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.api-card dd {
+  margin: 4px 0 0;
+  font-size: 1.3rem;
+  font-weight: 650;
+}
+.api-card p, .api-request small {
+  color: var(--muted);
+}
+.api-trend {
+  width: 100%;
+  height: 62px;
+  margin-bottom: 10px;
+}
+.api-success { fill: #1d9574; }
+.api-error { fill: #df6873; }
+.api-request-list {
+  list-style: none;
+  padding: 0;
+}
+.api-request {
+  display: flex;
+  width: 100%;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: start;
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.api-request code, .api-endpoint, .api-log {
+  overflow-wrap: anywhere;
+}
+.api-log {
+  padding: 10px;
+  white-space: pre-wrap;
+}

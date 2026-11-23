@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .store import Conflict, Store
@@ -63,11 +63,14 @@ def receive_event(store: Store, event: FlowEvent):
 
 def register_webhook(app: FastAPI, store: Store, token: str):
     @app.post("/v1/webhooks/weni/farma")
-    def accept(body: FlowEvent, authorization: str = Header(default="")):
+    def accept(
+        body: FlowEvent, request: Request, authorization: str = Header(default="")
+    ):
         if not secrets.compare_digest(
             authorization.encode(), ("Bearer " + token).encode()
         ):
             raise HTTPException(401, "AUTENTICACAO_INVALIDA")
+        request.state.api_body = {"tipo": body.tipo}
         try:
             return receive_event(store, body)
         except Conflict:

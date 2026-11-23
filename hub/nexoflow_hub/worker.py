@@ -119,7 +119,7 @@ def main():
 
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
-    next_signal = 0.0
+    next_signal = next_prune = 0.0
     while not stopping:
         Path("/tmp/hub-worker-heartbeat").touch()
         try:
@@ -128,6 +128,12 @@ def main():
             if now >= next_signal:
                 store.signal_worker_cycle()
                 next_signal = now + 10
+            if now >= next_prune:
+                next_prune = now + 3600
+                with store.connect() as db:
+                    db.execute(
+                        "DELETE FROM hub.api_requisicoes WHERE ocorrido_em < now() - interval '7 days'"
+                    )
         except Exception:
             print('{"evento":"worker_indisponivel","erro":"FALHA_INTERNA"}', flush=True)
             if args.once:

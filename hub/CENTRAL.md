@@ -115,3 +115,15 @@ central up -d --no-deps central-api central-web
 ```
 
 Confira **Infraestrutura** com o acesso autenticado da Central, a hora da coleta e as amostras mais recentes. O botão **Atualizar** relê o último snapshot gravado. Se a coleta falhar, o processo conserva o snapshot anterior. Para desligar a coleta, suspenda o agendamento e recrie a API da Central com os arquivos Compose anteriores.
+
+## Consumo de APIs
+
+A Central tem uma aba própria para o tráfego autenticado recebido pela **API do Hub** e pelo **webhook Weni FARMA**. A instrumentação cobre as rotas de execuções e de eventos instrumentadas. Tráfego externo ao Hub, como as chamadas do Analytics Windows, precisa de sua própria instrumentação para aparecer nesta tela.
+
+Os cartões usam as **últimas 24 horas** de registros no segmento selecionado. Uma resposta 2xx entra no numerador de sucesso. As demais respostas registradas entram no numerador de erro. Cada tentativa HTTP é contada, inclusive reentregas idempotentes. O total se refere às chamadas registradas. O percentil 95 é a primeira duração observada que cobre pelo menos 95% da amostra. A interface distingue janela vazia de falha de leitura. As verificações de saúde e prontidão ficam fora dos totais.
+
+Em **Detalhes**, a consulta pagina 50 registros, com opção de mostrar só erros. A linha abre o método, a rota registrada, o horário, a duração, os campos técnicos permitidos do corpo e a resposta técnica com HTTP e código de erro. O log textual pode ser copiado. A rota usa o modelo como `/tarefas/{uid}`. Dados de clientes, chaves de idempotência, parâmetros de URL, cabeçalhos e corpos integrais ficam fora da tabela. A contagem de tentativas é independente dos eventos únicos da Weni e do resultado comercial de uma tarefa.
+
+A migração **005** cria a tabela técnica e a visão de leitura por segmento. O registro ocorre depois da resposta, preservando o resultado da API mesmo se a telemetria falhar. O worker limpa registros técnicos com mais de sete dias. Para conferir a atualização, use o dump e o projeto de homologação já existentes. Compile os quatro serviços do Hub e da Central, aplique a migração, reaplique `provisionar-central-hml.sql` e suba as novas imagens. Conserve os arquivos Compose efetivos, inclusive o complemento de Infraestrutura se estiver em uso.
+
+Valide com o projeto Docker descartável. Envie uma chamada autorizada que retorna 2xx, repita um webhook idempotente e provoque uma rejeição de schema com dados sintéticos. Confira taxas, paginação, filtro de erros, detalhe e log textual. Uma identidade FARMA deve receber 403 ao consultar o segmento PET. Para reverter a interface, restaure as imagens anteriores de `central-api` e `central-web` e mantenha o núcleo compatível com o schema 005.
