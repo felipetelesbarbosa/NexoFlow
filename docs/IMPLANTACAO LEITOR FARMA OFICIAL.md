@@ -64,6 +64,8 @@ CASE WHEN IFNULL(TRIM(MAX(cliente)), "") = "" THEN "Nome não informado" ELSE MA
 
 No controle de 01 a 20/11/2026, confirme as mesmas cinco chaves distintas e a mesma receita na mesma ordem. Os dois clientes com nome vazio devem continuar em linhas separadas, com receitas de R$ 4.203,91 e R$ 3.861,68. Para reverter a apresentação, restaure `MAX(cliente)`.
 
+Use **Nome** e **Receita gerada** nos cabeçalhos visíveis de **Clientes de destaque**. Na **Base de clientes**, use rótulos como **Nome do cliente**, **Pedidos válidos** e **Receita histórica por cliente**. O agrupamento por chave continua sendo configuração interna. Confira os rótulos também nas dicas do gráfico, no seletor de campos apresentado ao leitor e nas mensagens de ausência de dados.
+
 ## Pendências de Público e do painel Anúncios
 
 - **Público.** Na cópia, o Looker exibiu erro de sistema nos gráficos após a troca, inclusive no ensaio do leitor ajustado. Os 12 componentes de `BI_Publico` voltaram às ligações anteriores. A consulta direta à API retornou HTTP 200 para as duas projeções integrais da READY v2. A métrica de compra identificada de `BI_Publico` soma marcações dos contatos. A mesclagem de compradores operacionais conta contatos com pedido elegível. Reconcilie os dois critérios separadamente antes de validar uma nova projeção dos cartões e filtros.
