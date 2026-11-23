@@ -26,6 +26,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--build", action="store_true")
     parser.add_argument("--pytest", action="store_true")
+    parser.add_argument(
+        "--central",
+        action="store_true",
+        help="Inclui Central, leitor e ingresso Weni sintético",
+    )
     args = parser.parse_args()
     project = "nexoflow-hub-test-" + uuid4().hex[:12]
     with tempfile.TemporaryDirectory(prefix="hub-hml-") as directory:
@@ -60,11 +65,22 @@ def main():
             str(ROOT / "hub/compose.homologacao.yaml"),
         ]
 
-        def command(command_args, *, expected=0):
+        if args.central:
+            import central_smoke
+
+            key = central_smoke.prepare(secret_dir)
+            env.update(
+                CENTRAL_ACCESS_ISSUER=central_smoke.ISSUER,
+                CENTRAL_ACCESS_AUD=central_smoke.AUDIENCE,
+            )
+            compose += ["-f", str(ROOT / "hub/compose.central-hml.yaml")]
+
+        def command(command_args, *, expected=0, stdin=None):
             result = subprocess.run(
                 command_args,
                 env=env,
                 cwd=ROOT,
+                input=stdin,
                 capture_output=True,
                 text=True,
                 timeout=180,
@@ -184,7 +200,9 @@ def main():
                         "pytest",
                         "hub/tests/test_hub.py",
                         "hub/tests/test_orders.py",
+                        "hub/tests/test_weni_events.py",
                         "hub/tests/test_history.py",
+                        *(["hub/tests/test_central.py"] if args.central else []),
                         "-q",
                     ],
                     cwd=ROOT,
@@ -286,7 +304,63 @@ def main():
             assert store.get("PET", history_task["id"])["resultado"]["received"] == 205
             other = store.create("PET", "n8n", "recuperacao", "normal")
             wait(lambda: completed(other, "PET"), "pet_apos_reinicio")
-            for service in ("api", "worker", "postgres-hml"):
+            if args.central:
+                provision = (ROOT / "hub/provisionar-central-hml.sql").read_text(
+                    encoding="utf-8"
+                )
+                command(
+                    [
+                        *compose,
+                        "exec",
+                        "-T",
+                        "postgres-hml",
+                        "psql",
+                        "-X",
+                        "-v",
+                        "ON_ERROR_STOP=1",
+                        "-U",
+                        "bootstrap_hml",
+                        "-d",
+                        "nexoflow_hub_hml",
+                    ],
+                    stdin=provision,
+                )
+                command(
+                    [
+                        *compose,
+                        "up",
+                        "-d",
+                        *(["--build"] if args.build else []),
+                        "central-api",
+                        "central-web",
+                    ]
+                )
+
+                def private_ip(service):
+                    return command(
+                        [
+                            *docker,
+                            "inspect",
+                            "-f",
+                            "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
+                            cid(service),
+                        ]
+                    )
+
+                central_smoke.verify(
+                    web_ip=private_ip("central-web"),
+                    api_ip=private_ip("api"),
+                    pg_ip=ip,
+                    secret_dir=secret_dir,
+                    key=key,
+                    farma_id=first["id"],
+                    pet_id=other["id"],
+                    wait=wait,
+                )
+            services = ["api", "worker", "postgres-hml"]
+            if args.central:
+                services.extend(("central-api", "central-web"))
+            for service in services:
                 container = cid(service)
                 binding = json.loads(
                     command(
@@ -300,6 +374,9 @@ def main():
                     )
                 )
                 assert not binding
+                if service in ("central-api", "central-web"):
+                    # A prontidão da Central foi conferida pelo caminho HTTP acima.
+                    continue
                 wait(
                     lambda container=container: (
                         command(

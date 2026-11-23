@@ -2,6 +2,10 @@
 
 Estado: desenvolvimento `0.1.0.dev0`, independente da versão Windows (consultar `../VERSION` e a release vigente). Não é um release operacional do Hub. API, worker e persistência são reais; as fontes comerciais são fixtures e todos os conectores de produção recusam leitura e escrita.
 
+## Central de Operações
+
+A [Central de Operações em homologação](CENTRAL.md) reúne tarefas do Hub e eventos que um fluxo envia ao webhook FARMA. O backend aplica o escopo do leitor. O frontend técnico tem acesso de consulta. O NexoFlow Métricas está desabilitado.
+
 ## Arquitetura implementada
 
 - `nexoflow_hub/api.py`: API FastAPI interna, tokens diferentes por FARMA/PET, autenticação de gerenciamento e prontidão. `/saude` só informa liveness/modo; não expõe dados. Sem Swagger público.
@@ -45,7 +49,7 @@ Python 3.12+, Docker/Compose. Dependências completas e transitivas estão fixad
 
 ```sh
 python3 -m venv /caminho/privado/venv-hub
-/caminho/privado/venv-hub/bin/python -m pip --disable-pip-version-check install -r hub/requirements.lock -r hub/requirements-dev.lock
+/caminho/privado/venv-hub/bin/python -m pip --disable-pip-version-check install -r hub/requirements.lock -r hub/central-requirements.lock -r hub/requirements-dev.lock
 PYTHONPATH=hub:app /caminho/privado/venv-hub/bin/python hub/tests/run_docker_hml.py --build --pytest
 ```
 

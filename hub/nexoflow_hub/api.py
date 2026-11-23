@@ -16,6 +16,7 @@ from order_history import MAX_HISTORY_PAGE_SIZE
 from .config import Settings
 from .contracts import Scenario
 from .store import Conflict, Store
+from .weni_events import register_webhook
 
 
 class TaskRequest(BaseModel):
@@ -162,5 +163,8 @@ def create_app(settings: Settings | None = None):
     def errors(uid: UUID, segment=dependency):
         task = lookup(uid, segment)
         return {"id": task["id"], "segmento": segment, "erro": task["erro"]}
+
+    if settings.weni_farma_token is not None:
+        register_webhook(app, store, settings.weni_farma_token)
 
     return app

@@ -1,0 +1,55 @@
+# Complemento opcional de compose.homologacao.yaml para a Central de Operações.
+services:
+  postgres-hml:
+    secrets:
+      - central_password
+  api:
+    environment:
+      HUB_WENI_FARMA_TOKEN_FILE: /run/secrets/weni_farma
+    secrets:
+      - weni_farma
+  central-api:
+    build:
+      context: ..
+      dockerfile: hub/Dockerfile.central
+    read_only: true
+    user: '10001:10001'
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      HUB_AMBIENTE: homologacao
+      HUB_ESCRITA_REAL: 'false'
+      CENTRAL_DSN_FILE: /run/secrets/central_dsn
+      CENTRAL_IDENTIDADES_FILE: /run/secrets/central_identidades.json
+      CENTRAL_ACCESS_JWKS_FILE: /run/secrets/central_jwks.json
+      CENTRAL_ACCESS_ISSUER: ${CENTRAL_ACCESS_ISSUER:?issuer da homologação obrigatório}
+      CENTRAL_ACCESS_AUD: ${CENTRAL_ACCESS_AUD:?audience da Central obrigatória}
+    secrets: [central_dsn, central_identidades.json, central_jwks.json]
+    networks: [interna, central]
+    pids_limit: 80
+    mem_limit: 192m
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}
+  central-web:
+    build:
+      context: ./central-web
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: ['/tmp:size=16m,mode=1777']
+    networks: [central]
+    depends_on: [central-api]
+    pids_limit: 80
+    mem_limit: 96m
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}
+networks:
+  central: {internal: true}
+secrets:
+  weni_farma: {file: '${HUB_SEGREDOS_DIR}/weni_farma'}
+  central_password: {file: '${HUB_SEGREDOS_DIR}/central_password'}
+  central_dsn: {file: '${HUB_SEGREDOS_DIR}/central_dsn'}
+  central_identidades.json: {file: '${HUB_SEGREDOS_DIR}/central_identidades.json'}
+  central_jwks.json: {file: '${HUB_SEGREDOS_DIR}/central_jwks.json'}

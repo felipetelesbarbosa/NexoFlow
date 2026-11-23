@@ -1,0 +1,131 @@
+{
+  "name": "Hub — Ensaio de webhook Weni FARMA",
+  "active": false,
+  "nodes": [
+    {
+      "id": "manual",
+      "name": "Iniciar homologação",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "primeiro",
+      "name": "Enviar evento sintético",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://hub-api:8000/v1/webhooks/weni/farma",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"evento_id\": \"74dee121-16eb-4014-8a73-6a3fbe4dddf7\",\n  \"tipo\": \"atendimento_transferido\",\n  \"ocorrido_em\": \"2026-11-23T08:15:00-03:00\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURAR_WEBHOOK_FARMA_HML",
+          "name": "Webhook Weni FARMA HML"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "segundo",
+      "name": "Repetir o mesmo evento",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://hub-api:8000/v1/webhooks/weni/farma",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"evento_id\": \"74dee121-16eb-4014-8a73-6a3fbe4dddf7\",\n  \"tipo\": \"atendimento_transferido\",\n  \"ocorrido_em\": \"2026-11-23T08:15:00-03:00\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURAR_WEBHOOK_FARMA_HML",
+          "name": "Webhook Weni FARMA HML"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "verificar",
+      "name": "Conferir recibo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const primeiro = $('Enviar evento sintético').first().json;\nconst segundo = $input.first().json;\nif (primeiro.estado !== 'CONFIRMADO' || segundo.estado !== 'CONFIRMADO' || !primeiro.recibo || primeiro.recibo !== segundo.recibo || !primeiro.recebido_em || primeiro.recebido_em !== segundo.recebido_em) {\n  throw new Error('RECIBO_INCONSISTENTE');\n}\nreturn [{ json: { estado: 'CONFIRMADO', recibo: segundo.recibo, recebido_em: segundo.recebido_em } }];"
+      }
+    }
+  ],
+  "connections": {
+    "Iniciar homologação": {
+      "main": [
+        [
+          {
+            "node": "Enviar evento sintético",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar evento sintético": {
+      "main": [
+        [
+          {
+            "node": "Repetir o mesmo evento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Repetir o mesmo evento": {
+      "main": [
+        [
+          {
+            "node": "Conferir recibo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "executionTimeout": 60
+  }
+}

@@ -25,7 +25,7 @@ O documento consolida:
 | --- | --- |
 | **Windows** | Operacional e autônomo; release 1.5.31 publicada em 10/11/2026, sujeito a homologações comerciais próprias. |
 | **Hub Linux** | Núcleo desenvolvido; implantado em **homologação isolada na VPS** na Etapa 3, originalmente SHA 23f2806. Testes n8n/PostgreSQL, backups e restauração aprovados com ressalvas. Nenhuma integração comercial ativada. |
-| **Central de Operações** | Planejada, com preparação de telemetria e segurança na 3.5. |
+| **Central de Operações** | [Interface e API de leitura para homologação](../../hub/CENTRAL.md) com tarefas por segmento, eventos recebidos e acesso individual. Telemetria da infraestrutura continua planejada. |
 | **NexoFlow Métricas** | Planejado, com inventário/paridade Data Studio e arquitetura de permissões iniciados na 3.5. |
 
 A implantação na VPS registrada pelo relatório do Work não deve ser confundida com a implantação comercial: `HUB_AMBIENTE=homologacao`, `HUB_ESCRITA_REAL=false` e workflows não comerciais inativos. O SHA atual do Windows não deve ser aplicado automaticamente na VPS.

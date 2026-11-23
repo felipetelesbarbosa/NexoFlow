@@ -17,6 +17,7 @@ class Settings:
     tokens: dict[str, str] = field(repr=False)
     lease_seconds: int = 30
     max_attempts: int = 3
+    weni_farma_token: str | None = field(default=None, repr=False)
 
     def __post_init__(self):
         try:
@@ -33,6 +34,11 @@ class Settings:
             raise ValueError("CHAVES_DE_SEGMENTO_OBRIGATORIAS")
         if self.tokens["FARMA"] == self.tokens["PET"]:
             raise ValueError("CHAVES_DEVEM_SER_DISTINTAS")
+        if self.weni_farma_token is not None and (
+            len(self.weni_farma_token) < 32
+            or self.weni_farma_token in self.tokens.values()
+        ):
+            raise ValueError("CHAVE_WEBHOOK_WENI_INVALIDA")
         if not 5 <= self.lease_seconds <= 300 or not 1 <= self.max_attempts <= 10:
             raise ValueError("LIMITES_INVALIDOS")
 
@@ -43,10 +49,14 @@ class Settings:
             or os.environ.get("HUB_ESCRITA_REAL", "false").lower() != "false"
         ):
             raise ValueError("OPERACAO_REAL_BLOQUEADA")
+        token_file = os.getenv("HUB_WENI_FARMA_TOKEN_FILE")
         return cls(
             Path(os.environ["HUB_DSN_FILE"]).read_text().strip(),
             {
                 s: Path(os.environ[f"HUB_{s}_TOKEN_FILE"]).read_text().strip()
                 for s in ("FARMA", "PET")
             },
+            weni_farma_token=Path(token_file).read_text().strip()
+            if token_file
+            else None,
         )

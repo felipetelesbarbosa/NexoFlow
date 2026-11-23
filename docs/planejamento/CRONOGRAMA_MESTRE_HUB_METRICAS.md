@@ -23,7 +23,7 @@ Os subdomínios são **propostas**. Implantação via Cloudflare Tunnel/HTTPS/Ac
 | **3. Deploy isolado na VPS** | **Concluída com ressalvas** | Hub em contêineres isolados, sete workflows n8n inativos, backups/restauração e testes reais de infraestrutura | Work |
 | **3.5. Preparação operacional e desenho dos produtos** | **Próxima, paralela ao início da 4** | Capacidade/retensão, DBeaver, telemetria mínima, inventário BI, modelo de usuários e especificações visuais | Work + Codex |
 | **4. Integrações reais SOMENTE LEITURA** | **Planejada** | Atualizar SHA Hub em HML; validar FARMA/PET e progressivamente Weni/Meta/Google; reconciliar dados e cobertura | Codex + Work |
-| **5. Observabilidade e Central de Operações web** | **Planejada, arquitetada na 3.5** | Stack técnica, painéis de logs/API/infra e portal próprio inspirado no Iota.hub | Work (infra) + Codex (produto) |
+| **5. Observabilidade e Central de Operações web** | **Primeira Central implementada para homologação.** [Guia e escopo](../../hub/CENTRAL.md) | Stack técnica, painéis de logs/API/infra e portal próprio inspirado no Iota.hub | Work (infra) + Codex (produto) |
 | **6. NexoFlow Métricas web** | **Planejada, inventariada na 3.5** | Dashboard próprio, URL, login individual, permissões por marca e paridade funcional com Data Studio | Codex (produto/BI) + Work (deploy/segurança) |
 | **7. Escrita comercial e transição controlada** | **Bloqueada** | Coordenação Windows/Hub, permissões por destino, escrita revisada, rollback e cutover progressivo | Codex + Work, autorização específica |
 | **8. Evolução, escala e governança contínua** | **Contínua após homologação** | Performance, retenção, backups, auditoria, custos, usabilidade, novas integrações | Equipe |
@@ -110,7 +110,7 @@ Antes da Etapa 6, Work/Codex deverá **percorrer cada página de ambos os relat�
 
 ## 5. Etapa 5 | Observabilidade e Central de Operações
 
-**Referência de UI:** sete screenshots fornecidas da Iota.hub. Inspirar-se em princípios de usabilidade, **não copiar marca, layout proprietário pixel a pixel ou código**. Visual dark clean/grafite, navegação simples, azul de destaque, cards compactos, gráficos, filtros, tabela de erros e drawer lateral sanitizado. Prever tema claro e responsividade.
+**Referência de UI:** sete screenshots fornecidas da Iota.hub. Inspirar-se em princípios de usabilidade, **não copiar marca, layout proprietário pixel a pixel ou código**. Tema claro inicial e escuro em grafite, cores de destaque dos ícones NexoFlow, navegação simples, cards compactos, gráficos, filtros, tabela de erros e painel lateral sanitizado. Desenvolver primeiro para celular.
 
 **Infra observável, dimensionada por medição real:**
 - Grafana para visualização técnica; Prometheus/exporters para métricas e Loki/agente para logs, **ou alternativa mais leve** se custo de RAM/CPU/disco do KVM 4 justificar.

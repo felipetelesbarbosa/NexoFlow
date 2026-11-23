@@ -11,14 +11,14 @@ permissions:
 jobs:
   homologacao:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
       - name: Instalar dependências fixadas sem atualizar pip
-        run: python -m pip --disable-pip-version-check install -r hub/requirements.lock -r hub/requirements-dev.lock
+        run: python -m pip --disable-pip-version-check install -r hub/requirements.lock -r hub/central-requirements.lock -r hub/requirements-dev.lock
       - name: Ferramentas de qualidade
         run: python -m pip --disable-pip-version-check install -r dependencias/requirements-dev.txt
       - name: Lint e tipos do Hub
@@ -26,8 +26,25 @@ jobs:
           ruff check hub app/business_identity.py app/business_recompra.py
           pyright --project hub/pyrightconfig.json --pythonpath "$(which python)"
       - name: Auditar dependências
-        run: pip-audit -r hub/requirements.lock
+        run: pip-audit -r hub/requirements.lock -r hub/central-requirements.lock
       - name: Build, PostgreSQL real, API, worker e reinício sem integrações comerciais
         env:
           PYTHONPATH: 'hub:app'
-        run: python hub/tests/run_docker_hml.py --build --pytest
+        run: python hub/tests/run_docker_hml.py --build --pytest --central
+  interface:
+    name: Central de Operações no Chromium
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: hub/central-web
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - run: npm ci --no-audit --no-fund
+      - run: npm test && npm run build
+      - run: npx --no-install playwright install --with-deps chromium
+      - run: npm run test:browser

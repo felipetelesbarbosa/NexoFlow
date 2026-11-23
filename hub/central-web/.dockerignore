@@ -1,0 +1,12 @@
+*
+!package*.json
+!tsconfig.json
+!build.mjs
+!index.html
+!nginx.conf
+!src/
+!src/**
+!public/
+!public/**
+!tests/
+!tests/*.test.mjs

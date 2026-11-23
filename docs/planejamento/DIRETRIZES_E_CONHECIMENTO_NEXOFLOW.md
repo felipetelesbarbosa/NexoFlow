@@ -23,7 +23,7 @@ Uma nota de planejamento não substitui contrato executável; uma divergência e
 | Windows/Local, Terminal, Weni, Analytics, Noturno e Recompra | [1.5.33 publicada](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.33), SHA `7884d7007fd0c65cbf90bfc30c5c35dc6c9056fb`, 10/11/2026, 23:28:34 UTC−3 | Release não comprova instalação ou ativação em cada PC. |
 | Validação da distribuição | [Workflow oficial aprovado](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/42943029299): Windows, Setup e pacotes; conferência independente registrada nas notas da release | Testes sintéticos/CI não equivalem à conciliação comercial, aprovação de antivírus ou autenticação no proxy real. |
 | Hub/Cloud | Núcleo Python, FastAPI, worker, PostgreSQL e Docker desenvolvidos em homologação; implantação isolada na VPS relatada pelo Work, originalmente SHA `23f2806` | Não houve inspeção da VPS nesta consolidação; SHA instalado atual e fontes reais precisam de conferência pelo Work. Sem release comercial do Hub. |
-| Central de Operações e NexoFlow Métricas | Planejados no cronograma e na Etapa 3.5 | URLs propostas e requisitos não comprovam serviços implantados. |
+| Central de Operações e NexoFlow Métricas | Primeira [Central de Operações para homologação](../../hub/CENTRAL.md) com interface e API de consulta por operador. Métricas aparece desabilitado até o desenvolvimento do produto. | URLs propostas e requisitos não comprovam serviços implantados. |
 | Data Studio FARMA/PET | Relatórios existentes; inventário datado e matriz de paridade disponíveis | Não foram abertos/alterados nesta tarefa; toda ligação, fórmula e total comercial exige evidência do corte correspondente. |
 | IA Manager, agentes personalizados e Weni CLI | Base de pesquisa disponível e referenciada | Não comprova integração comercial de agentes ao NexoFlow nem autorização de disparos. |
 
@@ -161,9 +161,9 @@ O conector deve ler somente tabelas autorizadas e partes confirmadas pelo manife
 
 ## 11. UX, observabilidade e segurança futuras
 
-Novos produtos web: pt-BR, hierarquia visual clara, fontes legíveis, filtros globais previsíveis, tabelas pesquisáveis, drill-down/paginação/exportação autorizados, responsividade e dark com opção clara. Preservar identidade FARMA; PET azul `#20AFE9` e laranja `#F69F11`. Reportei e Iota.hub são referências de usabilidade, sem copiar código, marca ou layout proprietário.
+Novos produtos web: pt-BR, hierarquia visual clara, fontes legíveis, filtros globais previsíveis, tabelas pesquisáveis, drill-down/paginação/exportação autorizados, design mobile first, tema claro inicial e alternativa escura persistida. Preservar identidade FARMA; PET azul `#20AFE9` e laranja `#F69F11`. Reportei e Iota.hub são referências de usabilidade, sem copiar código, marca ou layout proprietário.
 
-Central planejada: CPU/RAM/disco/rede, Docker/PostgreSQL/backups, filas/execuções/checkpoints, status HTTP, latência/p95, retries/timeouts/proxy/TLS/autenticação, correlação opaca e cobertura. Agentes/tools/flows só entram na observabilidade quando houver coleta autorizada. Grafana/Prometheus/Loki são candidatos sujeitos a medição e dimensionamento, não stack instalada comprovada.
+A Central de homologação já consulta tarefas e eventos do Hub. A telemetria planejada inclui CPU/RAM/disco/rede, Docker/PostgreSQL/backups, filas/execuções/checkpoints, status HTTP, latência/p95, retries/timeouts/proxy/TLS/autenticação, correlação opaca e cobertura. Agentes/tools/flows só entram na observabilidade quando houver coleta autorizada. Grafana/Prometheus/Loki são candidatos sujeitos a medição e dimensionamento, não stack instalada comprovada.
 
 Login individual, sessões seguras, RBAC e autorização no backend/consultas; revogação, auditoria, isolamento de ambientes e LGPD. Nunca incluir tokens, senhas, chaves, headers, DSN, URLs autenticadas, CPF, telefone, endereço ou payload comercial integral em Git, CI, pacotes ou logs comuns. Relatórios privados necessários devem ficar protegidos e separados.
 
