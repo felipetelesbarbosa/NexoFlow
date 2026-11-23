@@ -136,6 +136,8 @@ Conclua a execução em andamento antes de atualizar com **Atualizar mantendo da
 
 O tempo de “contatos + histórico” abrange toda a primeira das quatro etapas. Na leitura paginada da VPS, o Windows mostra a tabela, as linhas recebidas e o tempo decorrido. O total de páginas não é fornecido pela API. Na conferência local do histórico, o contador soma registros existentes indexados e alterações examinadas. No envio, o progresso avança por lote com recibo da VPS. Durante uma espera, o log volta a informar a operação em andamento a cada 15 segundos.
 
+Na versão de desenvolvimento, se a resposta de uma página da VPS se perder durante a execução, o cliente repete a consulta da mesma página até duas vezes, após esperas de um e dois segundos. O log identifica tabela, número da página, tentativa e motivo. A versão da resposta deve coincidir com a leitura em curso. Esgotadas as tentativas, a rotina interrompe a leitura e descarta a tabela parcial. Essa repetição funciona enquanto o processo está aberto. Para uma execução já encerrada, consulte o status da revisão conforme o procedimento abaixo.
+
 O tempo restante estimado vale para a operação identificada na linha. A leitura de tamanho desconhecido indica “indisponível”. O recibo de um lote atesta a gravação na revisão em preparo. A atualização do painel depende da confirmação final READY.
 
 ### Pendências históricas acumuladas no Analytics FARMA

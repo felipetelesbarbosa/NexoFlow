@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from pathlib import Path
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -32,6 +33,12 @@ def enabled(settings):
     if mode not in ("sheets", "postgres"):
         raise StorageError("DS_BACKEND_INVALIDO")
     return mode == "postgres"
+
+
+class _PageResponseError(StorageError):
+    def __init__(self, reason):
+        super().__init__("DS_RESPOSTA_NAO_CONFIRMADA_RETOMAR")
+        self.reason = reason
 
 
 class Client:
@@ -106,7 +113,10 @@ class Client:
                 method,
                 self.endpoint + path,
                 json=data,
-                timeout=(10, 120 if method == "POST" and path == "/v1/confirmar" else 65),
+                timeout=(
+                    10,
+                    120 if method == "POST" and path == "/v1/confirmar" else 65,
+                ),
                 allow_redirects=False,
             )
             if response.status_code not in (200, 201):
@@ -130,6 +140,21 @@ class Client:
         except (requests.RequestException, ValueError) as error:
             if isinstance(error, StorageError):
                 raise
+            if path == "/v1/linhas" and not isinstance(
+                error, requests.exceptions.SSLError
+            ):
+                if isinstance(
+                    error,
+                    (
+                        requests.Timeout,
+                        requests.ConnectionError,
+                        requests.exceptions.ChunkedEncodingError,
+                        requests.exceptions.ContentDecodingError,
+                        ValueError,
+                    ),
+                ):
+                    # A mensagem original pode conter URL, credenciais ou conteúdo da página.
+                    raise _PageResponseError(type(error).__name__) from None
             raise StorageError("DS_RESPOSTA_NAO_CONFIRMADA_RETOMAR") from None
 
     def verify(self):
@@ -148,26 +173,67 @@ class Client:
         self.info = info
         return info
 
+    def _read_page(self, name, revision, cursor, number):
+        request = dict(name=name, revision=revision, after=cursor, limit=1000)
+        attempt = 1
+        while True:
+            try:
+                return self.call("/v1/linhas", request)
+            except StorageError as error:
+                if isinstance(error, _PageResponseError):
+                    reason = error.reason
+                elif str(error) in {
+                    "DS_HTTP_408",
+                    "DS_HTTP_502",
+                    "DS_HTTP_503",
+                    "DS_HTTP_504",
+                    "DS_HTTP_524",
+                }:
+                    reason = str(error)
+                else:
+                    raise
+                logging.warning(
+                    "%s: falha ao ler %s, página %d, tentativa %d/3, motivo=%s.",
+                    POSTGRES_LABEL,
+                    name,
+                    number,
+                    attempt,
+                    reason,
+                )
+                if attempt == 3:
+                    raise
+                time.sleep(attempt)
+                attempt += 1
+
     def rows(self, name, revision):
         cursor = ""
         version = self.expected_read_version
+        number = 1
         while True:
-            page = self.call(
-                "/v1/linhas",
-                dict(name=name, revision=revision, after=cursor, limit=1000),
-            )
-            if not isinstance(page.get("version"), int):
+            page = self._read_page(name, revision, cursor, number)
+            if type(page.get("version")) is not int:
                 raise StorageError("DS_VERSAO_LEITURA_INVALIDA")
             if version is not None and page["version"] != version:
                 raise StorageError("DS_VERSAO_ALTERADA_DURANTE_LEITURA")
             version = page["version"]
-            yield from page["rows"]
+            rows = page.get("rows")
+            if (
+                not isinstance(rows, list)
+                or len(rows) > 1000
+                or "next" not in page
+                or not all(isinstance(row, dict) for row in rows)
+            ):
+                raise StorageError("DS_PAGINA_INVALIDA")
             next_cursor = page["next"]
+            if next_cursor is not None and (
+                not rows or not isinstance(next_cursor, str) or next_cursor <= cursor
+            ):
+                raise StorageError("DS_CURSOR_INVALIDO")
+            yield from rows
             if next_cursor is None:
                 break
-            if not isinstance(next_cursor, str) or next_cursor <= cursor:
-                raise StorageError("DS_CURSOR_INVALIDO")
             cursor = next_cursor
+            number += 1
 
     def begin(self, purpose, evidence=None):
         revision = str(uuid4())

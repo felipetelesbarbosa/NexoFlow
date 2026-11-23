@@ -182,3 +182,118 @@ def test_read_timeout_only_extended_for_final_confirmation():
     ]:
         client.call(path, data)
         assert session.request.call_args.kwargs["timeout"] == timeout
+
+
+@pytest.mark.parametrize(
+    "result", ["recuperada", "esgotada", "versao_alterada", "permissao"]
+)
+def test_falha_na_pagina_201_em_leitura_do_analytics(result, monkeypatch, caplog):
+    from unittest.mock import Mock
+
+    import requests
+
+    from ds_backend.adapter import PostgresStore
+    from ds_backend.client import Client
+
+    client = Client.__new__(Client)
+    client.endpoint = "https://example.invalid"
+    client.expected_target = "nexoflow_datastudio_homologacao.farma"
+    client.expected_read_version = 8
+    client.session = Mock()
+    client.reads = client.writes = 0
+    revision = "00000000-0000-4000-8000-000000000011"
+    table = "Itens_Pedidos_FarmaLider"
+    store = PostgresStore(client, revision=revision)
+    calls = []
+    delays = []
+    monkeypatch.setattr("ds_backend.client.time.sleep", delays.append)
+
+    def request(method, url, *, json, **kwargs):
+        assert (method, url) == ("POST", client.endpoint + "/v1/linhas")
+        assert json == dict(
+            name=table, revision=revision, after=json["after"], limit=1000
+        )
+        cursor = int(json["after"] or 0)
+        calls.append(cursor)
+        response = Mock(status_code=200)
+        if cursor < 200000:
+            end = cursor + 1000
+            page = dict(
+                version=8, rows=[{"i": i} for i in range(cursor, end)], next=f"{end:06}"
+            )
+        elif result == "permissao":
+            response.status_code = 403
+            page = dict(error="DS_PERMISSAO")
+        elif result == "esgotada" or calls.count(cursor) == 1:
+            raise requests.ReadTimeout("detalhe-privado")
+        else:
+            version = 9 if result == "versao_alterada" else 8
+            page = dict(version=version, rows=[{"i": cursor}], next=None)
+        response.json.return_value = page
+        return response
+
+    client.session.request.side_effect = request
+    if result == "recuperada":
+        rows = store.records(table)
+        assert len(rows) == 200001
+        assert all(row["i"] == i for i, row in enumerate(rows))
+        assert store.records(table) is rows
+    else:
+        code = {
+            "esgotada": "DS_RESPOSTA_NAO_CONFIRMADA_RETOMAR",
+            "versao_alterada": "DS_VERSAO_ALTERADA_DURANTE_LEITURA",
+            "permissao": "DS_PERMISSAO",
+        }[result]
+        with pytest.raises(StorageError, match=code):
+            store.records(table)
+        assert table not in store._cache
+    attempts = {"recuperada": 2, "esgotada": 3, "versao_alterada": 2, "permissao": 1}[
+        result
+    ]
+    assert calls == [*range(0, 200000, 1000), *([200000] * attempts)]
+    assert delays == list(range(1, attempts))
+    assert client.writes == 0
+    if result != "permissao":
+        assert "página 201, tentativa 1/3, motivo=ReadTimeout" in caplog.text
+    assert "detalhe-privado" not in caplog.text
+
+
+@pytest.mark.parametrize("failure", ["gateway", "json", "tls", "cursor", "rows"])
+def test_page_retry_handles_only_recoverable_responses(failure, monkeypatch):
+    from unittest.mock import Mock
+
+    import requests
+
+    from ds_backend.client import Client
+
+    client = Client.__new__(Client)
+    client.expected_read_version = 8
+    client.session = Mock()
+    client.endpoint = "https://example.invalid"
+    client.reads = client.writes = 0
+    monkeypatch.setattr("ds_backend.client.time.sleep", lambda _: None)
+    good = Mock(status_code=200)
+    good.json.return_value = dict(version=8, rows=[{"i": 1}], next=None)
+    bad = Mock(status_code=200)
+    if failure == "tls":
+        bad = requests.exceptions.SSLError("test")
+    elif failure == "gateway":
+        bad.status_code = 504
+        bad.json.side_effect = ValueError()
+    elif failure == "json":
+        bad.json.side_effect = ValueError()
+    else:
+        bad.json.return_value = dict(
+            version=8,
+            rows=["invalid"] if failure == "rows" else [{}],
+            next="" if failure == "cursor" else None,
+        )
+    client.session.request.side_effect = [bad, good]
+    iterator = client.rows("BI_Itens", None)
+    if failure in {"gateway", "json"}:
+        assert list(iterator) == [{"i": 1}]
+        assert client.reads == 2
+    else:
+        with pytest.raises(StorageError):
+            next(iterator)
+        assert client.reads == 1
