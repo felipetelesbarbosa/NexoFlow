@@ -25,6 +25,7 @@ import {
   PanelLeftOpen,
   RefreshCw,
   Search,
+  Server,
   SlidersHorizontal,
   Sun,
   Waypoints,
@@ -42,12 +43,14 @@ import {
   isSegmento,
 } from "./resumo";
 import type { Estado, Evento, Resumo, Segmento, Tarefa } from "./resumo";
+import { Infrastructure } from "./infraestrutura";
 import "./style.css";
 
 const pages = {
   geral: { nome: "Visão geral", icone: LayoutDashboard },
   execucoes: { nome: "Execuções", icone: ListChecks },
   eventos: { nome: "Eventos Weni", icone: Webhook },
+  infraestrutura: { nome: "Infraestrutura", icone: Server },
 } as const;
 type Page = keyof typeof pages;
 type Slice = ReturnType<typeof janela>;
@@ -308,6 +311,7 @@ function App() {
           <ChevronRight size={14} />
           <strong>{view.nome}</strong>
           <div className="header-right">
+            {page !== "infraestrutura" && <>
             <Layers size={15} />
             <span>Segmento</span>
             {scopes.length > 1 ? (
@@ -336,6 +340,7 @@ function App() {
                 {resumo?.segmento ?? "—"}
               </strong>
             )}
+            </>}
             <button
               className="plain theme-toggle"
               aria-label="Tema escuro"
@@ -348,6 +353,7 @@ function App() {
           </div>
         </header>
         <main id="conteudo" tabIndex={-1} ref={main}>
+          {page === "infraestrutura" ? <Infrastructure /> : <>
           <div className="title-row">
             <div>
               <h1>{page === "geral" ? "Visão geral" : view.nome}</h1>
@@ -445,6 +451,7 @@ function App() {
               amostra, no horário de Belém.
             </p>
           )}
+          </>}
         </main>
       </div>
       {detail && <TaskDetail value={detail} close={() => setDetail(null)} />}

@@ -16,6 +16,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 ISSUER = "https://homologacao-sintetica.cloudflareaccess.com"
 AUDIENCE = "central-de-operacoes-hml"
 SUMMARY = "/api/central/v1/resumo"
+INFRASTRUCTURE = "/api/central/v1/infraestrutura"
 EVENT = "/v1/webhooks/weni/farma"
 
 
@@ -133,6 +134,10 @@ def verify(*, web_ip, api_ip, pg_ip, secret_dir, key, farma_id, pet_id, wait):
             assert asset.status_code == 200 and len(asset.content) > 0
             assert "text/html" not in asset.headers.get("content-type", "")
         assert client.get(web + SUMMARY).status_code == 401
+        assert client.get(web + INFRASTRUCTURE).status_code == 401
+        infrastructure = client.get(web + INFRASTRUCTURE, headers=farma)
+        assert infrastructure.status_code == 200
+        assert infrastructure.json() == {"estado": "aguardando_coleta", "vps": None}
         assert (
             client.get(
                 web + SUMMARY, params={"segmento": "PET"}, headers=farma

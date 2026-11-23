@@ -93,3 +93,25 @@ No projeto já homologado, confira o nome do projeto e o volume em uso com `cent
 No projeto de homologação, desabilite a ação de envio do fluxo de teste e retire a rota da Central no ingresso de homologação, se configurada. Use `central stop central-web central-api` para desligar a interface e a API leitora. Para desabilitar o webhook, retire `HUB_WENI_FARMA_TOKEN_FILE` da configuração da API e recrie apenas esse serviço. Preserve o volume, os recibos e o PostgreSQL. Mantenha os binários da API e do worker compatíveis com a migração 004. O rollback de schema para banco vazio recusa a operação se houver eventos registrados.
 
 Para reverter a interface, restaure as imagens anteriores de `central-api` e `central-web`, mantendo o núcleo compatível com o schema 004. O núcleo anterior exige o schema 003 para declarar prontidão. A reversão completa dos binários requer um procedimento de migração próprio.
+
+## Infraestrutura da VPS
+
+A página **Infraestrutura** consulta `GET /api/central/v1/infraestrutura` com a sessão individual da Central. A VPS é compartilhada pelos segmentos. O painel mostra estado, sistema, localização, IPv4, plano, capacidade, renovação e último backup listado no provedor. CPU, memória, disco, tráfego e uptime usam a última amostra e as séries disponíveis nas últimas 24 horas. Os cartões de tráfego mostram bytes da última amostra. A cota de banda vem do plano. Campos ausentes ficam indisponíveis. O backup do provedor e o backup PostgreSQL do Hub têm fontes próprias. A cobertura do banco dedicado no Restic/R2 continua em conferência. [API Hostinger](https://github.com/hostinger/api-python-sdk/blob/main/docs/VPSVirtualMachineApi.md)
+
+O coletor roda no host ou em outro ambiente autorizado com HTTPS de saída. Use a credencial Hostinger dedicada e de menor escopo disponível, injetada no processo como `HOSTINGER_API_TOKEN` pelo mecanismo privado do ambiente. Apenas o coletor precisa dessa credencial. O coletor consulta a VPS selecionada e grava um JSON de campos permitidos por troca atômica. A Central lê o diretório como volume somente leitura e indica coleta atrasada acima de 20 minutos.
+
+Na homologação existente, prepare um diretório privado para o snapshot, com escrita para o usuário do coletor e leitura para o UID 10001 do contêiner da Central. O exemplo assume que o ambiente Python do coletor já instalou `hub/requirements.lock`, que a credencial foi injetada e que o ID real e o caminho do diretório foram definidos no ambiente. Rode a coleta manual uma vez no host antes de agendá-la a cada cinco minutos.
+
+```sh
+PYTHONPATH=hub python -m nexoflow_hub.collect_vps --vps "$HOSTINGER_VPS_ID" --diretorio "$CENTRAL_INFRA_DIR"
+```
+
+Use os mesmos arquivos Compose e nome de projeto já conferidos. Acrescente `-f hub/compose.infra-hml.yaml` à função `central` e rode:
+
+```sh
+central config --quiet
+central build central-api central-web
+central up -d --no-deps central-api central-web
+```
+
+Confira **Infraestrutura** com o acesso autenticado da Central, a hora da coleta e as amostras mais recentes. O botão **Atualizar** relê o último snapshot gravado. Se a coleta falhar, o processo conserva o snapshot anterior. Para desligar a coleta, suspenda o agendamento e recrie a API da Central com os arquivos Compose anteriores.

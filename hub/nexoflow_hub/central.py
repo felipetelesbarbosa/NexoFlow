@@ -15,6 +15,8 @@ from fastapi import FastAPI, HTTPException, Request
 from psycopg.conninfo import conninfo_to_dict
 from psycopg.rows import dict_row
 
+from .infrastructure import read_infrastructure
+
 SEGMENTS = {"FARMA", "PET"}
 
 
@@ -25,6 +27,7 @@ class CentralSettings:
     audience: str
     jwks_file: Path
     identities_file: Path
+    infrastructure_file: Path | None = None
 
     def __post_init__(self):
         if not re.fullmatch(
@@ -55,6 +58,7 @@ class CentralSettings:
             os.environ["CENTRAL_ACCESS_AUD"],
             Path(os.environ["CENTRAL_ACCESS_JWKS_FILE"]),
             Path(os.environ["CENTRAL_IDENTIDADES_FILE"]),
+            Path(value) if (value := os.getenv("CENTRAL_INFRA_FILE")) else None,
         )
 
 
@@ -184,6 +188,12 @@ def create_app(settings: CentralSettings | None = None):
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
         return response
+
+    @app.get("/api/central/v1/infraestrutura")
+    def infrastructure(request: Request):
+        tokens = request.headers.getlist("cf-access-jwt-assertion")
+        operator_segments(tokens[0] if len(tokens) == 1 else "", config)
+        return read_infrastructure(config.infrastructure_file)
 
     @app.get("/api/central/v1/resumo")
     def summary(request: Request):

@@ -244,3 +244,141 @@ def test_invalid_grant_never_permits_default_or_requested_scope(
             client.get(PATH + query, headers=assertion(token(signing_key))).status_code
             == 403
         )
+
+
+def test_infrastructure_is_authenticated_and_distinguishes_snapshot_states(
+    setup, signing_key, tmp_path
+):
+    from dataclasses import replace
+    from datetime import UTC, datetime, timedelta
+
+    config, original = setup
+    route = "/api/central/v1/infraestrutura"
+    headers = assertion(token(signing_key))
+    assert original.get(route, headers=headers).json()["estado"] == "aguardando_coleta"
+    snapshot = tmp_path / "vps.json"
+    client = TestClient(
+        central.create_app(replace(config, infrastructure_file=snapshot))
+    )
+    assert client.get(route).status_code == 401
+    assert client.post(route, headers=headers).status_code == 405
+    assert client.get(route, headers=headers).json()["estado"] == "aguardando_coleta"
+
+    values = {
+        "hostname": "srv.example.test",
+        "sistema": "Ubuntu",
+        "estado": "running",
+        "cidade": None,
+        "pais": None,
+        "ipv4": "192.0.2.1",
+        "plano": "KVM 4",
+        "nucleos": 4,
+        "ram_bytes": None,
+        "disco_bytes": None,
+        "banda_bytes": None,
+        "validade": None,
+        "renovacao_automatica": True,
+        "ultimo_backup_provedor": None,
+        "metricas": None,
+        "segredo_teste": "deve ser excluído",
+    }
+    for minutes, state in ((0, "disponivel"), (21, "desatualizado")):
+        snapshot.write_text(
+            json.dumps(
+                dict(
+                    values,
+                    coletado_em=(
+                        datetime.now(UTC) - timedelta(minutes=minutes)
+                    ).isoformat(),
+                )
+            ),
+            encoding="utf-8",
+        )
+        response = client.get(route, headers=headers)
+        assert response.headers["cache-control"] == "no-store"
+        assert response.json()["estado"] == state
+        assert response.json()["vps"]["ipv4"] == "192.0.2.1"
+        assert "segredo_teste" not in response.json()["vps"]
+    snapshot.write_text("incompleto", encoding="utf-8")
+    assert client.get(route, headers=headers).json() == {
+        "estado": "indisponivel",
+        "vps": None,
+    }
+    config.identities_file.write_text("{}", encoding="utf-8")
+    assert client.get(route, headers=headers).status_code == 403
+
+
+def test_collect_vps_only_uses_the_selected_inventory_and_last_24_hours():
+    from datetime import UTC, datetime, timedelta
+    from urllib.error import HTTPError
+
+    from nexoflow_hub.collect_vps import collect
+
+    now = datetime(2026, 11, 23, 19, tzinfo=UTC)
+    vm = {
+        "id": 99,
+        "data_center_id": 2,
+        "subscription_id": "assinatura-certa",
+        "hostname": "vps.example.test",
+        "state": "running",
+        "cpus": 4,
+        "memory": 16384,
+        "disk": 204800,
+        "bandwidth": 16384000,
+        "ipv4": [{"address": "192.0.2.1"}],
+        "template": {"name": "Ubuntu"},
+    }
+    components = {
+        "/vps/v1/virtual-machines/99": vm,
+        "/vps/v1/data-centers": [{"id": 2, "city": "Campinas", "location": "br"}],
+        "/billing/v1/subscriptions": {
+            "data": [
+                {"id": "outra", "is_auto_renewed": False},
+                {"id": "assinatura-certa", "is_auto_renewed": True, "valor": "privado"},
+            ]
+        },
+        "/vps/v1/virtual-machines/99/backups": {
+            "data": [
+                {"created_at": "2026-11-19T12:00:01Z"},
+                {"created_at": "2026-11-12T17:19:36Z"},
+            ]
+        },
+        "/vps/v1/virtual-machines/99/metrics": {
+            "cpu_usage": {
+                "unit": "%",
+                "usage": {
+                    str(int(now.timestamp())): 0,
+                    str(int((now - timedelta(hours=25)).timestamp())): 99,
+                },
+            },
+            "ram_usage": {"unit": "bytes", "usage": {}},
+        },
+    }
+
+    def get(path, params=None):
+        if path.endswith("/metrics"):
+            assert params == {
+                "date_from": "2026-11-22T19:00:00+00:00",
+                "date_to": "2026-11-23T19:00:00+00:00",
+            }
+        return components[path]
+
+    vps = collect(get, 99, now)
+    assert vps.pais == "BR"
+    assert vps.ram_bytes == 16 * 1024**3
+    assert vps.renovacao_automatica is True
+    assert vps.validade is None
+    assert vps.ultimo_backup_provedor == datetime(2026, 11, 19, 12, 0, 1, tzinfo=UTC)
+    assert vps.metricas is not None and vps.metricas.cpu == [(now, 0)]
+    assert vps.metricas.ram == []
+    assert "privado" not in vps.model_dump_json()
+
+    def limited(path, params=None):
+        if path.startswith("/billing"):
+            raise HTTPError("", 403, "sem acesso", {}, None)
+        return get(path, params)
+
+    assert collect(limited, 99, now).renovacao_automatica is None
+    vm["id"] = 1
+    with pytest.raises(ValueError, match="VPS_DIVERGENTE"):
+        collect(get, 99, now)

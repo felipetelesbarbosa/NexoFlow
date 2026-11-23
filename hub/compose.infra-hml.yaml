@@ -1,0 +1,12 @@
+# Complemento opcional para ler inventário e métricas já coletados no host.
+services:
+  central-api:
+    environment:
+      CENTRAL_INFRA_FILE: /run/nexoflow-infra/vps.json
+    volumes:
+      - type: bind
+        source: ${CENTRAL_INFRA_DIR:?diretorio de telemetria obrigatório}
+        target: /run/nexoflow-infra
+        read_only: true
+        bind:
+          create_host_path: false

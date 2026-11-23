@@ -249,3 +249,36 @@ test("trocar segmentos autorizados limpa dados e descarta respostas superadas; r
   await expect(page.getByLabel("Segmento FARMA")).toBeVisible();
   await expect(picker).toHaveCount(0);
 });
+
+test("infraestrutura em uma aba própria e uma coleta atrasada no celular", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 760 });
+  await page.route("**/api/central/v1/resumo", (r) => r.fulfill({ json: summary }));
+  let collected = false;
+  await page.route("**/api/central/v1/infraestrutura", (r) => r.fulfill({
+    json: collected ? {
+      estado: "desatualizado",
+      vps: {
+        coletado_em: now, hostname: "vps.example.test", sistema: "Ubuntu",
+        estado: "running", cidade: "Campinas", pais: "BR", ipv4: "192.0.2.1",
+        plano: "KVM 4", nucleos: 4, ram_bytes: 16 * 1024 ** 3,
+        disco_bytes: 200 * 1024 ** 3, banda_bytes: null,
+        validade: null, renovacao_automatica: null, ultimo_backup_provedor: null,
+        metricas: { cpu: [[now, 0]], ram: [], disco: [], entrada: [], saida: [], uptime: [] },
+      },
+    } : { estado: "aguardando_coleta", vps: null },
+  }));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Abrir menu" }).click();
+  await page.getByRole("link", { name: "Infraestrutura" }).click();
+  await expect(page.getByRole("heading", { name: "Infraestrutura" })).toBeVisible();
+  await expect(page.getByRole("status")).toContainText("Aguardando a primeira coleta");
+  await expect(page.getByLabel("Período")).toHaveCount(0);
+  collected = true;
+  await page.getByRole("button", { name: "Atualizar", exact: true }).click();
+  await expect(page.getByText("Coleta atrasada", { exact: false })).toBeVisible();
+  await expect(page.getByText("0%", { exact: true })).toBeVisible();
+  await expect(page.getByText("Sem amostra nas últimas 24 horas").first()).toBeVisible();
+  await page.getByRole("button", { name: "Tema escuro" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-tema", "grafite");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+});

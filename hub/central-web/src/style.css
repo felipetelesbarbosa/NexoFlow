@@ -1004,3 +1004,79 @@ td {
     animation: none;
   }
 }
+
+.infra-server, .infra-details, .infra-metric, .infra-notice {
+  padding: 16px;
+  margin-bottom: 14px;
+  min-width: 0;
+}
+.infra-server {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.infra-server h2, .infra-details h2, .infra-metric h2 {
+  font-size: 1rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.infra-server p, .infra-metric p {
+  margin: 5px 0;
+  color: var(--muted);
+}
+.infra-status {
+  margin-inline-start: auto;
+}
+.infra-status small {
+  display: block;
+  margin-top: 4px;
+}
+.infra-status small, .infra-metric small {
+  color: var(--muted);
+}
+.infra-grid, .infra-details-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+}
+.infra-details-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+}
+.infra-details h2, .infra-metric h2 {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.infra-metric-reading {
+  min-height: 46px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+.infra-metric-reading strong {
+  font-size: 1.25rem;
+}
+.infra-chart {
+  width: min(40%, 112px);
+  color: var(--blue);
+}
+.infra-details dl {
+  margin: 10px 0 0;
+}
+.infra-details dl div {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  column-gap: 16px;
+  row-gap: 4px;
+  padding-block: 8px;
+}
+.infra-details dt {
+  color: var(--muted);
+}
+.infra-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
