@@ -1,9 +1,34 @@
 import { useEffect, useRef, useState } from "react";
-import { Braces, ChevronRight, RefreshCw, X } from "lucide-react";
+import {
+  Activity, Braces, ChevronRight, CircleAlert, CircleCheck,
+  Radio, RefreshCw, Waypoints, X,
+} from "lucide-react";
 import { horaLocal } from "./resumo";
 import type { Segmento } from "./resumo";
 
 const labels = { hub: "API do Hub", weni: "Webhook Weni" };
+const monitored = {
+  hub: { description: "Execuções e consultas do Hub", icon: Braces },
+  weni: { description: "Eventos enviados pela Weni ao Hub", icon: Radio },
+};
+const awaiting = [
+  { name: "FarmaLíder", description: "Consultas de clientes, pedidos, itens e histórico por segmento", origin: "Windows" },
+  { name: "Weni Flows", description: "Consultas e atualizações de contatos, campos e grupos. Também fornece eventos e mensagens.", origin: "Windows" },
+  { name: "PostgreSQL · Publicador", description: "Leitura de tabelas, envio de lotes e confirmação de revisões", origin: "Windows → VPS" },
+  { name: "PostgreSQL · Leitor", description: "Consultas do conector do Looker Studio à API da VPS", origin: "Looker Studio → VPS" },
+  { name: "Meta Ads", description: "Anúncios, campanhas e Insights nos perfis com a integração habilitada", origin: "Windows · quando habilitada" },
+  { name: "Weni Insights e Chats", description: "Totais de conversas no Insights e leitura de atendimentos no Chats quando essas rotinas estão configuradas", origin: "Windows · sob configuração" },
+  { name: "Google Sheets e Drive", description: "Integrações legadas, exportações e rotinas de migração", origin: "Windows · quando selecionado" },
+];
+const errorDescriptions: Record<string, string> = {
+  SEGMENTO_NAO_AUTORIZADO: "A credencial desta chamada não tinha acesso ao segmento solicitado.",
+  TAREFA_NAO_ENCONTRADA: "A execução não foi localizada no segmento autorizado.",
+  IDEMPOTENCIA_CONFLITANTE: "A mesma chave foi usada com dados diferentes.",
+  EVENTO_CONFLITANTE: "O identificador do evento já estava registrado com dados diferentes.",
+  PARAMETROS_HISTORICO_INVALIDOS: "Um ou mais parâmetros do histórico não passaram na validação.",
+  REQUISICAO_INVALIDA: "O formato da requisição não passou na validação.",
+  SERVICO_INDISPONIVEL: "O Hub encontrou uma falha interna ao atender a chamada.",
+};
 type API = keyof typeof labels;
 type RequestLog = {
   id: number;
@@ -28,27 +53,88 @@ const percent = new Intl.NumberFormat("pt-BR", {
   style: "percent", maximumFractionDigits: 2,
 });
 
-function Trend({ volumes }: { volumes: Consumption["serie"] }) {
+const integer = new Intl.NumberFormat("pt-BR");
+const clock = new Intl.DateTimeFormat("pt-BR", {
+  hour: "2-digit", minute: "2-digit", timeZone: "America/Belem",
+});
+const HOUR_MS = 3600000;
+
+function Trend({ volumes, asOf }: { volumes: Consumption["serie"]; asOf: number }) {
   if (!volumes.length) return null;
-  const end = Date.parse(volumes.at(-1)!.hora);
-  const start = Date.parse(volumes[0].hora);
-  const peak = Math.max(1, ...volumes.flatMap((point) => [point.sucesso, point.erros]));
+  const lastHour = Math.floor(asOf / HOUR_MS) * HOUR_MS;
+  const firstHour = lastHour - 24 * HOUR_MS;
+  const peak = Math.max(1, ...volumes.map((point) => point.sucesso + point.erros));
+  const countsByHour = new Map(volumes.map((point) => [Date.parse(point.hora), point]));
   return (
-    <svg className="api-trend" viewBox="0 0 300 55" role="img"
-      aria-label="Volume por hora. Verde para sucessos e vermelho para erros.">
-      {volumes.map((point) => {
-        const x = (Date.parse(point.hora) - start) * 280 / Math.max(3600000, end - start);
-        return (
-          <g key={point.hora}>
-            <title>{horaLocal(point.hora)} · {point.sucesso} sucessos · {point.erros} erros</title>
-            <rect x={x} y={55 - 48 * point.sucesso / peak} width="5"
-              height={48 * point.sucesso / peak} className="api-success" />
-            <rect x={x + 5} y={55 - 48 * point.erros / peak} width="5"
-              height={48 * point.erros / peak} className="api-error" />
-          </g>
-        );
-      })}
-    </svg>
+    <figure className="api-figure">
+      <figcaption>
+        <strong>Requisições por hora</strong>
+        <span className="api-legend"><i className="api-dot-success" /> 2xx <i className="api-dot-error" /> Erros</span>
+      </figcaption>
+      <svg className="api-trend" viewBox="0 0 300 72" role="img"
+        aria-label="Requisições por hora. As barras empilham respostas 2xx e erros. A tabela abaixo mostra os valores.">
+        {[12, 36, 60].map((y) => (
+          <line key={y} x1="0" x2="300" y1={y} y2={y} className="api-chart-grid" />
+        ))}
+        {Array.from({ length: 25 }, (_, i) => {
+          const hour = firstHour + i * HOUR_MS;
+          const point = countsByHour.get(hour);
+          if (!point) return null;
+          const x = i * 12 + 2;
+          const success = 48 * point.sucesso / peak;
+          const errors = 48 * point.erros / peak;
+          return (
+            <g key={hour}>
+              <title>{horaLocal(point.hora)} · {point.sucesso} respostas 2xx · {point.erros} erros</title>
+              <rect x={x} y={60 - success} width="8" height={success} className="api-success" />
+              <rect x={x} y={60 - success - errors} width="8" height={errors} className="api-error" />
+            </g>
+          );
+        })}
+      </svg>
+      <div className="api-axis">
+        <span>Início · {clock.format(asOf - 24 * HOUR_MS)}</span>
+        <span>Consulta · {clock.format(asOf)}</span>
+      </div>
+      <details className="api-hourly">
+        <summary>Ver números por hora</summary>
+        <table>
+          <thead><tr><th scope="col">Hora (Belém)</th><th scope="col">HTTP 2xx</th><th scope="col">Erros</th></tr></thead>
+          <tbody>{volumes.map((point) => <tr key={point.hora}><td>{horaLocal(point.hora)}</td><td>{point.sucesso}</td><td>{point.erros}</td></tr>)}</tbody>
+        </table>
+      </details>
+    </figure>
+  );
+}
+
+function Status({ status }: { status: number }) {
+  const success = status >= 200 && status <= 299;
+  return (
+    <span className={"api-status " + (success ? "api-ok" : "api-failed")}>
+      {success ? <CircleCheck size={14} aria-hidden="true" /> : <CircleAlert size={14} aria-hidden="true" />}
+      HTTP {status}
+    </span>
+  );
+}
+
+function Overview({ summaries }: { summaries: Consumption["resumo"] }) {
+  const totals = summaries.reduce((sum, row) => ({
+    total: sum.total + row.total, success: sum.success + row.sucesso, errors: sum.errors + row.erros,
+  }), { total: 0, success: 0, errors: 0 });
+  const stats = [
+    { label: "Requisições registradas", value: totals.total, icon: Activity, tone: "total" },
+    { label: "Respostas HTTP 2xx", value: totals.success, icon: CircleCheck, tone: "good" },
+    { label: "Respostas com erro", value: totals.errors, icon: CircleAlert, tone: "bad" },
+  ];
+  return (
+    <div className="api-overview" aria-label="Totais das últimas 24 horas">
+      {stats.map(({ label, value, icon: Icon, tone }) => (
+        <div className={`panel api-stat api-stat-${tone}`} key={label}>
+          <span className="api-stat-icon"><Icon size={18} aria-hidden="true" /></span>
+          <div><span>{label}</span><strong>{integer.format(value)}</strong></div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -75,7 +161,12 @@ function RequestDetail({ item, api, close }: { item: RequestLog; api: API; close
       </div>
       <p>{labels[api]} · {horaLocal(item.ocorrido_em)} · Belém</p>
       <p className="api-endpoint"><code>{item.metodo} {item.endpoint}</code></p>
-      <p>HTTP {item.http} · {item.duracao_ms} ms</p>
+      <div className="api-result-line">
+        <Status status={item.http} /> <span>{integer.format(item.duracao_ms)} ms</span>
+      </div>
+      {item.erro && errorDescriptions[item.erro] && (
+        <p className="api-error-explanation">{errorDescriptions[item.erro]}</p>
+      )}
       <h3>Campos técnicos do corpo</h3>
       <pre className="api-log">{item.corpo ? JSON.stringify(item.corpo, null, 2) : "Sem campos registrados"}</pre>
       <h3>Resposta técnica</h3>
@@ -100,18 +191,23 @@ export function ApiConsumption({ segment }: { segment?: Segmento }) {
   const [api, setApi] = useState<API>();
   const [onlyErrors, setOnlyErrors] = useState(false);
   const [before, setBefore] = useState<number>();
-  const [data, setData] = useState<Consumption>();
+  const [snapshot, setSnapshot] = useState<{ data: Consumption; readAt: number; selection: string }>();
+  const detailsSection = useRef<HTMLElement>(null);
+  const openDetails = useRef(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [detail, setDetail] = useState<RequestLog>();
+  const selection = JSON.stringify([segment, api, before, onlyErrors, refresh]);
+  const currentSnapshot = snapshot?.selection === selection ? snapshot : undefined;
+  const data = currentSnapshot?.data;
   useEffect(() => {
     const stop = new AbortController();
     const timeout = setTimeout(() => stop.abort(), 15000);
     let active = true;
     setLoading(true);
     setError(false);
-    setData(undefined);
+    setSnapshot(undefined);
     setDetail(undefined);
     const params = new URLSearchParams();
     if (segment) params.set("segmento", segment);
@@ -124,7 +220,7 @@ export function ApiConsumption({ segment }: { segment?: Segmento }) {
       if (!response.ok || response.redirected) throw new Error();
       const result: Consumption = await response.json();
       if (segment && result.segmento !== segment) throw new Error();
-      if (active) setData(result);
+      if (active) setSnapshot({ data: result, readAt: Date.now(), selection });
     }).catch(() => {
       if (active) setError(true);
     }).finally(() => {
@@ -136,7 +232,14 @@ export function ApiConsumption({ segment }: { segment?: Segmento }) {
       clearTimeout(timeout);
       stop.abort();
     };
-  }, [segment, api, before, onlyErrors, refresh]);
+  }, [segment, api, before, onlyErrors, selection]);
+
+  useEffect(() => {
+    if (api && data && openDetails.current) {
+      openDetails.current = false;
+      detailsSection.current?.focus();
+    }
+  }, [api, data]);
 
   return (
     <>
@@ -152,46 +255,70 @@ export function ApiConsumption({ segment }: { segment?: Segmento }) {
       {loading && <p className="waiting" role="status">Consultando requisições…</p>}
       {error && <p className="error-panel" role="alert">Consulta de APIs indisponível. Confira seu acesso ou atualize o painel.</p>}
       {data && (
+        <>
+        <Overview summaries={data.resumo} />
+        <div className="api-section-heading">
+          <h2>APIs monitoradas</h2>
+          <span>Taxas calculadas sobre as chamadas registradas</span>
+        </div>
         <div className="api-grid">
           {(Object.keys(labels) as API[]).map((name) => {
             const summary = data.resumo.find((item) => item.api === name);
+            const source = monitored[name];
+            const Icon = source.icon;
             return (
-              <section className="panel api-card" key={name}>
-                <h2><Braces size={18} aria-hidden="true" /> {labels[name]}</h2>
+              <section className={`panel api-card api-service ${api === name ? "api-service-current" : ""}`} key={name}>
+                <div className="api-service-heading">
+                  <span className="api-service-icon"><Icon size={20} aria-hidden="true" /></span>
+                  <div><h3>{labels[name]}</h3><p>{source.description}</p></div>
+                </div>
                 {summary && summary.total > 0 ? (
                   <>
                     <dl>
                       <div><dt>Sucesso HTTP</dt><dd>{percent.format(summary.sucesso / summary.total)}</dd></div>
                       <div><dt>Taxa de erro</dt><dd>{percent.format(summary.erros / summary.total)}</dd></div>
                     </dl>
-                    <p>{summary.total} requisições · {summary.erros} erros · p95 de {summary.p95_ms} ms</p>
-                    <Trend volumes={data.serie.filter((point) => point.api === name)} />
+                    <p className="api-p95"><strong>{integer.format(summary.total)}</strong> requisições · 95% responderam em até <strong className="api-duration">{integer.format(summary.p95_ms)} ms</strong></p>
+                    <Trend volumes={data.serie.filter((point) => point.api === name)} asOf={currentSnapshot!.readAt} />
                   </>
-                ) : <p>Nenhuma requisição registrada no período.</p>}
+                ) : <p className="api-empty">Nenhuma requisição registrada no período.</p>}
                 <button className="refresh" aria-label={`Detalhes de ${labels[name]}`} aria-pressed={api === name}
-                  onClick={() => { setApi(name); setOnlyErrors(false); setBefore(undefined); }}>
+                  onClick={() => {
+                    if (api === name && !onlyErrors && !before) {
+                      detailsSection.current?.focus();
+                    } else {
+                      openDetails.current = true;
+                      setApi(name);
+                      setOnlyErrors(false);
+                      setBefore(undefined);
+                    }
+                  }}>
                   Detalhes <ChevronRight size={15} aria-hidden="true" />
                 </button>
               </section>
             );
           })}
         </div>
+        </>
       )}
       {api && data && (
-        <section className="panel api-card" aria-label={`Requisições de ${labels[api]}`}>
+        <section className="panel api-card" ref={detailsSection} tabIndex={-1}
+          aria-label={`Requisições de ${labels[api]}`}>
+          <div className="api-section-heading">
           <h2>Requisições · {labels[api]}</h2>
-          <label>
+          <label className="api-error-filter">
             <input type="checkbox" checked={onlyErrors} onChange={(event) => {
               setOnlyErrors(event.target.checked); setBefore(undefined);
             }} /> Somente erros
           </label>
+          </div>
           {data.requisicoes.length === 0 ? <p>Nenhuma requisição nesse recorte.</p> : (
             <ul className="api-request-list">
               {data.requisicoes.map((item) => (
                 <li key={item.id}>
                   <button type="button" className="api-request" onClick={() => setDetail(item)}>
                     <code>{item.metodo} {item.endpoint}</code>
-                    <span>HTTP {item.http} · {item.duracao_ms} ms</span>
+                    <span className="api-result-line"><Status status={item.http} /> {integer.format(item.duracao_ms)} ms</span>
                     <small>{horaLocal(item.ocorrido_em)} · Belém</small>
                   </button>
                 </li>
@@ -204,6 +331,17 @@ export function ApiConsumption({ segment }: { segment?: Segmento }) {
           </div>
         </section>
       )}
+      <section className="panel api-card api-coverage" aria-labelledby="api-coverage-title">
+        <h2 id="api-coverage-title">Integrações sem telemetria na Central</h2>
+        <ul>{awaiting.map(({ name, description, origin }) => (
+          <li key={name}>
+            <Waypoints size={17} aria-hidden="true" />
+            <div><strong>{name}</strong><p>{description}</p></div>
+            <span>{origin}</span>
+          </li>
+        ))}</ul>
+        <p>O coletor da VPS fica em <a href="#infraestrutura">Infraestrutura</a>.</p>
+      </section>
       {api && detail && <RequestDetail item={detail} api={api} close={() => setDetail(undefined)} />}
     </>
   );

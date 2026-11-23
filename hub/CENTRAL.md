@@ -118,7 +118,7 @@ Confira **Infraestrutura** com o acesso autenticado da Central, a hora da coleta
 
 ## Consumo de APIs
 
-A Central tem uma aba própria para o tráfego autenticado recebido pela **API do Hub** e pelo **webhook Weni FARMA**. A instrumentação cobre as rotas de execuções e de eventos instrumentadas. Tráfego externo ao Hub, como as chamadas do Analytics Windows, precisa de sua própria instrumentação para aparecer nesta tela.
+A Central tem uma aba própria para o tráfego autenticado recebido pela **API do Hub** e pelo **webhook Weni FARMA**. A página apresenta totais, gráficos por hora com tabela acessível e explicações para códigos técnicos conhecidos. O inventário abaixo dos gráficos identifica integrações que ainda precisam de instrumentação. A instrumentação cobre as rotas de execuções e de eventos instrumentadas. Tráfego externo ao Hub, como as chamadas do Analytics Windows, precisa de sua própria instrumentação para aparecer nesta tela.
 
 Em 23/11/2026 às 17h23 de Belém, o Work aplicou a migração 005 após verificar o backup. Os quatro serviços estavam operacionais no SHA `8ac4b41b49b02bd2f1b72ed9ed12bc85c31b0503`. No Chrome, o Work conferiu uma chamada `GET /tarefas` com HTTP 200 por segmento, os detalhes, o log textual e o filtro **Somente erros**. [Consumo de APIs em homologação](https://central-hml.nexoflowhub.com.br/#consumo)
 

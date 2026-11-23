@@ -292,7 +292,7 @@ test("consumo de APIs abre histórico, detalhes e log textual no celular", async
       json: {
         segmento: "FARMA",
         resumo: [{ api: "hub", total: 4, sucesso: 3, erros: 1, p95_ms: 22 }],
-        serie: [{ api: "hub", hora: now, sucesso: 3, erros: 1 }],
+        serie: [{ api: "hub", hora: new Date(Math.floor(Date.parse(now) / 3600000) * 3600000).toISOString(), sucesso: 3, erros: 1 }],
         requisicoes: api === "hub" ? [{
           id: 100, ocorrido_em: now, metodo: "POST", endpoint: "/tarefas",
           http: 409, duracao_ms: 22, corpo: { origem: "teste" },
@@ -305,12 +305,19 @@ test("consumo de APIs abre histórico, detalhes e log textual no celular", async
   await page.goto("/#consumo");
   await expect(page.getByText("75%", { exact: true })).toBeVisible();
   await expect(page.getByText("25%", { exact: true })).toBeVisible();
+  const coverage = page.getByRole("region", { name: "Integrações sem telemetria na Central" });
+  await expect(coverage.getByText("FarmaLíder", { exact: true })).toBeVisible();
+  await expect(coverage.getByText("Weni Flows", { exact: true })).toBeVisible();
+  await page.getByText("Ver números por hora").click();
+  await expect(page.getByRole("columnheader", { name: "Hora (Belém)" })).toBeVisible();
   await expect(page.getByText("Nenhuma requisição registrada no período.")).toBeVisible();
   await page.getByRole("button", { name: "Detalhes de API do Hub" }).click();
+  await expect(page.getByRole("region", { name: "Requisições de API do Hub" })).toBeFocused();
   await page.getByLabel("Somente erros").check();
   await page.getByRole("button", { name: /POST \/tarefas/ }).click();
   const detail = page.getByRole("dialog");
   await expect(detail).toContainText("IDEMPOTENCIA_CONFLITANTE");
+  await expect(detail).toContainText("A mesma chave foi usada com dados diferentes.");
   await expect(detail).toContainText("Campos técnicos do corpo");
   await detail.getByText("Log textual").click();
   await expect(detail.getByText(/"requisicao": 100/)).toBeVisible();
