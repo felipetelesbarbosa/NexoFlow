@@ -1,5 +1,13 @@
 # NexoFlow — Changelog
 
+## 1.5.59 — em validação
+
+O Analytics FARMA no PostgreSQL preserva os fechamentos antigos quando a descrição do item e a origem registrada no cabeçalho são as únicas diferenças comprovadas. As divergências que impedem a publicação aparecem no log por motivo.
+
+A abertura e o selo repetem uma vez o mesmo identificador se a resposta se perder. O cliente repete a página de leitura quando o banco está temporariamente indisponível ou limita requisições e confere o recibo de lotes com resposta incerta antes de reenviar.
+
+O diagnóstico de Anúncios informa quantos pedidos candidatos ficaram pendentes por motivo. Os indicadores do Looker permanecem sujeitos à homologação da fonte de Anúncios.
+
 ## 1.5.58 — publicada em 23/11/26 19:31:19 (Belém)
 
 [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.58) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/86180d2fa06b18d2bc1ac9f7d7faf1e99cfad7c6) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45277128402) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45277128575) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45277128475) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45280368979).
