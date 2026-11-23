@@ -73,6 +73,9 @@ def test_real_signature_and_database_scope(setup, signing_key, monkeypatch):
         def fetchall(self):
             return []
 
+        def fetchone(self):
+            return {"worker_estado": "sem_sinal"}
+
     @contextmanager
     def connect(dsn, **options):
         assert (
@@ -103,12 +106,15 @@ def test_real_signature_and_database_scope(setup, signing_key, monkeypatch):
             "tarefas": [],
             "integracoes": {"hub": "pronto", "processamento": "homologacao"},
             "eventos": [],
+            "operacao": {"worker_estado": "sem_sinal"},
         }
-        assert "REPEATABLE READ, READ ONLY" in statements[-4][0]
-        for query, params in statements[-3:]:
+        assert "REPEATABLE READ, READ ONLY" in statements[-5][0]
+        for query, params in statements[-4:]:
             assert params == (segment,)
             if "set_config" not in query:
-                assert "WHERE segmento=%s" in query and "LIMIT 50" in query
+                assert "WHERE segmento=%s" in query
+                if "central_operacao" not in query:
+                    assert "LIMIT 50" in query
         assert client.post(PATH, headers=headers).status_code == 405
         assert client.get("/tarefas", headers=headers).status_code == 404
 

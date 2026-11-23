@@ -39,7 +39,7 @@ def store(settings):
     # Banco temporário exclusivo desta suíte. Não executar em paralelo com VPS.
     with db.connect() as connection:
         connection.execute(
-            "TRUNCATE hub.historico_ltv,hub.historico_revisoes,hub.historico_pendencias,hub.historico_pedidos,hub.historico_recebidos,hub.historico_janelas,hub.auditoria,hub.checkpoints,hub.tentativas,hub.coordenacao,hub.tarefas,hub.cobertura"
+            "TRUNCATE hub.sinal_worker,hub.historico_ltv,hub.historico_revisoes,hub.historico_pendencias,hub.historico_pedidos,hub.historico_recebidos,hub.historico_janelas,hub.auditoria,hub.checkpoints,hub.tentativas,hub.coordenacao,hub.tarefas,hub.cobertura"
         )
     return db
 
@@ -97,10 +97,65 @@ def test_migration_and_empty_rollback(store):
     assert store.ready()
     store.migrate()
     store.migrate(down=True)
+    store.migrate(target=3)
+    previous = task(store)
     store.migrate()
-    task(store)
+    assert store.ready()
+    assert store.get("FARMA", previous["id"]) == previous
     with pytest.raises(Conflict, match="ROLLBACK_COM_DADOS"):
         store.migrate(down=True)
+
+
+def test_central_sinal_worker_e_fila_por_segmento(store):
+    def operation(segment):
+        with store.connect() as db:
+            db.execute("SELECT set_config('nexoflow.segmento', %s, true)", (segment,))
+            rows = db.execute("SELECT * FROM hub.central_operacao").fetchall()
+            assert len(rows) == 1 and rows[0]["segmento"] == segment
+            return rows[0]
+
+    initial = operation("PET")
+    assert initial["worker_estado"] == "sem_sinal"
+    assert initial["worker_ultimo_ciclo_em"] is None
+    assert initial["fila_espera_segundos"] is None
+    assert initial["ultima_conclusao_em"] is None
+
+    completed = task(store)
+    assert run_once(store)
+    running = task(store)
+    assert store.claim()["id"] == running["id"]
+    expire(store, running)
+    ready = task(store)
+    waiting = task(store)
+    task(store, "PET")
+    with store.connect() as db:
+        db.execute(
+            "UPDATE hub.tarefas SET disponivel_em=now()-interval '2 minutes' WHERE id=%s",
+            (ready["id"],),
+        )
+        db.execute(
+            "UPDATE hub.tarefas SET estado='aguardando', disponivel_em=now()+interval '2 minutes' WHERE id=%s",
+            (waiting["id"],),
+        )
+    store.signal_worker_cycle()
+    farma = operation("FARMA")
+    pet = operation("PET")
+    assert farma["worker_estado"] == pet["worker_estado"] == "ativo"
+    assert farma["worker_ultimo_ciclo_em"] == pet["worker_ultimo_ciclo_em"]
+    assert farma["fila_prontas"] == pet["fila_prontas"] == 1
+    assert farma["fila_espera_segundos"] >= 120
+    assert farma["fila_em_espera"] == farma["fila_leases_expirados"] == 1
+    assert pet["fila_em_espera"] == pet["fila_leases_expirados"] == 0
+    assert (
+        farma["ultima_conclusao_em"]
+        == store.get("FARMA", completed["id"])["atualizada_em"]
+    )
+    assert pet["ultima_conclusao_em"] is None
+    with store.connect() as db:
+        db.execute("UPDATE hub.sinal_worker SET ciclo_em=now()-interval '31 seconds'")
+    assert operation("FARMA")["worker_estado"] == "sinal_atrasado"
+    store.signal_worker_cycle()
+    assert operation("FARMA")["worker_estado"] == "ativo"
 
 
 def test_queue_idempotency_payload_conflict_and_segments(store):

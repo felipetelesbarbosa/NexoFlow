@@ -40,7 +40,7 @@ class Store:
         connection.row_factory = dict_row
         return connection
 
-    def migrate(self, *, down=False, target=3):
+    def migrate(self, *, down=False, target=4):
         root = Path(__file__).resolve().parents[1] / "migrations"
         with self.connect() as db:
             db.execute("SELECT pg_advisory_xact_lock(812631)")
@@ -57,7 +57,11 @@ class Store:
                 if exists
                 else []
             )
-            if versions not in ([], [1], [1, 2], [1, 2, 3]) or target not in (1, 2, 3):
+            if (
+                versions != list(range(1, len(versions) + 1))
+                or len(versions) > 4
+                or target not in range(1, 5)
+            ):
                 raise Conflict("SCHEMA_INCOMPATIVEL")
             if down:
                 if not exists:
@@ -68,6 +72,8 @@ class Store:
                 assert count is not None
                 if count["n"]:
                     raise Conflict("ROLLBACK_COM_DADOS_BLOQUEADO")
+                if 4 in versions:
+                    db.execute((root / "004_down.sql").read_bytes())
                 if 3 in versions:
                     db.execute((root / "003_down.sql").read_bytes())
                 if 2 in versions:
@@ -82,7 +88,15 @@ class Store:
         with self.connect() as db:
             return db.execute(
                 "SELECT versao FROM hub.migracoes ORDER BY versao"
-            ).fetchall() == [{"versao": 1}, {"versao": 2}, {"versao": 3}]
+            ).fetchall() == [{"versao": version} for version in range(1, 5)]
+
+    def signal_worker_cycle(self):
+        with self.connect() as db:
+            db.execute(
+                """INSERT INTO hub.sinal_worker(unico,ciclo_em) VALUES(true,clock_timestamp())
+                   ON CONFLICT(unico) DO UPDATE
+                   SET ciclo_em=greatest(hub.sinal_worker.ciclo_em, excluded.ciclo_em)"""
+            )
 
     def create(self, segment, origin, key, scenario, *, history=None):
         if scenario not in SCENARIOS:

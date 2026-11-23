@@ -5,6 +5,15 @@ const summary = {
   ambiente: "homologacao",
   metricas: { habilitado: false },
   integracoes: { hub: "pronto", processamento: "homologacao" },
+  operacao: {
+    worker_estado: "sinal_atrasado",
+    worker_ultimo_ciclo_em: now,
+    fila_prontas: 1,
+    fila_em_espera: 2,
+    fila_leases_expirados: 1,
+    fila_espera_segundos: 120,
+    ultima_conclusao_em: null,
+  },
   tarefas: [
     {
       id: "6129c5f2-3e58-4c36-9bc4-cb6916c77269",
@@ -119,6 +128,10 @@ for (const width of [320, 375]) {
       );
       await page.goto("/");
       if (dark) await page.getByRole("button", { name: "Tema escuro" }).click();
+      const operation = page.getByRole("region", { name: "Processamento do Hub" });
+      await expect(operation).toContainText("Sinal atrasado");
+      await expect(operation).toContainText("Maior espera entre as prontas 120 s");
+      await expect(operation).toContainText("Nenhuma conclusão registrada");
       const fits = async () =>
         expect(
           await page.evaluate(() =>

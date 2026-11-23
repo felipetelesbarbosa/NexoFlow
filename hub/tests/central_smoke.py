@@ -72,14 +72,23 @@ def assert_reader_grants(reader_dsn):
             "FROM pg_roles WHERE rolname=current_user"
         ).fetchone()
         assert role == ("hub_central_leitor", False, False, False, False)
-        for view in ("hub.central_tarefas", "hub.central_eventos"):
+        for view in (
+            "hub.central_tarefas",
+            "hub.central_eventos",
+            "hub.central_operacao",
+        ):
             assert db.execute(
                 "SELECT has_table_privilege(%s, 'SELECT')", (view,)
             ).fetchone() == (True,)
             assert db.execute(
                 "SELECT has_table_privilege(%s, 'INSERT,UPDATE,DELETE')", (view,)
             ).fetchone() == (False,)
-        for table in ("hub.tarefas", "hub.eventos_weni", "hub.checkpoints"):
+        for table in (
+            "hub.tarefas",
+            "hub.eventos_weni",
+            "hub.checkpoints",
+            "hub.sinal_worker",
+        ):
             assert db.execute(
                 "SELECT has_table_privilege(%s, 'SELECT,INSERT,UPDATE,DELETE')",
                 (table,),
@@ -159,6 +168,10 @@ def verify(*, web_ip, api_ip, pg_ip, secret_dir, key, farma_id, pet_id, wait):
             )
             assert summary["segmentos_autorizados"] == granted
             assert summary["metricas"] == {"habilitado": False}
+            operation = summary["operacao"]
+            assert operation["worker_estado"] == "ativo"
+            assert operation["worker_ultimo_ciclo_em"]
+            assert operation["ultima_conclusao_em"]
             task_ids = {item["id"] for item in summary["tarefas"]}
             assert (str(farma_id) in task_ids) == (segment == "FARMA")
             assert (str(pet_id) in task_ids) == (segment == "PET")

@@ -19,6 +19,20 @@ export type Evento = { tipo: string; ocorrido_em: string; recebido_em: string };
 export type Segmento = "FARMA" | "PET";
 export const isSegmento = (value: unknown): value is Segmento =>
   value === "FARMA" || value === "PET";
+export const estadosWorker = {
+  ativo: "Sinal recente",
+  sinal_atrasado: "Sinal atrasado",
+  sem_sinal: "Aguardando primeiro sinal",
+} as const;
+type Operacao = {
+  worker_estado: keyof typeof estadosWorker;
+  worker_ultimo_ciclo_em: string | null;
+  fila_prontas: number;
+  fila_em_espera: number;
+  fila_leases_expirados: number;
+  fila_espera_segundos: number | null;
+  ultima_conclusao_em: string | null;
+};
 export type Resumo = {
   segmento: Segmento;
   segmentos_autorizados: Segmento[];
@@ -27,6 +41,7 @@ export type Resumo = {
   tarefas: Tarefa[];
   integracoes: { hub: "pronto"; processamento: "homologacao" };
   eventos: Evento[];
+  operacao?: Operacao | null;
 };
 
 export const fuso = "America/Belem";
@@ -62,6 +77,29 @@ function instante(x: unknown): x is string {
   );
 }
 
+function contagem(x: unknown): x is number {
+  return typeof x === "number" && Number.isSafeInteger(x) && x >= 0;
+}
+
+function operacaoValida(x: unknown): boolean {
+  if (x === undefined || x === null) return true;
+  return (
+    registro(x) &&
+    typeof x.worker_estado === "string" &&
+    Object.hasOwn(estadosWorker, x.worker_estado) &&
+    (x.worker_estado === "sem_sinal"
+      ? x.worker_ultimo_ciclo_em === null
+      : instante(x.worker_ultimo_ciclo_em)) &&
+    contagem(x.fila_prontas) &&
+    contagem(x.fila_em_espera) &&
+    contagem(x.fila_leases_expirados) &&
+    (x.fila_prontas === 0
+      ? x.fila_espera_segundos === null
+      : contagem(x.fila_espera_segundos)) &&
+    (x.ultima_conclusao_em === null || instante(x.ultima_conclusao_em))
+  );
+}
+
 export function lerResumo(x: unknown): Resumo {
   const ok =
     registro(x) &&
@@ -72,6 +110,7 @@ export function lerResumo(x: unknown): Resumo {
     registro(x.integracoes) &&
     x.integracoes.hub === "pronto" &&
     x.integracoes.processamento === "homologacao" &&
+    operacaoValida(x.operacao) &&
     Array.isArray(x.tarefas) &&
     x.tarefas.every(
       (t: unknown) =>

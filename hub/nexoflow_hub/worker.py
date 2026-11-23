@@ -119,10 +119,15 @@ def main():
 
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
+    next_signal = 0.0
     while not stopping:
         Path("/tmp/hub-worker-heartbeat").touch()
         try:
             run_once(store)
+            now = time.monotonic()
+            if now >= next_signal:
+                store.signal_worker_cycle()
+                next_signal = now + 10
         except Exception:
             print('{"evento":"worker_indisponivel","erro":"FALHA_INTERNA"}', flush=True)
             if args.once:

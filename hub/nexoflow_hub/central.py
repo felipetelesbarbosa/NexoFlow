@@ -156,6 +156,12 @@ def read_summary(dsn: str, segment: str):
                WHERE segmento=%s ORDER BY recebido_em DESC, ocorrido_em DESC, tipo LIMIT 50""",
             (segment,),
         ).fetchall()
+        operation = db.execute(
+            """SELECT worker_estado, worker_ultimo_ciclo_em, fila_prontas,
+                      fila_em_espera, fila_leases_expirados, fila_espera_segundos,
+                      ultima_conclusao_em FROM hub.central_operacao WHERE segmento=%s""",
+            (segment,),
+        ).fetchone()
     return {
         "segmento": segment,
         "ambiente": "homologacao",
@@ -163,6 +169,7 @@ def read_summary(dsn: str, segment: str):
         "tarefas": tasks,
         "integracoes": {"hub": "pronto", "processamento": "homologacao"},
         "eventos": events,
+        "operacao": operation,
     }
 
 

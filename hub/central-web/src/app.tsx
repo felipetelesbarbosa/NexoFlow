@@ -35,6 +35,7 @@ import {
   ativos,
   atencao,
   estados,
+  estadosWorker,
   horaLocal,
   janela,
   lerResumo,
@@ -421,6 +422,7 @@ function App() {
                   tint="violet"
                 />
               </div>
+              <OperationPanel value={resumo?.operacao} />
               <div className="charts">
                 <ActivityChart data={data} />
                 <StatePanel rows={data.tarefas} />
@@ -447,6 +449,55 @@ function App() {
       </div>
       {detail && <TaskDetail value={detail} close={() => setDetail(null)} />}
     </div>
+  );
+}
+
+function OperationPanel({ value }: { value: Resumo["operacao"] }) {
+  return (
+    <section className="panel operation-panel" aria-labelledby="operation-title">
+      <h2 id="operation-title">Processamento do Hub</h2>
+      {value ? (
+        <dl>
+          <div>
+            <dt>Worker</dt>
+            <dd>{estadosWorker[value.worker_estado]}</dd>
+            {value.worker_ultimo_ciclo_em && (
+              <dd className="operation-detail">
+                Último ciclo em {horaLocal(value.worker_ultimo_ciclo_em)}
+              </dd>
+            )}
+          </div>
+          <div>
+            <dt>Fila do segmento</dt>
+            <dd>
+              {digits.format(value.fila_prontas)} prontas ·{" "}
+              {digits.format(value.fila_em_espera)} aguardando horário
+            </dd>
+            {value.fila_espera_segundos !== null && (
+              <dd className="operation-detail">
+                Maior espera entre as prontas{" "}
+                {digits.format(value.fila_espera_segundos)} s
+              </dd>
+            )}
+            {value.fila_leases_expirados > 0 && (
+              <dd className="operation-detail">
+                {digits.format(value.fila_leases_expirados)} com prazo de execução expirado
+              </dd>
+            )}
+          </div>
+          <div>
+            <dt>Última execução concluída</dt>
+            <dd>
+              {value.ultima_conclusao_em
+                ? horaLocal(value.ultima_conclusao_em)
+                : "Nenhuma conclusão registrada"}
+            </dd>
+          </div>
+        </dl>
+      ) : (
+        <p>Dados operacionais indisponíveis.</p>
+      )}
+    </section>
   );
 }
 

@@ -6,7 +6,8 @@ SELECT pg_advisory_xact_lock(hashtext('nexoflow_hub_hml.central.leitor'));
 DO $$
 BEGIN
     IF current_database() <> 'nexoflow_hub_hml' OR
-       to_regclass('hub.central_tarefas') IS NULL OR to_regclass('hub.central_eventos') IS NULL THEN
+       to_regclass('hub.central_tarefas') IS NULL OR to_regclass('hub.central_eventos') IS NULL OR
+       to_regclass('hub.central_operacao') IS NULL THEN
         RAISE EXCEPTION 'CENTRAL_DESTINO_OU_VISOES_INVALIDAS';
     END IF;
     IF EXISTS (
@@ -31,7 +32,7 @@ END
 $$;
 GRANT CONNECT ON DATABASE nexoflow_hub_hml TO hub_central_leitor;
 GRANT USAGE ON SCHEMA hub TO hub_central_leitor;
-GRANT SELECT ON hub.central_tarefas, hub.central_eventos TO hub_central_leitor;
+GRANT SELECT ON hub.central_tarefas, hub.central_eventos, hub.central_operacao TO hub_central_leitor;
 ALTER ROLE hub_central_leitor IN DATABASE nexoflow_hub_hml SET default_transaction_read_only TO on;
 
 DO $$
@@ -43,7 +44,7 @@ BEGIN
            WHERE n.nspname = 'hub' AND c.relkind IN ('r','p','v','m','f')
            AND (has_table_privilege('hub_central_leitor', c.oid, 'INSERT,UPDATE,DELETE,TRUNCATE,TRIGGER,REFERENCES')
                 OR has_any_column_privilege('hub_central_leitor', c.oid, 'INSERT,UPDATE,REFERENCES')
-                OR (c.relname NOT IN ('central_tarefas','central_eventos')
+                OR (c.relname NOT IN ('central_tarefas','central_eventos','central_operacao')
                     AND has_any_column_privilege('hub_central_leitor', c.oid, 'SELECT')))
        ) THEN
         RAISE EXCEPTION 'CENTRAL_PRIVILEGIO_EXCESSIVO';

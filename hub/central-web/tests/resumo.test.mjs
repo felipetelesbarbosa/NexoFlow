@@ -81,3 +81,25 @@ test("a lista de segmentos pertence à resposta e à identidade atual", () => {
     );
   }
 });
+
+test("telemetria distingue fila vazia, fila aguardando e versões antigas", () => {
+  const operacao = {
+    worker_estado: "sem_sinal",
+    worker_ultimo_ciclo_em: null,
+    fila_prontas: 0,
+    fila_em_espera: 2,
+    fila_leases_expirados: 0,
+    fila_espera_segundos: null,
+    ultima_conclusao_em: null,
+  };
+  assert.equal(lerResumo(sample).operacao, undefined);
+  assert.deepEqual(lerResumo({ ...sample, operacao }).operacao, operacao);
+  for (const fields of [
+    { worker_estado: "ativo" },
+    { fila_prontas: 1 },
+    { fila_leases_expirados: -1 },
+    { ultima_conclusao_em: "inválida" },
+  ]) {
+    assert.throws(() => lerResumo({ ...sample, operacao: { ...operacao, ...fields } }));
+  }
+});

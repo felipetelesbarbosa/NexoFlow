@@ -458,6 +458,28 @@ main:focus {
   border-radius: 11px;
   min-width: 0;
 }
+.operation-panel {
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.operation-panel h2 {
+  font-size: 1rem;
+  margin: 0 0 12px;
+}
+.operation-panel dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 14px;
+  margin: 0;
+}
+.operation-panel dt,
+.operation-panel .operation-detail {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.operation-panel dd {
+  margin: 4px 0 0;
+}
 .charts {
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) minmax(230px, 1fr);
