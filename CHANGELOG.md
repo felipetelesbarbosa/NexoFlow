@@ -1,6 +1,8 @@
 # NexoFlow — Changelog
 
-## 1.5.59 — em validação
+## 1.5.59 — publicada em 23/11/26 20:23:43 (Belém)
+
+[Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.59) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/3159cb44e67d6b1c89ef89bc95a59b7ede06c021) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45285569537) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45285569392) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45285569385) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45288357131).
 
 O Analytics FARMA no PostgreSQL preserva os fechamentos antigos quando a descrição do item e a origem registrada no cabeçalho são as únicas diferenças comprovadas. As divergências que impedem a publicação aparecem no log por motivo.
 
