@@ -52,7 +52,7 @@ function request(names = ['pedido_id'], filters = []) {
 }
 
 function fixture(contacts, orders, intercept) {
-  const calls = [];
+  const calls = [], logs = [];
   let now = 0;
   class Clock extends Date { static now() { return now; } }
   const cc = {
@@ -64,7 +64,7 @@ function fixture(contacts, orders, intercept) {
   const conf = {protocol:'nexoflow_datastudio_1', environment:'homologacao', segment:'FARMA',
     endpoint:'https://reader.example.invalid', api_token:'synthetic', access_client_id:'synthetic', access_client_secret:'synthetic'};
   const ctx = {
-    Date: Clock, DataStudioApp: {createCommunityConnector: () => cc}, console: {error() {}},
+    Date: Clock, DataStudioApp: {createCommunityConnector: () => cc}, console: {error: value => logs.push(JSON.parse(value).codigo)},
     PropertiesService: {getScriptProperties: () => ({getProperty: () => JSON.stringify(conf)})},
     Utilities: {newBlob: v => ({getBytes:() => Buffer.from(v)}), sleep(ms) { now += ms; }},
     UrlFetchApp: {fetch(url, options) {
@@ -87,7 +87,14 @@ function fixture(contacts, orders, intercept) {
   };
   vm.createContext(ctx);
   for (const name of ['Schemas.js','AbcCore.js','Code.js']) vm.runInContext(fs.readFileSync(path.join(folder, name),'utf8'),ctx);
-  return {ctx, calls, run: r => ctx.getData(r)};
+  return {ctx, calls, logs, run: r => ctx.getData(r)};
+}
+
+function assertFarmaError(f, req, code) {
+  const before = f.logs.length;
+  assert.throws(() => f.run(req), e => /Falha ao carregar os dados|A consulta demorou|O período selecionado/.test(e.message) && !e.message.includes('DS_'));
+  assert.equal(f.logs.length, before + 1);
+  assert.match(f.logs.at(-1), code);
 }
 
 function records(result) {
@@ -130,7 +137,7 @@ test('Meta com datas ausentes ou sem compra devolve vazio; data inválida não a
   assert.deepEqual(records(empty.run(request())), []);
   assert.deepEqual(ordersRequested(empty.calls), []);
   const bad = fixture([contact('invalido','2026-02-30T15:00:00-03:00')], []);
-  assert.throws(() => bad.run(request()), /DS_DATA_INVALIDA/);
+  assertFarmaError(bad, request(), /DS_DATA_INVALIDA/);
 });
 
 test('Meta respeita interseções dos filtros de pedido; filtros de outro campo ficam completos para o Looker', () => {
@@ -161,12 +168,12 @@ test('Meta mantém os lotes de IDs dentro do contrato e não entrega mistura de 
   const changed = fixture(contacts, orders, ({p,body,calls}) => {
     if (p.table === 'BI_Pedidos' && calls.filter(c => c.table === 'BI_Pedidos').length >= 2) body.version = calls.length;
   });
-  assert.throws(() => changed.run(request()), /Nenhum total parcial/);
+  assertFarmaError(changed, request(), /^DS_[A-Z0-9_]+$/);
 });
 
 test('Meta recusa duplicidade de cabeçalho, resposta parcial ou cabeçalho não solicitado', () => {
   const duplicated = fixture([contact('001')], [order('001'),order('001')]);
-  assert.throws(() => duplicated.run(request()), /Nenhum total parcial/);
+  assertFarmaError(duplicated, request(), /^DS_[A-Z0-9_]+$/);
   for (const change of ['partial','other-key']) {
     const bad = fixture([contact('001')], [order('001')], ({p,body}) => {
       if (p.table === 'BI_Pedidos') {
@@ -174,7 +181,7 @@ test('Meta recusa duplicidade de cabeçalho, resposta parcial ou cabeçalho não
         else body.rows[0][p.fields.indexOf('pedido_id')] = 'pedido-inesperado';
       }
     });
-    assert.throws(() => bad.run(request()), /Nenhum total parcial/);
+    assertFarmaError(bad, request(), /^DS_[A-Z0-9_]+$/);
   }
 });
 
@@ -188,14 +195,14 @@ test('Meta conserva a retentativa de falhas transitórias e o prazo total da ope
   const late = fixture([contact('001')],[order('001')], ({p,advance}) => {
     if (p.table === 'BI_Pedidos') advance(60_000);
   });
-  assert.throws(() => late.run(request()), /Nenhum total parcial/);
+  assertFarmaError(late, request(), /^DS_[A-Z0-9_]+$/);
 });
 
 test('Meta propaga o limite do leitor; um retorno parcial jamais vira conjunto vazio válido', () => {
   const limited = fixture([contact('001')],[order('001')], ({p}) => {
     if (p.table === 'BI_Pedidos') return {status:409,body:{error:'DS_CONSULTA_EXCEDE_LIMITE_USE_RESUMO_OU_PERIODO'}};
   });
-  assert.throws(() => limited.run(request()), /DS_CONSULTA_EXCEDE_LIMITE/);
+  assertFarmaError(limited, request(), /DS_CONSULTA_EXCEDE_LIMITE/);
 });
 
 test('Meta restringe a fonte ao segmento FARMA antes de consultar o leitor', () => {
@@ -217,7 +224,7 @@ test('Meta conta bytes UTF-8 no conjunto de lotes antes de devolver o resultado'
       if (p.table === 'BI_Pedidos') assert.ok(Buffer.byteLength(JSON.stringify(body)) < 7000000);
     });
     if (char === 'a') assert.equal(f.run(req).rows.length, 180);
-    else assert.throws(() => f.run(req), /DS_RESPOSTA_EXCEDE_LIMITE/);
+    else assertFarmaError(f, req, /DS_RESPOSTA_EXCEDE_LIMITE/);
     assert.equal(f.calls.filter(p => p.table === 'BI_Pedidos').length, 2);
   }
 });
@@ -343,6 +350,6 @@ test('Fontes Meta rejeitam data Weni não vazia impossível mesmo ao lado de um 
   const headers = [order('01'), order('02')];
   for (const req of [leftRequest('2026-05-01'), request(['pedido_id'])]) {
     const f = fixture(people, headers);
-    assert.throws(() => f.run(req), /DS_DATA_INVALIDA/);
+    assertFarmaError(f, req, /DS_DATA_INVALIDA/);
   }
 });

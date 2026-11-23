@@ -78,25 +78,59 @@ function dsCheckDestination_(c,info){
   if(!info||info.protocol!=='nexoflow_datastudio_1'||info.target!==db+'.'+c.segment.toLowerCase()||info.segment!==c.segment||info.environment!==c.environment||info.schema_hash!==NexoDSSchemaHash)throw new Error('DS_CONTRATO_DESTINO_DIVERGENTE');
 }
 var NexoDSAbcLabels={periodo_rotulo:'Período',produto_nome:'Produto',classe_abc:'Classe',unidades:'Unidades',receita_produtos:'Receita de produtos',participacao_receita:'Participação (%)',participacao_acumulada:'Acumulada (%)',skus_distintos:'Produtos diferentes',faturamento_produtos:'Receita de produtos',participacao_top5_receita:'Top 5 na receita (%)',produtos_classe_a:'Produtos na classe A',produtos_classe_b:'Produtos na classe B',produtos_classe_c:'Produtos na classe C',receita_classe_a:'Receita classe A (%)',receita_classe_b:'Receita classe B (%)',receita_classe_c:'Receita classe C (%)',produto_a_nome:'Produto A',produto_b_nome:'Produto B',pedidos_juntos:'Pedidos juntos'};
-function dsFields_(table){
+var NexoDSAdsLabels={
+  data:'Data', anuncio_id:'ID do anúncio', campanha_nome:'Campanha', anuncios:'Anúncios veiculados',
+  investimento_original:'Investimento em anúncios', conversas_meta:'Conversas iniciadas nos anúncios',
+  conversas_meta_informadas:'Conversas informadas pela Meta',
+  pedidos_apos_conversa_7d:'Pedidos em até 7 dias (outro atendimento)',
+  receita_apos_conversa_7d:'Receita dos pedidos em até 7 dias',
+  cpa_conversa_anuncio:'Custo por pedido na conversa do anúncio',
+  roas_conversa_anuncio:'Retorno sobre anúncios na conversa original',
+  dias_comerciais_parciais:'Registros de anúncios com dados parciais'
+};
+var NexoDSFarmaLabels={
+  Anuncios_Veiculados_FARMA:NexoDSAdsLabels,
+  Resumo_Anuncios_Veiculados_FARMA:NexoDSAdsLabels,
+  BI_Clientes_Vendas:{cliente:'Nome do cliente',data:'Data da compra',pedidos:'Pedidos válidos',faturamento:'Receita gerada',faturamento_produtos:'Receita de produtos',frete:'Frete'},
+  BI_Clientes:{cliente:'Nome do cliente',pedidos_identificados:'Pedidos identificados',faturamento_identificado:'Receita identificada',ultima_compra_identificada:'Última compra identificada'},
+  BI_LTV_Clientes:{pedidos:'Pedidos válidos no histórico',ltv_observado:'Receita histórica por cliente',ticket_medio:'Valor médio por pedido',primeira_compra:'Primeira compra',ultima_compra:'Última compra',cobertura:'Cobertura do histórico'},
+  Base_Contatos:{nome:'Nome do contato',farmalider_cliente_nome:'Nome do cliente no cadastro FarmaLíder',pedido_data:'Data do pedido',pedido_status_nome:'Situação do pedido'}
+};
+function dsFields_(table,segment){
   var cc=DataStudioApp.createCommunityConnector(),fields=cc.getFields(),spec=NexoDSSchemas[table];
   if(!spec)throw new Error('DS_TABELA_NAO_AUTORIZADA');
+  var friendly=segment==='FARMA' && NexoDSFarmaLabels[table] || {};
   spec.columns.forEach(function(name){
     var kind=spec.types[name],metric=kind==='number'&&!spec.dimensions.includes(name),field=metric?fields.newMetric():fields.newDimension();
     var metricKind=(spec.abc_kinds||spec.metric_kinds||{})[name];
     var brl=(NexoDSCurrencyBRL[table]||[]).includes(name)||['money','money_max'].includes(metricKind);
-    field.setId(name).setName(spec.abc_mode?(NexoDSAbcLabels[name]||name):((spec.labels||{})[name]||name)).setType(kind==='date'?cc.FieldType.YEAR_MONTH_DAY:kind==='number'?(brl?cc.FieldType.CURRENCY_BRL:cc.FieldType.NUMBER):cc.FieldType.TEXT);
+    var label=friendly[name]||(spec.abc_mode?NexoDSAbcLabels[name]:(spec.labels||{})[name])||name;
+    field.setId(name).setName(label).setType(kind==='date'?cc.FieldType.YEAR_MONTH_DAY:kind==='number'?(brl?cc.FieldType.CURRENCY_BRL:cc.FieldType.NUMBER):cc.FieldType.TEXT);
     if(metricKind==='percent')field.setType(cc.FieldType.PERCENT);
     if(metric)field.setAggregation(metricKind?(['sum','money'].includes(metricKind)?cc.AggregationType.SUM:cc.AggregationType.MAX):(/taxa|pct|idade|ranking|ticket_medio|^clientes$/.test(name)?cc.AggregationType.MAX:cc.AggregationType.SUM));
   });
   if(table==='BI_Itens')fields.newMetric().setId('produtos_distintos_periodo').setName('Produtos distintos no período (SKU informado)').setType(cc.FieldType.NUMBER).setIsReaggregatable(false);
   return fields;
 }
-function getSchema(request){try{var c=dsConfig_(request.configParams);dsVerify_(c);return {schema:dsFields_(request.configParams.tabela).build()};}catch(e){return dsError_(e);}}
-function dsError_(error){
+function getSchema(request){try{var c=dsConfig_(request.configParams);dsVerify_(c);return {schema:dsFields_(request.configParams.tabela,c.segment).build()};}catch(e){return dsError_(e,request&&request.configParams);}}
+function dsError_(error,params){
   var code=/^DS_[A-Z0-9_]+$/.test(String(error.message))?error.message:'DS_LEITURA_NAO_CONFIRMADA';
   console.error(JSON.stringify({diagnostico:'datastudio_postgres_1',codigo:code}));
-  DataStudioApp.createCommunityConnector().newUserError().setText(code+'. Nenhum total parcial foi retornado. Confira o diagnóstico e o período.').throwException();
+  var message=code+'. Nenhum total parcial foi retornado. Confira o diagnóstico e o período.';
+  if(params && params.segmento==='FARMA'){
+    if(['DS_PRAZO_CONSULTA','DS_CONSULTA_TEMPO_LIMITE'].includes(code)){
+      message='A consulta demorou mais que o previsto. Tente atualizar o relatório.';
+    }else if(['DS_PERIODO_OBRIGATORIO','DS_INSIGHTS_PERIODO_OBRIGATORIO','DS_PERIODO_INVALIDO'].includes(code)){
+      message='Selecione um período válido.';
+    }else if(['DS_CONSULTA_EXCEDE_LIMITE_USE_RESUMO_OU_PERIODO','DS_RESPOSTA_EXCEDE_LIMITE_USE_RESUMO'].includes(code)){
+      message='O período selecionado tem dados demais para este gráfico. Selecione um período menor.';
+    }else if(['DS_SEM_PUBLICACAO_CONFIRMADA','DS_ABC_BASE_INCOMPLETA','DS_INSIGHTS_COBERTURA_INCOMPLETA'].includes(code)){
+      message='Sem dados suficientes para o período selecionado.';
+    }else{
+      message='Falha ao carregar os dados. Tente atualizar o relatório.';
+    }
+  }
+  DataStudioApp.createCommunityConnector().newUserError().setText(message).throwException();
 }
 function getData(request){try{
   var p=request.configParams,c=dsConfig_(p),spec=NexoDSSchemas[p.tabela];
@@ -121,7 +155,7 @@ function getData(request){try{
     filters.push({field:'tipo_recorte',values:[p.recorte_historico]});
     if(['TOTAL','SEM_EMISSAO'].includes(p.recorte_historico))range={};
   }
-  names=dsFields_(p.tabela).forIds(names).build().map(function(f){return f.name;});
+  names=dsFields_(p.tabela,c.segment).forIds(names).build().map(function(f){return f.name;});
   var buyers = p.tabela === 'Compradores_Operacionais';
   var sumAggregation=buyers||p.tabela==='BI_Publico_Resumo' ? {} : dsSums_(p,spec,names,groups,supported,distinct);
   var payload={table:p.tabela,fields:distinct?['produto_codigo']:names,start:spec.period?(range.startDate||''):'',end:spec.period?(range.endDate||''):'',filters:filters,aggregation:distinct?{produto_codigo:'count_distinct'}:sumAggregation};
@@ -137,12 +171,12 @@ function getData(request){try{
   // Uma amostra de schema sem período não escolhe nem inventa um dia da Weni.
   if(p.tabela==='BI_Weni_Conversas_Diarias'&&request.scriptParams&&request.scriptParams.sampleExtraction&&!payload.start){
     dsVerify_(c);
-    return {schema:dsFields_(p.tabela).forIds(names).build(),rows:[],filtersApplied:false};
+    return {schema:dsFields_(p.tabela,c.segment).forIds(names).build(),rows:[],filtersApplied:false};
   }
   if(request.scriptParams&&request.scriptParams.sampleExtraction&&spec.period&&!payload.start){payload.start='2000-01-01';payload.end='2000-01-01';}
   var result=dsCheckedQuery_(c,payload);
   var publicFetched=publicTable?Date.now():0;
-  var fields=dsFields_(p.tabela).forIds(names);
+  var fields=dsFields_(p.tabela,c.segment).forIds(names);
   var data = buyers ? dsBuyerRows_(result.rows, payload.fields, names) : result.rows;
   var rows=dsFormatRows_(data,names,spec,distinct);
   if(publicTable&&typeof console.info==='function'){
@@ -154,7 +188,7 @@ function getData(request){try{
     }));
   }
   return {schema:fields.build(),rows:rows,filtersApplied:!!applied};
-}catch(error){return dsError_(error);}}
+}catch(error){return dsError_(error,request&&request.configParams);}}
 if(typeof module!=='undefined')module.exports={getData:getData,dsCall:dsCall_,dsConfig:dsConfig_};
 
 function dsCheckedQuery_(c,payload){
@@ -288,7 +322,7 @@ function dsAdData_(request, c, spec) {
   var applied = !left && groups.length > 0 && idFilters.length === groups.length;
   if (!applied) idFilters = [];
   var selected = requested.filter(function(f) { return !applied || !f.forFilterOnly; });
-  var schema = dsFields_(request.configParams.tabela).forIds(selected.map(function(f) { return f.name; })).build();
+  var schema = dsFields_(request.configParams.tabela,c.segment).forIds(selected.map(function(f) { return f.name; })).build();
   var names = schema.map(function(f) { return f.name; });
   var baseFields = ['pedido_id', 'pedido_data', 'primeiro_anuncio_data'];
   var cohort = 'coorte_primeiro_anuncio', attributed = 'pedido_apos_anuncio';
@@ -471,7 +505,7 @@ function dsProductsData_(request, config, spec) {
     return false;
   }).map(function(f) { return f.name; });
   if (!fields.length) throw new Error('DS_CAMPOS_NAO_AUTORIZADOS');
-  var schema = dsFields_(request.configParams.tabela).forIds(fields).build();
+  var schema = dsFields_(request.configParams.tabela,config.segment).forIds(fields).build();
   fields = schema.map(function(f) { return f.name; });
   var range = request.dateRange || {};
   var sample = request.scriptParams && request.scriptParams.sampleExtraction;
@@ -540,7 +574,7 @@ function dsAbcData_(request,c,spec){
   var range=request.dateRange||{},names=request.fields.map(function(f){return f.name;});
   if(!range.startDate||!range.endDate)throw new Error('DS_PERIODO_OBRIGATORIO');
   if(names.some(function(n){return !spec.columns.includes(n);}))throw new Error('DS_CAMPOS_NAO_AUTORIZADOS');
-  var responseSchema=dsFields_(request.configParams.tabela).forIds(names).build();
+  var responseSchema=dsFields_(request.configParams.tabela,c.segment).forIds(names).build();
   names=responseSchema.map(function(f){return f.name;});
   var p=request.configParams,top=null;
   if(spec.abc_mode==='juntos'&&p.pares_escopo&&p.pares_escopo!=='COMPLETO'){

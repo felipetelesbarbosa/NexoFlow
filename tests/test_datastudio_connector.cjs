@@ -2,18 +2,38 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 function fixture(callback){
  const calls=[],logs=[],sleeps=[];
  const secret={protocol:'nexoflow_datastudio_1',segment:'FARMA',environment:'homologacao',endpoint:'https://reader.example.invalid',api_token:'synthetic-reader-only-token',access_client_id:'synthetic.access',access_client_secret:'synthetic-access-secret'};
- function fields(){const all=[];function field(role){const f={role,setId(v){this.id=v;return this;},setName(){return this;},setType(v){this.type=v;return this;},setAggregation(v){this.aggregation=v;return this;},setIsReaggregatable(v){this.reaggregatable=v;return this;}};all.push(f);return f;}return {newMetric:()=>field('metric'),newDimension:()=>field('dimension'),build:()=>all,forIds:n=>({build:()=>all.filter(f=>n.includes(f.id)).map(f=>({name:f.id,type:f.type}))})};}
+ function fields(){const all=[];function field(role){const f={role,setId(v){this.id=v;return this;},setName(v){this.label=v;return this;},setType(v){this.type=v;return this;},setAggregation(v){this.aggregation=v;return this;},setIsReaggregatable(v){this.reaggregatable=v;return this;}};all.push(f);return f;}return {newMetric:()=>field('metric'),newDimension:()=>field('dimension'),build:()=>all,forIds:n=>({build:()=>all.filter(f=>n.includes(f.id)).map(f=>({name:f.id,type:f.type}))})};}
  const cc={getFields:fields,FieldType:{YEAR_MONTH_DAY:'date',NUMBER:'number',TEXT:'text',CURRENCY_BRL:'currency_brl',PERCENT:'percent'},AggregationType:{SUM:'sum',MAX:'max'},newUserError:()=>({setText(t){return {throwException(){throw Error(t)}}}})};
  const ctx={Date,DataStudioApp:{createCommunityConnector:()=>cc},console:{error:v=>logs.push(v)},Utilities:{sleep:v=>sleeps.push(v)},PropertiesService:{getScriptProperties:()=>({getProperty:()=>JSON.stringify(secret)})},UrlFetchApp:{fetch:(url,options)=>{calls.push({url,options});let reply;if(url.endsWith('/v1/destino'))reply={body:{protocol:secret.protocol,target:'nexoflow_datastudio_homologacao.farma',segment:'FARMA',environment:'homologacao',schema_hash:ctx.NexoDSSchemaHash}};else reply=callback(JSON.parse(options.payload),calls.length);return {getResponseCode:()=>reply.status||200,getContentText:()=>reply.raw ?? JSON.stringify(reply.body||{})};}}};
  vm.createContext(ctx);for(const f of ['Schemas.js','AbcCore.js','Code.js'])vm.runInContext(fs.readFileSync('connectors/datastudio_api/'+f,'utf8'),ctx);return {ctx,calls,logs,sleeps,secret};
 }
 function request(names=['produtos_distintos_periodo']){return {configParams:{segmento:'FARMA',ambiente:'homologacao',tabela:'BI_Itens'},fields:names.map(name=>({name})),dateRange:{startDate:'2026-11-01',endDate:'2026-11-03'},dimensionsFilters:[[{fieldName:'sku_informado',operator:'EQUALS',type:'INCLUDE',values:['1']}]]};}
+function assertFarmaError(f, req, code, message=/Falha ao carregar os dados|A consulta demorou|Selecione um período|O período selecionado tem dados demais|Sem dados suficientes/){
+ const before=f.logs.length;
+ assert.throws(()=>f.ctx.getData(req),e=>message.test(e.message)&&!e.message.includes('DS_'));
+ assert.equal(f.logs.length,before+1);
+ assert.match(JSON.parse(f.logs.at(-1)).codigo,code);
+}
 function result(p,rows){return {body:{protocol:"nexoflow_datastudio_1",target:"nexoflow_datastudio_homologacao.farma",segment:"FARMA",environment:"homologacao",schema_hash:require("../connectors/datastudio_api/Schemas.js").hash,fields:p.fields,rows:rows,complete:true,version:1}};}
 test('schema preserva IDs, datas, atualizado_em Texto e SKU sem agregação',()=>{
  const f=fixture(),fields=f.ctx.dsFields_('BI_Itens').build(),original=require('../connectors/continuacoes/Schemas.js').BI_Itens;
  assert.deepEqual(Array.from(fields.slice(0,12),f=>f.id),original.map(f=>f[0]));
  assert.equal(fields.find(f=>f.id==='atualizado_em').type,'text');assert.equal(fields.find(f=>f.id==='sku_informado').role,'dimension');assert.equal(fields.find(f=>f.id==='produtos_distintos_periodo').reaggregatable,false);
  assert.ok(!f.ctx.NexoDSSchemas.Controle&&!f.ctx.NexoDSSchemas.Cache_orders);
+});
+test('nomes comerciais FARMA aparecem com os IDs e as agregações atuais',()=>{
+ const f=fixture();
+ const schema=table=>f.ctx.getSchema({configParams:{...request().configParams,tabela:table}}).schema;
+ const ltv=schema('BI_LTV_Clientes').find(field=>field.id==='ltv_observado');
+ assert.equal(ltv.label,'Receita histórica por cliente');
+ assert.equal(ltv.type,'currency_brl');
+ const roas=schema('Resumo_Anuncios_Veiculados_FARMA').find(field=>field.id==='roas_conversa_anuncio');
+ assert.equal(roas.label,'Retorno sobre anúncios na conversa original');
+ assert.equal(roas.aggregation,'max');
+ const labels=segment=>f.ctx.dsFields_('BI_Clientes_Vendas',segment).build();
+ assert.equal(labels('FARMA').find(field=>field.id==='cliente').label,'Nome do cliente');
+ assert.equal(labels('PET').find(field=>field.id==='cliente').label,
+              labels().find(field=>field.id==='cliente').label);
 });
 test('distintos em todo o período vêm do SQL; credenciais fora dos logs e payload',()=>{
  const f=fixture(p=>{assert.equal(p.aggregation.produto_codigo,'count_distinct');return result(p,[[216]]);});
@@ -29,14 +49,14 @@ test('detalhe, zeros à esquerda, moeda e período vazio',()=>{
 test('falhas não expõem totais parciais; transientes têm retentativa limitada',()=>{
  for(const code of [401,403,409,429,503]){
   const f=fixture(()=>({status:code,body:{error:'raw-token-must-not-appear'}}));
-  assert.throws(()=>f.ctx.getData(request()),e=>e.message.includes('Nenhum total parcial')&&!e.message.includes('raw-token'));
+  assertFarmaError(f,request(),new RegExp('^DS_HTTP_'+code+'$'));
   assert.equal(f.sleeps.length,[429,503].includes(code)?2:0);
  }
- const f=fixture(p=>({body:{fields:p.fields,rows:[[216]],complete:false}}));assert.throws(()=>f.ctx.getData(request()),/Nenhum total parcial/);
+ const f=fixture(p=>({body:{fields:p.fields,rows:[[216]],complete:false}}));assertFarmaError(f,request(),/^DS_CONTRATO_DESTINO_DIVERGENTE$/);
 });
 test('503 do leitor distingue permissão de indisponibilidade e retoma somente a leitura transitória', () => {
  const denied=fixture(()=>({status:503,body:{error:'DS_PERMISSAO',detail:'private-sentinel'}}));
- assert.throws(()=>denied.ctx.getData(request()), /^Error: DS_PERMISSAO\. Nenhum total parcial/);
+ assertFarmaError(denied,request(),/^DS_PERMISSAO/);
  assert.equal(denied.calls.length,1);
  assert.deepEqual(denied.sleeps,[]);
  const offline={status:503,body:{error:'DS_BANCO_INDISPONIVEL',detail:'private-sentinel'}};
@@ -44,15 +64,15 @@ test('503 do leitor distingue permissão de indisponibilidade e retoma somente a
  assert.equal(retry.ctx.getData(request()).rows[0].values[0],17);
  assert.deepEqual(retry.sleeps,[1000,2000]);
  const exhausted=fixture(()=>offline);
- assert.throws(()=>exhausted.ctx.getData(request()), /^Error: DS_BANCO_INDISPONIVEL\. Nenhum total parcial/);
+ assertFarmaError(exhausted,request(),/^DS_BANCO_INDISPONIVEL/);
  assert.deepEqual(exhausted.sleeps,[1000,2000]);
  const interrupted=fixture((p,n)=>n===1?offline:{status:503,body:{error:'DS_PERMISSAO'}});
- assert.throws(()=>interrupted.ctx.getData(request()), /^Error: DS_PERMISSAO\./);
+ assertFarmaError(interrupted,request(),/^DS_PERMISSAO/);
  assert.deepEqual(interrupted.sleeps,[1000]);
  const late=fixture(()=>offline);
  let elapsed=0;
  late.ctx.Date=class extends Date {static now(){elapsed+=46000;return elapsed;}};
- assert.throws(()=>late.ctx.getData(request()), /^Error: DS_BANCO_INDISPONIVEL\./);
+ assertFarmaError(late,request(),/^DS_BANCO_INDISPONIVEL/);
  assert.deepEqual(late.sleeps,[]);
  for(const f of [denied,retry,exhausted,interrupted,late]) assert.ok(!f.logs.join().includes('private-sentinel'));
 });
@@ -60,24 +80,24 @@ test('503 genérico conserva apenas o status, mesmo após outra causa ou um corp
  for(const raw of ['<html>private-sentinel</html>','null','{"error":["DS_PERMISSAO"]}',
                    '{"error":"DS_INSIGHTS_COBERTURA_INCOMPLETA"}','{"error":"private-sentinel"}']) {
    const f=fixture((p,n)=>n===1?{status:503,body:{error:'DS_BANCO_INDISPONIVEL'}}:{status:503,raw});
-   assert.throws(()=>f.ctx.getData(request()), e=>e.message.startsWith('DS_HTTP_503.')&&!e.message.includes('private-sentinel'));
+   assertFarmaError(f,request(),/^DS_HTTP_503$/);
    assert.equal(f.calls.length,3);assert.deepEqual(f.sleeps,[1000,2000]);
    assert.ok(!f.logs.join().includes('private-sentinel'));
  }
  const auth=fixture(()=>({status:401,body:{error:'DS_BANCO_INDISPONIVEL'}}));
- assert.throws(()=>auth.ctx.getData(request()), /^Error: DS_HTTP_401\./);
+ assertFarmaError(auth,request(),/^DS_HTTP_401/);
  assert.deepEqual(auth.sleeps,[]);
 });
 test('rejeita agregação com filtro não suportado e marca não autorizada',()=>{
  const f=fixture(p=>result(p,[[216]])),r=request();r.dimensionsFilters[0][0].operator='REGEXP_PARTIAL_MATCH';
- assert.throws(()=>f.ctx.getData(r),/DS_FILTRO_AGREGACAO_NAO_SUPORTADO/);
+ assertFarmaError(f,r,/^DS_FILTRO_AGREGACAO_NAO_SUPORTADO/);
  r.configParams.segmento='OUTRO';assert.throws(()=>f.ctx.getData(r),/DS_CONFIGURACAO_INVALIDA/);
 });
 test('filtro aplicado não devolve campos solicitados só para filtrar; resumo exige grão',()=>{
  const f=fixture(p=>result(p,[[90]])),r=request();r.fields.push({name:'sku_informado',forFilterOnly:true});
  assert.equal(f.ctx.getData(r).schema.length,1);
  const summary=request(['pedidos']);summary.configParams.tabela='BI_Historico_Resumo';summary.dimensionsFilters=[];
- assert.throws(()=>f.ctx.getData(summary),/DS_RESUMO_EXIGE_GRAO/);
+ assertFarmaError(f,summary,/^DS_RESUMO_EXIGE_GRAO/);
 });
 
 test('Receita gerada preserva valor decimal e o tipo moeda BRL; atualizado_em continua Texto',()=>{
@@ -103,10 +123,10 @@ test('aliases TOTAL/MES/ANO/SEM_EMISSAO mantêm grãos separados e filtros FARMA
 
 test('guarda de recorte chega ao Work sem expor mensagem livre do servidor',()=>{
  const f=fixture(()=>({status:409,body:{error:'DS_FILTRO_CORTA_RECORTE_USE_DETALHE',detail:'PRIVATE-MUST-NOT-APPEAR'}}));
- assert.throws(()=>f.ctx.getData(request()),/DS_FILTRO_CORTA_RECORTE_USE_DETALHE/);
+ assertFarmaError(f,request(),/^DS_FILTRO_CORTA_RECORTE_USE_DETALHE/);
  assert.ok(!f.logs.join().includes('PRIVATE-MUST-NOT-APPEAR'));
  const bad=fixture(()=>({status:409,body:{error:'DS_PRIVATE-MUST-NOT-APPEAR'}}));
- assert.throws(()=>bad.ctx.getData(request()),/DS_HTTP_409/);
+ assertFarmaError(bad,request(),/^DS_HTTP_409/);
  assert.ok(!bad.logs.join().includes('PRIVATE-MUST-NOT-APPEAR'));
 });
 
@@ -133,7 +153,7 @@ test('ABC recusa falha, limite, resposta parcial e versão ausente',()=>{
    if(variant==='target')r.body.segment='PET';return r;
   });
   const r=request(['produto_codigo']);r.configParams.tabela='ABC_abc';r.dimensionsFilters=[];
-  assert.throws(()=>f.ctx.getData(r),/Nenhum total parcial/);
+  assertFarmaError(f,r,/^DS_[A-Z0-9_]+$/);
  }
 });
 test('projeções do inventário são tipadas sem expor payloads privados',()=>{
@@ -147,7 +167,7 @@ test('projeções do inventário são tipadas sem expor payloads privados',()=>{
 test('ABC propaga validação financeira e alinha ordem do SDK sem recalcular classe filtrada',()=>{
  const f=fixture(()=>({status:409,body:{error:'DS_ABC_BASE_INCOMPLETA'}}));
  const r=request(['classe_abc','produto_codigo']);r.configParams.tabela='ABC_abc';r.dimensionsFilters=[];
- assert.throws(()=>f.ctx.getData(r),/DS_ABC_BASE_INCOMPLETA/);
+ assertFarmaError(f,r,/^DS_ABC_BASE_INCOMPLETA/);
  const good=fixture(p=>{assert.deepEqual(p.fields,['produto_codigo','classe_abc']);return result(p,[['01','A']]);});
  r.dimensionsFilters=[[{fieldName:'classe_abc',operator:'EQUALS',type:'INCLUDE',values:['A']}]];
  const response=good.ctx.getData(r);
@@ -209,9 +229,9 @@ test('Compradores_Operacionais mantém filtros da fonte e as guardas do leitor',
   assert.equal(response.filtersApplied, true);
   assert.deepEqual(Array.from(response.rows[0].values), ['Sim']);
   const wrong = fixture(p => result(p, [['001', 'Não', 2]]));
-  assert.throws(() => wrong.ctx.getData(r), /DS_RESPOSTA_INCOMPLETA/);
+  assertFarmaError(wrong,r,/^DS_RESPOSTA_INCOMPLETA/);
   const limited = fixture(() => ({status:409, body:{error:'DS_CONSULTA_EXCEDE_LIMITE_USE_RESUMO_OU_PERIODO'}}));
-  assert.throws(() => limited.ctx.getData(r), /DS_CONSULTA_EXCEDE_LIMITE/);
+  assertFarmaError(limited,r,/^DS_CONSULTA_EXCEDE_LIMITE/);
 });
 
 
@@ -229,25 +249,25 @@ test('somas SQL explícitas reduzem volume sem inferir médias/distintos ou alte
  const direct=fixture(p=>{assert.deepEqual(p.aggregation,{});return result(p,[]);});
  delete r.configParams.modo_consulta;direct.ctx.getData(r);
  r.configParams.modo_consulta='somas';r.fields=[{name:'valor_unitario'}];
- assert.throws(()=>f.ctx.getData(r),/DS_METRICA_NAO_ADITIVA/);
+ assertFarmaError(f,r,/^DS_METRICA_NAO_ADITIVA/);
  r.fields=[{name:'quantidade'}];r.dimensionsFilters[0][0].operator='CONTAINS';
- assert.throws(()=>f.ctx.getData(r),/DS_FILTRO_AGREGACAO_NAO_SUPORTADO/);
+ assertFarmaError(f,r,/^DS_FILTRO_AGREGACAO_NAO_SUPORTADO/);
  r.configParams.tabela='BI_LTV_Clientes';r.fields=[{name:'ltv_observado'}];
- assert.throws(()=>f.ctx.getData(r),/DS_MODO_AGREGACAO_NAO_SUPORTADO/);
+ assertFarmaError(f,r,/^DS_MODO_AGREGACAO_NAO_SUPORTADO/);
 });
 
 test('ABC vazio válido continua vazio; valores malformados não viram zero',()=>{
  const r=request(['produto_codigo']);r.configParams.tabela='ABC_abc';r.dimensionsFilters=[];
  const empty=fixture(p=>result(p,[]));assert.equal(empty.ctx.getData(r).rows.length,0);
  r.fields=[{name:'unidades'}];
- const invalid=fixture(p=>result(p,[['NaN']]));assert.throws(()=>invalid.ctx.getData(r),/DS_NUMERO_INVALIDO/);
+ const invalid=fixture(p=>result(p,[['NaN']]));assertFarmaError(invalid,r,/^DS_NUMERO_INVALIDO/);
 });
 
 test('ABC mantém prazo e recusa resultado completo que chegou tarde',()=>{
  const f=fixture(p=>result(p,[['001']]));
  let now=0;f.ctx.Date={now:()=>{now+=23000;return now;}};
  const r=request(['produto_codigo']);r.configParams.tabela='ABC_abc';r.dimensionsFilters=[];
- assert.throws(()=>f.ctx.getData(r),/DS_PRAZO_CONSULTA/);
+ assertFarmaError(f,r,/^DS_PRAZO_CONSULTA$/,/^A consulta demorou mais que o previsto\./);
 });
 
 test('Top pares é explícito, tem universo verificado e não permite filtro silencioso',()=>{
@@ -256,9 +276,9 @@ test('Top pares é explícito, tem universo verificado e não permite filtro sil
  const f=fixture(p=>{assert.equal(p.top,25);assert.equal(p.mode,undefined);const r=result(p,[['001',2]]);r.body.scope={kind:'TOP_PARES',requested:25,universe_pairs:1,selected_pairs:1,all_pairs_returned:true};return r;});
  assert.equal(f.ctx.getData(req).rows.length,1);assert.ok(f.calls[0].url.endsWith('/v1/abc/pares'));
  assert.ok(f.logs.some(x=>x.includes('top_pares_v1')));
- const bad=fixture(p=>result(p,[['001',2]]));assert.throws(()=>bad.ctx.getData(req),/DS_RESPOSTA_INCOMPLETA/);
+ const bad=fixture(p=>result(p,[['001',2]]));assertFarmaError(bad,req,/^DS_RESPOSTA_INCOMPLETA/);
  req.dimensionsFilters=[[{fieldName:'produto_a_codigo',operator:'EQUALS',values:['001'],type:'INCLUDE'}]];
- assert.throws(()=>f.ctx.getData(req),/DS_TOP_PARES_FILTRO_NAO_SUPORTADO/);
+ assertFarmaError(f,req,/^DS_TOP_PARES_FILTRO_NAO_SUPORTADO/);
 });
 
 test('ds136 preserva tipos e zero confirmado, bloqueia lacunas e separa PET',()=>{
@@ -267,9 +287,9 @@ test('ds136 preserva tipos e zero confirmado, bloqueia lacunas e separa PET',()=
  const f=fixture(p=>result(p,[['2026-11-01',0]]));
  assert.deepEqual(Array.from(f.ctx.getData(r).rows[0].values),['20261101',0]);
  const blocked=fixture(()=>({status:409,body:{error:'DS_INSIGHTS_COBERTURA_INCOMPLETA'}}));
- assert.throws(()=>blocked.ctx.getData(r),/DS_INSIGHTS_COBERTURA_INCOMPLETA/);
+ assertFarmaError(blocked,r,/^DS_INSIGHTS_COBERTURA_INCOMPLETA/);
  delete r.dateRange;
- assert.throws(()=>f.ctx.getData(r),/DS_PERIODO_OBRIGATORIO/);
+ assertFarmaError(f,r,/^DS_PERIODO_OBRIGATORIO/);
  r.scriptParams={sampleExtraction:true};
  assert.equal(f.ctx.getData(r).rows.length,0);
  assert.ok(f.calls.at(-1).url.endsWith('/v1/destino'));
@@ -278,7 +298,7 @@ test('ds136 preserva tipos e zero confirmado, bloqueia lacunas e separa PET',()=
 });
 
 require('./datastudio/meta_orders.cjs');
-require('./datastudio/produtos_periodo.cjs')({fixture, result});
+require('./datastudio/produtos_periodo.cjs')({fixture, result, assertFarmaError});
 
 test('Público entrega dimensões e contagens aditivas sem linhas de contatos',()=>{
  const f=fixture(p=>{
@@ -321,5 +341,5 @@ test('visão Weni ausente é explícita e não se torna período zerado',()=>{
  const f=fixture(()=>({status:409,body:{error:'DS_INSIGHTS_VISAO_AUSENTE'}}));
  const r=request(['conversas_weni']);
  r.configParams.tabela='BI_Weni_Conversas_Diarias';
- assert.throws(()=>f.ctx.getData(r),/DS_INSIGHTS_VISAO_AUSENTE/);
+ assertFarmaError(f,r,/^DS_INSIGHTS_VISAO_AUSENTE/);
 });

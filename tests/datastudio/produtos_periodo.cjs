@@ -16,7 +16,7 @@ function includes(values, operator = 'IN_LIST') {
   return {fieldName: 'produto_nome', type: 'INCLUDE', operator, values};
 }
 
-module.exports = function registerProductTests({fixture, result}) {
+module.exports = function registerProductTests({fixture, result, assertFarmaError}) {
   test('Produtos mais vendidos fornece uma fonte de período FARMA com moeda, percentuais e agregações', () => {
     const f = fixture();
     const fields = f.ctx.dsFields_(table).build();
@@ -114,17 +114,17 @@ module.exports = function registerProductTests({fixture, result}) {
       [[includes(Array(101).fill('X'))]], [[includes(['ab\0cd'])]], [[includes([13])]],
       [Array(17).fill(includes(['A']))], [[]]
     ]) {
-      assert.throws(() => f.ctx.getData(request(['quantidade'], filters)), /DS_FILTRO_/);
+      assertFarmaError(f, request(['quantidade'], filters), /DS_FILTRO_/);
     }
     for (const fields of [
       ['posicao_receita_top5','posicao_unidades_top5'], ['produto_nome','receita_item'],
       ['produtos_distintos_periodo','produto_codigo'], ['item_chave'], [], ['produto_nome','produto_nome']
     ]) {
-      assert.throws(() => f.ctx.getData(request(fields)), /DS_CAMPOS_NAO_AUTORIZADOS/);
+      assertFarmaError(f, request(fields), /DS_CAMPOS_NAO_AUTORIZADOS/);
     }
     const strayFilter = request(['registros']);
     strayFilter.fields.push({name:'produto_nome', forFilterOnly:true});
-    assert.throws(() => f.ctx.getData(strayFilter), /DS_FILTRO_AGREGACAO_NAO_SUPORTADO/);
+    assertFarmaError(f, strayFilter, /DS_FILTRO_AGREGACAO_NAO_SUPORTADO/);
     assert.equal(f.calls.length, 0);
   });
 
@@ -139,11 +139,11 @@ module.exports = function registerProductTests({fixture, result}) {
     }
     assert.ok(f.calls.every(call => call.url.endsWith('/v1/destino')));
     const normal = request(['quantidade']);
-    assert.throws(() => f.ctx.getData({...normal, dateRange:{}}), /DS_PERIODO_OBRIGATORIO/);
+    assertFarmaError(f, {...normal, dateRange:{}}, /DS_PERIODO_OBRIGATORIO/);
     for (const [startDate,endDate] of [
       ['2026-02-29','2026-03-01'], ['2026-11-09','2026-11-08'], ['0000-01-01','0000-01-02']
     ]) {
-      assert.throws(() => f.ctx.getData({...normal, dateRange:{startDate,endDate}}), /DS_PERIODO_INVALIDO/);
+      assertFarmaError(f, {...normal, dateRange:{startDate,endDate}}, /DS_PERIODO_INVALIDO/);
     }
     assert.equal(f.calls.length, 2);
   });
@@ -166,23 +166,23 @@ module.exports = function registerProductTests({fixture, result}) {
       [['quantidade'], [[1,2]], /DS_SCHEMA_DIVERGENTE/], [['quantidade'], ['1'], /DS_SCHEMA_DIVERGENTE/],
       [['periodo_inicio'], [['2026-11-10']], /DS_DATA_INVALIDA/]
     ]) {
-      assert.throws(() => fixture(p => result(p,rows)).ctx.getData(request(fields)), error);
+      assertFarmaError(fixture(p => result(p,rows)), request(fields), error);
     }
     for (const override of [
       {complete:false}, {version:0}, {version:'1'}, {protocol:'outro'}, {fields:[]},
       {schema_hash:'outro'}, {environment:'producao'}, {target:'nexoflow_datastudio_homologacao.pet'}
     ]) {
       const f = fixture(p => ({body:{...result(p,[[1]]).body,...override}}));
-      assert.throws(() => f.ctx.getData(request(['registros'])), /DS_(RESPOSTA_INCOMPLETA|CONTRATO_DESTINO_DIVERGENTE)/);
+      assertFarmaError(f, request(['registros']), /DS_(RESPOSTA_INCOMPLETA|CONTRATO_DESTINO_DIVERGENTE)/);
     }
     for (const error of ['DS_PRODUTOS_BASE_INVALIDA','DS_REVISAO_ALTERADA']) {
       const f = fixture(() => ({status:409,body:{error,detail:'texto privado'}}));
-      assert.throws(() => f.ctx.getData(request(['receita_item'])), new RegExp(error));
+      assertFarmaError(f, request(['receita_item']), new RegExp(error));
       assert.ok(!f.logs.join().includes('texto privado'));
     }
     let elapsed = 0;
     const late = fixture(p => { elapsed = 45001; return result(p,[[0]]); });
     late.ctx.Date = class extends Date { static now() { return elapsed; } };
-    assert.throws(() => late.ctx.getData(request(['receita_item'])), /DS_PRAZO_CONSULTA/);
+    assertFarmaError(late, request(['receita_item']), /DS_PRAZO_CONSULTA/);
   });
 };
