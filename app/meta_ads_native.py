@@ -663,8 +663,9 @@ def sync_native_meta(
             conversations, failed_urns = load_conversations(
                 _setting(settings, segment, "WENI_API_TOKEN"),
                 {
-                    event["contact_urn"]
+                    urn
                     for event in evidence
+                    if isinstance(urn := event.get("contact_urn"), str) and urn.strip()
                     if event["segment"] == "FARMA"
                     and datetime.fromisoformat(event["date"]) <= clock
                 },
