@@ -422,7 +422,7 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-O Analytics FARMA consulta diretamente o anúncio e o dia quando a consulta por conta omite uma linha com conversas já registradas.
+O Analytics FARMA consulta diretamente o anúncio e o dia quando a consulta por conta omite uma linha com conversas já registradas. O diagnóstico mostra separadamente conversas sem CPF e calcula o retorno confirmado com as compras emitidas no período.
 
 Instale em Preserve e confira nexo versao. O Setup conserva configurações, credenciais, SQLite, logs, checkpoints e journals. Os ZIPs não incluem instalador Python nem dados comerciais. Não substitua módulos avulsos. A publicação do software não comprova recuperação ou homologação comercial e não executa cargas.
 

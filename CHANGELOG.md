@@ -2,7 +2,7 @@
 
 ## 1.5.61 — em validação
 
-O Analytics FARMA consulta diretamente o anúncio e o dia quando a consulta por conta omite uma linha com conversas já registradas.
+O Analytics FARMA consulta diretamente o anúncio e o dia quando a consulta por conta omite uma linha com conversas já registradas. O diagnóstico mostra separadamente conversas sem CPF e calcula o retorno confirmado com as compras emitidas no período.
 
 ## 1.5.60 — publicada em 24/11/26 01:48:43 (Belém)
 

@@ -486,6 +486,10 @@ def audit_conversations(
 ):
     """Confere cada conversa CTWA e devolve somente totais do recorte solicitado."""
     owners = _official_customers(contacts, weni_contacts, directory)
+    contacts_without_cpf = {
+        row["uuid"] for row in (weni_contacts or [])
+        if row.get("uuid") and not str((row.get("fields") or {}).get("cpf") or "").strip()
+    }
     by_conversation = defaultdict(set)
     unresolved_events = set()
     lookup_failures = set()
@@ -564,7 +568,11 @@ def audit_conversations(
         owner = owners.get(uid)
         if owner is None:
             states["pendente_de_conferencia"] += 1
-            reasons["CLIENTE_OFICIAL_NAO_CONFIRMADO"] += 1
+            reason = (
+                "SEM_CPF_NA_WENI" if uid in contacts_without_cpf
+                else "CLIENTE_OFICIAL_NAO_CONFIRMADO"
+            )
+            reasons[reason] += 1
             continue
         customers.add(owner)
         opening = conversation.opened.astimezone(UTC)
@@ -659,8 +667,11 @@ def audit_conversations(
     )
     revenue = sum((p.revenue for p in attributed), Decimal(0))
     media_ads = {row["anuncio_id"] for row in media}
+    period_begin = datetime.combine(start, time.min, BELEM)
+    period_end = datetime.combine(end, time.max, BELEM)
     metric_purchases = {
-        p: kind for p, (ad, kind) in attributed.items() if ad in media_ads
+        p: kind for p, (ad, kind) in attributed.items()
+        if ad in media_ads and period_begin <= p.at <= period_end
     }
     metric_revenue = sum((p.revenue for p in metric_purchases), Decimal(0))
     direct_revenue = sum(
@@ -669,11 +680,7 @@ def audit_conversations(
     )
     kinds = Counter(kind for _, kind in attributed.values())
     first_buyers = set()
-    period_begin = datetime.combine(start, time.min, BELEM)
-    period_end = datetime.combine(end, time.max, BELEM)
-    for owner in {
-        p.owner for p in metric_purchases if period_begin <= p.at <= period_end
-    }:
+    for owner in {p.owner for p in metric_purchases}:
         if None in unresolved[owner] or any(
             start <= day <= end for day in unresolved[owner] if day
         ):

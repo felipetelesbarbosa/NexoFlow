@@ -236,7 +236,7 @@ class ConversationAuditTests(unittest.TestCase):
         self.assertEqual(result["pedidos_apos_conversa_original_7d"], 1)
         self.assertEqual(result["pedidos_atribuidos_fora_do_periodo"], 1)
         self.assertEqual(result["receita_atribuida_comprovada"], "75")
-        self.assertEqual(result["roas_sobre_receita_comprovada"], "0.75")
+        self.assertEqual(result["roas_sobre_receita_comprovada"], "0.25")
         self.assertEqual(result["roas_na_conversa_original"], "0.25")
         self.assertEqual(result["cac_sobre_clientes_comprovados"], "100")
 
