@@ -1,5 +1,9 @@
 # NexoFlow — Changelog
 
+## 1.5.61 — em validação
+
+O Analytics FARMA consulta diretamente o anúncio e o dia quando a consulta por conta omite uma linha com conversas já registradas.
+
 ## 1.5.60 — publicada em 24/11/26 01:48:43 (Belém)
 
 [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.60) · [Testes e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45326478990) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45328895172)
