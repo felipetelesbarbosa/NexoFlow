@@ -22,7 +22,9 @@ from delivery_spreadsheets import (
     _uuid,
 )
 from meta_ads_evidence import PROJECT_NAMES, ReadOnlyEvidenceClient
+from order_history import HistoryQuery, IdentityIndex
 from pedido_utils import business_order_datetime
+from weni_client import WeniError
 
 PAYLOAD_KEY = "nf_atribuicao_comercial_v1"
 FLOWS_SOURCE = "WENI_FLOWS_V2"
@@ -31,6 +33,12 @@ WINDOW = timedelta(days=7)
 START_TOLERANCE = timedelta(seconds=5)
 BELEM = ZoneInfo("America/Belem")
 HISTORY_START = date(2020, 1, 1)
+CONVERSATION_STATES = (
+    "com_pedido",
+    "sem_pedido_apos_7d",
+    "em_acompanhamento",
+    "pendente_de_conferencia",
+)
 ROOM_EXPORT_NAME = re.compile(
     rf"{re.escape(Path(CONVERSATIONS_FILENAME).stem)}(?: ?\(\d+\))?\.xlsx",
     re.IGNORECASE,
@@ -66,6 +74,7 @@ class Purchase:
     owner: str
     at: datetime
     revenue: Decimal
+    contact: str = ""
 
 
 def read_finalized_rooms(path, start, end, clock):
@@ -162,7 +171,7 @@ def retain_commercial_audits(tables, previous):
 
 def load_conversations(token, urns, begin, end, *, org_uuid=""):
     if not urns:
-        return {}
+        return {}, set()
     client = ReadOnlyEvidenceClient(token, segment="FARMA")
     try:
         org = client.get_org()
@@ -174,13 +183,20 @@ def load_conversations(token, urns, begin, end, *, org_uuid=""):
             or (org_uuid and org.get("uuid") != org_uuid)
         ):
             raise ValueError("Organização Weni FARMA divergente.")
-        return {
-            urn: parse_conversations(
-                client.list_conversation_classifications(urn, after=begin, before=end),
-                urn,
-            )
-            for urn in sorted(urns)
-        }
+        conversations, failed = {}, set()
+        for urn in sorted(urns):
+            try:
+                conversations[urn] = parse_conversations(
+                    client.list_conversation_classifications(
+                        urn, after=begin, before=end
+                    ),
+                    urn,
+                )
+            except (WeniError, ValueError, KeyError, TypeError) as exc:
+                if getattr(exc, "status_code", None) in {401, 403}:
+                    raise
+                failed.add(urn)
+        return conversations, failed
     finally:
         client.close()
 
@@ -343,6 +359,375 @@ def _first_purchase(owner, first_day, first_day_orders, operational):
         dated.append((at, oid))
     dated.sort()
     return dated[0][1] if dated[0][0] != dated[1][0] else None
+
+
+def _official_customers(contacts, weni_contacts, directory):
+    owners = defaultdict(set)
+    if directory is not None and weni_contacts is not None:
+        if directory.segment != "FARMA":
+            raise ValueError("Cadastro oficial de outro segmento.")
+        index = IdentityIndex(weni_contacts)
+        for owner, customer in directory.by_id.items():
+            if owner not in directory.conflicted_ids:
+                uid, _ = index.match(customer)
+                if uid:
+                    owners[uid].add(owner)
+    else:
+        for row in contacts:
+            if (
+                row.get("farmalider_cliente_id")
+                and row.get("contact_uuid")
+                and row.get("farmalider_cliente_status")
+                in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO"}
+            ):
+                owners[row["contact_uuid"]].add(row["farmalider_cliente_id"])
+    return {uid: next(iter(ids)) for uid, ids in owners.items() if len(ids) == 1}
+
+
+def _observed_intervals(coverage, clock):
+    intervals = []
+    for row in coverage:
+        if (
+            row["segmento"] != "FARMA"
+            or row["vigente"] != "Sim"
+            or row["extracao"] != "extraida"
+            or str(row["pendencias"]) != "0"
+        ):
+            continue
+        observed = business_order_datetime(row.get("atualizado"))
+        if observed is None or observed > clock:
+            continue
+        query = HistoryQuery("FARMA", row["inicio"], row["fim"])
+        intervals.append((query.start_at, min(query.end_at, observed)))
+    merged = []
+    for start, end in sorted(intervals):
+        if start > end:
+            continue
+        if merged and start - merged[-1][1] <= timedelta(microseconds=1):
+            merged[-1] = (merged[-1][0], max(end, merged[-1][1]))
+        else:
+            merged.append((start, end))
+    return merged
+
+
+def _official_purchases(history, raw_history, orders, owners):
+    """Recupera a hora oficial quando a publicação conserva apenas a data civil."""
+    published = _unique_rows(history, "pedido_id")
+    if any(row is None for row in published.values()):
+        raise ValueError("Histórico com duplicidade conflitante de pedido.")
+    raw = {
+        row["id"]: row["record"]
+        for row in raw_history
+        if row["segment"] == "FARMA" and row["owner"] in owners
+    }
+    operational = _unique_rows(orders, "pedido_id")
+    purchases, unresolved = defaultdict(list), defaultdict(set)
+    for oid, row in published.items():
+        owner = row["cliente_id"]
+        if (
+            owner not in owners
+            or row["segmento"] != "FARMA"
+            or row["vigente"] != "Sim"
+            or row["estado"] != "valido"
+        ):
+            continue
+        day = date.fromisoformat(row["data"]) if row["data"] else None
+        revenue = Decimal(str(row["faturamento"]))
+        at = None
+        if oid in raw:
+            record = json.loads(raw[oid])
+            if (
+                record["segment"] == "FARMA"
+                and record["id"] == oid
+                and record["owner"] == owner
+                and record["state"] == "valido"
+                and record["revenue_cents"] == revenue * 100
+            ):
+                at = _order_timestamp({"data_hora": record["date"]})
+        else:
+            candidate = operational.get(oid)
+            if (
+                candidate
+                and _owner(candidate) == owner
+                and _sales_order_is_valid(candidate)
+            ):
+                at = _order_timestamp(candidate)
+        if (
+            at is None
+            or at.astimezone(BELEM).date() != day
+            or not revenue.is_finite()
+            or revenue < 0
+        ):
+            unresolved[owner].add(day)
+            continue
+        purchases[owner].append(
+            Purchase(oid, owner, at, revenue, row.get("contato_weni") or "")
+        )
+    return purchases, unresolved
+
+
+def audit_conversations(
+    tables,
+    evidence,
+    contacts,
+    orders,
+    history,
+    raw_history,
+    coverage,
+    conversations,
+    rooms,
+    start,
+    end,
+    clock,
+    *,
+    weni_contacts=None,
+    directory=None,
+    failed_urns=(),
+):
+    """Confere cada conversa CTWA e devolve somente totais do recorte solicitado."""
+    owners = _official_customers(contacts, weni_contacts, directory)
+    by_conversation = defaultdict(set)
+    unresolved_events = set()
+    lookup_failures = set()
+    for event in evidence:
+        if event["segment"] != "FARMA":
+            continue
+        at = datetime.fromisoformat(event["date"])
+        if at > clock:
+            continue
+        touch = Touch(
+            event["event_id"],
+            at,
+            event["contact_urn"],
+            _uuid(event.get("conversation_id")),
+            ("", event["ad_id"], ""),
+        )
+        conversation = _conversation_at_click(touch, conversations.get(touch.urn, ()))
+        if conversation is None:
+            if start <= at.astimezone(BELEM).date() <= end:
+                unresolved_events.add(touch.event_id)
+                if touch.urn in failed_urns:
+                    lookup_failures.add(touch.event_id)
+            continue
+        if conversation.opened <= clock:
+            uid = event["contact_uuid"] if event.get("link_status") == "unique" else ""
+            by_conversation[conversation.identity].add(
+                (touch.at, event["ad_id"], uid, touch.urn, conversation)
+            )
+
+    purchases, unresolved = _official_purchases(
+        history,
+        raw_history,
+        orders,
+        set(owners.values()),
+    )
+    intervals = _observed_intervals(coverage, clock)
+    states = Counter(dict.fromkeys(CONVERSATION_STATES, 0))
+    reasons = Counter()
+    matched = defaultdict(list)
+    customers = set()
+    complete = 0
+    if rooms is None:
+        rooms = {
+            urn: tuple(
+                Room(conv.opened, conv.closed)
+                for conv in entries
+                if conv.human
+                and conv.closed <= clock
+                and conv.closed.astimezone(BELEM).time() != time.max
+            )
+            for urn, entries in conversations.items()
+        }
+    for events in by_conversation.values():
+        first = min(event[0] for event in events)
+        finalists = {
+            (ad, uid, urn, conv) for at, ad, uid, urn, conv in events if at == first
+        }
+        if not any(
+            start <= entry[3].opened.astimezone(BELEM).date() <= end
+            for entry in finalists
+        ):
+            continue
+        if (
+            len(finalists) != 1
+            or len({(uid, conv) for _, _, uid, _, conv in events}) != 1
+        ):
+            states["pendente_de_conferencia"] += 1
+            reasons["ANUNCIO_OU_CONVERSA_AMBIGUOS"] += 1
+            continue
+        ad, uid, urn, conversation = finalists.pop()
+        owner = owners.get(uid)
+        if owner is None:
+            states["pendente_de_conferencia"] += 1
+            reasons["CLIENTE_OFICIAL_NAO_CONFIRMADO"] += 1
+            continue
+        customers.add(owner)
+        opening = conversation.opened.astimezone(UTC)
+        deadline = opening + WINDOW
+        first_day, last_day = (
+            opening.astimezone(BELEM).date(),
+            deadline.astimezone(BELEM).date(),
+        )
+        missing_time = any(
+            day is None or first_day <= day <= last_day for day in unresolved[owner]
+        )
+        full = (
+            not missing_time
+            and clock >= deadline
+            and any(a <= opening and deadline <= b for a, b in intervals)
+        )
+        complete += int(full)
+        eligible = [
+            purchase
+            for purchase in purchases[owner]
+            if opening < purchase.at <= min(clock, deadline)
+        ]
+        if eligible:
+            states["com_pedido"] += 1
+            for purchase in eligible:
+                candidates = [
+                    room
+                    for room in rooms.get(urn, ())
+                    if room.opened <= purchase.at <= room.closed
+                ]
+                direct = (
+                    purchase.contact == uid
+                    and len(candidates) == 1
+                    and _conversation_of_room(candidates[0], conversations[urn])
+                    == conversation
+                    and sum(
+                        candidates[0].opened <= p.at <= candidates[0].closed
+                        for p in purchases[owner]
+                    )
+                    == 1
+                )
+                kind = "sem_vinculo_conversa"
+                if direct:
+                    kind = "direto"
+                elif (
+                    conversation.closed < purchase.at
+                    and conversation.closed.astimezone(BELEM).time() != time.max
+                ):
+                    kind = "posterior"
+                matched[purchase].append((direct, opening, ad, kind))
+        elif missing_time:
+            states["pendente_de_conferencia"] += 1
+            reasons["PEDIDO_SEM_EMISSAO_CONCILIADA"] += 1
+        elif clock < deadline:
+            states["em_acompanhamento"] += 1
+        elif full:
+            states["sem_pedido_apos_7d"] += 1
+        else:
+            states["pendente_de_conferencia"] += 1
+            reasons["COBERTURA_DE_PEDIDOS_INCOMPLETA"] += 1
+
+    attributed = {}
+    for purchase, candidates in matched.items():
+        priority = max((direct, opening) for direct, opening, _, _ in candidates)
+        winners = {
+            (ad, kind)
+            for direct, opening, ad, kind in candidates
+            if (direct, opening) == priority
+        }
+        if len(winners) == 1:
+            attributed[purchase] = winners.pop()
+    ambiguous = len(matched) - len(attributed)
+    media = [
+        row
+        for row in tables["BI_Meta_Resultados"]
+        if row["segmento"] == row["classificacao"] == "FARMA"
+        and start.isoformat() <= row["data"] <= end.isoformat()
+    ]
+    meta = [
+        Decimal(row["conversas_iniciadas_meta"])
+        for row in media
+        if row["conversas_iniciadas_meta"] != ""
+    ]
+    spend = (
+        sum((Decimal(row["investimento_atribuivel"]) for row in media), Decimal(0))
+        if media
+        and all(
+            row["moeda"] == "BRL" and row["investimento_atribuivel"] != ""
+            for row in media
+        )
+        else None
+    )
+    revenue = sum((p.revenue for p in attributed), Decimal(0))
+    media_ads = {row["anuncio_id"] for row in media}
+    metric_purchases = {
+        p: kind for p, (ad, kind) in attributed.items() if ad in media_ads
+    }
+    metric_revenue = sum((p.revenue for p in metric_purchases), Decimal(0))
+    direct_revenue = sum(
+        (p.revenue for p, kind in metric_purchases.items() if kind == "direto"),
+        Decimal(0),
+    )
+    kinds = Counter(kind for _, kind in attributed.values())
+    first_buyers = set()
+    period_begin = datetime.combine(start, time.min, BELEM)
+    period_end = datetime.combine(end, time.max, BELEM)
+    for owner in {
+        p.owner for p in metric_purchases if period_begin <= p.at <= period_end
+    }:
+        if None in unresolved[owner] or any(
+            start <= day <= end for day in unresolved[owner] if day
+        ):
+            continue
+        in_period = [p for p in purchases[owner] if period_begin <= p.at <= period_end]
+        first = min(p.at for p in in_period)
+        candidates = [p for p in in_period if p.at == first]
+        if len(candidates) == 1 and candidates[0] in metric_purchases:
+            first_buyers.add(owner)
+    complete_cac = any(
+        a <= period_begin and min(clock, period_end) <= b for a, b in intervals
+    )
+    audited_completely = (
+        not unresolved_events
+        and not ambiguous
+        and complete == sum(states.values())
+        and len(meta) == len(media)
+        and sum(meta) == sum(states.values())
+    )
+    return dict(
+        status="conferida" if audited_completely else "dados_parciais",
+        inicio=start.isoformat(),
+        fim=end.isoformat(),
+        conversas_weni_identificadas=sum(states.values()),
+        conversas_meta_informadas=str(sum(meta)) if meta else None,
+        fatos_sem_metrica_meta=len(media) - len(meta),
+        diferenca_meta_weni=str(sum(meta) - sum(states.values()))
+        if media and len(media) == len(meta)
+        else None,
+        eventos_sem_conversa_comprovada=len(unresolved_events),
+        eventos_com_falha_na_leitura_weni=len(lookup_failures),
+        clientes_confirmados=len(customers),
+        consultas_completas=complete,
+        situacoes=dict(states),
+        pendencias_por_motivo=dict(sorted(reasons.items())),
+        pedidos_comprovados_distintos=len(matched),
+        pedidos_com_atribuicao_ambigua=ambiguous,
+        pedidos_na_conversa_original=kinds["direto"],
+        pedidos_apos_conversa_original_7d=kinds["posterior"],
+        pedidos_sem_vinculo_com_a_conversa_original=kinds["sem_vinculo_conversa"],
+        pedidos_atribuidos_fora_do_periodo=sum(
+            not period_begin <= p.at <= period_end for p in attributed
+        ),
+        receita_atribuida_comprovada=str(revenue),
+        receita_atribuida_anuncios_com_investimento=str(metric_revenue),
+        investimento_brl=str(spend) if spend is not None else None,
+        roas_sobre_receita_comprovada=str(metric_revenue / spend)
+        if spend and (metric_purchases or audited_completely)
+        else None,
+        roas_na_conversa_original=str(direct_revenue / spend)
+        if spend and ("direto" in metric_purchases.values() or audited_completely)
+        else None,
+        clientes_com_primeira_compra_atribuida_comprovada=len(first_buyers)
+        if complete_cac
+        else None,
+        cac_sobre_clientes_comprovados=str(spend / len(first_buyers))
+        if spend and first_buyers and complete_cac
+        else None,
+    )
 
 
 def prepare_attribution(tables, evidence, orders, history, rooms, *, through):

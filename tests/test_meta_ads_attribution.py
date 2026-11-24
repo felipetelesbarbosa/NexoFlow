@@ -16,6 +16,8 @@ from meta_ads_attribution import (
     Conversation,
     Room,
     apply_attribution,
+    audit_conversations,
+    load_conversations,
     optional_room_export,
 )
 from tests.test_delivery_spreadsheets import ROOM_HEADERS
@@ -112,6 +114,211 @@ def audit(tables, position):
     return json.loads(tables["Meta_Ads_Diario"][position]["payload_api_json"])[
         PAYLOAD_KEY
     ]
+
+
+class ConversationAuditTests(unittest.TestCase):
+    def setUp(self):
+        self.conversations = {}
+        self.events = []
+        self.contacts = []
+        self.coverage = [
+            dict(
+                segmento="FARMA",
+                vigente="Sim",
+                inicio="2026-11-01",
+                fim="2026-11-15",
+                extracao="extraida",
+                pendencias="0",
+                atualizado=moment(15, 9).isoformat(),
+            )
+        ]
+
+    def add_conversation(self, ad, uid, owner, opening, *, human=True):
+        urn = f"whatsapp:{uid}"
+        conversation = Conversation(
+            f"chat-{ad}-{uid}", opening, opening + timedelta(hours=1), human
+        )
+        self.events.append(event(ad, uid, opening))
+        self.conversations.setdefault(urn, []).append(conversation)
+        if owner:
+            self.contacts.append(
+                dict(
+                    contact_uuid=uid,
+                    farmalider_cliente_id=owner,
+                    farmalider_cliente_status="CPF_CONFIRMADO",
+                )
+            )
+        return conversation
+
+    def run_audit(self, history=(), orders=(), raw=(), *, start=1, end=4, **kwargs):
+        return audit_conversations(
+            {
+                "BI_Meta_Resultados": [
+                    dict(
+                        segmento="FARMA",
+                        classificacao="FARMA",
+                        data="2026-11-02",
+                        anuncio_id=ad,
+                        conversas_iniciadas_meta=count,
+                        investimento_atribuivel="25",
+                        moeda="BRL",
+                    )
+                    for ad, count in zip("abcd", "2111", strict=True)
+                ]
+            },
+            self.events,
+            self.contacts,
+            orders,
+            history,
+            raw,
+            self.coverage,
+            self.conversations,
+            None,
+            date(2026, 11, start),
+            date(2026, 11, end),
+            moment(15),
+            **kwargs,
+        )
+
+    def test_checks_each_conversation_and_deduplicates_purchases_across_channels(self):
+        self.add_conversation("a", "1", "77", moment(1))
+        self.add_conversation("b", "1", "77", moment(1, 14))
+        self.add_conversation("c", "2", "88", moment(2))
+        self.add_conversation("d", "3", None, moment(3))
+        self.add_conversation("pet", "7", "22", moment(2))
+        self.events[-1]["segment"] = "PET"
+        self.events.append(self.events[0])
+        self.events.append(event("no-opening", "missing", moment(2)))
+        history = [
+            historical("direct", "77", "1", moment(1).date(), "25"),
+            historical("cross-channel", "77", "", moment(8).date(), "50"),
+            historical("too-late", "77", "", moment(8).date(), "75"),
+            historical("cancelled", "88", "2", moment(3).date(), state="cancelado"),
+        ]
+        orders = [order("direct", "77", "1", moment(1, 10, 30))]
+        raw = [
+            dict(
+                segment="FARMA",
+                id=oid,
+                owner="77",
+                record=json.dumps(
+                    dict(
+                        segment="FARMA",
+                        id=oid,
+                        owner="77",
+                        state="valido",
+                        date=at.isoformat(),
+                        revenue_cents=cents,
+                    )
+                ),
+            )
+            for oid, at, cents in (
+                ("cross-channel", moment(8, 14), 5000),
+                ("too-late", moment(8, 14, 0, 1), 7500),
+            )
+        ]
+        result = self.run_audit(history, orders, raw, failed_urns={"whatsapp:missing"})
+        self.assertEqual(
+            result["situacoes"],
+            dict(
+                com_pedido=2,
+                sem_pedido_apos_7d=1,
+                em_acompanhamento=0,
+                pendente_de_conferencia=1,
+            ),
+        )
+        self.assertEqual(result["conversas_weni_identificadas"], 4)
+        self.assertEqual(result["diferenca_meta_weni"], "1")
+        self.assertEqual(result["eventos_sem_conversa_comprovada"], 1)
+        self.assertEqual(result["eventos_com_falha_na_leitura_weni"], 1)
+        self.assertEqual(result["pedidos_comprovados_distintos"], 2)
+        self.assertEqual(result["pedidos_na_conversa_original"], 1)
+        self.assertEqual(result["pedidos_apos_conversa_original_7d"], 1)
+        self.assertEqual(result["pedidos_atribuidos_fora_do_periodo"], 1)
+        self.assertEqual(result["receita_atribuida_comprovada"], "75")
+        self.assertEqual(result["roas_sobre_receita_comprovada"], "0.75")
+        self.assertEqual(result["roas_na_conversa_original"], "0.25")
+        self.assertEqual(result["cac_sobre_clientes_comprovados"], "100")
+
+    def test_does_not_report_no_purchase_when_coverage_or_time_is_missing(self):
+        self.add_conversation("a", "1", "77", moment(1))
+        self.add_conversation("b", "2", "88", moment(9))
+        history = [historical("sem-hora", "77", "1", moment(2).date())]
+        result = self.run_audit(history, end=10)
+        self.assertEqual(result["situacoes"]["em_acompanhamento"], 1)
+        self.assertEqual(result["situacoes"]["pendente_de_conferencia"], 1)
+        self.assertEqual(
+            result["pendencias_por_motivo"], {"PEDIDO_SEM_EMISSAO_CONCILIADA": 1}
+        )
+        self.assertIsNone(result["roas_sobre_receita_comprovada"])
+        self.coverage[0]["atualizado"] = moment(8, 9, 59).isoformat()
+        result = self.run_audit(end=10)
+        self.assertEqual(result["situacoes"]["sem_pedido_apos_7d"], 0)
+        self.assertEqual(
+            result["pendencias_por_motivo"], {"COBERTURA_DE_PEDIDOS_INCOMPLETA": 1}
+        )
+
+    def test_overlapping_conversations_share_order_but_each_is_checked(self):
+        self.add_conversation("a", "1", "77", moment(1))
+        self.add_conversation("b", "1", "77", moment(2))
+        sale = historical("sale", "77", "1", moment(3).date(), "50")
+        orders = [order("sale", "77", "1", moment(3))]
+        result = self.run_audit([sale], orders)
+        self.assertEqual(result["situacoes"]["com_pedido"], 2)
+        self.assertEqual(result["pedidos_comprovados_distintos"], 1)
+        self.assertEqual(result["receita_atribuida_comprovada"], "50")
+
+    def test_cac_reselects_the_first_purchase_within_the_period(self):
+        self.add_conversation("a", "1", "77", moment(2))
+        history = [
+            historical("previous", "77", "1", moment(1).date()),
+            historical("attributed", "77", "1", moment(2).date()),
+        ]
+        orders = [
+            order("previous", "77", "1", moment(1)),
+            order("attributed", "77", "1", moment(2, 10, 30)),
+        ]
+        wide = self.run_audit(history, orders)
+        self.assertEqual(wide["clientes_com_primeira_compra_atribuida_comprovada"], 0)
+        narrow = self.run_audit(history, orders, start=2)
+        self.assertEqual(narrow["clientes_com_primeira_compra_atribuida_comprovada"], 1)
+        self.assertEqual(narrow["cac_sobre_clientes_comprovados"], "100")
+
+    def test_official_directory_can_confirm_identity_without_a_prior_purchase(self):
+        from farmalider_customers import CustomerDirectory
+
+        self.add_conversation("a", "1", None, moment(1))
+        cpf = "52998224725"
+        directory = CustomerDirectory(
+            [{"id": "77", "cpf": cpf, "nome": "Pessoa de teste"}]
+        )
+        weni = [dict(uuid="1", fields={"cpf": cpf})]
+        result = self.run_audit(weni_contacts=weni, directory=directory)
+        self.assertEqual(result["situacoes"]["sem_pedido_apos_7d"], 1)
+        weni.append(dict(uuid="2", fields={"cpf": cpf}))
+        result = self.run_audit(weni_contacts=weni, directory=directory)
+        self.assertEqual(result["situacoes"]["sem_pedido_apos_7d"], 0)
+        self.assertEqual(
+            result["pendencias_por_motivo"], {"CLIENTE_OFICIAL_NAO_CONFIRMADO": 1}
+        )
+
+    def test_a_failed_contact_read_does_not_skip_other_contacts(self):
+        with patch("meta_ads_attribution.ReadOnlyEvidenceClient") as client:
+            client.return_value.get_org.return_value = dict(
+                name="Delivery FarmaLíder",
+                timezone="America/Belem",
+                uuid="11111111-1111-4111-8111-111111111111",
+            )
+            client.return_value.list_conversation_classifications.side_effect = [
+                ValueError(),
+                [],
+            ]
+            conversations, failed = load_conversations(
+                "test", {"a", "b"}, moment(1), moment(15)
+            )
+            self.assertEqual(failed, {"a"})
+            self.assertEqual(conversations, {"b": ()})
+            client.return_value.close.assert_called_once()
 
 
 class CommercialMetaTests(unittest.TestCase):

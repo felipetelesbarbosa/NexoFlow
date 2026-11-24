@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import math
 import os
@@ -98,8 +99,15 @@ secrets = load_private_settings()
 
 
 def _sync_optional_native_meta(
-    store, settings, contacts, orders, items, weni_contacts=None
-):
+    store,
+    settings,
+    contacts,
+    orders,
+    items,
+    weni_contacts=None,
+    *,
+    customer_directory=None,
+) -> dict[str, Any]:
     """Meta tem cursor próprio; falha isolada não invalida os pedidos confirmados."""
     if not getattr(settings, "META_ADS_ENABLED", False):
         return {"status": "desativado"}
@@ -117,12 +125,25 @@ def _sync_optional_native_meta(
             orders=orders,
             items=items,
             weni_contacts=weni_contacts,
+            customer_directory=customer_directory,
         )
     except Exception as exc:
         # Não registrar str(exc): erros externos podem conter URLs e dados privados.
         logging.error("Meta Ads: etapa isolada falhou; tipo=%s.", type(exc).__name__)
         result = {"status": "falha", "error_type": type(exc).__name__}
     logging.info("Meta Ads: resultado da etapa nativa=%s.", result.get("status"))
+    if "situacoes" in (conference := result.get("conferencia_conversas_anuncio", {})):
+        logging.info(
+            "Anúncios FARMA: Meta=%s; Weni=%s; situações=%s; pedidos distintos=%s.",
+            conference["conversas_meta_informadas"],
+            conference["conversas_weni_identificadas"],
+            conference["situacoes"],
+            conference["pedidos_comprovados_distintos"],
+        )
+    elif conference:
+        logging.warning(
+            "Anúncios FARMA: conferência pendente na etapa %s.", conference["etapa"]
+        )
     if result.get("critical"):
         logging.error(
             "Meta Ads: falha crítica de autenticação/permissão; "
@@ -1638,6 +1659,7 @@ def main() -> int:
             all_order_records,
             all_item_records,
             all_weni_contacts,
+            customer_directory=directory_for(farm_client),
         )
 
         if getattr(secrets, "META_ADS_DESTINOS_FILE", "") and native_meta_result.get("status") != "concluido":
@@ -1722,9 +1744,20 @@ def main() -> int:
             time.monotonic() - bi_started,
         )
 
+        conference_control = {}
+        if commercial_attribution_enabled(sheets, segment()):
+            conference = native_meta_result.get("conferencia_conversas_anuncio") or {
+                "status": "pendente_de_conferencia",
+            }
+            conference_control["ultima_execucao_conferencia_anuncios"] = json.dumps(
+                dict(conference, carga_meta=native_meta_result.get("status")),
+                ensure_ascii=False,
+                sort_keys=True,
+            )
         sheets.set_controls(
             {
                 **completion_controls,
+                **conference_control,
                 "escopo_farmacia_versao": PHARMACY_SCOPE_VERSION,
                 "ultima_execucao_contatos_api": str(len(contacts)),
                 "ultima_execucao_contatos_relevantes": str(len(relevant_contacts)),

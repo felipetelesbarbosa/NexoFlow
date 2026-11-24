@@ -226,6 +226,7 @@ def sync_native_meta(
     expected_manifest=None,
     schema_approved=False,
     weni_contacts=None,
+    customer_directory=None,
 ):
     """Serviços injetáveis; apply=False não cria estado, abas ou recibos."""
     started = monotonic()
@@ -242,6 +243,9 @@ def sync_native_meta(
     }
     if _setting(settings, segment, "META_ADS_ENABLED", False) is not True:
         return report
+    conference_enabled = commercial_attribution_enabled(store, segment)
+    if conference_enabled:
+        report["conferencia_conversas_anuncio"] = {"status": "pendente_de_conferencia"}
     report.update(enabled=True, status="planejando")
     stage, client = "configuracao", None
     runtime_root = (
@@ -517,9 +521,14 @@ def sync_native_meta(
             ).astimezone(UTC)
             for zone in zones
         )
+        scan_start = evidence_start
+        if conference_enabled:
+            from meta_ads_attribution import START_TOLERANCE
+
+            scan_start -= START_TOLERANCE
         evidence, coverage = (evidence_collector or collect_weni_evidence)(
             settings,
-            start=evidence_start,
+            start=scan_start,
             end=evidence_end,
             contacts_by_segment=supplied,
             **({"destination": destination} if destination else {}),
@@ -534,9 +543,10 @@ def sync_native_meta(
             )
             report.update(status="erro", partial=True, critical=True)
             return report
-        if not all(
+        coverage_complete = all(
             coverage.get("segments", {}).get(s) is True for s in ("FARMA", "PET")
-        ):
+        )
+        if not coverage_complete:
             report["errors"].append(
                 {
                     "stage": "evidencias_weni",
@@ -544,8 +554,9 @@ def sync_native_meta(
                     "critical": False,
                 }
             )
-            report.update(status="parcial", partial=True)
-            return report
+            if not conference_enabled:
+                report.update(status="parcial", partial=True)
+                return report
         stage = "transformacao"
         order_reconciliation = (
             {"inicio": start.isoformat(), "fim": end.isoformat()}
@@ -569,7 +580,7 @@ def sync_native_meta(
         if order_reconciliation is not None:
             report["reconciliacao_pedidos_weni"] = order_reconciliation
         differences = []
-        if segment == "FARMA":
+        if segment == "FARMA" and coverage_complete:
             from meta_ads_destinations import reconcile_conversation_days
 
             differences = reconcile_conversation_days(
@@ -606,16 +617,14 @@ def sync_native_meta(
                         status="controle_por_anuncio_divergente", partial=True
                     )
                     return report
-        if any(row["acao"] == "PENDENTE_HISTORICO" for row in differences):
-            report.update(status="conversas_meta_pendentes", partial=True)
-            return report
-        if commercial_attribution_enabled(store, segment):
+        if conference_enabled:
             stage = "atribuicao_comercial_weni"
             from meta_ads_attribution import (
                 FLOWS_SOURCE,
                 WINDOW,
                 XLSX_SOURCE,
                 apply_attribution,
+                audit_conversations,
                 load_conversations,
                 optional_room_export,
                 retain_commercial_audits,
@@ -649,27 +658,74 @@ def sync_native_meta(
                     xlsx_inicio_observado=observed_start.isoformat(),
                     xlsx_fim_observado=observed_end.isoformat(),
                 )
-            if begin <= through:
+            history = store.records("Historico_Pedidos")
+            history_coverage = store.records("BI_Cobertura_Historica")
+            conversations, failed_urns = load_conversations(
+                _setting(settings, segment, "WENI_API_TOKEN"),
+                {
+                    event["contact_urn"]
+                    for event in evidence
+                    if event["segment"] == "FARMA"
+                    and datetime.fromisoformat(event["date"]) <= clock
+                },
+                scan_start,
+                clock,
+                org_uuid=_setting(settings, segment, "WENI_FLOWS_ORG_UUID", ""),
+            )
+            report["conferencia_conversas_anuncio"] = audit_conversations(
+                tables,
+                evidence,
+                contacts,
+                orders,
+                history,
+                store.records("Cache_history_orders"),
+                history_coverage,
+                conversations,
+                rooms,
+                earliest if weni_contacts is not None else start,
+                latest_evidence_day if weni_contacts is not None else end,
+                clock,
+                weni_contacts=weni_contacts,
+                directory=customer_directory,
+                failed_urns=failed_urns,
+            )
+            if not coverage_complete or report["errors"]:
+                report["conferencia_conversas_anuncio"]["status"] = "dados_parciais"
+            if failed_urns:
+                report["errors"].append(
+                    dict(
+                        stage=stage,
+                        error_type="IncompleteConversationLookup",
+                        critical=False,
+                    )
+                )
+                report.update(status="parcial", partial=True)
+                return report
+            if coverage_complete and begin <= through:
                 commercial_result.update(
                     apply_attribution(
                         tables,
                         evidence,
                         orders,
-                        store.records("Historico_Pedidos"),
-                        store.records("BI_Cobertura_Historica"),
+                        history,
+                        history_coverage,
                         rooms,
                         begin,
                         through,
                         clock,
-                        lambda urns: load_conversations(
-                            _setting(settings, segment, "WENI_API_TOKEN"),
-                            urns,
-                            evidence_start,
-                            datetime.combine(through, time.max, TZ),
-                            org_uuid=_setting(settings, segment, "WENI_FLOWS_ORG_UUID", ""),
-                        ),
+                        lambda urns: {
+                            urn: conversations[urn]
+                            for urn in urns
+                            if urn in conversations
+                        },
                     )
                 )
+        if not coverage_complete:
+            report.update(status="parcial", partial=True)
+            return report
+        if any(row["acao"] == "PENDENTE_HISTORICO" for row in differences):
+            report.update(status="conversas_meta_pendentes", partial=True)
+            return report
         # Conversões deixam rastro em vez de manter receita de compra cancelada.
         fresh = {row["chave"] for row in tables["BI_Meta_Conversoes"]}
         for row in previous.get("BI_Meta_Conversoes", []):
@@ -794,6 +850,12 @@ def sync_native_meta(
         )
         return report
     finally:
+        if (
+            conference_enabled
+            and report["conferencia_conversas_anuncio"].get("status")
+            == "pendente_de_conferencia"
+        ):
+            report["conferencia_conversas_anuncio"]["etapa"] = stage
         report["elapsed_seconds"] = round(monotonic() - started, 3)
         report["last_stage"] = stage
         if client is not None:

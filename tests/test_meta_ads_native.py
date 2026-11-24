@@ -119,44 +119,115 @@ class NativeSyncTests(unittest.TestCase):
             return NOW.replace(day=2, hour=hour)
 
         event = dict(
-            segment="FARMA", event_id="ctwa-1", ad_id="123", contact_uuid="1",
-            contact_urn="whatsapp:1", link_status="unique", date=at(10).isoformat(),
+            segment="FARMA",
+            event_id="ctwa-1",
+            ad_id="123",
+            contact_uuid="1",
+            contact_urn="whatsapp:1",
+            link_status="unique",
+            date=at(10).isoformat(),
         )
         settings = {
             "META_ADS_ENABLED": True,
             "WENI_API_TOKEN": "token-ficticio",
             "META_ADS_WENI_SALAS": {
                 "arquivo": "importacoes/export-inexistente.xlsx",
-                "inicio": "2026-11-01", "fim": "2026-11-03",
+                "inicio": "2026-11-01",
+                "fim": "2026-11-03",
             },
         }
         store = Store()
         store.client = SimpleNamespace(config={"segment": "FARMA"})
         sources = {
+            "Cache_history_orders": [],
             "Historico_Pedidos": [historical("10", "77", "1", at(11).date())],
-            "BI_Cobertura_Historica": [dict(
-                segmento="FARMA", vigente="Sim", inicio="2020-01-01",
-                fim="2026-11-03", extracao="extraida", pendencias="0",
-            )],
+            "BI_Cobertura_Historica": [
+                dict(
+                    segmento="FARMA",
+                    vigente="Sim",
+                    inicio="2020-01-01",
+                    fim="2026-11-03",
+                    extracao="extraida",
+                    pendencias="0",
+                )
+            ],
         }
         store.records = sources.__getitem__
-        with tempfile.TemporaryDirectory() as tmp, patch(
-            "meta_ads_attribution.load_conversations",
-            return_value={"whatsapp:1": (Conversation("chat", at(10), at(13), True),)},
-        ) as get_conversations:
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch(
+                "meta_ads_attribution.load_conversations",
+                return_value=(
+                    {
+                        "whatsapp:1": (Conversation("chat", at(10), at(13), True),),
+                        "whatsapp:2": (Conversation("chat-2", at(10), at(13), True),),
+                    },
+                    set(),
+                ),
+            ) as get_conversations,
+        ):
+            contacts = [
+                dict(
+                    contact_uuid=uid,
+                    farmalider_cliente_id=oid,
+                    farmalider_cliente_status="CPF_CONFIRMADO",
+                )
+                for uid, oid in (("1", "77"), ("2", "88"))
+            ]
+            events = [
+                event,
+                dict(
+                    event, event_id="ctwa-2", contact_uuid="2", contact_urn="whatsapp:2"
+                ),
+            ]
             result = sync_native_meta(
-                store, settings, "FARMA", [], [order("10", "77", "1", at(11))], [],
-                now=NOW, apply=False, state_dir=Path(tmp), client_factory=Client,
-                evidence_collector=lambda *a, **k: ([event], evidence()[1]),
+                store,
+                settings,
+                "FARMA",
+                contacts,
+                [order("10", "77", "1", at(11))],
+                [],
+                now=NOW,
+                apply=False,
+                state_dir=Path(tmp),
+                client_factory=Client,
+                evidence_collector=lambda *a, **k: (events, evidence()[1]),
+            )
+            events[1]["link_status"] = "ambiguous"
+            partial = sync_native_meta(
+                store,
+                settings,
+                "FARMA",
+                contacts,
+                [order("10", "77", "1", at(11))],
+                [],
+                now=NOW,
+                apply=True,
+                state_dir=Path(tmp),
+                client_factory=Client,
+                evidence_collector=lambda *a, **k: (
+                    events,
+                    {"segments": {"FARMA": False, "PET": True}, "auth_failed": []},
+                ),
             )
         self.assertEqual(result["status"], "simulacao", result)
         diagnostic = result["atribuicao_comercial_weni"]
         self.assertEqual(diagnostic["xlsx_opcional"], "ausente")
         self.assertEqual(diagnostic["origem_evidencia"], "WENI_FLOWS_V2")
         self.assertEqual(diagnostic["direto"], 1)
+        conference = result["conferencia_conversas_anuncio"]
+        self.assertEqual(conference["situacoes"]["com_pedido"], 1)
+        self.assertEqual(conference["situacoes"]["em_acompanhamento"], 1)
+        self.assertEqual(partial["status"], "parcial", partial)
+        partial_conference = partial["conferencia_conversas_anuncio"]
+        self.assertEqual(partial_conference["situacoes"]["com_pedido"], 1)
+        self.assertEqual(partial_conference["situacoes"]["pendente_de_conferencia"], 1)
+        self.assertFalse(partial["applied"])
         self.assertEqual(store.writes, 0)
-        get_conversations.assert_called_once()
-        self.assertEqual(get_conversations.call_args.args[1], {"whatsapp:1"})
+        self.assertEqual(get_conversations.call_count, 2)
+        self.assertEqual(
+            get_conversations.call_args.args[1], {"whatsapp:1", "whatsapp:2"}
+        )
 
     def run_sync(
         self,
