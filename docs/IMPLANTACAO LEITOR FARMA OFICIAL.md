@@ -64,6 +64,8 @@ CASE WHEN IFNULL(TRIM(MAX(cliente)), "") = "" THEN "Nome não informado" ELSE MA
 
 No controle de 01 a 20/11/2026, confirme as mesmas cinco chaves distintas e a mesma receita na mesma ordem. Os dois clientes com nome vazio devem continuar em linhas separadas, com receitas de R$ 4.203,91 e R$ 3.861,68. Para reverter a apresentação, restaure `MAX(cliente)`.
 
+A aplicação foi confirmada no Resumo oficial FARMA após reabrir o relatório e selecionar **01 a 20/11/2026**. As cinco posições conservaram a ordem e os valores. As duas receitas de R$ 4.203,91 e R$ 3.861,68 continuaram em linhas separadas, ambas com **Nome não informado**. O aceite se refere ao campo **Nome** de **Clientes de destaque**. [Resumo oficial FARMA](https://datastudio.google.com/reporting/e60ba3bc-fe88-417d-8a39-d8512debf175/page/oeZAG)
+
 Use **Nome** e **Receita gerada** nos cabeçalhos visíveis de **Clientes de destaque**. Na **Base de clientes**, use rótulos como **Nome do cliente**, **Pedidos válidos** e **Receita histórica por cliente**. O agrupamento por chave continua sendo configuração interna. Confira os rótulos também nas dicas do gráfico, no seletor de campos apresentado ao leitor e nas mensagens de ausência de dados.
 
 O conector FARMA tem rótulos comerciais nas fontes de clientes e anúncios. Os códigos de falha ficam no histórico de execução do Apps Script. Na cópia, confira as mensagens de prazo, período inválido, cobertura insuficiente e falha de consulta. Um retorno completo sem linhas continua chegando como período vazio. Aplique os rótulos nos componentes já configurados e preserve os campos, a moeda, o agrupamento e o período. Registre a versão anterior do conector para reversão.
