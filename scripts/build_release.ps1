@@ -422,7 +422,7 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-O Analytics FARMA preserva fechamentos antigos quando a descrição dos itens e o registro de origem no cabeçalho são as únicas diferenças comprovadas. O log informa os motivos que impedem a publicação. Falhas temporárias ao abrir ou selar a revisão, ler páginas e receber lotes têm nova tentativa ou conferência de recibo com os mesmos identificadores. A simulação de Anúncios distingue os pedidos pendentes por motivo.
+O Analytics FARMA confere as conversas de anúncios e os pedidos válidos nas 168 horas seguintes. Conversas sem identificação suficiente ficam pendentes. A validação dos indicadores com dados reais no Looker é uma etapa própria.
 
 Instale em Preserve e confira nexo versao. O Setup conserva configurações, credenciais, SQLite, logs, checkpoints e journals. Os ZIPs não incluem instalador Python nem dados comerciais. Não substitua módulos avulsos. A publicação do software não comprova recuperação ou homologação comercial e não executa cargas.
 
