@@ -174,6 +174,44 @@ SELECT :'ltv_clientes_divergentes'::bigint = 0 AS ltv_ok \gset
 \else
     DO $$BEGIN RAISE EXCEPTION 'DS_AUDITORIA_LTV_DIVERGENTE'; END$$;
 \endif
+
+-- Opcional: conferir a fonte consolidada da Base de clientes, sem período.
+-- O histórico e a receita consolidada têm universos diferentes. Reportar a
+-- diferença sem publicar pedidos no histórico nem relaxar sua conferência.
+\if :{?conferir_cobertura_ltv}
+\if :conferir_cobertura_ltv
+WITH vendas AS (
+    SELECT cliente_chave, count(*) AS pedidos,
+           sum(round(faturamento*100)) AS centavos,
+           count(*)=count(faturamento) AS completo
+    FROM farma.ds_bi_clientes_vendas
+    GROUP BY cliente_chave
+), clientes AS (
+    SELECT cliente_chave, count(*) AS linhas,
+           sum(pedidos_identificados) AS pedidos,
+           sum(round(faturamento_identificado*100)) AS centavos,
+           count(*)=count(pedidos_identificados) AND
+           count(*)=count(faturamento_identificado) AS completo
+    FROM farma.ds_bi_clientes
+    GROUP BY cliente_chave
+)
+SELECT count(v.pedidos) AS clientes, coalesce(sum(v.pedidos),0) AS pedidos,
+       coalesce(sum(v.centavos),0) AS centavos,
+       coalesce(sum(v.pedidos),0)-:'ltv_pedidos'::bigint AS diferenca_pedidos,
+       coalesce(sum(v.centavos),0)-:'ltv_ltv_centavos'::numeric AS diferenca_centavos,
+       count(*) FILTER (WHERE nullif(btrim(v.cliente_chave),'') IS NULL
+                        OR v.completo IS NOT TRUE OR c.completo IS NOT TRUE
+                        OR c.linhas IS DISTINCT FROM 1 OR v.pedidos IS DISTINCT FROM c.pedidos
+                        OR v.centavos IS DISTINCT FROM c.centavos) AS clientes_divergentes
+FROM vendas v FULL JOIN clientes c USING (cliente_chave) \gset consolidado_
+\echo Base de clientes consolidada: clientes=:consolidado_clientes pedidos=:consolidado_pedidos centavos=:consolidado_centavos diferenca_pedidos=:consolidado_diferenca_pedidos diferenca_centavos=:consolidado_diferenca_centavos clientes_divergentes=:consolidado_clientes_divergentes
+SELECT :'consolidado_clientes_divergentes'::bigint = 0 AS consolidado_ok \gset
+\if :consolidado_ok
+\else
+    DO $$BEGIN RAISE EXCEPTION 'DS_AUDITORIA_CLIENTES_CONSOLIDADOS_DIVERGENTES'; END$$;
+\endif
+\endif
+\endif
 \if :financeiro_ok
 \else
     DO $$BEGIN RAISE EXCEPTION 'DS_AUDITORIA_PROJECOES_DIVERGENTES'; END$$;

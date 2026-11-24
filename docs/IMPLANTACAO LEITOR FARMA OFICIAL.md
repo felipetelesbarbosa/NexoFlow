@@ -72,6 +72,22 @@ O conector FARMA tem rótulos comerciais nas fontes de clientes e anúncios. Os 
 
 Em **Produtos de destaque**, o conector registra `produtos_farma` ao consultar `POST /v1/produtos`. O registro informa período, modo, campos, duração, versão publicada e quantidade de linhas. Compare o mesmo modo e os mesmos campos do gráfico ao medir a API. Uma agregação direta da visão de itens usa outro caminho e seu limite de tempo deve ser registrado separadamente. Confira se o componente usa o ranking paginado ou a lista de cinco produtos por receita antes de trocar a consulta.
 
+### Cobertura da Receita histórica por cliente · FARMA
+
+Na READY v8, o Work confirmou que a fonte histórica soma 208.286 pedidos válidos, R$ 28.867.370,02 e 39.450 clientes, sem depender do filtro de data. As vendas consolidadas incluem dois pedidos válidos de 20/03/2025, no valor de R$ 306,91, fora desse acumulado. Na mesma revisão, o controle esperado é de 208.288 pedidos e R$ 28.867.676,93. Confira o número de compradores distintos na leitura.
+
+Para mostrar todas as compras válidas publicadas, homologue o indicador **Receita histórica por cliente** com a fonte PostgreSQL `BI_Clientes`. Essa fonte usa `faturamento_identificado` e `pedidos_identificados` do consolidado de vendas no grão de cliente. Preserve a chave de agrupamento e a ordenação, mantenha o nome da métrica em português e confira a posição dos clientes afetados na cópia. Teste os dois intervalos de data e confirme que os valores permanecem iguais. A fonte `BI_LTV_Clientes` continua disponível para a conferência do histórico propriamente dito e para os componentes que exigem seus campos de cobertura e primeira compra. Revise separadamente os componentes que usam a mesclagem histórica antes de qualquer troca.
+
+Execute o [roteiro de auditoria](../integrations/datastudio/auditar_projecoes_farma.sql) com o papel leitor e a revisão ativa conferida:
+
+```bash
+psql -X -v revisao=UUID_READY -v inicio=2026-11-01 -v fim=2026-11-20 \
+  -v somente_diferencas=true -v conferir_cobertura_ltv=true \
+  -f integrations/datastudio/auditar_projecoes_farma.sql
+```
+
+O recorte é usado nos controles diários. No acumulado, a linha **Base de clientes consolidada** confere pedidos e receita por chave de cliente, informa a diferença em relação ao histórico e omite dados individuais. Compare os resultados com a cópia antes de editar o oficial.
+
 ## Pendências de Público e do painel Anúncios
 
 - **Público.** Na cópia, o Looker exibiu erro de sistema nos gráficos após a troca, inclusive no ensaio do leitor ajustado. Os 12 componentes de `BI_Publico` voltaram às ligações anteriores. A consulta direta à API retornou HTTP 200 para as duas projeções integrais da READY v2. A métrica de compra identificada de `BI_Publico` soma marcações dos contatos. A mesclagem de compradores operacionais conta contatos com pedido elegível. Reconcilie os dois critérios separadamente antes de validar uma nova projeção dos cartões e filtros.

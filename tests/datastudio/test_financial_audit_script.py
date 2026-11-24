@@ -55,6 +55,8 @@ def test_reconciliation_script_checks_ready_keys_and_missing_values(store, publi
                 "fim=" + end,
                 "-v",
                 "somente_diferencas=true",
+                "-v",
+                "conferir_cobertura_ltv=true",
                 "-f",
                 "-",
             ],
@@ -73,6 +75,10 @@ def test_reconciliation_script_checks_ready_keys_and_missing_values(store, publi
     assert items["unidades"] == 5 and items["skus"] == 2
     assert orders["pedidos"] == 3 and orders["linhas_duplicadas"] == 0
     assert "clientes=1 pedidos=1 centavos=7789 clientes_divergentes=0" in result.stdout
+    assert (
+        "clientes=1 pedidos=3 centavos=9724 diferenca_pedidos=2 "
+        "diferenca_centavos=1935 clientes_divergentes=0" in result.stdout
+    )
 
     result = audit(revision, "2027-01-01", "2027-01-01")
     assert result.returncode == 0 and _total(result)[2]["itens"] == 0
