@@ -110,9 +110,13 @@ O publicador grava somente contagens, receitas e cobertura no fato diário da Me
 
 O intervalo escolhido no Data Studio será aplicado antes de escolher o primeiro anúncio comprovado e a primeira compra válida de cada cliente naquele recorte. O mesmo intervalo selecionará os fatos de veiculação e investimento da Meta e as compras por data de emissão. As datas são inclusivas. Preserve o fuso da conta Meta nos fatos de mídia e use `America/Belem` nos eventos Weni e na emissão FarmaLíder. Confira a sequência pelo instante dos eventos quando as datas civis forem diferentes.
 
+Na homologação, parta de todas as conversas de anúncio que possam ser identificadas no projeto FARMA. Confira cada conversa, inclusive as que terminam sem compra. Quando várias conversas apontarem para o mesmo cliente, aproveite a consulta aos pedidos e mantenha todas as conversas na conferência. O total informado pela Meta pode ter conversas sem correspondência individual na Weni. Registre separadamente as conversas informadas, as conversas identificadas, os clientes confirmados, as consultas completas, os clientes sem pedido elegível e as pendências. Uma consulta que falhou fica pendente.
+
+Para identificar um **Pedido influenciado por anúncio**, comprove o anúncio e a abertura da conversa pelos metadados da Weni, confirme o mesmo cliente no cadastro oficial e procure pedidos válidos emitidos nas 168 horas seguintes. A compra pode ocorrer por outro canal. O CPF válido ajuda a conferir o cadastro com a FarmaLíder. O nome é apoio e casos de identidade ambígua ficam pendentes. Conte cada pedido uma vez, ainda que existam várias conversas. Preserve em separado os pedidos confirmados dentro da conversa original e as compras influenciadas fora dela. Aplique o período selecionado também à emissão do pedido.
+
 | Indicador | Cálculo no recorte |
 | --- | --- |
-| Pedidos e receita | Contagem por ID de pedido válido e soma da receita oficialmente atribuída. Preserve a separação entre pedidos na conversa original e pedidos em outro atendimento no ciclo de 7 dias. |
+| Pedidos e receita | Contagem por ID de pedido válido e soma da receita comprovada. Preserve a separação entre pedidos na conversa original e pedidos influenciados em até 7 dias, inclusive compras em outro canal. |
 | ROAS | Receita atribuída dividida pelo investimento realizado na Meta em BRL. |
 | CPA | Investimento realizado dividido pelos pedidos atribuídos distintos. |
 | CAC no período | Investimento realizado dividido pelos clientes oficiais distintos cuja primeira compra válida **no intervalo** foi atribuída. A mesma pessoa pode ter uma compra anterior ao intervalo. |
