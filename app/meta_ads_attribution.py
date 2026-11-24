@@ -369,16 +369,15 @@ def _official_customers(contacts, weni_contacts, directory):
         index = IdentityIndex(weni_contacts)
         for owner, customer in directory.by_id.items():
             if owner not in directory.conflicted_ids:
-                uid, _ = index.match(customer)
-                if uid:
+                uid, reason = index.match(customer)
+                if uid and reason == "CPF_VALIDO_UNICO":
                     owners[uid].add(owner)
     else:
         for row in contacts:
             if (
                 row.get("farmalider_cliente_id")
                 and row.get("contact_uuid")
-                and row.get("farmalider_cliente_status")
-                in {"CPF_CONFIRMADO", "CPF_INVALIDO_ENCONTRADO"}
+                and row.get("farmalider_cliente_status") == "CPF_CONFIRMADO"
             ):
                 owners[row["contact_uuid"]].add(row["farmalider_cliente_id"])
     return {uid: next(iter(ids)) for uid, ids in owners.items() if len(ids) == 1}
@@ -486,10 +485,13 @@ def audit_conversations(
 ):
     """Confere cada conversa CTWA e devolve somente totais do recorte solicitado."""
     owners = _official_customers(contacts, weni_contacts, directory)
-    contacts_without_cpf = {
-        row["uuid"] for row in (weni_contacts or [])
-        if row.get("uuid") and not str((row.get("fields") or {}).get("cpf") or "").strip()
-    }
+    contacts_without_cpf = set()
+    for row in weni_contacts or []:
+        cpf = (row.get("fields") or {}).get("cpf")
+        if isinstance(cpf, dict):
+            cpf = cpf.get("value")
+        if row.get("uuid") and not str(cpf or "").strip():
+            contacts_without_cpf.add(row["uuid"])
     by_conversation = defaultdict(set)
     unresolved_events = set()
     lookup_failures = set()
