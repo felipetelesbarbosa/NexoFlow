@@ -495,10 +495,15 @@ def audit_conversations(
         at = datetime.fromisoformat(event["date"])
         if at > clock:
             continue
+        urn = event.get("contact_urn")
+        if not isinstance(urn, str) or not urn.strip():
+            if start <= at.astimezone(BELEM).date() <= end:
+                unresolved_events.add(event["event_id"])
+            continue
         touch = Touch(
             event["event_id"],
             at,
-            event["contact_urn"],
+            urn,
             _uuid(event.get("conversation_id")),
             ("", event["ad_id"], ""),
         )
@@ -510,7 +515,7 @@ def audit_conversations(
                     lookup_failures.add(touch.event_id)
             continue
         if conversation.opened <= clock:
-            uid = event["contact_uuid"] if event.get("link_status") == "unique" else ""
+            uid = (event.get("contact_uuid") or "") if event.get("link_status") == "unique" else ""
             by_conversation[conversation.identity].add(
                 (touch.at, event["ad_id"], uid, touch.urn, conversation)
             )
@@ -760,7 +765,11 @@ def prepare_attribution(tables, evidence, orders, history, rooms, *, through):
             event["ad_id"],
             at.astimezone(ZoneInfo(zone)).date().isoformat(),
         )
-        if grain in days and event.get("link_status") != "unique":
+        if grain in days and (
+            event.get("link_status") != "unique"
+            or not event.get("contact_urn")
+            or not event.get("contact_uuid")
+        ):
             pending.add(grain)
         elif grain in days:
             touches[event["contact_uuid"]].add(
