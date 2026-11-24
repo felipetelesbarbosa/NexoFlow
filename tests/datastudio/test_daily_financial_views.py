@@ -244,6 +244,18 @@ def test_unidentified_orders_keep_separate_keys(published):
     assert sorted(result["rows"]) == [["sem-id-1"], ["sem-id-2"]]
 
 
+def test_customer_revenue_sums_only_valid_sales_in_period_and_returns_confirmed_zero(published):
+    owner = opaque_key("farmalider", "sintetico")
+    filters = [{"field": "cliente_chave", "values": [owner]}]
+    for start, end, expected in ((DAY, NEXT, "97.24"), (EMPTY, EMPTY, "0")):
+        result = published.query(
+            "BI_Clientes_Vendas", ["faturamento"], start, end, filters,
+            {"faturamento": "sum"},
+        )
+        assert result["complete"] is True
+        assert Decimal(result["rows"][0][0]) == Decimal(expected)
+
+
 def test_sales_by_day_reconciles_with_items_abc_and_observed_ltv(published):
     fields = [
         "data",

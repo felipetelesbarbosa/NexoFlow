@@ -342,6 +342,13 @@ class Reader(Store):
                 sql.SQL("{}::text=ANY(%s)").format(sql.Identifier(item["field"]))
             )
             params.append([str(v) for v in item["values"]])
+        period_customer_revenue = (
+            self.segment == "FARMA"
+            and table == "BI_Clientes_Vendas"
+            and bool(start)
+            and fields == ["faturamento"]
+            and aggregation == {"faturamento": "sum"}
+        )
         expressions = []
         for field in fields:
             column = sql.Identifier(field)
@@ -351,6 +358,8 @@ class Reader(Store):
                     expr = sql.SQL("COUNT(DISTINCT {})").format(column)
                 else:
                     expr = sql.SQL("{}({})").format(sql.SQL(operation.upper()), column)
+                if period_customer_revenue:
+                    expr = sql.SQL("coalesce({},0::numeric)").format(expr)
                 expressions.append(sql.SQL("{} AS {}").format(expr, column))
             else:
                 expressions.append(column)
@@ -383,6 +392,10 @@ class Reader(Store):
             if aggregation:
                 incomplete = sql.SQL("bool_or({})").format(incomplete)
             expressions.append(sql.SQL("({}) AS nf_incompleto").format(incomplete))
+        if period_customer_revenue:
+            expressions.append(
+                sql.SQL("count(*) <> count(faturamento) AS nf_incompleto")
+            )
         statement = sql.SQL("SELECT {} FROM {}.{}").format(
             sql.SQL(",").join(expressions),
             sql.Identifier(self.schema),
@@ -493,7 +506,9 @@ class Reader(Store):
                 if table == "BI_Pedidos" and self.segment == "FARMA":
                     raise StorageError("DS_BI_PEDIDO_OPERACIONAL_AMBIGUO") from None
                 raise
-            if daily_metrics and any(row["nf_incompleto"] for row in rows):
+            if (daily_metrics or period_customer_revenue) and any(
+                row["nf_incompleto"] for row in rows
+            ):
                 raise StorageError("DS_BI_VENDAS_INCOMPLETA")
         return self.result(version, fields, rows)
 

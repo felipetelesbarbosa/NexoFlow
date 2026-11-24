@@ -88,6 +88,10 @@ psql -X -v revisao=UUID_READY -v inicio=2026-11-01 -v fim=2026-11-20 \
 
 O recorte é usado nos controles diários. No acumulado, a linha **Base de clientes consolidada** confere pedidos e receita por chave de cliente, informa a diferença em relação ao histórico e omite dados individuais. Compare os resultados com a cópia antes de editar o oficial.
 
+### Receita do cliente no período · FARMA
+
+Na cópia, vincule um cartão separado à fonte `BI_Clientes_Vendas` do leitor FARMA em modo **somas**. Solicite apenas `faturamento` com soma e use `data` como dimensão do período. Para um cartão individual, confira que o filtro de cliente chega à consulta pela chave; mantenha a chave fora da apresentação. A consulta soma vendas válidas de todos os canais. O leitor devolve zero se o recorte filtrado estiver vazio, e sinaliza falha se houver uma venda com valor ausente. Mantenha **Receita histórica por cliente** em seu cartão acumulado.
+
 ## Pendências de Público e do painel Anúncios
 
 - **Público.** Na cópia, o Looker exibiu erro de sistema nos gráficos após a troca, inclusive no ensaio do leitor ajustado. Os 12 componentes de `BI_Publico` voltaram às ligações anteriores. A consulta direta à API retornou HTTP 200 para as duas projeções integrais da READY v2. A métrica de compra identificada de `BI_Publico` soma marcações dos contatos. A mesclagem de compradores operacionais conta contatos com pedido elegível. Reconcilie os dois critérios separadamente antes de validar uma nova projeção dos cartões e filtros.
