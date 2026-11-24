@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.5.61",
+    [string]$Version = "1.5.62",
     [string]$CertificateThumbprint = "",
     [switch]$RequireSignature
 )
@@ -422,7 +422,7 @@ A arquitetura por perfis permite incluir novos departamentos e segmentos mediant
 
 ## Nesta atualização
 
-O Analytics FARMA consulta diretamente o anúncio e o dia quando a consulta por conta omite uma linha com conversas já registradas. O diagnóstico mostra separadamente conversas sem CPF e calcula o retorno confirmado com as compras emitidas no período.
+O Analytics FARMA publica os vínculos confirmados entre anúncios e pedidos na própria revisão PostgreSQL. O leitor FARMA permite recalcular os indicadores pelo período no Looker, após homologar sua fonte e os vínculos.
 
 Instale em Preserve e confira nexo versao. O Setup conserva configurações, credenciais, SQLite, logs, checkpoints e journals. Os ZIPs não incluem instalador Python nem dados comerciais. Não substitua módulos avulsos. A publicação do software não comprova recuperação ou homologação comercial e não executa cargas.
 
@@ -438,7 +438,7 @@ A publicação é validada por testes no Windows, check-up e testes de instalaç
 
 Write-Host "==> Artefatos gerados"
 Get-ChildItem -LiteralPath $DistDir -File | Select-Object Name,Length
-# NexoFlow 1.5.61
+# NexoFlow 1.5.62
 
 Assert-ZipEntry -ZipPath $SetupZip -EntryName "NexoFlow Setup/payload/scripts/reconhecer_rede.ps1"
 Assert-ZipEntry -ZipPath $ProjectZip -EntryName "NexoFlow/scripts/reconhecer_rede.ps1"

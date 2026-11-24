@@ -1540,7 +1540,16 @@ var NexoDSSchemas={
       "cac_novos_clientes",
       "cpa_conversa_anuncio",
       "roas_conversa_anuncio",
-      "dias_comerciais_parciais"
+      "dias_comerciais_parciais",
+      "pedidos_atribuidos_periodo",
+      "receita_atribuida_periodo",
+      "primeiros_clientes_periodo",
+      "cpa_periodo",
+      "roas_periodo",
+      "cac_periodo",
+      "status_cpa_periodo",
+      "status_roas_periodo",
+      "status_cac_periodo"
     ],
     "period": "data",
     "labels": {
@@ -1552,9 +1561,22 @@ var NexoDSSchemas={
       "cac_novos_clientes": "CAC de novos clientes",
       "cpa_conversa_anuncio": "CPA na conversa do anúncio",
       "roas_conversa_anuncio": "ROAS na conversa do anúncio",
-      "dias_comerciais_parciais": "Fatos diários com atribuição comercial parcial"
+      "dias_comerciais_parciais": "Fatos diários com atribuição comercial parcial",
+      "pedidos_atribuidos_periodo": "Pedidos atribuídos no período",
+      "receita_atribuida_periodo": "Receita atribuída no período",
+      "primeiros_clientes_periodo": "Clientes com primeira compra atribuída no período",
+      "cpa_periodo": "Custo por venda",
+      "roas_periodo": "Retorno sobre anúncios",
+      "cac_periodo": "Custo por cliente com primeira compra no período",
+      "status_cpa_periodo": "Situação do custo por venda",
+      "status_roas_periodo": "Situação do retorno sobre anúncios",
+      "status_cac_periodo": "Situação do custo por cliente"
     },
     "metric_kinds": {
+      "cpa_periodo": "money_max",
+      "roas_periodo": "max",
+      "cac_periodo": "money_max",
+      "receita_atribuida_periodo": "money",
       "cpa": "max",
       "roas": "max",
       "conversas_weni": "max",
@@ -1596,7 +1618,16 @@ var NexoDSSchemas={
       "cac_novos_clientes": "number",
       "cpa_conversa_anuncio": "number",
       "roas_conversa_anuncio": "number",
-      "dias_comerciais_parciais": "number"
+      "dias_comerciais_parciais": "number",
+      "pedidos_atribuidos_periodo": "number",
+      "receita_atribuida_periodo": "number",
+      "primeiros_clientes_periodo": "number",
+      "cpa_periodo": "number",
+      "roas_periodo": "number",
+      "cac_periodo": "number",
+      "status_cpa_periodo": "text",
+      "status_roas_periodo": "text",
+      "status_cac_periodo": "text"
     },
     "dimensions": []
   },
@@ -1633,7 +1664,16 @@ var NexoDSSchemas={
       "cac_novos_clientes",
       "cpa_conversa_anuncio",
       "roas_conversa_anuncio",
-      "dias_comerciais_parciais"
+      "dias_comerciais_parciais",
+      "pedidos_atribuidos_periodo",
+      "receita_atribuida_periodo",
+      "primeiros_clientes_periodo",
+      "cpa_periodo",
+      "roas_periodo",
+      "cac_periodo",
+      "status_cpa_periodo",
+      "status_roas_periodo",
+      "status_cac_periodo"
     ],
     "period": "data",
     "labels": {
@@ -1645,9 +1685,22 @@ var NexoDSSchemas={
       "cac_novos_clientes": "CAC de novos clientes",
       "cpa_conversa_anuncio": "CPA na conversa do anúncio",
       "roas_conversa_anuncio": "ROAS na conversa do anúncio",
-      "dias_comerciais_parciais": "Fatos diários com atribuição comercial parcial"
+      "dias_comerciais_parciais": "Fatos diários com atribuição comercial parcial",
+      "pedidos_atribuidos_periodo": "Pedidos atribuídos no período",
+      "receita_atribuida_periodo": "Receita atribuída no período",
+      "primeiros_clientes_periodo": "Clientes com primeira compra atribuída no período",
+      "cpa_periodo": "Custo por venda",
+      "roas_periodo": "Retorno sobre anúncios",
+      "cac_periodo": "Custo por cliente com primeira compra no período",
+      "status_cpa_periodo": "Situação do custo por venda",
+      "status_roas_periodo": "Situação do retorno sobre anúncios",
+      "status_cac_periodo": "Situação do custo por cliente"
     },
     "metric_kinds": {
+      "cpa_periodo": "money_max",
+      "roas_periodo": "max",
+      "cac_periodo": "money_max",
+      "receita_atribuida_periodo": "money",
       "cpa": "max",
       "roas": "max",
       "conversas_weni": "max",
@@ -1687,7 +1740,16 @@ var NexoDSSchemas={
       "cac_novos_clientes": "number",
       "cpa_conversa_anuncio": "number",
       "roas_conversa_anuncio": "number",
-      "dias_comerciais_parciais": "number"
+      "dias_comerciais_parciais": "number",
+      "pedidos_atribuidos_periodo": "number",
+      "receita_atribuida_periodo": "number",
+      "primeiros_clientes_periodo": "number",
+      "cpa_periodo": "number",
+      "roas_periodo": "number",
+      "cac_periodo": "number",
+      "status_cpa_periodo": "text",
+      "status_roas_periodo": "text",
+      "status_cac_periodo": "text"
     },
     "dimensions": []
   },

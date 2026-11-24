@@ -361,3 +361,22 @@ test('visão Weni ausente é explícita e não se torna período zerado',()=>{
  r.configParams.tabela='BI_Weni_Conversas_Diarias';
  assertFarmaError(f,r,/^DS_INSIGHTS_VISAO_AUSENTE/);
 });
+
+test('CAC dinâmico envia cada recorte e mantém o estado do leitor', () => {
+ const f=fixture(p=>result(p,p.start==='2026-11-01'
+  ? [[null,'Sem primeira compra atribuída']]
+  : [[125,null]]));
+ const r=request(['cac_periodo','status_cac_periodo']);
+ r.configParams.tabela='Resumo_Anuncios_Veiculados_FARMA';
+ r.dimensionsFilters=[];
+ for(const [startDate,expected] of [
+  ['2026-11-01',[null,'Sem primeira compra atribuída']],
+  ['2026-11-02',[125,null]],
+ ]){
+  r.dateRange={startDate,endDate:'2026-11-18'};
+  assert.deepEqual(Array.from(f.ctx.getData(r).rows[0].values),expected);
+  const sent=JSON.parse(f.calls.at(-1).options.payload);
+  assert.deepEqual([sent.start,sent.end],[startDate,'2026-11-18']);
+  assert.deepEqual(sent.aggregation,{});
+ }
+});

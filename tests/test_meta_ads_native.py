@@ -153,6 +153,7 @@ class NativeSyncTests(unittest.TestCase):
             ],
         }
         store.records = sources.__getitem__
+        store.set_controls = Mock()
         with (
             tempfile.TemporaryDirectory() as tmp,
             patch(
@@ -188,10 +189,32 @@ class NativeSyncTests(unittest.TestCase):
                 [order("10", "77", "1", at(11))],
                 [],
                 now=NOW,
-                apply=False,
+                apply=True,
                 state_dir=Path(tmp),
                 client_factory=Client,
                 evidence_collector=lambda *a, **k: (events, evidence()[1]),
+            )
+            before_retry = deepcopy(store.tables["Meta_Ads_Diario"])
+            retry = sync_native_meta(
+                store,
+                settings,
+                "FARMA",
+                contacts,
+                [order("10", "77", "1", at(11))],
+                [],
+                now=NOW + timedelta(minutes=1),
+                apply=True,
+                state_dir=Path(tmp),
+                client_factory=Client,
+                evidence_collector=lambda *a, **k: (events, evidence()[1]),
+            )
+            self.assertTrue(retry["applied"], retry)
+            self.assertEqual(
+                [(row["chave"], row["payload_api_json"]) for row in before_retry],
+                [
+                    (row["chave"], row["payload_api_json"])
+                    for row in store.tables["Meta_Ads_Diario"]
+                ],
             )
             events[1]["link_status"] = "ambiguous"
             partial = sync_native_meta(
@@ -210,7 +233,15 @@ class NativeSyncTests(unittest.TestCase):
                     {"segments": {"FARMA": False, "PET": True}, "auth_failed": []},
                 ),
             )
-        self.assertEqual(result["status"], "simulacao", result)
+        self.assertEqual(result["status"], "concluido", result)
+        self.assertTrue(result["applied"])
+        snapshots = [
+            payload["nf_pedidos_periodo_v1"]
+            for row in store.tables["Meta_Ads_Diario"]
+            if "nf_pedidos_periodo_v1" in (payload := json.loads(row["payload_api_json"]))
+        ]
+        self.assertEqual(len(snapshots), 1)
+        self.assertEqual([row["vinculo"] for row in snapshots[0]["pedidos"]], ["direto"])
         diagnostic = result["atribuicao_comercial_weni"]
         self.assertEqual(diagnostic["xlsx_opcional"], "ausente")
         self.assertEqual(diagnostic["origem_evidencia"], "WENI_FLOWS_V2")
@@ -223,8 +254,8 @@ class NativeSyncTests(unittest.TestCase):
         self.assertEqual(partial_conference["situacoes"]["com_pedido"], 1)
         self.assertEqual(partial_conference["situacoes"]["pendente_de_conferencia"], 1)
         self.assertFalse(partial["applied"])
-        self.assertEqual(store.writes, 0)
-        self.assertEqual(get_conversations.call_count, 2)
+        self.assertEqual(store.writes, 2)
+        self.assertEqual(get_conversations.call_count, 3)
         self.assertEqual(
             get_conversations.call_args.args[1], {"whatsapp:1", "whatsapp:2"}
         )

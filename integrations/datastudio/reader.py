@@ -406,8 +406,17 @@ class Reader(Store):
             meta_destinations.COMMERCIAL_METRICS.keys()
             & (set(fields) | {f["field"] for f in filters})
         )
+        dynamic_ads = period_ads and bool(
+            (
+                meta_destinations.PERIOD_METRICS.keys()
+                | meta_destinations.PERIOD_STATES.keys()
+            )
+            & (set(fields) | {f["field"] for f in filters})
+        )
         ads_function = (
-            "ds_veiculacao_meta_v4" if commercial_ads else "ds_veiculacao_meta_v3"
+            "ds_veiculacao_meta_v4"
+            if commercial_ads or dynamic_ads
+            else "ds_veiculacao_meta_v3"
         )
         if period_ads:
             if not start or aggregation:
@@ -416,6 +425,32 @@ class Reader(Store):
                 sql.SQL(",").join(expressions), sql.Identifier(ads_function)
             )
             params = [start, end, table == meta_destinations.PERIOD[1], *params]
+            if dynamic_ads:
+                statement = sql.SQL("""
+                    SELECT {} FROM (
+                      SELECT m.*, a.pedidos AS pedidos_atribuidos_periodo,
+                        a.receita AS receita_atribuida_periodo,
+                        a.primeiros AS primeiros_clientes_periodo,
+                        CASE WHEN m.moeda='BRL' THEN m.investimento_original/nullif(a.pedidos,0) END AS cpa_periodo,
+                        CASE WHEN m.moeda='BRL' THEN a.receita/nullif(m.investimento_original,0) END AS roas_periodo,
+                        CASE WHEN m.moeda='BRL' THEN m.investimento_original/nullif(a.primeiros,0) END AS cac_periodo,
+                        CASE WHEN a.pedidos=0 THEN 'Sem pedido'
+                          WHEN a.pedidos IS NULL OR m.investimento_original IS NULL OR m.moeda<>'BRL' THEN 'Sem dados suficientes'
+                          WHEN a.parciais>0 THEN 'Dados parciais' END AS status_cpa_periodo,
+                        CASE WHEN m.investimento_original=0 THEN 'Sem investimento'
+                          WHEN a.receita IS NULL OR m.investimento_original IS NULL OR m.moeda<>'BRL' THEN 'Sem dados suficientes'
+                          WHEN a.parciais>0 THEN 'Dados parciais' END AS status_roas_periodo,
+                        CASE WHEN a.primeiros=0 THEN 'Sem primeira compra atribuída'
+                          WHEN a.primeiros IS NULL THEN 'Primeira compra ainda não confirmada'
+                          WHEN m.investimento_original IS NULL OR m.moeda<>'BRL' THEN 'Sem dados suficientes'
+                          WHEN a.parciais>0 THEN 'Dados parciais' END AS status_cac_periodo
+                      FROM farma.ds_veiculacao_meta_v4(%s,%s,%s) m
+                      LEFT JOIN farma.ds_atribuicao_periodo_v1(%s,%s,%s) a
+                        ON (m.conta_id,m.moeda,m.fuso,m.politica_atribuicao)=(a.conta_id,a.moeda,a.fuso,a.politica_atribuicao)
+                        AND m.anuncio_id IS NOT DISTINCT FROM a.ad
+                    ) atribuicao
+                """).format(sql.SQL(",").join(expressions))
+                params = [*params[:3], *params]
         if clauses:
             statement += sql.SQL(" WHERE ") + sql.SQL(" AND ").join(clauses)
         dimensions = [sql.Identifier(f) for f in fields if f not in aggregation]
@@ -450,6 +485,10 @@ class Reader(Store):
                     (f"farma.{ads_function}(date,date,boolean)",),
                 ).fetchone()["f"]
             ):
+                raise StorageError("DS_DESTINOS_VISAO_AUSENTE")
+            if dynamic_ads and not conn.execute(
+                "SELECT to_regprocedure('farma.ds_atribuicao_periodo_v1(date,date,boolean)') AS f"
+            ).fetchone()["f"]:
                 raise StorageError("DS_DESTINOS_VISAO_AUSENTE")
             if table == "BI_Weni_Conversas_Diarias":
                 coverage = conn.execute(

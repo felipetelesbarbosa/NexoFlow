@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+from collections import defaultdict
 from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from time import monotonic
@@ -732,6 +733,7 @@ def sync_native_meta(
                 clock,
                 org_uuid=_setting(settings, segment, "WENI_FLOWS_ORG_UUID", ""),
             )
+            period_evidence = defaultdict(list)
             report["conferencia_conversas_anuncio"] = audit_conversations(
                 tables,
                 evidence,
@@ -748,6 +750,7 @@ def sync_native_meta(
                 weni_contacts=weni_contacts,
                 directory=customer_directory,
                 failed_urns=failed_urns,
+                period_evidence=period_evidence,
             )
             if not coverage_complete or report["errors"]:
                 report["conferencia_conversas_anuncio"]["status"] = "dados_parciais"
@@ -761,6 +764,53 @@ def sync_native_meta(
                 )
                 report.update(status="parcial", partial=True)
                 return report
+            if coverage_complete and not report["errors"]:
+                # Grava uma coleção por anúncio, no fato diário mais recente desta
+                # revisão. O leitor de mídia continua usando o fuso da conta.
+                latest = {}
+                for row in tables["Meta_Ads_Diario"]:
+                    if row["segmento"] == row["classificacao"] == "FARMA":
+                        ad = row["anuncio_id"]
+                        if ad not in latest or row["data"] > latest[ad]["data"]:
+                            latest[ad] = row
+                previous_periods = {
+                    row["chave"]: json.loads(row["payload_api_json"] or "{}").get(
+                        "nf_pedidos_periodo_v1"
+                    )
+                    for row in previous.get("Meta_Ads_Diario", [])
+                }
+                for ad, row in latest.items():
+                    payload = json.loads(row["payload_api_json"] or "{}")
+                    conference = report["conferencia_conversas_anuncio"]
+                    period = {
+                        "coletado_em": clock.isoformat(),
+                        "inicio": conference["inicio"],
+                        "fim": conference["fim"],
+                        "cobertura": conference["status"],
+                        "pedidos": sorted(
+                            period_evidence.get(ad, ()),
+                            key=lambda item: (
+                                item["emissao"],
+                                item["abertura"],
+                                item["receita"],
+                                item["vinculo"],
+                                item["compra_anterior"] or "",
+                                item["primeira_compra_desde"] or "",
+                            ),
+                        ),
+                    }
+                    previous_period = previous_periods.get(row["chave"])
+                    if previous_period and dict(
+                        previous_period, coletado_em=period["coletado_em"]
+                    ) == period:
+                        period = previous_period
+                    payload["nf_pedidos_periodo_v1"] = period
+                    row["payload_api_json"] = json.dumps(
+                        payload,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    )
             if coverage_complete and begin <= through:
                 commercial_result.update(
                     apply_attribution(

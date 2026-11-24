@@ -26,11 +26,21 @@ for name, fields, period in meta_destinations.specs():
         columns=fields,
         period=period,
         labels={
-            f: v for f, v in meta_destinations.COMMERCIAL_METRICS.items() if f in fields
+            f: v
+            for f, v in (
+                meta_destinations.COMMERCIAL_METRICS
+                | meta_destinations.PERIOD_METRICS
+                | meta_destinations.PERIOD_STATES
+            ).items()
+            if f in fields
         },
         metric_kinds={
             f: kind
             for f, kind in {
+                "cpa_periodo": "money_max",
+                "roas_periodo": "max",
+                "cac_periodo": "money_max",
+                "receita_atribuida_periodo": "money",
                 "cpa": "max",
                 "roas": "max",
                 "conversas_weni": "max",

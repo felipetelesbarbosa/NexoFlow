@@ -1,5 +1,9 @@
 # NexoFlow — Changelog
 
+## 1.5.62 — em validação
+
+O Analytics FARMA grava, na revisão PostgreSQL da própria carga, a evidência de pedidos vinculados a anúncios. O leitor FARMA recalcula pedidos, receita, CPA, ROAS e CAC pelo período solicitado. A ativação no Looker depende da homologação da fonte e dos vínculos com dados reais.
+
 ## 1.5.61 — publicada em 24/11/26 08:09:26 (Belém)
 
 O Analytics FARMA consulta diretamente o anúncio e o dia quando a consulta por conta omite uma linha com conversas já registradas. O diagnóstico mostra separadamente conversas sem CPF e calcula o retorno confirmado com as compras emitidas no período.

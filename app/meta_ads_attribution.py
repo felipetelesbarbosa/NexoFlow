@@ -482,6 +482,7 @@ def audit_conversations(
     weni_contacts=None,
     directory=None,
     failed_urns=(),
+    period_evidence=None,
 ):
     """Confere cada conversa CTWA e devolve somente totais do recorte solicitado."""
     owners = _official_customers(contacts, weni_contacts, directory)
@@ -645,7 +646,58 @@ def audit_conversations(
             if (direct, opening) == priority
         }
         if len(winners) == 1:
-            attributed[purchase] = winners.pop()
+            ad, kind = winners.pop()
+            attributed[purchase] = (ad, kind)
+            if period_evidence is not None:
+                purchase_day = purchase.at.astimezone(BELEM).date()
+                previous = max(
+                    (
+                        p.at
+                        for p in purchases[purchase.owner]
+                        if p.at < purchase.at
+                    ),
+                    default=None,
+                )
+                covered_from = min(
+                    (
+                        a.astimezone(BELEM).date()
+                        + timedelta(days=int(a.astimezone(BELEM).time() != time.min))
+                        for a, b in intervals
+                        if a <= purchase.at <= b
+                    ),
+                    default=None,
+                )
+                unknown_days = unresolved[purchase.owner]
+                if None in unknown_days or any(
+                    p != purchase and p.at == purchase.at
+                    for p in purchases[purchase.owner]
+                ):
+                    covered_from = None
+                elif covered_from is not None:
+                    covered_from = max(
+                        [
+                            covered_from,
+                            *(
+                                day + timedelta(days=1)
+                                for day in unknown_days
+                                if day <= purchase_day
+                            ),
+                        ]
+                    )
+                period_evidence[ad].append(
+                    dict(
+                        abertura=priority[1].astimezone(BELEM).date().isoformat(),
+                        emissao=purchase_day.isoformat(),
+                        compra_anterior=previous.astimezone(BELEM).date().isoformat()
+                        if previous
+                        else None,
+                        primeira_compra_desde=covered_from.isoformat()
+                        if covered_from and covered_from <= purchase_day
+                        else None,
+                        receita=str(purchase.revenue),
+                        vinculo=kind,
+                    )
+                )
     ambiguous = len(matched) - len(attributed)
     media = [
         row
@@ -702,6 +754,7 @@ def audit_conversations(
         and len(meta) == len(media)
         and sum(meta) == sum(states.values())
     )
+    metric_order_count = len(metric_purchases)
     return dict(
         status="conferida" if audited_completely else "dados_parciais",
         inicio=start.isoformat(),
@@ -729,6 +782,12 @@ def audit_conversations(
         receita_atribuida_comprovada=str(revenue),
         receita_atribuida_anuncios_com_investimento=str(metric_revenue),
         investimento_brl=str(spend) if spend is not None else None,
+        pedidos_atribuidos_no_periodo=metric_order_count
+        if metric_order_count or audited_completely
+        else None,
+        cpa_sobre_pedidos_comprovados=str(spend / metric_order_count)
+        if spend is not None and metric_order_count
+        else None,
         roas_sobre_receita_comprovada=str(metric_revenue / spend)
         if spend and (metric_purchases or audited_completely)
         else None,

@@ -70,11 +70,35 @@ def test_two_stage_population_shared_grain_and_lost_ack(store):  # noqa: F811
                 novos_clientes_anuncio=day - 1,
                 cobertura_comercial=True,
             )
+        if ad == "001" and day == 2:
+            payload["nf_pedidos_periodo_v1"] = {
+                "coletado_em": "2026-11-15T00:00:00+00:00",
+                "inicio": "2026-11-01",
+                "fim": "2026-11-04",
+                "cobertura": "conferida",
+                "pedidos": [
+                    {
+                        "abertura": "2026-11-02",
+                        "emissao": "2026-11-02",
+                        "receita": "48",
+                        "vinculo": "direto",
+                        "compra_anterior": "2026-11-01",
+                        "primeira_compra_desde": "2026-11-01",
+                    }
+                ],
+            }
         d.append(
             row(
                 "Meta_Ads_Diario",
                 chave=key,
                 segmento="FARMA",
+                classificacao="FARMA",
+                conta_id="0001",
+                anuncio_id=ad,
+                data=f"2026-11-0{day}",
+                moeda="BRL",
+                fuso="America/Belem",
+                politica_atribuicao="A",
                 campanha_nome={1: "Campanha anterior", 2: "Campanha atual"}.get(day),
                 payload_api_json=json.dumps(payload),
             )
@@ -115,6 +139,45 @@ def test_two_stage_population_shared_grain_and_lost_ack(store):  # noqa: F811
         ).fetchone()["raw"]
         conn.rollback()
     reader = Reader(DSN, "homologacao", "FARMA")
+    dynamic_fields = [
+        "pedidos_atribuidos_periodo",
+        "receita_atribuida_periodo",
+        "cpa_periodo",
+        "roas_periodo",
+        "cac_periodo",
+        "status_cac_periodo",
+    ]
+    for period_table in PERIOD:
+        wide = reader.query(
+            period_table, dynamic_fields, "2026-11-01", "2026-11-03", [], {}
+        )["rows"][0]
+        narrow = reader.query(
+            period_table, dynamic_fields, "2026-11-02", "2026-11-03", [], {}
+        )["rows"][0]
+        assert [Decimal(str(x)) for x in wide[:3]] == [1, 48, 14]
+        assert abs(Decimal(str(wide[3])) - Decimal(48) / 14) < Decimal("1e-12")
+        assert wide[4:] == [None, "Sem primeira compra atribuída"]
+        assert [Decimal(str(x)) for x in narrow[:5]] == [1, 48, 2, 24, 2]
+        assert narrow[5] is None
+        states = [
+            "pedidos_atribuidos_periodo",
+            "receita_atribuida_periodo",
+            "roas_periodo",
+            "status_cpa_periodo",
+            "status_roas_periodo",
+        ]
+        zero = reader.query(
+            period_table, states, "2026-11-03", "2026-11-03", [], {}
+        )["rows"][0]
+        assert [Decimal(v) for v in zero[:3]] == [0, 0, 0]
+        assert zero[3:] == ["Sem pedido", None]
+        partial = reader.query(
+            period_table, states, "2026-11-01", "2026-11-04", [], {}
+        )["rows"]
+        assert any(row[3:] == ["Sem dados suficientes"] * 2 for row in partial) or (
+            period_table == PERIOD[1]
+            and partial[0][3:] == ["Dados parciais"] * 2
+        )
     commercial_fields = [
         "pedidos_conversa_anuncio",
         "pedidos_apos_conversa_7d",
@@ -261,15 +324,31 @@ def test_native_postgres_with_lost_batch_response(store, tmp_path, monkeypatch):
             evidence_collector=collect,
         )
 
+    def evidence_packets(revision=None):
+        return [
+            payload["nf_pedidos_periodo_v1"]
+            for row in store.rows("Meta_Ads_Diario", revision=revision)["rows"]
+            if "nf_pedidos_periodo_v1" in (payload := json.loads(row["payload_api_json"]))
+        ]
+
     finish(store, begin(store))
+    previous_packets = []
     for apply in [False, True, True]:
         target = PostgresStore(client, readonly=not apply)
         report = collect_metrics(target, apply)
         assert not report["partial"], report
         if apply:
+            staged_packets = evidence_packets(target.revision)
+            assert len(staged_packets) == 1
+            assert evidence_packets() == previous_packets
             assert target.finish(complete=True)["state"] == "READY"
+            assert evidence_packets() == staged_packets
+            if previous_packets:
+                assert staged_packets == previous_packets
+            previous_packets = staged_packets
         else:
             assert store.info()["version"] == 1
+            assert evidence_packets() == []
     assert session.lost
     assert len(store.rows("BI_Meta_Resultados")["rows"]) == 4
     assert len(store.rows("Controle")["rows"]) == 1

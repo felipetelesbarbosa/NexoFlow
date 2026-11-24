@@ -31,6 +31,20 @@ COMMERCIAL_METRICS = {
     "dias_comerciais_parciais": "Fatos diários com atribuição comercial parcial",
 }
 METRICS.update(COMMERCIAL_METRICS)
+PERIOD_METRICS = {
+    "pedidos_atribuidos_periodo": "Pedidos atribuídos no período",
+    "receita_atribuida_periodo": "Receita atribuída no período",
+    "primeiros_clientes_periodo": "Clientes com primeira compra atribuída no período",
+    "cpa_periodo": "Custo por venda",
+    "roas_periodo": "Retorno sobre anúncios",
+    "cac_periodo": "Custo por cliente com primeira compra no período",
+}
+PERIOD_STATES = {
+    "status_cpa_periodo": "Situação do custo por venda",
+    "status_roas_periodo": "Situação do retorno sobre anúncios",
+    "status_cac_periodo": "Situação do custo por cliente",
+}
+METRICS.update(PERIOD_METRICS)
 PERIOD = ("Anuncios_Veiculados_FARMA", "Resumo_Anuncios_Veiculados_FARMA")
 DETAIL = "Destinos_CTWA_Diarios"
 CATALOG = "Catalogo_Destinos_Meta"
@@ -42,6 +56,7 @@ def specs():
             *DIM,
             *([] if name == PERIOD[1] else ["anuncio_id", "campanha_nome"]),
             *METRICS,
+            *PERIOD_STATES,
         ]
         yield name, fields, "data"
     yield (
@@ -151,6 +166,7 @@ def install(conn):
     )
     conn.execute("GRANT SELECT ON farma.ds_destinos_ctwa_diarios TO nf_ds_farma_read")
     install_commercial(conn)
+    install_period_attribution(conn)
     from psycopg import sql
 
     rows = []
@@ -308,4 +324,66 @@ def install_commercial(conn):
     )
     conn.execute(
         "GRANT EXECUTE ON FUNCTION farma.ds_veiculacao_meta_v4(date,date,boolean) TO nf_ds_farma_read"
+    )
+
+
+def install_period_attribution(conn):
+    conn.execute("""CREATE OR REPLACE FUNCTION farma.ds_atribuicao_periodo_v1(
+        inicio date,fim date,resumo boolean)
+    RETURNS TABLE(conta_id text,moeda text,fuso text,politica_atribuicao text,ad text,
+      pedidos numeric,receita numeric,diretos numeric,receita_direta numeric,
+      posteriores numeric,receita_posterior numeric,primeiros numeric,parciais bigint)
+    LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $fn$
+      WITH ativos AS (
+        SELECT DISTINCT b.conta_id,b.moeda,b.fuso,b.politica_atribuicao,b.anuncio_id
+        FROM farma.ds_destino_meta_base_v1 b
+        WHERE b.data BETWEEN inicio AND fim AND (b.impressoes>0 OR b.investimento_original>0)
+      ), pacotes AS (
+        SELECT a.*, p.evidence FROM ativos a LEFT JOIN LATERAL (
+          SELECT (d.registro->>'payload_api_json')::jsonb->'nf_pedidos_periodo_v1' evidence
+          FROM farma.nf_atuais d WHERE d.tabela='Meta_Ads_Diario'
+            AND d.registro->>'segmento'='FARMA' AND d.registro->>'classificacao'='FARMA'
+            AND d.registro->>'conta_id'=a.conta_id AND d.registro->>'anuncio_id'=a.anuncio_id
+            AND d.registro->>'moeda'=a.moeda AND d.registro->>'fuso'=a.fuso
+            AND d.registro->>'politica_atribuicao'=a.politica_atribuicao
+            AND (nullif(d.registro->>'payload_api_json','')::jsonb) ? 'nf_pedidos_periodo_v1'
+          ORDER BY (d.registro->>'payload_api_json')::jsonb->'nf_pedidos_periodo_v1'->>'coletado_em' DESC NULLS LAST,
+            d.registro->>'data' DESC LIMIT 1
+        ) p ON true
+      ), por_anuncio AS (
+        SELECT a.*, coalesce(a.evidence->>'cobertura'='conferida'
+           AND (a.evidence->>'inicio')::date<=inicio AND (a.evidence->>'fim')::date>=fim,false) completo,
+           p.*
+        FROM pacotes a CROSS JOIN LATERAL (
+          SELECT count(*) n,sum((x->>'receita')::numeric) valor,
+            count(*) FILTER(WHERE x->>'vinculo'='direto') d,
+            sum((x->>'receita')::numeric) FILTER(WHERE x->>'vinculo'='direto') vd,
+            count(*) FILTER(WHERE x->>'vinculo'='posterior') t,
+            sum((x->>'receita')::numeric) FILTER(WHERE x->>'vinculo'='posterior') vt,
+            count(*) FILTER(WHERE (x->>'primeira_compra_desde')::date<=inicio
+              AND ((x->>'compra_anterior') IS NULL OR (x->>'compra_anterior')::date<inicio)) novos,
+            count(*) FILTER(WHERE ((x->>'compra_anterior') IS NULL OR (x->>'compra_anterior')::date<inicio)
+              AND ((x->>'primeira_compra_desde') IS NULL OR (x->>'primeira_compra_desde')::date>inicio)) incertos
+          FROM jsonb_array_elements(a.evidence->'pedidos') x
+          WHERE (x->>'emissao')::date BETWEEN inicio AND fim
+            AND (x->>'abertura')::date BETWEEN inicio AND fim
+        ) p
+      )
+      SELECT a.conta_id,a.moeda,a.fuso,a.politica_atribuicao,
+        CASE WHEN resumo THEN NULL ELSE a.anuncio_id END,
+        CASE WHEN sum(n)>0 OR bool_and(completo) THEN sum(n) END,
+        CASE WHEN sum(n)>0 OR bool_and(completo) THEN coalesce(sum(valor),0) END,
+        CASE WHEN sum(d)>0 OR bool_and(completo) THEN sum(d) END,
+        CASE WHEN sum(d)>0 OR bool_and(completo) THEN coalesce(sum(vd),0) END,
+        CASE WHEN sum(t)>0 OR bool_and(completo) THEN sum(t) END,
+        CASE WHEN sum(t)>0 OR bool_and(completo) THEN coalesce(sum(vt),0) END,
+        CASE WHEN sum(novos)>0 OR bool_and(completo AND incertos=0) THEN sum(novos) END,
+        count(*) FILTER(WHERE NOT completo OR incertos>0)
+      FROM por_anuncio a GROUP BY 1,2,3,4,5
+    $fn$""")
+    conn.execute(
+        "REVOKE ALL ON FUNCTION farma.ds_atribuicao_periodo_v1(date,date,boolean) FROM PUBLIC"
+    )
+    conn.execute(
+        "GRANT EXECUTE ON FUNCTION farma.ds_atribuicao_periodo_v1(date,date,boolean) TO nf_ds_farma_read"
     )

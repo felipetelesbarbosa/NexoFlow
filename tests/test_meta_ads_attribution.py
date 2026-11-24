@@ -235,6 +235,8 @@ class ConversationAuditTests(unittest.TestCase):
         self.assertEqual(result["pedidos_na_conversa_original"], 1)
         self.assertEqual(result["pedidos_apos_conversa_original_7d"], 1)
         self.assertEqual(result["pedidos_atribuidos_fora_do_periodo"], 1)
+        self.assertEqual(result["pedidos_atribuidos_no_periodo"], 1)
+        self.assertEqual(result["cpa_sobre_pedidos_comprovados"], "100")
         self.assertEqual(result["receita_atribuida_comprovada"], "75")
         self.assertEqual(result["roas_sobre_receita_comprovada"], "0.25")
         self.assertEqual(result["roas_na_conversa_original"], "0.25")
@@ -251,6 +253,8 @@ class ConversationAuditTests(unittest.TestCase):
             result["pendencias_por_motivo"], {"PEDIDO_SEM_EMISSAO_CONCILIADA": 1}
         )
         self.assertIsNone(result["roas_sobre_receita_comprovada"])
+        self.assertIsNone(result["pedidos_atribuidos_no_periodo"])
+        self.assertIsNone(result["cpa_sobre_pedidos_comprovados"])
         self.coverage[0]["atualizado"] = moment(8, 9, 59).isoformat()
         result = self.run_audit(end=10)
         self.assertEqual(result["situacoes"]["sem_pedido_apos_7d"], 0)
@@ -280,7 +284,13 @@ class ConversationAuditTests(unittest.TestCase):
         ]
         wide = self.run_audit(history, orders)
         self.assertEqual(wide["clientes_com_primeira_compra_atribuida_comprovada"], 0)
-        narrow = self.run_audit(history, orders, start=2)
+        evidence = {"a": []}
+        narrow = self.run_audit(history, orders, start=2, period_evidence=evidence)
+        self.assertEqual(len(evidence["a"]), 1)
+        self.assertEqual(evidence["a"][0]["emissao"], "2026-11-02")
+        self.assertEqual(evidence["a"][0]["compra_anterior"], "2026-11-01")
+        self.assertNotIn("cliente_id", evidence["a"][0])
+        self.assertNotIn("pedido_id", evidence["a"][0])
         self.assertEqual(narrow["clientes_com_primeira_compra_atribuida_comprovada"], 1)
         self.assertEqual(narrow["cac_sobre_clientes_comprovados"], "100")
 
