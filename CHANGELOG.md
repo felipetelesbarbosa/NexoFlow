@@ -1,6 +1,8 @@
 # NexoFlow — Changelog
 
-## 1.5.60 — em validação
+## 1.5.60 — publicada em 24/11/26 01:48:43 (Belém)
+
+[Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.60) · [Testes e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45326478990) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45328895172)
 
 O Analytics FARMA confere as conversas de anúncios e os pedidos válidos nas 168 horas seguintes. Eventos sem identificação de contato ficam pendentes.
 
