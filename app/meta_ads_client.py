@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+import re
 import time
 from datetime import UTC, date, datetime
 from email.utils import parsedate_to_datetime
@@ -51,6 +52,7 @@ class MetaAdsClient:
             "seconds": 0.0,
             "network_errors": 0,
         }
+        self._known_ads: dict[str, set[str]] = {}
         self._permissions_checked = False
         self.settings = settings
         self.session = session if session is not None else requests.Session()
@@ -135,7 +137,11 @@ class MetaAdsClient:
             for account in self.settings.allowed_account_ids
             for suffix in ("", "/campaigns", "/adsets", "/ads", "/insights")
         }
-        if relative_path not in allowed:
+        ad, _, endpoint = relative_path.partition("/")
+        known_ad_insights = endpoint == "insights" and any(
+            ad in ads for ads in self._known_ads.values()
+        )
+        if relative_path not in allowed and not known_ad_insights:
             raise MetaReadError("Caminho fora dos endpoints de leitura autorizados.")
         if check_permissions and relative_path != "me/permissions":
             self._ensure_ads_read()
@@ -350,12 +356,18 @@ class MetaAdsClient:
         self, account_id: str, limit: int = 50, pages: int | None = 2
     ) -> dict[str, Any]:
         account_id = self._account(account_id)
-        return self._pages(
+        result = self._pages(
             f"act_{account_id}/ads",
             {"fields": "id,name,adset_id,campaign_id,status,effective_status"},
             limit,
             pages,
         )
+
+        self._known_ads.setdefault(account_id, set()).update(
+            row["id"] for row in result["dados"]
+            if isinstance(row.get("id"), str) and re.fullmatch(r"[0-9]+", row["id"])
+        )
+        return result
 
     def insights(
         self,
@@ -366,12 +378,17 @@ class MetaAdsClient:
         limit: int = 100,
         pages: int | None = 3,
         *,
+        ad_id: str | None = None,
         time_increment: int | None = None,
         action_report_time: str | None = None,
         action_attribution_windows: tuple[str, ...] | None = None,
         use_account_attribution_setting: bool = False,
     ) -> dict[str, Any]:
         account_id = self._account(account_id)
+        if ad_id is not None and (
+            level != "ad" or ad_id not in self._known_ads.get(account_id, set())
+        ):
+            raise MetaReadError("Anúncio fora do catálogo da conta autorizada.")
         if level not in {"account", "campaign", "adset", "ad"}:
             raise MetaReadError("Nível permitido: account, campaign, adset ou ad.")
         try:
@@ -434,7 +451,7 @@ class MetaAdsClient:
             "clicks,inline_link_clicks,ctr,cpc,cpm,frequency,actions,action_values,purchase_roas,cost_per_action_type"
         )
         result = self._pages(
-            f"act_{account_id}/insights",
+            f"{ad_id}/insights" if ad_id is not None else f"act_{account_id}/insights",
             {
                 **options,
                 "fields": fields,
@@ -465,6 +482,7 @@ class MetaAdsClient:
         limit=100,
         pages: int | None = 10,
         *,
+        ad_id=None,
         action_report_time="impression",
         action_attribution_windows=("7d_click", "1d_view"),
         use_account_attribution_setting=False,
@@ -476,6 +494,7 @@ class MetaAdsClient:
             "ad",
             limit,
             pages,
+            ad_id=ad_id,
             time_increment=1,
             action_report_time=action_report_time,
             action_attribution_windows=action_attribution_windows,

@@ -428,6 +428,65 @@ def sync_native_meta(
                             )
                         )
                     cursor = stop + timedelta(days=1)
+                if segment == "FARMA":
+                    from meta_ads_destinations import reconcile_conversation_days
+                    from meta_ads_model import started_conversations
+
+                    missing = reconcile_conversation_days(
+                        previous.get("BI_Meta_Resultados", []),
+                        [],
+                        local_facts,
+                        {account: (since.isoformat(), end.isoformat())},
+                    )
+                    catalog_ids = {row.get("id") for row in local_catalogs["ads"]}
+                    recovered = 0
+                    candidates = [
+                        row for row in missing
+                        if row["acao"] == "PENDENTE_HISTORICO"
+                        and row["consulta"]["estado"] == "SEM_LINHA"
+                        and row["anuncio_id"] in catalog_ids
+                    ]
+                    for gap in candidates[:20]:
+                        day, ad = gap["data"], gap["anuncio_id"]
+                        try:
+                            direct = client.daily_insights(
+                                account, day, day, pages=1, ad_id=ad,
+                            )
+                            direct_rows = _rows(direct)
+                        except MetaReadError as exc:
+                            if exc.critical:
+                                raise
+                            continue
+                        if (
+                            len(direct_rows) != 1
+                            or direct.get("time_increment") != 1
+                            or direct.get("attribution") != attribution
+                            or direct.get("api_version") != response.get("api_version")
+                        ):
+                            continue
+                        row = direct_rows[0]
+                        if (
+                            row.get("account_id") != account
+                            or row.get("ad_id") != ad
+                            or row.get("date_start") != day
+                            or row.get("date_stop") != day
+                            or row.get("spend") in (None, "")
+                            or row.get("impressions") in (None, "")
+                            or started_conversations(row.get("actions")) in (None, "")
+                        ):
+                            continue
+                        local_facts.append(dict(
+                            row, currency=meta.get("currency", ""),
+                            timezone_name=meta.get("timezone_name", ""),
+                            attribution_policy=policy,
+                        ))
+                        recovered += 1
+                    if candidates:
+                        report.setdefault("recuperacao_meta_por_anuncio", {})[account] = {
+                            "linhas_omitidas": len(candidates),
+                            "consultas": min(20, len(candidates)),
+                            "recuperadas": recovered,
+                        }
                 existing_grains = {
                     (row.get("account_id"), row.get("ad_id"), row.get("date_start")): (
                         row.get("currency"),

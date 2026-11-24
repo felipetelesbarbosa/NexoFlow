@@ -43,6 +43,30 @@ class MetaAdsClientTests(unittest.TestCase):
             cli.campaigns("111111111111111")
         self.assertEqual(sess.calls, [])
 
+    def test_daily_insights_for_ad_requires_authorized_account_catalog(self):
+        account = "898435729140540"
+        ad = "102030405060708"
+        day = "2026-11-07"
+        sess = FakeSession([
+            FakeResponse({"data": [{"id": ad}]}),
+            FakeResponse({"data": [{"ad_id": ad}]}),
+        ])
+        cli = MetaAdsClient(self.settings, sess)
+        with self.assertRaises(MetaReadError):
+            cli.daily_insights(account, day, day, ad_id=ad)
+        self.assertEqual(sess.calls, [])
+        cli.ads(account)
+        result = cli.daily_insights(account, day, day, ad_id=ad)
+        self.assertEqual(result["dados"], [{"ad_id": ad}])
+        url, request = sess.calls[-1]
+        self.assertTrue(url.endswith(f"/{ad}/insights"))
+        self.assertEqual(request["params"]["time_increment"], 1)
+        self.assertEqual(request["params"]["action_report_time"], "impression")
+        self.assertEqual(
+            json.loads(request["params"]["action_attribution_windows"]),
+            ["7d_click", "1d_view"],
+        )
+
     def test_read_only_get_and_bearer_header(self):
         sess = FakeSession(
             [FakeResponse({"id": "act_898435729140540", "name": "Teste"})]
