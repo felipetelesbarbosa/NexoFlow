@@ -1,5 +1,9 @@
 # NexoFlow — Changelog
 
+## 1.5.63 — em preparação
+
+O Analytics FARMA no PostgreSQL valida a emissão dos últimos pedidos pelo horário em que cada registro foi observado. Pedidos emitidos durante a carga podem ser aceitos quando a emissão já era válida no momento da consulta. O horário inicial continua definindo a janela da carga, e emissões ausentes, ilegíveis ou posteriores à observação continuam pendentes.
+
 ## 1.5.62 — publicada em 25/11/26 08:52:45 (Belém)
 
 [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.62) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/5376f9b929ac3782949c9ba4c5ef6694778bf8b5) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45399924799) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45399924838) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45399924837) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45608401200).

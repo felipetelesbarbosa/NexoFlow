@@ -128,6 +128,65 @@ class HistoryTests(unittest.TestCase):
             [(NOW,)],
         )
 
+    def test_analytics_farma_usa_horario_do_ultimo_pedido_em_carga_historica(self):
+        from order_history_store import _analytics_history
+
+        self.db.execute("CREATE TABLE orders(id TEXT, payload TEXT, last_seen TEXT)")
+        seen = "2026-11-06T23:06:00+00:00"
+        observations = [
+            (1, "2026-11-06T20:01:00", seen),
+            (2, "2026-11-06T20:06:01-03:00", seen),
+            (3, None, seen),
+            (4, "2026-11-05T20:00:00-03:00", ""),
+        ]
+        for oid, issued, observed in observations:
+            snapshot = order(oid, segment="FARMA")
+            snapshot["capa"]["emissao"] = issued
+            self.db.execute(
+                "INSERT INTO orders VALUES(?, ?, ?)",
+                (
+                    str(oid),
+                    json.dumps(
+                        {"ultimoPedido": snapshot["capa"], "itens": snapshot["itens"]}
+                    ),
+                    observed,
+                ),
+            )
+
+        with (
+            patch.dict(
+                "os.environ",
+                {
+                    "NEXOFLOW_PERFIL": "FARMA",
+                    "NEXOFLOW_HISTORY_INICIO": "2026-11-01",
+                    "NEXOFLOW_HISTORY_FIM": "2026-11-05",
+                },
+            ),
+            patch("customer_observations.connect", return_value=self.db),
+        ):
+            _, _, result = _analytics_history(
+                Source([order(5, segment="FARMA")]),
+                [],
+                [],
+                [],
+                now=NOW,
+                settings=SimpleNamespace(ARMAZENAMENTO_BACKEND="postgres"),
+            )
+        assert result is not None
+        self.assertEqual(result["received"], 1)
+        self.assertEqual(result["pendencias"], 2)
+        self.assertEqual(
+            self.db.execute(
+                "SELECT id,reason FROM history_issues ORDER BY id"
+            ).fetchall(),
+            [("2", "EMISSAO_INVALIDA"), ("3", "EMISSAO_INVALIDA")],
+        )
+        record = self.db.execute(
+            "SELECT record,first_seen FROM history_orders WHERE segment='FARMA' AND id='1'"
+        ).fetchone()
+        self.assertEqual(json.loads(record[0])["state"], "valido")
+        self.assertEqual(record[1], seen)
+
     def test_limits_1200_and_single_page(self):
         for limit, expected in ((400, [1, 2, 3]), (500, [1, 2, 3])):
             q = HistoryQuery("PET", "2026-11-03", "2026-11-03", limit)

@@ -291,8 +291,10 @@ class HistoryStore:
                 )
         return counts
 
-    def seed_observations(self, now):
+    def seed_observations(self, now, *, use_observation_time=False):
         """Adota snapshots locais pela chave oficial, sem mudar sua proveniência."""
+        from pedido_utils import business_order_datetime
+
         if not self.db.execute(
             "SELECT 1 FROM sqlite_master WHERE name='orders'"
         ).fetchone():
@@ -313,13 +315,16 @@ class HistoryStore:
                     or str(header.get("segmento", "")).upper() != self.segment
                 ):
                     continue
+                emission_cutoff = now
+                if use_observation_time:
+                    emission_cutoff = business_order_datetime(observed) or now
                 record = normalize_order(
                     {
                         "capa": header,
                         **({"itens": snapshot["itens"]} if "itens" in snapshot else {}),
                     },
                     self.segment,
-                    now,
+                    emission_cutoff,
                 )
                 record["source"] = "FARMALIDER_CLIENTES_" + self.segment
                 self.upsert(record, now=observed, mode="observacao")
@@ -491,7 +496,8 @@ def _analytics_history(client, contacts, orders, items, *, now, settings):
                     (store.segment,),
                 )
             }
-        store.seed_observations(now)
+        # A consulta de últimos pedidos pode terminar após o início do Analytics.
+        store.seed_observations(now, use_observation_time=farma_postgres)
         result: dict = collect_windows(
             client,
             store,
