@@ -549,6 +549,20 @@ class Reader(Store):
                 row["nf_incompleto"] for row in rows
             ):
                 raise StorageError("DS_BI_VENDAS_INCOMPLETA")
+        if (
+            not rows
+            and table == meta_destinations.PERIOD[1]
+            and not filters
+            and meta_destinations.PERIOD_STATES.keys() & set(fields)
+        ):
+            # Só os cartões que pedem um estado recebem a linha de apresentação.
+            # A ausência de fatos no recorte não comprova totais iguais a zero.
+            empty: dict[str, Any] = dict.fromkeys(fields)
+            if "data" in empty:
+                empty["data"] = start
+            for field in meta_destinations.PERIOD_STATES.keys() & empty.keys():
+                empty[field] = "Sem veiculação registrada no período"
+            rows = [empty]
         return self.result(version, fields, rows)
 
     def result(self, version, fields, rows):

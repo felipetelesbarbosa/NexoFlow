@@ -198,6 +198,33 @@ def test_two_stage_population_shared_grain_and_lost_ack(store):  # noqa: F811
     assert reader.query(
         PERIOD[0], ["anuncio_id", "campanha_nome"], "2026-11-01", "2026-11-03", [], {}
     )["rows"] == [["001", "Campanha atual"]]
+    card_fields = [
+        "data",
+        "investimento_original",
+        "pedidos_atribuidos_periodo",
+        "cpa_periodo",
+        "status_cpa_periodo",
+        "status_roas_periodo",
+        "status_cac_periodo",
+    ]
+    no_delivery = reader.query(
+        PERIOD[1], card_fields, "2026-11-02", "2026-11-02", [], {}
+    )
+    assert no_delivery["complete"] is True
+    assert no_delivery["rows"] == [
+        ["2026-11-02", None, None, None] + ["Sem veiculação registrada no período"] * 3
+    ]
+    assert reader.query(
+        PERIOD[0], card_fields, "2026-11-02", "2026-11-02", [], {}
+    )["rows"] == []
+    assert reader.query(
+        PERIOD[1],
+        card_fields,
+        "2026-11-01",
+        "2026-11-03",
+        [{"field": "conta_id", "values": ["outra_conta"]}],
+        {},
+    )["rows"] == []
     fields = [
         "anuncios",
         "eventos_ctwa",
