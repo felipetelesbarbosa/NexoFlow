@@ -1,5 +1,11 @@
 # Versionamento do NexoFlow
 
+## Publicação 1.5.62
+
+Publicada em **25/11/26 08:52:45 (Belém)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.62) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/5376f9b929ac3782949c9ba4c5ef6694778bf8b5) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45399924799) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45399924838) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45399924837) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45608401200).
+
+A conferência dos downloads verificou SHA-256, CRC, 621 entradas do manifesto do Setup e os módulos de atribuição e conector do commit. A validação comercial FARMA precisa de uma carga de homologação com dados reais antes da ativação em produção.
+
 ## Publicação 1.5.59
 
 Publicada em **23/11/26 20:23:43 (Belém)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.59) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/3159cb44e67d6b1c89ef89bc95a59b7ede06c021) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45285569537) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45285569392) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45285569385) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45288357131).
