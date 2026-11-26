@@ -30,11 +30,14 @@ import {
   Server,
   SlidersHorizontal,
   Sun,
+  UserRound,
   Waypoints,
   Webhook,
   X,
 } from "lucide-react";
 import {
+  ambientes,
+  isAmbiente,
   ativos,
   atencao,
   estados,
@@ -45,9 +48,10 @@ import {
   lerResumo,
   isSegmento,
 } from "./resumo";
-import type { Estado, Evento, Resumo, Segmento, Tarefa } from "./resumo";
+import type { Ambiente, Estado, Evento, Resumo, Segmento, Tarefa } from "./resumo";
 import { ApiConsumption } from "./consumo";
 import { Infrastructure } from "./infraestrutura";
+import { MinhaConta } from "./minha-conta";
 import { Documentation } from "./documentacao";
 import "./style.css";
 
@@ -58,6 +62,7 @@ const pages = {
   consumo: { nome: "Consumo de APIs", icone: Braces },
   infraestrutura: { nome: "Infraestrutura", icone: Server },
   documentacao: { nome: "Documentação", icone: BookOpen },
+  conta: { nome: "Minha Conta", icone: UserRound },
 } as const;
 type Page = keyof typeof pages;
 type Slice = ReturnType<typeof janela>;
@@ -67,10 +72,13 @@ function pageFromHash(): Page {
   return Object.hasOwn(pages, slug) ? (slug as Page) : "geral";
 }
 
-async function consultar(signal: AbortSignal, segmento?: Segmento) {
+async function consultar(signal: AbortSignal, ambiente: Ambiente, segmento?: Segmento) {
   const path = "/api/central/v1/resumo";
+  const params = new URLSearchParams();
+  if (ambiente === "producao") params.set("ambiente", ambiente);
+  if (segmento) params.set("segmento", segmento);
   const response = await fetch(
-    segmento ? path + "?segmento=" + segmento : path,
+    params.size ? path + "?" + params : path,
     {
       credentials: "same-origin",
       cache: "no-store",
@@ -95,6 +103,8 @@ async function consultar(signal: AbortSignal, segmento?: Segmento) {
       "A autenticação ou a rota da Central precisa ser conferida.",
     );
   const data = lerResumo(await response.json());
+  if (data.ambiente !== ambiente)
+    throw new Error("A API retornou outro ambiente. Atualize a consulta.");
   if (segmento && data.segmento !== segmento)
     throw new Error("A API retornou outro segmento. Atualize a consulta.");
   return data;
@@ -118,23 +128,24 @@ function App() {
   const [page, setPage] = useState(pageFromHash);
   const [compact, setCompact] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [disponiveis, setDisponiveis] = useState<Ambiente[]>(["homologacao"]);
   const [resumo, setResumo] = useState<Resumo>();
   const [fetched, setFetched] = useState<Date>();
   const [busy, setBusy] = useState(true);
   const [erro, setErro] = useState("");
-  const [request, setRequest] = useState<{ id: number; segmento?: Segmento }>({
-    id: 0,
+  const [request, setRequest] = useState<{ id: number; ambiente: Ambiente; segmento?: Segmento }>({
+    id: 0, ambiente: "homologacao",
   });
   const [scopes, setScopes] = useState<Segmento[]>([]);
   const currentRequest = useRef(0);
-  function reload(segmento?: Segmento) {
+  function reload(segmento?: Segmento, ambiente = request.ambiente) {
     const id = ++currentRequest.current;
     setResumo(undefined);
     setFetched(undefined);
     setErro("");
     setDetail(null);
     setBusy(true);
-    setRequest({ id, segmento });
+    setRequest({ id, segmento, ambiente });
   }
   const [dias, setDias] = useState(7);
   const [detail, setDetail] = useState<Tarefa | null>(null);
@@ -172,7 +183,24 @@ function App() {
     window.addEventListener("hashchange", go);
     return () => window.removeEventListener("hashchange", go);
   }, []);
-  const needsSummary = page !== "documentacao";
+  useEffect(() => {
+    const stop = new AbortController();
+    fetch("/api/central/v1/sessao", {
+      credentials: "same-origin",
+      cache: "no-store",
+      signal: stop.signal,
+    }).then(async (response) => {
+      if (!response.ok || response.redirected) return;
+      const { ambientes: enabled } = await response.json();
+      if (!stop.signal.aborted && Array.isArray(enabled) && enabled.includes("producao")) {
+        setDisponiveis(["homologacao", "producao"]);
+      }
+    }).catch(() => {
+      // Homologação continua disponível mesmo se a consulta à sessão falhar.
+    });
+    return () => stop.abort();
+  }, []);
+  const needsSummary = page !== "documentacao" && page !== "conta";
   useEffect(() => {
     if (!needsSummary) return;
     const stop = new AbortController();
@@ -183,7 +211,7 @@ function App() {
     setDetail(null);
     setResumo(undefined);
     setFetched(undefined);
-    consultar(stop.signal, request.segmento)
+    consultar(stop.signal, request.ambiente, request.segmento)
       .then((data) => {
         if (active && request.id === currentRequest.current) {
           setScopes(data.segmentos_autorizados);
@@ -279,7 +307,7 @@ function App() {
         <div className="aside-bottom">
           <span className="homolog">
             <FlaskConical size={16} />
-            <span>Homologação</span>
+            <span>{ambientes[request.ambiente]}</span>
           </span>
           <button
             className="collapse plain"
@@ -320,7 +348,24 @@ function App() {
           <ChevronRight size={14} />
           <strong>{view.nome}</strong>
           <div className="header-right">
-            {page !== "infraestrutura" && page !== "documentacao" && <>
+            <select
+              className="segment-picker environment-picker"
+              aria-label="Ambiente da Central"
+              value={request.ambiente}
+              onChange={(event) => {
+                const value = event.target.value;
+                if (isAmbiente(value) && disponiveis.includes(value)) {
+                  setScopes([]);
+                  reload(undefined, value);
+                }
+              }}
+            >
+              <option value="homologacao">Homologação</option>
+              <option value="producao" disabled={!disponiveis.includes("producao")}>
+                {disponiveis.includes("producao") ? "Produção" : "Produção indisponível"}
+              </option>
+            </select>
+            {page !== "infraestrutura" && page !== "documentacao" && page !== "conta" && <>
             <Layers size={15} />
             <span>Segmento</span>
             {scopes.length > 1 ? (
@@ -362,8 +407,8 @@ function App() {
           </div>
         </header>
         <main id="conteudo" tabIndex={-1} ref={main}>
-          {page === "documentacao" ? <Documentation /> : page === "infraestrutura" ? <Infrastructure /> : page === "consumo" ? (
-            <ApiConsumption key={request.segmento ?? "inicial"} segment={request.segmento} />
+          {page === "conta" ? <MinhaConta /> : page === "documentacao" ? <Documentation /> : page === "infraestrutura" ? <Infrastructure /> : page === "consumo" ? (
+            <ApiConsumption key={request.ambiente + ":" + (request.segmento ?? "inicial")} ambiente={request.ambiente} segment={request.segmento} />
           ) : <>
           <div className="title-row">
             <div>

@@ -421,3 +421,62 @@ test("consumo de APIs abre histórico, detalhes e log textual no celular", async
   await page.keyboard.press("Escape");
   await expect(detail).toHaveCount(0);
 });
+
+test("troca de ambiente exibe apenas resultados e segmentos do destino", async ({ page }) => {
+  await page.route("**/api/central/v1/sessao", (route) =>
+    route.fulfill({ json: { ambientes: ["homologacao", "producao"] } }),
+  );
+  await page.route("**/api/central/v1/resumo*", (route) => {
+    const production = new URL(route.request().url()).searchParams.get("ambiente") === "producao";
+    return route.fulfill({ json: production ? {
+      ...summary,
+      segmento: "PET",
+      segmentos_autorizados: ["PET"],
+      ambiente: "producao",
+      integracoes: { hub: "pronto", processamento: "producao" },
+      tarefas: [],
+      eventos: [],
+    } : summary });
+  });
+  await page.goto("/");
+  const environment = page.getByRole("combobox", { name: "Ambiente da Central" });
+  await expect(environment).toHaveValue("homologacao");
+  await expect(page.getByRole("button", { name: /Detalhes da execução/ })).toBeVisible();
+  await environment.selectOption("producao");
+  await expect(page.getByLabel("Segmento PET", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Detalhes da execução/ })).toHaveCount(0);
+  await environment.selectOption("homologacao");
+  await expect(page.getByLabel("Segmento FARMA", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Detalhes da execução/ })).toBeVisible();
+});
+
+test("Minha Conta salva o nome e encaminha a segurança ao provedor", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 740 });
+  let name = "Felipe";
+  await page.route("**/api/central/v1/minha-conta", (route) => {
+    if (route.request().method() === "PUT") {
+      const change = route.request().postDataJSON();
+      name = change.nome;
+      return route.fulfill({ json: { nome: name } });
+    }
+    return route.fulfill({ json: {
+      nome: name,
+      email: "operador@example.invalid",
+      nome_editavel: true,
+      mfa_url: "https://ensaio.cloudflareaccess.com/AddMfaDevice",
+    } });
+  });
+  await page.goto("/#conta");
+  const field = page.getByRole("textbox", { name: "Nome de exibição" });
+  await expect(field).toHaveValue("Felipe");
+  await field.fill("Felipe Silva");
+  await page.getByRole("button", { name: "Salvar nome" }).click();
+  await expect(page.getByText("Nome salvo.")).toBeVisible();
+  await page.reload();
+  await expect(field).toHaveValue("Felipe Silva");
+  await expect(page.getByText("operador@example.invalid")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Alterar e-mail ou senha/ })).toHaveAttribute("href", "https://dash.cloudflare.com/profile");
+  await expect(page.getByRole("link", { name: /Configurar um dispositivo/ })).toHaveAttribute("href", "https://ensaio.cloudflareaccess.com/AddMfaDevice");
+  await expect(page.getByRole("option", { name: "Produção indisponível" })).toBeDisabled();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+});

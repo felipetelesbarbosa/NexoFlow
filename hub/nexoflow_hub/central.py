@@ -1,11 +1,12 @@
-"""Central técnica de homologação, com leitura restrita ao operador autenticado."""
+"""Central de Operações, com leitura restrita ao operador autenticado."""
 
 from __future__ import annotations
 
 import json
 import os
 import re
-from contextlib import contextmanager
+import sqlite3
+from contextlib import closing, contextmanager
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
@@ -18,6 +19,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request, Security
 from fastapi.security import APIKeyHeader
 from psycopg.conninfo import conninfo_to_dict
 from psycopg.rows import dict_row
+from pydantic import BaseModel, ConfigDict, Field
 
 from . import __version__
 from .api_observability import read_consumption
@@ -25,6 +27,44 @@ from .contracts import noturno_stages
 from .infrastructure import read_infrastructure
 
 SEGMENTS = {"FARMA", "PET"}
+PRODUCTION_HOST = "central.nexoflowhub.com.br"
+CENTRAL_HOSTS = {PRODUCTION_HOST, "central-hml.nexoflowhub.com.br"}
+Environment = Literal["homologacao", "producao"]
+
+
+def validate_dsn(dsn: str, environment: Environment) -> None:
+    try:
+        info = conninfo_to_dict(dsn)
+    except psycopg.ProgrammingError:
+        raise ValueError("DSN_CENTRAL_INVALIDO") from None
+    suffix = {"homologacao": "hml", "producao": "prod"}[environment]
+    if info.get("user") != "hub_central_leitor" or not re.fullmatch(
+        rf"nexoflow_hub_{suffix}(?:_[a-z0-9]+)?", str(info.get("dbname", ""))
+    ):
+        raise ValueError("DESTINO_LEITURA_" + suffix.upper() + "_OBRIGATORIO")
+
+
+@dataclass(frozen=True)
+class ProductionReader:
+    dsn: str = field(repr=False)
+    identities_file: Path
+
+    def __post_init__(self):
+        validate_dsn(self.dsn, "producao")
+
+
+@dataclass(frozen=True)
+class Operator:
+    subject: str
+    email: str
+    segments: list[str]
+
+
+class DisplayName(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    nome: str = Field(min_length=1, max_length=80, pattern=r"^[^\x00-\x1f\x7f]+$")
+
+
 CENTRAL_SESSION = Security(
     APIKeyHeader(
         name="Cf-Access-Jwt-Assertion",
@@ -58,6 +98,8 @@ class CentralSettings:
     jwks_file: Path
     identities_file: Path
     infrastructure_file: Path | None = None
+    profiles_db: Path | None = None
+    production: ProductionReader | None = None
 
     def __post_init__(self):
         if not re.fullmatch(
@@ -66,14 +108,13 @@ class CentralSettings:
             raise ValueError("EMISSOR_ACCESS_INVALIDO")
         if not self.audience.strip():
             raise ValueError("AUDIENCIA_ACCESS_OBRIGATORIA")
-        try:
-            info = conninfo_to_dict(self.dsn)
-        except psycopg.ProgrammingError:
-            raise ValueError("DSN_CENTRAL_INVALIDO") from None
-        if info.get("user") != "hub_central_leitor" or not re.fullmatch(
-            r"nexoflow_hub_hml(?:_[a-z0-9]+)?", str(info.get("dbname", ""))
+        validate_dsn(self.dsn, "homologacao")
+        if (
+            self.production
+            and self.production.identities_file.resolve()
+            == self.identities_file.resolve()
         ):
-            raise ValueError("DESTINO_LEITURA_HML_OBRIGATORIO")
+            raise ValueError("ESCOPOS_DE_PRODUCAO_DEVEM_SER_SEPARADOS")
 
     @classmethod
     def load(cls):
@@ -82,6 +123,17 @@ class CentralSettings:
             or os.getenv("HUB_ESCRITA_REAL", "false").lower() != "false"
         ):
             raise ValueError("CENTRAL_SOMENTE_HOMOLOGACAO")
+        production_dsn = os.getenv("CENTRAL_PROD_DSN_FILE")
+        production_scopes = os.getenv("CENTRAL_PROD_IDENTIDADES_FILE")
+        if bool(production_dsn) != bool(production_scopes):
+            raise ValueError("CONFIGURACAO_LEITURA_PROD_INCOMPLETA")
+        production = (
+            ProductionReader(
+                Path(production_dsn).read_text().strip(), Path(production_scopes)
+            )
+            if production_dsn and production_scopes
+            else None
+        )
         return cls(
             Path(os.environ["CENTRAL_DSN_FILE"]).read_text().strip(),
             os.environ["CENTRAL_ACCESS_ISSUER"],
@@ -89,6 +141,8 @@ class CentralSettings:
             Path(os.environ["CENTRAL_ACCESS_JWKS_FILE"]),
             Path(os.environ["CENTRAL_IDENTIDADES_FILE"]),
             Path(value) if (value := os.getenv("CENTRAL_INFRA_FILE")) else None,
+            Path(profiles) if (profiles := os.getenv("CENTRAL_PROFILES_DB")) else None,
+            production,
         )
 
 
@@ -113,7 +167,7 @@ def _private_object(path: Path) -> dict:
         raise HTTPException(503, "CONFIGURACAO_CENTRAL_INDISPONIVEL") from None
 
 
-def operator_segments(assertion: str, settings: CentralSettings) -> list[str]:
+def authenticated_operator(assertion: str, settings: CentralSettings) -> Operator:
     if not assertion or len(assertion) > 16384:
         raise HTTPException(401, "AUTENTICACAO_NECESSARIA")
     try:
@@ -146,6 +200,8 @@ def operator_segments(assertion: str, settings: CentralSettings) -> list[str]:
         )
         if (
             claims["type"] != "app"
+            or not isinstance(claims["sub"], str)
+            or not claims["sub"].strip()
             or "common_name" in claims
             or not isinstance(claims.get("email"), str)
             or not claims["email"].strip()
@@ -155,7 +211,14 @@ def operator_segments(assertion: str, settings: CentralSettings) -> list[str]:
         raise HTTPException(401, "IDENTIDADE_ACCESS_INVALIDA") from None
 
     # Releitura em cada consulta permite revogar o escopo sem reiniciar o serviço.
-    grant = _private_object(settings.identities_file).get(claims["sub"])
+    segments = granted_segments(settings.identities_file, claims["sub"])
+    if not segments:
+        raise HTTPException(403, "OPERADOR_SEM_ACESSO_A_CENTRAL")
+    return Operator(claims["sub"], claims["email"], segments)
+
+
+def granted_segments(path: Path, subject: str) -> list[str]:
+    grant = _private_object(path).get(subject)
     segments = [grant] if isinstance(grant, str) else grant
     if (
         not isinstance(segments, list)
@@ -163,8 +226,29 @@ def operator_segments(assertion: str, settings: CentralSettings) -> list[str]:
         or not all(isinstance(value, str) and value in SEGMENTS for value in segments)
         or len(set(segments)) != len(segments)
     ):
-        raise HTTPException(403, "OPERADOR_SEM_ACESSO_A_CENTRAL")
+        return []
     return segments
+
+
+def profile_name(path: Path, subject: str, name: str | None = None) -> str:
+    try:
+        with closing(sqlite3.connect(path, timeout=3)) as connection, connection:
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS profiles (subject TEXT PRIMARY KEY, name TEXT NOT NULL)"
+            )
+            if name is not None:
+                connection.execute(
+                    """INSERT INTO profiles (subject, name) VALUES (?, ?)
+                       ON CONFLICT(subject) DO UPDATE SET name = excluded.name""",
+                    (subject, name),
+                )
+                return name
+            row = connection.execute(
+                "SELECT name FROM profiles WHERE subject = ?", (subject,)
+            ).fetchone()
+            return row[0] if row else ""
+    except sqlite3.Error:
+        raise HTTPException(503, "PERFIL_CENTRAL_INDISPONIVEL") from None
 
 
 @contextmanager
@@ -223,7 +307,7 @@ def create_app(settings: CentralSettings | None = None):
     app = FastAPI(
         title="NexoFlow — Central de Operações",
         version=__version__,
-        description="Consultas de homologação para operadores com conta individual e MFA.",
+        description="Consultas operacionais para operadores com conta individual e MFA.",
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
@@ -239,7 +323,7 @@ def create_app(settings: CentralSettings | None = None):
 
     def authenticated(request: Request, _session=CENTRAL_SESSION):
         tokens = request.headers.getlist("cf-access-jwt-assertion")
-        return operator_segments(tokens[0] if len(tokens) == 1 else "", config)
+        return authenticated_operator(tokens[0] if len(tokens) == 1 else "", config)
 
     operator = Depends(authenticated)
     access_errors = {
@@ -247,6 +331,53 @@ def create_app(settings: CentralSettings | None = None):
         403: {"description": "A identidade não tem permissão para a consulta"},
         503: {"description": "Consulta temporariamente indisponível"},
     }
+
+    def production_segments(request: Request, identity: Operator) -> list[str]:
+        if (
+            config.production is None
+            or request.headers.get("x-central-host") != PRODUCTION_HOST
+        ):
+            return []
+        return granted_segments(config.production.identities_file, identity.subject)
+
+    def destination(request: Request, identity: Operator, ambiente: Environment):
+        if ambiente == "homologacao":
+            return config.dsn, identity.segments
+        scopes = production_segments(request, identity)
+        if config.production is None or not scopes:
+            raise HTTPException(403, "PRODUCAO_NAO_DISPONIVEL")
+        return config.production.dsn, scopes
+
+    @app.get("/api/central/v1/sessao", include_in_schema=False)
+    def session(request: Request, identity: Operator = operator):
+        environments = ["homologacao"]
+        if production_segments(request, identity):
+            environments.append("producao")
+        return {"ambientes": environments}
+
+    @app.get("/api/central/v1/minha-conta", include_in_schema=False)
+    def account(identity: Operator = operator):
+        return {
+            "nome": profile_name(config.profiles_db, identity.subject)
+            if config.profiles_db
+            else "",
+            "email": identity.email,
+            "nome_editavel": config.profiles_db is not None,
+            "mfa_url": config.issuer + "/AddMfaDevice",
+        }
+
+    @app.put("/api/central/v1/minha-conta", include_in_schema=False)
+    def rename(request: Request, profile: DisplayName, identity: Operator = operator):
+        host = request.headers.get("x-central-host")
+        if host not in CENTRAL_HOSTS or request.headers.getlist("origin") != [
+            "https://" + host
+        ]:
+            raise HTTPException(403, "ORIGEM_DA_CONTA_NAO_AUTORIZADA")
+        if config.profiles_db is None:
+            raise HTTPException(503, "PERFIL_CENTRAL_INDISPONIVEL")
+        return {
+            "nome": profile_name(config.profiles_db, identity.subject, profile.nome)
+        }
 
     @app.get("/api/central/v1/documentacao/openapi.json", include_in_schema=False)
     def documentation(_allowed=operator, api: Literal["hub", "central"] = "hub"):
@@ -268,24 +399,28 @@ def create_app(settings: CentralSettings | None = None):
         responses={**access_errors},
     )
     def consumption(
+        request: Request,
+        ambiente: Environment = "homologacao",
         segmento: Literal["FARMA", "PET"] | None = None,
         api: Literal["hub", "weni"] | None = None,
         antes: Annotated[int | None, Query(ge=1, le=2**53 - 1)] = None,
         so_erros: bool = False,
-        allowed=operator,
+        identity: Operator = operator,
     ):
+        dsn, allowed = destination(request, identity, ambiente)
         segment = segmento or allowed[0]
         if segment not in allowed:
             raise HTTPException(403, "SEGMENTO_NAO_AUTORIZADO")
         if not slots.acquire(blocking=False):
             raise HTTPException(503, "CENTRAL_OCUPADA")
         try:
-            with read_cursor(config.dsn, segment) as db:
+            with read_cursor(dsn, segment) as db:
                 return dict(
                     read_consumption(
                         db, segment, api=api, before=antes, only_errors=so_erros
                     ),
                     segmento=segment,
+                    ambiente=ambiente,
                 )
         except psycopg.Error:
             raise HTTPException(503, "LEITURA_CENTRAL_INDISPONIVEL") from None
@@ -308,24 +443,31 @@ def create_app(settings: CentralSettings | None = None):
         },
         responses={**access_errors, 422: {"description": "Segmento inválido"}},
     )
-    def summary(request: Request, allowed=operator):
+    def summary(
+        request: Request,
+        ambiente: Environment = "homologacao",
+        identity: Operator = operator,
+    ):
         params = request.query_params.multi_items()
-        segment = allowed[0]
-        if params:
-            if (
-                len(params) != 1
-                or params[0][0] != "segmento"
-                or params[0][1] not in SEGMENTS
-            ):
-                raise HTTPException(422, "SEGMENTO_DA_CONSULTA_INVALIDO")
-            segment = params[0][1]
-            if segment not in allowed:
-                raise HTTPException(403, "SEGMENTO_NAO_AUTORIZADO")
+        names = [name for name, _ in params]
+        if len(set(names)) != len(names) or any(
+            name not in {"segmento", "ambiente"} for name in names
+        ):
+            raise HTTPException(422, "CONSULTA_CENTRAL_INVALIDA")
+        requested = request.query_params.get("segmento")
+        if requested is not None and requested not in SEGMENTS:
+            raise HTTPException(422, "SEGMENTO_DA_CONSULTA_INVALIDO")
+        dsn, allowed = destination(request, identity, ambiente)
+        segment = requested or allowed[0]
+        if segment not in allowed:
+            raise HTTPException(403, "SEGMENTO_NAO_AUTORIZADO")
         if not slots.acquire(blocking=False):
             raise HTTPException(503, "CENTRAL_OCUPADA")
         try:
             return {
-                **read_summary(config.dsn, segment),
+                **read_summary(dsn, segment),
+                "ambiente": ambiente,
+                "integracoes": {"hub": "pronto", "processamento": ambiente},
                 "segmentos_autorizados": allowed,
             }
         except psycopg.Error:

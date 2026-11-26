@@ -19,12 +19,15 @@ services:
     environment:
       HUB_AMBIENTE: homologacao
       HUB_ESCRITA_REAL: 'false'
+      CENTRAL_PROFILES_DB: /var/lib/nexoflow-central/perfis.sqlite3
       CENTRAL_DSN_FILE: /run/secrets/central_dsn
       CENTRAL_IDENTIDADES_FILE: /run/secrets/central_identidades.json
       CENTRAL_ACCESS_JWKS_FILE: /run/secrets/central_jwks.json
       CENTRAL_ACCESS_ISSUER: ${CENTRAL_ACCESS_ISSUER:?issuer da homologação obrigatório}
       CENTRAL_ACCESS_AUD: ${CENTRAL_ACCESS_AUD:?audience da Central obrigatória}
     secrets: [central_dsn, central_identidades.json, central_jwks.json]
+    volumes:
+      - central_profiles:/var/lib/nexoflow-central
     networks: [interna, central]
     pids_limit: 80
     mem_limit: 192m
@@ -45,6 +48,8 @@ services:
     logging:
       driver: json-file
       options: {max-size: 10m, max-file: '3'}
+volumes:
+  central_profiles:
 networks:
   central: {internal: true}
 secrets:

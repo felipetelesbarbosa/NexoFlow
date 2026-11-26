@@ -418,3 +418,120 @@ def test_collect_vps_only_uses_the_selected_inventory_and_last_24_hours():
     vm["id"] = 1
     with pytest.raises(ValueError, match="VPS_DIVERGENTE"):
         collect(get, 99, now)
+
+
+def test_environment_uses_separate_grant_and_never_falls_back(
+    setup, signing_key, tmp_path, monkeypatch
+):
+    from dataclasses import replace
+
+    config, _ = setup
+    grants = tmp_path / "producao.json"
+    grants.write_text('{"operador-f":"PET"}')
+    production = central.ProductionReader(
+        "dbname=nexoflow_hub_prod user=hub_central_leitor", grants
+    )
+    client = TestClient(central.create_app(replace(config, production=production)))
+    headers = {
+        **assertion(token(signing_key)),
+        "X-Central-Host": central.PRODUCTION_HOST,
+    }
+    path = "/api/central/v1/sessao"
+    assert client.get(path, headers=headers).json()["ambientes"] == [
+        "homologacao",
+        "producao",
+    ]
+    alias = headers | {"X-Central-Host": "central-hml.nexoflowhub.com.br"}
+    assert client.get(path, headers=alias).json()["ambientes"] == ["homologacao"]
+
+    calls = []
+
+    def summary(dsn, segment):
+        calls.append((dsn, segment))
+        return {"segmento": segment}
+
+    @contextmanager
+    def read_cursor(dsn, segment):
+        calls.append((dsn, segment))
+        yield object()
+
+    monkeypatch.setattr(central, "read_summary", summary)
+    monkeypatch.setattr(central, "read_cursor", read_cursor)
+    monkeypatch.setattr(central, "read_consumption", lambda *_args, **_kwargs: {})
+    for route in [PATH, "/api/central/v1/consumo"]:
+        assert (
+            client.get(route + "?ambiente=producao", headers=alias).status_code == 403
+        )
+        assert (
+            client.get(
+                route + "?ambiente=producao&segmento=FARMA", headers=headers
+            ).status_code
+            == 403
+        )
+        res = client.get(route + "?ambiente=producao", headers=headers)
+        assert res.json()["ambiente"] == "producao"
+        assert res.json()["segmento"] == "PET"
+        assert calls[-1] == (production.dsn, "PET")
+        res = client.get(route, headers=headers)
+        assert res.json()["ambiente"] == "homologacao"
+        assert calls[-1] == (config.dsn, "FARMA")
+
+    grants.write_text("{}")
+    assert client.get(PATH + "?ambiente=producao", headers=headers).status_code == 403
+    assert len(calls) == 4
+    with pytest.raises(ValueError, match="DESTINO_LEITURA_PROD"):
+        central.ProductionReader(config.dsn, grants)
+
+
+def test_self_service_name_uses_signed_subject_and_same_origin(
+    setup, signing_key, tmp_path
+):
+    from dataclasses import replace
+
+    config, _ = setup
+    settings = replace(config, profiles_db=tmp_path / "perfis.sqlite3")
+    client = TestClient(central.create_app(settings))
+    route = "/api/central/v1/minha-conta"
+    assert client.get(route).status_code == 401
+
+    headers = {
+        **assertion(token(signing_key)),
+        "X-Central-Host": central.PRODUCTION_HOST,
+        "Origin": "https://" + central.PRODUCTION_HOST,
+    }
+    assert (
+        client.put(
+            route,
+            json={"nome": "Outro"},
+            headers=headers | {"Origin": "https://outro.example"},
+        ).status_code
+        == 403
+    )
+    assert (
+        client.put(
+            route,
+            json={"nome": "Outro", "email": "outro@example.invalid"},
+            headers=headers,
+        ).status_code
+        == 422
+    )
+    assert client.put(route, json={"nome": "  "}, headers=headers).status_code == 422
+    assert (
+        client.put(route, json={"nome": "Fábio\nSilva"}, headers=headers).status_code
+        == 422
+    )
+    assert client.put(
+        route, json={"nome": "  Fábio Silva  "}, headers=headers
+    ).json() == {"nome": "Fábio Silva"}
+
+    reloaded = TestClient(central.create_app(settings))
+    assert reloaded.get(route, headers=headers).json() == {
+        "nome": "Fábio Silva",
+        "email": "operador@example.invalid",
+        "nome_editavel": True,
+        "mfa_url": "https://ensaio.cloudflareaccess.com/AddMfaDevice",
+    }
+    other = assertion(
+        token(signing_key, sub="operador-p", email="pessoa-p@example.invalid")
+    )
+    assert reloaded.get(route, headers=other).json()["nome"] == ""

@@ -42,13 +42,21 @@ type Operacao = {
   fila_espera_segundos: number | null;
   ultima_conclusao_em: string | null;
 };
+export const ambientes = {
+  homologacao: "Homologação",
+  producao: "Produção",
+} as const;
+export type Ambiente = keyof typeof ambientes;
+export const isAmbiente = (value: unknown): value is Ambiente =>
+  typeof value === "string" && Object.hasOwn(ambientes, value);
+
 export type Resumo = {
   segmento: Segmento;
   segmentos_autorizados: Segmento[];
-  ambiente: "homologacao";
+  ambiente: Ambiente;
   metricas: { habilitado: false };
   tarefas: Tarefa[];
-  integracoes: { hub: "pronto"; processamento: "homologacao" };
+  integracoes: { hub: "pronto"; processamento: Ambiente };
   eventos: Evento[];
   operacao?: Operacao | null;
 };
@@ -113,12 +121,12 @@ export function lerResumo(x: unknown): Resumo {
   const ok =
     registro(x) &&
     isSegmento(x.segmento) &&
-    x.ambiente === "homologacao" &&
+    isAmbiente(x.ambiente) &&
     registro(x.metricas) &&
     x.metricas.habilitado === false &&
     registro(x.integracoes) &&
     x.integracoes.hub === "pronto" &&
-    x.integracoes.processamento === "homologacao" &&
+    x.integracoes.processamento === x.ambiente &&
     operacaoValida(x.operacao) &&
     Array.isArray(x.tarefas) &&
     x.tarefas.every(

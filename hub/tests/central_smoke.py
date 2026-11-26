@@ -19,6 +19,8 @@ SUMMARY = "/api/central/v1/resumo"
 CONSUMPTION = "/api/central/v1/consumo"
 INFRASTRUCTURE = "/api/central/v1/infraestrutura"
 OPENAPI = "/api/central/v1/documentacao/openapi.json"
+SESSION = "/api/central/v1/sessao"
+ACCOUNT = "/api/central/v1/minha-conta"
 EVENT = "/v1/webhooks/weni/farma"
 
 
@@ -140,6 +142,17 @@ def verify(*, web_ip, api_ip, pg_ip, secret_dir, key, farma_id, pet_id, wait):
         assert client.get(web + SUMMARY).status_code == 401
         assert client.get(web + INFRASTRUCTURE).status_code == 401
         assert client.get(web + OPENAPI).status_code == 401
+        assert client.get(web + ACCOUNT).status_code == 401
+        host = "central.nexoflowhub.com.br"
+        profile = {**farma, "Host": host, "Origin": "https://" + host}
+        assert client.get(web + SESSION, headers=profile).json() == {
+            "ambientes": ["homologacao"]
+        }
+        assert client.put(
+            web + ACCOUNT, headers=profile, json={"nome": "Operador FARMA"}
+        ).json() == {"nome": "Operador FARMA"}
+        assert client.get(web + ACCOUNT, headers=farma).json()["nome"] == "Operador FARMA"
+        assert client.get(web + ACCOUNT, headers=pet).json()["nome"] == ""
         contract = client.get(web + OPENAPI, headers=farma)
         assert contract.status_code == 200
         assert contract.json()["paths"][EVENT]["post"]["security"] == [

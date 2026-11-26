@@ -1,3 +1,4 @@
+import type { Ambiente } from "./resumo";
 import { useEffect, useRef, useState } from "react";
 import {
   Activity, Braces, ChevronRight, CircleAlert, CircleCheck,
@@ -187,7 +188,7 @@ function RequestDetail({ item, api, close }: { item: RequestLog; api: API; close
   );
 }
 
-export function ApiConsumption({ segment }: { segment?: Segmento }) {
+export function ApiConsumption({ segment, ambiente }: { segment?: Segmento; ambiente: Ambiente }) {
   const [api, setApi] = useState<API>();
   const [onlyErrors, setOnlyErrors] = useState(false);
   const [before, setBefore] = useState<number>();
@@ -198,7 +199,7 @@ export function ApiConsumption({ segment }: { segment?: Segmento }) {
   const [error, setError] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [detail, setDetail] = useState<RequestLog>();
-  const selection = JSON.stringify([segment, api, before, onlyErrors, refresh]);
+  const selection = JSON.stringify([ambiente, segment, api, before, onlyErrors, refresh]);
   const currentSnapshot = snapshot?.selection === selection ? snapshot : undefined;
   const data = currentSnapshot?.data;
   useEffect(() => {
@@ -210,6 +211,7 @@ export function ApiConsumption({ segment }: { segment?: Segmento }) {
     setSnapshot(undefined);
     setDetail(undefined);
     const params = new URLSearchParams();
+    if (ambiente === "producao") params.set("ambiente", ambiente);
     if (segment) params.set("segmento", segment);
     if (api) params.set("api", api);
     if (before) params.set("antes", String(before));
@@ -218,7 +220,8 @@ export function ApiConsumption({ segment }: { segment?: Segmento }) {
       credentials: "same-origin", cache: "no-store", signal: stop.signal,
     }).then(async (response) => {
       if (!response.ok || response.redirected) throw new Error();
-      const result: Consumption = await response.json();
+      const result: Consumption & { ambiente?: Ambiente } = await response.json();
+      if ((result.ambiente ?? "homologacao") !== ambiente) throw new Error();
       if (segment && result.segmento !== segment) throw new Error();
       if (active) setSnapshot({ data: result, readAt: Date.now(), selection });
     }).catch(() => {
@@ -232,7 +235,7 @@ export function ApiConsumption({ segment }: { segment?: Segmento }) {
       clearTimeout(timeout);
       stop.abort();
     };
-  }, [segment, api, before, onlyErrors, selection]);
+  }, [ambiente, segment, api, before, onlyErrors, selection]);
 
   useEffect(() => {
     if (api && data && openDetails.current) {

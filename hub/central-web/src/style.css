@@ -1296,3 +1296,49 @@ td {
   .api-coverage li { grid-template-columns: 18px 1fr minmax(160px, auto); }
   .api-coverage li > span { grid-column: 3; text-align: end; }
 }
+
+.account-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr));
+}
+.account-panel {
+  padding: 22px;
+  overflow-wrap: anywhere;
+}
+.account-panel h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 0;
+}
+.account-panel form {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0;
+}
+.account-panel input {
+  width: 100%;
+  border: 1px solid var(--control-line);
+  background: var(--control);
+  color: var(--heading);
+  border-radius: 6px;
+  padding: 9px 10px;
+}
+.account-panel .refresh {
+  justify-self: start;
+}
+.account-panel dd {
+  margin: 4px 0 0;
+}
+.account-panel a {
+  text-decoration: underline;
+}
+@media (max-width: 540px) {
+  header {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 65px;
+    padding-block: 8px;
+  }
+}
