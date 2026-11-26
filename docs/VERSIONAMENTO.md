@@ -1,5 +1,11 @@
 # Versionamento do NexoFlow
 
+## Publicação 1.5.64
+
+Publicada em **26/11/2026 às 20:11:29 (Fortaleza)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.64) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/d521d1371c515e93f1a1ae1045cc531ad19fd664) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45906986961) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45906986985) · [Meta Ads](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45906986994) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45909372087).
+
+Os dois ZIPs públicos foram conferidos por SHA-256 e CRC. O Setup contém 622 entradas verificadas no manifesto e os dois pacotes incluem a correção da recuperação de conversas Meta sem impressões.
+
 ## Publicação 1.5.63
 
 Publicada em **25/11/26 13:53:52 (Belém)**. [Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.63) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/fb182b19effcb6d3659dede72100d14a272c0ff4) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45654339845) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45654339456) · [Meta](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45654339566) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45658772259).

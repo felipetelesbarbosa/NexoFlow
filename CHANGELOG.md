@@ -1,6 +1,8 @@
 # NexoFlow — Changelog
 
-## 1.5.64
+## 1.5.64 — 26/11/2026 às 20:11:29 (Fortaleza)
+
+[Release](https://github.com/felipetelesbarbosa/NexoFlow/releases/tag/v1.5.64) · [Commit](https://github.com/felipetelesbarbosa/NexoFlow/commit/d521d1371c515e93f1a1ae1045cc531ad19fd664) · [CI Windows e pacotes](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45906986961) · [CodeQL](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45906986985) · [Meta Ads](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45906986994) · [Publicação](https://github.com/felipetelesbarbosa/NexoFlow/actions/runs/45909372087).
 
 O Analytics FARMA recupera o total de conversas quando a consulta direta confirma anúncio, conta, data, investimento e atribuição, mesmo que a Meta omita impressões. Impressões, CTR e CPM ficam indisponíveis nesse caso. A rotina também é usada pelo Noturno Windows.
 
