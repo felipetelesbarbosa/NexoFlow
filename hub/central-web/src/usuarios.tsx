@@ -4,7 +4,7 @@ import type { Segmento } from "./resumo";
 
 const api = "/api/central/v1";
 const centralOficial = "https://central.nexoflowhub.com.br";
-const accessApps = "https://one.dash.cloudflare.com/?to=/:account/access/apps";
+const accessApps = "https://dash.cloudflare.com/3d28f3cbcbb2f27849194e412022d510/one/access-controls/policies/53c46c33-5075-41fe-a475-77be7ab3be6a/edit";
 type Usuario = { id: string; email: string | null; segmentos: Segmento[]; super_admin: boolean };
 type Convite = { id: string; email: string; segmentos: Segmento[]; expira_em: number; estado: keyof typeof estados };
 type Acessos = { usuarios: Usuario[]; convites: Convite[] };
@@ -14,6 +14,10 @@ const estados = {
   expirado: "Expirado",
   cancelado: "Cancelado",
 };
+const abas = ["Pendentes", "Aceitos", "Cancelados"] as const;
+const abaPorEstado = {
+  pendente: "Pendentes", aceito: "Aceitos", cancelado: "Cancelados", expirado: "Cancelados",
+} as const;
 const mensagens: Record<string, string> = {
   EMAIL_JA_TEM_ACESSO: "Esse e-mail já tem acesso à Central.",
   CONVITE_JA_PENDENTE: "Já existe um convite pendente para esse e-mail. Cancele o anterior para gerar outro.",
@@ -43,6 +47,7 @@ async function consultar(path: string, body?: object, signal?: AbortSignal) {
 }
 
 export function GerenciarUsuarios() {
+  const [aba, setAba] = useState<(typeof abas)[number]>("Pendentes");
   const [acessos, setAcessos] = useState<Acessos>();
   const [email, setEmail] = useState("");
   const [segmentos, setSegmentos] = useState<Segmento[]>([]);
@@ -81,6 +86,9 @@ export function GerenciarUsuarios() {
       setBusy(false);
     }
   }
+
+  const grupos = { Pendentes: [] as Convite[], Aceitos: [] as Convite[], Cancelados: [] as Convite[] };
+  for (const convite of acessos?.convites ?? []) grupos[abaPorEstado[convite.estado]].push(convite);
 
   return (
     <>
@@ -154,14 +162,22 @@ export function GerenciarUsuarios() {
       </div>
       <section className="panel account-panel invite-history" aria-labelledby="autorizar-cloudflare">
         <h2 id="autorizar-cloudflare">Autorizar na Cloudflare</h2>
-        <p>Abra a aplicação <strong>NexoFlow Central de Operações</strong> e inclua na política de acesso o mesmo e-mail do convite.</p>
-        <a href={accessApps} target="_blank" rel="noopener noreferrer">Abrir aplicações no Cloudflare Access</a>
+        <p>Adicione o e-mail do convidado à política <strong>Central | Convidados OTP</strong>.</p>
+        <a href={accessApps} target="_blank" rel="noopener noreferrer">Autorizar convidados no Cloudflare Access</a>
       </section>
       <section className="panel account-panel invite-history" aria-labelledby="convites-lista">
-        <h2 id="convites-lista">Convites recentes</h2>
-        {acessos?.convites.length === 0 && <p>Nenhum convite criado.</p>}
-        <ul className="access-list">
-          {acessos?.convites.map((invite) => (
+        <h2 id="convites-lista">Convites</h2>
+        <div className="docs-tabs" role="group" aria-label="Filtrar convites por situação">
+          {abas.map((categoria) => (
+            <button key={categoria} type="button" aria-pressed={aba === categoria}
+              onClick={() => setAba(categoria)}>
+              {categoria}{acessos && ` (${grupos[categoria].length})`}
+            </button>
+          ))}
+        </div>
+        {acessos && grupos[aba].length === 0 && <p>Nenhum convite nesta aba.</p>}
+        <ul className="access-list" aria-label={aba}>
+          {grupos[aba].map((invite) => (
             <li key={invite.id}>
               <strong>{invite.email}</strong>
               <span>{estados[invite.estado]} · {invite.segmentos.join(" · ")}</span>

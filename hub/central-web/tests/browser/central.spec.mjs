@@ -487,20 +487,31 @@ test("só o Super Admin vê o cadastro de convites e o atalho para autorização
     route.fulfill({ json: { ambientes: ["homologacao"], gerencia_usuarios: admin } }),
   );
   await page.route("**/api/central/v1/usuarios", (route) =>
-    route.fulfill({ json: { usuarios: [], convites: [] } }),
+    route.fulfill({ json: { usuarios: [], convites: ["pendente", "aceito", "expirado", "cancelado"].map((estado) => ({
+      id: estado, email: estado + "@example.invalid", segmentos: ["FARMA"], estado, expira_em: 1800000000,
+    })) } }),
   );
   await page.route("**/api/central/v1/convites", (route) =>
     route.fulfill({ status: 201, json: { codigo: "c".repeat(43) } }),
   );
   await page.goto("/#usuarios");
   await expect(page.getByText("Área exclusiva do Super Admin.")).toBeVisible();
-  await expect(page.getByRole("link", { name: /Abrir aplicações no Cloudflare/ })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /Autorizar convidados no Cloudflare Access/ })).toHaveCount(0);
   admin = true;
   await page.reload();
   await expect(page.getByRole("region", { name: "Autorizar na Cloudflare" })).toBeVisible();
-  await expect(page.getByText("NexoFlow Central de Operações", { exact: true })).toBeVisible();
-  const link = page.getByRole("link", { name: /Abrir aplicações no Cloudflare/ });
-  await expect(link).toHaveAttribute("href", /one\.dash\.cloudflare\.com/);
+  await expect(page.getByText("Central | Convidados OTP", { exact: true })).toBeVisible();
+  const link = page.getByRole("link", { name: /Autorizar convidados no Cloudflare Access/ });
+  await expect(link).toHaveAttribute("href", "https://dash.cloudflare.com/3d28f3cbcbb2f27849194e412022d510/one/access-controls/policies/53c46c33-5075-41fe-a475-77be7ab3be6a/edit");
+  await expect(link).toHaveAttribute("target", "_blank");
+  await expect(page.getByRole("button", { name: "Pendentes (1)" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Cancelar convite" })).toBeVisible();
+  await page.getByRole("button", { name: "Aceitos (1)" }).click();
+  await expect(page.getByText("aceito@example.invalid", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cancelar convite" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Cancelados (2)" }).click();
+  await expect(page.getByText("Expirado · FARMA", { exact: true })).toBeVisible();
+  await expect(page.getByText("Cancelado · FARMA", { exact: true })).toBeVisible();
   await page.getByLabel("E-mail do convidado").fill("convidado@example.invalid");
   await page.getByLabel("FARMA", { exact: true }).check();
   await page.getByRole("button", { name: "Criar convite" }).click();
