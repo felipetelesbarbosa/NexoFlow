@@ -100,3 +100,9 @@ Locks PostgreSQL protegem **somente participantes Hub**. Win32 não participa de
 ## Marco histórico
 
 Contrato e migração 002 implementados após a regressão Windows: [histórico paginado](HISTORICO.md). A API aceita tarefas históricas parametrizadas de homologação, sem credenciais/destinos comerciais.
+
+### Investigação de falhas FARMA no n8n
+
+Importe [Investigação FARMA](n8n/investigacao-farma-hml.json) no projeto de homologação. Vincule a credencial HTTP Header Auth **Hub HML FARMA** aos dois nós de leitura. Confira que o endereço interno da API coincide com o usado pelo Noturno de homologação. Execute manualmente e abra o nó **Resumo da investigação**. O fluxo consulta até 10 execuções que exigem atenção na lista recente do Hub. A saída mostra a execução, o estado, a última etapa concluída, a primeira etapa em aberto quando disponível e a próxima verificação. Uma resposta incerta orienta a conferir o recibo antes de repetir. Se as etapas não estiverem disponíveis, o resumo conserva essa lacuna. A execução depende apenas de consultas GET e a configuração de retenção dispensa salvar os dados de execução no n8n.
+
+Valide com os ensaios `dados_incompletos` e `resposta_incerta` do Noturno. Confira que o primeiro orienta a reconsulta de Anúncios e o segundo aponta para o recibo e a etapa de publicação. O diagnóstico registra a próxima verificação. O responsável confirma a causa, testa a correção e comprova a implantação antes de encerrar o caso.

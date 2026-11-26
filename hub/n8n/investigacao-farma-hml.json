@@ -1,0 +1,230 @@
+{
+  "name": "NexoFlow Hub — Investigação FARMA (homologação)",
+  "active": false,
+  "nodes": [
+    {
+      "id": "manual",
+      "name": "Iniciar investigação",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "listar",
+      "name": "Ler execuções FARMA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "http://hub-api:8000/tarefas",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 10000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURAR_FARMA",
+          "name": "Hub HML FARMA"
+        }
+      }
+    },
+    {
+      "id": "selecionar",
+      "name": "Selecionar casos para investigar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nif (response.statusCode !== 200 || !Array.isArray(response.body)) {\n  throw new Error(\"A lista de execuções FARMA está indisponível.\");\n}\nconst attention = new Set([\"falhou\", \"parcial\", \"revisao_necessaria\", \"aguardando\"]);\nconst uuid = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;\nconst known = new Set([\"RESPOSTA_INCERTA\", \"FONTE_ESSENCIAL_INCOMPLETA\",\n  \"REDE_SIMULADA\", \"AUTENTICACAO_SIMULADA\", \"FALHA_INTERNA\"]);\nconst rows = response.body\n  .filter((item) => item && item.segmento === \"FARMA\" && typeof item.id === \"string\" &&\n    uuid.test(item.id) && attention.has(item.estado))\n  .slice(0, 10);\nif (!rows.length) return [{ json: { resultado: \"Sem execuções que exigem atenção na amostra.\", segmento: \"FARMA\" } }];\nreturn rows.map((item) => ({ json: {\n  id: item.id, estado: item.estado,\n  codigo: known.has(item.erro) ? item.erro : item.erro ? \"OUTRO_ERRO\" : null,\n  tentativa: Number.isSafeInteger(item.tentativa) ? item.tentativa : null,\n  anuncios_parciais: Array.isArray(item.resultado?.pendencias) &&\n    item.resultado.pendencias.some((p) => p?.fonte === \"anuncios\" && p.motivo === \"COBERTURA_PARCIAL\"),\n} }));"
+      }
+    },
+    {
+      "id": "tem_caso",
+      "name": "Há execução para investigar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "possui-id",
+              "leftValue": "={{ typeof $json.id === 'string' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "etapas",
+      "name": "Conferir etapas e checkpoint",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=http://hub-api:8000/tarefas/{{ $json.id }}/etapas",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 10000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURAR_FARMA",
+          "name": "Hub HML FARMA"
+        }
+      }
+    },
+    {
+      "id": "resumo",
+      "name": "Resumo da investigação",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const selected = $(\"Selecionar casos para investigar\").all();\nconst responses = $input.all();\nif (selected.length !== responses.length) {\n  throw new Error(\"A conferência das etapas retornou uma quantidade inesperada.\");\n}\nconst stageNames = {\n  atualizacao_weni: \"Atualização Weni\", analytics: \"Analytics\",\n  publicacao: \"Publicação PostgreSQL\", recompra: \"Recompra\",\n  analytics_final: \"Analytics após Recompra\",\n};\nreturn responses.map(({ json: response }, i) => {\n  const task = selected[i].json;\n  const stages = response.statusCode === 200 && response.body?.estado === task.estado &&\n    Array.isArray(response.body.etapas) ? response.body.etapas : [];\n  const confirmed = stages.filter((entry) => entry?.estado === \"concluida\" &&\n    Object.hasOwn(stageNames, entry.etapa));\n  const last = confirmed.at(-1);\n  const next = stages.find((entry) => entry?.estado !== \"concluida\" &&\n    Object.hasOwn(stageNames, entry.etapa));\n  let verificacao = \"Investigar a etapa e conferir os registros da fonte antes de repetir.\";\n  if (task.codigo === \"RESPOSTA_INCERTA\") {\n    verificacao = \"Conferir a revisão e o recibo da publicação antes de qualquer repetição.\";\n  } else if (task.codigo === \"FONTE_ESSENCIAL_INCOMPLETA\") {\n    verificacao = \"Conferir a cobertura da fonte do Analytics antes de publicar.\";\n  } else if (task.estado === \"aguardando\") {\n    verificacao = \"Acompanhar a próxima tentativa do worker e conferir o checkpoint.\";\n  } else if (task.anuncios_parciais) {\n    verificacao = \"Conferir a cobertura de Anúncios na próxima coleta.\";\n  }\n  return { json: {\n    segmento: \"FARMA\", ambiente: \"homologacao\", execucao: task.id, estado: task.estado,\n    codigo: task.codigo, tentativa: task.tentativa,\n    ultima_etapa_confirmada: last ? stageNames[last.etapa] : null,\n    primeira_etapa_aberta: next ? stageNames[next.etapa] : null,\n    evidencia_etapas: stages.length ? \"conferida\" : \"indisponivel\",\n    proxima_verificacao: verificacao,\n  } };\n});"
+      }
+    },
+    {
+      "id": "vazio",
+      "name": "Sem casos na amostra",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        880,
+        200
+      ],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "Iniciar investigação": {
+      "main": [
+        [
+          {
+            "node": "Ler execuções FARMA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler execuções FARMA": {
+      "main": [
+        [
+          {
+            "node": "Selecionar casos para investigar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Selecionar casos para investigar": {
+      "main": [
+        [
+          {
+            "node": "Há execução para investigar?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Há execução para investigar?": {
+      "main": [
+        [
+          {
+            "node": "Conferir etapas e checkpoint",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sem casos na amostra",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conferir etapas e checkpoint": {
+      "main": [
+        [
+          {
+            "node": "Resumo da investigação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Belem",
+    "executionTimeout": 120,
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false
+  }
+}
