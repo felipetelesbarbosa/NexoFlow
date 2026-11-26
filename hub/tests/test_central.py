@@ -535,3 +535,135 @@ def test_self_service_name_uses_signed_subject_and_same_origin(
         token(signing_key, sub="operador-p", email="pessoa-p@example.invalid")
     )
     assert reloaded.get(route, headers=other).json()["nome"] == ""
+
+
+def test_super_admin_invites_and_revokes_central_access(
+    setup, signing_key, tmp_path, monkeypatch
+):
+    from dataclasses import replace
+
+    config, _ = setup
+    settings = replace(
+        config, profiles_db=tmp_path / "perfis.sqlite3", super_admin="operador-f"
+    )
+    client = TestClient(central.create_app(settings))
+    prefix = "/api/central/v1"
+    origin = {
+        "X-Central-Host": central.PRODUCTION_HOST,
+        "Origin": "https://" + central.PRODUCTION_HOST,
+    }
+    manager = origin | assertion(token(signing_key))
+    invited = origin | assertion(
+        token(signing_key, sub="novato", email="novo@example.invalid")
+    )
+    viewer = origin | assertion(token(signing_key, sub="operador-p"))
+    wrong = origin | assertion(
+        token(signing_key, sub="novato", email="outro@example.invalid")
+    )
+    request = {"email": "Novo@Example.invalid", "segmentos": ["PET"]}
+
+    assert client.get(prefix + "/usuarios", headers=viewer).status_code == 403
+    assert (
+        client.post(prefix + "/convites", headers=viewer, json=request).status_code
+        == 403
+    )
+    assert client.get(prefix + "/sessao", headers=manager).json()["gerencia_usuarios"]
+    assert (
+        client.get(prefix + "/sessao", headers=viewer).json()["gerencia_usuarios"]
+        is False
+    )
+    assert (
+        client.post(
+            prefix + "/convites",
+            headers=manager | {"Origin": "https://outro.example"},
+            json=request,
+        ).status_code
+        == 403
+    )
+
+    issued = client.post(prefix + "/convites", headers=manager, json=request)
+    assert issued.status_code == 201
+    invite = issued.json()
+    assert (
+        client.post(prefix + "/convites", headers=manager, json=request).status_code
+        == 409
+    )
+    roster = client.get(prefix + "/usuarios", headers=manager)
+    assert invite["codigo"] not in roster.text
+    assert roster.json()["convites"][0]["estado"] == "pendente"
+
+    code = {"codigo": invite["codigo"]}
+    assert (
+        client.post(prefix + "/convites/aceitar", headers=wrong, json=code).status_code
+        == 403
+    )
+    assert client.get(prefix + "/minha-conta", headers=invited).status_code == 403
+    assert (
+        client.post(
+            prefix + "/convites/aceitar", headers=invited, json=code
+        ).status_code
+        == 204
+    )
+    assert (
+        client.post(
+            prefix + "/convites/aceitar", headers=invited, json=code
+        ).status_code
+        == 403
+    )
+    assert client.get(prefix + "/minha-conta", headers=invited).status_code == 200
+    assert client.get(PATH + "?segmento=FARMA", headers=invited).status_code == 403
+    assert client.get(PATH + "?ambiente=producao", headers=invited).status_code == 403
+    assert client.get(prefix + "/usuarios", headers=invited).status_code == 403
+
+    for subject, credentials in [("novato", invited), ("operador-p", viewer)]:
+        assert (
+            client.post(
+                prefix + "/usuarios/revogar", headers=manager, json={"id": subject}
+            ).status_code
+            == 204
+        )
+        assert (
+            client.get(prefix + "/minha-conta", headers=credentials).status_code == 403
+        )
+    assert (
+        client.post(
+            prefix + "/usuarios/revogar", headers=manager, json={"id": "operador-f"}
+        ).status_code
+        == 409
+    )
+    assert client.get(prefix + "/usuarios", headers=manager).status_code == 200
+
+    cancelled = client.post(prefix + "/convites", headers=manager, json=request).json()
+    assert (
+        client.post(
+            prefix + "/convites/cancelar", headers=manager, json={"id": cancelled["id"]}
+        ).status_code
+        == 204
+    )
+    assert (
+        client.post(
+            prefix + "/convites/aceitar",
+            headers=invited,
+            json={"codigo": cancelled["codigo"]},
+        ).status_code
+        == 403
+    )
+
+    expiring = client.post(prefix + "/convites", headers=manager, json=request).json()
+    monkeypatch.setattr(
+        central.access_management, "time", lambda: expiring["expira_em"]
+    )
+    assert (
+        client.post(
+            prefix + "/convites/aceitar",
+            headers=invited,
+            json={"codigo": expiring["codigo"]},
+        ).status_code
+        == 403
+    )
+    assert (
+        client.get(prefix + "/usuarios", headers=manager).json()["convites"][0][
+            "estado"
+        ]
+        == "expirado"
+    )

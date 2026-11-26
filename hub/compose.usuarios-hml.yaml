@@ -1,0 +1,9 @@
+# Acrescente este arquivo aos dois Compose da Central para habilitar Gerenciar Usuários.
+services:
+  central-api:
+    environment:
+      CENTRAL_SUPER_ADMIN_FILE: /run/secrets/central_super_admin
+    secrets:
+      - central_super_admin
+secrets:
+  central_super_admin: {file: '${HUB_SEGREDOS_DIR:?diretorio privado obrigatório}/central_super_admin'}

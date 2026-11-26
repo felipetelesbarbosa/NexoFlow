@@ -31,6 +31,7 @@ import {
   SlidersHorizontal,
   Sun,
   UserRound,
+  UsersRound,
   Waypoints,
   Webhook,
   X,
@@ -51,6 +52,7 @@ import {
 import type { Ambiente, Estado, Evento, Resumo, Segmento, Tarefa } from "./resumo";
 import { ApiConsumption } from "./consumo";
 import { Infrastructure } from "./infraestrutura";
+import { AceitarConvite, GerenciarUsuarios } from "./usuarios";
 import { MinhaConta } from "./minha-conta";
 import { Documentation } from "./documentacao";
 import "./style.css";
@@ -63,12 +65,15 @@ const pages = {
   infraestrutura: { nome: "Infraestrutura", icone: Server },
   documentacao: { nome: "Documentação", icone: BookOpen },
   conta: { nome: "Minha Conta", icone: UserRound },
+  usuarios: { nome: "Gerenciar Usuários", icone: UsersRound },
+  convite: { nome: "Convite", icone: UsersRound },
 } as const;
 type Page = keyof typeof pages;
 type Slice = ReturnType<typeof janela>;
 const digits = new Intl.NumberFormat("pt-BR");
 function pageFromHash(): Page {
   const slug = window.location.hash.slice(1);
+  if (slug.startsWith("convite/")) return "convite";
   return Object.hasOwn(pages, slug) ? (slug as Page) : "geral";
 }
 
@@ -128,6 +133,7 @@ function App() {
   const [page, setPage] = useState(pageFromHash);
   const [compact, setCompact] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [disponiveis, setDisponiveis] = useState<Ambiente[]>(["homologacao"]);
   const [resumo, setResumo] = useState<Resumo>();
   const [fetched, setFetched] = useState<Date>();
@@ -191,16 +197,19 @@ function App() {
       signal: stop.signal,
     }).then(async (response) => {
       if (!response.ok || response.redirected) return;
-      const { ambientes: enabled } = await response.json();
-      if (!stop.signal.aborted && Array.isArray(enabled) && enabled.includes("producao")) {
-        setDisponiveis(["homologacao", "producao"]);
+      const { ambientes: enabled, gerencia_usuarios: admin } = await response.json();
+      if (!stop.signal.aborted) {
+        setIsAdmin(admin === true);
+        if (Array.isArray(enabled) && enabled.includes("producao")) {
+          setDisponiveis(["homologacao", "producao"]);
+        }
       }
     }).catch(() => {
       // Homologação continua disponível mesmo se a consulta à sessão falhar.
     });
     return () => stop.abort();
   }, []);
-  const needsSummary = page !== "documentacao" && page !== "conta";
+  const needsSummary = page !== "documentacao" && page !== "conta" && page !== "usuarios" && page !== "convite";
   useEffect(() => {
     if (!needsSummary) return;
     const stop = new AbortController();
@@ -243,6 +252,7 @@ function App() {
 
   const data = resumo && fetched ? janela(resumo, dias, fetched) : null;
   const view = pages[page];
+  if (page === "convite") return <AceitarConvite />;
   return (
     <div className={`shell ${compact ? "compact" : ""}`}>
       <a
@@ -272,7 +282,9 @@ function App() {
         </div>
         <nav aria-label="Navegação principal">
           <div className="navlabel">Operação</div>
-          {(Object.keys(pages) as Page[]).map((key) => {
+          {(Object.keys(pages) as Page[])
+            .filter((key) => key !== "convite" && (key !== "usuarios" || isAdmin))
+            .map((key) => {
             const p = pages[key],
               Icon = p.icone;
             return (
@@ -365,7 +377,7 @@ function App() {
                 {disponiveis.includes("producao") ? "Produção" : "Produção indisponível"}
               </option>
             </select>
-            {page !== "infraestrutura" && page !== "documentacao" && page !== "conta" && <>
+            {page !== "infraestrutura" && page !== "documentacao" && page !== "conta" && page !== "usuarios" && <>
             <Layers size={15} />
             <span>Segmento</span>
             {scopes.length > 1 ? (
@@ -407,7 +419,7 @@ function App() {
           </div>
         </header>
         <main id="conteudo" tabIndex={-1} ref={main}>
-          {page === "conta" ? <MinhaConta /> : page === "documentacao" ? <Documentation /> : page === "infraestrutura" ? <Infrastructure /> : page === "consumo" ? (
+          {page === "usuarios" ? (isAdmin ? <GerenciarUsuarios /> : <p>Área exclusiva do Super Admin.</p>) : page === "conta" ? <MinhaConta /> : page === "documentacao" ? <Documentation /> : page === "infraestrutura" ? <Infrastructure /> : page === "consumo" ? (
             <ApiConsumption key={request.ambiente + ":" + (request.segmento ?? "inicial")} ambiente={request.ambiente} segment={request.segmento} />
           ) : <>
           <div className="title-row">

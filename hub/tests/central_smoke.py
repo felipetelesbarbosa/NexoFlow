@@ -32,6 +32,7 @@ def prepare(secret_dir):
     password = secrets.token_hex(32)
     files = {
         "central_password": password,
+        "central_super_admin": "operator-farma",
         "central_dsn": f"host=postgres-hml dbname=nexoflow_hub_hml user=hub_central_leitor password={password}",
         "central_jwks.json": json.dumps({"keys": [jwk]}),
         "central_identidades.json": json.dumps(
@@ -146,8 +147,26 @@ def verify(*, web_ip, api_ip, pg_ip, secret_dir, key, farma_id, pet_id, wait):
         host = "central.nexoflowhub.com.br"
         profile = {**farma, "Host": host, "Origin": "https://" + host}
         assert client.get(web + SESSION, headers=profile).json() == {
-            "ambientes": ["homologacao"]
+            "ambientes": ["homologacao"], "gerencia_usuarios": True,
         }
+        assert client.get(web + "/api/central/v1/usuarios", headers=pet).status_code == 403
+        invites = web + "/api/central/v1/convites"
+        created_invite = client.post(
+            invites, headers=profile, json={"email": "invitee@hml.invalid", "segmentos": ["PET"]}
+        )
+        assert created_invite.status_code == 201
+        visitor = {**access_header(key, "invitee"), "Host": host, "Origin": "https://" + host}
+        assert client.get(web + ACCOUNT, headers=visitor).status_code == 403
+        assert client.post(
+            invites + "/aceitar", headers=visitor,
+            json={"codigo": created_invite.json()["codigo"]},
+        ).status_code == 204
+        assert client.get(web + ACCOUNT, headers=visitor).status_code == 200
+        assert client.get(web + "/api/central/v1/usuarios", headers=visitor).status_code == 403
+        assert client.post(
+            web + "/api/central/v1/usuarios/revogar", headers=profile, json={"id": "invitee"}
+        ).status_code == 204
+        assert client.get(web + ACCOUNT, headers=visitor).status_code == 403
         assert client.put(
             web + ACCOUNT, headers=profile, json={"nome": "Operador FARMA"}
         ).json() == {"nome": "Operador FARMA"}

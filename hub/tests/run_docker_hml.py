@@ -73,7 +73,10 @@ def main():
                 CENTRAL_ACCESS_ISSUER=central_smoke.ISSUER,
                 CENTRAL_ACCESS_AUD=central_smoke.AUDIENCE,
             )
-            compose += ["-f", str(ROOT / "hub/compose.central-hml.yaml")]
+            compose += [
+                "-f", str(ROOT / "hub/compose.central-hml.yaml"),
+                "-f", str(ROOT / "hub/compose.usuarios-hml.yaml"),
+            ]
 
         def command(command_args, *, expected=0, stdin=None):
             result = subprocess.run(

@@ -480,3 +480,31 @@ test("Minha Conta salva o nome e encaminha a segurança ao provedor", async ({ p
   await expect(page.getByRole("option", { name: "Produção indisponível" })).toBeDisabled();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 });
+
+test("só o Super Admin vê o cadastro de convites e o atalho para autorização na Cloudflare", async ({ page }) => {
+  let admin = false;
+  await page.route("**/api/central/v1/sessao", (route) =>
+    route.fulfill({ json: { ambientes: ["homologacao"], gerencia_usuarios: admin } }),
+  );
+  await page.route("**/api/central/v1/usuarios", (route) =>
+    route.fulfill({ json: { usuarios: [], convites: [] } }),
+  );
+  await page.route("**/api/central/v1/convites", (route) =>
+    route.fulfill({ status: 201, json: { codigo: "c".repeat(43) } }),
+  );
+  await page.goto("/#usuarios");
+  await expect(page.getByText("Área exclusiva do Super Admin.")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Abrir aplicações no Cloudflare/ })).toHaveCount(0);
+  admin = true;
+  await page.reload();
+  await expect(page.getByRole("region", { name: "Autorizar na Cloudflare" })).toBeVisible();
+  const link = page.getByRole("link", { name: /Abrir aplicações no Cloudflare/ });
+  await expect(link).toHaveAttribute("href", /one\.dash\.cloudflare\.com/);
+  await page.getByLabel("E-mail do convidado").fill("convidado@example.invalid");
+  await page.getByLabel("FARMA", { exact: true }).check();
+  await page.getByRole("button", { name: "Criar convite" }).click();
+  await expect(page.getByLabel(/Link de uso único/)).toHaveValue(/#convite\//);
+  await page.goto("/#convite/" + "c".repeat(43));
+  await expect(page.getByRole("button", { name: "Aceitar convite" })).toBeVisible();
+  await expect(link).toHaveCount(0);
+});

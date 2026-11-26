@@ -21,7 +21,7 @@ from psycopg.conninfo import conninfo_to_dict
 from psycopg.rows import dict_row
 from pydantic import BaseModel, ConfigDict, Field
 
-from . import __version__
+from . import __version__, access_management
 from .api_observability import read_consumption
 from .contracts import noturno_stages
 from .infrastructure import read_infrastructure
@@ -58,11 +58,28 @@ class Operator:
     subject: str
     email: str
     segments: list[str]
+    managed: bool = False
 
 
 class DisplayName(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     nome: str = Field(min_length=1, max_length=80, pattern=r"^[^\x00-\x1f\x7f]+$")
+
+
+class Invitation(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    email: str = Field(max_length=254, pattern=r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+    segmentos: list[Literal["FARMA", "PET"]] = Field(min_length=1, max_length=2)
+
+
+class InviteCode(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    codigo: str = Field(pattern=r"^[A-Za-z0-9_-]{43}$")
+
+
+class AccessReference(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str = Field(min_length=1, max_length=256)
 
 
 CENTRAL_SESSION = Security(
@@ -100,6 +117,7 @@ class CentralSettings:
     infrastructure_file: Path | None = None
     profiles_db: Path | None = None
     production: ProductionReader | None = None
+    super_admin: str | None = field(default=None, repr=False)
 
     def __post_init__(self):
         if not re.fullmatch(
@@ -109,6 +127,12 @@ class CentralSettings:
         if not self.audience.strip():
             raise ValueError("AUDIENCIA_ACCESS_OBRIGATORIA")
         validate_dsn(self.dsn, "homologacao")
+        if self.super_admin is not None and (
+            not self.profiles_db
+            or not self.super_admin.strip()
+            or len(self.super_admin) > 256
+        ):
+            raise ValueError("CONFIGURACAO_SUPER_ADMIN_INVALIDA")
         if (
             self.production
             and self.production.identities_file.resolve()
@@ -143,6 +167,9 @@ class CentralSettings:
             Path(value) if (value := os.getenv("CENTRAL_INFRA_FILE")) else None,
             Path(profiles) if (profiles := os.getenv("CENTRAL_PROFILES_DB")) else None,
             production,
+            Path(admin_file).read_text(encoding="utf-8").strip()
+            if (admin_file := os.getenv("CENTRAL_SUPER_ADMIN_FILE"))
+            else None,
         )
 
 
@@ -167,7 +194,7 @@ def _private_object(path: Path) -> dict:
         raise HTTPException(503, "CONFIGURACAO_CENTRAL_INDISPONIVEL") from None
 
 
-def authenticated_operator(assertion: str, settings: CentralSettings) -> Operator:
+def signed_identity(assertion: str, settings: CentralSettings) -> tuple[str, str]:
     if not assertion or len(assertion) > 16384:
         raise HTTPException(401, "AUTENTICACAO_NECESSARIA")
     try:
@@ -210,15 +237,34 @@ def authenticated_operator(assertion: str, settings: CentralSettings) -> Operato
     except (jwt.PyJWTError, ValueError, TypeError, OverflowError):
         raise HTTPException(401, "IDENTIDADE_ACCESS_INVALIDA") from None
 
-    # Releitura em cada consulta permite revogar o escopo sem reiniciar o serviço.
-    segments = granted_segments(settings.identities_file, claims["sub"])
+    return claims["sub"], claims["email"]
+
+
+def authorized_operator(
+    subject: str, email: str, settings: CentralSettings
+) -> Operator:
+    # A revogação no diretório prevalece sobre os acessos legados.
+    recorded = (
+        access_management.member(settings.profiles_db, subject)
+        if settings.profiles_db
+        else None
+    )
+    if recorded is not None:
+        if recorded["revoked"]:
+            raise HTTPException(403, "OPERADOR_SEM_ACESSO_A_CENTRAL")
+        segments = parse_scopes(json.loads(recorded["scopes"]))
+    else:
+        segments = granted_segments(settings.identities_file, subject)
     if not segments:
         raise HTTPException(403, "OPERADOR_SEM_ACESSO_A_CENTRAL")
-    return Operator(claims["sub"], claims["email"], segments)
+    return Operator(subject, email, segments, managed=recorded is not None)
 
 
 def granted_segments(path: Path, subject: str) -> list[str]:
-    grant = _private_object(path).get(subject)
+    return parse_scopes(_private_object(path).get(subject))
+
+
+def parse_scopes(grant) -> list[str]:
     segments = [grant] if isinstance(grant, str) else grant
     if (
         not isinstance(segments, list)
@@ -321,11 +367,31 @@ def create_app(settings: CentralSettings | None = None):
         response.headers["X-Content-Type-Options"] = "nosniff"
         return response
 
-    def authenticated(request: Request, _session=CENTRAL_SESSION):
+    def verified_session(request: Request, _session=CENTRAL_SESSION):
         tokens = request.headers.getlist("cf-access-jwt-assertion")
-        return authenticated_operator(tokens[0] if len(tokens) == 1 else "", config)
+        return signed_identity(tokens[0] if len(tokens) == 1 else "", config)
+
+    signed_in = Depends(verified_session)
+
+    def authenticated(identity: tuple[str, str] = signed_in):
+        return authorized_operator(*identity, config)
 
     operator = Depends(authenticated)
+
+    def administrator(identity: Operator = operator):
+        if identity.subject != config.super_admin or config.profiles_db is None:
+            raise HTTPException(403, "GESTAO_EXCLUSIVA_DO_SUPER_ADMIN")
+        return identity.subject, config.profiles_db
+
+    admin = Depends(administrator)
+
+    def require_origin(request: Request):
+        host = request.headers.get("x-central-host")
+        if host not in CENTRAL_HOSTS or request.headers.getlist("origin") != [
+            "https://" + host
+        ]:
+            raise HTTPException(403, "ORIGEM_DA_CONTA_NAO_AUTORIZADA")
+
     access_errors = {
         401: {"description": "Sessão individual ausente ou inválida"},
         403: {"description": "A identidade não tem permissão para a consulta"},
@@ -335,6 +401,7 @@ def create_app(settings: CentralSettings | None = None):
     def production_segments(request: Request, identity: Operator) -> list[str]:
         if (
             config.production is None
+            or identity.managed
             or request.headers.get("x-central-host") != PRODUCTION_HOST
         ):
             return []
@@ -353,7 +420,77 @@ def create_app(settings: CentralSettings | None = None):
         environments = ["homologacao"]
         if production_segments(request, identity):
             environments.append("producao")
-        return {"ambientes": environments}
+        result = {"ambientes": environments}
+        if config.super_admin is not None:
+            return {
+                **result,
+                "gerencia_usuarios": identity.subject == config.super_admin,
+            }
+        return result
+
+    @app.get("/api/central/v1/usuarios", include_in_schema=False)
+    def users(manager: tuple[str, Path] = admin):
+        actor, registry = manager
+        legacy = {
+            subject: scopes
+            for subject, grant in _private_object(config.identities_file).items()
+            if (scopes := parse_scopes(grant))
+        }
+        return access_management.overview(registry, legacy, actor)
+
+    @app.post("/api/central/v1/convites", status_code=201, include_in_schema=False)
+    def create_invite(
+        request: Request, details: Invitation, manager: tuple[str, Path] = admin
+    ):
+        require_origin(request)
+        actor, registry = manager
+        scopes = list(dict.fromkeys(str(scope) for scope in details.segmentos))
+        return access_management.invite(
+            registry, actor, details.email.casefold(), scopes
+        )
+
+    @app.post(
+        "/api/central/v1/convites/aceitar", status_code=204, include_in_schema=False
+    )
+    def accept_invite(
+        request: Request, details: InviteCode, identity: tuple[str, str] = signed_in
+    ):
+        require_origin(request)
+        if config.super_admin is None or config.profiles_db is None:
+            raise HTTPException(404, "CONVITES_INDISPONIVEIS")
+        subject, email = identity
+        access_management.accept(
+            config.profiles_db,
+            subject,
+            email,
+            details.codigo,
+            bool(granted_segments(config.identities_file, subject)),
+        )
+
+    @app.post(
+        "/api/central/v1/convites/cancelar", status_code=204, include_in_schema=False
+    )
+    def cancel_invite(
+        request: Request, reference: AccessReference, manager: tuple[str, Path] = admin
+    ):
+        require_origin(request)
+        actor, registry = manager
+        access_management.cancel(registry, actor, reference.id)
+
+    @app.post(
+        "/api/central/v1/usuarios/revogar", status_code=204, include_in_schema=False
+    )
+    def revoke(
+        request: Request, reference: AccessReference, manager: tuple[str, Path] = admin
+    ):
+        require_origin(request)
+        actor, registry = manager
+        access_management.revoke(
+            registry,
+            actor,
+            reference.id,
+            bool(granted_segments(config.identities_file, reference.id)),
+        )
 
     @app.get("/api/central/v1/minha-conta", include_in_schema=False)
     def account(identity: Operator = operator):
@@ -368,11 +505,7 @@ def create_app(settings: CentralSettings | None = None):
 
     @app.put("/api/central/v1/minha-conta", include_in_schema=False)
     def rename(request: Request, profile: DisplayName, identity: Operator = operator):
-        host = request.headers.get("x-central-host")
-        if host not in CENTRAL_HOSTS or request.headers.getlist("origin") != [
-            "https://" + host
-        ]:
-            raise HTTPException(403, "ORIGEM_DA_CONTA_NAO_AUTORIZADA")
+        require_origin(request)
         if config.profiles_db is None:
             raise HTTPException(503, "PERFIL_CENTRAL_INDISPONIVEL")
         return {

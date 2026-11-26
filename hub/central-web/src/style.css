@@ -1342,3 +1342,27 @@ td {
     padding-block: 8px;
   }
 }
+
+.invite-segments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.invite-segments input { width: auto; }
+.access-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.access-list li {
+  padding: 12px 0;
+  display: grid;
+  gap: 3px;
+  border-top: 1px solid var(--line);
+}
+.access-list .plain { justify-self: start; }
+.invite-history { margin-top: 16px; }
+.invitation-page { width: min(100%, 36rem); }
