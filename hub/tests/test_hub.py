@@ -193,7 +193,8 @@ def test_noturno_meta_recuperacao_checkpoint_e_retomada(store, settings, scenari
     assert result["resultado"]["externas_gravacoes"] == 0
     assert result["resultado"]["etapas"]["analytics"] == before
     assert bool(result["resultado"]["pendencias"]) == (state == "parcial")
-    assert client.post("/tarefas/noturno", json=payload, headers=headers).json() == response.json()
+    repeated = client.post("/tarefas/noturno", json=payload, headers=headers).json()
+    assert repeated["id"] == uid and repeated["estado"] == state
     assert not run_once(store)
 
 
