@@ -6,6 +6,7 @@
 !hub/nexoflow_hub/__init__.py
 !hub/nexoflow_hub/central.py
 !hub/nexoflow_hub/access_management.py
+!hub/nexoflow_hub/metricas.py
 !hub/nexoflow_hub/infrastructure.py
 !hub/nexoflow_hub/api_observability.py
 !hub/nexoflow_hub/api.py

@@ -508,3 +508,63 @@ test("só o Super Admin vê o cadastro de convites e o atalho para autorização
   await expect(page.getByRole("button", { name: "Aceitar convite" })).toBeVisible();
   await expect(link).toHaveCount(0);
 });
+
+test("Vendas FARMA mostra KPIs, gráficos, filtros e layout para PDF no celular", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 740 });
+  await page.route("**/api/central/v1/sessao", (route) => route.fulfill({
+    json: { ambientes: ["homologacao"], metricas_farma: true },
+  }));
+  await page.route("**/api/central/v1/metricas/vendas?*", (route) => {
+    const params = new URL(route.request().url()).searchParams;
+    const inicio = params.get("inicio"), fim = params.get("fim");
+    const empty = inicio === "2025-01-01";
+    const totals = {
+      pedidos: empty ? 0 : 2,
+      produtos_centavos: empty ? 0 : 10100,
+      frete_centavos: empty ? 0 : 350,
+      faturamento_centavos: empty ? 0 : 10450,
+    };
+    return route.fulfill({ json: {
+      inicio, fim, segmento: "FARMA", fonte: "data_studio_producao",
+      revisao: "f3f4cbfd-eb3d-4c37-973c-b17190c3fe27", versao: 61,
+      totais: totals, dias: empty ? [] : [{ data: inicio, ...totals }],
+    } });
+  });
+  await page.goto("/#metricas");
+  const kpis = page.getByRole("region", { name: "Indicadores de vendas" });
+  await expect(kpis).toContainText("104,50");
+  await expect(page.getByText("Revisão publicada v61")).toBeVisible();
+  await expect(page.getByRole("img", { name: /Faturamento em reais por dia/ })).toBeVisible();
+  await page.getByRole("button", { name: "Pedidos", exact: true }).click();
+  await expect(page.getByRole("img", { name: /Pedidos válidos por dia/ })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  await page.evaluate(() => { window.print = () => document.body.classList.add("print-invoked"); });
+  await page.getByRole("button", { name: "Exportar PDF" }).click();
+  await expect(page.locator("body")).toHaveClass(/print-invoked/);
+  await page.emulateMedia({ media: "print" });
+  await expect(page.getByRole("button", { name: "Aplicar período" })).toBeHidden();
+  await expect(page.getByRole("navigation")).toBeHidden();
+  await expect(page.getByRole("heading", { name: "Vendas por dia" })).toBeVisible();
+  const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
+  expect(pdf.toString("utf8", 0, 5)).toBe("%PDF-");
+  expect(pdf.byteLength).toBeGreaterThan(15000);
+  await page.emulateMedia({ media: "screen" });
+  await page.getByLabel("Início", { exact: true }).fill("2025-01-01");
+  await page.getByLabel("Fim", { exact: true }).fill("2025-01-02");
+  await page.getByRole("button", { name: "Aplicar período" }).click();
+  await expect(page.getByText("Sem vendas registradas na revisão para este período.")).toBeVisible();
+  await expect(kpis).toContainText("0,00");
+});
+
+test("Vendas FARMA não consulta dados quando a sessão não tem permissão", async ({ page }) => {
+  await page.route("**/api/central/v1/sessao", (route) => route.fulfill({
+    json: { ambientes: ["homologacao"] },
+  }));
+  let accesses = 0;
+  page.on("request", (request) => {
+    if (request.url().includes("/metricas/vendas?")) accesses++;
+  });
+  await page.goto("/#metricas");
+  await expect(page.getByText("NexoFlow Métricas indisponível para esta conta.")).toBeVisible();
+  expect(accesses).toBe(0);
+});

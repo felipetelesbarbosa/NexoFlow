@@ -54,7 +54,7 @@ export type Resumo = {
   segmento: Segmento;
   segmentos_autorizados: Segmento[];
   ambiente: Ambiente;
-  metricas: { habilitado: false };
+  metricas: { habilitado: boolean };
   tarefas: Tarefa[];
   integracoes: { hub: "pronto"; processamento: Ambiente };
   eventos: Evento[];
@@ -123,7 +123,7 @@ export function lerResumo(x: unknown): Resumo {
     isSegmento(x.segmento) &&
     isAmbiente(x.ambiente) &&
     registro(x.metricas) &&
-    x.metricas.habilitado === false &&
+    typeof x.metricas.habilitado === "boolean" &&
     registro(x.integracoes) &&
     x.integracoes.hub === "pronto" &&
     x.integracoes.processamento === x.ambiente &&

@@ -8,10 +8,12 @@ import re
 import sqlite3
 from contextlib import closing, contextmanager
 from dataclasses import dataclass, field
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 from threading import BoundedSemaphore
 from typing import Annotated, Literal
+from uuid import UUID
 
 import jwt
 import psycopg
@@ -21,7 +23,7 @@ from psycopg.conninfo import conninfo_to_dict
 from psycopg.rows import dict_row
 from pydantic import BaseModel, ConfigDict, Field
 
-from . import __version__, access_management
+from . import __version__, access_management, metricas
 from .api_observability import read_consumption
 from .contracts import noturno_stages
 from .infrastructure import read_infrastructure
@@ -118,6 +120,7 @@ class CentralSettings:
     profiles_db: Path | None = None
     production: ProductionReader | None = None
     super_admin: str | None = field(default=None, repr=False)
+    metrics_dsn: str | None = field(default=None, repr=False)
 
     def __post_init__(self):
         if not re.fullmatch(
@@ -127,6 +130,10 @@ class CentralSettings:
         if not self.audience.strip():
             raise ValueError("AUDIENCIA_ACCESS_OBRIGATORIA")
         validate_dsn(self.dsn, "homologacao")
+        if self.metrics_dsn is not None:
+            if self.super_admin is None:
+                raise ValueError("METRICAS_EXIGE_SUPER_ADMIN")
+            metricas.validate_source(self.metrics_dsn)
         if self.super_admin is not None and (
             not self.profiles_db
             or not self.super_admin.strip()
@@ -169,6 +176,9 @@ class CentralSettings:
             production,
             Path(admin_file).read_text(encoding="utf-8").strip()
             if (admin_file := os.getenv("CENTRAL_SUPER_ADMIN_FILE"))
+            else None,
+            Path(metrics_file).read_text(encoding="utf-8").strip()
+            if (metrics_file := os.getenv("CENTRAL_METRICAS_DSN_FILE"))
             else None,
         )
 
@@ -359,6 +369,7 @@ def create_app(settings: CentralSettings | None = None):
         openapi_url=None,
     )
     slots = BoundedSemaphore(4)
+    metrics_slot = BoundedSemaphore(1)
 
     @app.middleware("http")
     async def private_response(request: Request, call_next):
@@ -415,12 +426,47 @@ def create_app(settings: CentralSettings | None = None):
             raise HTTPException(403, "PRODUCAO_NAO_DISPONIVEL")
         return config.production.dsn, scopes
 
+    def metrics_allowed(identity: Operator) -> bool:
+        return (
+            config.metrics_dsn is not None
+            and identity.subject == config.super_admin
+            and "FARMA" in identity.segments
+        )
+
+    @app.get(
+        "/api/central/v1/metricas/vendas",
+        response_model=metricas.SalesReport,
+        include_in_schema=False,
+    )
+    def sales(
+        inicio: date,
+        fim: date,
+        revisao: UUID | None = None,
+        identity: Operator = operator,
+    ):
+        if config.metrics_dsn is None or not metrics_allowed(identity):
+            raise HTTPException(403, "METRICAS_INDISPONIVEL_PARA_ESTA_CONTA")
+        if not 0 <= (fim - inicio).days < metricas.MAX_PERIOD_DAYS:
+            raise HTTPException(422, "PERIODO_DE_VENDAS_INVALIDO")
+        if not metrics_slot.acquire(blocking=False):
+            raise HTTPException(503, "METRICAS_OCUPADO")
+        try:
+            return metricas.read_sales(config.metrics_dsn, inicio, fim, revisao)
+        except metricas.RevisionChanged:
+            raise HTTPException(409, "REVISAO_DE_VENDAS_ALTERADA") from None
+        except (psycopg.Error, metricas.SourceUnavailable):
+            raise HTTPException(503, "FONTE_DE_VENDAS_INDISPONIVEL") from None
+        finally:
+            metrics_slot.release()
+
     @app.get("/api/central/v1/sessao", include_in_schema=False)
     def session(request: Request, identity: Operator = operator):
         environments = ["homologacao"]
         if production_segments(request, identity):
             environments.append("producao")
         result = {"ambientes": environments}
+        if metrics_allowed(identity):
+            result = {**result, "metricas_farma": True}
         if config.super_admin is not None:
             return {
                 **result,
@@ -600,6 +646,7 @@ def create_app(settings: CentralSettings | None = None):
             return {
                 **read_summary(dsn, segment),
                 "ambiente": ambiente,
+                "metricas": {"habilitado": metrics_allowed(identity)},
                 "integracoes": {"hub": "pronto", "processamento": ambiente},
                 "segmentos_autorizados": allowed,
             }

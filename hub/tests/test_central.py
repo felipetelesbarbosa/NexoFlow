@@ -667,3 +667,72 @@ def test_super_admin_invites_and_revokes_central_access(
         ]
         == "expirado"
     )
+
+
+def test_metrics_pilot_requires_owner_farma_and_pinned_read(
+    setup, signing_key, tmp_path, monkeypatch
+):
+    from dataclasses import replace
+    from datetime import date
+    from uuid import UUID
+
+    config, existing = setup
+    secrets = assertion(token(signing_key))
+    route = "/api/central/v1/metricas/vendas"
+    query = {"inicio": "2026-11-01", "fim": "2026-11-03", "revisao": str(UUID(int=5))}
+    assert existing.get(route, params=query, headers=secrets).status_code == 403
+    dsn = "dbname=nexoflow_datastudio user=nf_metricas_farma_leitor"
+    settings = replace(
+        config,
+        profiles_db=tmp_path / "perfis.sqlite3",
+        super_admin="operador-f",
+        metrics_dsn=dsn,
+    )
+    client = TestClient(central.create_app(settings))
+    other = assertion(token(signing_key, sub="operador-p"))
+    assert client.get(route, params=query).status_code == 401
+    assert client.get(route, params=query, headers=other).status_code == 403
+    assert (
+        "metricas_farma"
+        not in client.get("/api/central/v1/sessao", headers=other).json()
+    )
+    assert client.get("/api/central/v1/sessao", headers=secrets).json()[
+        "metricas_farma"
+    ]
+
+    calls = []
+
+    def read(target, start, end, expected):
+        calls.append((target, start, end, expected))
+        return central.metricas.SalesReport(
+            revisao=UUID(int=5),
+            versao=14,
+            inicio=start,
+            fim=end,
+            totais=central.metricas.SalesTotals(),
+            dias=[],
+        )
+
+    monkeypatch.setattr(central.metricas, "read_sales", read)
+    assert (
+        client.get(
+            route, params={**query, "fim": "2025-04-01"}, headers=secrets
+        ).status_code
+        == 422
+    )
+    assert (
+        client.get(
+            route, params={**query, "fim": "2028-04-01"}, headers=secrets
+        ).status_code
+        == 422
+    )
+    result = client.get(route, params=query, headers=secrets)
+    assert result.status_code == 200
+    assert result.json()["dias"] == []
+    assert calls == [(dsn, date(2026, 11, 1), date(2026, 11, 3), UUID(int=5))]
+    assert result.headers["Cache-Control"] == "no-store"
+    settings.identities_file.write_text('{"operador-f": "PET"}')
+    assert client.get(route, params=query, headers=secrets).status_code == 403
+    assert len(calls) == 1
+    with pytest.raises(ValueError, match="DESTINO_METRICAS_FARMA_INVALIDO"):
+        replace(settings, metrics_dsn=config.dsn)

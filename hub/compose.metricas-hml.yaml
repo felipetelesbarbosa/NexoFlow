@@ -1,0 +1,14 @@
+# Complemento da Central para o piloto privado de Vendas FARMA.
+services:
+  central-api:
+    environment:
+      CENTRAL_METRICAS_DSN_FILE: /run/secrets/central_metricas_dsn
+    secrets:
+      - central_metricas_dsn
+    networks: [metricas_fonte]
+secrets:
+  central_metricas_dsn: {file: '${HUB_SEGREDOS_DIR:?diretório privado obrigatório}/central_metricas_dsn'}
+networks:
+  metricas_fonte:
+    external: true
+    name: '${CENTRAL_METRICAS_REDE:?rede privada do PostgreSQL comercial obrigatória}'

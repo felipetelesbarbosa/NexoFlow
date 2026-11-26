@@ -53,6 +53,7 @@ import type { Ambiente, Estado, Evento, Resumo, Segmento, Tarefa } from "./resum
 import { ApiConsumption } from "./consumo";
 import { Infrastructure } from "./infraestrutura";
 import { AceitarConvite, GerenciarUsuarios } from "./usuarios";
+import { Metricas } from "./metricas";
 import { MinhaConta } from "./minha-conta";
 import { Documentation } from "./documentacao";
 import "./style.css";
@@ -67,6 +68,7 @@ const pages = {
   conta: { nome: "Minha Conta", icone: UserRound },
   usuarios: { nome: "Gerenciar Usuários", icone: UsersRound },
   convite: { nome: "Convite", icone: UsersRound },
+  metricas: { nome: "NexoFlow Métricas", icone: ChartNoAxesColumn },
 } as const;
 type Page = keyof typeof pages;
 type Slice = ReturnType<typeof janela>;
@@ -133,6 +135,7 @@ function App() {
   const [page, setPage] = useState(pageFromHash);
   const [compact, setCompact] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [metricsAccess, setMetricsAccess] = useState<boolean | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [disponiveis, setDisponiveis] = useState<Ambiente[]>(["homologacao"]);
   const [resumo, setResumo] = useState<Resumo>();
@@ -196,20 +199,21 @@ function App() {
       cache: "no-store",
       signal: stop.signal,
     }).then(async (response) => {
-      if (!response.ok || response.redirected) return;
-      const { ambientes: enabled, gerencia_usuarios: admin } = await response.json();
+      if (!response.ok || response.redirected) throw new Error();
+      const { ambientes: enabled, gerencia_usuarios: admin, metricas_farma: metrics } = await response.json();
       if (!stop.signal.aborted) {
         setIsAdmin(admin === true);
+        setMetricsAccess(metrics === true);
         if (Array.isArray(enabled) && enabled.includes("producao")) {
           setDisponiveis(["homologacao", "producao"]);
         }
       }
     }).catch(() => {
-      // Homologação continua disponível mesmo se a consulta à sessão falhar.
+      if (!stop.signal.aborted) setMetricsAccess(false);
     });
     return () => stop.abort();
   }, []);
-  const needsSummary = page !== "documentacao" && page !== "conta" && page !== "usuarios" && page !== "convite";
+  const needsSummary = page !== "documentacao" && page !== "conta" && page !== "usuarios" && page !== "convite" && page !== "metricas";
   useEffect(() => {
     if (!needsSummary) return;
     const stop = new AbortController();
@@ -283,7 +287,7 @@ function App() {
         <nav aria-label="Navegação principal">
           <div className="navlabel">Operação</div>
           {(Object.keys(pages) as Page[])
-            .filter((key) => key !== "convite" && (key !== "usuarios" || isAdmin))
+            .filter((key) => key !== "convite" && key !== "metricas" && (key !== "usuarios" || isAdmin))
             .map((key) => {
             const p = pages[key],
               Icon = p.icone;
@@ -306,7 +310,13 @@ function App() {
             );
           })}
           <div className="navlabel products">Produtos</div>
-          <button
+          {metricsAccess ? (
+            <a href="#metricas" className={page === "metricas" ? "current" : ""}
+              aria-current={page === "metricas" ? "page" : undefined}
+              aria-label="NexoFlow Métricas" title="NexoFlow Métricas">
+              <ChartNoAxesColumn size={19} /><span>NexoFlow Métricas</span>
+            </a>
+          ) : <button
             className="disabled-product"
             disabled
             title="NexoFlow Métricas desabilitado"
@@ -314,12 +324,12 @@ function App() {
             <ChartNoAxesColumn size={19} />
             <span>NexoFlow Métricas</span>
             <LockKeyhole size={13} className="end" />
-          </button>
+          </button>}
         </nav>
         <div className="aside-bottom">
           <span className="homolog">
             <FlaskConical size={16} />
-            <span>{ambientes[request.ambiente]}</span>
+            <span>{page === "metricas" ? "Homologação" : ambientes[request.ambiente]}</span>
           </span>
           <button
             className="collapse plain"
@@ -360,7 +370,7 @@ function App() {
           <ChevronRight size={14} />
           <strong>{view.nome}</strong>
           <div className="header-right">
-            <select
+            {page !== "metricas" && <select
               className="segment-picker environment-picker"
               aria-label="Ambiente da Central"
               value={request.ambiente}
@@ -376,8 +386,8 @@ function App() {
               <option value="producao" disabled={!disponiveis.includes("producao")}>
                 {disponiveis.includes("producao") ? "Produção" : "Produção indisponível"}
               </option>
-            </select>
-            {page !== "infraestrutura" && page !== "documentacao" && page !== "conta" && page !== "usuarios" && <>
+            </select>}
+            {page !== "metricas" && page !== "infraestrutura" && page !== "documentacao" && page !== "conta" && page !== "usuarios" && <>
             <Layers size={15} />
             <span>Segmento</span>
             {scopes.length > 1 ? (
@@ -419,7 +429,10 @@ function App() {
           </div>
         </header>
         <main id="conteudo" tabIndex={-1} ref={main}>
-          {page === "usuarios" ? (isAdmin ? <GerenciarUsuarios /> : <p>Área exclusiva do Super Admin.</p>) : page === "conta" ? <MinhaConta /> : page === "documentacao" ? <Documentation /> : page === "infraestrutura" ? <Infrastructure /> : page === "consumo" ? (
+          {page === "metricas" ? (
+            metricsAccess ? <Metricas /> : <p role="status">{metricsAccess === null
+              ? "Consultando acesso ao Métricas…" : "NexoFlow Métricas indisponível para esta conta."}</p>
+          ) : page === "usuarios" ? (isAdmin ? <GerenciarUsuarios /> : <p>Área exclusiva do Super Admin.</p>) : page === "conta" ? <MinhaConta /> : page === "documentacao" ? <Documentation /> : page === "infraestrutura" ? <Infrastructure /> : page === "consumo" ? (
             <ApiConsumption key={request.ambiente + ":" + (request.segmento ?? "inicial")} ambiente={request.ambiente} segment={request.segmento} />
           ) : <>
           <div className="title-row">
