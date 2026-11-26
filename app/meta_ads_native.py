@@ -472,10 +472,11 @@ def sync_native_meta(
                             or row.get("date_start") != day
                             or row.get("date_stop") != day
                             or row.get("spend") in (None, "")
-                            or row.get("impressions") in (None, "")
                             or started_conversations(row.get("actions")) in (None, "")
                         ):
                             continue
+                        # Impressões são opcionais na leitura direta. O modelo mantém
+                        # o campo vazio e deixa CTR e CPM indisponíveis.
                         local_facts.append(dict(
                             row, currency=meta.get("currency", ""),
                             timezone_name=meta.get("timezone_name", ""),

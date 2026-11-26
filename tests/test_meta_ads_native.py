@@ -458,6 +458,49 @@ class NativeSyncTests(unittest.TestCase):
             )
             self.assertEqual(row["conversas_iniciadas_meta"], "0.00")
 
+    def test_farma_recovers_direct_conversation_without_impressions(self):
+        day = "2026-11-02"
+        actions = [{"action_type": "messaging_conversation_started_7d", "value": "1"}]
+
+        class DirectClient(Client):
+            def __init__(self, omit_from_account):
+                super().__init__()
+                self.omit_from_account = omit_from_account
+
+            def ads(self, account, **kwargs):
+                return {"dados": [{"id": "123"}], "parcial": False}
+
+            def daily_insights(self, account, start, end, **kwargs):
+                result = super().daily_insights(account, start, end, **kwargs)
+                for row in result["dados"]:
+                    if row["date_start"] == day:
+                        row["actions"] = actions
+                        if kwargs.get("ad_id"):
+                            row.pop("impressions")
+                if self.omit_from_account and not kwargs.get("ad_id"):
+                    result["dados"] = [r for r in result["dados"] if r["date_start"] != day]
+                return result
+
+        def farma(*args, **kwargs):
+            events, coverage = evidence(*args, **kwargs)
+            return [
+                *events,
+                dict(segment="FARMA", event_id="1", ad_id="123", date=NOW.isoformat()),
+            ], coverage
+
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Store()
+            self.assertTrue(self.run_sync(store, DirectClient(False), Path(tmp), collector=farma)["applied"])
+            recovered = self.run_sync(store, DirectClient(True), Path(tmp), collector=farma)
+            self.assertTrue(recovered["applied"], recovered)
+            self.assertEqual(
+                recovered["recuperacao_meta_por_anuncio"][ACCOUNT]["recuperadas"], 1
+            )
+            row = next(r for r in store.tables["BI_Meta_Resultados"] if r["data"] == day)
+            self.assertEqual(row["conversas_iniciadas_meta"], "1.00")
+            self.assertEqual(row["investimento_original"], "10.00")
+            self.assertEqual((row["impressoes"], row["ctr_pct"], row["cpm"]), ("", "", ""))
+
     def test_success_checkpoint_and_replay_are_segment_account_scoped(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp)
