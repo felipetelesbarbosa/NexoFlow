@@ -27,9 +27,9 @@ const summary = {
   ],
 };
 
-test("documentação filtra rotas e abre o Swagger no celular", async ({ page }) => {
+test("documentação abre o Swagger em outra aba no celular e no PC", async ({ page, context }) => {
   await page.setViewportSize({ width: 375, height: 800 });
-  await page.route("**/swagger.html?*", async (route) => {
+  await context.route("**/swagger.html?*", async (route) => {
     const response = await route.fetch();
     await route.fulfill({ response, headers: {
       ...response.headers(),
@@ -37,7 +37,7 @@ test("documentação filtra rotas e abre o Swagger no celular", async ({ page })
     } });
   });
   await page.route("**/api/central/v1/resumo", (route) => route.fulfill({ json: summary }));
-  await page.route("**/api/central/v1/documentacao/openapi.json?*", (route) => {
+  await context.route("**/api/central/v1/documentacao/openapi.json?*", (route) => {
     const isCentral = new URL(route.request().url()).searchParams.get("api") === "central";
     return route.fulfill({ json: {
       openapi: "3.1.0",
@@ -67,11 +67,32 @@ test("documentação filtra rotas e abre o Swagger no celular", async ({ page })
   await expect(page.getByText("Consultar tarefas e eventos")).toBeVisible();
   await expect(page.getByText("Entre com sua conta individual", { exact: false })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
-  await page.getByRole("link", { name: "Abrir Swagger" }).click();
-  await expect(page.locator("#swagger-ui")).toContainText("Consultar tarefas e eventos");
-  await page.locator(".opblock-summary").click();
-  await expect(page.getByRole("button", { name: "Try it out" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /authorize/i })).toHaveCount(0);
+  const originalUrl = page.url();
+  const [swagger] = await Promise.all([
+    page.waitForEvent("popup", { timeout: 5000 }),
+    page.getByRole("link", { name: "Abrir Swagger" }).click(),
+  ]);
+  await expect(swagger).toHaveURL(/swagger\.html\?api=central$/);
+  await expect(swagger.locator("#swagger-ui")).toContainText("Consultar tarefas e eventos");
+  await swagger.locator(".opblock-summary").click();
+  await expect(swagger.getByRole("button", { name: "Try it out" })).toHaveCount(0);
+  await expect(swagger.getByRole("button", { name: /authorize/i })).toHaveCount(0);
+  await expect(page).toHaveURL(originalUrl);
+  await expect(page.getByRole("heading", { name: "Documentação da API" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "API da Central" })).toHaveAttribute("aria-pressed", "true");
+  await swagger.close();
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.getByRole("button", { name: "API do Hub" }).click();
+  await expect(page.getByText("Listar execuções do segmento")).toBeVisible();
+  const [hubSwagger] = await Promise.all([
+    page.waitForEvent("popup", { timeout: 5000 }),
+    page.getByRole("link", { name: "Abrir Swagger" }).click(),
+  ]);
+  await expect(hubSwagger).toHaveURL(/swagger\.html\?api=hub$/);
+  await expect(hubSwagger.locator("#swagger-ui")).toContainText("Listar execuções do segmento");
+  await expect(page).toHaveURL(originalUrl);
+  await expect(page.getByRole("heading", { name: "Documentação da API" })).toBeVisible();
 });
 
 test("navegar, filtrar e atualizar com revogação de acesso", async ({

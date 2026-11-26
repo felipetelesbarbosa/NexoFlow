@@ -100,7 +100,7 @@ export function Documentation() {
         <div><h1 id="docs-title">Documentação da API</h1>
           <p className="updated">Rotas, autenticação e exemplos do NexoFlow Hub.</p></div>
         <div className="docs-links">
-          <a className="docs-action" href={swagger}><BookOpen size={16} /> Abrir Swagger</a>
+          <a className="docs-action" href={swagger} target="_blank" rel="noopener noreferrer"><BookOpen size={16} /> Abrir Swagger</a>
           <a href={schema}>OpenAPI (JSON) <ArrowUpRight size={14} /></a>
         </div>
       </div>
