@@ -165,8 +165,24 @@ def verify(*, web_ip, api_ip, pg_ip, secret_dir, key, farma_id, pet_id, wait):
             == 403
         )
         assert client.post(api + EVENT, json=event).status_code == 401
-        wrong = {"Authorization": "Bearer " + (secret_dir / "farma").read_text()}
-        assert client.post(api + EVENT, json=event, headers=wrong).status_code == 401
+        integration = {"Authorization": "Bearer " + (secret_dir / "farma").read_text()}
+        assert client.post(api + EVENT, json=event, headers=integration).status_code == 401
+        request = {
+            "segmento": "FARMA", "origem": "n8n", "chave": "ensaio-docker",
+            "cenario": "dados_incompletos",
+        }
+        created = client.post(api + "/tarefas/noturno", json=request, headers=integration)
+        assert created.status_code == 202
+        noturno_id = created.json()["id"]
+        replay = client.post(api + "/tarefas/noturno", json=request, headers=integration)
+        assert replay.status_code == 202 and replay.json()["id"] == noturno_id
+        task_url = api + "/tarefas/" + noturno_id
+        wait(
+            lambda: client.get(task_url, headers=integration).json()["estado"] == "parcial",
+            "noturno_api_worker_com_pendencia_isolada",
+        )
+        stages = client.get(task_url + "/etapas", headers=integration).json()["etapas"]
+        assert len(stages) == 5 and all(stage["estado"] == "concluida" for stage in stages)
         accepted = client.post(api + EVENT, json=event, headers=hook)
         assert accepted.status_code == 200 and accepted.json()["estado"] == "CONFIRMADO"
         again = client.post(api + EVENT, json=event, headers=hook)
@@ -222,8 +238,13 @@ def verify(*, web_ip, api_ip, pg_ip, secret_dir, key, farma_id, pet_id, wait):
             task_ids = {item["id"] for item in summary["tarefas"]}
             assert (str(farma_id) in task_ids) == (segment == "FARMA")
             assert (str(pet_id) in task_ids) == (segment == "PET")
+            assert (noturno_id in task_ids) == (segment == "FARMA")
             for task in summary["tarefas"]:
-                assert set(task) == {"id", "estado", "criado_em", "atualizado_em"}
+                visible = {"id", "estado", "criado_em", "atualizado_em"}
+                if task["id"] == noturno_id:
+                    assert task["tipo"] == "noturno" and task["etapas"] == stages
+                    visible |= {"tipo", "etapas"}
+                assert set(task) == visible
             events = [
                 item
                 for item in summary["eventos"]
