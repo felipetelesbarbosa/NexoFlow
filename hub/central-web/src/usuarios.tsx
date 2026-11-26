@@ -3,6 +3,7 @@ import { horaLocal, isSegmento } from "./resumo";
 import type { Segmento } from "./resumo";
 
 const api = "/api/central/v1";
+const centralOficial = "https://central.nexoflowhub.com.br";
 const accessApps = "https://one.dash.cloudflare.com/?to=/:account/access/apps";
 type Usuario = { id: string; email: string | null; segmentos: Segmento[]; super_admin: boolean };
 type Convite = { id: string; email: string; segmentos: Segmento[]; expira_em: number; estado: keyof typeof estados };
@@ -66,7 +67,7 @@ export function GerenciarUsuarios() {
     try {
       const result = await consultar(path, body);
       if (path === "/convites" && /^[A-Za-z0-9_-]{43}$/.test(result?.codigo)) {
-        setLink(window.location.origin + "/#convite/" + result.codigo);
+        setLink(centralOficial + "/#convite/" + result.codigo);
         setEmail("");
         setSegmentos([]);
       } else {
@@ -117,10 +118,18 @@ export function GerenciarUsuarios() {
             <label htmlFor="link-convite">Link de uso único · válido por 7 dias</label>
             <input id="link-convite" readOnly value={link} onFocus={(event) => event.target.select()} />
             <button className="plain" onClick={() => {
-              if (!navigator.clipboard) { setAviso("Selecione o endereço acima para copiar."); return; }
+              const selecionarLink = () => {
+                const campo = document.getElementById("link-convite");
+                if (campo instanceof HTMLInputElement) {
+                  campo.focus();
+                  campo.select();
+                }
+                setAviso("Link selecionado. Pressione Ctrl+C para copiar.");
+              };
+              if (!navigator.clipboard) { selecionarLink(); return; }
               navigator.clipboard.writeText(link).then(
                 () => setAviso("Link copiado."),
-                () => setAviso("Selecione o endereço acima para copiar."),
+                selecionarLink,
               );
             }}>Copiar convite</button>
           </>}
@@ -145,7 +154,7 @@ export function GerenciarUsuarios() {
       </div>
       <section className="panel account-panel invite-history" aria-labelledby="autorizar-cloudflare">
         <h2 id="autorizar-cloudflare">Autorizar na Cloudflare</h2>
-        <p>Abra a aplicação <strong>NexoFlow Central de Operações HML</strong> e inclua na política de acesso o mesmo e-mail do convite.</p>
+        <p>Abra a aplicação <strong>NexoFlow Central de Operações</strong> e inclua na política de acesso o mesmo e-mail do convite.</p>
         <a href={accessApps} target="_blank" rel="noopener noreferrer">Abrir aplicações no Cloudflare Access</a>
       </section>
       <section className="panel account-panel invite-history" aria-labelledby="convites-lista">

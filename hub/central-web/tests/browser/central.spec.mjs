@@ -498,12 +498,15 @@ test("só o Super Admin vê o cadastro de convites e o atalho para autorização
   admin = true;
   await page.reload();
   await expect(page.getByRole("region", { name: "Autorizar na Cloudflare" })).toBeVisible();
+  await expect(page.getByText("NexoFlow Central de Operações", { exact: true })).toBeVisible();
   const link = page.getByRole("link", { name: /Abrir aplicações no Cloudflare/ });
   await expect(link).toHaveAttribute("href", /one\.dash\.cloudflare\.com/);
   await page.getByLabel("E-mail do convidado").fill("convidado@example.invalid");
   await page.getByLabel("FARMA", { exact: true }).check();
   await page.getByRole("button", { name: "Criar convite" }).click();
-  await expect(page.getByLabel(/Link de uso único/)).toHaveValue(/#convite\//);
+  await expect(page.getByLabel(/Link de uso único/)).toHaveValue(
+    "https://central.nexoflowhub.com.br/#convite/" + "c".repeat(43),
+  );
   await page.goto("/#convite/" + "c".repeat(43));
   await expect(page.getByRole("button", { name: "Aceitar convite" })).toBeVisible();
   await expect(link).toHaveCount(0);
