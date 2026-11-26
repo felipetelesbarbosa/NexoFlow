@@ -16,8 +16,10 @@ from meta_ads_evidence import collect_weni_evidence
 from meta_ads_model import build_native_tables
 from meta_ads_recovery import (
     merge_observations,
-    read_complete_rows as _rows,
     recover_direct_conversations,
+)
+from meta_ads_recovery import (
+    read_complete_rows as _rows,
 )
 from meta_ads_settings import SettingsError, load_settings
 from meta_ads_sheets import NativeMetaSheets
