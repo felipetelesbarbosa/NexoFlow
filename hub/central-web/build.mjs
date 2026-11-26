@@ -28,8 +28,14 @@ const html = (await readFile("index.html", "utf8")).replace(
 );
 await writeFile("dist/index.html", html);
 await cp("public", "dist", { recursive: true });
+for (const asset of ["swagger-ui-bundle.js", "swagger-ui.css"]) {
+  await cp("node_modules/swagger-ui-dist/" + asset, "dist/assets/" + asset);
+}
 const notices = [];
-for (const name of ["react", "react-dom", "scheduler", "lucide-react", "@fontsource-variable/inter"]) {
+for (const name of ["react", "react-dom", "scheduler", "lucide-react", "@fontsource-variable/inter", "swagger-ui-dist"]) {
   notices.push(name + "\n" + (await readFile("node_modules/" + name + "/LICENSE", "utf8")));
+}
+for (const notice of ["NOTICE", "swagger-ui-bundle.js.LICENSE.txt"]) {
+  notices.push(await readFile("node_modules/swagger-ui-dist/" + notice, "utf8"));
 }
 await writeFile("dist/licenses.txt", notices.join("\n\n"));

@@ -7,3 +7,12 @@
 !hub/nexoflow_hub/central.py
 !hub/nexoflow_hub/infrastructure.py
 !hub/nexoflow_hub/api_observability.py
+!hub/nexoflow_hub/api.py
+!hub/nexoflow_hub/config.py
+!hub/nexoflow_hub/contracts.py
+!hub/nexoflow_hub/store.py
+!hub/nexoflow_hub/weni_events.py
+!app/
+!app/order_history.py
+!app/pedido_utils.py
+!app/business_identity.py

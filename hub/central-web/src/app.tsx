@@ -5,6 +5,7 @@ import {
   Activity,
   ArrowDownWideNarrow,
   ArrowRight,
+  BookOpen,
   Braces,
   CalendarDays,
   ChartNoAxesColumn,
@@ -46,6 +47,7 @@ import {
 import type { Estado, Evento, Resumo, Segmento, Tarefa } from "./resumo";
 import { ApiConsumption } from "./consumo";
 import { Infrastructure } from "./infraestrutura";
+import { Documentation } from "./documentacao";
 import "./style.css";
 
 const pages = {
@@ -54,6 +56,7 @@ const pages = {
   eventos: { nome: "Eventos Weni", icone: Webhook },
   consumo: { nome: "Consumo de APIs", icone: Braces },
   infraestrutura: { nome: "Infraestrutura", icone: Server },
+  documentacao: { nome: "Documentação", icone: BookOpen },
 } as const;
 type Page = keyof typeof pages;
 type Slice = ReturnType<typeof janela>;
@@ -168,7 +171,9 @@ function App() {
     window.addEventListener("hashchange", go);
     return () => window.removeEventListener("hashchange", go);
   }, []);
+  const needsSummary = page !== "documentacao";
   useEffect(() => {
+    if (!needsSummary) return;
     const stop = new AbortController();
     let active = true;
     const timer = setTimeout(() => stop.abort(), 20000);
@@ -205,7 +210,7 @@ function App() {
       clearTimeout(timer);
       stop.abort();
     };
-  }, [request]);
+  }, [request, needsSummary]);
 
   const data = resumo && fetched ? janela(resumo, dias, fetched) : null;
   const view = pages[page];
@@ -314,7 +319,7 @@ function App() {
           <ChevronRight size={14} />
           <strong>{view.nome}</strong>
           <div className="header-right">
-            {page !== "infraestrutura" && <>
+            {page !== "infraestrutura" && page !== "documentacao" && <>
             <Layers size={15} />
             <span>Segmento</span>
             {scopes.length > 1 ? (
@@ -356,7 +361,7 @@ function App() {
           </div>
         </header>
         <main id="conteudo" tabIndex={-1} ref={main}>
-          {page === "infraestrutura" ? <Infrastructure /> : page === "consumo" ? (
+          {page === "documentacao" ? <Documentation /> : page === "infraestrutura" ? <Infrastructure /> : page === "consumo" ? (
             <ApiConsumption key={request.segmento ?? "inicial"} segment={request.segmento} />
           ) : <>
           <div className="title-row">

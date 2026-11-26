@@ -57,6 +57,42 @@ def assertion(value):
     return {"Cf-Access-Jwt-Assertion": value}
 
 
+def test_documentation_requires_operator_and_describes_each_authentication(
+    setup, signing_key, monkeypatch
+):
+    _, client = setup
+    path = "/api/central/v1/documentacao/openapi.json"
+
+    def no_database(*_args, **_kwargs):
+        pytest.fail("A documentação não deve abrir o PostgreSQL")
+
+    monkeypatch.setattr(central.psycopg, "connect", no_database)
+    assert client.get(path).status_code == 401
+    assert (
+        client.get(
+            path, headers=assertion(token(signing_key, sub="sem-acesso"))
+        ).status_code
+        == 403
+    )
+    signed = assertion(token(signing_key))
+    response = client.get(path, headers=signed)
+    assert response.status_code == 200
+    assert response.headers["Cache-Control"] == "no-store"
+    schema = response.json()
+    assert schema["paths"]["/saude"]["get"].get("security") is None
+    assert schema["paths"]["/tarefas"]["post"]["security"] == [{"TokenHub": []}]
+    webhook = schema["paths"]["/v1/webhooks/weni/farma"]["post"]
+    assert webhook["security"] == [{"TokenWebhookWeni": []}]
+    assert {"200", "401", "409"} <= set(webhook["responses"])
+    for value in ("f" * 32, "p" * 32, "w" * 32, "nexoflow_hub_hml"):
+        assert value not in response.text
+
+    central_schema = client.get(path, params={"api": "central"}, headers=signed).json()
+    assert central_schema["paths"][PATH]["get"]["security"] == [{"SessaoCentral": []}]
+    assert path not in central_schema["paths"]
+    assert client.get("/openapi.json", headers=signed).status_code == 404
+
+
 def test_real_signature_and_database_scope(setup, signing_key, monkeypatch):
     config, client = setup
     statements = []

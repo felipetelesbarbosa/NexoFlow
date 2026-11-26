@@ -22,6 +22,12 @@ A referência da Iota.hub registrada no [cronograma da Central](../docs/planejam
 
 Capturas da homologação com registros sintéticos. [Desktop em tema claro](central-web/docs/central-desktop.png) · [Celular em tema escuro](central-web/docs/central-celular.png).
 
+## Documentação do Hub
+
+A aba **Documentação** da Central reúne as rotas por assunto, com busca e referência OpenAPI. **Abrir Swagger** usa os arquivos distribuídos com a Central e exige a sessão individual do operador para consultar o contrato e os exemplos. O Swagger exibe as rotas em modo de consulta. O endpoint de documentação é `GET /api/central/v1/documentacao/openapi.json?api=hub`. Use `api=central` para consultar o contrato da Central.
+
+Para clientes como n8n, use `Authorization: Bearer SEU_TOKEN` nas rotas de execução do Hub. O token determina o segmento. O webhook recebe a credencial exclusiva da Weni FARMA. A Central usa identidade individual assinada pelo Cloudflare Access. O endpoint interno `GET /saude` é a verificação básica para o ambiente Docker.
+
 ## Caminhos dos dados
 
 | Caminho | Comportamento desta entrega |

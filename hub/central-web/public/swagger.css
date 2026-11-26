@@ -1,0 +1,20 @@
+body {
+  margin: 0;
+  background: #f4f6f9;
+}
+.swagger-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1rem clamp(1rem, 4vw, 3rem);
+  background: #121c2a;
+  color: #fff;
+  font: .9rem system-ui, sans-serif;
+}
+.swagger-nav a { color: inherit; }
+#swagger-ui[role="alert"] { padding: 2rem; font: 1rem system-ui, sans-serif; }
+.swagger-ui .scheme-container { padding-block: 12px; }
+.swagger-ui .info { margin-block: 28px; }
+.swagger-ui .auth-wrapper { display: none; }
+.swagger-ui .opblock-summary-path { overflow-wrap: anywhere; }

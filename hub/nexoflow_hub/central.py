@@ -7,20 +7,46 @@ import os
 import re
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 from threading import BoundedSemaphore
 from typing import Annotated, Literal
 
 import jwt
 import psycopg
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Security
+from fastapi.security import APIKeyHeader
 from psycopg.conninfo import conninfo_to_dict
 from psycopg.rows import dict_row
 
+from . import __version__
 from .api_observability import read_consumption
 from .infrastructure import read_infrastructure
 
 SEGMENTS = {"FARMA", "PET"}
+CENTRAL_SESSION = Security(
+    APIKeyHeader(
+        name="Cf-Access-Jwt-Assertion",
+        auto_error=False,
+        scheme_name="SessaoCentral",
+        description="O Cloudflare Access envia a identidade individual da sessão à Central.",
+    )
+)
+
+
+@lru_cache(maxsize=1)
+def hub_openapi() -> dict:
+    from .api import create_app as create_hub_app
+    from .config import Settings
+
+    # A geração do contrato apenas registra rotas e modelos. Não abre o banco
+    # nem lê os segredos da API de integração que está em execução.
+    demo = Settings(
+        "dbname=nexoflow_hub_hml",
+        {"FARMA": "f" * 32, "PET": "p" * 32},
+        weni_farma_token="w" * 32,
+    )
+    return create_hub_app(demo).openapi()
 
 
 @dataclass(frozen=True)
@@ -188,7 +214,14 @@ def read_summary(dsn: str, segment: str):
 
 def create_app(settings: CentralSettings | None = None):
     config = settings or CentralSettings.load()
-    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(
+        title="NexoFlow — Central de Operações",
+        version=__version__,
+        description="Consultas de homologação para operadores com conta individual e MFA.",
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+    )
     slots = BoundedSemaphore(4)
 
     @app.middleware("http")
@@ -198,22 +231,43 @@ def create_app(settings: CentralSettings | None = None):
         response.headers["X-Content-Type-Options"] = "nosniff"
         return response
 
-    @app.get("/api/central/v1/infraestrutura")
-    def infrastructure(request: Request):
+    def authenticated(request: Request, _session=CENTRAL_SESSION):
         tokens = request.headers.getlist("cf-access-jwt-assertion")
-        operator_segments(tokens[0] if len(tokens) == 1 else "", config)
+        return operator_segments(tokens[0] if len(tokens) == 1 else "", config)
+
+    operator = Depends(authenticated)
+    access_errors = {
+        401: {"description": "Sessão individual ausente ou inválida"},
+        403: {"description": "A identidade não tem permissão para a consulta"},
+        503: {"description": "Consulta temporariamente indisponível"},
+    }
+
+    @app.get("/api/central/v1/documentacao/openapi.json", include_in_schema=False)
+    def documentation(_allowed=operator, api: Literal["hub", "central"] = "hub"):
+        return hub_openapi() if api == "hub" else app.openapi()
+
+    @app.get(
+        "/api/central/v1/infraestrutura",
+        tags=["Infraestrutura"],
+        summary="Consultar a situação da VPS",
+        responses={**access_errors},
+    )
+    def infrastructure(_allowed=operator):
         return read_infrastructure(config.infrastructure_file)
 
-    @app.get("/api/central/v1/consumo")
+    @app.get(
+        "/api/central/v1/consumo",
+        tags=["Consumo de APIs"],
+        summary="Consultar tráfego e falhas por segmento",
+        responses={**access_errors},
+    )
     def consumption(
-        request: Request,
         segmento: Literal["FARMA", "PET"] | None = None,
         api: Literal["hub", "weni"] | None = None,
         antes: Annotated[int | None, Query(ge=1, le=2**53 - 1)] = None,
         so_erros: bool = False,
+        allowed=operator,
     ):
-        tokens = request.headers.getlist("cf-access-jwt-assertion")
-        allowed = operator_segments(tokens[0] if len(tokens) == 1 else "", config)
         segment = segmento or allowed[0]
         if segment not in allowed:
             raise HTTPException(403, "SEGMENTO_NAO_AUTORIZADO")
@@ -232,10 +286,23 @@ def create_app(settings: CentralSettings | None = None):
         finally:
             slots.release()
 
-    @app.get("/api/central/v1/resumo")
-    def summary(request: Request):
-        tokens = request.headers.getlist("cf-access-jwt-assertion")
-        allowed = operator_segments(tokens[0] if len(tokens) == 1 else "", config)
+    @app.get(
+        "/api/central/v1/resumo",
+        tags=["Operação"],
+        summary="Consultar tarefas, eventos e processamento",
+        openapi_extra={
+            "parameters": [
+                {
+                    "in": "query",
+                    "name": "segmento",
+                    "schema": {"type": "string", "enum": ["FARMA", "PET"]},
+                    "description": "Se omitido, usa o primeiro segmento autorizado.",
+                }
+            ]
+        },
+        responses={**access_errors, 422: {"description": "Segmento inválido"}},
+    )
+    def summary(request: Request, allowed=operator):
         params = request.query_params.multi_items()
         segment = allowed[0]
         if params:

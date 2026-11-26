@@ -27,6 +27,53 @@ const summary = {
   ],
 };
 
+test("documentação filtra rotas e abre o Swagger no celular", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 800 });
+  await page.route("**/swagger.html?*", async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({ response, headers: {
+      ...response.headers(),
+      "Content-Security-Policy": "default-src 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'none'",
+    } });
+  });
+  await page.route("**/api/central/v1/resumo", (route) => route.fulfill({ json: summary }));
+  await page.route("**/api/central/v1/documentacao/openapi.json?*", (route) => {
+    const isCentral = new URL(route.request().url()).searchParams.get("api") === "central";
+    return route.fulfill({ json: {
+      openapi: "3.1.0",
+      info: { title: isCentral ? "API da Central" : "API do Hub", version: "0.1.0" },
+      paths: {
+        [isCentral ? "/api/central/v1/resumo" : "/tarefas"]: {
+          get: {
+            tags: [isCentral ? "Operação" : "Execuções"],
+            operationId: isCentral ? "resumo" : "tarefas",
+            summary: isCentral ? "Consultar tarefas e eventos" : "Listar execuções do segmento",
+            security: [{ Token: [] }],
+            responses: { 200: { description: "Sucesso" } },
+          },
+        },
+      },
+      components: { securitySchemes: { Token: { type: "http", scheme: "bearer" } } },
+    } });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Abrir menu" }).click();
+  await page.getByRole("link", { name: "Documentação", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Documentação da API" })).toBeVisible();
+  await expect(page.getByText("Authorization: Bearer SEU_TOKEN")).toBeVisible();
+  await page.getByRole("textbox", { name: "Buscar rotas da API" }).fill("xyz");
+  await expect(page.getByText("Nenhuma rota encontrada.")).toBeVisible();
+  await page.getByRole("button", { name: "API da Central" }).click();
+  await expect(page.getByText("Consultar tarefas e eventos")).toBeVisible();
+  await expect(page.getByText("Entre com sua conta individual", { exact: false })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
+  await page.getByRole("link", { name: "Abrir Swagger" }).click();
+  await expect(page.locator("#swagger-ui")).toContainText("Consultar tarefas e eventos");
+  await page.locator(".opblock-summary").click();
+  await expect(page.getByRole("button", { name: "Try it out" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /authorize/i })).toHaveCount(0);
+});
+
 test("navegar, filtrar e atualizar com revogação de acesso", async ({
   page,
 }) => {
