@@ -18,6 +18,7 @@ AUDIENCE = "central-de-operacoes-hml"
 SUMMARY = "/api/central/v1/resumo"
 CONSUMPTION = "/api/central/v1/consumo"
 INFRASTRUCTURE = "/api/central/v1/infraestrutura"
+OPENAPI = "/api/central/v1/documentacao/openapi.json"
 EVENT = "/v1/webhooks/weni/farma"
 
 
@@ -138,6 +139,16 @@ def verify(*, web_ip, api_ip, pg_ip, secret_dir, key, farma_id, pet_id, wait):
             assert "text/html" not in asset.headers.get("content-type", "")
         assert client.get(web + SUMMARY).status_code == 401
         assert client.get(web + INFRASTRUCTURE).status_code == 401
+        assert client.get(web + OPENAPI).status_code == 401
+        contract = client.get(web + OPENAPI, headers=farma)
+        assert contract.status_code == 200
+        assert contract.json()["paths"][EVENT]["post"]["security"] == [
+            {"TokenWebhookWeni": []}
+        ]
+        swagger = client.get(web + "/swagger.html")
+        assert swagger.status_code == 200
+        assert "/assets/swagger-ui-bundle.js" in swagger.text
+        assert client.get(web + "/assets/swagger-ui-bundle.js").status_code == 200
         infrastructure = client.get(web + INFRASTRUCTURE, headers=farma)
         assert infrastructure.status_code == 200
         assert infrastructure.json() == {"estado": "aguardando_coleta", "vps": None}
