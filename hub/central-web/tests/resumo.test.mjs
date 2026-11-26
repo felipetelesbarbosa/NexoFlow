@@ -19,9 +19,10 @@ const sample = {
 
 test("vazio confirmado fica vazio e resposta inválida é recusada", () => {
   assert.equal(lerResumo(sample).eventos.length, 0);
+  assert.equal(lerResumo({ ...sample, metricas: { habilitado: true } }).metricas.habilitado, true);
   for (const fields of [
     { eventos: null },
-    { metricas: { habilitado: true } },
+    { metricas: { habilitado: "sim" } },
     { ambiente: "producao" },
     { tarefas: [{}] },
   ]) {

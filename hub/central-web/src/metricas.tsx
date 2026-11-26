@@ -52,8 +52,8 @@ function serie(report: Vendas, indicador: Indicador) {
   const pontos = [];
   for (let instante = Date.parse(report.inicio); instante <= Date.parse(report.fim); instante += umDia) {
     const data = new Date(instante).toISOString().slice(0, 10);
-    const total = dias.get(data) ?? 0;
-    pontos.push({ data, total: indicador === "pedidos" ? total : total / 100 });
+    const total = dias.get(data);
+    pontos.push({ data, total: total === undefined ? null : indicador === "pedidos" ? total : total / 100 });
   }
   return pontos;
 }
@@ -65,6 +65,15 @@ function GraficoVendas({ report, indicador }: { report: Vendas; indicador: Indic
     const ctx = node?.getContext("2d");
     if (!node || !ctx) return;
     const pontos = serie(report, indicador);
+    const grupos: { index: number; total: number }[][] = [];
+    let anterior = -2;
+    pontos.forEach(({ total }, index) => {
+      if (total === null) return;
+      if (index !== anterior + 1) grupos.push([]);
+      grupos[grupos.length - 1].push({ index, total });
+      anterior = index;
+    });
+    const valores = grupos.flatMap((grupo) => grupo.map(({ total }) => total));
     function draw() {
       if (!node || !ctx) return;
       const { width, height } = node.getBoundingClientRect();
@@ -79,8 +88,8 @@ function GraficoVendas({ report, indicador }: { report: Vendas; indicador: Indic
       const grid = printing ? "#cbd4df" : vars.getPropertyValue("--chart-grid").trim();
       const accent = printing ? "#0051fa" : vars.getPropertyValue("--accent").trim();
       const left = 50, right = width - 15, top = 16, bottom = height - 30;
-      const min = Math.min(0, ...pontos.map((point) => point.total));
-      const max = Math.max(1, ...pontos.map((point) => point.total));
+      const min = Math.min(0, ...valores);
+      const max = Math.max(1, ...valores);
       const x = (index: number) => left + (right - left) *
         (pontos.length === 1 ? 0.5 : index / (pontos.length - 1));
       const y = (value: number) => bottom - (bottom - top) * (value - min) / (max - min);
@@ -105,26 +114,28 @@ function GraficoVendas({ report, indicador }: { report: Vendas; indicador: Indic
         ctx.textAlign = pontos.length === 1 ? "center" : i === 0 ? "left" : i === markers.length - 1 ? "right" : "center";
         ctx.fillText(dataBr(pontos[index].data).slice(0, 5), x(index), height - 9);
       });
-      ctx.beginPath();
-      pontos.forEach((ponto, index) => {
-        if (index === 0) ctx.moveTo(x(index), y(ponto.total));
-        else ctx.lineTo(x(index), y(ponto.total));
-      });
-      ctx.strokeStyle = accent;
-      ctx.lineWidth = 2.2;
-      ctx.lineJoin = "round";
-      ctx.stroke();
-      if (pontos.length === 1) {
+      for (const grupo of grupos) {
         ctx.fillStyle = accent;
+        if (grupo.length === 1) {
+          const [{ index, total }] = grupo;
+          ctx.beginPath();
+          ctx.arc(x(index), y(total), 3.5, 0, 2 * Math.PI);
+          ctx.fill();
+          continue;
+        }
         ctx.beginPath();
-        ctx.arc(x(0), y(pontos[0].total), 4, 0, 2 * Math.PI);
-        ctx.fill();
-      } else {
-        ctx.lineTo(right, y(0));
-        ctx.lineTo(left, y(0));
+        for (const [position, { index, total }] of grupo.entries()) {
+          if (position === 0) ctx.moveTo(x(index), y(total));
+          else ctx.lineTo(x(index), y(total));
+        }
+        ctx.strokeStyle = accent;
+        ctx.lineWidth = 2.2;
+        ctx.lineJoin = "round";
+        ctx.stroke();
+        ctx.lineTo(x(grupo[grupo.length - 1].index), y(0));
+        ctx.lineTo(x(grupo[0].index), y(0));
         ctx.closePath();
         ctx.globalAlpha = 0.10;
-        ctx.fillStyle = accent;
         ctx.fill();
         ctx.globalAlpha = 1;
       }
@@ -267,7 +278,11 @@ export function Metricas() {
                       onClick={() => setIndicador("pedidos")}>Pedidos</button>
                   </div>
                 </div>
-                <p className="metricas-unit">{indicador === "pedidos" ? "Pedidos válidos" : "Faturamento em reais"}</p>
+                <p className="metricas-unit">
+                  {indicador === "pedidos" ? "Pedidos válidos" : "Faturamento em reais"}
+                  {vendas.dias.length < 1 + (Date.parse(vendas.fim) - Date.parse(vendas.inicio)) / umDia
+                    && " · Dias sem registro ficam sem ponto"}
+                </p>
                 <GraficoVendas report={vendas} indicador={indicador} />
               </section>
               <section className="panel metricas-section" aria-labelledby="metricas-composicao">

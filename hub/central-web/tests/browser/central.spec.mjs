@@ -549,6 +549,10 @@ test("Vendas FARMA mostra KPIs, gráficos, filtros e layout para PDF no celular"
   expect(pdf.toString("utf8", 0, 5)).toBe("%PDF-");
   expect(pdf.byteLength).toBeGreaterThan(15000);
   await page.emulateMedia({ media: "screen" });
+  await page.getByLabel("Início", { exact: true }).fill("2026-11-01");
+  await page.getByLabel("Fim", { exact: true }).fill("2026-11-03");
+  await page.getByRole("button", { name: "Aplicar período" }).click();
+  await expect(page.getByText(/Dias sem registro ficam sem ponto/)).toBeVisible();
   await page.getByLabel("Início", { exact: true }).fill("2025-01-01");
   await page.getByLabel("Fim", { exact: true }).fill("2025-01-02");
   await page.getByRole("button", { name: "Aplicar período" }).click();
