@@ -240,7 +240,7 @@ def _conversation_observation(value):
 
 def reconcile_conversation_days(published, candidate, refreshed, windows):
     """Compara a resposta bruta com a revisão anterior antes de aceitar a mescla."""
-    from meta_ads_model import started_conversations
+    from meta_ads_recovery import started_conversations
 
     eligible = _farma_delivery(published) | _farma_delivery(candidate)
 

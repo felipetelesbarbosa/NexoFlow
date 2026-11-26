@@ -6,7 +6,7 @@ import hashlib
 import json
 from collections import Counter, defaultdict
 from datetime import date
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -15,6 +15,14 @@ from analytics import (
     _sales_order_is_valid,
     ad_is_after_order,
     bi_customer_key,
+)
+from meta_ads_recovery import (
+    _action_value,
+    _money,
+    _number,
+    _ratio,
+    observed_media_metrics,
+    started_conversations as started_conversations,
 )
 from pedido_utils import business_order_datetime
 
@@ -242,32 +250,6 @@ def _json(value):
     )
 
 
-def _action_value(actions, names):
-    if not isinstance(actions, list):
-        return ""
-    for name in names:
-        found = [
-            _number(a.get("value"))
-            for a in actions
-            if isinstance(a, dict) and a.get("action_type") == name
-        ]
-        if found:
-            return (
-                _money(found[0]) if None not in found and len(set(found)) == 1 else ""
-            )
-    return ""
-
-
-def started_conversations(actions):
-    return _action_value(
-        actions,
-        (
-            "onsite_conversion.messaging_conversation_started_7d",
-            "messaging_conversation_started_7d",
-        ),
-    )
-
-
 def _catalog_index(rows):
     return {
         (
@@ -286,26 +268,6 @@ def _key(*parts):
     return hashlib.sha256(
         json.dumps(parts, ensure_ascii=False, separators=(",", ":")).encode()
     ).hexdigest()
-
-
-def _number(value):
-    try:
-        result = Decimal(str(value))
-    except (ValueError, TypeError, InvalidOperation):
-        return None
-    return result if result.is_finite() and result >= 0 else None
-
-
-def _money(value):
-    return "" if value is None else format(value.quantize(Decimal("0.01")), "f")
-
-
-def _ratio(numerator, denominator, factor=Decimal(1)):
-    return (
-        _money(numerator * factor / denominator)
-        if numerator is not None and denominator and denominator > 0
-        else ""
-    )
 
 
 def _rows(catalogs, name, alias):
@@ -872,7 +834,8 @@ def build_native_tables(
         link_clicks = _number(fact.get("inline_link_clicks"))
         if link_clicks is None:
             link_clicks = _number(_action_value(fact.get("actions"), ("link_click",)))
-        started = started_conversations(fact.get("actions"))
+        media = observed_media_metrics(fact)
+        started = media["conversas_iniciadas_meta"]
         purchase_value = _canonical_purchase(fact.get("action_values"))
         raw.update(
             {
@@ -933,9 +896,9 @@ def build_native_tables(
                 "investimento_atribuivel": _money(spend) if cost_proven else "",
                 "impressoes": _money(impressions),
                 "cliques": _money(clicks),
-                "ctr_pct": _ratio(clicks, impressions, Decimal(100)),
+                "ctr_pct": media["ctr_pct"],
                 "cpc": _ratio(spend, clicks),
-                "cpm": _ratio(spend, impressions, Decimal(1000)),
+                "cpm": media["cpm"],
                 "eventos_ctwa": len(local_events),
                 "contatos": len(
                     {e["contact_uuid"] for e in local_events if e["contact_uuid"]}

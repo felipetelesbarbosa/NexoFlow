@@ -14,6 +14,11 @@ from zoneinfo import ZoneInfo
 from meta_ads_client import MetaAdsClient, MetaReadError
 from meta_ads_evidence import collect_weni_evidence
 from meta_ads_model import build_native_tables
+from meta_ads_recovery import (
+    merge_observations,
+    read_complete_rows as _rows,
+    recover_direct_conversations,
+)
 from meta_ads_settings import SettingsError, load_settings
 from meta_ads_sheets import NativeMetaSheets
 
@@ -69,17 +74,6 @@ def _state(path, segment, account):
         raise ValueError("Estado Meta pertence a outro perfil/conta ou é inválido.")
     date.fromisoformat(state["through"])
     return state
-
-
-def _rows(result):
-    if not isinstance(result, dict) or result.get("parcial") is not False:
-        raise MetaReadError(
-            "Consulta Meta parcial; checkpoint preservado.", retryable=True
-        )
-    rows = result.get("dados")
-    if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
-        raise MetaReadError("Dados Meta inválidos.")
-    return rows
 
 
 def _restore_facts(tables):
@@ -141,17 +135,6 @@ def _restore_facts(tables):
             fact[api] = row.get(column, "")
         result.append(fact)
     return result
-
-
-def _fact_key(row):
-    return (
-        str(row.get("account_id", "")),
-        str(row.get("ad_id", "")),
-        str(row.get("date_start", "")),
-        str(row.get("currency", "")),
-        str(row.get("timezone_name", "")),
-        str(row.get("attribution_policy", "")),
-    )
 
 
 def _failure(account, stage, exc):
@@ -430,65 +413,16 @@ def sync_native_meta(
                         )
                     cursor = stop + timedelta(days=1)
                 if segment == "FARMA":
-                    from meta_ads_destinations import reconcile_conversation_days
-                    from meta_ads_model import started_conversations
-
-                    missing = reconcile_conversation_days(
-                        previous.get("BI_Meta_Resultados", []),
-                        [],
-                        local_facts,
-                        {account: (since.isoformat(), end.isoformat())},
+                    recovered, recovery = recover_direct_conversations(
+                        client, account, previous.get("BI_Meta_Resultados", []),
+                        local_facts, ads=local_catalogs["ads"],
+                        since=since.isoformat(), end=end.isoformat(), meta=meta,
+                        attribution=attribution, api_version=response.get("api_version"),
+                        policy=policy,
                     )
-                    catalog_ids = {row.get("id") for row in local_catalogs["ads"]}
-                    recovered = 0
-                    candidates = [
-                        row for row in missing
-                        if row["acao"] == "PENDENTE_HISTORICO"
-                        and row["consulta"]["estado"] == "SEM_LINHA"
-                        and row["anuncio_id"] in catalog_ids
-                    ]
-                    for gap in candidates[:20]:
-                        day, ad = gap["data"], gap["anuncio_id"]
-                        try:
-                            direct = client.daily_insights(
-                                account, day, day, pages=1, ad_id=ad,
-                            )
-                            direct_rows = _rows(direct)
-                        except MetaReadError as exc:
-                            if exc.critical:
-                                raise
-                            continue
-                        if (
-                            len(direct_rows) != 1
-                            or direct.get("time_increment") != 1
-                            or direct.get("attribution") != attribution
-                            or direct.get("api_version") != response.get("api_version")
-                        ):
-                            continue
-                        row = direct_rows[0]
-                        if (
-                            row.get("account_id") != account
-                            or row.get("ad_id") != ad
-                            or row.get("date_start") != day
-                            or row.get("date_stop") != day
-                            or row.get("spend") in (None, "")
-                            or started_conversations(row.get("actions")) in (None, "")
-                        ):
-                            continue
-                        # Impressões são opcionais na leitura direta. O modelo mantém
-                        # o campo vazio e deixa CTR e CPM indisponíveis.
-                        local_facts.append(dict(
-                            row, currency=meta.get("currency", ""),
-                            timezone_name=meta.get("timezone_name", ""),
-                            attribution_policy=policy,
-                        ))
-                        recovered += 1
-                    if candidates:
-                        report.setdefault("recuperacao_meta_por_anuncio", {})[account] = {
-                            "linhas_omitidas": len(candidates),
-                            "consultas": min(20, len(candidates)),
-                            "recuperadas": recovered,
-                        }
+                    local_facts.extend(recovered)
+                    if recovery["linhas_omitidas"]:
+                        report.setdefault("recuperacao_meta_por_anuncio", {})[account] = recovery
                 existing_grains = {
                     (row.get("account_id"), row.get("ad_id"), row.get("date_start")): (
                         row.get("currency"),
@@ -515,10 +449,7 @@ def sync_native_meta(
                         raise MetaMigrationRequired(
                             "Política/moeda/fuso Meta mudou para um grão já armazenado."
                         )
-                facts_by_key = {_fact_key(row): row for row in facts}
-                for row in local_facts:
-                    facts_by_key[_fact_key(row)] = row
-                facts = list(facts_by_key.values())
+                facts = merge_observations(facts, local_facts)
                 for name, rows in local_catalogs.items():
                     catalogs[name].extend(rows)
                 account_meta[account] = meta

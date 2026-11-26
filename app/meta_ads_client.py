@@ -18,17 +18,8 @@ from urllib.parse import quote, quote_plus
 
 import requests
 
+from meta_ads_recovery import MetaReadError as MetaReadError
 from meta_ads_settings import MetaSettings, account_number
-
-
-class MetaReadError(RuntimeError):
-    """Erro público sanitizado de consulta à Meta."""
-
-    def __init__(self, message, *, status_code=None, critical=False, retryable=False):
-        super().__init__(message)
-        self.status_code = status_code
-        self.critical = critical
-        self.retryable = retryable
 
 
 class MetaAdsClient:

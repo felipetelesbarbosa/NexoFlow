@@ -1,6 +1,7 @@
 """Ensaio FARMA com checkpoints locais e fontes sintéticas."""
 
 from hashlib import sha256
+from typing import Any
 from uuid import uuid5
 
 from publication_receipt import ready_receipt_matches
@@ -27,6 +28,7 @@ def run_noturno(store, task, *, interrupt_after=None):
     saved = store.checkpoints(task)
     scenario = task["cenario"]
     partial_ads = scenario == "dados_incompletos"
+    result: dict[str, Any]
     for step, stage in enumerate(NOTURNO_STAGES, start=1):
         if step in saved:
             continue
@@ -40,6 +42,12 @@ def run_noturno(store, task, *, interrupt_after=None):
                 "venda": evaluate("FARMA", "normal")["venda"],
                 "cobertura_anuncios": "parcial" if partial_ads else "completa",
             }
+            if scenario in {"meta_recuperacao", "meta_consulta_direta_falha"}:
+                from .meta_recovery import evaluate_meta_fixture
+
+                meta_result = evaluate_meta_fixture(scenario)
+                result["meta_recuperacao"] = meta_result
+                result["cobertura_anuncios"] = meta_result["cobertura"]
         elif stage == "publicacao":
             if scenario == "rede_temporaria" and task["tentativa"] == 1:
                 store.finish(task, "aguardando", error="REDE_SIMULADA")
@@ -59,6 +67,8 @@ def run_noturno(store, task, *, interrupt_after=None):
         saved[step] = result
         if interrupt_after == step:
             raise SystemExit(75)
+    # O checkpoint durável de Analytics governa a retomada, inclusive Meta.
+    partial_ads = saved[2]["cobertura_anuncios"] == "parcial"
     store.finish(
         task,
         "parcial" if partial_ads else "concluida",

@@ -20,6 +20,7 @@ py-modules = [
   "business_recompra",
   "meta_events",
   "meta_ads_native",
+  "meta_ads_recovery",
   "meta_ads_attribution",
   "meta_ads_client",
   "meta_ads_settings",

@@ -167,6 +167,36 @@ def test_noturno_preserva_progresso_e_bloqueia_publicacao_incerta(
         assert resumed["tentativa"] == 2
 
 
+@pytest.mark.parametrize(
+    "scenario,state,recovered",
+    [("meta_recuperacao", "concluida", 2),
+     ("meta_consulta_direta_falha", "parcial", 0)],
+)
+def test_noturno_meta_recuperacao_checkpoint_e_retomada(store, settings, scenario, state, recovered):
+    client = TestClient(create_app(settings))
+    headers = {"Authorization": f"Bearer {settings.tokens['FARMA']}"}
+    payload = dict(segmento="FARMA", origem="teste", chave=uuid4().hex, cenario=scenario)
+    response = client.post("/tarefas/noturno", json=payload, headers=headers)
+    assert response.status_code == 202
+    uid = response.json()["id"]
+    with pytest.raises(SystemExit):
+        run_once(store, interrupt_after=2)
+    item = store.get("FARMA", uid)
+    before = store.checkpoints(item)[2]
+    assert before["meta_recuperacao"]["recuperadas"] == recovered
+    expire(store, item)
+    assert run_once(store)
+    completed = store.get("FARMA", uid)
+    assert store.checkpoints(completed)[2] == before
+    result = client.get(f"/tarefas/{uid}/resultado", headers=headers).json()
+    assert result["estado"] == state
+    assert result["resultado"]["externas_gravacoes"] == 0
+    assert result["resultado"]["etapas"]["analytics"] == before
+    assert bool(result["resultado"]["pendencias"]) == (state == "parcial")
+    assert client.post("/tarefas/noturno", json=payload, headers=headers).json() == response.json()
+    assert not run_once(store)
+
+
 def test_migration_and_empty_rollback(store):
     assert store.ready()
     store.migrate()

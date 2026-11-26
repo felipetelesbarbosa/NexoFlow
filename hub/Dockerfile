@@ -10,6 +10,6 @@ RUN --mount=type=secret,id=proxy_ca \
 COPY --chown=10001:10001 hub/nexoflow_hub ./nexoflow_hub
 COPY --chown=10001:10001 hub/migrations ./migrations
 COPY --chown=10001:10001 app/order_history.py app/pedido_utils.py app/business_identity.py app/business_recompra.py app/ad_attribution.py app/urn_utils.py app/product_scope.py app/pet_catalog.py app/runtime_profile.py /opt/shared/
-COPY --chown=10001:10001 app/publication_receipt.py /opt/shared/
+COPY --chown=10001:10001 app/publication_receipt.py app/meta_ads_recovery.py app/meta_ads_destinations.py /opt/shared/
 USER 10001:10001
 CMD ["python", "-m", "uvicorn", "nexoflow_hub.api:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--no-access-log", "--no-server-header"]
