@@ -13,7 +13,9 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from .config import Settings
-from .contracts import SCENARIOS
+from .contracts import NOTURNO_SCENARIOS, SCENARIOS
+
+SCHEMA_VERSION = 6
 
 
 class Conflict(Exception):
@@ -40,7 +42,7 @@ class Store:
         connection.row_factory = dict_row
         return connection
 
-    def migrate(self, *, down=False, target=5):
+    def migrate(self, *, down=False, target=SCHEMA_VERSION):
         root = Path(__file__).resolve().parents[1] / "migrations"
         with self.connect() as db:
             db.execute("SELECT pg_advisory_xact_lock(812631)")
@@ -59,8 +61,8 @@ class Store:
             )
             if (
                 versions != list(range(1, len(versions) + 1))
-                or len(versions) > 5
-                or target not in range(1, 6)
+                or len(versions) > SCHEMA_VERSION
+                or target not in range(1, SCHEMA_VERSION + 1)
             ):
                 raise Conflict("SCHEMA_INCOMPATIVEL")
             if down:
@@ -72,15 +74,8 @@ class Store:
                 assert count is not None
                 if count["n"]:
                     raise Conflict("ROLLBACK_COM_DADOS_BLOQUEADO")
-                if 5 in versions:
-                    db.execute((root / "005_down.sql").read_bytes())
-                if 4 in versions:
-                    db.execute((root / "004_down.sql").read_bytes())
-                if 3 in versions:
-                    db.execute((root / "003_down.sql").read_bytes())
-                if 2 in versions:
-                    db.execute((root / "002_down.sql").read_bytes())
-                db.execute((root / "001_down.sql").read_bytes())
+                for version in reversed(versions):
+                    db.execute((root / f"{version:03d}_down.sql").read_bytes())
                 return
             for version in range(1, target + 1):
                 if version not in versions:
@@ -90,7 +85,7 @@ class Store:
         with self.connect() as db:
             return db.execute(
                 "SELECT versao FROM hub.migracoes ORDER BY versao"
-            ).fetchall() == [{"versao": version} for version in range(1, 6)]
+            ).fetchall() == [{"versao": version} for version in range(1, SCHEMA_VERSION + 1)]
 
     def signal_worker_cycle(self):
         with self.connect() as db:
@@ -100,16 +95,24 @@ class Store:
                    SET ciclo_em=greatest(hub.sinal_worker.ciclo_em, excluded.ciclo_em)"""
             )
 
-    def create(self, segment, origin, key, scenario, *, history=None):
-        if scenario not in SCENARIOS:
+    def create(self, segment, origin, key, scenario, *, history=None, noturno=False):
+        if scenario not in (NOTURNO_SCENARIOS if noturno else SCENARIOS):
             raise ValueError("CENARIO_NAO_HABILITADO")
+        request = {"cenario": scenario}
+        task_type = "avaliacao"
+        if history is not None:
+            from .history import validate_parameters
+
+            validate_parameters(segment, history)
+            request["historico"] = history
+            task_type = "historico"
+        if noturno:
+            if segment != "FARMA" or history is not None:
+                raise ValueError("NOTURNO_INCOMPATIVEL")
+            request["noturno"] = True
+            task_type = "noturno"
         digest = hashlib.sha256(
-            json.dumps(
-                {"cenario": scenario}
-                if history is None
-                else {"cenario": scenario, "historico": history},
-                sort_keys=True,
-            ).encode()
+            json.dumps(request, sort_keys=True).encode()
         ).hexdigest()
         with self.connect() as db:
             row = db.execute(
@@ -127,13 +130,10 @@ class Store:
                 if row["pedido_hash"] != digest:
                     raise Conflict("IDEMPOTENCIA_CONFLITANTE")
             else:
-                if history is not None:
-                    from .history import validate_parameters
-
-                    validate_parameters(segment, history)
+                if task_type != "avaliacao":
                     row = db.execute(
-                        "UPDATE hub.tarefas SET tipo='historico',parametros=%s WHERE id=%s RETURNING *",
-                        (Jsonb(history), row["id"]),
+                        "UPDATE hub.tarefas SET tipo=%s,parametros=%s WHERE id=%s RETURNING *",
+                        (task_type, Jsonb(history) if history is not None else None, row["id"]),
                     ).fetchone()
                     assert row is not None
                 self.audit(db, row, "CRIADA")
@@ -284,6 +284,7 @@ class Store:
             "REDE_SIMULADA",
             "AUTENTICACAO_SIMULADA",
             "RESPOSTA_INCERTA",
+            "FONTE_ESSENCIAL_INCOMPLETA",
             "FALHA_INTERNA",
             "TENTATIVAS_ESGOTADAS",
         }

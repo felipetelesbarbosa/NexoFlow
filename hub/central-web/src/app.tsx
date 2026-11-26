@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useId, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useId, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { ComponentType } from "react";
 import {
@@ -38,6 +38,7 @@ import {
   ativos,
   atencao,
   estados,
+  etapasNoturno,
   estadosWorker,
   horaLocal,
   janela,
@@ -464,7 +465,12 @@ function App() {
           </>}
         </main>
       </div>
-      {detail && <TaskDetail value={detail} close={() => setDetail(null)} />}
+      {detail && (
+        <TaskDetail
+          value={data?.tarefas.find((task) => task.id === detail.id) ?? detail}
+          close={() => setDetail(null)}
+        />
+      )}
     </div>
   );
 }
@@ -747,6 +753,7 @@ function Tasks({
                   onClick={() => onOpen(t)}
                   aria-label={"Detalhes da execução " + t.id}
                 >
+                  {t.tipo === "noturno" ? "Noturno · " : ""}
                   {t.id.slice(0, 8)}
                   <ChevronRight size={13} />
                 </button>
@@ -797,6 +804,21 @@ function TaskDetail({ value, close }: { value: Tarefa; close: () => void }) {
         <dt>Atualizada em · Belém</dt>
         <dd>{horaLocal(value.atualizado_em)}</dd>
       </dl>
+      {value.etapas && (
+        <section aria-label="Etapas do Noturno">
+          <h3>Etapas do Noturno</h3>
+          <dl>
+            {value.etapas.map(({ etapa, estado }) => (
+              <Fragment key={etapa}>
+                <dt>{etapasNoturno[etapa]}</dt>
+                <dd>
+                  <Status value={estado} />
+                </dd>
+              </Fragment>
+            ))}
+          </dl>
+        </section>
+      )}
     </dialog>
   );
 }

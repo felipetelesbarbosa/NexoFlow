@@ -44,7 +44,8 @@ class MemoryClient:
             return dict(state="SELADA")
         assert path == "/v1/confirmar"
         assert data["manifest"]["batches"] == self.receipts
-        return dict(state="READY")
+        return dict(state="READY", revision=data["revision"], version=2,
+                    manifest_hash=digest(data["manifest"]))
 
     def close(self):
         pass
@@ -574,3 +575,20 @@ def test_lost_seal_response_replays_same_manifest_before_confirming(monkeypatch)
     assert [path for path, _ in calls] == ["/v1/selar", "/v1/selar", "/v1/confirmar"]
     assert calls[0] == calls[1]
     assert calls[1][1]["manifest"] == calls[2][1]["manifest"]
+
+
+def test_ready_with_wrong_manifest_does_not_finish():
+    client = MemoryClient()
+    store = PostgresStore(client)
+    original_call = client.call
+
+    def call(path, data):
+        result = original_call(path, data)
+        if path == "/v1/confirmar":
+            result["manifest_hash"] = "0" * 64
+        return result
+
+    client.call = call
+    with pytest.raises(StorageError, match="DS_RECIBO_DIVERGENTE"):
+        store.finish(complete=True)
+    assert not store._finished

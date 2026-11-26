@@ -9,11 +9,20 @@ export const estados = {
 } as const;
 
 export type Estado = keyof typeof estados;
+export const etapasNoturno = {
+  atualizacao_weni: "Atualização Weni",
+  analytics: "Analytics",
+  publicacao: "Publicação PostgreSQL",
+  recompra: "Recompra",
+  analytics_final: "Analytics após Recompra",
+} as const;
 export type Tarefa = {
   id: string;
   estado: Estado;
   criado_em: string;
   atualizado_em: string;
+  tipo?: string;
+  etapas?: { etapa: keyof typeof etapasNoturno; estado: Estado }[];
 };
 export type Evento = { tipo: string; ocorrido_em: string; recebido_em: string };
 export type Segmento = "FARMA" | "PET";
@@ -120,7 +129,17 @@ export function lerResumo(x: unknown): Resumo {
         typeof t.estado === "string" &&
         Object.hasOwn(estados, t.estado) &&
         instante(t.criado_em) &&
-        instante(t.atualizado_em),
+        instante(t.atualizado_em) &&
+        (t.etapas === undefined ||
+          (Array.isArray(t.etapas) &&
+            t.etapas.every(
+              (stage: unknown) =>
+                registro(stage) &&
+                typeof stage.etapa === "string" &&
+                Object.hasOwn(etapasNoturno, stage.etapa) &&
+                typeof stage.estado === "string" &&
+                Object.hasOwn(estados, stage.estado),
+            ))),
     ) &&
     Array.isArray(x.eventos) &&
     x.eventos.every(

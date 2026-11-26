@@ -2,9 +2,9 @@ name: Homologar NexoFlow Hub Linux
 on:
   push:
     branches: [main]
-    paths: ['hub/**', 'app/business_*.py', 'app/order_history.py', 'app/pedido_utils.py', 'app/ad_attribution.py', 'app/product_scope.py', '.github/workflows/hub.yml']
+    paths: ['hub/**', 'app/business_*.py', 'app/order_history.py', 'app/pedido_utils.py', 'app/ad_attribution.py', 'app/product_scope.py', 'app/publication_receipt.py', '.github/workflows/hub.yml']
   pull_request:
-    paths: ['hub/**', 'app/business_*.py', 'app/order_history.py', 'app/pedido_utils.py', '.github/workflows/hub.yml']
+    paths: ['hub/**', 'app/business_*.py', 'app/order_history.py', 'app/pedido_utils.py', 'app/publication_receipt.py', '.github/workflows/hub.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -23,7 +23,7 @@ jobs:
         run: python -m pip --disable-pip-version-check install -r dependencias/requirements-dev.txt
       - name: Lint e tipos do Hub
         run: |
-          ruff check hub app/business_identity.py app/business_recompra.py
+          ruff check hub app/business_identity.py app/business_recompra.py app/publication_receipt.py
           pyright --project hub/pyrightconfig.json --pythonpath "$(which python)"
       - name: Auditar dependências
         run: pip-audit -r hub/requirements.lock -r hub/central-requirements.lock

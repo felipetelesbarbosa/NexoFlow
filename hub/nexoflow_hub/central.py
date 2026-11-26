@@ -21,6 +21,7 @@ from psycopg.rows import dict_row
 
 from . import __version__
 from .api_observability import read_consumption
+from .contracts import noturno_stages
 from .infrastructure import read_infrastructure
 
 SEGMENTS = {"FARMA", "PET"}
@@ -186,7 +187,7 @@ def read_cursor(dsn: str, segment: str):
 def read_summary(dsn: str, segment: str):
     with read_cursor(dsn, segment) as db:
         tasks = db.execute(
-            """SELECT id, estado, criado_em, atualizado_em FROM hub.central_tarefas
+            """SELECT id, estado, criado_em, atualizado_em, tipo, etapas_concluidas FROM hub.central_tarefas
                WHERE segmento=%s ORDER BY criado_em DESC, id DESC LIMIT 50""",
             (segment,),
         ).fetchall()
@@ -201,6 +202,10 @@ def read_summary(dsn: str, segment: str):
                       ultima_conclusao_em FROM hub.central_operacao WHERE segmento=%s""",
             (segment,),
         ).fetchone()
+    for task in tasks:
+        completed = task.pop("etapas_concluidas")
+        if completed is not None:
+            task["etapas"] = noturno_stages(completed, task["estado"])
     return {
         "segmento": segment,
         "ambiente": "homologacao",

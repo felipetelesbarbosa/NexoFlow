@@ -29,6 +29,7 @@ from ds_backend.contract import (
     table_contract,
 )
 from google_sheets import GoogleSheetsStore, UpsertResult
+from publication_receipt import ready_receipt_matches
 from task_progress import TaskProgress
 
 # Estas leituras acumuladas podem ocupar vários minutos no Analytics.
@@ -625,10 +626,9 @@ class PostgresStore(GoogleSheetsStore):
             receipt = status.get("receipt")
             if status.get("state") == "READY":
                 version = status.get("version")
-                if (type(version) is not int or version < 1 or not isinstance(receipt, dict)
-                        or receipt.get("state") != "READY" or receipt.get("revision") != self.revision
-                        or type(receipt.get("version")) is not int or receipt["version"] != version
-                        or receipt.get("manifest_hash") != digest(manifest)):
+                if type(version) is not int or not ready_receipt_matches(
+                    receipt, revision=self.revision, manifest_hash=digest(manifest), version=version
+                ):
                     raise StorageError("DS_RECIBO_DIVERGENTE")
                 logging.info("%s: publicação confirmada pelo recibo final da versão %d.", POSTGRES_LABEL, version)
                 return receipt
@@ -658,6 +658,10 @@ class PostgresStore(GoogleSheetsStore):
             result = self._read_final_receipt(manifest)
         if result.get("state") != "READY":
             raise StorageError("DS_REVISAO_NAO_CONFIRMADA")
+        if not ready_receipt_matches(
+            result, revision=self.revision, manifest_hash=digest(manifest)
+        ):
+            raise StorageError("DS_RECIBO_DIVERGENTE")
         logging.info("%s: revisão %s confirmada (READY).", POSTGRES_LABEL, self.revision)
         self._finished = True
         return result

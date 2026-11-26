@@ -51,7 +51,8 @@ class ClientMemory:
         if path == "/v1/confirmar":
             if data["manifest"]["batches"] != self.receipts:
                 raise AssertionError("recibos divergentes")
-            return {"state": "READY"}
+            return {"state": "READY", "revision": data["revision"], "version": 2,
+                    "manifest_hash": digest(data["manifest"])}
         return {}
 
     def close(self):

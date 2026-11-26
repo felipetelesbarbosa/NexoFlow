@@ -20,12 +20,12 @@ from order_history import MAX_HISTORY_PAGE_SIZE
 from . import __version__
 from .api_observability import authenticated_segment, observe
 from .config import Settings
-from .contracts import Scenario
+from .contracts import NoturnoScenario, NoturnoStage, Scenario, noturno_stages
 from .store import Conflict, Store
 from .weni_events import register_webhook
 
 
-class TaskRequest(BaseModel):
+class TaskSubmission(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     segmento: Literal["FARMA", "PET"]
     origem: Literal["manual", "n8n", "teste"] = "manual"
@@ -36,6 +36,9 @@ class TaskRequest(BaseModel):
         description="Chave da execução. Reutilize no reenvio da mesma solicitação.",
         examples=["ensaio-farma-001"],
     )
+
+
+class TaskRequest(TaskSubmission):
     cenario: Scenario = "normal"
 
 
@@ -51,6 +54,21 @@ class HistoryRequest(BaseModel):
     modo: Literal["historica", "incremental", "reconciliacao"] = "historica"
     reiniciar: bool = False
     quantidade_sintetica: int = Field(default=205, ge=0, le=1200)
+
+
+class NoturnoRequest(TaskSubmission):
+    cenario: NoturnoScenario = "normal"
+
+
+class NoturnoProgress(BaseModel):
+    etapa: NoturnoStage
+    estado: str
+
+
+class NoturnoStages(BaseModel):
+    estado: str
+    etapas: list[NoturnoProgress]
+    erro: str | None
 
 
 class TaskOutcome(BaseModel):
@@ -229,6 +247,25 @@ def create_app(settings: Settings | None = None):
             raise HTTPException(409, "IDEMPOTENCIA_CONFLITANTE") from None
 
     @app.post(
+        "/tarefas/noturno",
+        status_code=202,
+        tags=["Execuções"],
+        summary="Enfileirar o ensaio do Noturno FARMA",
+        description="O worker confirma as etapas sintéticas na ordem e preserva o progresso após interrupções.",
+        responses={202: {"model": TaskView}, **CREATE_ERRORS},
+    )
+    def noturno(body: NoturnoRequest, request: Request, segment=dependency):
+        request.state.api_body = {"origem": body.origem, "cenario": body.cenario}
+        if segment != "FARMA" or body.segmento != segment:
+            raise HTTPException(403, "SEGMENTO_NAO_AUTORIZADO")
+        try:
+            return public(
+                store.create(segment, body.origem, body.chave, body.cenario, noturno=True)
+            )
+        except Conflict:
+            raise HTTPException(409, "IDEMPOTENCIA_CONFLITANTE") from None
+
+    @app.post(
         "/tarefas/historico",
         status_code=202,
         tags=["Histórico"],
@@ -282,6 +319,22 @@ def create_app(settings: Settings | None = None):
     )
     def get(uid: UUID, segment=dependency):
         return public(lookup(uid, segment))
+
+    @app.get(
+        "/tarefas/{uid}/etapas",
+        tags=["Execuções"],
+        summary="Consultar etapas do ensaio do Noturno",
+        responses={200: {"model": NoturnoStages}, **LOOKUP_ERRORS},
+    )
+    def stages(uid: UUID, segment=dependency):
+        task = lookup(uid, segment)
+        if task["tipo"] != "noturno":
+            raise HTTPException(404, "TAREFA_NAO_ENCONTRADA")
+        return {
+            "estado": task["estado"],
+            "etapas": noturno_stages(store.checkpoints(task), task["estado"]),
+            "erro": task["erro"],
+        }
 
     @app.get(
         "/tarefas/{uid}/resultado",

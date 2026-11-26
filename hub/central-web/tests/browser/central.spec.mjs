@@ -27,6 +27,34 @@ const summary = {
   ],
 };
 
+test("Central mostra as etapas do Noturno e onde a execução parou", async ({ page }) => {
+  await page.route("**/api/central/v1/resumo", (route) =>
+    route.fulfill({ json: {
+      ...summary,
+      tarefas: [{
+        ...summary.tarefas[0],
+        tipo: "noturno",
+        estado: "revisao_necessaria",
+        etapas: [
+          { etapa: "atualizacao_weni", estado: "concluida" },
+          { etapa: "analytics", estado: "concluida" },
+          { etapa: "publicacao", estado: "revisao_necessaria" },
+          { etapa: "recompra", estado: "pendente" },
+        ],
+      }],
+    } }),
+  );
+  await page.goto("/");
+  await expect(page.getByText("Noturno · 6129c5f2")).toBeVisible();
+  await page.getByRole("button", { name: /Detalhes da execução/ }).click();
+  const stages = page.getByRole("region", { name: "Etapas do Noturno" });
+  await expect(stages).toBeVisible();
+  await expect(stages).toContainText("Publicação PostgreSQL");
+  await expect(stages).toContainText("Revisão necessária");
+  await expect(stages).toContainText("Recompra");
+  await expect(stages).toContainText("Pendente");
+});
+
 test("documentação abre o Swagger em outra aba no celular e no PC", async ({ page, context }) => {
   await page.setViewportSize({ width: 375, height: 800 });
   await context.route("**/swagger.html?*", async (route) => {

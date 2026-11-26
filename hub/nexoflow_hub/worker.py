@@ -34,6 +34,11 @@ def run_once(store: Store, *, interrupt_after=None):
 
             run_history(store, task, interrupt_after=interrupt_after)
             return True
+        if task.get("tipo") == "noturno":
+            from .noturno import run_noturno
+
+            run_noturno(store, task, interrupt_after=interrupt_after)
+            return True
         saved = store.checkpoints(task)
         for step in (1, 2):
             if step in saved:

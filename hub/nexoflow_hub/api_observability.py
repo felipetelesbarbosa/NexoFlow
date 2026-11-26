@@ -16,6 +16,8 @@ ROUTES = {
     ("GET", "/tarefas/{uid}"),
     ("GET", "/tarefas/{uid}/resultado"),
     ("GET", "/tarefas/{uid}/erros"),
+    ("POST", "/tarefas/noturno"),
+    ("GET", "/tarefas/{uid}/etapas"),
     ("POST", WENI_ROUTE),
 }
 ERROR_CODES = frozenset(

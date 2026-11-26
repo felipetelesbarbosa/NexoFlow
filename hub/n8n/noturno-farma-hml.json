@@ -1,0 +1,873 @@
+{
+  "name": "NexoFlow Hub — Noturno FARMA (homologação)",
+  "active": false,
+  "nodes": [
+    {
+      "id": "manual",
+      "name": "Iniciar ensaio manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "create",
+      "name": "Enfileirar Noturno FARMA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "url": "http://hub-api:8000/tarefas/noturno",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 10000
+        },
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { segmento: 'FARMA', origem: 'n8n', chave: 'noturno-farma-' + $now.setZone('America/Belem').toISODate(), cenario: 'normal' } }}"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURAR_FARMA",
+          "name": "Hub HML FARMA"
+        }
+      }
+    },
+    {
+      "id": "result",
+      "name": "Conferir resultado para a Central",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3100,
+        0
+      ],
+      "parameters": {
+        "url": "=http://hub-api:8000/tarefas/{{ $('Enfileirar Noturno FARMA').first().json.id }}/resultado",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURAR_FARMA",
+          "name": "Hub HML FARMA"
+        }
+      }
+    },
+    {
+      "id": "blocked",
+      "name": "Sinalizar etapa bloqueada",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        3100,
+        280
+      ],
+      "parameters": {
+        "errorMessage": "={{ 'Noturno FARMA: ' + ($json.erro || $json.estado) }}"
+      }
+    },
+    {
+      "id": "atualizacao_weni",
+      "name": "Atualização Weni",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        460,
+        0
+      ],
+      "parameters": {
+        "url": "=http://hub-api:8000/tarefas/{{ $('Enfileirar Noturno FARMA').first().json.id }}/etapas",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURAR_FARMA",
+          "name": "Hub HML FARMA"
+        }
+      }
+    },
+    {
+      "id": "atualizacao_weni_verificar",
+      "name": "Conferir · Atualização Weni",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        680,
+        0
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "atualizacao_weni_bloqueado",
+                    "leftValue": "={{ ['falhou', 'revisao_necessaria'].includes($json.estado) }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Bloqueada"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "atualizacao_weni_confirmado",
+                    "leftValue": "={{ $json.etapas.some(etapa => etapa.etapa === 'atualizacao_weni' && etapa.estado === 'concluida') }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Confirmada"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      }
+    },
+    {
+      "id": "atualizacao_weni_aguardar",
+      "name": "Aguardar · Atualização Weni",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        680,
+        240
+      ],
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "analytics",
+      "name": "Analytics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "url": "=http://hub-api:8000/tarefas/{{ $('Enfileirar Noturno FARMA').first().json.id }}/etapas",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURAR_FARMA",
+          "name": "Hub HML FARMA"
+        }
+      }
+    },
+    {
+      "id": "analytics_verificar",
+      "name": "Conferir · Analytics",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1180,
+        0
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "analytics_bloqueado",
+                    "leftValue": "={{ ['falhou', 'revisao_necessaria'].includes($json.estado) }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Bloqueada"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "analytics_confirmado",
+                    "leftValue": "={{ $json.etapas.some(etapa => etapa.etapa === 'analytics' && etapa.estado === 'concluida') }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Confirmada"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      }
+    },
+    {
+      "id": "analytics_aguardar",
+      "name": "Aguardar · Analytics",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1180,
+        240
+      ],
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "publicacao",
+      "name": "Publicação PostgreSQL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1460,
+        0
+      ],
+      "parameters": {
+        "url": "=http://hub-api:8000/tarefas/{{ $('Enfileirar Noturno FARMA').first().json.id }}/etapas",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURAR_FARMA",
+          "name": "Hub HML FARMA"
+        }
+      }
+    },
+    {
+      "id": "publicacao_verificar",
+      "name": "Conferir · Publicação PostgreSQL",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1680,
+        0
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "publicacao_bloqueado",
+                    "leftValue": "={{ ['falhou', 'revisao_necessaria'].includes($json.estado) }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Bloqueada"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "publicacao_confirmado",
+                    "leftValue": "={{ $json.etapas.some(etapa => etapa.etapa === 'publicacao' && etapa.estado === 'concluida') }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Confirmada"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      }
+    },
+    {
+      "id": "publicacao_aguardar",
+      "name": "Aguardar · Publicação PostgreSQL",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1680,
+        240
+      ],
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "recompra",
+      "name": "Recompra",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1960,
+        0
+      ],
+      "parameters": {
+        "url": "=http://hub-api:8000/tarefas/{{ $('Enfileirar Noturno FARMA').first().json.id }}/etapas",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURAR_FARMA",
+          "name": "Hub HML FARMA"
+        }
+      }
+    },
+    {
+      "id": "recompra_verificar",
+      "name": "Conferir · Recompra",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        2180,
+        0
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "recompra_bloqueado",
+                    "leftValue": "={{ ['falhou', 'revisao_necessaria'].includes($json.estado) }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Bloqueada"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "recompra_confirmado",
+                    "leftValue": "={{ $json.etapas.some(etapa => etapa.etapa === 'recompra' && etapa.estado === 'concluida') }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Confirmada"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      }
+    },
+    {
+      "id": "recompra_aguardar",
+      "name": "Aguardar · Recompra",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2180,
+        240
+      ],
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "analytics_final",
+      "name": "Analytics após Recompra",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2460,
+        0
+      ],
+      "parameters": {
+        "url": "=http://hub-api:8000/tarefas/{{ $('Enfileirar Noturno FARMA').first().json.id }}/etapas",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURAR_FARMA",
+          "name": "Hub HML FARMA"
+        }
+      }
+    },
+    {
+      "id": "analytics_final_verificar",
+      "name": "Conferir · Analytics após Recompra",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        2680,
+        0
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "analytics_final_bloqueado",
+                    "leftValue": "={{ ['falhou', 'revisao_necessaria'].includes($json.estado) }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Bloqueada"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "analytics_final_confirmado",
+                    "leftValue": "={{ $json.etapas.some(etapa => etapa.etapa === 'analytics_final' && etapa.estado === 'concluida') && ['concluida', 'parcial'].includes($json.estado) }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Confirmada"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      }
+    },
+    {
+      "id": "analytics_final_aguardar",
+      "name": "Aguardar · Analytics após Recompra",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2680,
+        240
+      ],
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      }
+    }
+  ],
+  "connections": {
+    "Iniciar ensaio manual": {
+      "main": [
+        [
+          {
+            "node": "Enfileirar Noturno FARMA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enfileirar Noturno FARMA": {
+      "main": [
+        [
+          {
+            "node": "Atualização Weni",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atualização Weni": {
+      "main": [
+        [
+          {
+            "node": "Conferir · Atualização Weni",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aguardar · Atualização Weni": {
+      "main": [
+        [
+          {
+            "node": "Atualização Weni",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conferir · Atualização Weni": {
+      "main": [
+        [
+          {
+            "node": "Sinalizar etapa bloqueada",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Analytics",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aguardar · Atualização Weni",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analytics": {
+      "main": [
+        [
+          {
+            "node": "Conferir · Analytics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aguardar · Analytics": {
+      "main": [
+        [
+          {
+            "node": "Analytics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conferir · Analytics": {
+      "main": [
+        [
+          {
+            "node": "Sinalizar etapa bloqueada",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Publicação PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aguardar · Analytics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publicação PostgreSQL": {
+      "main": [
+        [
+          {
+            "node": "Conferir · Publicação PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aguardar · Publicação PostgreSQL": {
+      "main": [
+        [
+          {
+            "node": "Publicação PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conferir · Publicação PostgreSQL": {
+      "main": [
+        [
+          {
+            "node": "Sinalizar etapa bloqueada",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Recompra",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aguardar · Publicação PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recompra": {
+      "main": [
+        [
+          {
+            "node": "Conferir · Recompra",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aguardar · Recompra": {
+      "main": [
+        [
+          {
+            "node": "Recompra",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conferir · Recompra": {
+      "main": [
+        [
+          {
+            "node": "Sinalizar etapa bloqueada",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Analytics após Recompra",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aguardar · Recompra",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analytics após Recompra": {
+      "main": [
+        [
+          {
+            "node": "Conferir · Analytics após Recompra",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aguardar · Analytics após Recompra": {
+      "main": [
+        [
+          {
+            "node": "Analytics após Recompra",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conferir · Analytics após Recompra": {
+      "main": [
+        [
+          {
+            "node": "Sinalizar etapa bloqueada",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Conferir resultado para a Central",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aguardar · Analytics após Recompra",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Belem",
+    "executionTimeout": 120,
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none"
+  }
+}

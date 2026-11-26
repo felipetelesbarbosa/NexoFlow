@@ -43,6 +43,16 @@ Estados: `pendente → executando → concluida/parcial/falhou/revisao_necessari
 
 Os JSON em `n8n/` ficam **inativos**, com trigger manual, credenciais referenciadas por placeholder e prazo de 120s para polling. Configure no n8n uma credencial Header Auth por segmento, sem inserir tokens no JSON. Eles usam `http://hub-api:8000`, acessível apenas depois de preparar uma rede interna de homologação. A mudança de rede de um n8n existente exige conferência operacional; não execute isso automaticamente. A importação/execução do motor n8n real na VPS continua para o Work; o contrato HTTP e a estrutura dos arquivos são testados aqui. n8n não valida pedidos nem calcula receita.
 
+### Noturno FARMA em homologação
+
+O [fluxo do Noturno FARMA](n8n/noturno-farma-hml.json) enfileira uma execução e mostra no canvas a Atualização Weni, o Analytics, a publicação PostgreSQL, a Recompra e o Analytics final. Cada bloco consulta a etapa gravada pelo worker. O nó final abre o resultado da mesma execução. Na Central, abra **Execuções** e selecione **Noturno** para conferir os estados por etapa. A migração **006** acrescenta essa leitura ao banco operacional da homologação.
+
+Importe o JSON no n8n de homologação e vincule a credencial privada **Hub HML FARMA**. O modo inicial é manual. A chave padrão usa a data de Belém e reutiliza a execução em disparos repetidos no mesmo dia. Para um ensaio independente, ajuste a chave em **Enfileirar Noturno FARMA**. O intervalo de espera e o prazo total podem ser editados no canvas. O Hub mantém a sequência e os checkpoints caso a janela de acompanhamento do n8n termine.
+
+O resultado identifica as fontes e os recibos como sintéticos. Com `cenario: 'dados_incompletos'`, a publicação e a Recompra simuladas terminam e a pendência de anúncios é registrada para a próxima carga. Com `resposta_incerta`, o worker encerra em revisão necessária na publicação. Com `fonte_essencial_incompleta`, encerra antes da publicação. Use chaves diferentes para comparar esses ensaios e confirme os estados no n8n e na Central antes de configurar o agendamento.
+
+Para interromper a homologação, desative o workflow e preserve os checkpoints. A migração 006 mantém os dados anteriores. Se precisar voltar a um binário que exige o schema 005, use um backup restaurado em banco isolado para testar a reversão. O comando de reversão de schema vazio recusa bancos com execuções.
+
 ## Executar em Linux
 
 Python 3.12+, Docker/Compose. Dependências completas e transitivas estão fixadas em `requirements.lock`; ferramentas de teste em `requirements-dev.lock`. Não atualizar pip ou pacotes automaticamente. O módulo usa também as funções puras do diretório `app` do mesmo commit; não há suporte a um wheel Hub isolado nem dependência do Setup Windows.
