@@ -2,8 +2,9 @@
 
 import unittest
 
-from meta_ads_recovery import MetaReadError
 from nexoflow_hub.meta_recovery import DAYS, FixtureMetaRead, run_meta_recovery
+
+from meta_ads_recovery import MetaReadError
 
 
 class MetaRecoveryTests(unittest.TestCase):
@@ -14,7 +15,7 @@ class MetaRecoveryTests(unittest.TestCase):
         self.assertEqual((result["linhas_omitidas"], result["recuperadas"]), (2, 2))
         self.assertEqual(result["cobertura"], "completa")
         self.assertEqual(result["pendencias"], [])
-        for row, day, spend in zip(result["linhas"], DAYS, ("10.00", "12.50")):
+        for row, day, spend in zip(result["linhas"], DAYS, ("10.00", "12.50"), strict=True):
             self.assertEqual((row["data"], row["origem"]), (day, "consulta_direta"))
             self.assertEqual(row["conversas_iniciadas_meta"], "1.00")
             self.assertEqual(row["investimento_original"], spend)
