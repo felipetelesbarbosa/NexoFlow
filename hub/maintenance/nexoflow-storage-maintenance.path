@@ -1,0 +1,10 @@
+[Unit]
+Description=NexoFlow - solicitações locais de manutenção
+After=docker.service
+
+[Path]
+PathExists=/srv/nexoflow/manutencao/limpeza/requests/request.json
+Unit=nexoflow-storage-maintenance.service
+
+[Install]
+WantedBy=multi-user.target
