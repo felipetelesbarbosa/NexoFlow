@@ -17,3 +17,8 @@ uvicorn==0.54.0
 certifi==2026.10.23
 httpcore==1.0.9
 httpx==0.28.1
+
+# Transporte compartilhado de leitura HTTP, usado no aceite real FARMA.
+requests==2.34.2
+charset-normalizer==3.4.7
+urllib3==2.7.0
