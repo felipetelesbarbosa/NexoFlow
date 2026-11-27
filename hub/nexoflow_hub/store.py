@@ -270,6 +270,23 @@ class Store:
                 (self.settings.lease_seconds, task["segmento"], task["dono"]),
             )
 
+    def renew_lease(self, task):
+        """Renovação apenas pelo proprietário vigente, também durante leitura HTTP."""
+        with self.connect() as db:
+            self.fenced(db, task)
+            guard = db.execute(
+                "UPDATE hub.coordenacao SET lease_ate=clock_timestamp()+%s*interval '1 second' "
+                "WHERE segmento=%s AND dono=%s AND tarefa_id=%s AND lease_ate>clock_timestamp()",
+                (self.settings.lease_seconds, task["segmento"], task["dono"], task["id"]),
+            )
+            if guard.rowcount != 1:
+                raise LostLease("LEASE_PERDIDO")
+            db.execute(
+                "UPDATE hub.tarefas SET lease_ate=clock_timestamp()+%s*interval '1 second',"
+                "atualizada_em=clock_timestamp() WHERE id=%s AND dono=%s",
+                (self.settings.lease_seconds, task["id"], task["dono"]),
+            )
+
     def finish(self, task, state, *, result=None, error=None):
         if state not in {
             "concluida",

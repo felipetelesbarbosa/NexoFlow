@@ -590,3 +590,43 @@ def test_falha_no_log_nao_muda_a_resposta_da_api(store, monkeypatch, caplog):
     assert response.status_code == 200
     assert "TELEMETRIA_API_INDISPONIVEL" in caplog.text
     assert "NAO_EXIBIR_ERRO_BRUTO" not in caplog.text
+
+
+def test_real_read_amostral_via_api_and_central(store, settings, monkeypatch):
+    from nexoflow_hub.central import read_summary
+
+    monkeypatch.setattr(
+        "nexoflow_hub.real_read_probe.collect_sources",
+        lambda: {
+            "meta": {"estado": "amostra_validada", "recuperacao": {"recuperadas": 2}},
+            "weni": {"estado": "amostra_validada"},
+            "farmalider": {"estado": "pendente", "motivo": "CREDENCIAL_NAO_PROVISIONADA"},
+        },
+    )
+    client = TestClient(create_app(settings))
+    farma = {"Authorization": f"Bearer {settings.tokens['FARMA']}"}
+    pet = {"Authorization": f"Bearer {settings.tokens['PET']}"}
+    payload = {
+        "segmento": "FARMA", "origem": "n8n", "chave": "leitura-real-ensaio",
+        "cenario": "leitura_real_amostral",
+    }
+    accepted = client.post("/tarefas/noturno", headers=farma, json=payload)
+    assert accepted.status_code == 202
+    uid = accepted.json()["id"]
+    assert client.post("/tarefas/noturno", headers=pet, json=payload).status_code == 403
+    assert run_once(store)
+    result = client.get(f"/tarefas/{uid}/resultado", headers=farma).json()
+    assert result["estado"] == "revisao_necessaria"
+    assert result["resultado"]["fontes"]["meta"]["recuperacao"]["recuperadas"] == 2
+    assert result["resultado"]["fontes"]["farmalider"]["estado"] == "pendente"
+    assert result["resultado"]["externas_gravacoes"] == 0
+    assert result["resultado"]["publicacoes"] == 0
+    assert not store.checkpoints(store.get("FARMA", uid))
+    task = read_summary(settings.dsn, "FARMA")["tarefas"][0]
+    assert str(task["id"]) == uid
+    assert task["estado"] == "revisao_necessaria"
+    assert task["etapas"][0]["estado"] == "revisao_necessaria"
+    assert "FONTE_ESSENCIAL_INCOMPLETA" in task["motivos"]
+    assert read_summary(settings.dsn, "PET")["tarefas"] == []
+    assert client.post("/tarefas/noturno", headers=farma, json=payload).json()["id"] == uid
+    assert not run_once(store)
