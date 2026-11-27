@@ -1713,8 +1713,12 @@ def apply_review(
     audit_path=AUDIT,
     purchase_checks_path=None,
     pending_report_path=None,
+    read_structure=None,
+    resolve_checked_contact=None,
 ):
     """Somente snapshots revisados; conflito ou confirmação incerta bloqueia inclusão."""
+    read_structure = read_structure or inspect_structure
+    resolve_checked_contact = resolve_checked_contact or _resolve_checked_contact
     profile = profile_for(review.get("structure", {}).get("segment", "FARMA"))
     if profile.segment == "PET" and (
         Path(state_path) == Path("logs/recompra_state.json")
@@ -1731,9 +1735,9 @@ def apply_review(
     now = now_fn()
     ensure_review_current(review, now)
     structure = (
-        inspect_structure(weni)
+        read_structure(weni)
         if profile.segment == "FARMA"
-        else inspect_structure(weni, segment=profile.segment)
+        else read_structure(weni, segment=profile.segment)
     )
     ensure_review_current(review, now_fn())
     if structure["errors"]:
@@ -1875,7 +1879,7 @@ def apply_review(
                 order, items = None, []
             else:
                 try:
-                    order, items = _resolve_checked_contact(
+                    order, items = resolve_checked_contact(
                         current, reads, now_fn().isoformat(), saved
                     )
                 except (FarmaliderAuthError, FarmaliderUnavailableError):

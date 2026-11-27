@@ -1,0 +1,38 @@
+# Exclusivo à homologação FARMA: nenhum destino comercial e nenhuma porta pública.
+services:
+  worker:
+    environment:
+      HUB_NOTURNO_TEST_DSN_FILE: /run/secrets/noturno_test_dsn
+      HUB_NOTURNO_TEST_STATE_DIR: /var/lib/nexoflow-noturno-teste
+      NEXOFLOW_PERFIL: FARMA
+    secrets:
+      - noturno_test_dsn
+    volumes:
+      - noturno_test_state:/var/lib/nexoflow-noturno-teste
+    networks: [interna, noturno_teste]
+    mem_limit: 512m
+  noturno-pg-teste:
+    image: postgres:18.6@sha256:e3d24f6906d0760bf4da0dae872415391ededefad23fd471c47dc53b0ddf3c42
+    environment:
+      POSTGRES_DB: nexoflow_datastudio_homologacao
+      POSTGRES_USER: noturno_teste
+      POSTGRES_PASSWORD_FILE: /run/secrets/noturno_test_password
+    command: [postgres, -c, nexoflow.test_instance=isolated_synthetic_only]
+    secrets: [noturno_test_password]
+    volumes:
+      - noturno_test_pg:/var/lib/postgresql
+    networks: [noturno_teste]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U noturno_teste -d nexoflow_datastudio_homologacao']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    mem_limit: 256m
+networks:
+  noturno_teste: {internal: true}
+volumes:
+  noturno_test_state:
+  noturno_test_pg:
+secrets:
+  noturno_test_dsn: {file: '${HUB_SEGREDOS_DIR}/noturno_test_dsn'}
+  noturno_test_password: {file: '${HUB_SEGREDOS_DIR}/noturno_test_password'}

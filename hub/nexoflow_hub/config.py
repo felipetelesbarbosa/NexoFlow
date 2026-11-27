@@ -19,6 +19,8 @@ class Settings:
     max_attempts: int = 3
     weni_farma_token: str | None = field(default=None, repr=False)
 
+    noturno_test_dsn: str | None = field(default=None, repr=False)
+
     def __post_init__(self):
         try:
             info = conninfo_to_dict(self.dsn)
@@ -58,5 +60,10 @@ class Settings:
             },
             weni_farma_token=Path(token_file).read_text().strip()
             if token_file
+            else None,
+            noturno_test_dsn=Path(os.environ["HUB_NOTURNO_TEST_DSN_FILE"])
+            .read_text()
+            .strip()
+            if os.getenv("HUB_NOTURNO_TEST_DSN_FILE")
             else None,
         )

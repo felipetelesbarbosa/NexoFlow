@@ -43,6 +43,7 @@ import {
   atencao,
   estados,
   etapasNoturno,
+  motivosNoturno,
   estadosWorker,
   horaLocal,
   janela,
@@ -874,6 +875,12 @@ function TaskDetail({ value, close }: { value: Tarefa; close: () => void }) {
         <dt>Atualizada em · Belém</dt>
         <dd>{horaLocal(value.atualizado_em)}</dd>
       </dl>
+      {value.motivos && value.motivos.length > 0 && (
+        <section aria-label="Motivos de atenção">
+          <h3>Motivos de atenção</h3>
+          <ul>{value.motivos.map((motivo) => <li key={motivo}>{motivosNoturno[motivo]}</li>)}</ul>
+        </section>
+      )}
       {value.etapas && (
         <section aria-label="Etapas do Noturno">
           <h3>Etapas do Noturno</h3>

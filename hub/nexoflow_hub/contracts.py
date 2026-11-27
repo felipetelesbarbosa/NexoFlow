@@ -28,6 +28,7 @@ NoturnoScenario = Literal[
     "fonte_essencial_incompleta",
     "meta_recuperacao",
     "meta_consulta_direta_falha",
+    "reserva_isolada", "reserva_anuncios_incompletos", "recompra_resposta_perdida",
 ]
 NOTURNO_SCENARIOS = frozenset(get_args(NoturnoScenario))
 NoturnoStage = Literal[

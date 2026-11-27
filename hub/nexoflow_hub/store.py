@@ -15,7 +15,7 @@ from psycopg.types.json import Jsonb
 from .config import Settings
 from .contracts import NOTURNO_SCENARIOS, SCENARIOS
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 
 class Conflict(Exception):

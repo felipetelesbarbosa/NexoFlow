@@ -327,7 +327,7 @@ def read_cursor(dsn: str, segment: str):
 def read_summary(dsn: str, segment: str):
     with read_cursor(dsn, segment) as db:
         tasks = db.execute(
-            """SELECT id, estado, criado_em, atualizado_em, etapas_concluidas FROM hub.central_tarefas
+            """SELECT id, estado, criado_em, atualizado_em, etapas_concluidas, motivos FROM hub.central_tarefas
                WHERE segmento=%s ORDER BY criado_em DESC, id DESC LIMIT 50""",
             (segment,),
         ).fetchall()
@@ -344,6 +344,8 @@ def read_summary(dsn: str, segment: str):
         ).fetchone()
     for task in tasks:
         completed = task.pop("etapas_concluidas")
+        if task["motivos"] is None:
+            task.pop("motivos")
         if completed is not None:
             task["tipo"] = "noturno"
             task["etapas"] = noturno_stages(completed, task["estado"])

@@ -16,12 +16,19 @@ export const etapasNoturno = {
   recompra: "Recompra",
   analytics_final: "Analytics após Recompra",
 } as const;
+export const motivosNoturno = {
+  RESERVA_FARMA: "Reserva FARMA: retirada do grupo Opt-Out LGPD adiada para a próxima carga.",
+  COBERTURA_PARCIAL: "Anúncios: cobertura incompleta; verificar na próxima carga.",
+  RESPOSTA_INCERTA: "Publicação sem confirmação: conferir a revisão e o recibo antes de repetir.",
+  FONTE_ESSENCIAL_INCOMPLETA: "Fonte essencial incompleta: conferir a cobertura antes de publicar.",
+} as const;
 export type Tarefa = {
   id: string;
   estado: Estado;
   criado_em: string;
   atualizado_em: string;
   tipo?: string;
+  motivos?: (keyof typeof motivosNoturno)[];
   etapas?: { etapa: keyof typeof etapasNoturno; estado: Estado }[];
 };
 export type Evento = { tipo: string; ocorrido_em: string; recebido_em: string };
@@ -138,6 +145,7 @@ export function lerResumo(x: unknown): Resumo {
         Object.hasOwn(estados, t.estado) &&
         instante(t.criado_em) &&
         instante(t.atualizado_em) &&
+        (t.motivos === undefined || (Array.isArray(t.motivos) && t.motivos.every((m: unknown) => typeof m === "string" && Object.hasOwn(motivosNoturno, m)))) &&
         (t.etapas === undefined ||
           (Array.isArray(t.etapas) &&
             t.etapas.every(
