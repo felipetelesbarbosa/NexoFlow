@@ -214,7 +214,7 @@ export function Metricas() {
     <div className="metricas">
       <header className="metricas-heading">
         <div>
-          <p className="metricas-kicker">NexoFlow Métricas <span>FARMA</span></p>
+          <p className="metricas-kicker"><span className="metricas-print-name">NexoFlow Métricas</span><span>FARMA</span></p>
           <h1>Vendas</h1>
           <p>Homologação · Dados reais do Data Studio</p>
         </div>

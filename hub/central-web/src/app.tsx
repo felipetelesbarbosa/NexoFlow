@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import type { ComponentType } from "react";
 import {
   Activity,
+  ArrowLeft,
   ArrowDownWideNarrow,
   ArrowRight,
   BookOpen,
@@ -15,6 +16,7 @@ import {
   CircleAlert,
   CircleCheck,
   Clock3,
+  ExternalLink,
   FlaskConical,
   Inbox,
   Layers,
@@ -216,6 +218,11 @@ function App() {
   }, []);
   const needsSummary = page !== "documentacao" && page !== "conta" && page !== "usuarios" && page !== "convite" && page !== "metricas";
   useEffect(() => {
+    document.title = page === "metricas"
+      ? "Vendas · NexoFlow Métricas"
+      : "Central de Operações · NexoFlow Hub";
+  }, [page]);
+  useEffect(() => {
     if (!needsSummary) return;
     const stop = new AbortController();
     let active = true;
@@ -258,18 +265,62 @@ function App() {
   const data = resumo && fetched ? janela(resumo, dias, fetched) : null;
   const view = pages[page];
   if (page === "convite") return <AceitarConvite />;
+  const skip = (
+    <a
+      className="skip"
+      href="#conteudo"
+      onClick={(e) => {
+        e.preventDefault();
+        main.current?.focus();
+      }}
+    >
+      Ir para o conteúdo
+    </a>
+  );
+  const themeToggle = (
+    <button
+      className="plain theme-toggle"
+      aria-label="Tema escuro"
+      aria-pressed={dark}
+      title={dark ? "Usar tema claro" : "Usar tema grafite"}
+      onClick={toggleTheme}
+    >
+      {dark ? <Sun size={18} /> : <Moon size={18} />}
+    </button>
+  );
+  if (page === "metricas") {
+    return (
+      <div className="metricas-page">
+        {skip}
+        <header className="metricas-topbar">
+          <div className="metricas-topbar-content">
+            <div className="metricas-brand">
+              <img src="/nexoflow.ico" alt="" width="28" height="28" />
+              <strong>NexoFlow Métricas</strong>
+            </div>
+            <div className="metricas-topbar-actions">
+              <a href="/#geral" className="metricas-back">
+                <ArrowLeft size={16} aria-hidden="true" /> Voltar à Central
+              </a>
+              {themeToggle}
+            </div>
+          </div>
+          {metricsAccess && (
+            <nav className="metricas-pages" aria-label="Páginas do NexoFlow Métricas">
+              <a href="/#metricas" aria-current="page">Vendas</a>
+            </nav>
+          )}
+        </header>
+        <main id="conteudo" tabIndex={-1} ref={main}>
+          {metricsAccess ? <Metricas /> : <p role="status">{metricsAccess === null
+            ? "Consultando acesso ao Métricas…" : "NexoFlow Métricas indisponível para esta conta."}</p>}
+        </main>
+      </div>
+    );
+  }
   return (
     <div className={`shell ${compact ? "compact" : ""}`}>
-      <a
-        className="skip"
-        href="#conteudo"
-        onClick={(e) => {
-          e.preventDefault();
-          main.current?.focus();
-        }}
-      >
-        Ir para o conteúdo
-      </a>
+      {skip}
       <aside id="navegacao" className={`sidebar ${menu ? "opened" : ""}`}>
         <div className="brand">
           <img src="/nexoflow.ico" alt="" width="36" height="36" />
@@ -312,10 +363,11 @@ function App() {
           })}
           <div className="navlabel products">Produtos</div>
           {metricsAccess ? (
-            <a href="#metricas" className={page === "metricas" ? "current" : ""}
-              aria-current={page === "metricas" ? "page" : undefined}
-              aria-label="NexoFlow Métricas" title="NexoFlow Métricas">
+            <a href="/#metricas" target="_blank" rel="noopener noreferrer"
+              aria-label="NexoFlow Métricas" aria-description="Abre em nova aba"
+              title="Abrir NexoFlow Métricas em nova aba">
               <ChartNoAxesColumn size={19} /><span>NexoFlow Métricas</span>
+              <ExternalLink className="end" size={13} aria-hidden="true" />
             </a>
           ) : <button
             className="disabled-product"
@@ -330,7 +382,7 @@ function App() {
         <div className="aside-bottom">
           <span className="homolog">
             <FlaskConical size={16} />
-            <span>{page === "metricas" ? "Homologação" : ambientes[request.ambiente]}</span>
+            <span>{ambientes[request.ambiente]}</span>
           </span>
           <button
             className="collapse plain"
@@ -371,7 +423,7 @@ function App() {
           <ChevronRight size={14} />
           <strong>{view.nome}</strong>
           <div className="header-right">
-            {page !== "metricas" && <select
+            <select
               className="segment-picker environment-picker"
               aria-label="Ambiente da Central"
               value={request.ambiente}
@@ -387,8 +439,8 @@ function App() {
               <option value="producao" disabled={!disponiveis.includes("producao")}>
                 {disponiveis.includes("producao") ? "Produção" : "Produção indisponível"}
               </option>
-            </select>}
-            {page !== "metricas" && page !== "infraestrutura" && page !== "documentacao" && page !== "conta" && page !== "usuarios" && <>
+            </select>
+            {page !== "infraestrutura" && page !== "documentacao" && page !== "conta" && page !== "usuarios" && <>
             <Layers size={15} />
             <span>Segmento</span>
             {scopes.length > 1 ? (
@@ -418,22 +470,11 @@ function App() {
               </strong>
             )}
             </>}
-            <button
-              className="plain theme-toggle"
-              aria-label="Tema escuro"
-              aria-pressed={dark}
-              title={dark ? "Usar tema claro" : "Usar tema grafite"}
-              onClick={toggleTheme}
-            >
-              {dark ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
+            {themeToggle}
           </div>
         </header>
         <main id="conteudo" tabIndex={-1} ref={main}>
-          {page === "metricas" ? (
-            metricsAccess ? <Metricas /> : <p role="status">{metricsAccess === null
-              ? "Consultando acesso ao Métricas…" : "NexoFlow Métricas indisponível para esta conta."}</p>
-          ) : page === "usuarios" ? (isAdmin ? <GerenciarUsuarios /> : <p>Área exclusiva do Super Admin.</p>) : page === "conta" ? <MinhaConta /> : page === "documentacao" ? <Documentation /> : page === "infraestrutura" ? <Infrastructure /> : page === "consumo" ? (
+          {page === "usuarios" ? (isAdmin ? <GerenciarUsuarios /> : <p>Área exclusiva do Super Admin.</p>) : page === "conta" ? <MinhaConta /> : page === "documentacao" ? <Documentation /> : page === "infraestrutura" ? <Infrastructure /> : page === "consumo" ? (
             <ApiConsumption key={request.ambiente + ":" + (request.segmento ?? "inicial")} ambiente={request.ambiente} segment={request.segmento} />
           ) : <>
           <div className="title-row">

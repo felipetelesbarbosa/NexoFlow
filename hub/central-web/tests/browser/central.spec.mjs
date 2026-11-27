@@ -523,12 +523,13 @@ test("só o Super Admin vê o cadastro de convites e o atalho para autorização
   await expect(link).toHaveCount(0);
 });
 
-test("Vendas FARMA mostra KPIs, gráficos, filtros e layout para PDF no celular", async ({ page }) => {
-  await page.setViewportSize({ width: 320, height: 740 });
-  await page.route("**/api/central/v1/sessao", (route) => route.fulfill({
+test("Vendas FARMA abre em outra aba, mostra os indicadores e imprime no celular", async ({ page: central, context }) => {
+  await central.setViewportSize({ width: 320, height: 740 });
+  await context.route("**/api/central/v1/sessao", (route) => route.fulfill({
     json: { ambientes: ["homologacao"], metricas_farma: true },
   }));
-  await page.route("**/api/central/v1/metricas/vendas?*", (route) => {
+  await context.route("**/api/central/v1/resumo", (route) => route.fulfill({ json: summary }));
+  await context.route("**/api/central/v1/metricas/vendas?*", (route) => {
     const params = new URL(route.request().url()).searchParams;
     const inicio = params.get("inicio"), fim = params.get("fim");
     const empty = inicio === "2025-01-01";
@@ -544,7 +545,22 @@ test("Vendas FARMA mostra KPIs, gráficos, filtros e layout para PDF no celular"
       totais: totals, dias: empty ? [] : [{ data: inicio, ...totals }],
     } });
   });
-  await page.goto("/#metricas");
+  await central.goto("/#geral");
+  await central.getByRole("button", { name: "Tema escuro" }).click();
+  await central.getByRole("button", { name: "Abrir menu" }).click();
+  const [page] = await Promise.all([
+    central.waitForEvent("popup", { timeout: 5000 }),
+    central.getByRole("link", { name: "NexoFlow Métricas", exact: true }).click(),
+  ]);
+  await page.setViewportSize({ width: 320, height: 740 });
+  await expect(central).toHaveURL(/#geral$/);
+  await expect(page).toHaveURL(/#metricas$/);
+  await expect(page).toHaveTitle("Vendas · NexoFlow Métricas");
+  await expect(page.locator("html")).toHaveAttribute("data-tema", "grafite");
+  await expect(page.getByRole("navigation", { name: "Navegação principal" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Vendas" })).toHaveAttribute("aria-current", "page");
+  const back = page.getByRole("link", { name: "Voltar à Central" });
+  await expect(back).toBeVisible();
   const kpis = page.getByRole("region", { name: "Indicadores de vendas" });
   await expect(kpis).toContainText("104,50");
   await expect(page.getByText("Revisão publicada v61")).toBeVisible();
@@ -558,6 +574,8 @@ test("Vendas FARMA mostra KPIs, gráficos, filtros e layout para PDF no celular"
   await page.emulateMedia({ media: "print" });
   await expect(page.getByRole("button", { name: "Aplicar período" })).toBeHidden();
   await expect(page.getByRole("navigation")).toBeHidden();
+  await expect(back).toBeHidden();
+  await expect(page.locator(".metricas-print-name")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Vendas por dia" })).toBeVisible();
   const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
   expect(pdf.toString("utf8", 0, 5)).toBe("%PDF-");
@@ -572,6 +590,9 @@ test("Vendas FARMA mostra KPIs, gráficos, filtros e layout para PDF no celular"
   await page.getByRole("button", { name: "Aplicar período" }).click();
   await expect(page.getByText("Sem vendas registradas na revisão para este período.")).toBeVisible();
   await expect(kpis).toContainText("0,00");
+  await back.click();
+  await expect(page).toHaveURL(/#geral$/);
+  await expect(page.getByRole("heading", { name: "Visão geral" })).toBeVisible();
 });
 
 test("Vendas FARMA não consulta dados quando a sessão não tem permissão", async ({ page }) => {
