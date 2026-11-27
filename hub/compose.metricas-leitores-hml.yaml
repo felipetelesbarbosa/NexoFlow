@@ -1,0 +1,9 @@
+# Complemento opcional sobre compose.metricas-hml.yaml.
+services:
+  central-api:
+    environment:
+      CENTRAL_METRICAS_LEITORES_FILE: /run/secrets/central_metricas_leitores.json
+    secrets:
+      - central_metricas_leitores.json
+secrets:
+  central_metricas_leitores.json: {file: '${HUB_SEGREDOS_DIR:?diretório privado obrigatório}/central_metricas_leitores.json'}

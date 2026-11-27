@@ -736,3 +736,74 @@ def test_metrics_pilot_requires_owner_farma_and_pinned_read(
     assert len(calls) == 1
     with pytest.raises(ValueError, match="DESTINO_METRICAS_FARMA_INVALIDO"):
         replace(settings, metrics_dsn=config.dsn)
+
+
+def test_metrics_reader_requires_active_farma_invite_and_cannot_manage_users(
+    setup, signing_key, tmp_path, monkeypatch
+):
+    from dataclasses import replace
+    from uuid import UUID
+
+    config, _ = setup
+    readers = tmp_path / "leitores.json"
+    readers.write_text('{"convidado-f": true, "operador-p": true}')
+    settings = replace(
+        config,
+        profiles_db=tmp_path / "perfis.sqlite3",
+        super_admin="operador-f",
+        metrics_dsn="dbname=nexoflow_datastudio user=nf_metricas_farma_leitor",
+        metrics_readers_file=readers,
+    )
+    client = TestClient(central.create_app(settings))
+    prefix = "/api/central/v1"
+    route = prefix + "/metricas/vendas"
+    query = {"inicio": "2026-11-01", "fim": "2026-11-03"}
+    origin = {
+        "X-Central-Host": central.PRODUCTION_HOST,
+        "Origin": "https://" + central.PRODUCTION_HOST,
+    }
+    manager = origin | assertion(token(signing_key))
+    invited = origin | assertion(
+        token(signing_key, sub="convidado-f", email="leitor@example.invalid")
+    )
+    pet = assertion(token(signing_key, sub="operador-p"))
+
+    def read(_dsn, start, end, _revision):
+        return central.metricas.SalesReport(
+            revisao=UUID(int=5),
+            versao=14,
+            inicio=start,
+            fim=end,
+            totais=central.metricas.SalesTotals(),
+            dias=[],
+        )
+
+    monkeypatch.setattr(central.metricas, "read_sales", read)
+    assert client.get(route, params=query, headers=invited).status_code == 403
+    assert client.get(route, params=query, headers=pet).status_code == 403
+
+    request = {"email": "leitor@example.invalid", "segmentos": ["FARMA"]}
+    invite = client.post(prefix + "/convites", headers=manager, json=request)
+    assert invite.status_code == 201
+    accepted = client.post(
+        prefix + "/convites/aceitar", headers=invited,
+        json={"codigo": invite.json()["codigo"]},
+    )
+    assert accepted.status_code == 204
+    assert client.get(prefix + "/sessao", headers=invited).json() == {
+        "ambientes": ["homologacao"], "metricas_farma": True, "gerencia_usuarios": False,
+    }
+    assert client.get(route, params=query, headers=invited).status_code == 200
+    assert client.get(prefix + "/usuarios", headers=invited).status_code == 403
+    assert client.post(prefix + "/convites", headers=invited, json=request).status_code == 403
+
+    readers.write_text("{}")
+    assert client.get(route, params=query, headers=invited).status_code == 403
+    assert client.get(prefix + "/minha-conta", headers=invited).status_code == 200
+
+    readers.write_text('{"convidado-f": true}')
+    revoked = client.post(
+        prefix + "/usuarios/revogar", headers=manager, json={"id": "convidado-f"},
+    )
+    assert revoked.status_code == 204
+    assert client.get(route, params=query, headers=invited).status_code == 403

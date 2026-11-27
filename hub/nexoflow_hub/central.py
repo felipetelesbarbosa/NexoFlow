@@ -121,6 +121,7 @@ class CentralSettings:
     production: ProductionReader | None = None
     super_admin: str | None = field(default=None, repr=False)
     metrics_dsn: str | None = field(default=None, repr=False)
+    metrics_readers_file: Path | None = None
 
     def __post_init__(self):
         if not re.fullmatch(
@@ -180,6 +181,7 @@ class CentralSettings:
             Path(metrics_file).read_text(encoding="utf-8").strip()
             if (metrics_file := os.getenv("CENTRAL_METRICAS_DSN_FILE"))
             else None,
+            Path(readers) if (readers := os.getenv("CENTRAL_METRICAS_LEITORES_FILE")) else None,
         )
 
 
@@ -431,8 +433,14 @@ def create_app(settings: CentralSettings | None = None):
     def metrics_allowed(identity: Operator) -> bool:
         return (
             config.metrics_dsn is not None
-            and identity.subject == config.super_admin
             and "FARMA" in identity.segments
+            and (
+                identity.subject == config.super_admin
+                or (
+                    config.metrics_readers_file is not None
+                    and _private_object(config.metrics_readers_file).get(identity.subject) is True
+                )
+            )
         )
 
     @app.get(
