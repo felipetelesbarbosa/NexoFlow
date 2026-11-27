@@ -580,6 +580,10 @@ test("Vendas FARMA abre em outra aba, mostra os indicadores e imprime no celular
   const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
   expect(pdf.toString("utf8", 0, 5)).toBe("%PDF-");
   expect(pdf.byteLength).toBeGreaterThan(15000);
+  // A one-row report must not create an empty cover page.
+  expect(pdf.toString("latin1").match(/\/Type\s*\/Page\b/g) ?? []).toHaveLength(1);
+  await expect(page.locator("html")).toHaveCSS("page", "relatorio-vendas");
+  await expect(page.locator(".metricas-table")).toHaveCSS("table-layout", "fixed");
   await page.emulateMedia({ media: "screen" });
   await page.getByLabel("Início", { exact: true }).fill("2026-11-01");
   await page.getByLabel("Fim", { exact: true }).fill("2026-11-03");
