@@ -1317,7 +1317,8 @@ td {
   gap: 8px;
   margin: 18px 0;
 }
-.account-panel input {
+.account-panel input,
+.account-panel select {
   width: 100%;
   border: 1px solid var(--control-line);
   background: var(--control);

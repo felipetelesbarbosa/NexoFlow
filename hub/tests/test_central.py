@@ -738,7 +738,7 @@ def test_metrics_pilot_requires_owner_farma_and_pinned_read(
         replace(settings, metrics_dsn=config.dsn)
 
 
-def test_metrics_reader_requires_active_farma_invite_and_cannot_manage_users(
+def test_admin_requires_active_farma_and_cannot_manage_users(
     setup, signing_key, tmp_path, monkeypatch
 ):
     from dataclasses import replace
@@ -782,7 +782,7 @@ def test_metrics_reader_requires_active_farma_invite_and_cannot_manage_users(
     assert client.get(route, params=query, headers=invited).status_code == 403
     assert client.get(route, params=query, headers=pet).status_code == 403
 
-    request = {"email": "leitor@example.invalid", "segmentos": ["FARMA"]}
+    request = {"email": "leitor@example.invalid", "segmentos": ["FARMA", "PET"], "papel": "admin"}
     invite = client.post(prefix + "/convites", headers=manager, json=request)
     assert invite.status_code == 201
     accepted = client.post(
@@ -791,19 +791,121 @@ def test_metrics_reader_requires_active_farma_invite_and_cannot_manage_users(
     )
     assert accepted.status_code == 204
     assert client.get(prefix + "/sessao", headers=invited).json() == {
-        "ambientes": ["homologacao"], "metricas_farma": True, "gerencia_usuarios": False,
+        "ambientes": ["homologacao"], "metricas_farma": True,
+        "gerencia_usuarios": False, "papel": "admin",
     }
     assert client.get(route, params=query, headers=invited).status_code == 200
     assert client.get(prefix + "/usuarios", headers=invited).status_code == 403
     assert client.post(prefix + "/convites", headers=invited, json=request).status_code == 403
+    assert client.post(
+        prefix + "/usuarios/papel", headers=invited,
+        json={"id": "convidado-f", "papel": "admin"},
+    ).status_code == 403
+    assert client.post(
+        prefix + "/usuarios/revogar", headers=invited, json={"id": "operador-p"}
+    ).status_code == 403
+    assert client.post(
+        prefix + "/convites/cancelar", headers=invited, json={"id": invite.json()["id"]}
+    ).status_code == 403
+    assert client.get(PATH + "?ambiente=producao", headers=invited).status_code == 403
+    monkeypatch.setattr(central, "read_summary", lambda _dsn, seg: {"segmento": seg})
+    for seg in ("FARMA", "PET"):
+        response = client.get(PATH, headers=invited, params={"segmento": seg})
+        assert response.status_code == 200 and response.json()["segmento"] == seg
 
     readers.write_text("{}")
+    assert client.get(route, params=query, headers=invited).status_code == 200
+    # O papel é explícito; um arquivo legado não reativa Métricas depois da redução.
+    readers.write_text('{"convidado-f": true}')
+    demoted = client.post(
+        prefix + "/usuarios/papel", headers=manager,
+        json={"id": "convidado-f", "papel": "convidado"},
+    )
+    assert demoted.status_code == 204
     assert client.get(route, params=query, headers=invited).status_code == 403
     assert client.get(prefix + "/minha-conta", headers=invited).status_code == 200
+    assert client.get(prefix + "/sessao", headers=invited).json()["papel"] == "convidado"
+    assert client.post(
+        prefix + "/usuarios/papel", headers=manager,
+        json={"id": "convidado-f", "papel": "admin"},
+    ).status_code == 204
+    assert client.get(route, params=query, headers=invited).status_code == 200
+    assert client.post(
+        prefix + "/usuarios/papel", headers=manager,
+        json={"id": "operador-f", "papel": "convidado"},
+    ).status_code == 409
+    assert client.post(
+        prefix + "/usuarios/papel", headers=manager,
+        json={"id": "convidado-f", "papel": "super_admin"},
+    ).status_code == 422
+    assert client.post(
+        prefix + "/usuarios/papel", headers=manager,
+        json={"id": "sem-acesso", "papel": "admin"},
+    ).status_code == 404
+    assert client.get(prefix + "/sessao", headers=manager).json()["papel"] == "super_admin"
+    assert client.get(prefix + "/usuarios", headers=manager).status_code == 200
 
-    readers.write_text('{"convidado-f": true}')
     revoked = client.post(
         prefix + "/usuarios/revogar", headers=manager, json={"id": "convidado-f"},
     )
     assert revoked.status_code == 204
     assert client.get(route, params=query, headers=invited).status_code == 403
+    assert client.post(
+        prefix + "/usuarios/papel", headers=manager,
+        json={"id": "convidado-f", "papel": "admin"},
+    ).status_code == 404
+    # Reaceite com convite padrão não reaproveita o papel anterior.
+    guest_invite = client.post(
+        prefix + "/convites", headers=manager,
+        json={"email": "leitor@example.invalid", "segmentos": ["FARMA"]},
+    )
+    assert guest_invite.status_code == 201
+    assert client.post(
+        prefix + "/convites/aceitar", headers=invited,
+        json={"codigo": guest_invite.json()["codigo"]},
+    ).status_code == 204
+    assert client.get(prefix + "/sessao", headers=invited).json()["papel"] == "convidado"
+    assert client.get(route, params=query, headers=invited).status_code == 403
+
+
+def test_role_migration_preserves_old_profiles_invites_and_revocations(
+    setup, signing_key, tmp_path
+):
+    import sqlite3
+    from dataclasses import replace
+
+    config, _ = setup
+    db_path = tmp_path / "perfis.sqlite3"
+    with sqlite3.connect(db_path) as db:
+        db.executescript("""
+            CREATE TABLE central_members (subject TEXT PRIMARY KEY, email TEXT,
+              scopes TEXT NOT NULL, revoked INTEGER NOT NULL DEFAULT 0);
+            CREATE TABLE central_invites (id TEXT PRIMARY KEY, digest TEXT NOT NULL UNIQUE,
+              email TEXT NOT NULL, scopes TEXT NOT NULL, expires_at INTEGER NOT NULL,
+              status TEXT NOT NULL DEFAULT 'pendente');
+            CREATE TABLE profiles (subject TEXT PRIMARY KEY, name TEXT NOT NULL);
+            INSERT INTO central_members VALUES ('ja-aceito','leitor@example.invalid','["FARMA"]',0);
+            INSERT INTO central_members VALUES ('revogado','r@example.invalid','["FARMA"]',1);
+            INSERT INTO central_invites VALUES ('antigo','digest','leitor@example.invalid','["FARMA"]',9999999999,'aceito');
+            INSERT INTO profiles VALUES ('ja-aceito','Nome preservado');
+        """)
+    readers = tmp_path / "leitores.json"
+    readers.write_text('{"ja-aceito": true, "revogado": true}')
+    settings = replace(
+        config, profiles_db=db_path, super_admin="operador-f",
+        metrics_dsn="dbname=nexoflow_datastudio user=nf_metricas_farma_leitor",
+        metrics_readers_file=readers,
+    )
+    client = TestClient(central.create_app(settings))
+    prefix = "/api/central/v1"
+    signed = assertion(token(signing_key, sub="ja-aceito", email="leitor@example.invalid"))
+    assert client.get(prefix + "/sessao", headers=signed).json()["papel"] == "admin"
+    assert client.get(prefix + "/minha-conta", headers=signed).json()["nome"] == "Nome preservado"
+    manager = assertion(token(signing_key))
+    overview = client.get(prefix + "/usuarios", headers=manager).json()
+    assert overview["convites"][0]["estado"] == "aceito"
+    assert overview["convites"][0]["papel"] == "convidado"
+    assert all(u["id"] != "revogado" for u in overview["usuarios"])
+    assert client.get(
+        prefix + "/sessao", headers=assertion(token(signing_key, sub="revogado"))
+    ).status_code == 403

@@ -5,8 +5,13 @@ import type { Segmento } from "./resumo";
 const api = "/api/central/v1";
 const centralOficial = "https://central.nexoflowhub.com.br";
 const accessApps = "https://dash.cloudflare.com/3d28f3cbcbb2f27849194e412022d510/one/access-controls/policies/53c46c33-5075-41fe-a475-77be7ab3be6a/edit";
-type Usuario = { id: string; email: string | null; segmentos: Segmento[]; super_admin: boolean };
-type Convite = { id: string; email: string; segmentos: Segmento[]; expira_em: number; estado: keyof typeof estados };
+const accessAdminOtp = "https://dash.cloudflare.com/3d28f3cbcbb2f27849194e412022d510/one/access-controls/policies/ae3938e9-9ed6-48fa-b376-5528bf0791b4/edit";
+const accessAdminMfa = "https://dash.cloudflare.com/3d28f3cbcbb2f27849194e412022d510/one/access-controls/policies/17c00832-aa4b-423d-9d24-ca6cbe9c4233/edit";
+const accessGuestMfa = "https://dash.cloudflare.com/3d28f3cbcbb2f27849194e412022d510/one/access-controls/policies/42c4c9d2-cad1-4788-be7c-fb342a62aa63/edit";
+type Papel = "convidado" | "admin";
+type Usuario = { id: string; email: string | null; segmentos: Segmento[]; super_admin: boolean; papel?: Papel | "super_admin" };
+type Convite = { id: string; email: string; segmentos: Segmento[]; expira_em: number; estado: keyof typeof estados; papel?: Papel };
+const papeis = { super_admin: "Super Admin", admin: "Admin", convidado: "Convidado" };
 type Acessos = { usuarios: Usuario[]; convites: Convite[] };
 const estados = {
   pendente: "Pendente",
@@ -23,6 +28,8 @@ const mensagens: Record<string, string> = {
   CONVITE_JA_PENDENTE: "Já existe um convite pendente para esse e-mail. Cancele o anterior para gerar outro.",
   CONVITE_INVALIDO_OU_INDISPONIVEL: "Este convite expirou, já foi utilizado ou foi enviado para outro e-mail.",
   OPERADOR_JA_TEM_ACESSO: "Sua conta já tem acesso à Central.",
+  PAPEL_SUPER_ADMIN_IMUTAVEL: "O papel do Super Admin não pode ser alterado aqui.",
+  OPERADOR_NAO_ENCONTRADO: "A pessoa não tem um acesso ativo à Central.",
 };
 const segmentOptions: Segmento[] = ["FARMA", "PET"];
 
@@ -51,6 +58,7 @@ export function GerenciarUsuarios() {
   const [acessos, setAcessos] = useState<Acessos>();
   const [email, setEmail] = useState("");
   const [segmentos, setSegmentos] = useState<Segmento[]>([]);
+  const [papel, setPapel] = useState<Papel>("convidado");
   const [link, setLink] = useState("");
   const [aviso, setAviso] = useState("");
   const [erro, setErro] = useState("");
@@ -75,6 +83,7 @@ export function GerenciarUsuarios() {
         setLink(centralOficial + "/#convite/" + result.codigo);
         setEmail("");
         setSegmentos([]);
+        setPapel("convidado");
       } else {
         setLink("");
       }
@@ -100,13 +109,19 @@ export function GerenciarUsuarios() {
       <div className="account-grid">
         <section className="panel account-panel" aria-labelledby="convidar">
           <h2 id="convidar">Convidar para homologação</h2>
-          <p>Escolha os segmentos que o convidado poderá consultar.</p>
+          <p>Escolha o papel e os segmentos que a pessoa poderá consultar.</p>
           <form onSubmit={(event) => {
             event.preventDefault();
-            if (!busy && email.trim() && segmentos.length) void alterar("/convites", { email, segmentos }, "Convite criado.");
+            if (!busy && email.trim() && segmentos.length) void alterar("/convites", { email, segmentos, papel }, "Convite criado.");
           }}>
             <label htmlFor="email-convite">E-mail do convidado</label>
             <input id="email-convite" type="email" required maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} />
+            <label htmlFor="papel-convite">Papel do usuário</label>
+            <select id="papel-convite" value={papel} onChange={(event) => setPapel(event.target.value === "admin" ? "admin" : "convidado")}>
+              <option value="convidado">Convidado · Hub</option>
+              <option value="admin">Admin · Hub e Métricas</option>
+            </select>
+            <small>Gerenciar Usuários é exclusivo do Super Admin. Métricas respeita os segmentos autorizados.</small>
             <fieldset className="invite-segments">
               <legend>Segmentos permitidos</legend>
               {segmentOptions.map((segmento) => (
@@ -149,7 +164,14 @@ export function GerenciarUsuarios() {
               <li key={user.id}>
                 <strong>{user.super_admin ? "Você · Super Admin" : user.email ?? "Usuário já cadastrado"}</strong>
                 <span>{user.segmentos.join(" · ")}</span>
+                {!user.super_admin && <small>{papeis[user.papel ?? "convidado"]}</small>}
                 {!user.email && !user.super_admin && <small>Identidade Access {user.id}</small>}
+                {!user.super_admin && user.papel && <button className="plain" disabled={busy} onClick={() => {
+                  const proximo = user.papel === "admin" ? "convidado" : "admin";
+                  if (window.confirm(`Alterar o papel desta pessoa para ${papeis[proximo]}? Confira as políticas correspondentes no Cloudflare Access.`)) {
+                    void alterar("/usuarios/papel", { id: user.id, papel: proximo }, "Papel atualizado. Confira as políticas no Cloudflare Access.");
+                  }
+                }}>{user.papel === "admin" ? "Tornar Convidado" : "Tornar Admin"}</button>}
                 {!user.super_admin && <button className="plain" disabled={busy} onClick={() => {
                   if (window.confirm("Revogar o acesso desta pessoa à Central de Operações?")) {
                     void alterar("/usuarios/revogar", { id: user.id }, "Acesso revogado.");
@@ -162,8 +184,13 @@ export function GerenciarUsuarios() {
       </div>
       <section className="panel account-panel invite-history" aria-labelledby="autorizar-cloudflare">
         <h2 id="autorizar-cloudflare">Autorizar na Cloudflare</h2>
-        <p>Adicione o e-mail do convidado à política <strong>Central | Convidados OTP</strong>.</p>
+        <p>Adicione o e-mail à política correspondente ao papel. OTP permite o código por e-mail; MFA permite o login Cloudflare com autenticação adicional para identidades elegíveis.</p>
+        <p><strong>Central | Convidados OTP</strong></p>
         <a href={accessApps} target="_blank" rel="noopener noreferrer">Autorizar convidados no Cloudflare Access</a>
+        <p><a href={accessGuestMfa} target="_blank" rel="noopener noreferrer">Autorizar convidados com MFA</a></p>
+        <p><strong>Central | Admins OTP</strong></p>
+        <a href={accessAdminOtp} target="_blank" rel="noopener noreferrer">Autorizar admins no Cloudflare Access</a>
+        <p><a href={accessAdminMfa} target="_blank" rel="noopener noreferrer">Autorizar admins com MFA</a></p>
       </section>
       <section className="panel account-panel invite-history" aria-labelledby="convites-lista">
         <h2 id="convites-lista">Convites</h2>
@@ -181,6 +208,7 @@ export function GerenciarUsuarios() {
             <li key={invite.id}>
               <strong>{invite.email}</strong>
               <span>{estados[invite.estado]} · {invite.segmentos.join(" · ")}</span>
+              <small>{papeis[invite.papel ?? "convidado"]}</small>
               {invite.estado === "pendente" && <>
                 <small>Válido até {horaLocal(new Date(invite.expira_em * 1000))} · Belém</small>
                 <button className="plain" disabled={busy} onClick={() => {

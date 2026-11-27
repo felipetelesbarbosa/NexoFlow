@@ -61,6 +61,7 @@ class Operator:
     email: str
     segments: list[str]
     managed: bool = False
+    role: Literal["super_admin", "admin", "convidado"] = "convidado"
 
 
 class DisplayName(BaseModel):
@@ -72,6 +73,7 @@ class Invitation(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     email: str = Field(max_length=254, pattern=r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
     segmentos: list[Literal["FARMA", "PET"]] = Field(min_length=1, max_length=2)
+    papel: access_management.Role = "convidado"
 
 
 class InviteCode(BaseModel):
@@ -82,6 +84,10 @@ class InviteCode(BaseModel):
 class AccessReference(BaseModel):
     model_config = ConfigDict(extra="forbid")
     id: str = Field(min_length=1, max_length=256)
+
+
+class RoleChange(AccessReference):
+    papel: access_management.Role
 
 
 CENTRAL_SESSION = Security(
@@ -269,7 +275,31 @@ def authorized_operator(
         segments = granted_segments(settings.identities_file, subject)
     if not segments:
         raise HTTPException(403, "OPERADOR_SEM_ACESSO_A_CENTRAL")
-    return Operator(subject, email, segments, managed=recorded is not None)
+    if subject == settings.super_admin:
+        role = "super_admin"
+    else:
+        assigned = (
+            access_management.assigned_role(settings.profiles_db, subject)
+            if settings.profiles_db else None
+        )
+        # A concessão privada da versão anterior continua válida para
+        # identidades ativas ainda sem papel explícito. A atribuição e a
+        # revogação feitas pelo Super Admin prevalecem.
+        role = (
+            "admin" if assigned == "admin" or (
+                assigned is None and subject in legacy_metric_admins(settings)
+            ) else "convidado"
+        )
+    return Operator(subject, email, segments, managed=recorded is not None, role=role)
+
+
+def legacy_metric_admins(settings: CentralSettings) -> set[str]:
+    if settings.metrics_readers_file is None:
+        return set()
+    return {
+        subject for subject, grant in _private_object(settings.metrics_readers_file).items()
+        if grant is True
+    }
 
 
 def granted_segments(path: Path, subject: str) -> list[str]:
@@ -394,7 +424,7 @@ def create_app(settings: CentralSettings | None = None):
     operator = Depends(authenticated)
 
     def administrator(identity: Operator = operator):
-        if identity.subject != config.super_admin or config.profiles_db is None:
+        if identity.role != "super_admin" or config.profiles_db is None:
             raise HTTPException(403, "GESTAO_EXCLUSIVA_DO_SUPER_ADMIN")
         return identity.subject, config.profiles_db
 
@@ -434,13 +464,7 @@ def create_app(settings: CentralSettings | None = None):
         return (
             config.metrics_dsn is not None
             and "FARMA" in identity.segments
-            and (
-                identity.subject == config.super_admin
-                or (
-                    config.metrics_readers_file is not None
-                    and _private_object(config.metrics_readers_file).get(identity.subject) is True
-                )
-            )
+            and identity.role in {"super_admin", "admin"}
         )
 
     @app.get(
@@ -480,7 +504,8 @@ def create_app(settings: CentralSettings | None = None):
         if config.super_admin is not None:
             return {
                 **result,
-                "gerencia_usuarios": identity.subject == config.super_admin,
+                "gerencia_usuarios": identity.role == "super_admin",
+                "papel": identity.role,
             }
         return result
 
@@ -492,7 +517,7 @@ def create_app(settings: CentralSettings | None = None):
             for subject, grant in _private_object(config.identities_file).items()
             if (scopes := parse_scopes(grant))
         }
-        return access_management.overview(registry, legacy, actor)
+        return access_management.overview(registry, legacy, actor, legacy_metric_admins(config))
 
     @app.post("/api/central/v1/convites", status_code=201, include_in_schema=False)
     def create_invite(
@@ -502,7 +527,7 @@ def create_app(settings: CentralSettings | None = None):
         actor, registry = manager
         scopes = list(dict.fromkeys(str(scope) for scope in details.segmentos))
         return access_management.invite(
-            registry, actor, details.email.casefold(), scopes
+            registry, actor, details.email.casefold(), scopes, details.papel
         )
 
     @app.post(
@@ -532,6 +557,19 @@ def create_app(settings: CentralSettings | None = None):
         require_origin(request)
         actor, registry = manager
         access_management.cancel(registry, actor, reference.id)
+
+    @app.post(
+        "/api/central/v1/usuarios/papel", status_code=204, include_in_schema=False
+    )
+    def change_role(
+        request: Request, change: RoleChange, manager: tuple[str, Path] = admin
+    ):
+        require_origin(request)
+        actor, registry = manager
+        access_management.set_role(
+            registry, actor, change.id, change.papel,
+            bool(granted_segments(config.identities_file, change.id)),
+        )
 
     @app.post(
         "/api/central/v1/usuarios/revogar", status_code=204, include_in_schema=False
