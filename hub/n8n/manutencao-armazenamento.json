@@ -1,0 +1,301 @@
+[
+  {
+    "id": "NFStorageClean30",
+    "name": "NexoFlow VPS | Limpeza segura (30 dias)",
+    "active": false,
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "days",
+                "daysInterval": 30,
+                "triggerAtHour": 6,
+                "triggerAtMinute": 30
+              }
+            ]
+          }
+        },
+        "id": "9d580ce0-931b-53aa-b8d5-00c2c1a7a5a5",
+        "name": "A cada 30 dias",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          0,
+          -80
+        ]
+      },
+      {
+        "parameters": {},
+        "id": "d0e52f82-7e6a-5bf6-9d82-b69bf5665470",
+        "name": "Teste manual",
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          0,
+          100
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://nexoflow-storage-maintenance-bridge:8080/limpeza",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "options": {
+            "timeout": 300000
+          }
+        },
+        "id": "89d10864-4cd7-57b6-b64e-13199cb40755",
+        "name": "Solicitar limpeza verificada",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          280,
+          0
+        ],
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "NFStorageGate001",
+            "name": "NexoFlow | Manutenção VPS"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "a093efb9-8cd4-5f1b-b20f-33f60ed86d4c",
+                "leftValue": "={{ $json.estado }}",
+                "rightValue": "em_andamento",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "0765a895-5416-5304-8e4a-e4a2e924b50c",
+        "name": "Ainda em andamento?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          520,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "resume": "timeInterval",
+          "amount": 3,
+          "unit": "minutes"
+        },
+        "id": "d91a8670-2d06-5431-bcce-2defb0013195",
+        "name": "Aguardar 3 minutos",
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1.1,
+        "position": [
+          760,
+          -100
+        ]
+      },
+      {
+        "parameters": {
+          "method": "GET",
+          "url": "http://nexoflow-storage-maintenance-bridge:8080/estado/limpeza",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "options": {
+            "timeout": 300000
+          }
+        },
+        "id": "a839b3a5-17ea-55a8-923c-e17078d3650a",
+        "name": "Consultar resultado",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1000,
+          -100
+        ],
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "NFStorageGate001",
+            "name": "NexoFlow | Manutenção VPS"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "A cada 30 dias": {
+        "main": [
+          [
+            {
+              "node": "Solicitar limpeza verificada",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Teste manual": {
+        "main": [
+          [
+            {
+              "node": "Solicitar limpeza verificada",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Solicitar limpeza verificada": {
+        "main": [
+          [
+            {
+              "node": "Ainda em andamento?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Ainda em andamento?": {
+        "main": [
+          [
+            {
+              "node": "Aguardar 3 minutos",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          []
+        ]
+      },
+      "Aguardar 3 minutos": {
+        "main": [
+          [
+            {
+              "node": "Consultar resultado",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1",
+      "timezone": "America/Belem",
+      "saveManualExecutions": true,
+      "saveDataErrorExecution": "all",
+      "saveDataSuccessExecution": "all"
+    }
+  },
+  {
+    "id": "NFR2MonitorDaily",
+    "name": "NexoFlow R2 | Monitoramento diário",
+    "active": false,
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "days",
+                "daysInterval": 1,
+                "triggerAtHour": 7,
+                "triggerAtMinute": 30
+              }
+            ]
+          }
+        },
+        "id": "5d79cfbd-3a5b-5be3-b57d-9f8c34d460af",
+        "name": "Todos os dias",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          0,
+          -80
+        ]
+      },
+      {
+        "parameters": {},
+        "id": "3eece86e-a8b8-58e1-877d-71245998a327",
+        "name": "Teste manual",
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          0,
+          100
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://nexoflow-storage-maintenance-bridge:8080/monitorar",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "options": {
+            "timeout": 300000
+          }
+        },
+        "id": "144a6f05-749d-5648-9a91-cc485d8af598",
+        "name": "Medir consumo real do R2",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          280,
+          0
+        ],
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "NFStorageGate001",
+            "name": "NexoFlow | Manutenção VPS"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Todos os dias": {
+        "main": [
+          [
+            {
+              "node": "Medir consumo real do R2",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Teste manual": {
+        "main": [
+          [
+            {
+              "node": "Medir consumo real do R2",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1",
+      "timezone": "America/Belem",
+      "saveManualExecutions": true,
+      "saveDataErrorExecution": "all",
+      "saveDataSuccessExecution": "all"
+    }
+  }
+]
