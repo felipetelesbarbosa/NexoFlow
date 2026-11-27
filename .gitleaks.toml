@@ -12,4 +12,9 @@ regexTarget = "secret"
 # faturamento_produtos= (teste sintético) como segredo. Exceção somente deste
 # texto exato; não ignora arquivo, commit, valores nem regra de segurança.
 # PAYLOAD_KEY, em app/meta_ads_attribution.py, nomeia um campo JSON público do código.
-regexes = ['''^3200/farmalider$''', '''^8000/tarefas/historico$''', '''^faturamento_produtos=$''', '''^nf_atribuicao_comercial_v1$''']
+# 90db3d5, hub/tests/test_real_read_probe.py linhas 133/137/141/153:
+# quatro falsos positivos generic-api-key nos testes de transporte. O
+# scanner interpreta a porta + caminho público como chave. As URLs não
+# têm usuário, senha, query ou fragmento; não há exceção por arquivo,
+# commit, prefixo ou regra. Somente estes dois literais públicos exatos.
+regexes = ['''^3200/farmalider$''', '''^8000/tarefas/historico$''', '''^faturamento_produtos=$''', '''^nf_atribuicao_comercial_v1$''', '''^3200/farmalider/api/Delivery/pedidos/farma$''', '''^3200/farmalider/api/Delivery/pedidos/pet$''']
