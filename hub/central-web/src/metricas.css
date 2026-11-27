@@ -170,6 +170,7 @@
 .metricas-foot { margin: 0; font-size: .78rem; overflow-wrap: anywhere; }
 .metricas-empty { margin: 0; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
 
+@page { size: A4 portrait; margin: 12mm; }
 @page relatorio-vendas { size: A4 portrait; margin: 12mm; }
 @media print {
   html:has(.metricas) { page: relatorio-vendas; color-scheme: light; background: #fff !important; }
@@ -193,7 +194,7 @@
   .metricas-page:has(.metricas) > :is(.metricas-topbar, .skip),
   .metricas-export, .metricas-filter, .metricas-graph-controls { display: none; }
   html:has(.metricas) body, html:has(.metricas) #root { background: #fff; margin: 0; padding: 0; }
-  .metricas-page:has(.metricas) main { width: 100%; max-width: none; margin: 0; padding: 0; }
+  .metricas-page:has(.metricas) main { width: 100%; max-width: none; margin: 0; padding: 3mm 4mm; box-sizing: border-box; }
   .metricas-kicker .metricas-print-name { display: inline; padding: 0; font-size: inherit; background: none; }
   .metricas { display: block; width: 100%; max-width: 100%; print-color-adjust: exact; }
   .metricas-heading h1 { font-size: 24pt; }
