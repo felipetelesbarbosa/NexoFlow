@@ -792,7 +792,7 @@ def test_admin_requires_active_farma_and_cannot_manage_users(
     assert accepted.status_code == 204
     assert client.get(prefix + "/sessao", headers=invited).json() == {
         "ambientes": ["homologacao"], "metricas_farma": True,
-        "gerencia_usuarios": False, "papel": "admin",
+        "gerencia_usuarios": False, "papel": "admin", "hub_disponivel": True,
     }
     assert client.get(route, params=query, headers=invited).status_code == 200
     assert client.get(prefix + "/usuarios", headers=invited).status_code == 403
@@ -909,3 +909,142 @@ def test_role_migration_preserves_old_profiles_invites_and_revocations(
     assert client.get(
         prefix + "/sessao", headers=assertion(token(signing_key, sub="revogado"))
     ).status_code == 403
+
+
+def test_metrics_only_guest_cannot_enter_hub_or_manage_access(
+    setup, signing_key, tmp_path, monkeypatch
+):
+    from dataclasses import replace
+    from uuid import UUID
+
+    config, _ = setup
+    settings = replace(
+        config, profiles_db=tmp_path / "perfis.sqlite3",
+        super_admin="operador-f",
+        metrics_dsn="dbname=nexoflow_datastudio user=nf_metricas_farma_leitor",
+    )
+    client = TestClient(central.create_app(settings))
+    prefix = "/api/central/v1"
+    origin = {
+        "X-Central-Host": central.PRODUCTION_HOST,
+        "Origin": "https://" + central.PRODUCTION_HOST,
+    }
+    manager = origin | assertion(token(signing_key))
+    invited = origin | assertion(
+        token(signing_key, sub="somente-metricas", email="metricas@example.invalid")
+    )
+    query = {"inicio": "2026-11-01", "fim": "2026-11-03"}
+    route = prefix + "/metricas/vendas"
+    reads = []
+
+    def read(_dsn, start, end, _revision):
+        reads.append((start, end))
+        return central.metricas.SalesReport(
+            revisao=UUID(int=15), versao=15, inicio=start, fim=end,
+            totais=central.metricas.SalesTotals(), dias=[],
+        )
+
+    def no_hub(*_args, **_kwargs):
+        pytest.fail("O perfil Métricas não pode consultar o Hub")
+
+    monkeypatch.setattr(central.metricas, "read_sales", read)
+    monkeypatch.setattr(central, "read_summary", no_hub)
+    monkeypatch.setattr(central, "read_infrastructure", no_hub)
+    monkeypatch.setattr(central, "read_consumption", no_hub)
+    monkeypatch.setattr(central, "hub_openapi", no_hub)
+
+    details = {"email": "metricas@example.invalid", "papel": "convidado_metricas"}
+    for scopes in (["PET"], ["FARMA", "PET"]):
+        assert client.post(
+            prefix + "/convites", headers=manager,
+            json={**details, "segmentos": scopes},
+        ).status_code == 422
+    request = {**details, "segmentos": ["FARMA"]}
+    assert client.get(route, params=query, headers=invited).status_code == 403
+    result = client.post(prefix + "/convites", headers=manager, json=request)
+    assert result.status_code == 201
+    assert client.post(
+        prefix + "/convites/aceitar", headers=invited,
+        json={"codigo": result.json()["codigo"]},
+    ).status_code == 204
+    assert client.get(prefix + "/sessao", headers=invited).json() == {
+        "ambientes": ["homologacao"], "metricas_farma": True,
+        "gerencia_usuarios": False, "papel": "convidado_metricas",
+        "hub_disponivel": False,
+    }
+    assert client.get(route, params=query, headers=invited).status_code == 200
+    assert len(reads) == 1
+    for path in (
+        "/resumo", "/resumo?segmento=PET", "/resumo?ambiente=producao",
+        "/consumo", "/infraestrutura", "/documentacao/openapi.json?api=hub",
+        "/documentacao/openapi.json?api=central", "/minha-conta",
+    ):
+        blocked = client.get(prefix + path, headers=invited)
+        assert blocked.status_code == 403
+        assert blocked.json()["detail"] == "HUB_INDISPONIVEL_PARA_ESTA_CONTA"
+    assert client.get(prefix + "/usuarios", headers=invited).status_code == 403
+    assert client.put(prefix + "/minha-conta", headers=invited, json={"nome": "Teste"}).status_code == 403
+    assert client.post(prefix + "/convites", headers=invited, json=request).status_code == 403
+    assert client.post(
+        prefix + "/usuarios/papel", headers=invited,
+        json={"id": "somente-metricas", "papel": "admin"},
+    ).status_code == 403
+    assert client.post(
+        prefix + "/usuarios/revogar", headers=invited, json={"id": "operador-p"},
+    ).status_code == 403
+    assert client.post(
+        prefix + "/usuarios/papel", headers=manager,
+        json={"id": "operador-p", "papel": "convidado_metricas"},
+    ).status_code == 422
+    overview = client.get(prefix + "/usuarios", headers=manager).json()
+    assert next(u for u in overview["usuarios"] if u["id"] == "somente-metricas")["papel"] == "convidado_metricas"
+    assert overview["convites"][0]["papel"] == "convidado_metricas"
+
+    # As três funções continuam distintas após uma mudança explícita de papel.
+    monkeypatch.setattr(central, "read_summary", lambda _dsn, seg: {"segmento": seg})
+    for next_role, hub, sales_allowed in (
+        ("admin", True, True), ("convidado", True, False),
+        ("convidado_metricas", False, True),
+    ):
+        assert client.post(
+            prefix + "/usuarios/papel", headers=manager,
+            json={"id": "somente-metricas", "papel": next_role},
+        ).status_code == 204
+        session = client.get(prefix + "/sessao", headers=invited).json()
+        assert session["hub_disponivel"] is hub
+        assert session.get("metricas_farma", False) is sales_allowed
+        assert client.get(PATH, headers=invited).status_code == (200 if hub else 403)
+        assert client.get(route, params=query, headers=invited).status_code == (200 if sales_allowed else 403)
+    assert client.post(
+        prefix + "/usuarios/revogar", headers=manager,
+        json={"id": "somente-metricas"},
+    ).status_code == 204
+    assert client.get(route, params=query, headers=invited).status_code == 403
+    assert client.get(prefix + "/sessao", headers=invited).status_code == 403
+
+
+def test_upgrade_two_role_registry_preserves_rows_and_constraints(tmp_path):
+    import sqlite3
+
+    path = tmp_path / "perfis.sqlite3"
+    with sqlite3.connect(path) as db:
+        db.executescript("""
+            CREATE TABLE central_roles (subject TEXT PRIMARY KEY,
+                role TEXT NOT NULL CHECK(role IN ('convidado', 'admin')));
+            CREATE TABLE central_invite_roles (invite_id TEXT PRIMARY KEY,
+                role TEXT NOT NULL CHECK(role IN ('convidado', 'admin')));
+            INSERT INTO central_roles VALUES ('james','admin'),('guest','convidado');
+            INSERT INTO central_invite_roles VALUES ('old-admin','admin'),('old-guest','convidado');
+        """)
+    with central.access_management.registry(path) as db:
+        assert dict(db.execute("SELECT subject, role FROM central_roles")) == {
+            "james": "admin", "guest": "convidado",
+        }
+        assert dict(db.execute("SELECT invite_id, role FROM central_invite_roles")) == {
+            "old-admin": "admin", "old-guest": "convidado",
+        }
+        db.execute("INSERT INTO central_roles VALUES ('new','convidado_metricas')")
+        db.execute("INSERT INTO central_invite_roles VALUES ('new-invite','convidado_metricas')")
+        with pytest.raises(sqlite3.IntegrityError):
+            db.execute("INSERT INTO central_roles VALUES ('not-allowed','super_admin')")
+    assert central.access_management.assigned_role(path, "new") == "convidado_metricas"

@@ -61,7 +61,7 @@ class Operator:
     email: str
     segments: list[str]
     managed: bool = False
-    role: Literal["super_admin", "admin", "convidado"] = "convidado"
+    role: Literal["super_admin", "admin", "convidado", "convidado_metricas"] = "convidado"
 
 
 class DisplayName(BaseModel):
@@ -285,11 +285,12 @@ def authorized_operator(
         # A concessão privada da versão anterior continua válida para
         # identidades ativas ainda sem papel explícito. A atribuição e a
         # revogação feitas pelo Super Admin prevalecem.
-        role = (
-            "admin" if assigned == "admin" or (
-                assigned is None and subject in legacy_metric_admins(settings)
-            ) else "convidado"
-        )
+        if assigned is None:
+            role = "admin" if subject in legacy_metric_admins(settings) else "convidado"
+        elif assigned in {"admin", "convidado", "convidado_metricas"}:
+            role = assigned
+        else:
+            raise HTTPException(403, "PAPEL_NAO_AUTORIZADO")
     return Operator(subject, email, segments, managed=recorded is not None, role=role)
 
 
@@ -423,6 +424,16 @@ def create_app(settings: CentralSettings | None = None):
 
     operator = Depends(authenticated)
 
+    def hub_allowed(identity: Operator) -> bool:
+        return identity.role in {"super_admin", "admin", "convidado"}
+
+    def hub_operator(identity: Operator = operator):
+        if not hub_allowed(identity):
+            raise HTTPException(403, "HUB_INDISPONIVEL_PARA_ESTA_CONTA")
+        return identity
+
+    hub_access = Depends(hub_operator)
+
     def administrator(identity: Operator = operator):
         if identity.role != "super_admin" or config.profiles_db is None:
             raise HTTPException(403, "GESTAO_EXCLUSIVA_DO_SUPER_ADMIN")
@@ -446,6 +457,7 @@ def create_app(settings: CentralSettings | None = None):
     def production_segments(request: Request, identity: Operator) -> list[str]:
         if (
             config.production is None
+            or not hub_allowed(identity)
             or identity.managed
             or request.headers.get("x-central-host") != PRODUCTION_HOST
         ):
@@ -464,7 +476,7 @@ def create_app(settings: CentralSettings | None = None):
         return (
             config.metrics_dsn is not None
             and "FARMA" in identity.segments
-            and identity.role in {"super_admin", "admin"}
+            and identity.role in {"super_admin", "admin", "convidado_metricas"}
         )
 
     @app.get(
@@ -506,6 +518,7 @@ def create_app(settings: CentralSettings | None = None):
                 **result,
                 "gerencia_usuarios": identity.role == "super_admin",
                 "papel": identity.role,
+                "hub_disponivel": hub_allowed(identity),
             }
         return result
 
@@ -526,6 +539,8 @@ def create_app(settings: CentralSettings | None = None):
         require_origin(request)
         actor, registry = manager
         scopes = list(dict.fromkeys(str(scope) for scope in details.segmentos))
+        if details.papel == "convidado_metricas" and config.metrics_dsn is None:
+            raise HTTPException(409, "METRICAS_INDISPONIVEL")
         return access_management.invite(
             registry, actor, details.email.casefold(), scopes, details.papel
         )
@@ -566,9 +581,12 @@ def create_app(settings: CentralSettings | None = None):
     ):
         require_origin(request)
         actor, registry = manager
+        if change.papel == "convidado_metricas" and config.metrics_dsn is None:
+            raise HTTPException(409, "METRICAS_INDISPONIVEL")
+        legacy_scopes = granted_segments(config.identities_file, change.id)
         access_management.set_role(
             registry, actor, change.id, change.papel,
-            bool(granted_segments(config.identities_file, change.id)),
+            bool(legacy_scopes), legacy_scopes=legacy_scopes,
         )
 
     @app.post(
@@ -587,7 +605,7 @@ def create_app(settings: CentralSettings | None = None):
         )
 
     @app.get("/api/central/v1/minha-conta", include_in_schema=False)
-    def account(identity: Operator = operator):
+    def account(identity: Operator = hub_access):
         return {
             "nome": profile_name(config.profiles_db, identity.subject)
             if config.profiles_db
@@ -598,7 +616,7 @@ def create_app(settings: CentralSettings | None = None):
         }
 
     @app.put("/api/central/v1/minha-conta", include_in_schema=False)
-    def rename(request: Request, profile: DisplayName, identity: Operator = operator):
+    def rename(request: Request, profile: DisplayName, identity: Operator = hub_access):
         require_origin(request)
         if config.profiles_db is None:
             raise HTTPException(503, "PERFIL_CENTRAL_INDISPONIVEL")
@@ -607,7 +625,7 @@ def create_app(settings: CentralSettings | None = None):
         }
 
     @app.get("/api/central/v1/documentacao/openapi.json", include_in_schema=False)
-    def documentation(_allowed=operator, api: Literal["hub", "central"] = "hub"):
+    def documentation(_allowed=hub_access, api: Literal["hub", "central"] = "hub"):
         return hub_openapi() if api == "hub" else app.openapi()
 
     @app.get(
@@ -616,7 +634,7 @@ def create_app(settings: CentralSettings | None = None):
         summary="Consultar a situação da VPS",
         responses={**access_errors},
     )
-    def infrastructure(_allowed=operator):
+    def infrastructure(_allowed=hub_access):
         return read_infrastructure(config.infrastructure_file)
 
     @app.get(
@@ -632,7 +650,7 @@ def create_app(settings: CentralSettings | None = None):
         api: Literal["hub", "weni"] | None = None,
         antes: Annotated[int | None, Query(ge=1, le=2**53 - 1)] = None,
         so_erros: bool = False,
-        identity: Operator = operator,
+        identity: Operator = hub_access,
     ):
         dsn, allowed = destination(request, identity, ambiente)
         segment = segmento or allowed[0]
@@ -673,7 +691,7 @@ def create_app(settings: CentralSettings | None = None):
     def summary(
         request: Request,
         ambiente: Environment = "homologacao",
-        identity: Operator = operator,
+        identity: Operator = hub_access,
     ):
         params = request.query_params.multi_items()
         names = [name for name, _ in params]

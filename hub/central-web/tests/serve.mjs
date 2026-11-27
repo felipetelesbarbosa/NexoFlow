@@ -12,6 +12,13 @@ const mime = {
 http
   .createServer(async (req, res) => {
     const pathname = new URL(req.url, "http://localhost").pathname;
+    // Sessão sintética padrão para os ensaios da interface; testes de papel
+    // e autenticação substituem esta resposta no próprio navegador.
+    if (pathname === "/api/central/v1/sessao") {
+      res.writeHead(200, { "Content-Type": "application/json" })
+        .end(JSON.stringify({ ambientes: ["homologacao"], hub_disponivel: true }));
+      return;
+    }
     const path = resolve(
       root,
       "." + (pathname === "/" ? "/index.html" : pathname),

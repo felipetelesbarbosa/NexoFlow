@@ -519,9 +519,11 @@ test("só o Super Admin vê o cadastro de convites e o atalho para autorização
   await expect(page.getByRole("link", { name: "Autorizar admins com MFA" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Autorizar convidados com MFA" })).toBeVisible();
   const tornarConvidado = page.getByRole("button", { name: "Tornar Convidado", exact: true });
+  const tornarMetricas = page.getByRole("button", { name: "Tornar Convidado Métricas", exact: true });
   const tornarAdmin = page.getByRole("button", { name: "Tornar Admin", exact: true });
   await expect(page.getByRole("listitem").filter({ hasText: "Você · Super Admin" }).getByRole("button")).toHaveCount(0);
   await expect(tornarConvidado).toBeVisible();
+  await expect(tornarMetricas).toBeVisible();
   await expect(tornarAdmin).toBeVisible();
   await expect(tornarConvidado).toBeEnabled();
   await expect(tornarAdmin).toBeDisabled();
@@ -540,6 +542,12 @@ test("só o Super Admin vê o cadastro de convites e o atalho para autorização
   await expect(tornarConvidado).toBeEnabled();
   await expect(tornarAdmin).toBeDisabled();
   expect(papelAlterado).toEqual({ id: "leitor", papel: "admin" });
+  page.once("dialog", (dialog) => dialog.accept());
+  await tornarMetricas.click();
+  await expect(tornarMetricas).toBeDisabled();
+  await expect(tornarConvidado).toBeEnabled();
+  await expect(tornarAdmin).toBeEnabled();
+  expect(papelAlterado).toEqual({ id: "leitor", papel: "convidado_metricas" });
   await expect(page.getByRole("button", { name: "Pendentes (1)" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Cancelar convite" })).toBeVisible();
   await page.getByRole("button", { name: "Aceitos (1)" }).click();
@@ -556,6 +564,17 @@ test("só o Super Admin vê o cadastro de convites e o atalho para autorização
     "https://central.nexoflowhub.com.br/#convite/" + "c".repeat(43),
   );
   expect(conviteEnviado).toEqual({ email: "convidado@example.invalid", segmentos: ["FARMA"], papel: "admin" });
+  await page.getByLabel("E-mail do convidado").fill("metricas@example.invalid");
+  await page.getByLabel("PET", { exact: true }).check();
+  await page.getByLabel("Papel do usuário").selectOption("convidado_metricas");
+  await expect(page.getByLabel("FARMA", { exact: true })).toBeChecked();
+  await expect(page.getByLabel("PET", { exact: true })).not.toBeChecked();
+  await expect(page.getByLabel("PET", { exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "Criar convite" }).click();
+  await expect(page.getByLabel(/Link de uso único/)).toHaveValue(
+    "https://central.nexoflowhub.com.br/#convite/" + "c".repeat(43),
+  );
+  expect(conviteEnviado).toEqual({ email: "metricas@example.invalid", segmentos: ["FARMA"], papel: "convidado_metricas" });
   await page.goto("/#convite/" + "c".repeat(43));
   await expect(page.getByRole("button", { name: "Aceitar convite" })).toBeVisible();
   await expect(link).toHaveCount(0);
@@ -648,4 +667,54 @@ test("Vendas FARMA não consulta dados quando a sessão não tem permissão", as
   await page.goto("/#metricas");
   await expect(page.getByText("NexoFlow Métricas indisponível para esta conta.")).toBeVisible();
   expect(accesses).toBe(0);
+});
+
+test("convidado exclusivo do Métricas entra direto em Vendas sem consultar nem exibir o Hub", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 740 });
+  await page.route("**/api/central/v1/sessao", (route) => route.fulfill({
+    json: {
+      ambientes: ["homologacao"], papel: "convidado_metricas",
+      hub_disponivel: false, metricas_farma: true, gerencia_usuarios: false,
+    },
+  }));
+  await page.route("**/api/central/v1/metricas/vendas?*", (route) => {
+    const params = new URL(route.request().url()).searchParams;
+    return route.fulfill({ json: {
+      inicio: params.get("inicio"), fim: params.get("fim"), segmento: "FARMA",
+      fonte: "data_studio_producao", revisao: "f3f4cbfd-eb3d-4c37-973c-b17190c3fe27",
+      versao: 15, totais: { pedidos: 0, produtos_centavos: 0, frete_centavos: 0, faturamento_centavos: 0 },
+      dias: [],
+    } });
+  });
+  const hubCalls = [];
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    if (path.startsWith("/api/central/v1/") && !["/api/central/v1/sessao", "/api/central/v1/metricas/vendas"].includes(path)) hubCalls.push(path);
+  });
+  await page.goto("/");
+  await expect(page).toHaveURL(/#metricas$/);
+  await expect(page.getByRole("region", { name: "Indicadores de vendas" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Voltar à Central" })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Navegação principal" })).toHaveCount(0);
+  for (const path of ["usuarios", "infraestrutura", "documentacao", "execucoes", "conta"]) {
+    await page.goto("/#" + path);
+    await expect(page).toHaveURL(/#metricas$/);
+    await expect(page.getByRole("link", { name: "Vendas", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Gerenciar Usuários" })).toHaveCount(0);
+  }
+  expect(hubCalls).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+});
+
+test("falha da sessão não abre a navegação nem consulta dados do Hub", async ({ page }) => {
+  await page.route("**/api/central/v1/sessao", (route) => route.fulfill({ status: 403 }));
+  const hubCalls = [];
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    if (path.startsWith("/api/central/v1/") && path !== "/api/central/v1/sessao") hubCalls.push(path);
+  });
+  await page.goto("/#infraestrutura");
+  await expect(page.getByRole("alert")).toContainText("Não foi possível confirmar sua autorização");
+  await expect(page.getByRole("navigation", { name: "Navegação principal" })).toHaveCount(0);
+  expect(hubCalls).toEqual([]);
 });

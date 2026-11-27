@@ -8,10 +8,13 @@ const accessApps = "https://dash.cloudflare.com/3d28f3cbcbb2f27849194e412022d510
 const accessAdminOtp = "https://dash.cloudflare.com/3d28f3cbcbb2f27849194e412022d510/one/access-controls/policies/ae3938e9-9ed6-48fa-b376-5528bf0791b4/edit";
 const accessAdminMfa = "https://dash.cloudflare.com/3d28f3cbcbb2f27849194e412022d510/one/access-controls/policies/17c00832-aa4b-423d-9d24-ca6cbe9c4233/edit";
 const accessGuestMfa = "https://dash.cloudflare.com/3d28f3cbcbb2f27849194e412022d510/one/access-controls/policies/42c4c9d2-cad1-4788-be7c-fb342a62aa63/edit";
-type Papel = "convidado" | "admin";
+type Papel = "convidado" | "convidado_metricas" | "admin";
 type Usuario = { id: string; email: string | null; segmentos: Segmento[]; super_admin: boolean; papel?: Papel | "super_admin" };
 type Convite = { id: string; email: string; segmentos: Segmento[]; expira_em: number; estado: keyof typeof estados; papel?: Papel };
-const papeis = { super_admin: "Super Admin", admin: "Admin", convidado: "Convidado" };
+const papeis = { super_admin: "Super Admin", admin: "Admin", convidado: "Convidado · Hub", convidado_metricas: "Convidado · Métricas" };
+const acoesPapel: Record<Papel, string> = {
+  convidado: "Tornar Convidado", convidado_metricas: "Tornar Convidado Métricas", admin: "Tornar Admin",
+};
 type Acessos = { usuarios: Usuario[]; convites: Convite[] };
 const estados = {
   pendente: "Pendente",
@@ -30,6 +33,8 @@ const mensagens: Record<string, string> = {
   OPERADOR_JA_TEM_ACESSO: "Sua conta já tem acesso à Central.",
   PAPEL_SUPER_ADMIN_IMUTAVEL: "O papel do Super Admin não pode ser alterado aqui.",
   OPERADOR_NAO_ENCONTRADO: "A pessoa não tem um acesso ativo à Central.",
+  METRICAS_EXIGE_FARMA: "O Métricas está disponível somente para FARMA nesta etapa.",
+  METRICAS_INDISPONIVEL: "A fonte de Métricas ainda não está disponível.",
 };
 const segmentOptions: Segmento[] = ["FARMA", "PET"];
 
@@ -117,16 +122,25 @@ export function GerenciarUsuarios() {
             <label htmlFor="email-convite">E-mail do convidado</label>
             <input id="email-convite" type="email" required maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} />
             <label htmlFor="papel-convite">Papel do usuário</label>
-            <select id="papel-convite" value={papel} onChange={(event) => setPapel(event.target.value === "admin" ? "admin" : "convidado")}>
+            <select id="papel-convite" value={papel} onChange={(event) => {
+              const next = event.target.value;
+              if (next === "convidado" || next === "convidado_metricas" || next === "admin") {
+                setPapel(next);
+                if (next === "convidado_metricas") setSegmentos(["FARMA"]);
+              }
+            }}>
               <option value="convidado">Convidado · Hub</option>
+              <option value="convidado_metricas">Convidado · Métricas</option>
               <option value="admin">Admin · Hub e Métricas</option>
             </select>
             <small>Gerenciar Usuários é exclusivo do Super Admin. Métricas respeita os segmentos autorizados.</small>
+            {papel === "convidado_metricas" && <small>Somente Vendas FARMA. Sem acesso ao Hub.</small>}
             <fieldset className="invite-segments">
               <legend>Segmentos permitidos</legend>
               {segmentOptions.map((segmento) => (
                 <label key={segmento}>
                   <input type="checkbox" value={segmento} checked={segmentos.includes(segmento)}
+                    disabled={papel === "convidado_metricas"}
                     onChange={(event) => {
                       const value = event.target.value;
                       if (isSegmento(value)) setSegmentos(event.target.checked
@@ -167,14 +181,16 @@ export function GerenciarUsuarios() {
                 {!user.super_admin && <small>{papeis[user.papel ?? "convidado"]}</small>}
                 {!user.email && !user.super_admin && <small>Identidade Access {user.id}</small>}
                 {!user.super_admin && <div className="access-role-actions" role="group" aria-label="Alterar papel">
-                  {(["convidado", "admin"] as const).map((proximo) => {
+                  {(["convidado", "convidado_metricas", "admin"] as const).map((proximo) => {
                     const atual = (user.papel ?? "convidado") === proximo;
+                    const indisponivel = proximo === "convidado_metricas" && !user.segmentos.includes("FARMA");
                     return <button type="button" key={proximo} className="plain" aria-pressed={atual}
-                      title={atual ? "Papel atual" : undefined} disabled={busy || atual} onClick={() => {
+                      title={atual ? "Papel atual" : indisponivel ? "Requer autorização FARMA" : undefined}
+                      disabled={busy || atual || indisponivel} onClick={() => {
                         if (window.confirm(`Alterar o papel desta pessoa para ${papeis[proximo]}? Confira as políticas correspondentes no Cloudflare Access.`)) {
                           void alterar("/usuarios/papel", { id: user.id, papel: proximo }, "Papel atualizado. Confira as políticas no Cloudflare Access.");
                         }
-                      }}>Tornar {papeis[proximo]}</button>;
+                      }}>{acoesPapel[proximo]}</button>;
                   })}
                 </div>}
                 {!user.super_admin && <button className="plain" disabled={busy} onClick={() => {
@@ -189,7 +205,7 @@ export function GerenciarUsuarios() {
       </div>
       <section className="panel account-panel invite-history" aria-labelledby="autorizar-cloudflare">
         <h2 id="autorizar-cloudflare">Autorizar na Cloudflare</h2>
-        <p>Adicione o e-mail à política correspondente ao papel. OTP permite o código por e-mail; MFA permite o login Cloudflare com autenticação adicional para identidades elegíveis.</p>
+        <p>Adicione o e-mail à política correspondente ao papel. Os dois tipos de Convidado usam as mesmas políticas de convidados; o acesso ao produto é definido na Central. OTP permite o código por e-mail; MFA permite o login Cloudflare com autenticação adicional para identidades elegíveis.</p>
         <p><strong>Central | Convidados OTP</strong></p>
         <a href={accessApps} target="_blank" rel="noopener noreferrer">Autorizar convidados no Cloudflare Access</a>
         <p><a href={accessGuestMfa} target="_blank" rel="noopener noreferrer">Autorizar convidados com MFA</a></p>

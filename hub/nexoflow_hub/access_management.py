@@ -15,7 +15,45 @@ from uuid import uuid4
 from fastapi import HTTPException
 
 INVITE_TTL = 7 * 24 * 60 * 60
-Role = Literal["convidado", "admin"]
+Role = Literal["convidado", "convidado_metricas", "admin"]
+
+# Apenas nomes e colunas definidos pelo código. A migração é transacional e
+# conserva todas as atribuições existentes (inclusive convites aceitos).
+_ROLE_TABLES = {"central_roles": "subject", "central_invite_roles": "invite_id"}
+
+
+def _ensure_role_tables(db: sqlite3.Connection) -> None:
+    def create(table: str, column: str):
+        db.execute(
+            f"""CREATE TABLE IF NOT EXISTS {table} (
+                    {column} TEXT PRIMARY KEY,
+                    role TEXT NOT NULL CHECK(role IN
+                        ('convidado', 'convidado_metricas', 'admin'))
+                )"""
+        )
+
+    def old_tables():
+        return [
+            table for table in _ROLE_TABLES
+            if "convidado_metricas" not in db.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,)
+            ).fetchone()[0]
+        ]
+
+    for table, column in _ROLE_TABLES.items():
+        create(table, column)
+    if not old_tables():
+        return
+    db.execute("BEGIN IMMEDIATE")
+    # Outro processo pode ter concluído a migração enquanto aguardávamos o lock.
+    for table in old_tables():
+        column = _ROLE_TABLES[table]
+        previous = table + "_anterior"
+        db.execute(f"ALTER TABLE {table} RENAME TO {previous}")
+        create(table, column)
+        db.execute(f"INSERT INTO {table} SELECT {column},role FROM {previous}")
+        db.execute(f"DROP TABLE {previous}")
+    db.commit()
 
 
 @contextmanager
@@ -42,20 +80,7 @@ def registry(path: Path):
                        registered_at INTEGER NOT NULL
                    )"""
             )
-            # Aditivo: o volume existente, os convites e as revogações não
-            # precisam ser regravados. Nenhum papel pode criar um Super Admin.
-            db.execute(
-                """CREATE TABLE IF NOT EXISTS central_roles (
-                       subject TEXT PRIMARY KEY,
-                       role TEXT NOT NULL CHECK(role IN ('convidado', 'admin'))
-                   )"""
-            )
-            db.execute(
-                """CREATE TABLE IF NOT EXISTS central_invite_roles (
-                       invite_id TEXT PRIMARY KEY,
-                       role TEXT NOT NULL CHECK(role IN ('convidado', 'admin'))
-                   )"""
-            )
+            _ensure_role_tables(db)
             yield db
     except sqlite3.Error:
         raise HTTPException(503, "GESTAO_DE_ACESSO_INDISPONIVEL") from None
@@ -130,6 +155,8 @@ def audit(db, actor: str, action: str, reference: str, now: int) -> None:
 
 
 def invite(path: Path, actor: str, email: str, scopes: list[str], role: Role = "convidado"):
+    if role == "convidado_metricas" and scopes != ["FARMA"]:
+        raise HTTPException(422, "METRICAS_EXIGE_FARMA")
     now = int(time())
     token = secrets.token_urlsafe(32)
     digest = hashlib.sha256(token.encode("ascii")).hexdigest()
@@ -172,6 +199,8 @@ def accept(path: Path, subject: str, email: str, token: str, has_legacy_access: 
         ).fetchone()
         if row is None:
             raise HTTPException(403, "CONVITE_INVALIDO_OU_INDISPONIVEL")
+        if row["role"] == "convidado_metricas" and json.loads(row["scopes"]) != ["FARMA"]:
+            raise HTTPException(403, "CONVITE_INVALIDO_OU_INDISPONIVEL")
         existing = db.execute(
             "SELECT revoked FROM central_members WHERE subject = ?", (subject,)
         ).fetchone()
@@ -196,18 +225,25 @@ def accept(path: Path, subject: str, email: str, token: str, has_legacy_access: 
         audit(db, subject, "convite_aceito", row["id"], now)
 
 
-def set_role(path: Path, actor: str, subject: str, role: Role, has_legacy_access: bool):
+def set_role(
+    path: Path, actor: str, subject: str, role: Role, has_legacy_access: bool,
+    *, legacy_scopes: list[str] | None = None,
+):
     if subject == actor:
         raise HTTPException(409, "PAPEL_SUPER_ADMIN_IMUTAVEL")
     with registry(path) as db:
         db.execute("BEGIN IMMEDIATE")
         current = db.execute(
-            "SELECT revoked FROM central_members WHERE subject = ?", (subject,)
+            "SELECT revoked, scopes FROM central_members WHERE subject = ?", (subject,)
         ).fetchone()
         if (current is not None and current["revoked"]) or (
             current is None and not has_legacy_access
         ):
             raise HTTPException(404, "OPERADOR_NAO_ENCONTRADO")
+        if role == "convidado_metricas" and "FARMA" not in (
+            json.loads(current["scopes"]) if current is not None else (legacy_scopes or [])
+        ):
+            raise HTTPException(422, "METRICAS_EXIGE_FARMA")
         db.execute(
             """INSERT INTO central_roles (subject,role) VALUES (?,?)
                ON CONFLICT(subject) DO UPDATE SET role = excluded.role""",

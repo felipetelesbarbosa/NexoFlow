@@ -139,6 +139,8 @@ function App() {
   const [compact, setCompact] = useState(false);
   const [menu, setMenu] = useState(false);
   const [metricsAccess, setMetricsAccess] = useState<boolean | null>(null);
+  const [sessionStatus, setSessionStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [hubAccess, setHubAccess] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [disponiveis, setDisponiveis] = useState<Ambiente[]>(["homologacao"]);
   const [resumo, setResumo] = useState<Resumo>();
@@ -203,25 +205,40 @@ function App() {
       signal: stop.signal,
     }).then(async (response) => {
       if (!response.ok || response.redirected) throw new Error();
-      const { ambientes: enabled, gerencia_usuarios: admin, metricas_farma: metrics } = await response.json();
+      const { ambientes: enabled, gerencia_usuarios: admin, metricas_farma: metrics,
+        hub_disponivel: hub, papel } = await response.json();
+      if (!Array.isArray(enabled) || !enabled.includes("homologacao")) throw new Error();
       if (!stop.signal.aborted) {
-        setIsAdmin(admin === true);
+        const canUseHub = hub !== false && papel !== "convidado_metricas";
+        setHubAccess(canUseHub);
+        setIsAdmin(admin === true && canUseHub);
         setMetricsAccess(metrics === true);
-        if (Array.isArray(enabled) && enabled.includes("producao")) {
+        if (canUseHub && enabled.includes("producao")) {
           setDisponiveis(["homologacao", "producao"]);
         }
+        setSessionStatus("ready");
       }
     }).catch(() => {
-      if (!stop.signal.aborted) setMetricsAccess(false);
+      if (!stop.signal.aborted) {
+        setMetricsAccess(false);
+        setSessionStatus("error");
+      }
     });
     return () => stop.abort();
   }, []);
-  const needsSummary = page !== "documentacao" && page !== "conta" && page !== "usuarios" && page !== "convite" && page !== "metricas";
+  const metricsOnly = sessionStatus === "ready" && !hubAccess;
   useEffect(() => {
-    document.title = page === "metricas"
+    if (metricsOnly && page !== "convite" && page !== "metricas") {
+      window.history.replaceState(null, "", "/#metricas");
+      setPage("metricas");
+    }
+  }, [metricsOnly, page]);
+  const needsSummary = sessionStatus === "ready" && hubAccess && page !== "documentacao" && page !== "conta" && page !== "usuarios" && page !== "convite" && page !== "metricas";
+  useEffect(() => {
+    document.title = page === "metricas" || (metricsOnly && page !== "convite")
       ? "Vendas · NexoFlow Métricas"
       : "Central de Operações · NexoFlow Hub";
-  }, [page]);
+  }, [page, metricsOnly]);
   useEffect(() => {
     if (!needsSummary) return;
     const stop = new AbortController();
@@ -265,6 +282,17 @@ function App() {
   const data = resumo && fetched ? janela(resumo, dias, fetched) : null;
   const view = pages[page];
   if (page === "convite") return <AceitarConvite />;
+  if (sessionStatus !== "ready") return (
+    <main className="invitation-page">
+      <section className="panel account-panel">
+        <h1>NexoFlow</h1>
+        {sessionStatus === "loading" ? <p role="status">Conferindo seu acesso…</p> : <>
+          <p role="alert">Não foi possível confirmar sua autorização. Entre novamente ou consulte o administrador.</p>
+          <button className="refresh" onClick={() => window.location.reload()}>Tentar novamente</button>
+        </>}
+      </section>
+    </main>
+  );
   const skip = (
     <a
       className="skip"
@@ -288,7 +316,7 @@ function App() {
       {dark ? <Sun size={18} /> : <Moon size={18} />}
     </button>
   );
-  if (page === "metricas") {
+  if (page === "metricas" || metricsOnly) {
     return (
       <div className="metricas-page">
         {skip}
@@ -299,9 +327,9 @@ function App() {
               <strong>NexoFlow Métricas</strong>
             </div>
             <div className="metricas-topbar-actions">
-              <a href="/#geral" className="metricas-back">
+              {hubAccess && <a href="/#geral" className="metricas-back">
                 <ArrowLeft size={16} aria-hidden="true" /> Voltar à Central
-              </a>
+              </a>}
               {themeToggle}
             </div>
           </div>
