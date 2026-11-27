@@ -1,0 +1,8 @@
+# Aplica-se apenas ao worker FARMA de homologação: nenhuma escrita externa.
+# Complementa o Compose privado de Meta já montado na VPS.
+services:
+  worker:
+    environment:
+      HUB_REAL_READ_PROBE_ENABLED: 'true'
+      WENI_PROXY_ACTIVE: '0'
+      NEXOFLOW_PERFIL: FARMA

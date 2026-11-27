@@ -4,7 +4,8 @@
   ],
   "extraPaths": [
     ".",
-    "../app"
+    "../app",
+    ".."
   ],
   "pythonVersion": "3.12",
   "typeCheckingMode": "basic"

@@ -590,3 +590,135 @@ def test_falha_no_log_nao_muda_a_resposta_da_api(store, monkeypatch, caplog):
     assert response.status_code == 200
     assert "TELEMETRIA_API_INDISPONIVEL" in caplog.text
     assert "NAO_EXIBIR_ERRO_BRUTO" not in caplog.text
+
+
+def test_real_read_amostral_via_api_and_central(store, settings, monkeypatch):
+    from nexoflow_hub.central import read_summary
+
+    monkeypatch.setattr(
+        "nexoflow_hub.real_read_probe.collect_sources",
+        lambda: {
+            "meta": {"estado": "amostra_validada", "recuperacao": {"recuperadas": 2}},
+            "weni": {"estado": "amostra_validada"},
+            "farmalider": {"estado": "pendente", "motivo": "CREDENCIAL_NAO_PROVISIONADA"},
+        },
+    )
+    client = TestClient(create_app(settings))
+    farma = {"Authorization": f"Bearer {settings.tokens['FARMA']}"}
+    pet = {"Authorization": f"Bearer {settings.tokens['PET']}"}
+    payload = {
+        "segmento": "FARMA", "origem": "n8n", "chave": "leitura-real-ensaio",
+        "cenario": "leitura_real_amostral",
+    }
+    accepted = client.post("/tarefas/noturno", headers=farma, json=payload)
+    assert accepted.status_code == 202
+    uid = accepted.json()["id"]
+    assert client.post("/tarefas/noturno", headers=pet, json=payload).status_code == 403
+    assert run_once(store)
+    result = client.get(f"/tarefas/{uid}/resultado", headers=farma).json()
+    assert result["estado"] == "revisao_necessaria"
+    assert result["resultado"]["fontes"]["meta"]["recuperacao"]["recuperadas"] == 2
+    assert result["resultado"]["fontes"]["farmalider"]["estado"] == "pendente"
+    assert result["resultado"]["externas_gravacoes"] == 0
+    assert result["resultado"]["publicacoes"] == 0
+    assert not store.checkpoints(store.get("FARMA", uid))
+    task = read_summary(settings.dsn, "FARMA")["tarefas"][0]
+    assert str(task["id"]) == uid
+    assert task["estado"] == "revisao_necessaria"
+    assert task["etapas"][0]["estado"] == "revisao_necessaria"
+    assert "FONTE_ESSENCIAL_INCOMPLETA" in task["motivos"]
+    evidence = task["evidencia"]
+    assert evidence["modo"] == "leitura_real_amostral"
+    assert evidence["primeira_etapa_pendente"] == "atualizacao_weni"
+    assert len(evidence["fontes"]) == 3
+    assert evidence["fontes"][1] == {
+        "nome": "farmalider", "estado": "pendente", "origem": "nao_confirmada",
+        "motivo": "CREDENCIAL_NAO_PROVISIONADA", "cobertura_integral": False,
+    }
+    assert read_summary(settings.dsn, "PET")["tarefas"] == []
+    assert client.post("/tarefas/noturno", headers=farma, json=payload).json()["id"] == uid
+    assert not run_once(store)
+
+
+def test_planejamento_real_via_worker_com_lease_e_projecao(store, settings, monkeypatch):
+    from nexoflow_hub.central import read_summary
+
+    monkeypatch.setattr(
+        "nexoflow_hub.real_read_probe.collect_sources",
+        lambda **kw: {
+            "weni": {"estado": "amostra_validada", "sintetico": False},
+            "farmalider": {"estado": "amostra_validada", "sintetico": False},
+            "meta": {"estado": "amostra_validada", "sintetico": False},
+        },
+    )
+    monkeypatch.setattr(
+        "nexoflow_hub.real_plan.plan_from_worker",
+        lambda cutoff: {
+            "estado": "parcial",
+            "fontes": {
+                "weni": {"estado": "validada", "sintetico": False, "cobertura_integral": True},
+                "farmalider": {"estado": "validada", "sintetico": False, "cobertura_integral": True},
+            },
+            "planos": {
+                "atualizacao_weni": {"estado": "planejado", "aplicado": False},
+                "analytics": {"estado": "planejado", "atribuicao_comercial": "pendente"},
+                "recompra": {"estado": "parcial", "aplicado": False},
+            },
+        },
+    )
+    client = TestClient(create_app(settings))
+    farma = {"Authorization": "Bearer " + settings.tokens["FARMA"]}
+    body = {
+        "segmento": "FARMA", "origem": "n8n", "chave": "planejamento-real-ensaio",
+        "cenario": "planejamento_real",
+    }
+    accepted = client.post("/tarefas/noturno", headers=farma, json=body)
+    assert accepted.status_code == 202
+    uid = accepted.json()["id"]
+    assert run_once(store)
+    task = store.get("FARMA", uid)
+    result = task["resultado"]
+    assert result["externas_gravacoes"] == result["publicacoes"] == 0
+    assert result["primeira_etapa_pendente"] == "analytics"
+    assert result["etapas"]["publicacao"]["estado"] == "nao_executada"
+    assert result["etapas"]["analytics_final"]["estado"] == "nao_executada"
+    assert store.checkpoints(task) == {}
+    assert task["estado"] == "revisao_necessaria"
+    evidence = read_summary(settings.dsn, "FARMA")["tarefas"][0]["evidencia"]
+    assert evidence["modo"] == "planejamento_real"
+    assert evidence["primeira_etapa_pendente"] == "analytics"
+    assert evidence["fontes"][0]["cobertura_integral"]
+    assert not evidence["fontes"][2]["cobertura_integral"]
+    assert evidence["planos"][2]["estado"] == "nao_executada"
+    assert read_summary(settings.dsn, "PET")["tarefas"] == []
+    assert client.post("/tarefas/noturno", headers=farma, json=body).json()["id"] == uid
+    assert not run_once(store)
+    with pytest.raises(LostLease):
+        store.renew_lease(task)
+
+
+def test_lease_renovacao_real_respeita_fencing(store):
+    created = task(store)
+    claimed = store.claim()
+    assert claimed["id"] == created["id"]
+    store.renew_lease(claimed)
+    assert store.get("FARMA", claimed["id"])["lease_ate"] >= claimed["lease_ate"]
+    expire(store, claimed)
+    with pytest.raises(LostLease):
+        store.renew_lease(claimed)
+
+
+def test_workflows_reais_manuais():
+    for name, scenario in (
+        ("noturno-farma-leitura-real-hml.json", "leitura_real_amostral"),
+        ("noturno-farma-planejamento-real-hml.json", "planejamento_real"),
+    ):
+        workflow = json.loads((Path(__file__).resolve().parents[1] / "n8n" / name).read_text())
+        assert workflow["active"] is False
+        nodes = {node["id"]: node for node in workflow["nodes"]}
+        assert [n for n in nodes.values() if "Trigger" in n["type"]] == [nodes["manual"]]
+        assert scenario in nodes["create"]["parameters"]["jsonBody"]
+        http_nodes = [n for n in nodes.values() if n["type"].endswith(".httpRequest")]
+        assert len(http_nodes) == 2
+        assert all(n["credentials"]["httpHeaderAuth"]["id"] == "CONFIGURAR_FARMA" for n in http_nodes)
+        assert all(n["parameters"]["url"].startswith(("http://hub-api:8000/", "=http://hub-api:8000/")) for n in http_nodes)

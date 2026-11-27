@@ -1541,7 +1541,9 @@ def write_review(review, path=REVIEW):
         f"Resultados: {dict(counts)}",
     ]
     if "contatos_reservados" in review:
-        lines.append(f"Reservas do operador: {len(review['contatos_reservados'])} contatos protegidos. As propostas desses contatos serão adiadas.")
+        lines.append(
+            f"Reservas do operador: {len(review['contatos_reservados'])} contatos protegidos. As propostas desses contatos serão adiadas."
+        )
     lines.extend(public_review_lines(review))
     if review.get("pagination"):
         lines.append(f"Paginação consolidada: {review['pagination']}")
@@ -1589,7 +1591,9 @@ def read_review(path):
         != profile_for(review.get("structure", {}).get("segment", "FARMA")).policy
     ):
         raise RuntimeError("Revisão inválida ou alterada. Nenhuma aplicação iniciada.")
-    reservas_farma.carregar(review["structure"].get("segment", "FARMA")).conferir_revisao(review)
+    reservas_farma.carregar(
+        review["structure"].get("segment", "FARMA")
+    ).conferir_revisao(review)
     _validate_review_uuids(review["plans"])
     for plan in review["plans"]:
         if plan.get("segment", "FARMA") != review["structure"].get("segment", "FARMA"):
@@ -1701,6 +1705,94 @@ def diagnose_state(state_path=STATE, audit_path=AUDIT):
         "ultimas_pendencias_auditoria": last_failures,
         "aviso": "Pending não comprova envio. Reconciliar Weni e auditoria antes de qualquer novo apply.",
     }
+
+
+def _check_pre_admission(fresh, latest, structure, profile, order, now_fn, check_day):
+    """Revalida identidade, consentimento, pedido e janela antes do POST."""
+    expected = dict(fresh["guard"])
+    expected["fields"] = {
+        **expected["fields"],
+        **{k: field_guard(k, v) for k, v in fresh["fields"].items()},
+    }
+    actual = guard(latest)
+    actual["groups"] = [
+        g for g in actual["groups"] if g not in {structure["group_uuid"], profile.group}
+    ]
+    expected["groups"] = [
+        g
+        for g in expected["groups"]
+        if g not in {structure["group_uuid"], profile.group}
+    ]
+    purchase_dt = business_order_datetime(fresh["purchase"]["data_hora"])
+    if purchase_dt is None:
+        raise RuntimeError("Data da compra inválida; inclusão no grupo interrompida.")
+    if (
+        actual != expected
+        or refused(latest, segment=profile.segment)
+        or member(latest, structure["opt_out_uuid"], OPT_OUT)
+        or cancelled_order_reason(order, latest)
+    ):
+        # Diagnóstico por NOMES de campos: nunca expor conteúdo, CPF, URNs ou token.
+        field_diffs = sorted(
+            k
+            for k in expected["fields"]
+            if actual["fields"].get(k) != expected["fields"].get(k)
+        )
+        other_diffs = [
+            k for k in ("name", "urns", "groups") if actual[k] != expected[k]
+        ]
+        if refused(latest, segment=profile.segment) or member(
+            latest, structure["opt_out_uuid"], OPT_OUT
+        ):
+            other_diffs.append("opt_out_marketing")
+        if cancelled_order_reason(order, latest):
+            other_diffs.append("pedido_ou_pagamento_cancelado")
+        raise PreAdmissionConflict(
+            "Guarda divergiu antes da inclusão: campos="
+            + ",".join(field_diffs)
+            + "; demais="
+            + ",".join(other_diffs)
+        )
+    if (
+        not 0
+        <= (now_fn().astimezone(TZ).date() - purchase_dt.date()).days
+        <= profile.days
+    ):
+        check_day()
+        raise RuntimeError(
+            f"Janela de 0 a {profile.days} dias terminou durante a aplicação."
+        )
+    event_at = business_order_datetime(fresh["event_at"])
+    if event_at is None or event_at <= now_fn().astimezone(TZ):
+        raise PreAdmissionConflict(
+            f"HORARIO_D{profile.days}_ENCERRADO: horário do evento passou antes da inclusão."
+        )
+
+
+def _reviewed_plan_changed(fresh, reviewed):
+    """Compara todos os campos obrigatórios e evidências opcionais da revisão."""
+    return any(
+        fresh[key] != reviewed[key]
+        for key in (
+            "fields",
+            "action",
+            "order_id",
+            "reason",
+            "purchase",
+            "event_at",
+            "due_today",
+            "within_window",
+            "scheduled_future",
+        )
+    ) or any(
+        fresh.get(key) != reviewed.get(key)
+        for key in (
+            "warnings",
+            "pending_purchase_check",
+            "purchase_check_resolved",
+            "campaign_products",
+        )
+    )
 
 
 def apply_review(
@@ -1819,7 +1911,13 @@ def apply_review(
             )
             if reservas.protege(uid):
                 summary["reservados"] += 1
-                record_event({"contact_uuid": uid, "status": "RESERVADO", "acao_adiada": reviewed["action"]})
+                record_event(
+                    {
+                        "contact_uuid": uid,
+                        "status": "RESERVADO",
+                        "acao_adiada": reviewed["action"],
+                    }
+                )
                 continue
             if has_incomplete_query(reviewed) and not pending_group_removal_due(
                 reviewed, now_fn()
@@ -1906,28 +2004,7 @@ def apply_review(
             ):
                 defer_query(uid, "reconsultar_pedido", plan=fresh)
                 continue
-            if any(
-                fresh[key] != reviewed[key]
-                for key in (
-                    "fields",
-                    "action",
-                    "order_id",
-                    "reason",
-                    "purchase",
-                    "event_at",
-                    "due_today",
-                    "within_window",
-                    "scheduled_future",
-                )
-            ) or any(
-                fresh.get(key) != reviewed.get(key)
-                for key in (
-                    "warnings",
-                    "pending_purchase_check",
-                    "purchase_check_resolved",
-                    "campaign_products",
-                )
-            ):
+            if _reviewed_plan_changed(fresh, reviewed):
                 summary["conflitos"] += 1
                 record_event(
                     {
@@ -2066,72 +2143,9 @@ def apply_review(
                     write_metrics.observe_fields(uid, fresh["fields"], latest)
                     if not latest:
                         raise PreAdmissionConflict("Contato ausente antes da inclusão.")
-                    expected = dict(fresh["guard"])
-                    expected["fields"] = {
-                        **expected["fields"],
-                        **{k: field_guard(k, v) for k, v in fresh["fields"].items()},
-                    }
-                    actual = guard(latest)
-                    actual["groups"] = [
-                        g
-                        for g in actual["groups"]
-                        if g not in {structure["group_uuid"], profile.group}
-                    ]
-                    expected["groups"] = [
-                        g
-                        for g in expected["groups"]
-                        if g not in {structure["group_uuid"], profile.group}
-                    ]
-                    purchase_dt = business_order_datetime(
-                        fresh["purchase"]["data_hora"]
+                    _check_pre_admission(
+                        fresh, latest, structure, profile, order, now_fn, check_day
                     )
-                    if purchase_dt is None:
-                        raise RuntimeError(
-                            "Data da compra inválida; inclusão no grupo interrompida."
-                        )
-                    if (
-                        actual != expected
-                        or refused(latest, segment=profile.segment)
-                        or member(latest, structure["opt_out_uuid"], OPT_OUT)
-                        or cancelled_order_reason(order, latest)
-                    ):
-                        # Diagnóstico por NOMES de campos: nunca expor conteúdo, CPF, URNs ou token.
-                        field_diffs = sorted(
-                            k
-                            for k in expected["fields"]
-                            if actual["fields"].get(k) != expected["fields"].get(k)
-                        )
-                        other_diffs = [
-                            k
-                            for k in ("name", "urns", "groups")
-                            if actual[k] != expected[k]
-                        ]
-                        if refused(latest, segment=profile.segment) or member(
-                            latest, structure["opt_out_uuid"], OPT_OUT
-                        ):
-                            other_diffs.append("opt_out_marketing")
-                        if cancelled_order_reason(order, latest):
-                            other_diffs.append("pedido_ou_pagamento_cancelado")
-                        raise PreAdmissionConflict(
-                            "Guarda divergiu antes da inclusão: campos="
-                            + ",".join(field_diffs)
-                            + "; demais="
-                            + ",".join(other_diffs)
-                        )
-                    if (
-                        not 0
-                        <= (now_fn().astimezone(TZ).date() - purchase_dt.date()).days
-                        <= profile.days
-                    ):
-                        check_day()
-                        raise RuntimeError(
-                            f"Janela de 0 a {profile.days} dias terminou durante a aplicação."
-                        )
-                    event_at = business_order_datetime(fresh["event_at"])
-                    if event_at is None or event_at <= now_fn().astimezone(TZ):
-                        raise PreAdmissionConflict(
-                            f"HORARIO_D{profile.days}_ENCERRADO: horário do evento passou antes da inclusão."
-                        )
                     check_day()
                     writes_started = True
                     stage = "adicionar_grupo"
@@ -2364,7 +2378,11 @@ def apply_review(
                 "started_at": now.isoformat(),
                 "finished_at": now_fn().isoformat(),
                 "aplicacao_concluida": True,
-                **({"reservas_farma_sha256": reservas.sha256} if reservas.sha256 else {}),
+                **(
+                    {"reservas_farma_sha256": reservas.sha256}
+                    if reservas.sha256
+                    else {}
+                ),
                 "resultado": dict(summary),
                 "escritas_confirmadas": write_metrics.snapshot(),
                 "pendencias_por_motivo": dict(

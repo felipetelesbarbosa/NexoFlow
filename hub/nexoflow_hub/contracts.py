@@ -26,6 +26,8 @@ SCENARIOS = frozenset(get_args(Scenario))
 NoturnoScenario = Literal[
     "normal", "dados_incompletos", "rede_temporaria", "resposta_incerta",
     "fonte_essencial_incompleta",
+    "leitura_real_amostral",
+    "planejamento_real",
     "meta_recuperacao",
     "meta_consulta_direta_falha",
     "reserva_isolada", "reserva_anuncios_incompletos", "recompra_resposta_perdida",

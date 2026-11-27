@@ -296,6 +296,34 @@ class ReleaseSecretScanTests(unittest.TestCase):
         self.assertNotIn(sentinel, output)
         runner.assert_called_once()
 
+    def test_history_reports_only_validated_location_and_file_hash(self):
+        private = "DADO_SINTETICO_NUNCA_EXIBIR"
+        report = {
+            "Secret": private,
+            "Match": private,
+            "File": "app/fixture.py",
+            "Author": private,
+            "Commit": "a" * 40,
+            "StartLine": 42,
+            "RuleID": "generic-api-key",
+        }
+        result, output, _ = self.invoke(
+            "history", scanner=self.scanner_result(findings=[report], exit_code=1)
+        )
+        self.assertEqual(result, 1)
+        metadata = json.loads(output.split("Localização sanitizada: ", 1)[1])
+        self.assertEqual(
+            metadata,
+            {
+                "commit": "a" * 40,
+                "regra": "generic-api-key",
+                "linha": 42,
+                "arquivo_sha256": hashlib.sha256(b"app/fixture.py").hexdigest(),
+            },
+        )
+        self.assertNotIn(private, output)
+        self.assertNotIn("app/fixture.py", output)
+
     def test_findings_block_even_when_scanner_returns_zero(self):
         result, output, _ = self.invoke(
             "history", scanner=self.scanner_result(findings=[{"RuleID": "synthetic"}])

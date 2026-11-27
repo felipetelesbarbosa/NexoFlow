@@ -104,3 +104,19 @@ test("telemetria distingue fila vazia, fila aguardando e versões antigas", () =
     assert.throws(() => lerResumo({ ...sample, operacao: { ...operacao, ...fields } }));
   }
 });
+
+test("diagnóstico real e cobertura por fonte têm contrato fechado", () => {
+  const tarefa = { id: "ensaio", estado: "revisao_necessaria",
+    criado_em: "2026-11-27T16:00:00Z", atualizado_em: "2026-11-27T16:00:00Z" };
+  const evidencia = { modo: "leitura_real_amostral", primeira_etapa_pendente: "atualizacao_weni",
+    fontes: [
+      { nome: "weni", estado: "amostra_validada", origem: "real", cobertura_integral: false, motivo: null },
+      { nome: "farmalider", estado: "pendente", origem: "nao_confirmada", cobertura_integral: false,
+        motivo: "CREDENCIAL_NAO_PROVISIONADA" },
+      { nome: "meta", estado: "amostra_validada", origem: "real", cobertura_integral: false, motivo: null },
+    ] };
+  assert.deepEqual(lerResumo({...sample, tarefas: [{...tarefa, evidencia}]}).tarefas[0].evidencia, evidencia);
+  assert.throws(() => lerResumo({...sample, tarefas: [{...tarefa, evidencia: {...evidencia, fontes: [
+    evidencia.fontes[0], evidencia.fontes[1], {...evidencia.fontes[2], motivo: "texto arbitrário"},
+  ]}}]}));
+});

@@ -251,7 +251,7 @@ def create_app(settings: Settings | None = None):
         status_code=202,
         tags=["Execuções"],
         summary="Enfileirar o ensaio do Noturno FARMA",
-        description="O worker confirma as etapas sintéticas na ordem e preserva o progresso após interrupções.",
+        description="O worker executa os ensaios sintéticos ou a leitura e o planejamento real FARMA em simulação, sem publicação comercial.",
         responses={202: {"model": TaskView}, **CREATE_ERRORS},
     )
     def noturno(body: NoturnoRequest, request: Request, segment=dependency):

@@ -9,6 +9,7 @@ from copy import deepcopy
 from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 from urllib.parse import urlsplit
 from uuid import uuid5
 
@@ -98,27 +99,38 @@ class Adapters:
     def get_contact(self, *, uuid=None, urn=None):
         self.fence()
         with self.pub.connect(readonly=True) as conn:
-            row = conn.execute(
-                "SELECT documento FROM ensaio.weni WHERE tarefa=%s AND contato=%s",
-                (self.task["id"], uuid),
-            ).fetchone()
-            return row["documento"] if row else None
+            row = cast(
+                dict[str, Any] | None,
+                conn.execute(
+                    "SELECT documento FROM ensaio.weni WHERE tarefa=%s AND contato=%s",
+                    (self.task["id"], uuid),
+                ).fetchone(),
+            )
+            return row["documento"] if isinstance(row, dict) else None
 
     def mutate(self, uid, action, detail):
         self.fence()
         with self.pub.connect() as conn:
-            row = conn.execute(
-                "SELECT documento FROM ensaio.weni WHERE tarefa=%s AND contato=%s FOR UPDATE",
-                (self.task["id"], uid),
-            ).fetchone()
-            if not row:
+            row = cast(
+                dict[str, Any] | None,
+                conn.execute(
+                    "SELECT documento FROM ensaio.weni WHERE tarefa=%s AND contato=%s FOR UPDATE",
+                    (self.task["id"], uid),
+                ).fetchone(),
+            )
+            if not isinstance(row, dict):
                 raise RuntimeError("CONTATO_TESTE_AUSENTE")
             c = row["documento"]
             if action == "fields":
                 c["fields"].update(detail)
             else:
                 groups = {g["uuid"] for g in c["groups"]}
-                if action == "add" and detail in groups or action == "remove" and detail not in groups:
+                if (
+                    action == "add"
+                    and detail in groups
+                    or action == "remove"
+                    and detail not in groups
+                ):
                     return c
                 c["groups"] = [g for g in c["groups"] if g["uuid"] != detail]
                 if action == "add":
@@ -151,10 +163,16 @@ class Adapters:
 
     def count(self, uid, action):
         with self.pub.connect(readonly=True) as conn:
-            return conn.execute(
-                "SELECT count(*) AS n FROM ensaio.acoes WHERE tarefa=%s AND contato=%s AND acao=%s",
-                (self.task["id"], uid, action),
-            ).fetchone()["n"]
+            row = cast(
+                dict[str, Any] | None,
+                conn.execute(
+                    "SELECT count(*) AS n FROM ensaio.acoes WHERE tarefa=%s AND contato=%s AND acao=%s",
+                    (self.task["id"], uid, action),
+                ).fetchone(),
+            )
+            if not isinstance(row, dict):
+                raise RuntimeError("CONTAGEM_TESTE_INDISPONIVEL")
+            return row["n"]
 
     def update(self):
         import weni_update as wu
@@ -185,14 +203,20 @@ class Adapters:
             candidate_message_ids=set(),
             farm_client=None,
             captured_at="2026-10-09T13:57:00-03:00",
-            **kwargs,
+            opt_in_group_name=kwargs["opt_in_group_name"],
+            opt_in_group_uuid=kwargs["opt_in_group_uuid"],
+            opt_out_group_name=kwargs["opt_out_group_name"],
+            opt_out_group_uuid=kwargs["opt_out_group_uuid"],
         )
         wu.audit_plans(
             [plan], opt_out_group_available=True, opt_in_group_available=True
         )
         if not reservations.protege(uid):
+            current = self.get_contact(uuid=uid)
+            if current is None:
+                raise RuntimeError("CONTATO_TESTE_AUSENTE")
             pending, conflict = wu._prepare_frozen_plan_for_apply(
-                plan, self.get_contact(uuid=uid), **kwargs
+                plan, current, **kwargs
             )
             if pending is None:
                 raise RuntimeError("PLANO_TESTE_DIVERGENTE")

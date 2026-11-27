@@ -46,6 +46,9 @@ import {
   estados,
   etapasNoturno,
   motivosNoturno,
+  fontesNoturno,
+  estadosFonte,
+  motivosFonte,
   estadosWorker,
   horaLocal,
   janela,
@@ -948,6 +951,56 @@ function TaskDetail({ value, close }: { value: Tarefa; close: () => void }) {
         <section aria-label="Motivos de atenção">
           <h3>Motivos de atenção</h3>
           <ul>{value.motivos.map((motivo) => <li key={motivo}>{motivosNoturno[motivo]}</li>)}</ul>
+        </section>
+      )}
+      {value.evidencia && (
+        <section aria-label="Cobertura das fontes">
+          <h3>Cobertura das fontes</h3>
+          {value.evidencia.modo === "sintetico" ? (
+            <p>Ensaio com dados sintéticos. Nenhuma leitura comercial.</p>
+          ) : (
+            <>
+              <p>{value.evidencia.modo === "leitura_real_amostral"
+                ? "Diagnóstico amostral de leitura real"
+                : "Planejamento em simulação, sem aplicação comercial"}</p>
+              <dl>
+                {value.evidencia.fontes.map(fonte => (
+                  <Fragment key={fonte.nome}>
+                    <dt>{fontesNoturno[fonte.nome]}</dt>
+                    <dd>{estadosFonte[fonte.estado]} · {fonte.origem === "real" ? "Dados reais" : "Origem não confirmada"}
+                      {fonte.cobertura_integral ? " · Cobertura integral do recorte" : " · Cobertura integral não confirmada"}
+                      {fonte.motivo && <> · {motivosFonte[fonte.motivo]}</>}
+                    </dd>
+                  </Fragment>
+                ))}
+                {value.evidencia.planejamento_motivo && (
+                  <>
+                    <dt>Bloqueio do planejamento</dt>
+                    <dd>{motivosFonte[value.evidencia.planejamento_motivo]}</dd>
+                  </>
+                )}
+                {value.evidencia.primeira_etapa_pendente && (
+                  <>
+                    <dt>Primeira etapa pendente</dt>
+                    <dd>{etapasNoturno[value.evidencia.primeira_etapa_pendente]}</dd>
+                  </>
+                )}
+              </dl>
+              {value.evidencia.modo === "planejamento_real" && value.evidencia.planos && (
+                <>
+                  <h4>Planos · nenhuma aplicação comercial</h4>
+                  <dl>
+                    {value.evidencia.planos.map(plano => (
+                      <Fragment key={plano.etapa}>
+                        <dt>{etapasNoturno[plano.etapa]}</dt>
+                        <dd>{{planejado: "Planejado", parcial: "Parcial", pendente: "Pendente", nao_executada: "Não executada"}[plano.estado]}</dd>
+                      </Fragment>
+                    ))}
+                  </dl>
+                </>
+              )}
+            </>
+          )}
         </section>
       )}
       {value.etapas && (

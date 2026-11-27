@@ -148,6 +148,7 @@ def verify(*, web_ip, api_ip, pg_ip, secret_dir, key, farma_id, pet_id, wait):
         profile = {**farma, "Host": host, "Origin": "https://" + host}
         assert client.get(web + SESSION, headers=profile).json() == {
             "ambientes": ["homologacao"], "gerencia_usuarios": True,
+            "papel": "super_admin", "hub_disponivel": True,
         }
         assert client.get(web + "/api/central/v1/usuarios", headers=pet).status_code == 403
         invites = web + "/api/central/v1/convites"
@@ -162,6 +163,10 @@ def verify(*, web_ip, api_ip, pg_ip, secret_dir, key, farma_id, pet_id, wait):
             json={"codigo": created_invite.json()["codigo"]},
         ).status_code == 204
         assert client.get(web + ACCOUNT, headers=visitor).status_code == 200
+        assert client.get(web + SESSION, headers=visitor).json() == {
+            "ambientes": ["homologacao"], "gerencia_usuarios": False,
+            "papel": "convidado", "hub_disponivel": True,
+        }
         assert client.get(web + "/api/central/v1/usuarios", headers=visitor).status_code == 403
         assert client.post(
             web + "/api/central/v1/usuarios/revogar", headers=profile, json={"id": "invitee"}
@@ -275,7 +280,9 @@ def verify(*, web_ip, api_ip, pg_ip, secret_dir, key, farma_id, pet_id, wait):
                 visible = {"id", "estado", "criado_em", "atualizado_em"}
                 if task["id"] == noturno_id:
                     assert task["tipo"] == "noturno" and task["etapas"] == stages
-                    visible |= {"tipo", "etapas"}
+                    assert task["evidencia"] == {"modo": "sintetico"}
+                    assert task["motivos"] == ["COBERTURA_PARCIAL"]
+                    visible |= {"tipo", "etapas", "evidencia", "motivos"}
                 assert set(task) == visible
             events = [
                 item
