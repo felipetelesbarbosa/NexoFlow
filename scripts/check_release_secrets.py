@@ -1,7 +1,7 @@
 """Bloqueia publicação se o Gitleaks não aprovar histórico ou pacotes.
 
-O scanner é instalado externamente. Sua saída e seus relatórios nunca são
-reproduzidos no console, mesmo quando ele termina com erro.
+O scanner é instalado externamente. Sua saída e relatórios brutos nunca são
+reproduzidos no console. Só metadados mínimos e validados permitem triagem.
 """
 
 from __future__ import annotations
@@ -166,6 +166,26 @@ def extract_packages(assets_dir: Path, destination: Path) -> None:
         ) from exc
 
 
+def finding_location(finding: dict) -> dict:
+    """Identifica a ocorrência sem reproduzir conteúdo, autor ou caminho bruto."""
+    commit = finding.get("Commit")
+    rule = finding.get("RuleID")
+    file = finding.get("File")
+    line = finding.get("StartLine")
+    return {
+        "commit": commit
+        if isinstance(commit, str) and re.fullmatch(r"[0-9a-f]{40}", commit)
+        else None,
+        "regra": rule
+        if isinstance(rule, str) and re.fullmatch(r"[a-z][a-z0-9-]{0,63}", rule)
+        else None,
+        "arquivo_sha256": hashlib.sha256(file.encode("utf-8")).hexdigest()
+        if isinstance(file, str)
+        else None,
+        "linha": line if type(line) is int and 0 < line < 100_000_000 else None,
+    }
+
+
 def run_scanner(
     scanner: str, mode: str, target: Path, config: Path, private_dir: Path
 ) -> int:
@@ -224,6 +244,12 @@ def run_scanner(
         print(
             f"Segurança: publicação bloqueada; scanner sinalizou {len(findings)} ocorrência(s)."
         )
+        if mode == "history":
+            for finding in findings:
+                print(
+                    "Localização sanitizada: "
+                    + json.dumps(finding_location(finding), ensure_ascii=True)
+                )
         return 1
     print("Segurança: varredura aprovada, sem ocorrências.")
     return 0
@@ -247,7 +273,9 @@ def main(argv: list[str] | None = None) -> int:
         "--repo", required=True, type=Path, help="Raiz com .gitleaks.toml."
     )
     parser.add_argument(
-        "--assets-dir", type=Path, help="Diretório dos dois ZIPs e SHA256SUMS-1.5.64.txt."
+        "--assets-dir",
+        type=Path,
+        help="Diretório dos dois ZIPs e SHA256SUMS-1.5.64.txt.",
     )
     parser.add_argument(
         "--report-dir",
