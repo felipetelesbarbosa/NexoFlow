@@ -21,4 +21,4 @@ httpx==0.28.1
 # Transporte compartilhado de leitura HTTP, usado no aceite real FARMA.
 requests==2.34.2
 charset-normalizer==3.4.7
-urllib3==2.7.0
+urllib3==2.8.0
