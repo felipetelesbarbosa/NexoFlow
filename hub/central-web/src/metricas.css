@@ -172,7 +172,7 @@
 
 @page relatorio-vendas { size: A4 portrait; margin: 12mm; }
 @media print {
-  html:has(.metricas) { color-scheme: light; background: #fff; }
+  html:has(.metricas) { page: relatorio-vendas; color-scheme: light; background: #fff !important; }
   :root:has(.metricas), :root[data-tema="grafite"]:has(.metricas) {
     --canvas: #fff;
     --panel: #fff;
@@ -192,9 +192,22 @@
   }
   .metricas-page:has(.metricas) > :is(.metricas-topbar, .skip),
   .metricas-export, .metricas-filter, .metricas-graph-controls { display: none; }
-  .metricas-page:has(.metricas) main { padding: 0; }
+  html:has(.metricas) body, html:has(.metricas) #root { background: #fff; margin: 0; padding: 0; }
+  .metricas-page:has(.metricas) main { width: 100%; max-width: none; margin: 0; padding: 0; }
   .metricas-kicker .metricas-print-name { display: inline; padding: 0; font-size: inherit; background: none; }
-  .metricas { page: relatorio-vendas; display: block; print-color-adjust: exact; }
+  .metricas { display: block; width: 100%; max-width: 100%; print-color-adjust: exact; }
+  .metricas-heading h1 { font-size: 24pt; }
+  .metricas-source { overflow-wrap: anywhere; }
+  .metrica-card { padding: 9px; }
+  .metrica-card p { font-size: 12pt; letter-spacing: 0; }
+  .metricas-section { padding: 10px; }
+  .metricas-breakdown > div { grid-template-columns: minmax(0, 1fr) minmax(0, auto); }
+  .metricas-breakdown dd { overflow-wrap: anywhere; }
+  .metricas-table { table-layout: fixed; font-size: 9pt; }
+  .metricas-table th, .metricas-table td { padding: 5px 4px; white-space: normal; overflow-wrap: anywhere; }
+  .metricas-table th:first-child { width: 18%; }
+  .metricas-table th:nth-child(2) { width: 12%; }
+  .metricas-table th:nth-child(n+3) { width: 23.333%; }
   .metricas > * { margin-bottom: 12px; }
   .metricas-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .metricas-graphs { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
