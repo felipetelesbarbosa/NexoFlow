@@ -1365,5 +1365,27 @@ td {
   border-top: 1px solid var(--line);
 }
 .access-list .plain { justify-self: start; }
+.access-role-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-block: 5px 1px;
+}
+.access-role-actions .plain {
+  border: 1px solid var(--control-line);
+  background: var(--control);
+  color: var(--heading);
+  padding: 6px 10px;
+  font-weight: 600;
+}
+.access-role-actions .plain:enabled:hover {
+  background: var(--hover);
+}
+.access-role-actions .plain[aria-pressed="true"] {
+  background: var(--active);
+  border-color: var(--blue);
+  color: var(--blue);
+}
+.access-role-actions .plain:disabled[aria-pressed="false"] { opacity: .6; }
 .invite-history { margin-top: 16px; }
 .invitation-page { width: min(100%, 36rem); }

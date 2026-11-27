@@ -166,12 +166,17 @@ export function GerenciarUsuarios() {
                 <span>{user.segmentos.join(" · ")}</span>
                 {!user.super_admin && <small>{papeis[user.papel ?? "convidado"]}</small>}
                 {!user.email && !user.super_admin && <small>Identidade Access {user.id}</small>}
-                {!user.super_admin && user.papel && <button className="plain" disabled={busy} onClick={() => {
-                  const proximo = user.papel === "admin" ? "convidado" : "admin";
-                  if (window.confirm(`Alterar o papel desta pessoa para ${papeis[proximo]}? Confira as políticas correspondentes no Cloudflare Access.`)) {
-                    void alterar("/usuarios/papel", { id: user.id, papel: proximo }, "Papel atualizado. Confira as políticas no Cloudflare Access.");
-                  }
-                }}>{user.papel === "admin" ? "Tornar Convidado" : "Tornar Admin"}</button>}
+                {!user.super_admin && <div className="access-role-actions" role="group" aria-label="Alterar papel">
+                  {(["convidado", "admin"] as const).map((proximo) => {
+                    const atual = (user.papel ?? "convidado") === proximo;
+                    return <button type="button" key={proximo} className="plain" aria-pressed={atual}
+                      title={atual ? "Papel atual" : undefined} disabled={busy || atual} onClick={() => {
+                        if (window.confirm(`Alterar o papel desta pessoa para ${papeis[proximo]}? Confira as políticas correspondentes no Cloudflare Access.`)) {
+                          void alterar("/usuarios/papel", { id: user.id, papel: proximo }, "Papel atualizado. Confira as políticas no Cloudflare Access.");
+                        }
+                      }}>Tornar {papeis[proximo]}</button>;
+                  })}
+                </div>}
                 {!user.super_admin && <button className="plain" disabled={busy} onClick={() => {
                   if (window.confirm("Revogar o acesso desta pessoa à Central de Operações?")) {
                     void alterar("/usuarios/revogar", { id: user.id }, "Acesso revogado.");

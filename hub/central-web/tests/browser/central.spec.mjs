@@ -490,7 +490,7 @@ test("só o Super Admin vê o cadastro de convites e o atalho para autorização
     route.fulfill({ json: { ambientes: ["homologacao"], gerencia_usuarios: admin, metricas_farma: true, papel: admin ? "super_admin" : "admin" } }),
   );
   await page.route("**/api/central/v1/usuarios", (route) =>
-    route.fulfill({ json: { usuarios: [{ id: "leitor", email: "leitor@example.invalid", segmentos: ["FARMA"], super_admin: false, papel }], convites: ["pendente", "aceito", "expirado", "cancelado"].map((estado) => ({
+    route.fulfill({ json: { usuarios: [{ id: "super", email: "super@example.invalid", segmentos: ["FARMA"], super_admin: true, papel: "super_admin" }, { id: "leitor", email: "leitor@example.invalid", segmentos: ["FARMA"], super_admin: false, papel }], convites: ["pendente", "aceito", "expirado", "cancelado"].map((estado) => ({
       id: estado, email: estado + "@example.invalid", segmentos: ["FARMA"], estado, expira_em: 1800000000,
     })) } }),
   );
@@ -518,10 +518,28 @@ test("só o Super Admin vê o cadastro de convites e o atalho para autorização
   await expect(page.getByRole("link", { name: "Autorizar admins no Cloudflare Access" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Autorizar admins com MFA" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Autorizar convidados com MFA" })).toBeVisible();
+  const tornarConvidado = page.getByRole("button", { name: "Tornar Convidado", exact: true });
+  const tornarAdmin = page.getByRole("button", { name: "Tornar Admin", exact: true });
+  await expect(page.getByRole("listitem").filter({ hasText: "Você · Super Admin" }).getByRole("button")).toHaveCount(0);
+  await expect(tornarConvidado).toBeVisible();
+  await expect(tornarAdmin).toBeVisible();
+  await expect(tornarConvidado).toBeEnabled();
+  await expect(tornarAdmin).toBeDisabled();
+  expect(await tornarAdmin.getAttribute("aria-pressed")).toBe("true");
   page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "Tornar Convidado" }).click();
-  await expect(page.getByRole("button", { name: "Tornar Admin" })).toBeVisible();
+  await tornarConvidado.click();
+  await expect(tornarConvidado).toBeDisabled();
+  await expect(tornarAdmin).toBeEnabled();
   expect(papelAlterado).toEqual({ id: "leitor", papel: "convidado" });
+  await page.setViewportSize({ width: 320, height: 740 });
+  await expect(tornarConvidado).toBeVisible();
+  await expect(tornarAdmin).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  page.once("dialog", (dialog) => dialog.accept());
+  await tornarAdmin.click();
+  await expect(tornarConvidado).toBeEnabled();
+  await expect(tornarAdmin).toBeDisabled();
+  expect(papelAlterado).toEqual({ id: "leitor", papel: "admin" });
   await expect(page.getByRole("button", { name: "Pendentes (1)" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Cancelar convite" })).toBeVisible();
   await page.getByRole("button", { name: "Aceitos (1)" }).click();
