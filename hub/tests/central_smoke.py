@@ -275,7 +275,9 @@ def verify(*, web_ip, api_ip, pg_ip, secret_dir, key, farma_id, pet_id, wait):
                 visible = {"id", "estado", "criado_em", "atualizado_em"}
                 if task["id"] == noturno_id:
                     assert task["tipo"] == "noturno" and task["etapas"] == stages
-                    visible |= {"tipo", "etapas"}
+                    assert task["evidencia"] == {"modo": "sintetico"}
+                    assert task["motivos"] == ["COBERTURA_PARCIAL"]
+                    visible |= {"tipo", "etapas", "evidencia", "motivos"}
                 assert set(task) == visible
             events = [
                 item

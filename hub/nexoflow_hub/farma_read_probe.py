@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+from contextlib import contextmanager
 
 from order_history import HistoryQuery, page_envelope
 
@@ -94,7 +95,8 @@ def inspect_sources(client, start, end, *, limit=10, directory=False):
     return result
 
 
-def run_from_worker(start, end):
+@contextmanager
+def farmalider_client_from_worker():
     """Reutiliza cliente Windows, fixando a rota externa sem fallback corporativo."""
     require_scope()
     token = private_token("HUB_FARMALIDER_TOKEN_FILE")
@@ -126,11 +128,16 @@ def run_from_worker(start, end):
     try:
         if client.base_url != EXTERNAL or client.customer_segment != "FARMA":
             raise ValueError("ROTA_EXTERNA_FARMA_OBRIGATORIA")
+        yield client
+    finally:
+        client.close()
+
+
+def run_from_worker(start, end, *, directory=None):
+    with farmalider_client_from_worker() as client:
         return inspect_sources(
             client,
             start,
             end,
-            directory=os.environ.get("HUB_FARMALIDER_DIRECTORY_PROBE") == "true",
+            directory=(os.environ.get("HUB_FARMALIDER_DIRECTORY_PROBE") == "true" if directory is None else directory),
         )
-    finally:
-        client.close()

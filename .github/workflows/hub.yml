@@ -18,7 +18,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Instalar dependências fixadas sem atualizar pip
-        run: python -m pip --disable-pip-version-check install -r hub/requirements.lock -r hub/central-requirements.lock -r hub/requirements-dev.lock
+        run: python -m pip --disable-pip-version-check install -r hub/requirements.lock -r hub/central-requirements.lock -r hub/requirements-dev.lock -r requirements.txt
       - name: Ferramentas de qualidade
         run: python -m pip --disable-pip-version-check install -r dependencias/requirements-dev.txt
       - name: Lint e tipos do Hub

@@ -1,12 +1,22 @@
-# Noturno FARMA HML: aceite amostral das fontes reais
+# Noturno FARMA HML: leitura real e planejamento em simulação
 
-Esta entrega é um **diagnóstico inicial**, não a migração operacional do
-Noturno. Mantém os fluxos sintéticos anteriores e a publicação oficial Windows.
-O cenário explícito `leitura_real_amostral` entra na fila do Noturno existente e
-é executado pelo mesmo worker. Nenhuma etapa comercial, reserva, planejamento
-de compra ou publicação é confirmada por uma amostra. O resultado terminal é
-`revisao_necessaria` com a primeira etapa pendente e as evidências agregadas
-por fonte em `GET /tarefas/{id}/resultado`. Não há recibo READY artificial.
+Esta entrega mantém a publicação oficial Windows e os cenários sintéticos.
+Os dois cenários explícitos abaixo entram na fila existente e são executados
+pelo mesmo worker que a Central monitora. Nunca aplicam planos nem publicam
+Analytics, inclusive em homologação. Não criam checkpoint comercial nem READY.
+
+| Cenário | Escopo | Resultado |
+| --- | --- | --- |
+| `leitura_real_amostral` | Weni, FarmaLíder e Meta independentes; Meta recupera a referência 07 e 09/11/2026 | Diagnóstico sanitizado, com cobertura amostral |
+| `planejamento_real` | Diagnóstico + histórico paginado, estado FARMA verificado, Update Weni e Recompra D+25 | Propostas agregadas e totais financeiros confirmados; revisão necessária |
+
+A identificação CTWA usa o módulo compartilhado `meta_events` e o planejador
+Weni. A **atribuição comercial integral do Analytics** (classificações de
+conversas, destinos históricos, cobertura de anúncios e histórico de
+primeira compra) ainda exige integração e conciliação; não se infere venda
+ou CAC de um clique. O Analytics financeiro usa `order_history.normalize_order`.
+O recorte não substitui uma revisão congelada do Windows. Recompra é calculada
+sobre o cadastro Weni observado, não sobre um Update hipoteticamente aplicado.
 
 ## Credenciais e rede
 
@@ -53,34 +63,80 @@ por fonte em `GET /tarefas/{id}/resultado`. Não há recibo READY artificial.
   as permissões GET para os endpoints acima e `/api/Delivery/cliente/cpf/{cpf}`,
   e acesso pela rota externa TLS porta 3200 a partir da VPS.
 
-## Execução manual
+## Preparar o planejamento (opcional após o diagnóstico)
 
-1. Base `main`, sem release Windows, preserve imagens/Compose atuais. Valide
-   a configuração e o build de API/worker; implante somente esses serviços em
-   homologação após verificar o SHA e backup. Nenhuma migração adicional é
-   necessária para **este diagnóstico**.
-2. Importe `n8n/noturno-farma-leitura-real-hml.json`, vincule a credencial
-   existente Hub HML FARMA aos dois nós HTTP. Não grave tokens de fontes
-   comerciais nos nós. Deixe o fluxo inativo, sem Schedule Trigger.
-3. Execute manualmente. O fluxo usa a API/worker padrão, com chave de
-   idempotência derivada da execução n8n e consulta apenas o resultado
-   sanitizado. A Central mostra o mesmo ID FARMA em Revisão necessária.
-   Os detalhes por fonte são retornados pelo endpoint de resultado. A tela
-   atual ainda não tem uma seção específica de evidências por fonte.
-4. Meta: use a conta e anúncio de referência de 07 e 09/11/2026. A resposta
-   por conta é real; se omitida, use a mesma recuperação direta da 1.5.64.
-   A referência Windows é somente hipótese para localizar lacunas, jamais
-   preenchimento de fatos. Métricas não retornadas permanecem indisponíveis.
-5. Confirme resultado por fonte e ausência de publicação; teste nova chave,
-   e reenvio com a mesma chave. Verifique agendamentos, serviços, READY
-   oficial e PET intactos. Registre ID n8n/Hub e SHA implantado.
+O diagnóstico amostral independe do ZIP Windows. Para um planejamento com
+estado real, use o complemento `compose.planejamento-real-hml.yaml` após
+comprovar as três leituras e transferir os insumos privados FARMA:
 
-## Continuação obrigatória antes da paridade operacional
+- `farma_leitura/weni_update_state.json`: checkpoint existente com
+  `last_success_utc` válido e pendências de compra do Update.
+- `farma_leitura/recompra_state.json`: estado existente, schema 1, com mapa
+  `contacts` e pendências de compra. Não use estado vazio inventado.
+- `farma_leitura/farma-reservas.json`: manifesto FARMA original; deve ser
+  legível pelo UID 10001 e montado somente leitura.
+- Configure os SHA-256 respectivos em
+  `HUB_PLAN_WENI_STATE_FILE_SHA256`, `HUB_PLAN_RECOMPRA_STATE_FILE_SHA256`
+  e `NEXOFLOW_RESERVAS_FARMA_SHA256` no ambiente privado do Compose.
+  Confirme a origem FARMA de cada arquivo. O código não altera esses hashes,
+  arquivos ou checkpoints.
+- `HUB_PLAN_HISTORY_START` e `HUB_PLAN_HISTORY_END` definem o recorte civil
+  America/Belem (ex.: 2026-11-01 e 2026-11-26). O corte UTC é a criação da
+  tarefa no Hub; o fim do período e o checkpoint anterior não podem
+  ultrapassá-lo. Um cadastro observado depois do corte impede afirmar uma
+  fotografia congelada. Use a mesma janela/corte para conciliar o Windows.
+- Até 32 dias, 50 páginas de 500 pedidos, 50 mil cadastros, 5 mil contatos,
+  30 mil mensagens e eventos CTWA. Cada sessão permite até 2 mil GETs e
+  900 s, com corpo decodificado limitado a 64 MiB. Antes de habilitar a
+  consulta integral, confira orçamento real de RAM e tempo do worker.
+  Excesso de limite, paginação inconsistente, identidade ou reserva não
+  confirmada ficam pendentes; não se substitui o restante por zero.
 
-A amostra não demonstra cobertura do período de Analytics, nem produção
-dos planos reais. Implementar adaptadores não comerciais com regras
-compartilhadas de Update Weni, histórico, Analytics/atribuição e Recompra
-(realidade de reservas, checkpoints e consentimentos). Definir corte e
-limites, reconciliar com referência Windows, apresentar cobertura por fonte
-na Central com projeção sanitizada e somente depois preparar publicação de
-teste no PostgreSQL HML. Nunca conectar destino comercial de escrita.
+O transporte restringe método GET, destinos HTTPS, portas, rotas, proxy
+privado e certificado; rejeita redirecionamentos. O resultado persiste
+somente contagens, totais financeiros, origem, estados e códigos fechados.
+Não envia cadastro, CPF, telefone ou token ao Hub/n8n/Central.
+
+## Implantação e execução manual (somente HML)
+
+1. Aguarde a aprovação do PR e a CI Hub com PostgreSQL temporário. Confira
+   SHA, Compose ativo, imagens de reversão, backup recuperável e banco
+   `nexoflow_hub_hml` na VPS. Não altere PET, Windows ou Produção.
+2. Preserve perfis, convites, papéis, volume de perfis, credenciais,
+   complementos de usuários/Métricas/Meta e domínio oficial. Construa as
+   imagens do Hub, Central API e Central Web no SHA aprovado. Aplique a
+   **migração 008 somente no banco HML**, pelo serviço `migracao` existente,
+   e atualize API, worker, Central API e Central Web de forma coordenada.
+   A migração acrescenta à view existente uma projeção de evidência com
+   chaves/valores permitidos, sem conceder acesso à tabela de tarefas.
+   Confirme saúde dos quatro serviços. Em rollback, preserve o backup
+   recuperável e as imagens anteriores; não faça downgrade com tarefas
+   gravadas nem restaure banco oficial. O código antigo exige schema 007;
+   a reversão da migração deve ser planejada antes da mudança.
+3. Importe o workflow `n8n/noturno-farma-leitura-real-hml.json`. Associe
+   a credencial existente Hub HML FARMA aos dois nós HTTP. Deixe inativo
+   (manual, sem Schedule Trigger). Rode sem aguardar o ZIP.
+4. Registre ID n8n, ID Hub, três fontes, período, Meta 07 e 09/11, erros e
+   pendências. Se não houver credencial FarmaLíder, confirme a pendência
+   dessa fonte, sem bloquear Meta e Weni. As omissões da Meta são
+   recuperadas pelo cliente compartilhado sem inventar impressões/CTR/CPM.
+5. Quando os estados reais e reservas estiverem disponíveis, habilite o
+   complemento de planejamento e importe
+   `n8n/noturno-farma-planejamento-real-hml.json`. Também manual e inativo.
+   Execute, compare os totais e propostas com a referência equivalente,
+   e confira a primeira etapa pendente no detalhe da Central. Ausência
+   de estado/checkpoint/reserva impede comprovar o plano, não fabrica um.
+6. Reenvie a mesma chave (preserva ID, nenhuma reaplicação); nova chave
+   produz novo diagnóstico. Confira zero escritas comerciais, zero
+   publicações, nenhum READY criado, agendamentos desligados, PET e READY
+   oficial intactos. Registre SHA efetivamente implantado e os IDs.
+7. Só depois da conciliação preparar publicador de teste HML em entrega
+   separada. Não habilitar Produção nesta etapa.
+
+## Validação
+
+As fixtures da suíte são exclusivamente sintéticas, sem rede comercial.
+Os ensaios verificam recuperação Meta, limites, regras compartilhadas de
+Update Weni e Recompra, normalização financeira, segregação FARMA/PET,
+idempotência, fencing/renovação e o contrato visual. A confirmação de
+acesso externo, credenciais e volumes privados só pode ocorrer na VPS.

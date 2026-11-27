@@ -718,3 +718,38 @@ test("falha da sessão não abre a navegação nem consulta dados do Hub", async
   await expect(page.getByRole("navigation", { name: "Navegação principal" })).toHaveCount(0);
   expect(hubCalls).toEqual([]);
 });
+
+test("Central separa cobertura real, etapa bloqueada e ausência de aplicação", async ({ page }) => {
+  await page.route("**/api/central/v1/resumo", (route) => route.fulfill({ json: {
+    ...summary, tarefas: [{
+      ...summary.tarefas[0], tipo: "noturno", estado: "revisao_necessaria",
+      evidencia: {
+        modo: "planejamento_real",
+        primeira_etapa_pendente: "analytics",
+        planejamento_motivo: null,
+        fontes: [
+          {nome: "weni", estado: "validada", origem: "real", cobertura_integral: true, motivo: null},
+          {nome: "farmalider", estado: "pendente", origem: "nao_confirmada", cobertura_integral: false, motivo: "CREDENCIAL_NAO_PROVISIONADA"},
+          {nome: "meta", estado: "amostra_validada", origem: "real", cobertura_integral: false, motivo: null},
+        ],
+        planos: [
+          {etapa: "atualizacao_weni", estado: "planejado"},
+          {etapa: "analytics", estado: "parcial"},
+          {etapa: "publicacao", estado: "nao_executada"},
+          {etapa: "recompra", estado: "nao_executada"},
+          {etapa: "analytics_final", estado: "nao_executada"},
+        ],
+      },
+    }],
+  } }));
+  await page.goto("/");
+  await page.getByRole("button", {name: /Detalhes da execução/}).click();
+  const evidence = page.getByRole("region", {name: "Cobertura das fontes"});
+  await expect(evidence).toContainText("Dados reais");
+  await expect(evidence).toContainText("Credencial não provisionada");
+  await expect(evidence).toContainText("Primeira etapa pendente");
+  await expect(evidence).toContainText("Planejamento em simulação, sem aplicação comercial");
+  await expect(evidence).toContainText("Não executada");
+  await page.setViewportSize({width: 390, height: 844});
+  await expect(evidence).toBeVisible();
+});

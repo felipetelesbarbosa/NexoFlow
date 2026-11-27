@@ -1,7 +1,9 @@
 """Aceite amostral do Noturno real FARMA. Não gera planos nem recibos READY."""
 
 import os
+from contextlib import contextmanager
 from decimal import Decimal, InvalidOperation
+from typing import Any
 
 from meta_ads_recovery import (
     observed_media_metrics,
@@ -17,6 +19,7 @@ from .real_read_transport import (
 )
 
 SCENARIO = "leitura_real_amostral"
+PLAN_SCENARIO = "planejamento_real"
 DAYS = ("2026-11-07", "2026-11-09")
 ACCOUNT = "898435729140540"
 AD = "120250534034080073"
@@ -144,7 +147,8 @@ def meta_from_worker():
         session.close()
 
 
-def weni_from_worker():
+@contextmanager
+def weni_client_from_worker(*, planning=False):
     require_scope()
     from weni_client import WeniClient
 
@@ -164,12 +168,33 @@ def weni_from_worker():
                     "/api/v2/messages.json",
                     "/api/v2/groups.json",
                 }
+                | (
+                    {
+                        "/api/v2/fields.json",
+                        "/api/v2/events.json",
+                        "/api/v2/campaigns.json",
+                        "/api/v2/campaign_events.json",
+                        "/api/v2/definitions.json",
+                    }
+                    if planning
+                    else set()
+                )
             ),
             proxy_var="HUB_SOURCE_PROXY_URL",
             proxy_expected="http://farma-fontes-egress:3128",
         )
         session.headers.update(original.headers)
         client.session = session
+        # Verifica a organização antes de admitir qualquer dado comercial.
+        client._check_profile_org()
+        yield client
+    finally:
+        original.close()
+        client.close()
+
+
+def weni_from_worker():
+    with weni_client_from_worker() as client:
         probe = client.test_update_access("Opt-Out LGPD")
         return {
             "estado": "amostra_validada" if probe["opt_out_group_found"] else "parcial",
@@ -180,17 +205,32 @@ def weni_from_worker():
             "grupo_opt_out_confirmado": probe["opt_out_group_found"],
             "cobertura_integral": False,
         }
-    finally:
-        original.close()
-        client.close()
 
 
-def safe_source(fn):
+def safe_source(fn) -> dict[str, Any]:
     # Não publicar exceções, URLs, corpo de respostas, CPFs ou token.
     try:
         return fn()
     except ProbePending as exc:
-        return {"estado": "pendente", "motivo": str(exc)}
+        return {
+            "estado": "pendente",
+            "motivo": str(exc)
+            if str(exc)
+            in {
+                "CREDENCIAL_NAO_PROVISIONADA",
+                "CREDENCIAL_INVALIDA",
+                "SAIDA_PRIVADA_NAO_CONFIGURADA",
+                "ESCOPO_FARMA_HML_OBRIGATORIO",
+                "CONSULTA_FORA_ESCOPO_LEITURA",
+                "CONTA_META_DIVERGENTE",
+                "ANUNCIO_REFERENCIA_AUSENTE",
+                "LIMITE_AMOSTRA_EXCEDIDO",
+                "ESTADO_PRIVADO_AUSENTE",
+                "RESERVAS_NAO_CONFIRMADAS",
+                "CONTEXTO_INCOMPLETO",
+            }
+            else "LEITURA_NAO_CONFIRMADA",
+        }
     except Exception as exc:
         code = getattr(exc, "status_code", None)
         return {
@@ -200,7 +240,7 @@ def safe_source(fn):
         }
 
 
-def collect_sources():
+def collect_sources(*, directory=None):
     require_scope()
     from .farma_read_probe import run_from_worker
 
@@ -208,7 +248,7 @@ def collect_sources():
     return {
         "meta": safe_source(meta_from_worker),
         "weni": safe_source(weni_from_worker),
-        "farmalider": safe_source(lambda: run_from_worker(DAYS[0], DAYS[-1])),
+        "farmalider": safe_source(lambda: run_from_worker(DAYS[0], DAYS[-1], directory=directory)),
     }
 
 
@@ -218,6 +258,8 @@ def run_noturno_probe(store, task):
     A leitura amostral não confirma etapas comerciais. Nenhum checkpoint de
     plano/publicação é criado; a próxima etapa permanece Atualização Weni.
     """
+    import logging
+    from contextlib import redirect_stderr, redirect_stdout
     from pathlib import Path
     from threading import Event, Thread
 
@@ -240,15 +282,26 @@ def run_noturno_probe(store, task):
     store.renew_lease(task)
     thread = Thread(target=heartbeat, name="nf-real-read-lease", daemon=True)
     thread.start()
+    scenario = task["cenario"]
+    planning: dict[str, Any] = {}
+    previous = logging.root.manager.disable
     try:
+        logging.disable(logging.CRITICAL)
         try:
-            sources = collect_sources()
+            with open(os.devnull, "w") as sink, redirect_stdout(sink), redirect_stderr(sink):
+                sources = (collect_sources(directory=False) if scenario == PLAN_SCENARIO else collect_sources())
+                if scenario == PLAN_SCENARIO:
+                    from .real_plan import plan_from_worker
+
+                    planning = safe_source(lambda: plan_from_worker(task["criada_em"]))
+                    sources.update(planning.get("fontes", {}))
         except ProbePending:
             sources = {
                 n: {"estado": "pendente", "motivo": "ESCOPO_FARMA_HML_OBRIGATORIO"}
                 for n in ("meta", "weni", "farmalider")
             }
     finally:
+        logging.disable(previous)
         stopped.set()
         thread.join()
     if lost.is_set():
@@ -261,8 +314,9 @@ def run_noturno_probe(store, task):
             "tratamento": "validar_cobertura_integral_e_planos",
         }
         for n in ("weni", "farmalider")
+        if not sources[n].get("cobertura_integral")
     ]
-    if sources["meta"].get("estado") != "amostra_validada":
+    if not sources["meta"].get("cobertura_integral"):
         pending.append(
             {
                 "fonte": "anuncios",
@@ -270,31 +324,56 @@ def run_noturno_probe(store, task):
                 "tratamento": "verificar_meta",
             }
         )
-    # Sempre revisão: a amostra não prova a cobertura/planos do Noturno inteiro.
+    if scenario == PLAN_SCENARIO:
+        pending.append({
+            "fonte": "analytics",
+            "motivo": "FONTE_ESSENCIAL_INCOMPLETA",
+            "tratamento": "conciliar_atribuicao_comercial_e_referencia_windows",
+        })
+    # Sempre revisão: nenhuma publicação e nenhuma aplicação real.
+    steps: dict[str, dict[str, Any]] = {
+        name: {"estado": "nao_executada", "motivo": "AMOSTRA_NAO_CONFIRMA_PLANO"}
+        for name in (
+            "atualizacao_weni",
+            "analytics",
+            "publicacao",
+            "recompra",
+            "analytics_final",
+        )
+    }
+    steps.update(planning.get("planos", {}))
+    first = "atualizacao_weni"
+    if steps["atualizacao_weni"]["estado"] == "planejado":
+        first = "analytics"
+        if (
+            steps["analytics"]["estado"] == "planejado"
+            and steps["analytics"].get("atribuicao_comercial") != "pendente"
+        ):
+            first = "publicacao"
+    if scenario == PLAN_SCENARIO:
+        steps["publicacao"] = {
+            "estado": "nao_executada",
+            "motivo": "PUBLICACAO_DEFERIDA",
+        }
+        steps["analytics_final"] = {
+            "estado": "nao_executada",
+            "motivo": "SEM_APLICACAO_RECOMPRA",
+        }
     store.finish(
         task,
         "revisao_necessaria",
         error="FONTE_ESSENCIAL_INCOMPLETA",
         result={
-            "modo": SCENARIO,
+            "modo": scenario,
             "periodo_referencia": list(DAYS),
             "fontes": sources,
-            "primeira_etapa_pendente": "atualizacao_weni",
+            "primeira_etapa_pendente": first,
+            "planejamento": {
+                k: v for k, v in planning.items() if k not in {"fontes", "planos"}
+            },
             "externas_gravacoes": 0,
             "publicacoes": 0,
-            "etapas": {
-                name: {
-                    "estado": "nao_executada",
-                    "motivo": "AMOSTRA_NAO_CONFIRMA_PLANO",
-                }
-                for name in (
-                    "atualizacao_weni",
-                    "analytics",
-                    "publicacao",
-                    "recompra",
-                    "analytics_final",
-                )
-            },
+            "etapas": steps,
             "pendencias": pending,
         },
     )

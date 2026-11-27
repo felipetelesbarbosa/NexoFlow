@@ -1,0 +1,27 @@
+# Usar apenas com leitura-real + proxy/segredos privados já conferidos.
+# Estados e reservas são os arquivos reais congelados de FARMA, não fixtures.
+services:
+  worker:
+    environment:
+      HUB_REAL_PLAN_ENABLED: 'true'
+      HUB_FARMALIDER_DIRECTORY_PROBE: 'true'
+      HUB_PLAN_STATE_SEGMENT: FARMA
+      HUB_PLAN_WENI_STATE_FILE: /run/secrets/farma_weni_state
+      HUB_PLAN_WENI_STATE_FILE_SHA256: '${HUB_PLAN_WENI_STATE_FILE_SHA256:?hash do checkpoint Weni obrigatório}'
+      HUB_PLAN_RECOMPRA_STATE_FILE: /run/secrets/farma_recompra_state
+      HUB_PLAN_RECOMPRA_STATE_FILE_SHA256: '${HUB_PLAN_RECOMPRA_STATE_FILE_SHA256:?hash do checkpoint Recompra obrigatório}'
+      NEXOFLOW_RESERVAS_FARMA_SHA256: '${NEXOFLOW_RESERVAS_FARMA_SHA256:?hash das reservas obrigatório}'
+      HUB_PLAN_HISTORY_START: '${HUB_PLAN_HISTORY_START:?início do recorte obrigatório}'
+      HUB_PLAN_HISTORY_END: '${HUB_PLAN_HISTORY_END:?fim do recorte obrigatório}'
+    volumes:
+      - '${HUB_SEGREDOS_DIR:?diretorio privado obrigatório}/farma_leitura/farma-reservas.json:/opt/nexoflow/credentials/farma-reservas.json:ro'
+    secrets:
+      - source: farma_weni_state
+        target: farma_weni_state
+      - source: farma_recompra_state
+        target: farma_recompra_state
+secrets:
+  farma_weni_state:
+    file: '${HUB_SEGREDOS_DIR}/farma_leitura/weni_update_state.json'
+  farma_recompra_state:
+    file: '${HUB_SEGREDOS_DIR}/farma_leitura/recompra_state.json'

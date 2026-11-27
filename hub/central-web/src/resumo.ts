@@ -22,6 +22,42 @@ export const motivosNoturno = {
   RESPOSTA_INCERTA: "Publicação sem confirmação: conferir a revisão e o recibo antes de repetir.",
   FONTE_ESSENCIAL_INCOMPLETA: "Fonte essencial incompleta: conferir a cobertura antes de publicar.",
 } as const;
+export const fontesNoturno = {
+  weni: "Weni",
+  farmalider: "FarmaLíder",
+  meta: "Meta Ads",
+} as const;
+export const estadosFonte = {
+  amostra_validada: "Amostra validada",
+  validada: "Cobertura validada",
+  parcial: "Parcial",
+  pendente: "Pendente",
+  nao_executada: "Não executada",
+} as const;
+export const motivosFonte = {
+  CREDENCIAL_NAO_PROVISIONADA: "Credencial não provisionada",
+  SAIDA_PRIVADA_NAO_CONFIGURADA: "Saída privada não configurada",
+  ESCOPO_FARMA_HML_OBRIGATORIO: "Escopo de homologação não confirmado",
+  LEITURA_NAO_CONFIRMADA: "Leitura não confirmada",
+  CREDENCIAL_INVALIDA: "Credencial inválida",
+  CONTEXTO_INCOMPLETO: "Contexto incompleto",
+  LIMITE_AMOSTRA_EXCEDIDO: "Limite de coleta excedido",
+  ESTADO_PRIVADO_AUSENTE: "Estado privado não provisionado",
+  RESERVAS_NAO_CONFIRMADAS: "Reservas não confirmadas",
+} as const;
+export type EvidenciaNoturno = { modo: "sintetico" } | {
+  modo: "leitura_real_amostral" | "planejamento_real";
+  primeira_etapa_pendente: keyof typeof etapasNoturno | null;
+  planejamento_motivo?: keyof typeof motivosFonte | null;
+  planos?: { etapa: keyof typeof etapasNoturno; estado: "planejado" | "parcial" | "pendente" | "nao_executada" }[];
+  fontes: {
+    nome: keyof typeof fontesNoturno;
+    estado: keyof typeof estadosFonte;
+    origem: "real" | "nao_confirmada";
+    cobertura_integral: boolean;
+    motivo: keyof typeof motivosFonte | null;
+  }[];
+};
 export type Tarefa = {
   id: string;
   estado: Estado;
@@ -29,6 +65,7 @@ export type Tarefa = {
   atualizado_em: string;
   tipo?: string;
   motivos?: (keyof typeof motivosNoturno)[];
+  evidencia?: EvidenciaNoturno;
   etapas?: { etapa: keyof typeof etapasNoturno; estado: Estado }[];
 };
 export type Evento = { tipo: string; ocorrido_em: string; recebido_em: string };
@@ -124,6 +161,31 @@ function operacaoValida(x: unknown): boolean {
   );
 }
 
+function evidenciaValida(x: unknown): boolean {
+  if (x === undefined) return true;
+  if (!registro(x)) return false;
+  if (x.modo === "sintetico") return true;
+  return (x.modo === "leitura_real_amostral" || x.modo === "planejamento_real") &&
+    (x.primeira_etapa_pendente === null || (
+      typeof x.primeira_etapa_pendente === "string" &&
+      Object.hasOwn(etapasNoturno, x.primeira_etapa_pendente))) &&
+    (x.planejamento_motivo === undefined || x.planejamento_motivo === null ||
+       (typeof x.planejamento_motivo === "string" && Object.hasOwn(motivosFonte, x.planejamento_motivo))) &&
+    (x.planos === undefined || (Array.isArray(x.planos) && x.planos.length === 5 &&
+      new Set(x.planos.map(p => registro(p) ? p.etapa : null)).size === 5 &&
+      x.planos.every((p: unknown) => registro(p) && typeof p.etapa === "string" &&
+        Object.hasOwn(etapasNoturno, p.etapa) &&
+        ["planejado", "parcial", "pendente", "nao_executada"].includes(String(p.estado))))) &&
+    Array.isArray(x.fontes) && x.fontes.length === 3 &&
+    new Set(x.fontes.map(f => registro(f) ? f.nome : null)).size === 3 &&
+    x.fontes.every((f: unknown) =>
+      registro(f) && typeof f.nome === "string" && Object.hasOwn(fontesNoturno, f.nome) &&
+      typeof f.estado === "string" && Object.hasOwn(estadosFonte, f.estado) &&
+      (f.origem === "real" || f.origem === "nao_confirmada") &&
+      typeof f.cobertura_integral === "boolean" &&
+      (f.motivo === null || (typeof f.motivo === "string" && Object.hasOwn(motivosFonte, f.motivo))));
+}
+
 export function lerResumo(x: unknown): Resumo {
   const ok =
     registro(x) &&
@@ -145,6 +207,7 @@ export function lerResumo(x: unknown): Resumo {
         Object.hasOwn(estados, t.estado) &&
         instante(t.criado_em) &&
         instante(t.atualizado_em) &&
+        evidenciaValida(t.evidencia) &&
         (t.motivos === undefined || (Array.isArray(t.motivos) && t.motivos.every((m: unknown) => typeof m === "string" && Object.hasOwn(motivosNoturno, m)))) &&
         (t.etapas === undefined ||
           (Array.isArray(t.etapas) &&

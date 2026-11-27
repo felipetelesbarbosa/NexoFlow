@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from time import monotonic
 from urllib.parse import urlsplit
 
 import requests
@@ -50,6 +51,8 @@ class ReadOnlySession(requests.Session):
             self.close()
             raise ProbePending("SAIDA_PRIVADA_NAO_CONFIGURADA")
         self.proxies = {"https": proxy}
+        self.deadline = monotonic() + 900
+        self.remaining_requests = 2000
 
     def send(self, request, **kwargs):
         parsed = urlsplit(request.url)
@@ -65,8 +68,33 @@ class ReadOnlySession(requests.Session):
             or kwargs.get("verify") is False
         ):
             raise ProbePending("CONSULTA_FORA_ESCOPO_LEITURA")
+        remaining = self.deadline - monotonic()
+        if remaining <= 0 or self.remaining_requests <= 0:
+            raise ProbePending("LIMITE_AMOSTRA_EXCEDIDO")
+        self.remaining_requests -= 1
+        # Uma leitura não pode exceder o orçamento restante; o corpo também é limitado.
+        timeout = kwargs.get("timeout")
+        if isinstance(timeout, tuple):
+            kwargs["timeout"] = tuple(min(float(t), remaining) for t in timeout)
+        else:
+            kwargs["timeout"] = min(float(timeout or 90), remaining)
         kwargs["allow_redirects"] = False
         kwargs["verify"] = True
         # Nem o cliente Windows nem o ambiente podem sobrescrever a saída.
         kwargs["proxies"] = dict(self.proxies)
-        return super().send(request, **kwargs)
+        kwargs["stream"] = True
+        response = super().send(request, **kwargs)
+        try:
+            body = bytearray()
+            for chunk in response.iter_content(chunk_size=64 * 1024):
+                if (
+                    monotonic() > self.deadline
+                    or len(body) + len(chunk) > 64 * 1024 * 1024
+                ):
+                    raise ProbePending("LIMITE_AMOSTRA_EXCEDIDO")
+                body.extend(chunk)
+            response._content = bytes(body)
+            response._content_consumed = True
+            return response
+        finally:
+            response.close()
