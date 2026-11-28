@@ -64,7 +64,9 @@ export const contagensReplay = {
   grupos: "Ações de grupo", identicos: "Decisões idênticas",
   divergentes: "Divergências", inclusoes: "Inclusões", remocoes: "Remoções",
   trocas: "Trocas", sem_acao: "Sem ação de grupo", reservados: "Reservados",
-  novos_pendentes: "Novos cadastros pendentes",
+  novos_pendentes: "Novos cadastros com descoberta pendente",
+  novos_conteudo_identico: "Conteúdo de novos cadastros idêntico",
+  novos_conteudo_divergente: "Conteúdo de novos cadastros divergente",
 } as const;
 export type EvidenciaReplay = {
   modo: "referencia_congelada";

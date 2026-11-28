@@ -69,6 +69,13 @@ def scope(task):
             "ESCOPO_FARMA_HML_OBRIGATORIO")
 
 
+def stream_sha256(stream):
+    value = hashlib.sha256()
+    while block := stream.read(1024 * 1024):
+        value.update(block)
+    return value.hexdigest()
+
+
 def expected_revision():
     revision = os.environ.get("HUB_FROZEN_REPLAY_REVISION", "")
     try:
@@ -84,7 +91,7 @@ class Capture:
         require(archive.stat().st_size <= MAX_ARCHIVE, "LIMITE_REFERENCIA_EXCEDIDO")
         self.file = archive.open("rb")
         try:
-            require(hashlib.file_digest(self.file, "sha256").hexdigest() == expected_sha)
+            require(stream_sha256(self.file) == expected_sha)
             revision = expected_revision()
             self.file.seek(0)
             self.zip = zipfile.ZipFile(self.file)
@@ -109,7 +116,7 @@ class Capture:
             for name, entry in entries.items():
                 require(self.zip.getinfo(name).file_size == entry["bytes"])
                 with self.zip.open(name) as f:
-                    require(hashlib.file_digest(f, "sha256").hexdigest() == entry["sha256"])
+                    require(stream_sha256(f) == entry["sha256"])
             receipt = self.read("ready_recibo.json")
             require(receipt["state"] == "READY" and receipt["revision"] == revision
                     and receipt["version"] == 15 and receipt["source_sha"] == m["ready"]["source_sha"])
@@ -241,12 +248,13 @@ class FrozenRules:
         kw = dict(a["parametros"])
         require(kw["captured_at"] == self.weni_review["captured_at_utc"])
         old = self.weni.get(uid)
-        if uid.startswith("novo-api:"):
-            # A descoberta de cadastro exige o diretório integral. Não preencher
-            # o pedido ausente com o plano esperado (seria uma comparação circular).
+        new_customer = uid.startswith("novo-api:")
+        if new_customer:
+            # A decisão de descoberta deve permanecer pendente sem o diretório
+            # completo; mas os campos/pedido da proposta podem ser recalculados
+            # com o cadastro selecionado e a resposta normalizada já capturados.
             require(old is not None)
             counts["novos_pendentes"] += 1
-            return
         def recorded(key):
             # Alguns caminhos (identidade com pedidos distintos) não consultam
             # pedido; ausência é permitida somente se a regra não pedir o dado.
@@ -259,6 +267,9 @@ class FrozenRules:
         with patch.object(wu, "selected_customer", lambda *_a, **_kw: recorded("cadastro_selecionado")), patch.object(wu, "resolve_contact_order", lambda *_a, **_kw: recorded("pedido_normalizado")):
             # Objeto marcador, não é cliente e não sabe fazer requisições.
             fresh = wu._build_contact_plan(a["contato"], farm_client=cast(FarmaliderClient, object()), **kw)
+        if new_customer:
+            self.creation_content(a, fresh, old, counts)
+            return
         emitted = fresh.has_changes or any(k.startswith("__pending_purchase_check") for k in fresh.guards)
         counts["contatos"] += 1
         if emitted:
@@ -270,6 +281,44 @@ class FrozenRules:
         old_value = None if old is None else {k: v for k, v in old.items() if k != "display"}
         new_value = wu._canonical_plan(fresh) if emitted else None
         counts["identicos" if canonical(old_value) == canonical(new_value) else "divergentes"] += 1
+
+    def creation_content(self, a, fresh, old, counts):
+        from analytics import normalize_cpf
+        from customer_discovery import GUARD, phone
+        from farmalider_customers import matching_order_address
+
+        customer = a["cadastro_selecionado"]
+        require(isinstance(customer, dict) and fresh.order_validated)
+        fields = set(a["parametros"]["available_weni_fields"])
+        cpf = normalize_cpf(customer["cpf"])
+        number = phone(customer.get("celular"))
+        urns = ["whatsapp:" + number] if number else []
+        name = str(customer.get("nome") or "").strip()
+        require(a["contato"]["urns"] == urns and a["contato"]["name"] == name
+                and a["contato"]["fields"]["cpf"] == cpf)
+        extra = {}
+        if "email" in fields and customer.get("email"):
+            extra["email"] = str(customer["email"]).strip()
+        if "origem_contato" in fields:
+            extra["origem_contato"] = "API FarmaLíder — FARMA"
+        status, address = matching_order_address(customer, segment="FARMA")
+        if "endereco" in fields and status == "ENDERECO_CONFIRMADO" and address:
+            extra["endereco"] = ", ".join(str(address.get(k) or "").strip()
+                for k in ("logradouro","numero","complemento") if str(address.get(k) or "").strip())
+        fresh.fields["cpf"] = cpf
+        fresh.previous["cpf"] = None
+        fresh.guards[GUARD] = {
+            "segment": "FARMA", "customer_id": str(customer["id"]), "name": name,
+            "urns": urns, "extra_fields": extra,
+        }
+        self.wu.audit_plans([fresh], opt_out_group_available=True, opt_in_group_available=True)
+        expected = deepcopy({k:v for k,v in old.items() if k!="display"})
+        # O hash do snapshot bruto não pode ser reconstruído de um cadastro
+        # selecionado; excluí-lo explicitamente da comparação de conteúdo.
+        expected["guards"][GUARD].pop("source_sha256")
+        actual = self.wu._canonical_plan(fresh)
+        counts["novos_conteudo_identico" if canonical(expected) == canonical(actual)
+               else "novos_conteudo_divergente"] += 1
 
     def recompra_row(self, a, counts):
         rc = self.rc
@@ -496,12 +545,14 @@ def run_frozen(store, task, *, interrupt_after=None):
         rc, rl, rr = r
         differences = {stage: {key: counts.get(key, 0)-value for key,value in rules.expected[stage].items()}
                        for stage, counts in (("weni", wc), ("recompra", rc))}
-        valid = (not wc.get("divergentes") and not rc.get("divergentes")
+        valid = (not wc.get("divergentes") and not wc.get("novos_conteudo_divergente") and not rc.get("divergentes")
                  and not any(v for d in differences.values() for v in d.values()))
         outcome = progress("conferido", wl+rl+1, wl+rl+1,
                            {"identicos":wc.get("identicos",0)+rc.get("identicos",0),
                             "divergentes":wc.get("divergentes",0)+rc.get("divergentes",0),
-                            "novos_pendentes":wc.get("novos_pendentes",0)},
+                            "novos_pendentes":wc.get("novos_pendentes",0),
+                            "novos_conteudo_identico":wc.get("novos_conteudo_identico",0),
+                            "novos_conteudo_divergente":wc.get("novos_conteudo_divergente",0)},
                            retomada=wr or rr, paridade=valid, etapa_pendente="weni")
         outcome.update(
             update_weni=wc, recompra=rc, analytics=financial, diferencas=differences,

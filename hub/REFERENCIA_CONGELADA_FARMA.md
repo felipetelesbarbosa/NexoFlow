@@ -47,8 +47,10 @@ PET. A perda do processo/lease também se recupera pelos checkpoints.
   anteriores para chegar ao cursor, sem recalcular as decisões confirmadas.
 - Descoberta de novos cadastros e deduplicação não devem ser declaradas
   equivalentes quando falta a base cadastral integral e seus insumos no
-  mesmo corte. Validar a integridade/auditoria da revisão original sem
-  usar o resultado esperado como insumo circular.
+  mesmo corte. Recalcular os campos da proposta de criação com o cadastro
+  selecionado e o pedido normalizado, mantendo a descoberta e a prova do
+  hash do snapshot bruto pendentes. Validar a revisão sem usar o resultado
+  esperado como insumo circular.
 - Analytics compara os totais da READY com o histórico vigente e o
   operacional, registra divergências dos pedidos/itens em centavos e
   distingue `BI_Vendas` armazenada da visão `farma.ds_bi_vendas`.

@@ -34,12 +34,12 @@ CREATE OR REPLACE VIEW hub.central_tarefas WITH (security_barrier=true) AS
                     'contagens', COALESCE((
                         SELECT jsonb_object_agg(k, (t.resultado->'replay'->'contagens'->>k)::bigint)
                         FROM unnest(ARRAY['contatos','planos','campos','grupos','identicos','divergentes',
-                            'inclusoes','remocoes','trocas','sem_acao','reservados','novos_pendentes']) AS keys(k)
+                            'inclusoes','remocoes','trocas','sem_acao','reservados','novos_pendentes','novos_conteudo_identico','novos_conteudo_divergente']) AS keys(k)
                         WHERE t.resultado->'replay'->'contagens'->>k ~ '^[0-9]{1,9}$'
                     ), '{}'::jsonb),
                     'weni_final', COALESCE((
                         SELECT jsonb_object_agg(k, (t.resultado->'update_weni'->>k)::bigint)
-                        FROM unnest(ARRAY['contatos','planos','campos','grupos','identicos','divergentes','reservados','novos_pendentes']) AS keys(k)
+                        FROM unnest(ARRAY['contatos','planos','campos','grupos','identicos','divergentes','reservados','novos_pendentes','novos_conteudo_identico','novos_conteudo_divergente']) AS keys(k)
                         WHERE t.resultado->'update_weni'->>k ~ '^[0-9]{1,9}$'
                     ), '{}'::jsonb),
                     'recompra_final', COALESCE((
