@@ -216,7 +216,7 @@ export function Metricas() {
         <div>
           <p className="metricas-kicker"><span className="metricas-print-name">NexoFlow Métricas</span><span>FARMA</span></p>
           <h1>Vendas</h1>
-          <p>Homologação · Dados reais do Data Studio</p>
+          <p>Homologação · Dados reais da VPS</p>
         </div>
         <div className="metricas-export">
           <button className="metricas-secondary" disabled={!vendas || busy} onClick={() => window.print()}>
@@ -320,7 +320,7 @@ export function Metricas() {
               </div>
             </section>
           )}
-          <p className="metricas-foot">Fonte PostgreSQL do Data Studio · FARMA · Revisão {vendas.revisao}</p>
+          <p className="metricas-foot">Fonte PostgreSQL da VPS · FARMA · Revisão {vendas.revisao}</p>
         </>
       )}
     </div>

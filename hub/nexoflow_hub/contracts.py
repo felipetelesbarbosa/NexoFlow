@@ -28,6 +28,8 @@ NoturnoScenario = Literal[
     "fonte_essencial_incompleta",
     "leitura_real_amostral",
     "planejamento_real",
+    "referencia_congelada",
+    "referencia_congelada_retomada",
     "meta_recuperacao",
     "meta_consulta_direta_falha",
     "reserva_isolada", "reserva_anuncios_incompletos", "recompra_resposta_perdida",
@@ -53,3 +55,7 @@ def noturno_stages(completed, task_state):
         }
         for number, name in enumerate(NOTURNO_STAGES, start=1)
     ]
+
+
+class LostLease(Exception):
+    """O proprietário da tarefa não pode mais confirmar progresso."""

@@ -14,15 +14,12 @@ from psycopg.types.json import Jsonb
 
 from .config import Settings
 from .contracts import NOTURNO_SCENARIOS, SCENARIOS
+from .contracts import LostLease as LostLease
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 
 class Conflict(Exception):
-    pass
-
-
-class LostLease(Exception):
     pass
 
 
@@ -246,7 +243,7 @@ class Store:
                 )
             }
 
-    def checkpoint(self, task, step, result):
+    def checkpoint(self, task, step, result, *, progress=None):
         with self.connect() as db:
             self.fenced(db, task)
             prior = db.execute(
@@ -261,6 +258,15 @@ class Store:
                     (task["segmento"], task["id"], step, Jsonb(result)),
                 )
                 self.audit(db, task, "ETAPA_CONFIRMADA")
+            if progress is not None:
+                # O agregado e seu checkpoint se tornam visíveis juntos.
+                # O fencing acima impede confirmação por proprietário antigo.
+                if task["cenario"] not in {"referencia_congelada", "referencia_congelada_retomada"}:
+                    raise ValueError("PROGRESSO_REPLAY_INCOMPATIVEL")
+                db.execute(
+                    "UPDATE hub.tarefas SET resultado=%s WHERE id=%s AND segmento=%s",
+                    (Jsonb(progress), task["id"], task["segmento"]),
+                )
             db.execute(
                 "UPDATE hub.tarefas SET lease_ate=clock_timestamp()+%s*interval '1 second',atualizada_em=clock_timestamp() WHERE id=%s",
                 (self.settings.lease_seconds, task["id"]),

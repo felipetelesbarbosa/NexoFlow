@@ -34,6 +34,10 @@ def publication(task_id, stage, *, response_uncertain=False):
 
 def run_noturno(store, task, *, interrupt_after=None):
     scenario = task["cenario"]
+    if scenario in {"referencia_congelada", "referencia_congelada_retomada"}:
+        from .frozen_replay import run_frozen
+
+        return run_frozen(store, task, interrupt_after=interrupt_after)
     if scenario in {"leitura_real_amostral", "planejamento_real"}:
         from .real_read_probe import run_noturno_probe
 

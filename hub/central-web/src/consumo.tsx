@@ -16,7 +16,7 @@ const awaiting = [
   { name: "FarmaLíder", description: "Consultas de clientes, pedidos, itens e histórico por segmento", origin: "Windows" },
   { name: "Weni Flows", description: "Consultas e atualizações de contatos, campos e grupos. Também fornece eventos e mensagens.", origin: "Windows" },
   { name: "PostgreSQL · Publicador", description: "Leitura de tabelas, envio de lotes e confirmação de revisões", origin: "Windows → VPS" },
-  { name: "PostgreSQL · Leitor", description: "Consultas do conector do Looker Studio à API da VPS", origin: "Looker Studio → VPS" },
+  { name: "PostgreSQL · Leitor", description: "Consultas de relatórios à API da VPS", origin: "Relatórios → VPS" },
   { name: "Meta Ads", description: "Anúncios, campanhas e Insights nos perfis com a integração habilitada", origin: "Windows · quando habilitada" },
   { name: "Weni Insights e Chats", description: "Totais de conversas no Insights e leitura de atendimentos no Chats quando essas rotinas estão configuradas", origin: "Windows · sob configuração" },
   { name: "Google Sheets e Drive", description: "Integrações legadas, exportações e rotinas de migração", origin: "Windows · quando selecionado" },

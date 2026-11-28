@@ -753,3 +753,21 @@ test("Central separa cobertura real, etapa bloqueada e ausência de aplicação"
   await page.setViewportSize({width: 390, height: 844});
   await expect(evidence).toBeVisible();
 });
+
+test("Central mostra checkpoint e falha da referência congelada sem expor dados individuais", async ({page})=>{
+  const fixture = {modo:"referencia_congelada",etapa:"weni",etapa_pendente:"recompra",
+    motivo:"REFERENCIA_DIVERGENTE",ultimo_lote:3,lotes_total:3,retomada:true,
+    paridade:false,revisao:"v15",contagens:{contatos:1234,identicos:1234}};
+  await page.route("**/api/central/v1/resumo",route=>route.fulfill({json:{
+    ...summary,tarefas:[{...summary.tarefas[0],tipo:"noturno",estado:"revisao_necessaria",evidencia:fixture}]
+  }}));
+  await page.goto("/");
+  await page.getByRole("button",{name:/Detalhes da execução/}).click();
+  const pane=page.getByRole("region",{name:"Cobertura das fontes"});
+  await expect(pane).toContainText("Referência congelada FARMA");
+  await expect(pane).toContainText("3 / 3");
+  await expect(pane).toContainText("Do checkpoint confirmado");
+  await expect(pane).toContainText("Recompra D+25");
+  await expect(pane).toContainText("Referência ou checkpoint divergente");
+  await expect(pane).toContainText("1.234");
+});

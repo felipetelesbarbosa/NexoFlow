@@ -722,3 +722,100 @@ def test_workflows_reais_manuais():
         assert len(http_nodes) == 2
         assert all(n["credentials"]["httpHeaderAuth"]["id"] == "CONFIGURAR_FARMA" for n in http_nodes)
         assert all(n["parameters"]["url"].startswith(("http://hub-api:8000/", "=http://hub-api:8000/")) for n in http_nodes)
+
+
+def test_frozen_replay_postgres_fencing_resume_central(store, settings, monkeypatch, tmp_path):
+    """A small synthetic source; real Store/worker, never contacts or API."""
+    from nexoflow_hub import frozen_replay as replay
+    from nexoflow_hub.central import read_summary
+
+    # Replay uses the real dispatch, transactions and progress projection, while
+    # the capture/rules below are minimal synthetic responses for the queue test.
+    for key, value in {
+        "HUB_AMBIENTE":"homologacao","HUB_ESCRITA_REAL":"false",
+        "NEXOFLOW_PERFIL":"FARMA","HUB_FROZEN_REPLAY_ENABLED":"true",
+        "HUB_FROZEN_REPLAY_INTERRUPT_TEST":"true",
+        "HUB_FROZEN_REPLAY_SHA256":"0"*64,
+        "HUB_FROZEN_REPLAY_REVISION":"11111111-1111-4111-8111-111111111111",
+        "HUB_FROZEN_REPLAY_ZIP_FILE":str(tmp_path/"reference.zip"),
+    }.items():
+        monkeypatch.setenv(key, value)
+    (tmp_path/"reference.zip").write_bytes(b"synthetic")
+    executed = []
+    records = {
+        "weni_insumos_privados.jsonl": [{"contato":{"uuid":f"w{i}"}} for i in range(3)],
+        "recompra_insumos_privados.jsonl": [{"contato":{"uuid":f"r{i}"}} for i in range(3)],
+    }
+
+    class Cap:
+        sha = "0"*64
+
+        def __init__(self, *_args):
+            pass
+
+        def rows(self, name):
+            return iter(records[name])
+
+        def close(self):
+            pass
+
+    class Rules:
+        weni = {f"w{i}":{} for i in range(3)}
+        recompra = {f"r{i}":{} for i in range(3)}
+        weni_review = {"captured_at_utc":"2026-11-27T23:19:22Z"}
+        recompra_review = {"created_at":"2026-11-27T20:45:52-03:00"}
+        reservas = type("R",(),{"contatos":set()})()
+        dedup = {"pairs":0,"pending":0,"renames":0}
+        expected = {"weni":{"contatos":3}, "recompra":{"planos":3}}
+
+        def __init__(self, _cap):
+            pass
+
+        def weni_row(self, row, counts):
+            executed.append(row["contato"]["uuid"])
+            counts["contatos"]+=1
+            counts["identicos"]+=1
+
+        def recompra_row(self, row, counts):
+            executed.append(row["contato"]["uuid"])
+            counts["planos"]+=1
+            counts["identicos"]+=1
+
+    monkeypatch.setattr(replay,"Capture",Cap)
+    monkeypatch.setattr(replay,"FrozenRules",Rules)
+    monkeypatch.setattr(replay,"BATCH_SIZE",2)
+    monkeypatch.setattr(replay,"finance",lambda _cap:{"periodos":[]})
+    monkeypatch.setattr(replay,"meta_summary",lambda _cap:{"atribuicao":"parcial"})
+
+    client = TestClient(create_app(settings))
+    farma={"Authorization":f"Bearer {settings.tokens['FARMA']}"}
+    pet={"Authorization":f"Bearer {settings.tokens['PET']}"}
+    payload={"segmento":"FARMA","origem":"n8n","chave":"replay-teste","cenario":"referencia_congelada_retomada"}
+    response=client.post("/tarefas/noturno",headers=farma,json=payload)
+    assert response.status_code==202
+    uid=response.json()["id"]
+    assert client.post("/tarefas/noturno",headers=pet,json=payload).status_code==403
+    run_once(store)
+    item=store.get("FARMA",uid)
+    assert item["estado"]=="aguardando"
+    checks=store.checkpoints(item)
+    assert list(checks)==[1001]
+    assert checks[1001]["linhas"]==2
+    assert executed==["w0","w1"]
+    with store.connect() as db:
+        db.execute("UPDATE hub.tarefas SET disponivel_em=clock_timestamp() WHERE id=%s",(uid,))
+    run_once(store)
+    item=store.get("FARMA",uid)
+    assert item["estado"]=="parcial"
+    assert item["resultado"]["replay"]["retomada"]
+    assert item["resultado"]["replay"]["paridade"]
+    assert item["resultado"]["externas_gravacoes"]==item["resultado"]["publicacoes"]==0
+    assert executed==["w0","w1","w2","r0","r1","r2"]
+    assert store.checkpoints(item)[1001]==checks[1001]
+    assert client.post("/tarefas/noturno",headers=farma,json=payload).json()["id"]==uid
+    assert client.get(f"/tarefas/{uid}/resultado",headers=pet).status_code==404
+    summary=read_summary(settings.dsn,"FARMA")
+    evidence=next(x["evidencia"] for x in summary["tarefas"] if str(x["id"])==uid)
+    assert evidence["modo"]=="referencia_congelada"
+    assert evidence["retomada"] and evidence["paridade"]
+    assert evidence["contagens"]["identicos"]==6
