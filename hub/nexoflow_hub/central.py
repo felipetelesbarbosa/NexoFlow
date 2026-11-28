@@ -383,7 +383,8 @@ def read_summary(dsn: str, segment: str):
             task.pop("motivos")
         if completed is not None:
             task["tipo"] = "noturno"
-            task["etapas"] = noturno_stages(completed, task["estado"])
+            if (task.get("evidencia") or {}).get("modo") != "referencia_congelada":
+                task["etapas"] = noturno_stages(completed, task["estado"])
     return {
         "segmento": segment,
         "ambiente": "homologacao",

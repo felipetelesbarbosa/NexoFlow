@@ -1,0 +1,15 @@
+# Complemento exclusivo do worker HML. ZIP provisionado fora de Git/n8n.
+services:
+  worker:
+    environment:
+      HUB_FROZEN_REPLAY_ENABLED: 'true'
+      HUB_FROZEN_REPLAY_INTERRUPT_TEST: 'true'
+      NEXOFLOW_PERFIL: FARMA
+      HUB_FROZEN_REPLAY_ZIP_FILE: /run/secrets/farma_referencia_zip
+      HUB_FROZEN_REPLAY_REVISION: '${HUB_FROZEN_REPLAY_REVISION:?UUID privado READY}'
+      HUB_FROZEN_REPLAY_SHA256: '${HUB_FROZEN_REPLAY_SHA256:?sha256 da captura privada}'
+    volumes:
+      - '${HUB_FROZEN_REPLAY_PRIVATE_FILE:?arquivo ZIP privado}:/run/secrets/farma_referencia_zip:ro'
+    # O limite de 256 MiB original não comporta o estado JSON de 94 MB.
+    # Orçamento do replay offline, sem alterar limites HTTP existentes.
+    mem_limit: 1536m

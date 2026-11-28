@@ -332,7 +332,10 @@ def create_app(settings: Settings | None = None):
             raise HTTPException(404, "TAREFA_NAO_ENCONTRADA")
         return {
             "estado": task["estado"],
-            "etapas": noturno_stages(store.checkpoints(task), task["estado"]),
+            # O replay não executa/publica etapas do Noturno comercial; o
+            # resultado expõe sua própria fase e lote.
+            "etapas": [] if task["cenario"] in {"referencia_congelada", "referencia_congelada_retomada"}
+            else noturno_stages(store.checkpoints(task), task["estado"]),
             "erro": task["erro"],
         }
 

@@ -120,3 +120,19 @@ test("diagnóstico real e cobertura por fonte têm contrato fechado", () => {
     evidencia.fontes[0], evidencia.fontes[1], {...evidencia.fontes[2], motivo: "texto arbitrário"},
   ]}}]}));
 });
+
+test("referência congelada expõe somente progresso agregado e aceita retomada", () => {
+  const tarefa = { id: "replay", estado: "aguardando",
+    criado_em: "2026-11-27T16:00:00Z", atualizado_em: "2026-11-27T16:00:00Z" };
+  const evidencia = {
+    modo: "referencia_congelada", etapa: "weni", etapa_pendente: null,
+    motivo: null, ultimo_lote: 1, lotes_total: 3, retomada: true,
+    paridade: false, revisao: "v15", contagens: {contatos: 120, identicos: 120}
+  };
+  const input = (e) => ({ ...sample,tarefas:[{...tarefa,evidencia:e}] });
+  assert.deepEqual(lerResumo(input(evidencia)).tarefas[0].evidencia,evidencia);
+  for (const patch of [
+    {ultimo_lote:4}, {etapa:"desconhecida"}, {contagens:{uuid:"privado"}},
+    {motivo:"desconhecido"}, {revisao:"v16"}, {contagens:{contatos:-1}}
+  ]) assert.throws(()=>lerResumo(input({...evidencia,...patch})));
+});

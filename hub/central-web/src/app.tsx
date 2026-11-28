@@ -45,6 +45,9 @@ import {
   atencao,
   estados,
   etapasNoturno,
+  etapasReplay,
+  motivosReplay,
+  contagensReplay,
   motivosNoturno,
   fontesNoturno,
   estadosFonte,
@@ -958,6 +961,34 @@ function TaskDetail({ value, close }: { value: Tarefa; close: () => void }) {
           <h3>Cobertura das fontes</h3>
           {value.evidencia.modo === "sintetico" ? (
             <p>Ensaio com dados sintéticos. Nenhuma leitura comercial.</p>
+          ) : value.evidencia.modo === "referencia_congelada" ? (
+            <>
+              <p>Referência congelada FARMA · READY {value.evidencia.revisao} · simulação offline</p>
+              <dl>
+                <dt>Etapa</dt><dd>{etapasReplay[value.evidencia.etapa]}</dd>
+                <dt>Último lote confirmado</dt><dd>{value.evidencia.ultimo_lote} / {value.evidencia.lotes_total}</dd>
+                <dt>Retomada</dt><dd>{value.evidencia.retomada ? "Do checkpoint confirmado" : "Não registrada nesta etapa"}</dd>
+                {value.evidencia.etapa_pendente && <><dt>Etapa pendente</dt><dd>{etapasReplay[value.evidencia.etapa_pendente]}</dd></>}
+                {value.evidencia.motivo && <><dt>Motivo</dt><dd>{motivosReplay[value.evidencia.motivo]}</dd></>}
+                {Object.entries(value.evidencia.contagens).map(([k,v]) => (
+                    <Fragment key={k}><dt>{contagensReplay[k as keyof typeof contagensReplay]}</dt><dd>{digits.format(v)}</dd></Fragment>
+                ))}
+                {value.evidencia.etapa === "conferido" && <><dt>Paridade dos planos recalculados</dt><dd>{value.evidencia.paridade ? "Confirmada" : "Revisão necessária"}</dd></>}
+              </dl>
+              {value.evidencia.etapa === "conferido" && (
+                <>
+                  <h4>Update Weni · resultado</h4>
+                  <dl>{Object.entries(value.evidencia.weni_final ?? {}).map(([k,v]) => (
+                    <Fragment key={k}><dt>{contagensReplay[k as keyof typeof contagensReplay]}</dt><dd>{digits.format(v)}</dd></Fragment>
+                  ))}</dl>
+                  <h4>Recompra D+25 · resultado</h4>
+                  <dl>{Object.entries(value.evidencia.recompra_final ?? {}).map(([k,v]) => (
+                    <Fragment key={k}><dt>{contagensReplay[k as keyof typeof contagensReplay]}</dt><dd>{digits.format(v)}</dd></Fragment>
+                  ))}</dl>
+                </>
+              )}
+              <p>Sem publicação e sem aplicação comercial. Atribuição de anúncios permanece parcial.</p>
+            </>
           ) : (
             <>
               <p>{value.evidencia.modo === "leitura_real_amostral"

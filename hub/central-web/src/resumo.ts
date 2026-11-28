@@ -45,7 +45,41 @@ export const motivosFonte = {
   ESTADO_PRIVADO_AUSENTE: "Estado privado não provisionado",
   RESERVAS_NAO_CONFIRMADAS: "Reservas não confirmadas",
 } as const;
-export type EvidenciaNoturno = { modo: "sintetico" } | {
+export const etapasReplay = {
+  validacao: "Validação da referência",
+  weni: "Update Weni",
+  recompra: "Recompra D+25",
+  analytics: "Analytics",
+  conferido: "Comparação encerrada",
+} as const;
+export const motivosReplay = {
+  ESTADO_PRIVADO_AUSENTE: "Referência privada não provisionada",
+  ESCOPO_FARMA_HML_OBRIGATORIO: "Escopo de homologação não confirmado",
+  REFERENCIA_DIVERGENTE: "Referência ou checkpoint divergente",
+  LIMITE_REFERENCIA_EXCEDIDO: "Limite de referência excedido",
+  ESCRITA_O_REDE_BLOQUEADA: "Operação externa bloqueada",
+} as const;
+export const contagensReplay = {
+  contatos: "Contatos existentes", planos: "Planos", campos: "Campos",
+  grupos: "Ações de grupo", identicos: "Decisões idênticas",
+  divergentes: "Divergências", inclusoes: "Inclusões", remocoes: "Remoções",
+  trocas: "Trocas", sem_acao: "Sem ação de grupo", reservados: "Reservados",
+  novos_pendentes: "Novos cadastros com descoberta pendente",
+  novos_conteudo_identico: "Conteúdo de novos cadastros idêntico",
+  novos_conteudo_divergente: "Conteúdo de novos cadastros divergente",
+} as const;
+export type EvidenciaReplay = {
+  modo: "referencia_congelada";
+  etapa: keyof typeof etapasReplay;
+  etapa_pendente: keyof typeof etapasReplay | null;
+  motivo: keyof typeof motivosReplay | null;
+  ultimo_lote: number; lotes_total: number;
+  retomada: boolean; paridade: boolean; revisao: "v15";
+  contagens: Partial<Record<keyof typeof contagensReplay,number>>;
+  weni_final?: Partial<Record<keyof typeof contagensReplay,number>>;
+  recompra_final?: Partial<Record<keyof typeof contagensReplay,number>>;
+};
+export type EvidenciaNoturno = { modo: "sintetico" } | EvidenciaReplay | {
   modo: "leitura_real_amostral" | "planejamento_real";
   primeira_etapa_pendente: keyof typeof etapasNoturno | null;
   planejamento_motivo?: keyof typeof motivosFonte | null;
@@ -165,6 +199,17 @@ function evidenciaValida(x: unknown): boolean {
   if (x === undefined) return true;
   if (!registro(x)) return false;
   if (x.modo === "sintetico") return true;
+  if (x.modo === "referencia_congelada") {
+    return typeof x.etapa === "string" && Object.hasOwn(etapasReplay,x.etapa) &&
+      (x.etapa_pendente === null || (typeof x.etapa_pendente === "string" && Object.hasOwn(etapasReplay,x.etapa_pendente))) &&
+      (x.motivo === null || (typeof x.motivo === "string" && Object.hasOwn(motivosReplay,x.motivo))) &&
+      contagem(x.ultimo_lote) && contagem(x.lotes_total) && x.ultimo_lote <= x.lotes_total &&
+      typeof x.retomada === "boolean" && typeof x.paridade === "boolean" &&
+      x.revisao === "v15" && registro(x.contagens) &&
+      Object.entries(x.contagens).every(([k,v]) => Object.hasOwn(contagensReplay,k) && contagem(v)) &&
+      [x.weni_final,x.recompra_final].every(r => r === undefined || (registro(r) &&
+        Object.entries(r).every(([k,v]) => Object.hasOwn(contagensReplay,k) && contagem(v))));
+  }
   return (x.modo === "leitura_real_amostral" || x.modo === "planejamento_real") &&
     (x.primeira_etapa_pendente === null || (
       typeof x.primeira_etapa_pendente === "string" &&
