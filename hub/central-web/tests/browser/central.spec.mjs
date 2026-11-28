@@ -615,7 +615,7 @@ test("Vendas FARMA abre em outra aba, mostra os indicadores e imprime no celular
   await expect(page).toHaveTitle("Vendas · NexoFlow Métricas");
   await expect(page.locator("html")).toHaveAttribute("data-tema", "grafite");
   await expect(page.getByRole("navigation", { name: "Navegação principal" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Vendas" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByLabel("Página", { exact: true })).toHaveValue("vendas");
   const back = page.getByRole("link", { name: "Voltar à Central" });
   await expect(back).toBeVisible();
   const kpis = page.getByRole("region", { name: "Indicadores de vendas" });
@@ -699,7 +699,7 @@ test("convidado exclusivo do Métricas entra direto em Vendas sem consultar nem 
   for (const path of ["usuarios", "infraestrutura", "documentacao", "execucoes", "conta"]) {
     await page.goto("/#" + path);
     await expect(page).toHaveURL(/#metricas$/);
-    await expect(page.getByRole("link", { name: "Vendas", exact: true })).toBeVisible();
+    await expect(page.getByLabel("Página", { exact: true })).toHaveValue("vendas");
     await expect(page.getByRole("link", { name: "Gerenciar Usuários" })).toHaveCount(0);
   }
   expect(hubCalls).toEqual([]);
@@ -770,4 +770,87 @@ test("Central mostra checkpoint e falha da referência congelada sem expor dados
   await expect(pane).toContainText("Recompra D+25");
   await expect(pane).toContainText("Referência ou checkpoint divergente");
   await expect(pane).toContainText("1.234");
+});
+
+test("Métricas navega nas nove abas e filtra pedidos de anúncios por identificação", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 780 });
+  await page.route("**/api/central/v1/sessao", (route) => route.fulfill({
+    json: { ambientes: ["homologacao"], papel: "convidado_metricas", hub_disponivel: false, metricas_farma: true },
+  }));
+  const valor = {
+    conta: "101", moeda: "BRL", fuso: "America/Belem", atribuicao: "7 dias",
+    investimento: "251.02", conversas: "70", pedidos: 3, receita_centavos: 46120,
+    primeiras_compras: 2, cpa_centavos: 8367, roas: "1.84", cac_centavos: 12551,
+    cobertura_parcial: true, conversas_parciais: false,
+  };
+  const buscas = [];
+  await page.route("**/api/central/v1/metricas/**", (route) => {
+    const { searchParams, pathname } = new URL(route.request().url());
+    const report = {
+      inicio: searchParams.get("inicio"), fim: searchParams.get("fim"),
+      segmento: "FARMA", fonte: "data_studio_producao",
+      revisao: "f3f4cbfd-eb3d-4c37-973c-b17190c3fe27", versao: 15,
+    };
+    if (pathname.endsWith("/pedidos-anuncios")) {
+      buscas.push([searchParams.get("tipo"), searchParams.get("identificador")]);
+      return route.fulfill({ json: { ...report, encontrado: true, cobertura: "parcial", limitado: false,
+        pedidos: [{ anuncio: "789", campanha: "Campanha de teste", conversa: report.inicio,
+          emissao: report.inicio, vinculo: "posterior", receita_centavos: 14900 }],
+      } });
+    }
+    if (pathname.endsWith("/anuncios")) return route.fulfill({ json: {
+      ...report, totais: [{ ...valor, anuncio: null, campanha: null }],
+      anuncios: [{ ...valor, anuncio: "789", campanha: "Campanha de teste" }], anuncios_limitados: false,
+    } });
+    if (pathname.endsWith("/produtos")) return route.fulfill({ json: {
+      ...report, produtos_com_codigo: 1, itens_sem_codigo: 0, itens_incompletos: 0,
+      unidades: "3", receita_centavos: 5000,
+      ranking: [{ codigo: "12", nome: "Produto de teste", unidades: "3", receita_centavos: 5000 }],
+    } });
+    return route.fulfill({ json: {
+      ...report, dias: [],
+      totais: { pedidos: 0, produtos_centavos: 0, frete_centavos: 0, faturamento_centavos: 0 },
+    } });
+  });
+
+  await page.goto("/#metricas/anuncios");
+  const menu = page.getByLabel("Página", { exact: true });
+  await expect(menu.locator("option")).toHaveCount(9);
+  const cards = page.getByRole("region", { name: "Indicadores de anúncios" });
+  for (const [label, amount] of [["Investimento", "251,02"], ["Receita atribuída", "461,20"],
+    ["Pedidos atribuídos", "3"], ["Conversas iniciadas", "70"], ["CPA", "83,67"], ["ROAS", "1,84×"], ["CAC", "125,51"]]) {
+    await expect(cards.locator("article").filter({ has: page.getByRole("heading", { name: label, exact: true }) })).toContainText(amount);
+  }
+  await expect(page.getByText(/Dados parciais/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "5 anúncios com maior investimento" })).toBeVisible();
+  await page.getByLabel("Início", { exact: true }).fill("2026-11-01");
+  await page.getByLabel("Fim", { exact: true }).fill("2026-11-24");
+  await page.getByRole("button", { name: "Aplicar período" }).click();
+  await expect(page.getByText("01/11/2026 a 24/11/2026 · Belém")).toBeVisible();
+
+  await menu.selectOption("pedidos-dos-anuncios");
+  await expect(page.getByRole("heading", { name: "Pedidos dos Anúncios" })).toBeVisible();
+  await expect(page.getByLabel("Início", { exact: true })).toHaveValue("2026-11-01");
+  for (const [tipo, id] of [["campanha", "123"], ["grupo", "456"], ["anuncio", "789"]]) {
+    await page.getByLabel("Buscar por").selectOption(tipo);
+    await page.getByLabel("ID na Meta").fill(id);
+    await page.getByRole("button", { name: "Buscar pedidos" }).click();
+    await expect(page.getByText("01/11/2026 a 24/11/2026 · ID " + id)).toBeVisible();
+    await expect(page.getByRole("cell", { name: /149,00/ })).toBeVisible();
+  }
+  expect(buscas).toEqual([["campanha", "123"], ["grupo", "456"], ["anuncio", "789"]]);
+
+  for (const [slug, titulo] of [["resumo", "Resumo"], ["vendas", "Vendas"], ["clientes", "Meus clientes"],
+    ["pedidos-por-cliente", "Pedidos por cliente"], ["produtos", "Produtos mais vendidos"], ["abc", "Curva ABC"], ["base", "Base de clientes"]]) {
+    await menu.selectOption(slug);
+    await expect(page.getByRole("heading", { level: 1, name: titulo })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
+  }
+  await expect(page.getByLabel("Início", { exact: true })).toHaveCount(0);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const navigation = page.getByRole("navigation", { name: "Páginas do NexoFlow Métricas" });
+  await expect(navigation.getByRole("link")).toHaveCount(9);
+  await navigation.getByRole("link", { name: "Produtos mais vendidos" }).click();
+  await expect(page.getByRole("progressbar", { name: "Produto de teste" })).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "Produtos mais vendidos" })).toHaveAttribute("aria-current", "page");
 });
