@@ -3,6 +3,9 @@
 }
 .metricas-page > .metricas-topbar {
   display: block;
+  position: sticky;
+  top: 0;
+  z-index: 3;
   height: auto;
   padding: 0;
   background: var(--panel);
@@ -42,8 +45,8 @@
 }
 .metricas-back:hover { background: var(--hover); }
 .metricas-pages {
-  gap: 12px;
-  overflow-x: auto;
+  flex-wrap: wrap;
+  gap: 0 6px;
 }
 .metricas-pages a {
   width: auto;
@@ -57,6 +60,18 @@
   border-color: var(--accent);
   color: var(--blue);
   font-weight: 650;
+}
+.metricas-page-picker { display: none; }
+@media (max-width: 850px) {
+  .metricas-pages > a { display: none; }
+  .metricas-page-picker {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 10px;
+    padding-bottom: 8px;
+  }
+  .metricas-page-picker select { flex: 1; min-width: 0; min-height: 38px; }
 }
 .metricas { display: grid; gap: 18px; }
 .metricas > .metricas-heading {
@@ -103,7 +118,8 @@
 }
 .metricas-filter > svg { align-self: center; margin: 6px; color: var(--muted); }
 .metricas-filter label { display: grid; gap: 3px; color: var(--soft); font-size: .82rem; }
-.metricas-filter input, .metricas-secondary {
+.metricas-filter :is(input, select), .metricas-secondary, .metricas-page-picker select,
+.metricas-search :is(input, select) {
   min-width: 0;
   padding: 8px 10px;
   border: 1px solid var(--control-line);
@@ -169,6 +185,16 @@
 .metricas-table td, .metricas-table th:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
 .metricas-foot { margin: 0; font-size: .78rem; overflow-wrap: anywhere; }
 .metricas-empty { margin: 0; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.metricas-search {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--soft);
+}
+.metricas-search :is(input, select) { max-width: 100%; }
+.metricas-table td.metricas-table-empty { text-align: left; color: var(--muted); white-space: normal; }
 
 @page { size: A4 portrait; margin: 12mm; }
 @page relatorio-vendas { size: A4 portrait; margin: 12mm; }
@@ -192,7 +218,7 @@
     background: #fff;
   }
   .metricas-page:has(.metricas) > :is(.metricas-topbar, .skip),
-  .metricas-export, .metricas-filter, .metricas-graph-controls { display: none; }
+  .metricas-export, .metricas-filter, .metricas-graph-controls, .metricas-search { display: none; }
   html:has(.metricas) body, html:has(.metricas) #root { background: #fff; margin: 0; padding: 0; }
   .metricas-page:has(.metricas) main { width: 100%; max-width: none; margin: 0; padding: 3mm 4mm; box-sizing: border-box; }
   .metricas-kicker .metricas-print-name { display: inline; padding: 0; font-size: inherit; background: none; }
@@ -209,6 +235,8 @@
   .metricas-table th:first-child { width: 18%; }
   .metricas-table th:nth-child(2) { width: 12%; }
   .metricas-table th:nth-child(n+3) { width: 23.333%; }
+  .metricas-report-table th:nth-child(n) { width: auto; }
+  .metricas-report-table th:first-child { width: 27%; }
   .metricas > * { margin-bottom: 12px; }
   .metricas-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .metricas-graphs { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }

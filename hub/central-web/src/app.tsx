@@ -63,6 +63,7 @@ import { ApiConsumption } from "./consumo";
 import { Infrastructure } from "./infraestrutura";
 import { AceitarConvite, GerenciarUsuarios } from "./usuarios";
 import { Metricas } from "./metricas";
+import { enderecoMetricas, paginaMetricasDoHash, paginasMetricas } from "./metricas-paginas";
 import { MinhaConta } from "./minha-conta";
 import { Documentation } from "./documentacao";
 import "./style.css";
@@ -85,6 +86,7 @@ const digits = new Intl.NumberFormat("pt-BR");
 function pageFromHash(): Page {
   const slug = window.location.hash.slice(1);
   if (slug.startsWith("convite/")) return "convite";
+  if (slug.startsWith("metricas/")) return "metricas";
   return Object.hasOwn(pages, slug) ? (slug as Page) : "geral";
 }
 
@@ -142,6 +144,7 @@ function App() {
     }
   }
   const [page, setPage] = useState(pageFromHash);
+  const [paginaMetricas, setPaginaMetricas] = useState(() => paginaMetricasDoHash(window.location.hash));
   const [compact, setCompact] = useState(false);
   const [menu, setMenu] = useState(false);
   const [metricsAccess, setMetricsAccess] = useState<boolean | null>(null);
@@ -197,6 +200,7 @@ function App() {
   useEffect(() => {
     const go = () => {
       setPage(pageFromHash());
+      setPaginaMetricas(paginaMetricasDoHash(window.location.hash));
       setMenu(false);
       main.current?.focus();
     };
@@ -237,14 +241,15 @@ function App() {
     if (metricsOnly && page !== "convite" && page !== "metricas") {
       window.history.replaceState(null, "", "/#metricas");
       setPage("metricas");
+      setPaginaMetricas("vendas");
     }
   }, [metricsOnly, page]);
   const needsSummary = sessionStatus === "ready" && hubAccess && page !== "documentacao" && page !== "conta" && page !== "usuarios" && page !== "convite" && page !== "metricas";
   useEffect(() => {
     document.title = page === "metricas" || (metricsOnly && page !== "convite")
-      ? "Vendas · NexoFlow Métricas"
+      ? paginasMetricas[paginaMetricas] + " · NexoFlow Métricas"
       : "Central de Operações · NexoFlow Hub";
-  }, [page, metricsOnly]);
+  }, [page, metricsOnly, paginaMetricas]);
   useEffect(() => {
     if (!needsSummary) return;
     const stop = new AbortController();
@@ -341,12 +346,26 @@ function App() {
           </div>
           {metricsAccess && (
             <nav className="metricas-pages" aria-label="Páginas do NexoFlow Métricas">
-              <a href="/#metricas" aria-current="page">Vendas</a>
+              <label className="metricas-page-picker">Página
+                <select aria-label="Página" value={paginaMetricas} onChange={(event) => {
+                  const pagina = event.target.value as keyof typeof paginasMetricas;
+                  window.location.hash = enderecoMetricas(pagina).slice(1);
+                }}>
+                  {(Object.keys(paginasMetricas) as (keyof typeof paginasMetricas)[]).map((pagina) => (
+                    <option key={pagina} value={pagina}>{paginasMetricas[pagina]}</option>
+                  ))}
+                </select>
+              </label>
+              {(Object.keys(paginasMetricas) as (keyof typeof paginasMetricas)[]).map((pagina) => (
+                <a key={pagina} href={enderecoMetricas(pagina)} aria-current={pagina === paginaMetricas ? "page" : undefined}>
+                  {paginasMetricas[pagina]}
+                </a>
+              ))}
             </nav>
           )}
         </header>
         <main id="conteudo" tabIndex={-1} ref={main}>
-          {metricsAccess ? <Metricas /> : <p role="status">{metricsAccess === null
+          {metricsAccess ? <Metricas pagina={paginaMetricas} /> : <p role="status">{metricsAccess === null
             ? "Consultando acesso ao Métricas…" : "NexoFlow Métricas indisponível para esta conta."}</p>}
         </main>
       </div>

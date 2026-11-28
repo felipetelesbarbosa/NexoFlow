@@ -140,3 +140,7 @@ Os ensaios verificam recuperação Meta, limites, regras compartilhadas de
 Update Weni e Recompra, normalização financeira, segregação FARMA/PET,
 idempotência, fencing/renovação e o contrato visual. A confirmação de
 acesso externo, credenciais e volumes privados só pode ocorrer na VPS.
+
+### Monitoramento horário das fontes
+
+`n8n/saude-fontes-farma-hml.json` é importável e vem desativado. Tem disparo manual e agendamento de uma hora. Usa a mesma credencial Hub HML FARMA e o cenário amostral de leitura; a chave é estável dentro da hora UTC. Confirme no modo manual que dois disparos na mesma hora retornam a mesma tarefa, com cobertura na Central e sem publicação. A escolha de ativar o timer de leitura em homologação é independente do agendamento comercial.

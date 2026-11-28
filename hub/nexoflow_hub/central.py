@@ -508,6 +508,52 @@ def create_app(settings: CentralSettings | None = None):
         finally:
             metrics_slot.release()
 
+    @app.get(
+        "/api/central/v1/metricas/produtos",
+        response_model=metricas.ProductsReport,
+        include_in_schema=False,
+    )
+    @app.get(
+        "/api/central/v1/metricas/anuncios",
+        response_model=metricas.AdsReport,
+        include_in_schema=False,
+    )
+    @app.get(
+        "/api/central/v1/metricas/pedidos-anuncios",
+        response_model=metricas.AdOrdersReport,
+        include_in_schema=False,
+    )
+    def advanced_metrics(
+        request: Request,
+        inicio: date,
+        fim: date,
+        revisao: UUID | None = None,
+        tipo: Literal["campanha", "grupo", "anuncio"] | None = None,
+        identificador: Annotated[str | None, Query(pattern=r"^[0-9]{1,25}$")] = None,
+        identity: Operator = operator,
+    ):
+        if config.metrics_dsn is None or not metrics_allowed(identity):
+            raise HTTPException(403, "METRICAS_INDISPONIVEL_PARA_ESTA_CONTA")
+        if not 0 <= (fim - inicio).days < metricas.MAX_PERIOD_DAYS:
+            raise HTTPException(422, "PERIODO_DE_METRICAS_INVALIDO")
+        report = request.url.path.rsplit("/", 1)[-1]
+        if report == "pedidos-anuncios" and (tipo is None or identificador is None):
+            raise HTTPException(422, "INFORME_IDENTIFICACAO_DO_ANUNCIO")
+        if not metrics_slot.acquire(blocking=False):
+            raise HTTPException(503, "METRICAS_OCUPADO")
+        try:
+            if report == "pedidos-anuncios" and tipo is not None and identificador is not None:
+                return metricas.read_ad_orders(config.metrics_dsn, inicio, fim, tipo, identificador, revisao)
+            if report == "anuncios":
+                return metricas.read_ads(config.metrics_dsn, inicio, fim, revisao)
+            return metricas.read_products(config.metrics_dsn, inicio, fim, revisao)
+        except metricas.RevisionChanged:
+            raise HTTPException(409, "REVISAO_DE_METRICAS_ALTERADA") from None
+        except (psycopg.Error, metricas.SourceUnavailable):
+            raise HTTPException(503, "FONTE_DE_METRICAS_INDISPONIVEL") from None
+        finally:
+            metrics_slot.release()
+
     @app.get("/api/central/v1/sessao", include_in_schema=False)
     def session(request: Request, identity: Operator = operator):
         environments = ["homologacao"]

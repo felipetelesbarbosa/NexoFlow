@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Banknote, CalendarDays, Package, Printer, ShoppingBag, Truck } from "lucide-react";
 import { dataLocal } from "./resumo";
+import { paginasMetricas, previas } from "./metricas-paginas";
+import type { PaginaMetricas } from "./metricas-paginas";
+import { Anuncios, PedidosAnuncios, PreviaMetricas, Produtos, conferirPublicacao, lerAnuncios, lerProdutos } from "./metricas-relatorios";
+import type { RelatorioAnuncios, RelatorioProdutos } from "./metricas-relatorios";
 import "./metricas.css";
 
 type Totais = {
@@ -163,35 +167,50 @@ function GraficoVendas({ report, indicador }: { report: Vendas; indicador: Indic
   );
 }
 
-export function Metricas() {
+export function Metricas({ pagina }: { pagina: PaginaMetricas }) {
   const [filtros, setFiltros] = useState<Periodo>(() => {
     const hoje = dataLocal(new Date());
     return { inicio: hoje.slice(0, 7) + "-01", fim: hoje };
   });
   const [consulta, setConsulta] = useState<Periodo>(filtros);
-  const [vendas, setVendas] = useState<Vendas>();
+  const [carregado, setCarregado] = useState<
+    { destino: "vendas"; dados: Vendas } |
+    { destino: "produtos"; dados: RelatorioProdutos } |
+    { destino: "anuncios"; dados: RelatorioAnuncios }
+  >();
+  const destino = pagina === "resumo" || pagina === "vendas" ? "vendas"
+    : pagina === "produtos" || pagina === "anuncios" ? pagina : null;
+  const atual = carregado?.destino === destino &&
+    carregado.dados.inicio === consulta.inicio && carregado.dados.fim === consulta.fim ? carregado : undefined;
+  const vendas = atual?.destino === "vendas" ? atual.dados : undefined;
   const [indicador, setIndicador] = useState<Indicador>("faturamento_centavos");
   const [busy, setBusy] = useState(true);
-  const [erro, setErro] = useState("");
+  const [falha, setFalha] = useState<{ destino: string; periodo: Periodo; texto: string }>();
   const [filtroErro, setFiltroErro] = useState("");
   useEffect(() => {
+    if (destino === null) return;
     const controller = new AbortController();
     let active = true;
     const timer = setTimeout(() => controller.abort(), 58000);
     setBusy(true);
-    setErro("");
-    setVendas(undefined);
-    fetch("/api/central/v1/metricas/vendas?" + new URLSearchParams(consulta), {
+    setFalha(undefined);
+    setCarregado(undefined);
+    fetch("/api/central/v1/metricas/" + destino + "?" + new URLSearchParams(consulta), {
       credentials: "same-origin", cache: "no-store", redirect: "error", signal: controller.signal,
     }).then(async (response) => {
-      if (response.status === 403) throw new Error("Sua conta ainda não tem acesso a Vendas FARMA.");
-      if (!response.ok) throw new Error("Não foi possível consultar a fonte de vendas. Tente novamente.");
-      const report = lerVendas(await response.json(), consulta);
-      if (active) setVendas(report);
+      if (response.status === 403) throw new Error("Sua conta não tem acesso a este relatório FARMA.");
+      if (!response.ok) throw new Error("Não foi possível consultar a fonte na VPS. Tente novamente.");
+      const report = await response.json();
+      conferirPublicacao(report, consulta);
+      if (!active) return;
+      if (destino === "produtos") setCarregado({ destino, dados: lerProdutos(report) });
+      else if (destino === "anuncios") setCarregado({ destino, dados: lerAnuncios(report) });
+      else setCarregado({ destino, dados: lerVendas(report, consulta) });
     }).catch((reason) => {
-      if (active) setErro(controller.signal.aborted ? "A fonte de vendas excedeu o prazo." :
-        reason instanceof Error && !(reason instanceof TypeError)
-          ? reason.message : "Não foi possível acessar a fonte de vendas.");
+      if (active) setFalha({ destino, periodo: consulta,
+        texto: controller.signal.aborted ? "A consulta à VPS excedeu o prazo." :
+          reason instanceof Error && !(reason instanceof TypeError) ? reason.message : "Não foi possível consultar a VPS.",
+      });
     }).finally(() => {
       clearTimeout(timer);
       if (active) setBusy(false);
@@ -201,34 +220,39 @@ export function Metricas() {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [consulta]);
+  }, [consulta, destino]);
+  const erro = falha?.destino === destino && falha.periodo === consulta ? falha.texto : "";
+  const previa = Object.hasOwn(previas, pagina) ? pagina as keyof typeof previas : null;
+  const carregando = destino !== null && (busy || (!atual && !erro));
 
   const totals = vendas?.totais;
   const kpis = totals && [
     { title: "Faturamento", value: dinheiro(totals.faturamento_centavos), icon: Banknote, primary: true },
     { title: "Pedidos válidos", value: numeros.format(totals.pedidos), icon: ShoppingBag },
     { title: "Receita de produtos", value: dinheiro(totals.produtos_centavos), icon: Package },
-    { title: "Frete", value: dinheiro(totals.frete_centavos), icon: Truck },
+    ...(pagina === "resumo" ? [
+      { title: "Ticket médio", value: totals.pedidos ? dinheiro(Math.round(totals.faturamento_centavos / totals.pedidos)) : "Sem pedidos", icon: Truck },
+    ] : [{ title: "Frete", value: dinheiro(totals.frete_centavos), icon: Truck }]),
   ];
   return (
     <div className="metricas">
       <header className="metricas-heading">
         <div>
           <p className="metricas-kicker"><span className="metricas-print-name">NexoFlow Métricas</span><span>FARMA</span></p>
-          <h1>Vendas</h1>
-          <p>Homologação · Dados reais da VPS</p>
+          <h1>{paginasMetricas[pagina]}</h1>
+          <p>{previa ? previas[previa].escopo : "Homologação · Dados reais da VPS"}</p>
         </div>
-        <div className="metricas-export">
-          <button className="metricas-secondary" disabled={!vendas || busy} onClick={() => window.print()}>
+        {destino && <div className="metricas-export">
+          <button className="metricas-secondary" disabled={!atual || carregando} onClick={() => window.print()}>
             <Printer size={16} aria-hidden="true" /> Imprimir
           </button>
-          <button className="refresh" title="Abra a impressão e selecione Salvar como PDF" disabled={!vendas || busy}
+          <button className="refresh" title="Abra a impressão e selecione Salvar como PDF" disabled={!atual || carregando}
             onClick={() => window.print()}>
             Exportar PDF <ArrowUpRight size={16} aria-hidden="true" />
           </button>
-        </div>
+        </div>}
       </header>
-      <form className="metricas-filter" onSubmit={(event) => {
+      {pagina !== "base" && <form className="metricas-filter" onSubmit={(event) => {
         event.preventDefault();
         const intervalo = Date.parse(filtros.fim) - Date.parse(filtros.inicio);
         if (!Number.isFinite(intervalo) || intervalo < 0 || intervalo >= 366 * umDia) {
@@ -243,17 +267,22 @@ export function Metricas() {
           onChange={(event) => setFiltros({ ...filtros, inicio: event.target.value })} /></label>
         <label>Fim<input type="date" value={filtros.fim} required
           onChange={(event) => setFiltros({ ...filtros, fim: event.target.value })} /></label>
-        <button className="refresh" disabled={busy}>Aplicar período</button>
-      </form>
+        <button className="refresh" disabled={carregando}>Aplicar período</button>
+      </form>}
       {filtroErro && <p role="alert">{filtroErro}</p>}
-      {busy && <p className="waiting" role="status">Consultando a publicação de vendas…</p>}
-      {erro && <div className="error-panel" role="alert"><div><h2>Vendas indisponíveis</h2><p>{erro}</p></div></div>}
+      {carregando && <p className="waiting" role="status">Consultando a publicação na VPS…</p>}
+      {erro && <div className="error-panel" role="alert"><div><h2>Falha ao carregar o relatório</h2><p>{erro}</p></div></div>}
+      {atual && <div className="metricas-source">
+        <span>{dataBr(atual.dados.inicio)} a {dataBr(atual.dados.fim)} · Belém</span>
+        <span title={atual.dados.revisao}>Revisão publicada v{atual.dados.versao}</span>
+      </div>}
+      {previa && <PreviaMetricas key={previa} pagina={previa} periodo={pagina === "base" ? undefined :
+        dataBr(consulta.inicio) + " a " + dataBr(consulta.fim)} />}
+      {pagina === "pedidos-dos-anuncios" && <PedidosAnuncios periodo={consulta} />}
+      {atual?.destino === "produtos" && <Produtos relatorio={atual.dados} />}
+      {atual?.destino === "anuncios" && <Anuncios relatorio={atual.dados} />}
       {vendas && totals && kpis && (
         <>
-          <div className="metricas-source">
-            <span>{dataBr(vendas.inicio)} a {dataBr(vendas.fim)} · Belém</span>
-            <span title={vendas.revisao}>Revisão publicada v{vendas.versao}</span>
-          </div>
           <section className="metricas-kpis" aria-label="Indicadores de vendas">
             {kpis.map(({ title, value, icon: Icon, primary }) => (
               <article key={title} className={primary ? "metrica-card metrica-primary" : "metrica-card"}>
@@ -304,7 +333,7 @@ export function Metricas() {
               </section>
             </div>
           )}
-          {vendas.dias.length > 0 && (
+          {pagina === "vendas" && vendas.dias.length > 0 && (
             <section className="panel metricas-section metricas-detail" aria-labelledby="metricas-dias">
               <h2 id="metricas-dias">Vendas por dia</h2>
               <div className="metricas-table-wrap" tabIndex={0} role="region" aria-labelledby="metricas-dias">
@@ -320,9 +349,10 @@ export function Metricas() {
               </div>
             </section>
           )}
-          <p className="metricas-foot">Fonte PostgreSQL da VPS · FARMA · Revisão {vendas.revisao}</p>
+
         </>
       )}
+      {atual && <p className="metricas-foot">Fonte PostgreSQL da VPS · FARMA · Revisão {atual.dados.revisao}</p>}
     </div>
   );
 }
